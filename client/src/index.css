@@ -4,46 +4,60 @@
 @tailwind utilities;
 
 :root {
-  /* São Judas Purple Theme - Light Mode */
-  --background: hsl(0, 0%, 100%);
-  --foreground: hsl(222.2, 84%, 4.9%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(222.2, 84%, 4.9%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(222.2, 84%, 4.9%);
+  /* CORES BASE - Tons Pérola e Marfim (Paleta Litúrgica MESC) */
+  --color-pearl: 253, 252, 248;        /* #FDFCF8 - Fundo principal */
+  --color-ivory: 250, 248, 243;        /* #FAF8F3 - Cards e seções */
+  --color-cream: 247, 244, 237;        /* #F7F4ED - Elementos secundários */
+  --color-beige: 245, 241, 232;        /* #F5F1E8 - Bordas suaves */
   
-  /* Primary - São Judas Purple */
-  --primary: hsl(262, 83%, 58%);
-  --primary-foreground: hsl(210, 40%, 98%);
+  /* CORES DE TEXTO - Bronze e Mogno */
+  --color-bronze-900: 61, 47, 31;      /* #3D2F1F - Texto principal */
+  --color-bronze-800: 74, 58, 40;      /* #4A3A28 - Títulos */
+  --color-bronze-700: 92, 72, 55;      /* #5C4837 - Subtítulos */
+  --color-bronze-600: 115, 96, 79;     /* #73604F - Texto secundário */
   
-  --secondary: hsl(210, 40%, 96%);
-  --secondary-foreground: hsl(222.2, 84%, 4.9%);
-  --muted: hsl(210, 40%, 96%);
-  --muted-foreground: hsl(215.4, 16.3%, 46.9%);
-  --accent: hsl(210, 40%, 96%);
-  --accent-foreground: hsl(222.2, 84%, 4.9%);
-  --destructive: hsl(0, 84.2%, 60.2%);
-  --destructive-foreground: hsl(210, 40%, 98%);
-  --border: hsl(214.3, 31.8%, 91.4%);
-  --input: hsl(214.3, 31.8%, 91.4%);
-  --ring: hsl(262, 83%, 58%);
+  /* CORES PRIMÁRIAS - Cobre Acetinado */
+  --color-copper-800: 160, 82, 45;     /* #A0522D - Botão padrão */
+  --color-copper-700: 184, 115, 51;    /* #B87333 - Destaque */
   
-  /* Chart colors for statistics */
-  --chart-1: hsl(12, 76%, 61%);
-  --chart-2: hsl(173, 58%, 39%);
-  --chart-3: hsl(197, 37%, 24%);
-  --chart-4: hsl(43, 74%, 66%);
-  --chart-5: hsl(27, 87%, 67%);
+  /* CORES SECUNDÁRIAS - Dourado Litúrgico */
+  --color-gold-900: 184, 150, 63;      /* #B8963F - Ícones premium */
+  --color-gold-800: 201, 169, 97;      /* #C9A961 - Elementos especiais */
   
-  /* Sidebar specific colors */
-  --sidebar: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(222.2, 84%, 4.9%);
-  --sidebar-primary: hsl(262, 83%, 58%);
-  --sidebar-primary-foreground: hsl(210, 40%, 98%);
-  --sidebar-accent: hsl(210, 40%, 96%);
-  --sidebar-accent-foreground: hsl(222.2, 84%, 4.9%);
-  --sidebar-border: hsl(214.3, 31.8%, 91.4%);
-  --sidebar-ring: hsl(262, 83%, 58%);
+  /* Light Mode - Sistema de cores usando paleta litúrgica */
+  --radius: 0.625rem;
+  --background: rgb(var(--color-pearl));
+  --foreground: rgb(var(--color-bronze-900));
+  --card: rgb(var(--color-ivory));
+  --card-foreground: rgb(var(--color-bronze-800));
+  --popover: rgb(var(--color-ivory));
+  --popover-foreground: rgb(var(--color-bronze-900));
+  --primary: rgb(var(--color-copper-800));
+  --primary-foreground: rgb(var(--color-pearl));
+  --secondary: rgb(var(--color-cream));
+  --secondary-foreground: rgb(var(--color-bronze-700));
+  --muted: rgb(var(--color-beige));
+  --muted-foreground: rgb(var(--color-bronze-600));
+  --accent: rgb(var(--color-gold-900));
+  --accent-foreground: rgb(var(--color-pearl));
+  --destructive: rgb(220, 53, 69);
+  --destructive-foreground: rgb(var(--color-pearl));
+  --border: rgb(var(--color-beige));
+  --input: rgb(var(--color-cream));
+  --ring: rgb(var(--color-copper-700));
+  --chart-1: rgb(var(--color-copper-800));
+  --chart-2: rgb(var(--color-gold-900));
+  --chart-3: rgb(var(--color-bronze-700));
+  --chart-4: rgb(var(--color-copper-700));
+  --chart-5: rgb(var(--color-gold-800));
+  --sidebar: rgb(var(--color-ivory));
+  --sidebar-foreground: rgb(var(--color-bronze-800));
+  --sidebar-primary: rgb(var(--color-copper-800));
+  --sidebar-primary-foreground: rgb(var(--color-pearl));
+  --sidebar-accent: rgb(var(--color-cream));
+  --sidebar-accent-foreground: rgb(var(--color-bronze-700));
+  --sidebar-border: rgb(var(--color-beige));
+  --sidebar-ring: rgb(var(--color-copper-700));
   
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -51,56 +65,70 @@
   --font-serif: Georgia, serif;
   --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
   
-  --radius: 0.75rem;
+  --radius: 0.75rem; /* 12px conforme DSD */
   
   /* Shadows for depth */
-  --shadow-2xs: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00), 0px 1px 2px -1px hsl(262, 83%, 58%, 0.00);
-  --shadow: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00), 0px 1px 2px -1px hsl(262, 83%, 58%, 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00), 0px 2px 4px -1px hsl(262, 83%, 58%, 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00), 0px 4px 6px -1px hsl(262, 83%, 58%, 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00), 0px 8px 10px -1px hsl(262, 83%, 58%, 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(262, 83%, 58%, 0.00);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
 .dark {
-  /* São Judas Purple Theme - Dark Mode */
-  --background: hsl(222.2, 84%, 4.9%);
-  --foreground: hsl(210, 40%, 98%);
-  --card: hsl(222.2, 84%, 4.9%);
-  --card-foreground: hsl(210, 40%, 98%);
-  --popover: hsl(222.2, 84%, 4.9%);
-  --popover-foreground: hsl(210, 40%, 98%);
+  /* Dark Mode - Tons mais profundos mantendo harmonia litúrgica */
+  --color-pearl: 25, 24, 22;
+  --color-ivory: 35, 32, 28;
+  --color-cream: 45, 40, 34;
+  --color-beige: 55, 48, 40;
   
-  /* Primary - Lighter purple for dark mode */
-  --primary: hsl(262, 83%, 70%);
-  --primary-foreground: hsl(222.2, 84%, 4.9%);
+  --color-bronze-900: 247, 244, 237;
+  --color-bronze-800: 235, 230, 220;
+  --color-bronze-700: 210, 200, 185;
+  --color-bronze-600: 180, 170, 155;
   
-  --secondary: hsl(217.2, 32.6%, 17.5%);
-  --secondary-foreground: hsl(210, 40%, 98%);
-  --muted: hsl(217.2, 32.6%, 17.5%);
-  --muted-foreground: hsl(215, 20.2%, 65.1%);
-  --accent: hsl(217.2, 32.6%, 17.5%);
-  --accent-foreground: hsl(210, 40%, 98%);
-  --destructive: hsl(0, 62.8%, 30.6%);
-  --destructive-foreground: hsl(210, 40%, 98%);
-  --border: hsl(217.2, 32.6%, 17.5%);
-  --input: hsl(217.2, 32.6%, 17.5%);
-  --ring: hsl(262, 83%, 70%);
+  --color-copper-800: 205, 133, 63;
+  --color-copper-700: 218, 165, 32;
   
-  /* Sidebar dark mode */
-  --sidebar: hsl(222.2, 84%, 4.9%);
-  --sidebar-foreground: hsl(210, 40%, 98%);
-  --sidebar-primary: hsl(262, 83%, 70%);
-  --sidebar-primary-foreground: hsl(222.2, 84%, 4.9%);
-  --sidebar-accent: hsl(217.2, 32.6%, 17.5%);
-  --sidebar-accent-foreground: hsl(210, 40%, 98%);
-  --sidebar-border: hsl(217.2, 32.6%, 17.5%);
-  --sidebar-ring: hsl(262, 83%, 70%);
+  --color-gold-900: 218, 180, 90;
+  --color-gold-800: 230, 200, 120;
+  
+  --background: rgb(var(--color-pearl));
+  --foreground: rgb(var(--color-bronze-900));
+  --card: rgb(var(--color-ivory));
+  --card-foreground: rgb(var(--color-bronze-800));
+  --popover: rgb(var(--color-ivory));
+  --popover-foreground: rgb(var(--color-bronze-900));
+  --primary: rgb(var(--color-copper-800));
+  --primary-foreground: rgb(var(--color-pearl));
+  --secondary: rgb(var(--color-cream));
+  --secondary-foreground: rgb(var(--color-bronze-700));
+  --muted: rgb(var(--color-beige));
+  --muted-foreground: rgb(var(--color-bronze-600));
+  --accent: rgb(var(--color-gold-900));
+  --accent-foreground: rgb(var(--color-pearl));
+  --destructive: rgb(239, 68, 68);
+  --destructive-foreground: rgb(var(--color-bronze-900));
+  --border: rgb(var(--color-beige));
+  --input: rgb(var(--color-cream));
+  --ring: rgb(var(--color-copper-700));
+  --chart-1: rgb(var(--color-copper-800));
+  --chart-2: rgb(var(--color-gold-900));
+  --chart-3: rgb(var(--color-bronze-700));
+  --chart-4: rgb(var(--color-copper-700));
+  --chart-5: rgb(var(--color-gold-800));
+  --sidebar: rgb(var(--color-ivory));
+  --sidebar-foreground: rgb(var(--color-bronze-800));
+  --sidebar-primary: rgb(var(--color-copper-800));
+  --sidebar-primary-foreground: rgb(var(--color-pearl));
+  --sidebar-accent: rgb(var(--color-cream));
+  --sidebar-accent-foreground: rgb(var(--color-bronze-700));
+  --sidebar-border: rgb(var(--color-beige));
+  --sidebar-ring: rgb(var(--color-copper-700));
 }
 
 @layer base {
@@ -237,18 +265,30 @@
   }
 }
 
-/* Utility classes for sacred/liturgical aesthetic */
+/* Utility classes MESC Design System */
 @layer utilities {
-  .sacred-gradient {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.8) 100%);
+  /* Gradiente de fundo litúrgico */
+  .gradient-bg {
+    background: linear-gradient(135deg, rgb(var(--color-pearl)) 0%, rgb(var(--color-ivory)) 100%);
   }
 
-  .liturgical-shadow {
-    box-shadow: 0 10px 25px -5px hsl(var(--primary) / 0.1), 0 4px 6px -2px hsl(var(--primary) / 0.05);
+  /* Sombra litúrgica */
+  .shadow-liturgical {
+    box-shadow: 0 4px 20px rgba(var(--color-bronze-700), 0.1);
+  }
+
+  /* Padrão de fundo sacro */
+  .pattern-bg {
+    background-image: radial-gradient(circle at 1px 1px, rgba(var(--color-gold-900), 0.1) 1px, transparent 0);
+    background-size: 20px 20px;
+  }
+
+  .sacred-gradient {
+    background: linear-gradient(135deg, rgb(var(--color-copper-800)) 0%, rgb(var(--color-copper-700)) 100%);
   }
 
   .sacred-border {
-    border: 1px solid hsl(var(--primary) / 0.2);
+    border: 1px solid rgb(var(--color-beige));
     border-radius: var(--radius);
   }
 
@@ -258,6 +298,32 @@
 
   .card-hover-sacred:hover {
     transform: translateY(-2px);
-    box-shadow: 0 20px 40px -5px hsl(var(--primary) / 0.15);
+    box-shadow: 0 4px 20px rgba(var(--color-bronze-700), 0.15);
+  }
+
+  /* Classes adicionais para elementos do MESC */
+  .text-liturgical-primary {
+    color: rgb(var(--color-copper-800));
+  }
+
+  .text-liturgical-accent {
+    color: rgb(var(--color-gold-900));
+  }
+
+  .bg-liturgical-light {
+    background-color: rgb(var(--color-pearl));
+  }
+
+  .bg-liturgical-card {
+    background-color: rgb(var(--color-ivory));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

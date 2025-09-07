@@ -28,25 +28,35 @@ export const sessions = pgTable(
 );
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['reitor', 'coordenador', 'ministro']);
+export const userRoleEnum = pgEnum('user_role', ['gestor', 'coordenador', 'ministro']);
 export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
-export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'substitution', 'announcement', 'reminder']);
+export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
+export const substitutionStatusEnum = pgEnum('substitution_status', ['pending', 'approved', 'rejected', 'cancelled']);
+export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'substitution', 'formation', 'announcement', 'reminder']);
+export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
+export const formationStatusEnum = pgEnum('formation_status', ['not_started', 'in_progress', 'completed']);
 
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email", { length: 255 }).unique().notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   
   // MESC specific fields
-  name: varchar('name', { length: 255 }).notNull().default(''),
+  name: varchar('name', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 20 }),
+  whatsapp: varchar('whatsapp', { length: 20 }),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   role: userRoleEnum('role').notNull().default('ministro'),
   status: userStatusEnum('status').notNull().default('pending'),
   requiresPasswordChange: boolean('requires_password_change').default(true),
+  lastLogin: timestamp('last_login'),
+  joinDate: date('join_date'),
+  photoUrl: text('photo_url'),
+  familyId: uuid('family_id').references(() => families.id),
   
   // Personal information
   birthDate: date('birth_date'),
@@ -84,8 +94,21 @@ export const users = pgTable("users", {
   // Observations
   observations: text('observations'),
   
+  // Registration fields
+  ministerType: varchar('minister_type', { length: 50 }),
+  approvedAt: timestamp('approved_at'),
+  approvedById: varchar('approved_by_id'),
+  rejectionReason: text('rejection_reason'),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Families table
+export const families = pgTable('families', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Questionnaires table
@@ -127,42 +150,28 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
 // Schedules
 export const schedules = pgTable('schedules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 255 }).notNull(),
-  month: integer('month').notNull(),
-  year: integer('year').notNull(),
-  status: scheduleStatusEnum('status').notNull().default('draft'),
-  version: integer('version').default(1),
-  
-  totalAssignments: integer('total_assignments').default(0),
-  totalMinisters: integer('total_ministers').default(0),
-  
-  createdById: varchar('created_by_id').references(() => users.id),
-  publishedAt: timestamp('published_at'),
-  completedAt: timestamp('completed_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
+  date: date('date').notNull(),
+  time: time('time').notNull(),
+  type: scheduleTypeEnum('type').notNull().default('missa'),
+  location: varchar('location', { length: 255 }),
+  ministerId: varchar('minister_id').references(() => users.id),
+  status: varchar('status', { length: 20 }).notNull().default('scheduled'),
+  substituteId: varchar('substitute_id').references(() => users.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-// Schedule assignments
-export const scheduleAssignments = pgTable('schedule_assignments', {
+// Substitution requests
+export const substitutionRequests = pgTable('substitution_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id),
-  userId: varchar('user_id').notNull().references(() => users.id),
-  
-  date: date('date').notNull(),
-  massTime: time('mass_time').notNull(),
-  position: integer('position').notNull(),
-  
-  confirmed: boolean('confirmed').default(false),
-  confirmedAt: timestamp('confirmed_at'),
-  present: boolean('present'),
-  
-  isSubstitution: boolean('is_substitution').default(false),
-  originalUserId: varchar('original_user_id').references(() => users.id),
-  substitutionReason: text('substitution_reason'),
-  
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
+  requesterId: varchar('requester_id').notNull().references(() => users.id),
+  substituteId: varchar('substitute_id').references(() => users.id),
+  reason: text('reason'),
+  status: substitutionStatusEnum('status').notNull().default('pending'),
+  approvedBy: varchar('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Notifications
@@ -175,9 +184,33 @@ export const notifications = pgTable('notifications', {
   data: jsonb('data'),
   read: boolean('read').default(false),
   readAt: timestamp('read_at'),
-  actionUrl: text('action_url'),
+  actionUrl: varchar('action_url', { length: 255 }),
   priority: varchar('priority', { length: 10 }).default('normal'),
   expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Formation modules
+export const formationModules = pgTable('formation_modules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  category: formationCategoryEnum('category').notNull(),
+  content: text('content'),
+  videoUrl: varchar('video_url', { length: 255 }),
+  durationMinutes: integer('duration_minutes'),
+  orderIndex: integer('order_index'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Formation progress
+export const formationProgress = pgTable('formation_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
+  status: formationStatusEnum('status').notNull().default('not_started'),
+  progressPercentage: integer('progress_percentage').default(0),
+  completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -196,11 +229,21 @@ export const massTimesConfig = pgTable('mass_times_config', {
 });
 
 // Relations
+export const familiesRelations = relations(families, ({ many }) => ({
+  members: many(users)
+}));
+
 export const usersRelations = relations(users, ({ many, one }) => ({
+  family: one(families, {
+    fields: [users.familyId],
+    references: [families.id]
+  }),
   questionnaires: many(questionnaires),
   questionnaireResponses: many(questionnaireResponses),
-  scheduleAssignments: many(scheduleAssignments),
+  schedules: many(schedules),
+  substitutionRequests: many(substitutionRequests),
   notifications: many(notifications),
+  formationProgress: many(formationProgress),
   spouse: one(users, {
     fields: [users.spouseMinisterId],
     references: [users.id]
@@ -227,25 +270,48 @@ export const questionnaireResponsesRelations = relations(questionnaireResponses,
 }));
 
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
-  createdBy: one(users, {
-    fields: [schedules.createdById],
+  minister: one(users, {
+    fields: [schedules.ministerId],
     references: [users.id]
   }),
-  assignments: many(scheduleAssignments)
+  substitute: one(users, {
+    fields: [schedules.substituteId],
+    references: [users.id]
+  }),
+  substitutionRequests: many(substitutionRequests)
 }));
 
-export const scheduleAssignmentsRelations = relations(scheduleAssignments, ({ one }) => ({
+export const substitutionRequestsRelations = relations(substitutionRequests, ({ one }) => ({
   schedule: one(schedules, {
-    fields: [scheduleAssignments.scheduleId],
+    fields: [substitutionRequests.scheduleId],
     references: [schedules.id]
   }),
-  user: one(users, {
-    fields: [scheduleAssignments.userId],
+  requester: one(users, {
+    fields: [substitutionRequests.requesterId],
     references: [users.id]
   }),
-  originalUser: one(users, {
-    fields: [scheduleAssignments.originalUserId],
+  substitute: one(users, {
+    fields: [substitutionRequests.substituteId],
     references: [users.id]
+  }),
+  approvedByUser: one(users, {
+    fields: [substitutionRequests.approvedBy],
+    references: [users.id]
+  })
+}));
+
+export const formationModulesRelations = relations(formationModules, ({ many }) => ({
+  progress: many(formationProgress)
+}));
+
+export const formationProgressRelations = relations(formationProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [formationProgress.userId],
+    references: [users.id]
+  }),
+  module: one(formationModules, {
+    fields: [formationProgress.moduleId],
+    references: [formationModules.id]
   })
 }));
 
@@ -301,11 +367,14 @@ export const insertMassTimeSchema = createInsertSchema(massTimesConfig).pick({
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Family = typeof families.$inferSelect;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type InsertQuestionnaire = z.infer<typeof insertQuestionnaireSchema>;
 export type QuestionnaireResponse = typeof questionnaireResponses.$inferSelect;
 export type Schedule = typeof schedules.$inferSelect;
-export type ScheduleAssignment = typeof scheduleAssignments.$inferSelect;
+export type SubstitutionRequest = typeof substitutionRequests.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type FormationModule = typeof formationModules.$inferSelect;
+export type FormationProgress = typeof formationProgress.$inferSelect;
 export type MassTimeConfig = typeof massTimesConfig.$inferSelect;
 export type InsertMassTime = z.infer<typeof insertMassTimeSchema>;

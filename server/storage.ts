@@ -3,7 +3,7 @@ import {
   questionnaires,
   questionnaireResponses,
   schedules,
-  scheduleAssignments,
+  substitutionRequests,
   notifications,
   massTimesConfig,
   type User,
@@ -13,7 +13,7 @@ import {
   type InsertQuestionnaire,
   type QuestionnaireResponse,
   type Schedule,
-  type ScheduleAssignment,
+  type SubstitutionRequest,
   type Notification,
   type MassTimeConfig,
   type InsertMassTime,
@@ -51,11 +51,11 @@ export interface IStorage {
   updateSchedule(id: string, schedule: any): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
   
-  // Schedule assignment operations
-  createScheduleAssignment(assignment: any): Promise<ScheduleAssignment>;
-  getScheduleAssignments(scheduleId: string): Promise<ScheduleAssignment[]>;
-  updateScheduleAssignment(id: string, assignment: any): Promise<ScheduleAssignment>;
-  deleteScheduleAssignment(id: string): Promise<void>;
+  // Substitution request operations
+  createSubstitutionRequest(request: any): Promise<SubstitutionRequest>;
+  getSubstitutionRequests(scheduleId: string): Promise<SubstitutionRequest[]>;
+  updateSubstitutionRequest(id: string, request: any): Promise<SubstitutionRequest>;
+  deleteSubstitutionRequest(id: string): Promise<void>;
   
   // Mass times operations
   createMassTime(massTime: InsertMassTime): Promise<MassTimeConfig>;
@@ -210,33 +210,33 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schedules).where(eq(schedules.id, id));
   }
 
-  // Schedule assignment operations
-  async createScheduleAssignment(assignmentData: any): Promise<ScheduleAssignment> {
-    const [assignment] = await db
-      .insert(scheduleAssignments)
-      .values(assignmentData)
+  // Substitution request operations
+  async createSubstitutionRequest(requestData: any): Promise<SubstitutionRequest> {
+    const [request] = await db
+      .insert(substitutionRequests)
+      .values(requestData)
       .returning();
-    return assignment;
+    return request;
   }
 
-  async getScheduleAssignments(scheduleId: string): Promise<ScheduleAssignment[]> {
+  async getSubstitutionRequests(scheduleId: string): Promise<SubstitutionRequest[]> {
     return await db
       .select()
-      .from(scheduleAssignments)
-      .where(eq(scheduleAssignments.scheduleId, scheduleId));
+      .from(substitutionRequests)
+      .where(eq(substitutionRequests.scheduleId, scheduleId));
   }
 
-  async updateScheduleAssignment(id: string, assignmentData: any): Promise<ScheduleAssignment> {
-    const [assignment] = await db
-      .update(scheduleAssignments)
-      .set({ ...assignmentData, updatedAt: new Date() })
-      .where(eq(scheduleAssignments.id, id))
+  async updateSubstitutionRequest(id: string, requestData: any): Promise<SubstitutionRequest> {
+    const [request] = await db
+      .update(substitutionRequests)
+      .set({ ...requestData, updatedAt: new Date() })
+      .where(eq(substitutionRequests.id, id))
       .returning();
-    return assignment;
+    return request;
   }
 
-  async deleteScheduleAssignment(id: string): Promise<void> {
-    await db.delete(scheduleAssignments).where(eq(scheduleAssignments.id, id));
+  async deleteSubstitutionRequest(id: string): Promise<void> {
+    await db.delete(substitutionRequests).where(eq(substitutionRequests.id, id));
   }
 
   // Mass times operations
@@ -315,16 +315,16 @@ export class DatabaseStorage implements IStorage {
         eq(users.availableForSpecialEvents, true)
       ));
 
-    // Get substitutions from the current week (simplified)
+    // Get substitutions from the current week
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     
     const [substitutionsResult] = await db
       .select({ count: count() })
-      .from(scheduleAssignments)
+      .from(substitutionRequests)
       .where(and(
-        eq(scheduleAssignments.isSubstitution, true),
-        gte(scheduleAssignments.createdAt, weekStart)
+        eq(substitutionRequests.status, 'pending'),
+        gte(substitutionRequests.createdAt, weekStart)
       ));
 
     return {

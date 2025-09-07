@@ -1,25 +1,33 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Cross } from "lucide-react";
+import { Church, Cross } from "lucide-react";
+
+import { useLocation } from "wouter";
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
+  
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    setLocation("/login");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/20">
+    <div className="min-h-screen flex items-center justify-center gradient-bg pattern-bg">
       <div className="w-full max-w-md animate-fade-in">
-        <Card className="shadow-xl">
-          <CardContent className="pt-8 pb-8 px-8">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
-                <Cross className="text-primary-foreground text-2xl w-8 h-8" />
+        <Card className="shadow-liturgical border bg-card">
+          <CardContent className="p-6">
+            <div className="text-center mb-6">
+              <div className="mx-auto mb-6">
+                <img 
+                  src="/LogoSJT.png" 
+                  alt="Santuário São Judas Tadeu" 
+                  className="h-32 w-auto mx-auto"
+                />
               </div>
-              <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
+              <h1 className="text-4xl font-bold mb-2">
                 Sistema MESC
               </h1>
-              <p className="text-muted-foreground">Santuário São Judas Tadeu</p>
+              <p className="text-accent font-semibold">Santuário São Judas Tadeu</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Ministros Extraordinários da Sagrada Comunhão
               </p>
@@ -37,6 +45,7 @@ export default function Landing() {
                   size="lg"
                   data-testid="button-login"
                 >
+                  <Church className="w-5 h-5 mr-2" />
                   Entrar no Sistema
                 </Button>
               </div>

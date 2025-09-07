@@ -26,7 +26,7 @@ const navigation = [
 ];
 
 export function Sidebar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [location] = useLocation();
 
@@ -36,7 +36,7 @@ export function Sidebar() {
 
   const handleLogout = () => {
     if (confirm("Tem certeza que deseja sair?")) {
-      window.location.href = "/api/logout";
+      logout();
     }
   };
 
