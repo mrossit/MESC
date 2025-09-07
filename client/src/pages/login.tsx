@@ -149,7 +149,7 @@ export default function Login() {
               <img 
                 src="/LogoSJT.png" 
                 alt="Santuário São Judas Tadeu" 
-                className="h-32 w-auto mx-auto relative z-10 drop-shadow-lg"
+                className="h-40 w-auto mx-auto relative z-10 drop-shadow-lg"
               />
             </motion.div>
             <motion.div
