@@ -360,9 +360,6 @@ export default function Login() {
               >
                 <UserPlus className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
                 Criar Nova Conta
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  Grátis
-                </Badge>
               </Button>
               <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                 <Info className="w-3 h-3" />
