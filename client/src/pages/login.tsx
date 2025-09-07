@@ -26,6 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import sjtLogo from "@assets/sjtlogo.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -107,7 +108,6 @@ export default function Login() {
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[rgb(184,150,63)]/5 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[rgb(160,82,45)]/5 rounded-full blur-3xl animate-pulse delay-1000" />
       </div>
-      
       <motion.div 
         className="w-full max-w-md z-10"
         initial={{ opacity: 0, y: 20 }}
@@ -147,9 +147,9 @@ export default function Login() {
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[rgb(184,150,63)]/20 to-[rgb(160,82,45)]/10 rounded-full blur-2xl scale-110" />
               <img 
-                src="/LogoSJT.png" 
+                src={sjtLogo} 
                 alt="Santuário São Judas Tadeu" 
-                className="h-40 w-auto mx-auto relative z-10 drop-shadow-lg"
+                className="h-40 w-auto mx-auto relative z-10 drop-shadow-lg ml-[0px] mr-[0px]"
               />
             </motion.div>
             <motion.div
