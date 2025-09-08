@@ -104,7 +104,10 @@ export class DatabaseStorage implements IStorage {
   async createUser(userData: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Usuário',
+      })
       .returning();
     return user;
   }
@@ -134,7 +137,9 @@ export class DatabaseStorage implements IStorage {
   async createQuestionnaire(questionnaireData: InsertQuestionnaire & { createdById: string }): Promise<Questionnaire> {
     const [questionnaire] = await db
       .insert(questionnaires)
-      .values(questionnaireData)
+      .values({
+        ...questionnaireData,
+      })
       .returning();
     return questionnaire;
   }
@@ -151,7 +156,10 @@ export class DatabaseStorage implements IStorage {
   async updateQuestionnaire(id: string, questionnaireData: Partial<InsertQuestionnaire>): Promise<Questionnaire> {
     const [questionnaire] = await db
       .update(questionnaires)
-      .set({ ...questionnaireData, updatedAt: new Date() })
+      .set({
+        ...questionnaireData,
+        updatedAt: new Date(),
+      })
       .where(eq(questionnaires.id, id))
       .returning();
     return questionnaire;
