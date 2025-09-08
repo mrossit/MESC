@@ -9,10 +9,10 @@
 Desenvolver um sistema web completo para gestão dos Ministros Extraordinários da Sagrada Comunhão (MESC) do Santuário São Judas Tadeu em Sorocaba/SP, automatizando processos de escalação, comunicação, formação e gestão administrativa.
 
 ### 1.2 Stakeholders
-- **Coordenador Geral**: Pe. Anderson (gestão completa do sistema)
-- **Coordenadores de Sistema**: 2 pessoas (gestão operacional)
+- **Administrador do Sistema**: Gestor (gestão e administração completa do sistema)
+- **Coordenador Paroquial**: 2 pessoas: Marco Rossit e Priscila Machado (gestão operacional e acompanhamento de relatórios)
+- **Coordenador**: 1 pessoa: Ana Paula (gestão operacional e acompanhamento de relatórios)
 - **Ministros**: ~150 pessoas ativas (uso diário do sistema)
-- **Administração Paroquial**: Acompanhamento e relatórios
 
 ### 1.3 Problema a Resolver
 - Gestão manual de escalas via WhatsApp é ineficiente
@@ -222,7 +222,7 @@ Infraestrutura:
   - Máximo 5 tentativas em 15 minutos
 - **Funcionalidades**:
   - "Lembrar-me" (30 dias)
-  - Recuperação de senha via email
+  - Recuperação de senha via solicitação ao gestor
   - Login automático após cadastro aprovado
 
 #### 4.1.2 Cadastro de Novos Ministros
@@ -230,7 +230,7 @@ Infraestrutura:
   1. Ministro preenche formulário público
   2. Sistema envia notificação aos coordenadores
   3. Coordenador revisa e aprova/rejeita
-  4. Email automático com credenciais ao aprovado
+  4. Push notification automático com credenciais ao aprovado
 
 - **Campos do Cadastro**:
   - Nome completo*
@@ -250,66 +250,57 @@ Infraestrutura:
 
 1. **Disponibilidade para Missas Dominicais**
    - Tipo: Múltipla escolha
-   - Opções:
-     - [ ] Sábado 17h
-     - [ ] Sábado 19h30
-     - [ ] Domingo 7h
-     - [ ] Domingo 9h
-     - [ ] Domingo 11h
-     - [ ] Domingo 17h
-     - [ ] Domingo 19h30
+   - Pergunta prévia - Preferência familiar: inserir uma pergunta se o usuário que tiver cônjuge ou familiar cadastrado, se o sistema deverá considerar as mesmas respostas para os familiares e abrir opção para quais familiares o sistema deverá considerar.
+   - Pergunta principal: Você poderá servir esse mês?
+   - ( ) Sim
+   - ( ) Não
+   - Se sim, qual horário constuma servir:
+     - [ ] Domingo 8h
+     - [ ] Domingo 10h
+     - [ ] Domingo 15h (quando dia 28 cair em domingo - honra S. Judas Tadeu)
+     - [ ] Domingo 19h
+   OBS.: ao selecionar uma das opções de horário, abrir um segundo submenu com as opções reais de data para os domingos do referido mês
 
 2. **Disponibilidade para Missas Semanais**
    - Tipo: Múltipla escolha
-   - Opções:
-     - [ ] Segunda 7h
-     - [ ] Segunda 19h30
-     - [ ] Terça 7h
-     - [ ] Terça 19h30
-     - [ ] Quarta 7h
-     - [ ] Quarta 19h30
-     - [ ] Quinta 7h
-     - [ ] Quinta 19h30
-     - [ ] Sexta 7h
-     - [ ] Sexta 19h30
+   - Pergunta prévia: (Sim, Não ou Apenas alguns dias)
+   - Opções caso seja alguns dias:
+     - [ ] Segunda-feira 6h30
+     - [ ] Terça-feira 6h30
+     - [ ] Quarta-feira 6h30
+     - [ ] Quinta-feira 6h30
+     - [ ] Sexta-feira 6h30 (a missa de sexta-feita durante o tempo quaresmal que antecede a Páscoa ocorrerá às 5h, mudar a pergunta durante o período de quaresma)
 
-3. **Período de Indisponibilidade**
-   - Tipo: Seleção de datas
-   - Descrição: "Informe os dias que você NÃO estará disponível no próximo mês"
-   - Interface: Calendário com múltipla seleção
-
-4. **Preferência de Frequência**
-   - Tipo: Seleção única
-   - Pergunta: "Quantas vezes você prefere servir por mês?"
-   - Opções:
-     - ( ) 1-2 vezes
-     - ( ) 3-4 vezes
-     - ( ) 5-6 vezes
-     - ( ) Mais de 6 vezes
-     - ( ) Sem preferência
-
-5. **Disponibilidade para Eventos Especiais**
+3. **Você poderá servir no dia [primeira quinta-feira do mês] na missa por cura e libertação às 19h30 (19h se cair em feriado)?**
+     - ( ) Sim
+     - ( ) Não
+      
+4. **Você poderá servir no dia [primeira sexta-feira do mês] na missa votiva ao Sagrado Coração de Jesus às 6h30 (19h se cair em feriado)?**
+     - ( ) Sim
+     - ( ) Não
+       
+5. **Você poderá servir no dia [primeiro sábado do mês] na missa votiva ao Imaculado Coração de Maria às 6h30?**
+     - ( ) Sim
+     - ( ) Não
+      
+6. **Você pode conduzir o terço da nossa adoração - Segunda-feira 22h? (faremos revezamento de ministros que conduzem o terço)**
    - Tipo: Múltipla escolha
    - Opções:
-     - [ ] Casamentos (sábados)
-     - [ ] Batizados (domingos tarde)
-     - [ ] Primeira Eucaristia
-     - [ ] Crisma
-     - [ ] Festas Litúrgicas
-     - [ ] Procissões
-
-6. **Observações Adicionais**
+     - [ ] Sim
+     - [ ] Não
+   
+7. **Observações Adicionais**
    - Tipo: Texto livre
    - Placeholder: "Alguma observação sobre sua disponibilidade?"
    - Limite: 500 caracteres
 
 #### 4.2.2 Regras de Negócio
-- Questionário liberado dia 15 de cada mês
+- Questionário liberado dia 20 de cada mês
 - Prazo para resposta: até dia 25
 - Notificações automáticas:
-  - Dia 15: Questionário disponível
-  - Dia 20: Lembrete para não respondentes
-  - Dia 23: Último lembrete
+  - Dia 20: Questionário disponível
+  - Dia 23: Lembrete para não respondentes
+  - Dia 24: Último lembrete
   - Dia 25: Encerramento
 - Ministros sem resposta: considerados indisponíveis
 
@@ -326,20 +317,20 @@ Infraestrutura:
    - Sistema lista ministros:
      - Que marcaram disponibilidade para aquele horário
      - Que não estão escalados
-     - Ordenados por: proximidade geográfica, frequência de serviço
+     - Ordenados por: frequência de serviço
    - Ministro pode enviar convite direto
    - Ou solicitar que coordenação encontre substituto
 
 3. **Confirmação**:
-   - Substituto recebe notificação (app + WhatsApp)
+   - Substituto recebe notificação (app)
    - Tem 48h para aceitar/recusar
    - Ao aceitar: escala é atualizada automaticamente
-   - Notificações enviadas para todos envolvidos
+   - Notificações enviadas para todos envolvidos (auxiliares 1 e 2)
 
 4. **Regras**:
-   - Substituições até 24h antes: automáticas
-   - Menos de 24h: requer aprovação do coordenador
-   - Máximo 3 substituições por mês por ministro
+   - Substituições até 12h antes: automáticas
+   - Menos de 12h: requer aprovação do coordenador
+   - Máximo 2 substituições por mês por ministro se maior que duas precisará de aprovação de um dos coordenadores
    - Histórico mantido para relatórios
 
 ### 4.4 Dashboard por Perfil
@@ -347,7 +338,7 @@ Infraestrutura:
 #### 4.4.1 Dashboard Ministro
 **Cards Principais:**
 - **Próximas Escalas**: Lista das próximas 5 escalas
-- **Questionário do Mês**: Status e link direto
+- **Questionário do Mês**: Status e Push
 - **Formação**: Progresso nos módulos
 - **Substituições**: Solicitações pendentes
 
@@ -409,6 +400,8 @@ Infraestrutura:
 - Comparativo mês a mês
 
 ### 4.6 Sistema de Escalas
+- há uma ordenação de posições dos ministros começando em 1 até 28, nas missas dominicais das 8h e 15h (quando houver) serão 15, nas missas dominicais das 10 e 19h serão 20 ministros; nas missas diárias serão 5 ministros e nas missas do Sagrado Coração de Jesus e Imaculado Coração de Maria serão 10 ministros; na Missa por Cura e Libertação serão escalados 28 ministros.
+- as funções se distribuem da seguinte forma: Auxiliares (1 e 2); Recolher Jesus (3 e 4); Velas (5 e 6); Fila / Adoração (7 e 8); Purificar e Expor (9 ao 12); Mezanino e Auxiliar Capela (13 ao 15); Credência e Materiais Litúrgicos (16 ao 28).
 
 #### 4.6.1 Geração Automática
 **Algoritmo considera:**
@@ -421,7 +414,7 @@ Infraestrutura:
 
 #### 4.6.2 Ajuste Manual
 **Interface drag-and-drop para:**
-- Mover ministros entre horários
+- Mover ministros entre horários e posições
 - Adicionar/remover ministros
 - Marcar ausências previstas
 - Definir substitutos fixos
@@ -477,6 +470,7 @@ MESC - Santuário São Judas
 │   ├── 🎓 Formação
 │   │   ├── Trilha Liturgia
 │   │   ├── Espiritualidade
+│   │   ├── Prática
 │   │   └── Biblioteca
 │   │
 │   ├── 👥 Gestão [coordenador/gestor]
@@ -621,39 +615,39 @@ MESC - Santuário São Judas
 
 ## 10. FASES DE IMPLEMENTAÇÃO
 
-### Fase 1 - MVP (Semanas 1-4)
+### Fase 1 - MVP 
 - [ ] Setup inicial com MCP Shadcn/UI
 - [ ] Autenticação e gestão de usuários
 - [ ] Questionário básico
 - [ ] Dashboard simples
 - [ ] Sistema de escalas manual
 
-### Fase 2 - Core Features (Semanas 5-8)
+### Fase 2 - Core Features
 - [ ] Questionário completo com todas as perguntas
 - [ ] Sistema de substituições
 - [ ] Notificações in-app
 - [ ] Acompanhamento de respostas
 - [ ] Melhorias no dashboard
 
-### Fase 3 - Formação (Semanas 9-10)
+### Fase 3 - Formação 
 - [ ] Módulos de formação
 - [ ] Sistema de progresso
 - [ ] Biblioteca de materiais
 - [ ] Certificados
 
-### Fase 4 - Analytics (Semanas 11-12)
+### Fase 4 - Analytics 
 - [ ] Relatórios completos
 - [ ] Exportação de dados
 - [ ] Dashboard analytics
 - [ ] Previsões e insights
 
-### Fase 5 - PWA e Otimizações (Semanas 13-14)
+### Fase 5 - PWA e Otimizações
 - [ ] Implementação PWA completa
 - [ ] Otimizações de performance
 - [ ] Testes de carga
 - [ ] Ajustes finais
 
-### Fase 6 - Deploy e Treinamento (Semanas 15-16)
+### Fase 6 - Deploy e Treinamento 
 - [ ] Deploy em produção
 - [ ] Migração de dados existentes
 - [ ] Treinamento dos coordenadores
@@ -665,8 +659,8 @@ MESC - Santuário São Judas
 ## 11. MÉTRICAS DE SUCESSO
 
 ### KPIs Principais
-1. **Adoção**: 80% dos ministros ativos em 3 meses
-2. **Engajamento**: 70% de resposta nos questionários
+1. **Adoção**: 100% dos ministros ativos em 2 meses
+2. **Engajamento**: 80% de resposta nos questionários
 3. **Eficiência**: Redução de 50% no tempo de escalação
 4. **Satisfação**: NPS > 8 após 6 meses
 5. **Formação**: 60% com trilha básica completa em 6 meses

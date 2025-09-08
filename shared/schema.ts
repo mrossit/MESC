@@ -228,6 +228,19 @@ export const massTimesConfig = pgTable('mass_times_config', {
   updatedAt: timestamp('updated_at').defaultNow()
 });
 
+// Password reset requests
+export const passwordResetRequests = pgTable('password_reset_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  requestedAt: timestamp('requested_at').defaultNow().notNull(),
+  reason: text('reason'),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, approved, rejected
+  processedBy: varchar('processed_by').references(() => users.id),
+  processedAt: timestamp('processed_at'),
+  adminNotes: text('admin_notes'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Relations
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)

@@ -1,329 +1,378 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* CORES BASE - Tons Pérola e Marfim (Paleta Litúrgica MESC) */
-  --color-pearl: 253, 252, 248;        /* #FDFCF8 - Fundo principal */
-  --color-ivory: 250, 248, 243;        /* #FAF8F3 - Cards e seções */
-  --color-cream: 247, 244, 237;        /* #F7F4ED - Elementos secundários */
-  --color-beige: 245, 241, 232;        /* #F5F1E8 - Bordas suaves */
+  /* PALETA NEUTRA - LIGHT MODE */
   
-  /* CORES DE TEXTO - Bronze e Mogno */
-  --color-bronze-900: 61, 47, 31;      /* #3D2F1F - Texto principal */
-  --color-bronze-800: 74, 58, 40;      /* #4A3A28 - Títulos */
-  --color-bronze-700: 92, 72, 55;      /* #5C4837 - Subtítulos */
-  --color-bronze-600: 115, 96, 79;     /* #73604F - Texto secundário */
+  /* Cores Base - Tons Neutros */
+  --peanut: 201, 194, 178;                /* #C9C2B2 - Peanut - Base neutra */
+  --chalk-beige: 235, 230, 218;           /* #EBE6DA - Chalk Beige - Fundo principal */
+  --white-beige: 248, 245, 238;           /* #F8F5EE - White Beige - Fundo claro */
+  --cream: 252, 248, 237;                 /* #FCF8ED - Cream - Fundo mais claro */
+  --neutral: 158, 151, 138;               /* #9E978A - Neutral - Elementos secundários */
+  --peach-cream: 243, 235, 220;           /* #F3EBDC - Peach Cream - Cards */
+  --card-bg: #E4E5DD;                     /* #E4E5DD - Card Background - Nova cor */
   
-  /* CORES PRIMÁRIAS - Cobre Acetinado */
-  --color-copper-800: 160, 82, 45;     /* #A0522D - Botão padrão */
-  --color-copper-700: 184, 115, 51;    /* #B87333 - Destaque */
+  /* Cores de Texto */
+  --text-dark: 51, 48, 43;                /* #33302B - Texto escuro */
+  --text-medium: 102, 97, 88;             /* #666158 - Texto médio */
+  --text-light: 140, 135, 125;            /* #8C877D - Texto claro */
   
-  /* CORES SECUNDÁRIAS - Dourado Litúrgico */
-  --color-gold-900: 184, 150, 63;      /* #B8963F - Ícones premium */
-  --color-gold-800: 201, 169, 97;      /* #C9A961 - Elementos especiais */
+  /* Cores de Destaque */
+  --accent-warm: 186, 175, 156;           /* #BAAF9C - Acento quente */
+  --accent-soft: 211, 203, 189;           /* #D3CBBD - Acento suave */
+  --accent-neutral: 175, 168, 155;        /* #AFA89B - Acento neutro */
   
-  /* Light Mode - Sistema de cores usando paleta litúrgica */
-  --radius: 0.625rem;
-  --background: rgb(var(--color-pearl));
-  --foreground: rgb(var(--color-bronze-900));
-  --card: rgb(var(--color-ivory));
-  --card-foreground: rgb(var(--color-bronze-800));
-  --popover: rgb(var(--color-ivory));
-  --popover-foreground: rgb(var(--color-bronze-900));
-  --primary: rgb(var(--color-copper-800));
-  --primary-foreground: rgb(var(--color-pearl));
-  --secondary: rgb(var(--color-cream));
-  --secondary-foreground: rgb(var(--color-bronze-700));
-  --muted: rgb(var(--color-beige));
-  --muted-foreground: rgb(var(--color-bronze-600));
-  --accent: rgb(var(--color-gold-900));
-  --accent-foreground: rgb(var(--color-pearl));
-  --destructive: rgb(220, 53, 69);
-  --destructive-foreground: rgb(var(--color-pearl));
-  --border: rgb(var(--color-beige));
-  --input: rgb(var(--color-cream));
-  --ring: rgb(var(--color-copper-700));
-  --chart-1: rgb(var(--color-copper-800));
-  --chart-2: rgb(var(--color-gold-900));
-  --chart-3: rgb(var(--color-bronze-700));
-  --chart-4: rgb(var(--color-copper-700));
-  --chart-5: rgb(var(--color-gold-800));
-  --sidebar: rgb(var(--color-ivory));
-  --sidebar-foreground: rgb(var(--color-bronze-800));
-  --sidebar-primary: rgb(var(--color-copper-800));
-  --sidebar-primary-foreground: rgb(var(--color-pearl));
-  --sidebar-accent: rgb(var(--color-cream));
-  --sidebar-accent-foreground: rgb(var(--color-bronze-700));
-  --sidebar-border: rgb(var(--color-beige));
-  --sidebar-ring: rgb(var(--color-copper-700));
+  /* Badges - Tons Suaves */
+  --badge-light: 245, 241, 235;           /* #F5F1EB - Badge claro */
+  --badge-warm: 228, 220, 207;            /* #E4DCCF - Badge quente */
+  --badge-neutral: 218, 211, 200;         /* #DAD3C8 - Badge neutro */
+  --badge-soft: 238, 233, 225;            /* #EEE9E1 - Badge suave */
   
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-heading: 'Poppins', var(--font-sans);
-  --font-serif: Georgia, serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  /* Sistema Light Mode - Paleta Neutra */
+  --background: var(--chalk-beige);       /* Chalk Beige - Fundo principal */
+  --foreground: var(--text-dark);         /* Texto escuro */
   
-  --radius: 0.75rem; /* 12px conforme DSD */
+  --card: var(--card-bg);                 /* Card Background - Nova cor #E4E5DD */
+  --card-foreground: var(--text-dark);
   
-  /* Shadows for depth */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --popover: var(--white-beige);
+  --popover-foreground: var(--text-dark);
   
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
+  --primary: var(--neutral);              /* Neutral - Botões primários */
+  --primary-foreground: var(--cream);
+  
+  --secondary: var(--peanut);             /* Peanut - Botões secundários */
+  --secondary-foreground: var(--white-beige);
+  
+  --muted: var(--peach-cream);
+  --muted-foreground: var(--text-medium);
+  
+  --accent: var(--accent-warm);
+  --accent-foreground: var(--text-dark);
+  
+  --destructive: 185, 28, 28;             /* #B91C1C - Vermelho erro */
+  --destructive-foreground: 255, 255, 255;
+  
+  --border: 220, 214, 203;                /* #DCD6CB - Borda suave */
+  --input: var(--white-beige);
+  --ring: var(--peanut);
+  
+  /* Sidebar Light - Tons Neutros */
+  --sidebar-background: var(--chalk-beige);
+  --sidebar-foreground: var(--text-dark);
+  --sidebar-primary: var(--neutral);
+  --sidebar-primary-foreground: var(--cream);
+  --sidebar-accent: var(--peanut);
+  --sidebar-accent-foreground: var(--text-dark);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--peanut);
+  
+  --radius: 0.375rem;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-display: 'Playfair Display', serif;
 }
 
 .dark {
-  /* Dark Mode - Tons mais profundos mantendo harmonia litúrgica */
-  --color-pearl: 25, 24, 22;
-  --color-ivory: 35, 32, 28;
-  --color-cream: 45, 40, 34;
-  --color-beige: 55, 48, 40;
+  /* PALETA DARK BROWN REFINADA - DARK MODE */
   
-  --color-bronze-900: 247, 244, 237;
-  --color-bronze-800: 235, 230, 220;
-  --color-bronze-700: 210, 200, 185;
-  --color-bronze-600: 180, 170, 155;
+  /* Dark Brown Shades - Base */
+  --dark-1: 56, 35, 32;                   /* #382320 - Mais claro */
+  --dark-2: 50, 31, 28;                   /* #321F1C */
+  --dark-3: 43, 27, 25;                   /* #2B1B19 */
+  --dark-4: 37, 23, 21;                   /* #251715 */
+  --dark-5: 31, 20, 18;                   /* #1F1412 - Meio */
+  --dark-6: 25, 16, 14;                   /* #19100E */
+  --dark-7: 19, 12, 11;                   /* #130C0B */
+  --dark-8: 12, 8, 7;                     /* #0C0807 */
+  --dark-9: 6, 4, 3;                      /* #060403 */
+  --dark-10: 0, 0, 0;                     /* #000000 - Mais escuro */
   
-  --color-copper-800: 205, 133, 63;
-  --color-copper-700: 218, 165, 32;
+  /* Cores de Destaque Dark */
+  --dark-gold: 184, 134, 11;              /* #B8860B - Dourado escuro */
+  --dark-terracotta: 139, 69, 19;         /* #8B4513 - Terracota escuro */
+  --dark-copper: 139, 90, 43;             /* #8B5A2B - Cobre escuro */
+  --dark-bronze: 139, 105, 20;            /* #8B6914 - Bronze escuro */
+  --text-light: 255, 248, 240;            /* #FFF8F0 - Texto claro */
+  --text-gold: 255, 215, 0;               /* #FFD700 - Dourado para texto */
   
-  --color-gold-900: 218, 180, 90;
-  --color-gold-800: 230, 200, 120;
+  /* Sistema Dark Mode - Alto Contraste */
+  --background: var(--dark-8);            /* #0C0807 - Fundo principal */
+  --foreground: var(--text-light);        /* Texto claro para contraste */
   
-  --background: rgb(var(--color-pearl));
-  --foreground: rgb(var(--color-bronze-900));
-  --card: rgb(var(--color-ivory));
-  --card-foreground: rgb(var(--color-bronze-800));
-  --popover: rgb(var(--color-ivory));
-  --popover-foreground: rgb(var(--color-bronze-900));
-  --primary: rgb(var(--color-copper-800));
-  --primary-foreground: rgb(var(--color-pearl));
-  --secondary: rgb(var(--color-cream));
-  --secondary-foreground: rgb(var(--color-bronze-700));
-  --muted: rgb(var(--color-beige));
-  --muted-foreground: rgb(var(--color-bronze-600));
-  --accent: rgb(var(--color-gold-900));
-  --accent-foreground: rgb(var(--color-pearl));
-  --destructive: rgb(239, 68, 68);
-  --destructive-foreground: rgb(var(--color-bronze-900));
-  --border: rgb(var(--color-beige));
-  --input: rgb(var(--color-cream));
-  --ring: rgb(var(--color-copper-700));
-  --chart-1: rgb(var(--color-copper-800));
-  --chart-2: rgb(var(--color-gold-900));
-  --chart-3: rgb(var(--color-bronze-700));
-  --chart-4: rgb(var(--color-copper-700));
-  --chart-5: rgb(var(--color-gold-800));
-  --sidebar: rgb(var(--color-ivory));
-  --sidebar-foreground: rgb(var(--color-bronze-800));
-  --sidebar-primary: rgb(var(--color-copper-800));
-  --sidebar-primary-foreground: rgb(var(--color-pearl));
-  --sidebar-accent: rgb(var(--color-cream));
-  --sidebar-accent-foreground: rgb(var(--color-bronze-700));
-  --sidebar-border: rgb(var(--color-beige));
-  --sidebar-ring: rgb(var(--color-copper-700));
+  --card: var(--dark-7);                  /* #130C0B - Cards */
+  --card-foreground: var(--text-light);
+  
+  --popover: var(--dark-6);               /* #19100E - Popovers */
+  --popover-foreground: var(--text-light);
+  
+  --primary: var(--dark-gold);
+  --primary-foreground: var(--dark-10);
+  
+  --secondary: var(--dark-terracotta);
+  --secondary-foreground: var(--text-light);
+  
+  --muted: var(--dark-5);                 /* #1F1412 - Elementos muted */
+  --muted-foreground: 200, 180, 160;      /* Texto muted mais claro */
+  
+  --accent: var(--dark-copper);
+  --accent-foreground: var(--text-light);
+  
+  --destructive: 220, 38, 38;             /* #DC2626 - Vermelho erro */
+  --destructive-foreground: var(--text-light);
+  
+  --border: var(--dark-4);                /* #251715 - Bordas sutis */
+  --input: var(--dark-6);                 /* #19100E - Inputs */
+  --ring: var(--text-gold);               /* Dourado para focus */
+  
+  /* Sidebar Dark - Contraste otimizado */
+  --sidebar-background: var(--dark-8);    /* #0C0807 - Mesmo fundo das páginas */
+  --sidebar-foreground: var(--text-light);
+  --sidebar-primary: var(--dark-gold);
+  --sidebar-primary-foreground: var(--dark-10);
+  --sidebar-accent: var(--dark-3);        /* #2B1B19 - Hover items */
+  --sidebar-accent-foreground: var(--text-gold);
+  --sidebar-border: var(--dark-5);        /* #1F1412 - Borda sutil */
+  --sidebar-ring: var(--dark-gold);
 }
 
 @layer base {
   * {
     @apply border-border;
-    scroll-behavior: smooth;
   }
-
+  
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased;
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+    /* Renderização de alta definição */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "kern" 1, "liga" 1;
   }
-
-  /* High-resolution optimization */
-  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    body {
-      font-weight: 400;
-      letter-spacing: 0;
-    }
+  
+  /* Tipografia elegante */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    color: rgb(var(--foreground));
   }
-
-  /* Typography classes */
-  .heading-1 {
-    font-family: var(--font-heading);
-    font-size: 2.25rem;
-    font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.025em;
+  
+  /* Traços finos e alta definição */
+  button, input, select, textarea {
+    border-width: 0.5px;
   }
-
-  .heading-2 {
-    font-family: var(--font-heading);
-    font-size: 1.875rem;
-    font-weight: 600;
-    line-height: 1.25;
-  }
-
-  .heading-3 {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.5;
-  }
-
-  .body-text {
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.75;
-  }
-
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-    border-radius: 5px;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary));
-    border-radius: 5px;
-    border: 2px solid hsl(var(--muted));
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.8);
-  }
-
-  /* Firefox scrollbar */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
-  }
-
-  /* Animations */
-  @keyframes fadeIn {
-    from { 
-      opacity: 0; 
-      transform: translateY(20px); 
-    }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
-    }
-  }
-
-  @keyframes slideUp {
-    from { 
-      transform: translateY(100%); 
-    }
-    to { 
-      transform: translateY(0); 
-    }
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-in-out;
-  }
-
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-  }
-
-  /* Reduced motion support */
-  @media (prefers-reduced-motion: reduce) {
-    * {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
-
-  /* High contrast support */
-  @media (prefers-contrast: high) {
-    :root {
-      --border: hsl(0, 0%, 0%);
-      --text-secondary: hsl(0, 0%, 25%);
-    }
-  }
-
-  /* Print optimization */
-  @media print {
-    body {
-      font-size: 12pt;
-      color: black;
-      background: white;
-    }
+  
+  /* Focus states refinados */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    ring-color: rgb(var(--ring));
+    ring-offset-color: rgb(var(--background));
   }
 }
 
-/* Utility classes MESC Design System */
+@layer components {
+  /* Cor personalizada para cards */
+  .custom-card-bg {
+    background-color: #E4E5DD !important;
+  }
+  
+  /* Botões com gradientes sutis */
+  .btn-primary {
+    background: linear-gradient(135deg, 
+      rgb(var(--primary)) 0%, 
+      rgb(var(--primary)) 50%, 
+      rgba(var(--primary), 0.9) 100%
+    );
+    color: rgb(var(--primary-foreground));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
+    border: 0.5px solid rgba(var(--primary), 0.2);
+  }
+  
+  .btn-secondary {
+    background: linear-gradient(135deg, 
+      rgb(var(--secondary)) 0%, 
+      rgb(var(--secondary)) 50%, 
+      rgba(var(--secondary), 0.9) 100%
+    );
+    color: rgb(var(--secondary-foreground));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
+    border: 0.5px solid rgba(var(--secondary), 0.2);
+  }
+  
+  /* Cards com bordas finas */
+  .card-liturgical {
+    background: rgb(var(--card));
+    color: rgb(var(--card-foreground));
+    border: 0.5px solid rgb(var(--border));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 rounded-md;
+  }
+  
+  /* Badges acetinados */
+  .badge-pearl {
+    background: rgb(var(--badge-pearl));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-gold {
+    background: rgb(var(--badge-gold));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-copper {
+    background: rgb(var(--badge-copper));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-terracotta {
+    background: rgb(var(--badge-terracotta));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+}
+
 @layer utilities {
-  /* Gradiente de fundo litúrgico */
-  .gradient-bg {
-    background: linear-gradient(135deg, rgb(var(--color-pearl)) 0%, rgb(var(--color-ivory)) 100%);
+  /* Sidebar refinado - Sem bordas nas opções */
+  [data-sidebar="sidebar"] {
+    background: rgb(var(--sidebar-background)) !important;
+    color: rgb(var(--sidebar-foreground)) !important;
   }
-
-  /* Sombra litúrgica */
+  
+  [data-sidebar="sidebar"] * {
+    color: rgb(var(--sidebar-foreground)) !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"] {
+    @apply transition-all duration-200 rounded-md border-0;
+    border: none !important;
+    outline: none !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover {
+    background: rgba(var(--sidebar-accent), 0.15) !important;
+    border: none !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] {
+    background: rgba(var(--sidebar-accent), 0.2) !important;
+    font-weight: 500;
+    border: none !important;
+  }
+  
+  /* Mobile sidebar - Sem bordas */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    background: rgb(var(--sidebar-background)) !important;
+    color: rgb(var(--sidebar-foreground)) !important;
+    border: none !important;
+  }
+  
+  /* Remover todas as bordas dos itens do menu */
+  [data-sidebar="menu-sub"] {
+    border-left: none !important;
+  }
+  
+  [data-sidebar="menu-item"],
+  [data-sidebar="menu-sub-item"],
+  [data-sidebar="menu-sub-button"] {
+    border: none !important;
+  }
+  
+  /* Sombras litúrgicas */
+  .shadow-liturgical-sm {
+    box-shadow: 0 1px 2px 0 rgba(var(--foreground), 0.05);
+  }
+  
   .shadow-liturgical {
-    box-shadow: 0 4px 20px rgba(var(--color-bronze-700), 0.1);
+    box-shadow: 
+      0 1px 3px 0 rgba(var(--foreground), 0.1),
+      0 1px 2px -1px rgba(var(--foreground), 0.06);
   }
-
-  /* Padrão de fundo sacro */
-  .pattern-bg {
-    background-image: radial-gradient(circle at 1px 1px, rgba(var(--color-gold-900), 0.1) 1px, transparent 0);
-    background-size: 20px 20px;
+  
+  .shadow-liturgical-md {
+    box-shadow: 
+      0 4px 6px -1px rgba(var(--foreground), 0.1),
+      0 2px 4px -2px rgba(var(--foreground), 0.06);
   }
-
-  .sacred-gradient {
-    background: linear-gradient(135deg, rgb(var(--color-copper-800)) 0%, rgb(var(--color-copper-700)) 100%);
+  
+  /* Gradientes litúrgicos */
+  .gradient-liturgical {
+    background: linear-gradient(135deg, 
+      rgb(var(--primary)) 0%, 
+      rgb(var(--secondary)) 100%
+    );
   }
-
-  .sacred-border {
-    border: 1px solid rgb(var(--color-beige));
-    border-radius: var(--radius);
+  
+  .gradient-pearl {
+    background: linear-gradient(180deg, 
+      rgb(var(--pearl-satin)) 0%, 
+      rgb(var(--beige-light-satin)) 100%
+    );
   }
-
-  .card-hover-sacred {
-    transition: all 0.3s ease;
+  
+  /* Bordas finas de alta definição */
+  .border-liturgical {
+    border: 0.5px solid rgb(var(--border));
   }
-
-  .card-hover-sacred:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(var(--color-bronze-700), 0.15);
-  }
-
-  /* Classes adicionais para elementos do MESC */
-  .text-liturgical-primary {
-    color: rgb(var(--color-copper-800));
-  }
-
-  .text-liturgical-accent {
-    color: rgb(var(--color-gold-900));
-  }
-
-  .bg-liturgical-light {
-    background-color: rgb(var(--color-pearl));
-  }
-
-  .bg-liturgical-card {
-    background-color: rgb(var(--color-ivory));
+  
+  /* Texto com antialiasing refinado */
+  .text-liturgical {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+/* Animações suaves */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar customizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--foreground), 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--foreground), 0.3);
+}
+
+/* Print styles */
+@media print {
   body {
-    @apply bg-background text-foreground;
+    background: white;
+    color: black;
   }
 }

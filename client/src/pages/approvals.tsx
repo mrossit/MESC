@@ -1,407 +1,220 @@
-import { useState, useEffect } from "react";
+import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Layout, PageHeader } from "@/components/layout";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
-import { 
-  Users, 
-  User,
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  Mail, 
-  Phone, 
-  Calendar,
-  MessageSquare,
-  Loader2,
-  Church,
-  MapPin,
-  Building2,
-  Heart,
-  Eye,
-  UserCheck,
-  UserX,
-  Clock
-} from "lucide-react";
-
-interface PendingUser {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  whatsapp: string;
-  birthDate: string;
-  address: string;
-  parishOrigin: string;
-  timeAsMinister: string;
-  motivation: string;
-  createdAt: string;
-}
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check, X, User } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { User as UserType } from "@/lib/types";
 
 export default function Approvals() {
-  const { toast } = useToast();
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchPendingUsers();
-  }, []);
+  const { data, isLoading, error } = useQuery<UserType[]>({
+    queryKey: ["/api/users/pending"],
+    initialData: [], // Começar com array vazio
+  });
 
-  const fetchPendingUsers = async () => {
-    try {
-      const response = await fetch("/api/users/pending", {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        }
+  // Garantir que pendingUsers seja sempre um array, mesmo que data seja null/undefined
+  const pendingUsers = Array.isArray(data) ? data : [];
+
+  const updateUserStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
+      return apiRequest("PATCH", `/api/users/${userId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({
+        title: "Sucesso",
+        description: "Status do usuário atualizado com sucesso.",
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPendingUsers(data.users || []);
-      }
-    } catch (error) {
+    },
+    onError: (error) => {
       toast({
         title: "Erro",
-        description: "Erro ao carregar usuários pendentes",
-        variant: "destructive"
+        description: error instanceof Error ? error.message : "Falha ao atualizar status.",
+        variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleApproval = (userId: string, status: "active" | "inactive") => {
+    updateUserStatusMutation.mutate({ userId, status });
   };
-
-  const handleApprove = async (userId: string) => {
-    setProcessingUserId(userId);
-    try {
-      const response = await fetch(`/api/users/${userId}/approve`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Usuário aprovado com sucesso!"
-        });
-        fetchPendingUsers();
-      } else {
-        throw new Error("Erro ao aprovar usuário");
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao aprovar usuário",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingUserId(null);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedUser) return;
-    
-    setProcessingUserId(selectedUser.id);
-    try {
-      const response = await fetch(`/api/users/${selectedUser.id}/reject`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ reason: rejectionReason })
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Usuário rejeitado",
-          description: "O usuário foi notificado sobre a rejeição."
-        });
-        setShowRejectDialog(false);
-        setSelectedUser(null);
-        setRejectionReason("");
-        fetchPendingUsers();
-      } else {
-        throw new Error("Erro ao rejeitar usuário");
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao rejeitar usuário",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingUserId(null);
-    }
-  };
-
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
-    <Layout>
-      <PageHeader 
-        title="Aprovações Pendentes" 
-        description="Gerencie as solicitações de cadastro de novos ministros"
-      />
+    <Layout 
+      title="Aprovações Pendentes"
+      subtitle="Gerencie solicitações de cadastro de ministros"
+    >
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-[rgb(184,150,63)]/20 to-[rgb(160,82,45)]/10 rounded-lg">
-              <UserCheck className="w-6 h-6 text-[rgb(160,82,45)]" />
+        {/* Summary Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Resumo de Aprovações</CardTitle>
+              <Badge variant="secondary">
+                {pendingUsers.length} pendentes
+              </Badge>
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-[rgb(74,58,40)]">Solicitações de Cadastro</h2>
-              <p className="text-sm text-muted-foreground">Revise e aprove novos ministros</p>
-            </div>
-          </div>
-          <Badge 
-            variant={pendingUsers.length > 0 ? "destructive" : "secondary"}
-            className="text-sm px-3 py-1"
-          >
-            <AlertCircle className="w-4 h-4 mr-1" />
-            {pendingUsers.length} pendente{pendingUsers.length !== 1 ? 's' : ''}
-          </Badge>
-        </div>
-
-        {pendingUsers.length === 0 ? (
-          <Card className="border-[rgb(184,150,63)]/30">
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                  className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[rgb(184,150,63)]/10 to-[rgb(160,82,45)]/5 rounded-full flex items-center justify-center"
-                >
-                  <Users className="h-10 w-10 text-[rgb(184,150,63)]" />
-                </motion.div>
-                <h3 className="text-lg font-medium text-[rgb(74,58,40)]">Nenhuma aprovação pendente</h3>
-                <p className="text-muted-foreground mt-2">
-                  Não há solicitações de cadastro aguardando aprovação.
-                </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-muted/30 rounded-lg">
+                <p className="text-2xl font-bold">{pendingUsers.length}</p>
+                <p className="text-sm text-muted-foreground">Aguardando Aprovação</p>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {pendingUsers.map((user, index) => (
-              <motion.div
-                key={user.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="border-[rgb(184,150,63)]/30 hover:border-[rgb(184,150,63)]/50 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[rgb(184,150,63)]/20 to-[rgb(160,82,45)]/10 flex items-center justify-center">
-                          <User className="w-6 h-6 text-[rgb(160,82,45)]" />
-                        </div>
-                        <div className="space-y-3 flex-1">
-                          <div>
-                            <h3 className="text-lg font-semibold text-[rgb(74,58,40)]">{user.name}</h3>
-                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                Solicitado em {new Date(user.createdAt).toLocaleDateString("pt-BR")}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Há {Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24))} dias
-                              </span>
-                            </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">0</p>
+                <p className="text-sm text-muted-foreground">Aprovados Hoje</p>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <p className="text-2xl font-bold text-red-600">0</p>
+                <p className="text-sm text-muted-foreground">Rejeitados Hoje</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pending Approvals List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Solicitações de Cadastro</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="border rounded-lg p-4 sm:p-6 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-12 w-12 rounded-full" variant="shimmer" />
+                        <div className="space-y-2 flex-1">
+                          <Skeleton className="h-5 w-32" variant="shimmer" />
+                          <Skeleton className="h-4 w-48" />
+                          <div className="flex gap-2">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-4 w-24" />
                           </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-sm">
-                                <Mail className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                <span>{user.email}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <Phone className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                <span>{user.phone}</span>
-                              </div>
-                              {user.whatsapp && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <MessageSquare className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                  <span>{user.whatsapp}</span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-sm">
-                                <Building2 className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                <span>{user.parishOrigin}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <Heart className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                <span>Tempo: {user.timeAsMinister}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <MapPin className="w-4 h-4 text-[rgb(184,150,63)]" />
-                                <span className="truncate">{user.address}</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {user.motivation && (
-                            <div className="p-3 bg-[rgb(247,244,237)]/50 rounded-lg">
-                              <p className="text-sm font-medium text-[rgb(92,72,55)] mb-1">Motivação:</p>
-                              <p className="text-sm text-muted-foreground">{user.motivation}</p>
-                            </div>
-                          )}
                         </div>
                       </div>
-                      
-                      <div className="flex flex-col gap-2">
+                      <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                        <Skeleton className="h-9 flex-1 sm:flex-initial sm:w-24" />
+                        <Skeleton className="h-9 flex-1 sm:flex-initial sm:w-24" />
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : pendingUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  Nenhuma solicitação pendente
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingUsers.map((user, index) => (
+                  <div 
+                    key={user.id} 
+                    className="border rounded-lg p-4 sm:p-6 animate-slide-up transition-all hover:shadow-lg hover:border-primary/20"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    data-testid={`approval-item-${user.id}`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12 flex-shrink-0">
+                          <AvatarFallback>
+                            <User className="h-6 w-6" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <h3 
+                            className="font-semibold truncate"
+                            data-testid={`text-user-name-detail-${user.id}`}
+                          >
+                            {user.name}
+                          </h3>
+                          <p 
+                            className="text-muted-foreground text-sm truncate"
+                            data-testid={`text-user-email-detail-${user.id}`}
+                          >
+                            {user.email}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <Badge 
+                              variant="secondary"
+                              data-testid={`badge-user-role-detail-${user.id}`}
+                            >
+                              {user.role === "ministro" ? "Ministro" : user.role}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Solicitado em {new Date().toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                         <Button
-                          size="sm"
-                          className="bg-gradient-to-r from-[rgb(160,82,45)] to-[rgb(184,115,51)] hover:from-[rgb(160,82,45)]/90 hover:to-[rgb(184,115,51)]/90"
-                          onClick={() => handleApprove(user.id)}
-                          disabled={processingUserId === user.id}
-                        >
-                          {processingUserId === user.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                          <span className="ml-1">Aprovar</span>
-                        </Button>
-                        <Button
-                          size="sm"
                           variant="outline"
-                          className="border-red-300 hover:bg-red-50 hover:text-red-600"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowRejectDialog(true);
-                          }}
-                          disabled={processingUserId === user.id}
+                          className="text-green-600 border-green-600 hover:bg-green-50 hover:border-green-500 hover:text-green-700 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 flex-1 sm:flex-initial"
+                          onClick={() => handleApproval(user.id, "active")}
+                          disabled={updateUserStatusMutation.isPending}
+                          data-testid={`button-approve-detail-${user.id}`}
                         >
-                          <XCircle className="h-4 w-4" />
-                          <span className="ml-1">Rejeitar</span>
+                          <Check className="h-4 w-4 mr-1 sm:mr-2 transition-transform group-hover:scale-110" />
+                          <span className="hidden sm:inline">Aprovar</span>
+                          <span className="sm:hidden">OK</span>
                         </Button>
                         <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-[rgb(184,150,63)] hover:text-[rgb(184,150,63)]/80"
-                          onClick={() => setSelectedUser(user)}
+                          variant="outline"
+                          className="text-red-600 border-red-600 hover:bg-red-50 hover:border-red-500 hover:text-red-700 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 flex-1 sm:flex-initial"
+                          onClick={() => handleApproval(user.id, "inactive")}
+                          disabled={updateUserStatusMutation.isPending}
+                          data-testid={`button-reject-detail-${user.id}`}
                         >
-                          <Eye className="h-4 w-4" />
-                          <span className="ml-1">Detalhes</span>
+                          <X className="h-4 w-4 mr-1 sm:mr-2 transition-transform group-hover:scale-110" />
+                          <span className="hidden sm:inline">Rejeitar</span>
+                          <span className="sm:hidden">X</span>
                         </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                  <UserX className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <DialogTitle>Rejeitar Cadastro</DialogTitle>
-                  <DialogDescription>
-                    Rejeitando solicitação de {selectedUser?.name}
-                  </DialogDescription>
-                </div>
+                    
+                    {/* Additional user info */}
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-muted-foreground">Status:</span>
+                          <span className="ml-2">{user.status}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-muted-foreground">Função:</span>
+                          <span className="ml-2 capitalize">{user.role}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-muted-foreground">Cadastrado:</span>
+                          <span className="ml-2">Hoje</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <Alert className="border-yellow-200 bg-yellow-50">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <AlertDescription className="text-yellow-800">
-                  Esta ação não pode ser desfeita. O solicitante será notificado por email.
-                </AlertDescription>
-              </Alert>
-              <div className="space-y-2">
-                <Label htmlFor="reason">Motivo da Rejeição (obrigatório)</Label>
-                <Textarea
-                  id="reason"
-                  placeholder="Explique o motivo da rejeição para o solicitante..."
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  rows={4}
-                  className="resize-none"
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowRejectDialog(false);
-                  setSelectedUser(null);
-                  setRejectionReason("");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleReject}
-                disabled={processingUserId === selectedUser?.id || !rejectionReason.trim()}
-              >
-                {processingUserId === selectedUser?.id ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Rejeitando...
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Confirmar Rejeição
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

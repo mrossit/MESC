@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import cookieParser from "cookie-parser";
 import { storage } from "./storage";
-import { setupAuth as setupReplitAuth, authenticateToken as isReplitAuthenticated } from "./replitAuth";
 import { authenticateToken, requireRole, AuthRequest } from "./auth";
 import authRoutes from "./authRoutes";
+import { passwordResetRoutes } from "./passwordResetRoutes";
+import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -15,8 +16,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes (nosso sistema próprio)
   app.use('/api/auth', authRoutes);
   
-  // Mantém Replit Auth temporariamente como fallback
-  // await setupReplitAuth(app);
+  // Password reset routes
+  app.use('/api/password-reset', passwordResetRoutes);
+  
+  // Questionnaire admin routes
+  app.use('/api/questionnaires/admin', questionnaireAdminRoutes);
+  
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

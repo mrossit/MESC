@@ -12,10 +12,25 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Check payload size before sending
+  let body: string | undefined;
+  if (data) {
+    body = JSON.stringify(data);
+    // Warn if payload is large (> 100KB)
+    const sizeInKB = new Blob([body]).size / 1024;
+    if (sizeInKB > 100) {
+      console.warn(`Large request payload: ${sizeInKB.toFixed(2)}KB for ${url}`);
+    }
+    // Reject if payload is too large (> 500KB)
+    if (sizeInKB > 500) {
+      throw new Error(`Request payload too large: ${sizeInKB.toFixed(2)}KB. Please reduce the amount of data being sent.`);
+    }
+  }
+
   const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    body,
     credentials: "include",
   });
 
@@ -46,9 +61,17 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: false, // Desabilita refetch ao focar janela
+      staleTime: 5 * 60 * 1000, // 5 minutos - tempo razoável de cache
+      gcTime: 30 * 60 * 1000, // 30 minutos - mantém dados por mais tempo
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401 (unauthorized)
+        if (error?.message?.startsWith("401")) {
+          return false;
+        }
+        // Retry up to 2 times for other errors
+        return failureCount < 2;
+      },
     },
     mutations: {
       retry: false,

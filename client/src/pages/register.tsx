@@ -1,515 +1,338 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { motion } from "framer-motion";
-import { 
-  ArrowLeft, Eye, EyeOff, Loader2, Mail, Lock, User, Phone, Church, 
-  AlertCircle, CheckCircle, Calendar, MapPin, Heart, Building2, Sparkles,
-  MessageSquare, Users
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Church, Eye, EyeOff, CheckCircle, AlertCircle, MessageCircle } from "lucide-react";
+import { authAPI } from "@/lib/auth";
+import { toast } from "@/hooks/use-toast";
 
 export default function Register() {
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateEmailMessage, setDuplicateEmailMessage] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
-    whatsapp: "",
     password: "",
     confirmPassword: "",
-    birthDate: "",
-    address: "",
-    parishOrigin: "",
-    timeAsMinister: "",
-    motivation: ""
+    role: "ministro" as const,
   });
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    
-    // Validações
-    if (formData.password !== formData.confirmPassword) {
-      setError("As senhas não coincidem");
-      return;
-    }
-    
-    if (formData.password.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres");
-      return;
-    }
-    
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          whatsapp: formData.whatsapp,
-          password: formData.password,
-          birthDate: formData.birthDate,
-          address: formData.address,
-          parishOrigin: formData.parishOrigin,
-          timeAsMinister: formData.timeAsMinister,
-          motivation: formData.motivation
-        }),
+  const registerMutation = useMutation({
+    mutationFn: authAPI.register,
+    onSuccess: () => {
+      toast({
+        title: "Cadastro realizado com sucesso!",
+        description: "Aguarde a aprovação do coordenador para acessar o sistema.",
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSuccess(true);
-        toast({
-          title: "Cadastro realizado com sucesso!",
-          description: "Aguarde a aprovação do coordenador para acessar o sistema.",
-        });
-        
-        // Aguarda 3 segundos e redireciona para login
-        setTimeout(() => {
-          setLocation("/login");
-        }, 3000);
+      navigate("/login");
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || "Falha ao criar conta";
+      
+      // Verifica se é erro de email duplicado
+      if (errorMessage.includes("já foi cadastrado") || errorMessage.includes("já está cadastrado")) {
+        setDuplicateEmailMessage(errorMessage);
+        setShowDuplicateDialog(true);
       } else {
-        setError(data.message || "Erro ao realizar cadastro");
+        toast({
+          title: "Erro no cadastro",
+          description: errorMessage,
+          variant: "destructive",
+        });
       }
-    } catch (err) {
-      setError("Erro de conexão. Tente novamente.");
-    } finally {
-      setIsLoading(false);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não conferem",
+        variant: "destructive",
+      });
+      return;
     }
+
+    registerMutation.mutate(formData);
   };
 
-  if (success) {
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  if (registerMutation.isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-bg pattern-bg p-4">
-        <motion.div 
-          className="w-full max-w-md"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Card className="shadow-liturgical border bg-card">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <motion.div 
-                  className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-[rgb(184,150,63)]/20 to-[rgb(160,82,45)]/10 rounded-full flex items-center justify-center"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                >
-                  <CheckCircle className="h-8 w-8 text-[rgb(184,150,63)]" />
-                </motion.div>
-                <h2 className="text-2xl font-bold text-[rgb(74,58,40)] mb-2">
-                  Cadastro Realizado com Sucesso!
-                </h2>
-                <p className="text-[rgb(92,72,55)] mb-4">
-                  Seu pedido foi enviado para aprovação.
-                </p>
-                <Badge variant="secondary" className="mb-4">
-                  Aguardando Aprovação
-                </Badge>
-                <p className="text-sm text-muted-foreground">
-                  Você receberá um email quando sua conta for aprovada pela coordenação.
-                </p>
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Redirecionando para o login...
-                  </p>
-                </div>
+      <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-liturgical border-border/30">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Cadastro Realizado!
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-foreground/70">
+              Seu cadastro foi enviado com sucesso. Aguarde a aprovação do coordenador 
+              para acessar o sistema.
+            </p>
+            <p className="text-sm text-foreground/60">
+              Você receberá uma confirmação por email quando sua conta for aprovada.
+            </p>
+            <Button
+              onClick={() => navigate("/login")}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-medium"
+              data-testid="button-go-to-login"
+            >
+              Ir para Login
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center gradient-bg pattern-bg p-4">
-      <motion.div 
-        className="w-full max-w-2xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="shadow-liturgical border bg-card/95 backdrop-blur-sm">
-          <CardHeader className="p-6 text-center relative">
-            <motion.div 
-              className="mx-auto mb-4 relative"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[rgb(184,150,63)]/20 to-[rgb(160,82,45)]/10 rounded-full blur-xl" />
-              <img 
-                src="/LogoSJT.png" 
-                alt="Santuário São Judas Tadeu" 
-                className="h-24 w-auto mx-auto relative z-10"
+    <div className="min-h-screen bg-gradient-bg pattern-bg flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-liturgical border-border/30">
+        <CardHeader className="text-center pb-4">
+          <div className="flex justify-center mb-2">
+            <img 
+              src="/logo-santuario.png" 
+              alt="Santuário São Judas Tadeu" 
+              className="h-40 w-40 object-contain"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold text-foreground mb-1">
+            Cadastro MESC
+          </CardTitle>
+          <p className="text-foreground/60 text-sm">
+            Solicitação para Ministro da Sagrada Comunhão
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-foreground font-medium">
+                Nome Completo
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Seu nome completo"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                className="border-border focus:border-primary focus:ring-primary"
+                required
+                data-testid="input-name"
               />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-[rgb(74,58,40)] to-[rgb(160,82,45)] bg-clip-text text-transparent">
-                Cadastro de Novo Ministro
-              </h1>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <Badge variant="secondary" className="text-xs">
-                  <Users className="w-3 h-3 mr-1" />
-                  MESC
-                </Badge>
-                <Badge variant="outline" className="text-xs">
-                  Formulário de Adesão
-                </Badge>
-              </div>
-              <p className="text-[rgb(184,150,63)] font-medium text-sm mt-3">
-                Santuário São Judas Tadeu - Sorocaba/SP
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Preencha todos os campos obrigatórios (*) para solicitar sua participação
-              </p>
-            </motion.div>
-          </CardHeader>
+            </div>
 
-          <CardContent className="p-6 pt-0">
-            <form onSubmit={handleRegister} className="space-y-6">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-foreground font-medium">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value.toLowerCase().trim())}
+                className="border-border focus:border-primary focus:ring-primary"
+                autoComplete="email"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck="false"
+                required
+                data-testid="input-email"
+              />
+            </div>
 
-              <div className="space-y-4">
-                <div className="text-sm font-medium text-[rgb(92,72,55)] flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Dados Pessoais
-                </div>
-                <Separator className="bg-[rgb(245,241,232)]" />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome Completo*</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="Seu nome completo"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="birthDate">Data de Nascimento*</Label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="birthDate"
-                        type="date"
-                        value={formData.birthDate}
-                        onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email*</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="seu.email@exemplo.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone*</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="(15) 99999-9999"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="whatsapp">WhatsApp</Label>
-                    <div className="relative">
-                      <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="whatsapp"
-                        type="tel"
-                        placeholder="(15) 99999-9999"
-                        value={formData.whatsapp}
-                        onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                        className="pl-9"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Endereço Completo*</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="address"
-                        type="text"
-                        placeholder="Rua, número, bairro"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-sm font-medium text-[rgb(92,72,55)] flex items-center gap-2">
-                  <Church className="w-4 h-4" />
-                  Informações Ministeriais
-                </div>
-                <Separator className="bg-[rgb(245,241,232)]" />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="parishOrigin">Paróquia de Origem*</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="parishOrigin"
-                        type="text"
-                        placeholder="Nome da paróquia"
-                        value={formData.parishOrigin}
-                        onChange={(e) => setFormData({ ...formData, parishOrigin: e.target.value })}
-                        className="pl-9"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="timeAsMinister">Tempo como Ministro*</Label>
-                    <Select 
-                      value={formData.timeAsMinister} 
-                      onValueChange={(value) => setFormData({ ...formData, timeAsMinister: value })}
-                      disabled={isLoading}
-                    >
-                      <SelectTrigger className="pl-9">
-                        <Heart className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder="Selecione o tempo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="novo">Sou novo no ministério</SelectItem>
-                        <SelectItem value="menos1">Menos de 1 ano</SelectItem>
-                        <SelectItem value="1a3">1 a 3 anos</SelectItem>
-                        <SelectItem value="3a5">3 a 5 anos</SelectItem>
-                        <SelectItem value="mais5">Mais de 5 anos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="motivation">Motivação (opcional)</Label>
-                  <Textarea
-                    id="motivation"
-                    placeholder="Por que deseja ser um Ministro Extraordinário da Sagrada Comunhão?"
-                    value={formData.motivation}
-                    onChange={(e) => setFormData({ ...formData, motivation: e.target.value })}
-                    rows={3}
-                    disabled={isLoading}
-                    className="resize-none"
-                  />
-                  <p className="text-xs text-muted-foreground">Máximo de 500 caracteres</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-sm font-medium text-[rgb(92,72,55)] flex items-center gap-2">
-                  <Lock className="w-4 h-4" />
-                  Dados de Acesso
-                </div>
-                <Separator className="bg-[rgb(245,241,232)]" />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Senha*</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Mínimo 8 caracteres"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="pl-9 pr-9"
-                        required
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirmar Senha*</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Repita a senha"
-                        value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        className="pl-9 pr-9"
-                        required
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Separator className="bg-[rgb(245,241,232)]" />
-              
-              <div className="flex gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-foreground font-medium">
+                Telefone (opcional)
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="(15) 99999-9999"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                className="border-border focus:border-primary focus:ring-primary"
+                data-testid="input-phone"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-foreground font-medium">
+                Senha
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Crie uma senha"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange("password", e.target.value)}
+                  className="border-border focus:border-primary focus:ring-primary pr-12"
+                  required
+                  minLength={6}
+                  data-testid="input-password"
+                />
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => setLocation("/login")}
-                  className="flex-1 border-[rgb(184,150,63)]/30 hover:bg-[rgb(184,150,63)]/5"
-                  disabled={isLoading}
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  data-testid="button-toggle-password"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-[rgb(160,82,45)] to-[rgb(184,115,51)] hover:from-[rgb(160,82,45)]/90 hover:to-[rgb(184,115,51)]/90 shadow-lg"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando Solicitação...
-                    </>
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-foreground/60" />
                   ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Enviar Solicitação de Cadastro
-                    </>
+                    <Eye className="h-4 w-4 text-foreground/60" />
                   )}
                 </Button>
               </div>
-            </form>
-
-            <div className="mt-6 p-4 bg-[rgb(247,244,237)]/50 rounded-lg text-center">
-              <p className="text-xs text-muted-foreground mb-2">Já possui cadastro aprovado?</p>
-              <button
-                onClick={() => setLocation("/login")}
-                className="text-sm text-[rgb(184,150,63)] hover:text-[rgb(184,150,63)]/80 font-medium transition-colors flex items-center justify-center gap-1 mx-auto"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                Voltar para o Login
-              </button>
             </div>
-          </CardContent>
-        </Card>
 
-        <motion.div 
-          className="text-center mt-6 text-sm text-muted-foreground"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          <div className="flex items-center justify-center gap-4 mb-2">
-            <Badge variant="outline" className="text-xs">
-              LGPD Compliant
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              Dados Protegidos
-            </Badge>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-foreground font-medium">
+                Confirmar Senha
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirme sua senha"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                  className="border-border focus:border-primary focus:ring-primary pr-12"
+                  required
+                  data-testid="input-confirm-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  data-testid="button-toggle-confirm-password"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-foreground/60" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-foreground/60" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90 text-white font-medium"
+              disabled={registerMutation.isPending}
+              data-testid="button-register"
+            >
+              {registerMutation.isPending ? "Cadastrando..." : "Solicitar Cadastro"}
+            </Button>
+          </form>
+
+          <div className="mt-6">
+            <div className="text-center">
+              <p className="text-sm text-foreground/60">
+                Já tem uma conta?{" "}
+                <Link href="/login">
+                  <span className="text-primary hover:text-primary/80 font-medium cursor-pointer">
+                    Faça login aqui
+                  </span>
+                </Link>
+              </p>
+            </div>
+
+            <Alert className="mt-4 border-border/50 bg-muted/50">
+              <AlertDescription className="text-sm text-foreground/70">
+                <strong>Importante:</strong> Seu cadastro precisa ser aprovado pelo coordenador 
+                antes de você poder acessar o sistema. Isso pode levar alguns dias.
+              </AlertDescription>
+            </Alert>
           </div>
-          <p>© 2025 Santuário São Judas Tadeu - Sorocaba/SP</p>
-          <p className="mt-1">Ministério Extraordinário da Sagrada Comunhão</p>
-        </motion.div>
-      </motion.div>
+        </CardContent>
+      </Card>
+
+      {/* Dialog para email duplicado */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Email J\u00e1 Cadastrado</DialogTitle>
+            <DialogDescription className="text-center space-y-3">
+              <p className="text-base">
+                {duplicateEmailMessage}
+              </p>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-2 text-left">
+                <div className="flex items-start gap-3">
+                  <MessageCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-blue-900 dark:text-blue-100">O que fazer:</p>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
+                      <li>\u2022 Se voc\u00ea j\u00e1 \u00e9 cadastrado, fa\u00e7a login com sua senha</li>
+                      <li>\u2022 Se esqueceu a senha, entre em contato com a coordena\u00e7\u00e3o</li>
+                      <li>\u2022 Se \u00e9 seu primeiro cadastro, verifique se digitou o email corretamente</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-sm text-muted-foreground pt-2">
+                Em caso de d\u00favidas, procure a coordena\u00e7\u00e3o ap\u00f3s a missa ou 
+                entre em contato pelo WhatsApp do minist\u00e9rio.
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowDuplicateDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Tentar Novamente
+            </Button>
+            <Button 
+              onClick={() => navigate("/login")}
+              className="w-full sm:w-auto"
+            >
+              Ir para Login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
