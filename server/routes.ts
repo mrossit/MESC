@@ -127,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questionnaireData = insertQuestionnaireSchema.parse(req.body);
       const questionnaire = await storage.createQuestionnaire({
         ...questionnaireData,
-        createdById: req.user?.id
+        createdById: req.user?.id || '0'
       });
       res.status(201).json(questionnaire);
     } catch (error) {

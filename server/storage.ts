@@ -48,6 +48,7 @@ export interface IStorage {
   createSchedule(schedule: any): Promise<Schedule>;
   getSchedules(): Promise<Schedule[]>;
   getScheduleById(id: string): Promise<Schedule | undefined>;
+  getScheduleAssignments(scheduleId: string): Promise<any[]>;
   updateSchedule(id: string, schedule: any): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
   
@@ -103,10 +104,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(userData: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values({
-        ...userData,
-        name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-      })
+      .values(userData)
       .returning();
     return user;
   }
@@ -195,6 +193,11 @@ export class DatabaseStorage implements IStorage {
   async getScheduleById(id: string): Promise<Schedule | undefined> {
     const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
     return schedule;
+  }
+
+  async getScheduleAssignments(scheduleId: string): Promise<any[]> {
+    // For now, return empty array - this can be implemented later with proper assignments table
+    return [];
   }
 
   async updateSchedule(id: string, scheduleData: any): Promise<Schedule> {
