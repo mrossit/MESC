@@ -102,11 +102,33 @@ export class DatabaseStorage implements IStorage {
 
   // MESC specific user operations
   async createUser(userData: InsertUser): Promise<User> {
+    // Generate a temporary password for admin-created users
+    const tempPassword = Math.random().toString(36).slice(-12);
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    
     const [user] = await db
       .insert(users)
       .values({
-        ...userData,
+        email: userData.email,
+        passwordHash,
         name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Usuário',
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        phone: userData.phone || null,
+        role: userData.role as any || 'ministro',
+        status: userData.status as any || 'pending',
+        birthDate: userData.birthDate || null,
+        address: userData.address || null,
+        city: userData.city || null,
+        zipCode: userData.zipCode || null,
+        maritalStatus: userData.maritalStatus || null,
+        ministryStartDate: userData.ministryStartDate || null,
+        experience: userData.experience || null,
+        specialSkills: userData.specialSkills || null,
+        liturgicalTraining: userData.liturgicalTraining || false,
+        observations: userData.observations || null,
+        requiresPasswordChange: true // Force password change for admin-created users
       })
       .returning();
     return user;
@@ -138,8 +160,15 @@ export class DatabaseStorage implements IStorage {
     const [questionnaire] = await db
       .insert(questionnaires)
       .values({
-        ...questionnaireData,
-      })
+        title: questionnaireData.title,
+        description: questionnaireData.description || null,
+        month: questionnaireData.month,
+        year: questionnaireData.year,
+        questions: questionnaireData.questions as any,
+        deadline: questionnaireData.deadline || null,
+        targetUserIds: questionnaireData.targetUserIds as any || null,
+        createdById: questionnaireData.createdById
+      } as any)
       .returning();
     return questionnaire;
   }
@@ -154,12 +183,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuestionnaire(id: string, questionnaireData: Partial<InsertQuestionnaire>): Promise<Questionnaire> {
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    if (questionnaireData.title) updateData.title = questionnaireData.title;
+    if (questionnaireData.description !== undefined) updateData.description = questionnaireData.description;
+    if (questionnaireData.month) updateData.month = questionnaireData.month;
+    if (questionnaireData.year) updateData.year = questionnaireData.year;
+    if (questionnaireData.questions) updateData.questions = questionnaireData.questions;
+    if (questionnaireData.deadline !== undefined) updateData.deadline = questionnaireData.deadline;
+    if (questionnaireData.targetUserIds !== undefined) updateData.targetUserIds = questionnaireData.targetUserIds;
+    
     const [questionnaire] = await db
       .update(questionnaires)
-      .set({
-        ...questionnaireData,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(questionnaires.id, id))
       .returning();
     return questionnaire;

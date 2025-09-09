@@ -175,13 +175,11 @@ export async function register(userData: {
         email: userData.email,
         passwordHash,
         name: userData.name,
-        phone: userData.phone,
-        role: userData.role || 'ministro',
-        status: userData.status || 'pending', // Novo usuário começa como pendente
-        observations: userData.observations,
-        requiresPasswordChange: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        phone: userData.phone || null,
+        role: userData.role as any || 'ministro',
+        status: userData.status as any || 'pending',
+        observations: userData.observations || null,
+        requiresPasswordChange: false
       })
       .returning();
 
