@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Wrapper para npm no Replit
+NODE_PATH="/nix/store/8y4ls7z2sfxbq6ch3yp45l28p29qswvx-nodejs-20.19.3-wrapped/bin/node"
+
+if [ "$1" = "run" ] && [ "$2" = "dev" ]; then
+    echo "🚀 Iniciando servidor MESC..."
+    cd /home/runner/workspace
+    exec env NODE_ENV=development $NODE_PATH node_modules/.bin/tsx server/index.ts
+else
+    echo "Comando npm '$*' não implementado no wrapper."
+    echo "Use: ./start.sh ou o botão Run do Replit"
+    exit 1
+fi
