@@ -1,25 +1,12 @@
-run = "cd /home/runner/workspace && NODE_ENV=development /nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node node_modules/.bin/tsx server/index.ts"
-hidden = [".config", "package-lock.json"]
-modules = ["nodejs-20:v9-20241021-a3d0dd6"]
+run = "NODE_ENV=development node node_modules/.bin/tsx server/index.ts"
+modules = ["nodejs-20"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
 
 [nix]
 channel = "stable-24_05"
 
-[unitTest]
-language = "nodejs"
-
-[deployment]
-run = ["node", "dist/index.js"]
-deploymentTarget = "cloudrun"
-
-[[ports]]
-localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 5173
-externalPort = 80
-
 [env]
-PATH = "/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin"
 NODE_ENV = "development"
