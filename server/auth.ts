@@ -5,9 +5,16 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// JWT secret - em produção isso deve vir de variável de ambiente
-const JWT_SECRET = process.env.JWT_SECRET || 'sjt-mesc-secret-key-2025';
-const JWT_EXPIRES_IN = '7d';
+// JWT secret - deve vir de variável de ambiente
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+  // Fallback para desenvolvimento (mas deve ser definido mesmo assim)
+  console.warn('⚠️  JWT_SECRET não definido, usando valor padrão para desenvolvimento');
+  return 'sjt-mesc-development-secret-2025';
+})();
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 // Tipos
 export interface AuthRequest extends Request {
@@ -262,12 +269,9 @@ export async function resetPassword(email: string) {
       .where(eq(users.id, user.id));
 
     // TODO: Enviar email com a senha temporária
-    // Por enquanto, retorna a senha (apenas para desenvolvimento)
+    // Log temporário apenas para desenvolvimento (não retornar ao cliente)
     if (process.env.NODE_ENV === 'development') {
-      return { 
-        message: 'Senha temporária gerada',
-        tempPassword // REMOVER EM PRODUÇÃO
-      };
+      console.log(`[DEV] Senha temporária gerada para ${email}: ${tempPassword}`);
     }
 
     return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
