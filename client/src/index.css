@@ -31,6 +31,14 @@
   --badge-warm: 228, 220, 207;            /* #E4DCCF - Badge quente */
   --badge-neutral: 218, 211, 200;         /* #DAD3C8 - Badge neutro */
   --badge-soft: 238, 233, 225;            /* #EEE9E1 - Badge suave */
+  --badge-pearl: 250, 248, 243;           /* #FAF8F3 - Badge pérola */
+  --badge-gold: 212, 175, 55;             /* #D4AF37 - Badge dourado */
+  --badge-copper: 184, 115, 51;           /* #B87333 - Badge cobre */
+  --badge-terracotta: 204, 119, 102;      /* #CC7766 - Badge terracota */
+  
+  /* Cores Complementares */
+  --coffee: 101, 67, 33;                  /* #654321 - Cor café para textos */
+  --aged-bronze: 107, 86, 55;             /* #6B5637 - Bronze envelhecido */
   
   /* Sistema Light Mode - Paleta Neutra */
   --background: var(--chalk-beige);       /* Chalk Beige - Fundo principal */
@@ -49,7 +57,7 @@
   --secondary-foreground: var(--white-beige);
   
   --muted: var(--peach-cream);
-  --muted-foreground: var(--text-medium);
+  --muted-foreground: 85, 80, 71;         /* Texto muted mais escuro para melhor contraste */
   
   --accent: var(--accent-warm);
   --accent-foreground: var(--text-dark);
@@ -99,6 +107,16 @@
   --text-light: 255, 248, 240;            /* #FFF8F0 - Texto claro */
   --text-gold: 255, 215, 0;               /* #FFD700 - Dourado para texto */
   
+  /* Badges Dark Mode */
+  --badge-pearl: 60, 50, 45;              /* Pérola escura */
+  --badge-gold: 120, 95, 30;              /* Dourado escuro */
+  --badge-copper: 100, 65, 25;            /* Cobre escuro */
+  --badge-terracotta: 110, 70, 55;        /* Terracota escura */
+  
+  /* Cores Complementares Dark */
+  --coffee: 200, 170, 140;                /* Café claro para contraste */
+  --aged-bronze: 160, 130, 100;           /* Bronze claro para contraste */
+  
   /* Sistema Dark Mode - Alto Contraste */
   --background: var(--dark-8);            /* #0C0807 - Fundo principal */
   --foreground: var(--text-light);        /* Texto claro para contraste */
@@ -116,7 +134,7 @@
   --secondary-foreground: var(--text-light);
   
   --muted: var(--dark-5);                 /* #1F1412 - Elementos muted */
-  --muted-foreground: 200, 180, 160;      /* Texto muted mais claro */
+  --muted-foreground: 220, 200, 180;      /* Texto muted com mais contraste */
   
   --accent: var(--dark-copper);
   --accent-foreground: var(--text-light);
@@ -170,16 +188,14 @@
   
   /* Focus states refinados */
   *:focus-visible {
-    @apply outline-none ring-2 ring-offset-2;
-    ring-color: rgb(var(--ring));
-    ring-offset-color: rgb(var(--background));
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
 
 @layer components {
   /* Cor personalizada para cards */
   .custom-card-bg {
-    background-color: #E4E5DD !important;
+    background-color: rgb(var(--card)) !important;
   }
   
   /* Botões com gradientes sutis */
@@ -316,8 +332,8 @@
   
   .gradient-pearl {
     background: linear-gradient(180deg, 
-      rgb(var(--pearl-satin)) 0%, 
-      rgb(var(--beige-light-satin)) 100%
+      rgb(var(--badge-pearl)) 0%, 
+      rgb(var(--badge-light)) 100%
     );
   }
   

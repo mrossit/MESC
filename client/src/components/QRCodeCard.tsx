@@ -118,49 +118,49 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4 flex items-center justify-center">
-      <Card className="w-full max-w-2xl bg-white shadow-2xl border-0">
+    <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+      <Card className="w-full max-w-2xl shadow-2xl">
         <CardContent className="p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-amber-600 to-orange-700 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <Users className="h-8 w-8 text-white" />
+            <div className="w-16 h-16 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
+              <Users className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-bold text-amber-800 mb-2">MESC</h1>
-            <h2 className="text-xl text-amber-700 mb-1">Santuário São Judas Tadeu</h2>
-            <p className="text-amber-600">Sistema de Gestão de Ministros Extraordinários da Sagrada Comunhão</p>
+            <h1 className="text-4xl font-bold text-foreground mb-2">MESC</h1>
+            <h2 className="text-xl text-muted-foreground mb-1">Santuário São Judas Tadeu</h2>
+            <p className="text-muted-foreground">Sistema de Gestão de Ministros Extraordinários da Sagrada Comunhão</p>
           </div>
 
           {/* QR Code */}
           <div className="text-center mb-8">
-            <div className="bg-white p-6 rounded-2xl shadow-lg inline-block border-4 border-amber-200">
+            <div className="bg-background p-6 rounded-2xl shadow-lg inline-block border-4 border-border">
               {qrCodeDataURL ? (
                 <img src={qrCodeDataURL} alt="QR Code" className="w-64 h-64 mx-auto" />
               ) : (
-                <div className="w-64 h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-500">Gerando QR Code...</span>
+                <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
+                  <span className="text-muted-foreground">Gerando QR Code...</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Instructions */}
-          <div className="bg-amber-50 rounded-2xl p-6 mb-6">
-            <h3 className="text-lg font-semibold text-amber-800 mb-4 flex items-center">
+          <div className="bg-muted rounded-2xl p-6 mb-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
               <Smartphone className="h-5 w-5 mr-2" />
               Como acessar:
             </h3>
-            <ol className="space-y-2 text-amber-700">
+            <ol className="space-y-2 text-foreground">
               <li className="flex items-start">
-                <span className="bg-amber-200 text-amber-800 rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">1</span>
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">1</span>
                 <span>Aponte a câmera do seu celular para o QR Code</span>
               </li>
               <li className="flex items-start">
-                <span className="bg-amber-200 text-amber-800 rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">2</span>
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">2</span>
                 <span>Toque na notificação que aparecer na tela</span>
               </li>
               <li className="flex items-start">
-                <span className="bg-amber-200 text-amber-800 rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">3</span>
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold mr-3 mt-0.5">3</span>
                 <span>Faça login com seu email e senha fornecidos pela coordenação</span>
               </li>
             </ol>
@@ -168,8 +168,8 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
 
           {/* URL */}
           <div className="text-center mb-6">
-            <p className="text-sm text-amber-600 mb-2">Ou acesse diretamente:</p>
-            <code className="bg-amber-100 text-amber-800 px-4 py-2 rounded-lg text-sm font-mono">
+            <p className="text-sm text-muted-foreground mb-2">Ou acesse diretamente:</p>
+            <code className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-mono">
               {url}
             </code>
           </div>
@@ -178,7 +178,7 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
           <div className="flex flex-col sm:flex-row gap-3">
             <Button 
               onClick={downloadCard} 
-              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+              className="flex-1"
             >
               <Download className="h-4 w-4 mr-2" />
               Baixar Card
@@ -186,7 +186,7 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
             <Button 
               onClick={shareCard}
               variant="outline" 
-              className="flex-1 border-amber-600 text-amber-600 hover:bg-amber-50"
+              className="flex-1"
             >
               <Share2 className="h-4 w-4 mr-2" />
               Compartilhar
@@ -194,8 +194,8 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-6 pt-6 border-t border-amber-200">
-            <p className="text-sm text-amber-600">
+          <div className="text-center mt-6 pt-6 border-t border-border">
+            <p className="text-sm text-muted-foreground">
               Para dúvidas sobre o acesso, contate a coordenação dos ministros
             </p>
           </div>
