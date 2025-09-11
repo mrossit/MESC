@@ -1,19 +1,26 @@
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { sign, verify, type Secret, type SignOptions } from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 // JWT secret - deve vir de variável de ambiente
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
+function getJWTSecret(): string {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET environment variable is required in production');
   }
+  
   // Fallback para desenvolvimento (mas deve ser definido mesmo assim)
   console.warn('⚠️  JWT_SECRET não definido, usando valor padrão para desenvolvimento');
   return 'sjt-mesc-development-secret-2025';
-})();
+}
+
+const JWT_SECRET = getJWTSecret();
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 // Tipos
@@ -39,15 +46,20 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // Função para gerar JWT
 export function generateToken(user: any): string {
-  return jwt.sign(
+  const secret: Secret = JWT_SECRET;
+  const options: SignOptions = { 
+    expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as SignOptions['expiresIn'] 
+  };
+  
+  return sign(
     {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role
     },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    secret,
+    options
   );
 }
 
@@ -55,6 +67,7 @@ export function generateToken(user: any): string {
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const secret: Secret = JWT_SECRET;
 
   if (!token) {
     // Verifica se há token no cookie também
@@ -64,7 +77,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     }
     
     // Usa o token do cookie
-    jwt.verify(cookieToken, JWT_SECRET, (err: any, user: any) => {
+    verify(cookieToken, secret, (err: any, user: any) => {
       if (err) {
         return res.status(403).json({ message: 'Token inválido ou expirado' });
       }
@@ -74,7 +87,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     return;
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  verify(token, secret, (err: any, user: any) => {
     if (err) {
       return res.status(403).json({ message: 'Token inválido ou expirado' });
     }

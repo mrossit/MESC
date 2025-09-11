@@ -13,6 +13,12 @@ import { authenticateToken as requireAuth, AuthRequest } from '../auth';
 
 const router = Router();
 
+// Month names for Portuguese locale
+const monthNames = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
 // Função auxiliar para analisar respostas e extrair disponibilidades
 function analyzeResponses(responses: any[]) {
   const availabilities: any = {
@@ -116,10 +122,11 @@ router.post('/templates', requireAuth, async (req: AuthRequest, res) => {
       const [created] = await db
         .insert(questionnaires)
         .values({
+          title: `Questionário ${monthNames[month - 1]} ${year}`,
           month,
           year,
           questions: questions,
-          createdBy: userId
+          createdById: userId
         })
         .returning();
 
@@ -134,10 +141,6 @@ router.post('/templates', requireAuth, async (req: AuthRequest, res) => {
           eq(users.status, 'active')
         ));
 
-      const monthNames = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-      ];
 
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -145,7 +148,7 @@ router.post('/templates', requireAuth, async (req: AuthRequest, res) => {
             userId: minister.id,
             title: 'Novo Questionário Disponível',
             message: `O questionário de disponibilidade para ${monthNames[month - 1]} de ${year} está disponível. Por favor, responda o quanto antes.`,
-            type: 'info'
+            type: 'announcement'
           });
         }
       }
@@ -230,7 +233,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     console.log('[RESPONSES] Body recebido:', JSON.stringify(req.body, null, 2));
     
     const schema = z.object({
-      questionnaireTemplateId: z.string().optional(),
+      questionnaireId: z.string().optional(),
       month: z.number().min(1).max(12),
       year: z.number().min(2024).max(2050),
       responses: z.array(z.object({
@@ -268,9 +271,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Verificar se existe template e se não está encerrado
-    if (data.questionnaireTemplateId) {
+    if (data.questionnaireId) {
       const [template] = await db.select().from(questionnaires)
-        .where(eq(questionnaires.id, data.questionnaireTemplateId))
+        .where(eq(questionnaires.id, data.questionnaireId))
         .limit(1);
       
       if (template && template.status === 'closed') {
@@ -316,7 +319,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Se não foi fornecido templateId, buscar ou criar um
-    let templateId = data.questionnaireTemplateId;
+    let templateId = data.questionnaireId;
     console.log('[RESPONSES] Template ID inicial:', templateId);
     
     if (!templateId) {
@@ -338,10 +341,11 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
         const [newTemplate] = await db
           .insert(questionnaires)
           .values({
+            title: `Questionário ${monthNames[data.month - 1]} ${data.year}`,
             month: data.month,
             year: data.year,
             questions: questions,
-            createdBy: userId
+            createdById: userId
           })
           .returning();
         templateId = newTemplate.id;
@@ -350,13 +354,12 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     }
     console.log('[RESPONSES] Template ID final:', templateId);
 
-    // Verificar se já existe resposta para este mês/ano
-    console.log('[RESPONSES] Verificando resposta existente para ministerId:', minister.id, 'mês:', data.month, 'ano:', data.year);
+    // Verificar se já existe resposta para este template
+    console.log('[RESPONSES] Verificando resposta existente para userId:', minister.id, 'templateId:', templateId);
     const [existingResponse] = await db.select().from(questionnaireResponses)
       .where(and(
-        eq(questionnaireResponses.ministerId, minister.id),
-        eq(questionnaireResponses.month, data.month),
-        eq(questionnaireResponses.year, data.year)
+        eq(questionnaireResponses.userId, minister.id),
+        eq(questionnaireResponses.questionnaireId, templateId)
       ))
       .limit(1);
     console.log('[RESPONSES] Resposta existente encontrada?', existingResponse ? 'Sim' : 'Não');
@@ -373,9 +376,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
         const [updated] = await db
           .update(questionnaireResponses)
           .set({
-            questionnaireTemplateId: templateId,
+            questionnaireId: templateId,
             responses: JSON.stringify(data.responses),
-            availabilities: JSON.stringify(availabilities),
             submittedAt: new Date()
           })
           .where(eq(questionnaireResponses.id, existingResponse.id))
@@ -385,8 +387,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
         res.json({
           ...updated,
-          responses: JSON.parse(updated.responses),
-          availabilities: JSON.parse(updated.availabilities)
+          responses: JSON.parse(updated.responses as string)
         });
       } catch (updateError) {
         console.error('[RESPONSES] Erro ao atualizar resposta:', updateError);
@@ -399,12 +400,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
         const [created] = await db
           .insert(questionnaireResponses)
           .values({
-            ministerId: minister.id,
-            questionnaireTemplateId: templateId,
-            month: data.month,
-            year: data.year,
-            responses: JSON.stringify(data.responses),
-            availabilities: JSON.stringify(availabilities)
+            userId: minister.id,
+            questionnaireId: templateId,
+            responses: JSON.stringify(data.responses)
           })
           .returning();
         
@@ -412,8 +410,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
         res.json({
           ...created,
-          responses: JSON.parse(created.responses),
-          availabilities: JSON.parse(created.availabilities)
+          responses: JSON.parse(created.responses as string)
         });
       } catch (insertError) {
         console.error('[RESPONSES] Erro ao criar resposta:', insertError);
@@ -477,11 +474,8 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
 
       const [response] = await db.select({
         id: questionnaireResponses.id,
-        ministerId: questionnaireResponses.ministerId,
-        month: questionnaireResponses.month,
-        year: questionnaireResponses.year,
+        userId: questionnaireResponses.userId,
         responses: questionnaireResponses.responses,
-        availabilities: questionnaireResponses.availabilities,
         submittedAt: questionnaireResponses.submittedAt,
         questionnaireTemplate: {
           id: questionnaires.id,
@@ -491,11 +485,11 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
           status: questionnaires.status
         }
       }).from(questionnaireResponses)
-        .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireTemplateId, questionnaires.id))
+        .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
         .where(and(
-          eq(questionnaireResponses.ministerId, minister.id),
-          eq(questionnaireResponses.month, month),
-          eq(questionnaireResponses.year, year)
+          eq(questionnaireResponses.userId, minister.id),
+          eq(questionnaires.month, month),
+          eq(questionnaires.year, year)
         ))
         .limit(1);
 
@@ -503,8 +497,7 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
         // Parse JSON fields
         res.json({
           ...response,
-          responses: JSON.parse(response.responses),
-          availabilities: JSON.parse(response.availabilities),
+          responses: JSON.parse(response.responses as string),
           questionnaireTemplate: response.questionnaireTemplate ? {
             ...response.questionnaireTemplate,
             questions: response.questionnaireTemplate.questions
@@ -542,11 +535,8 @@ router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, 
 
     const responses = await db.select({
       id: questionnaireResponses.id,
-      ministerId: questionnaireResponses.ministerId,
-      month: questionnaireResponses.month,
-      year: questionnaireResponses.year,
+      userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
-      availabilities: questionnaireResponses.availabilities,
       submittedAt: questionnaireResponses.submittedAt,
       user: {
         id: users.id,
@@ -555,14 +545,16 @@ router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, 
       },
       questionnaireTemplate: {
         id: questionnaires.id,
-        questions: questionnaires.questions
+        questions: questionnaires.questions,
+        month: questionnaires.month,
+        year: questionnaires.year
       }
     }).from(questionnaireResponses)
-      .leftJoin(users, eq(questionnaireResponses.ministerId, users.id))
-      .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireTemplateId, questionnaires.id))
+      .leftJoin(users, eq(questionnaireResponses.userId, users.id))
+      .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
       .where(and(
-        eq(questionnaireResponses.month, month),
-        eq(questionnaireResponses.year, year)
+        eq(questionnaires.month, month),
+        eq(questionnaires.year, year)
       ));
 
     res.json(responses);
@@ -573,7 +565,7 @@ router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, 
 });
 
 // Encerrar questionário (impedir novas respostas)
-router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
+router.patch('/admin/templates/:id/close', requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id!;
     const templateId = req.params.id;
@@ -605,7 +597,6 @@ router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
       .update(questionnaires)
       .set({
         status: 'closed',
-        closedAt: new Date(),
         updatedAt: new Date()
       })
       .where(eq(questionnaires.id, templateId))
@@ -613,7 +604,7 @@ router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
 
     res.json({
       ...updated,
-      questions: JSON.parse(updated.questions)
+      questions: updated.questions
     });
   } catch (error) {
     console.error('Error closing questionnaire:', error);
@@ -622,7 +613,7 @@ router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
 });
 
 // Reabrir questionário (permitir novas respostas)
-router.patch('/admin/templates/:id/reopen', requireAuth, async (req, res) => {
+router.patch('/admin/templates/:id/reopen', requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id!;
     const templateId = req.params.id;
@@ -654,7 +645,6 @@ router.patch('/admin/templates/:id/reopen', requireAuth, async (req, res) => {
       .update(questionnaires)
       .set({
         status: 'sent',
-        closedAt: null,
         updatedAt: new Date()
       })
       .where(eq(questionnaires.id, templateId))
@@ -662,7 +652,7 @@ router.patch('/admin/templates/:id/reopen', requireAuth, async (req, res) => {
 
     res.json({
       ...updated,
-      questions: JSON.parse(updated.questions)
+      questions: updated.questions
     });
   } catch (error) {
     console.error('Error reopening questionnaire:', error);

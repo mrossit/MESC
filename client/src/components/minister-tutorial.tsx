@@ -129,15 +129,18 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
   };
 
   useEffect(() => {
-    // Adicionar classe ao body para escurecer o fundo
+    // Salvar o estilo original do overflow
+    const originalOverflow = document.body.style.overflow;
+    
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = originalOverflow || "unset";
     }
 
+    // Cleanup: restaurar o estilo original quando o componente desmontar ou isOpen mudar
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = originalOverflow || "unset";
     };
   }, [isOpen]);
 

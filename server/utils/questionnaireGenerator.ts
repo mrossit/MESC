@@ -1,5 +1,6 @@
 import { format, getDaysInMonth, getDay, lastDayOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { logger } from './logger';
 
 interface Question {
   id: string;
@@ -38,12 +39,12 @@ const MONTHLY_THEMES: { [key: number]: string } = {
 };
 
 export function generateQuestionnaireQuestions(month: number, year: number): Question[] {
-  console.log(`[GENERATOR] Iniciando geração para ${month}/${year}`);
+  logger.debug(`Iniciando geração de questionário para ${month}/${year}`);
   const questions: Question[] = [];
   const monthName = format(new Date(year, month - 1), 'MMMM', { locale: ptBR });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
   const theme = MONTHLY_THEMES[month] || 'do mês';
-  console.log(`[GENERATOR] Tema detectado: ${theme}`);
+  logger.debug(`Tema detectado para questionário: ${theme}`);
   
   // Obter todos os domingos do mês
   const sundayDates: string[] = [];
@@ -123,8 +124,7 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     metadata: {
       dependsOn: 'monthly_availability',
       showIf: 'Sim',
-      conditionalOptions: ['8h', '10h', '19h'],
-      conditionalTrigger: true
+      conditionalOptions: ['8h', '10h', '19h']
     },
     order: 5
   });
@@ -224,8 +224,8 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     order: 99
   });
 
-  console.log(`[GENERATOR] Total de perguntas geradas: ${questions.length}`);
-  console.log(`[GENERATOR] Primeira pergunta: "${questions[0]?.question}"`);
+  logger.debug(`Total de perguntas geradas: ${questions.length}`);
+  logger.debug(`Primeira pergunta: "${questions[0]?.question}"`);
   return questions;
 }
 

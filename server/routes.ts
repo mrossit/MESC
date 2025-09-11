@@ -9,6 +9,53 @@ import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
+import { logger } from "./utils/logger";
+
+// Função utilitária para tratamento de erro centralizado
+function handleApiError(error: any, operation: string) {
+  if (error instanceof z.ZodError) {
+    return {
+      status: 400,
+      message: `Dados inválidos para ${operation}`,
+      errors: error.errors
+    };
+  }
+
+  if (error.code === '23505') { // PostgreSQL unique violation
+    return {
+      status: 409,
+      message: `Já existe um registro com estes dados para ${operation}`
+    };
+  }
+
+  if (error.code === '23503') { // PostgreSQL foreign key violation
+    return {
+      status: 400,
+      message: `Referência inválida encontrada para ${operation}`
+    };
+  }
+
+  if (error.message && error.message.includes('não encontrado')) {
+    return {
+      status: 404,
+      message: error.message
+    };
+  }
+
+  if (error.message && error.message.includes('não autorizado')) {
+    return {
+      status: 403,
+      message: error.message
+    };
+  }
+
+  // Erro genérico
+  logger.error(`Error in ${operation}:`, error);
+  return {
+    status: 500,
+    message: `Erro interno do servidor durante ${operation}`
+  };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Cookie parser middleware
@@ -32,13 +79,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ message: "User not authenticated" });
+        return res.status(401).json({ message: "Usuário não autenticado" });
       }
       const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      const errorResponse = handleApiError(error, "buscar usuário atual");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
@@ -48,8 +98,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getDashboardStats();
       res.json(stats);
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+      const errorResponse = handleApiError(error, "buscar estatísticas do dashboard");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
@@ -59,8 +109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
+      const errorResponse = handleApiError(error, "buscar lista de usuários");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
@@ -68,12 +118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUser(req.params.id);
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Usuário não encontrado" });
       }
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      const errorResponse = handleApiError(error, "buscar usuário");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
@@ -83,11 +133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser(userData);
       res.status(201).json(user);
     } catch (error) {
-      console.error("Error creating user:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid user data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create user" });
+      const errorResponse = handleApiError(error, "criar usuário");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
@@ -97,11 +144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.updateUser(req.params.id, userData);
       res.json(user);
     } catch (error) {
-      console.error("Error updating user:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid user data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update user" });
+      const errorResponse = handleApiError(error, "atualizar usuário");
+      res.status(errorResponse.status).json(errorResponse);
     }
   });
 
