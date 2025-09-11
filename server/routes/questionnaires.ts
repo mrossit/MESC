@@ -1,26 +1,75 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../db-config';
+import { db } from '../db';
 import { 
   questionnaires, 
   questionnaireResponses,
   users,
   notifications
-} from '../../shared/schema-simple';
+} from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
-// Middleware de autenticação local
-const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.session?.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
+import { authenticateToken as requireAuth, AuthRequest } from '../auth';
 
 const router = Router();
 
+// Função auxiliar para analisar respostas e extrair disponibilidades
+function analyzeResponses(responses: any[]) {
+  const availabilities: any = {
+    sundays: [],
+    massTimes: [],
+    dailyMass: false,
+    dailyMassDays: [],
+    alternativeTimes: [],
+    specialEvents: []
+  };
+
+  responses.forEach(r => {
+    const { questionId, answer } = r;
+    
+    // Domingos disponíveis
+    if (questionId === 'sundays_available' && Array.isArray(answer)) {
+      availabilities.sundays = answer;
+    }
+    
+    // Horário principal de missa
+    if (questionId === 'primary_mass_time' && typeof answer === 'string') {
+      availabilities.massTimes.push(answer);
+    }
+    
+    // Missas diárias
+    if (questionId === 'daily_mass_availability') {
+      if (answer === 'Sim') {
+        availabilities.dailyMass = true;
+        availabilities.dailyMassDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+      } else if (answer === 'Apenas em alguns dias') {
+        availabilities.dailyMass = true;
+      }
+    }
+    
+    // Dias específicos para missas diárias
+    if (questionId === 'daily_mass_days' && Array.isArray(answer)) {
+      availabilities.dailyMassDays = answer;
+    }
+    
+    // Horários alternativos (pergunta yes_no_with_options)
+    if (questionId === 'other_times_available') {
+      if (typeof answer === 'object' && answer.answer === 'Sim' && answer.selectedOptions) {
+        availabilities.alternativeTimes = answer.selectedOptions;
+      }
+    }
+    
+    // Eventos especiais
+    if (questionId.includes('special_event_') && answer === 'Sim') {
+      availabilities.specialEvents.push(questionId.replace('special_event_', ''));
+    }
+  });
+
+  return { availabilities };
+}
+
 // Criar ou atualizar template de questionário para um mês específico
-router.post('/templates', requireAuth, async (req, res) => {
+router.post('/templates', requireAuth, async (req: AuthRequest, res) => {
   try {
     const schema = z.object({
       month: z.number().min(1).max(12),
@@ -28,7 +77,7 @@ router.post('/templates', requireAuth, async (req, res) => {
     });
 
     const { month, year } = schema.parse(req.body);
-    const userId = req.session.userId!;
+    const userId = req.user?.id!;
 
     // Check if db is available
     if (!db) {
@@ -114,7 +163,7 @@ router.post('/templates', requireAuth, async (req, res) => {
 });
 
 // Obter template de questionário para um mês específico
-router.get('/templates/:year/:month', requireAuth, async (req, res) => {
+router.get('/templates/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -174,10 +223,10 @@ router.get('/templates/:year/:month', requireAuth, async (req, res) => {
 });
 
 // Submeter resposta ao questionário
-router.post('/responses', requireAuth, async (req, res) => {
+router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
   try {
     console.log('[RESPONSES] Início do endpoint de submissão');
-    console.log('[RESPONSES] UserId:', req.session?.userId);
+    console.log('[RESPONSES] UserId:', req.user?.id);
     console.log('[RESPONSES] Body recebido:', JSON.stringify(req.body, null, 2));
     
     const schema = z.object({
@@ -211,7 +260,7 @@ router.post('/responses', requireAuth, async (req, res) => {
       });
     }
     
-    const userId = req.session.userId!;
+    const userId = req.user?.id!;
 
     // Check if db is available
     if (!db) {
@@ -375,17 +424,35 @@ router.post('/responses', requireAuth, async (req, res) => {
     console.error('[RESPONSES] Erro geral no endpoint:', error);
     if (error instanceof Error) {
       console.error('[RESPONSES] Stack trace:', error.stack);
+      console.error('[RESPONSES] Error message:', error.message);
+      
+      // Mensagem de erro mais específica
+      let errorMessage = 'Erro ao enviar resposta do questionário';
+      
+      if (error.message.includes('database') || error.message.includes('db')) {
+        errorMessage = 'Erro de conexão com o banco de dados. Tente novamente.';
+      } else if (error.message.includes('validation')) {
+        errorMessage = 'Dados inválidos no questionário.';
+      } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+        errorMessage = 'Sem permissão para enviar o questionário.';
+      } else if (error.message) {
+        // Se houver uma mensagem específica, usar ela (mas não expor detalhes técnicos)
+        errorMessage = `Erro: ${error.message.substring(0, 100)}`;
+      }
+      
+      res.status(500).json({ error: errorMessage });
+    } else {
+      res.status(500).json({ error: 'Erro desconhecido ao processar questionário' });
     }
-    res.status(500).json({ error: 'Failed to submit questionnaire response' });
   }
 });
 
 // Obter resposta do ministro para um mês específico
-router.get('/responses/:year/:month', requireAuth, async (req, res) => {
+router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const userId = req.session.userId!;
+    const userId = req.user?.id!;
 
     // If db is not available, return null
     if (!db) {
@@ -457,7 +524,7 @@ router.get('/responses/:year/:month', requireAuth, async (req, res) => {
 });
 
 // Obter todas as respostas para um mês (admin/coordenador)
-router.get('/responses/all/:year/:month', requireAuth, async (req, res) => {
+router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -508,7 +575,7 @@ router.get('/responses/all/:year/:month', requireAuth, async (req, res) => {
 // Encerrar questionário (impedir novas respostas)
 router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId!;
+    const userId = req.user?.id!;
     const templateId = req.params.id;
     
     // Verificar se é admin (reitor ou coordenador)
@@ -557,7 +624,7 @@ router.patch('/admin/templates/:id/close', requireAuth, async (req, res) => {
 // Reabrir questionário (permitir novas respostas)
 router.patch('/admin/templates/:id/reopen', requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId!;
+    const userId = req.user?.id!;
     const templateId = req.params.id;
     
     // Verificar se é admin (reitor ou coordenador)

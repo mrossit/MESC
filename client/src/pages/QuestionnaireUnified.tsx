@@ -152,16 +152,45 @@ export default function QuestionnaireUnified() {
         : `/api/questionnaires/templates/${selectedYear}/${selectedMonth}`;
       
       console.log('Carregando questionário de:', endpoint);
+      console.log('isAdmin:', isAdmin);
+      console.log('URL completa:', window.location.origin + endpoint);
         
       const templateRes = await fetch(endpoint, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
       
       console.log('Resposta do servidor:', templateRes.status);
+      const contentType = templateRes.headers.get('content-type');
+      console.log('Content-Type recebido:', contentType);
       
       let templateData = null;
       if (templateRes.ok) {
-        templateData = await templateRes.json();
+        // Verificar se a resposta é JSON antes de tentar fazer parse
+        if (contentType && !contentType.includes('application/json')) {
+          const text = await templateRes.text();
+          console.error('ERRO: Servidor retornou HTML em vez de JSON!');
+          console.error('Primeiros 500 caracteres da resposta:', text.substring(0, 500));
+          throw new Error('Servidor retornou HTML em vez de JSON');
+        }
+        
+        try {
+          templateData = await templateRes.json();
+        } catch (parseError) {
+          console.error('Erro ao fazer parse do JSON:', parseError);
+          console.log('Response status:', templateRes.status);
+          try {
+            const clonedResponse = templateRes.clone();
+            const text = await clonedResponse.text();
+            console.log('Response text:', text.substring(0, 500));
+          } catch (e) {
+            console.log('Não foi possível ler o texto da resposta');
+          }
+          throw new Error('Invalid JSON response');
+        }
         
         // Aplicar ordenação às perguntas ao carregar
         // Se houver ordem personalizada, usar ela; senão, aplicar padrão
@@ -213,14 +242,23 @@ export default function QuestionnaireUnified() {
         }
       } else if (templateRes.status === 403) {
         // Questionário existe mas não está disponível
-        const errorData = await templateRes.json();
-        console.log('Questionário não disponível:', errorData);
-        setTemplate(null);
-        if (!preserveSuccessMessage) {
-          setError(errorData.error || 'Questionário ainda não está disponível');
+        try {
+          const errorData = await templateRes.json();
+          console.log('Questionário não disponível:', errorData);
+          setTemplate(null);
+          if (!preserveSuccessMessage) {
+            setError(errorData.error || 'Questionário ainda não está disponível');
+          }
+        } catch (parseErr) {
+          console.error('Erro ao parsear resposta 403:', parseErr);
+          setTemplate(null);
+          if (!preserveSuccessMessage) {
+            setError('Questionário ainda não está disponível');
+          }
         }
       } else {
         // Outro erro
+        console.log(`Status não tratado: ${templateRes.status}`);
         setTemplate(null);
       }
 
@@ -249,11 +287,24 @@ export default function QuestionnaireUnified() {
       }
     } catch (err) {
       console.error('Erro em loadQuestionnaire:', err);
-      // Não mostrar erro se o template simplesmente não existe ainda
-      // ou se estamos preservando mensagem de sucesso
-      if (!preserveSuccessMessage && template) {
-        // Só mostrar erro se havia um template e algo deu errado
-        setError('Erro ao carregar questionário');
+      // Só mostrar erro se:
+      // 1. Não estamos preservando mensagem de sucesso
+      // 2. É um erro real (não apenas template não existe)
+      if (!preserveSuccessMessage) {
+        // Verificar se é um erro de rede/servidor real
+        if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+          setError('Erro de conexão com o servidor. Verifique sua internet.');
+        } else if (err instanceof SyntaxError) {
+          setError('Erro ao processar resposta do servidor.');
+        } else if (err instanceof Error && err.message.includes('HTML em vez de JSON')) {
+          setError('Erro de configuração do servidor. Por favor, verifique se o servidor está rodando corretamente.');
+        } else if (err instanceof Error && err.message.includes('500')) {
+          setError('Erro interno do servidor. Tente novamente mais tarde.');
+        } else if (err instanceof Error) {
+          // Mostrar a mensagem de erro específica
+          setError(err.message);
+        }
+        // Não mostrar erro genérico para outros casos (404, 403, etc - já tratados acima)
       }
     } finally {
       setLoading(false);
@@ -599,16 +650,42 @@ export default function QuestionnaireUnified() {
       } else {
         const responseText = await res.text();
         console.error('Response not OK:', res.status, responseText);
-        try {
-          const data = JSON.parse(responseText);
-          setError(data.error || 'Erro ao enviar questionário');
-        } catch {
-          setError(`Erro no servidor (${res.status}): ${responseText.substring(0, 100)}`);
+        
+        // Tratamento específico por código de status
+        if (res.status === 401) {
+          setError('Sessão expirada. Por favor, faça login novamente.');
+        } else if (res.status === 403) {
+          setError('Você não tem permissão para enviar este questionário.');
+        } else if (res.status === 400) {
+          try {
+            const data = JSON.parse(responseText);
+            setError(data.error || 'Dados inválidos no questionário');
+          } catch {
+            setError('Dados inválidos no questionário');
+          }
+        } else if (res.status === 500 || res.status === 503) {
+          setError('Erro interno do servidor. Tente novamente em alguns instantes.');
+        } else {
+          try {
+            const data = JSON.parse(responseText);
+            setError(data.error || data.message || 'Erro ao enviar questionário');
+          } catch {
+            setError(`Erro no servidor (${res.status}): ${responseText.substring(0, 100)}`);
+          }
         }
       }
     } catch (err) {
       console.error('Full error details:', err);
-      setError(`Erro ao enviar questionário: ${(err as Error)?.message || 'Erro desconhecido'}`);
+      console.error('Error type:', err instanceof Error ? err.constructor.name : typeof err);
+      console.error('Error message:', (err as Error)?.message);
+      console.error('Error stack:', (err as Error)?.stack);
+      
+      // Se for erro de rede, tentar entender melhor
+      if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+        setError('Erro de conexão com o servidor. Verifique se o servidor está rodando.');
+      } else {
+        setError(`Erro ao enviar questionário: ${(err as Error)?.message || 'Erro desconhecido'}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -747,7 +824,7 @@ export default function QuestionnaireUnified() {
         // Formato do valor: { answer: 'Sim' | 'Não', selectedOptions?: string[] }
         const yesNoValue = typeof value === 'object' ? value : { answer: '', selectedOptions: [] };
         // Para daily_mass_availability, só mostra opções quando responde "Apenas em alguns dias"
-        // Para alternative_times, mostra quando responde "Sim"
+        // Para other_times_available, mostra quando responde "Sim"
         const showOptions = question.id === 'daily_mass_availability' 
           ? yesNoValue.answer === 'Apenas em alguns dias'
           : yesNoValue.answer === 'Sim';
@@ -759,10 +836,10 @@ export default function QuestionnaireUnified() {
               value={yesNoValue.answer || ''} 
               onValueChange={(val) => {
                 // Para daily_mass_availability com "Apenas em alguns dias", mantém seleções
-                // Para alternative_times com "Sim", mantém seleções
+                // Para other_times_available com "Sim", mantém seleções
                 const shouldKeepSelections = 
                   (question.id === 'daily_mass_availability' && val === 'Apenas em alguns dias') ||
-                  (question.id === 'alternative_times' && val === 'Sim');
+                  (question.id === 'other_times_available' && val === 'Sim');
                 
                 const newValue = {
                   answer: val,
@@ -790,6 +867,8 @@ export default function QuestionnaireUnified() {
                 <p className="text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">
                   {question.id === 'daily_mass_availability' 
                     ? 'Selecione os dias que você pode servir:' 
+                    : question.id === 'other_times_available'
+                    ? 'Selecione os horários disponíveis:'
                     : question.id.includes('st_jude_mass')
                     ? 'Selecione os horários que você pode servir:'
                     : 'Selecione os horários disponíveis:'}

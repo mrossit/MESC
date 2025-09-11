@@ -6,6 +6,7 @@ import { authenticateToken, requireRole, AuthRequest } from "./auth";
 import authRoutes from "./authRoutes";
 import { passwordResetRoutes } from "./passwordResetRoutes";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
+import questionnaireRoutes from "./routes/questionnaires";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -18,6 +19,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Password reset routes
   app.use('/api/password-reset', passwordResetRoutes);
+  
+  // Questionnaire routes (IMPORTANTE: registrar as rotas regulares ANTES das admin)
+  app.use('/api/questionnaires', questionnaireRoutes);
   
   // Questionnaire admin routes
   app.use('/api/questionnaires/admin', questionnaireAdminRoutes);

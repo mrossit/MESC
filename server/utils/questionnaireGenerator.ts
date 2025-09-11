@@ -112,37 +112,24 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     order: 4
   });
 
-  // 5. Disponibilidade para outros horários
+  // 5. Disponibilidade para outros horários (pergunta unificada)
   questions.push({
     id: 'other_times_available',
-    type: 'multiple_choice',
+    type: 'yes_no_with_options',
     question: 'Este mês você poderá servir em outros horários além do seu horário principal?',
     options: ['Sim', 'Não'],
     required: false,
     category: 'regular',
     metadata: {
       dependsOn: 'monthly_availability',
-      showIf: 'Sim'
+      showIf: 'Sim',
+      conditionalOptions: ['8h', '10h', '19h'],
+      conditionalTrigger: true
     },
     order: 5
   });
 
-  // 6. Seleção de horários alternativos
-  questions.push({
-    id: 'alternative_times',
-    type: 'checkbox',
-    question: 'Selecione os horários disponíveis:',
-    options: ['8h', '10h', '19h'],
-    required: false,
-    category: 'regular',
-    metadata: {
-      dependsOn: 'other_times_available',
-      showIf: 'Sim'
-    },
-    order: 6
-  });
-
-  // 7. Missas diárias 6h30
+  // 6. Missas diárias 6h30
   questions.push({
     id: 'daily_mass_availability',
     type: 'multiple_choice',
@@ -154,10 +141,10 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
       dependsOn: 'monthly_availability',
       showIf: 'Sim'
     },
-    order: 7
+    order: 6
   });
 
-  // 8. Dias específicos para missas diárias
+  // 7. Dias específicos para missas diárias
   questions.push({
     id: 'daily_mass_days',
     type: 'checkbox',
@@ -169,10 +156,10 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
       dependsOn: 'daily_mass_availability',
       showIf: 'Apenas em alguns dias'
     },
-    order: 8
+    order: 7
   });
 
-  // 9. Adoração segunda-feira 22h
+  // 8. Adoração segunda-feira 22h
   questions.push({
     id: 'adoration_monday',
     type: 'multiple_choice',
@@ -184,10 +171,10 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
       dependsOn: 'monthly_availability',
       showIf: 'Sim'
     },
-    order: 9
+    order: 8
   });
 
-  // 10. Eventos especiais do mês
+  // 9. Eventos especiais do mês
   // Para setembro, adicionar São Miguel Arcanjo (29/09)
   if (month === 9) {
     questions.push({
@@ -203,7 +190,7 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         dependsOn: 'monthly_availability',
         showIf: 'Sim'
       },
-      order: 10
+      order: 9
     });
   }
 
@@ -223,7 +210,7 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         dependsOn: 'monthly_availability',
         showIf: 'Sim'
       },
-      order: 11 + index
+      order: 10 + index
     });
   });
 
