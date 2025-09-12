@@ -31,7 +31,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import Layout from '@/components/layout';
+import { Layout } from '@/components/layout';
 
 interface GeneratedSchedule {
   date: string;
