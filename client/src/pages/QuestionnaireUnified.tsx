@@ -38,6 +38,7 @@ type Question = {
     conditionalTrigger?: boolean;
     dependsOn?: string;
     enabledWhen?: string | string[];
+    showIf?: string; // Condição para mostrar a pergunta
     conditionalOptions?: string[]; // Opções que aparecem quando responde "Sim"
     filterMode?: 'exclude' | 'include'; // Modo de filtro para opções condicionais
     sundayDates?: string[]; // Datas dos domingos do mês
@@ -823,11 +824,16 @@ export default function QuestionnaireUnified() {
       case 'yes_no_with_options':
         // Formato do valor: { answer: 'Sim' | 'Não', selectedOptions?: string[] }
         const yesNoValue = typeof value === 'object' ? value : { answer: '', selectedOptions: [] };
-        // Para daily_mass_availability, só mostra opções quando responde "Apenas em alguns dias"
-        // Para other_times_available, mostra quando responde "Sim"
-        const showOptions = question.id === 'daily_mass_availability' 
-          ? yesNoValue.answer === 'Apenas em alguns dias'
-          : yesNoValue.answer === 'Sim';
+        // Determinar quando mostrar opções condicionais baseado no tipo de pergunta
+        const getConditionalTrigger = () => {
+          if (question.id === 'daily_mass_availability') {
+            return 'Apenas em alguns dias';
+          }
+          // Para outras perguntas yes_no_with_options (como other_times_available)
+          return 'Sim';
+        };
+        
+        const showOptions = yesNoValue.answer === getConditionalTrigger();
         
         return (
           <div className="space-y-4">
@@ -835,11 +841,9 @@ export default function QuestionnaireUnified() {
             <RadioGroup 
               value={yesNoValue.answer || ''} 
               onValueChange={(val) => {
-                // Para daily_mass_availability com "Apenas em alguns dias", mantém seleções
-                // Para other_times_available com "Sim", mantém seleções
-                const shouldKeepSelections = 
-                  (question.id === 'daily_mass_availability' && val === 'Apenas em alguns dias') ||
-                  (question.id === 'other_times_available' && val === 'Sim');
+                // Mantém as seleções quando a resposta é o trigger condicional específico
+                const conditionalTrigger = getConditionalTrigger();
+                const shouldKeepSelections = val === conditionalTrigger;
                 
                 const newValue = {
                   answer: val,
@@ -1747,8 +1751,7 @@ export default function QuestionnaireUnified() {
                   // Modo resposta - formulário de respostas
                   <div className="space-y-6">
                     {/* Debug info */}
-                    {console.log('Renderizando modo respond, template status:', template?.status)}
-                    {/* Botão de retorno ao modo administração */}
+                                    {/* Botão de retorno ao modo administração */}
                     {isAdmin && (
                       <div className="flex justify-start mb-4">
                         <Button onClick={() => setMode('admin')} variant="outline" className="gap-2">
@@ -1760,9 +1763,10 @@ export default function QuestionnaireUnified() {
                     
                     {template.questions.filter((question) => {
                       // Verificar se a pergunta deve ser exibida baseado em dependências
-                      if (question.metadata?.dependsOn && question.metadata?.showIf) {
+                      if (question.metadata?.dependsOn && (question.metadata?.showIf || question.metadata?.enabledWhen)) {
                         const dependencyValue = responses[question.metadata.dependsOn];
-                        return dependencyValue === question.metadata.showIf;
+                        const expectedValue = question.metadata.showIf || question.metadata.enabledWhen;
+                        return dependencyValue === expectedValue;
                       }
                       return true; // Mostrar perguntas sem dependências
                     }).map((question) => (

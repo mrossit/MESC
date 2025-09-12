@@ -129,34 +129,20 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     order: 5
   });
 
-  // 6. Missas diárias 6h30
+  // 6. Missas diárias 6h30 (pergunta unificada com opções condicionais)
   questions.push({
     id: 'daily_mass_availability',
-    type: 'multiple_choice',
+    type: 'yes_no_with_options',
     question: 'Este mês você pode servir nas missas diárias das 6h30?',
     options: ['Sim', 'Não', 'Apenas em alguns dias'],
     required: false,
     category: 'daily',
     metadata: {
       dependsOn: 'monthly_availability',
-      showIf: 'Sim'
+      showIf: 'Sim',
+      conditionalOptions: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']
     },
     order: 6
-  });
-
-  // 7. Dias específicos para missas diárias
-  questions.push({
-    id: 'daily_mass_days',
-    type: 'checkbox',
-    question: 'Selecione os dias que você pode servir:',
-    options: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
-    required: false,
-    category: 'daily',
-    metadata: {
-      dependsOn: 'daily_mass_availability',
-      showIf: 'Apenas em alguns dias'
-    },
-    order: 7
   });
 
   // 8. Adoração segunda-feira 22h
