@@ -3,6 +3,19 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 
+// Global error handlers to prevent server crashes
+process.on('uncaughtException', (error) => {
+  log(`Uncaught Exception: ${error.message}`);
+  console.error('Uncaught Exception:', error);
+  // Don't exit the process, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  log(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, just log the error
+});
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -27,14 +40,37 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add health check route before other routes
+  app.get('/health', (_req: Request, res: Response) => {
+    res.status(200).json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Log the error instead of throwing it
+    log(`Error ${status} on ${req.method} ${req.path}: ${message}`);
+    console.error('Request error:', {
+      method: req.method,
+      path: req.path,
+      status,
+      message,
+      stack: err.stack
+    });
+
+    // Send error response to client
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
+    
+    // Do NOT throw the error - this was causing server crashes
   });
 
   // importantly only setup vite in development and after

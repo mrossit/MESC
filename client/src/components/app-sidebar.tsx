@@ -58,6 +58,23 @@ import { useNavigate } from "@/hooks/use-navigate";
 import { useState } from "react";
 import { MinisterTutorial } from "@/components/minister-tutorial";
 
+// Interface para items do menu
+interface MenuItem {
+  title: string;
+  href?: string;
+  icon: React.ComponentType<any>;
+  roles: string[];
+  badge?: number | string;
+  items?: SubMenuItem[];
+}
+
+interface SubMenuItem {
+  title: string;
+  href: string;
+  roles: string[];
+  badge?: number | string;
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
   const navigate = useNavigate();
@@ -102,7 +119,7 @@ export function AppSidebar() {
     navigate("/login");
   };
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       title: "Dashboard",
       href: "/dashboard",
@@ -117,6 +134,7 @@ export function AppSidebar() {
         { title: "Questionário", href: "/questionnaire", roles: ["gestor", "coordenador", "ministro"] },
         { title: "Acompanhamento", href: "/questionnaire-responses", roles: ["gestor", "coordenador"] },
         { title: "Escalas", href: "/schedules", roles: ["gestor", "coordenador", "ministro"] },
+        { title: "Geração Automática", href: "/schedules/auto-generation", roles: ["gestor", "coordenador"] },
         { title: "Substituições", href: "/schedules/substitutions", roles: ["gestor", "coordenador", "ministro"] },
       ]
     },

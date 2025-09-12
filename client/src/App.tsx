@@ -25,6 +25,7 @@ import QuestionnaireResponses from "@/pages/QuestionnaireResponses";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import Substitutions from "@/pages/Substitutions";
+import AutoScheduleGeneration from "@/pages/AutoScheduleGeneration";
 import Formation from "@/pages/formation";
 import Communication from "@/pages/communication";
 import Install from "@/pages/install";
@@ -53,6 +54,12 @@ function Router() {
       <Route path="/schedules/substitutions">
         <AuthGuard>
           <Substitutions />
+        </AuthGuard>
+      </Route>
+      
+      <Route path="/schedules/auto-generation">
+        <AuthGuard allowedRoles={["gestor", "coordenador"]}>
+          <AutoScheduleGeneration />
         </AuthGuard>
       </Route>
       
