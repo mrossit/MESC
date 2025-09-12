@@ -61,7 +61,7 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
   questions.push({
     id: 'monthly_availability',
     type: 'multiple_choice',
-    question: `No mês de ${capitalizedMonth}, dedicado ao tema "${theme}", você tem disponibilidade para servir no seu horário de costume?`,
+    question: `Neste mês de ${capitalizedMonth} dedicado à "${theme}", você tem disponibilidade para servir no seu horário de costume?`,
     options: ['Sim', 'Não'],
     required: true,
     category: 'regular',
