@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { sign, verify, type Secret, type SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
@@ -46,20 +46,17 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // Função para gerar JWT
 export function generateToken(user: any): string {
-  const secret: Secret = JWT_SECRET;
-  const options: SignOptions = { 
-    expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as SignOptions['expiresIn'] 
-  };
-  
-  return sign(
+  return jwt.sign(
     {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role
     },
-    secret,
-    options
+    JWT_SECRET,
+    { 
+      expiresIn: JWT_EXPIRES_IN
+    } as any
   );
 }
 
@@ -67,7 +64,7 @@ export function generateToken(user: any): string {
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-  const secret: Secret = JWT_SECRET;
+  const secret: string = JWT_SECRET;
 
   if (!token) {
     // Verifica se há token no cookie também
@@ -77,7 +74,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     }
     
     // Usa o token do cookie
-    verify(cookieToken, secret, (err: any, user: any) => {
+    jwt.verify(cookieToken, secret, (err: any, user: any) => {
       if (err) {
         return res.status(403).json({ message: 'Token inválido ou expirado' });
       }
@@ -87,7 +84,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     return;
   }
 
-  verify(token, secret, (err: any, user: any) => {
+  jwt.verify(token, secret, (err: any, user: any) => {
     if (err) {
       return res.status(403).json({ message: 'Token inválido ou expirado' });
     }
