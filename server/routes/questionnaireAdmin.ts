@@ -233,8 +233,8 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
           description: `Questionário de disponibilidade para ${getMonthName(data.month)} de ${data.year}`,
           status: 'draft',
           createdById: userId,
-          targetUserIds: JSON.stringify([]),
-          notifiedUserIds: JSON.stringify([])
+          targetUserIds: [],
+          notifiedUserIds: []
         })
         .returning();
 
@@ -517,7 +517,7 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
           message: isResend 
             ? `O questionário de ${monthNames[month - 1]} de ${year} foi atualizado. Por favor, revise e atualize suas respostas se necessário.`
             : `O questionário de disponibilidade para ${monthNames[month - 1]} de ${year} está disponível. Por favor, responda o quanto antes.`,
-          type: isResend ? 'warning' : 'info'
+          type: 'announcement'
         });
       }
     }
@@ -794,7 +794,7 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
         // Parse responses to get availability answer
         let availability = 'Não informado';
         try {
-          const parsedResponses = JSON.parse(response.responses);
+          const parsedResponses = JSON.parse(response.responses as string);
           // Nova estrutura: monthly_availability com objeto {answer, selectedOptions}
           const monthlyAvailability = parsedResponses.find((r: any) => r.questionId === 'monthly_availability');
           if (monthlyAvailability) {
@@ -963,7 +963,7 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
     const questions = template.questions as any[];
     
     responses.forEach(response => {
-      const parsedResponses = JSON.parse(response.responses);
+      const parsedResponses = JSON.parse(response.responses as string);
       
       parsedResponses.forEach((resp: any) => {
         if (!summary[resp.questionId]) {
