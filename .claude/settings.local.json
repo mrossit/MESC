@@ -29,7 +29,8 @@
       "Bash(git log:*)",
       "Bash(echo $PORT)",
       "Bash(echo:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
