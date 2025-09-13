@@ -1,16 +1,8 @@
 import { Router } from "express";
-import { db } from "../db-config";
-import { scheduleAssignments, ministers, users } from "@shared/schema";
+import { db } from "../db";
+import { schedules, users } from "@shared/schema";
 import { eq } from "drizzle-orm";
-// Usar implementações inline para evitar problemas de import
-const requireAuth = () => (req: any, res: any, next: any) => {
-  if (!req.session?.userId) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  req.user = { id: req.session.userId, role: req.session.userRole };
-  next();
-};
-
+import { authenticateToken, requireRole, AuthRequest } from "../auth";
 const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
   // Log simples por enquanto - pode ser expandido depois
   console.log(`Activity: ${userId} - ${action}: ${description}`, metadata);
@@ -19,27 +11,23 @@ const logActivity = async (userId: string, action: string, description: string, 
 const router = Router();
 
 // Update assignment
-router.patch("/:id", requireAuth(), async (req, res) => {
+router.patch("/:id", authenticateToken, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
-    // Only coordinators can modify assignments
-    if (req.user?.role !== "coordenador" && req.user?.role !== "gestor") {
-      return res.status(403).json({ message: "Sem permissão para editar escalações" });
-    }
 
-    const { ministerId, position } = req.body;
+    const { ministerId, notes } = req.body;
 
     // Validate required fields
-    if (!ministerId || !position) {
-      return res.status(400).json({ message: "Ministro e posição são obrigatórios" });
+    if (!ministerId) {
+      return res.status(400).json({ message: "Ministro é obrigatório" });
     }
 
     const updatedAssignment = await db
-      .update(scheduleAssignments)
+      .update(schedules)
       .set({ 
         ministerId,
-        position: parseInt(position)
+        notes
       })
-      .where(eq(scheduleAssignments.id, req.params.id))
+      .where(eq(schedules.id, req.params.id))
       .returning();
 
     if (updatedAssignment.length === 0) {
@@ -47,7 +35,7 @@ router.patch("/:id", requireAuth(), async (req, res) => {
     }
 
     await logActivity(
-      req.user.id,
+      req.user!.id,
       "assignment_updated",
       `Escalação modificada`,
       { assignmentId: req.params.id }
@@ -61,16 +49,12 @@ router.patch("/:id", requireAuth(), async (req, res) => {
 });
 
 // Delete assignment
-router.delete("/:id", requireAuth(), async (req, res) => {
+router.delete("/:id", authenticateToken, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
-    // Only coordinators can delete assignments
-    if (req.user?.role !== "coordenador" && req.user?.role !== "gestor") {
-      return res.status(403).json({ message: "Sem permissão para remover escalações" });
-    }
 
     const deletedAssignment = await db
-      .delete(scheduleAssignments)
-      .where(eq(scheduleAssignments.id, req.params.id))
+      .delete(schedules)
+      .where(eq(schedules.id, req.params.id))
       .returning();
 
     if (deletedAssignment.length === 0) {
@@ -78,7 +62,7 @@ router.delete("/:id", requireAuth(), async (req, res) => {
     }
 
     await logActivity(
-      req.user.id,
+      req.user!.id,
       "assignment_deleted",
       `Escalação removida`,
       { assignmentId: req.params.id }
@@ -92,35 +76,31 @@ router.delete("/:id", requireAuth(), async (req, res) => {
 });
 
 // Create new assignment
-router.post("/", requireAuth(), async (req, res) => {
+router.post("/", authenticateToken, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
-    // Only coordinators can create assignments
-    if (req.user?.role !== "coordenador" && req.user?.role !== "gestor") {
-      return res.status(403).json({ message: "Sem permissão para criar escalações" });
-    }
 
-    const { scheduleId, ministerId, date, massTime, position } = req.body;
+    const { ministerId, date, time, type, location, notes } = req.body;
 
     // Validate required fields
-    if (!scheduleId || !ministerId || !date || !massTime || !position) {
-      return res.status(400).json({ message: "Todos os campos são obrigatórios" });
+    if (!ministerId || !date || !time) {
+      return res.status(400).json({ message: "Ministro, data e horário são obrigatórios" });
     }
 
     const newAssignment = await db
-      .insert(scheduleAssignments)
+      .insert(schedules)
       .values({
-        scheduleId,
         ministerId,
-        date: new Date(date),
-        massTime,
-        position: parseInt(position),
-        confirmed: false,
-        createdAt: new Date()
+        date,
+        time,
+        type: type || 'missa',
+        location,
+        notes,
+        status: 'scheduled'
       })
       .returning();
 
     await logActivity(
-      req.user.id,
+      req.user!.id,
       "assignment_created",
       `Nova escalação criada`,
       { assignmentId: newAssignment[0].id }

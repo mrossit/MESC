@@ -3,10 +3,10 @@ import multer from 'multer';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
-import { db } from '../db-config';
+import { db } from '../db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { requireAuth } from '../middleware';
+import { authenticateToken, AuthRequest } from '../auth';
 
 const router = Router();
 
@@ -22,7 +22,7 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: any, file: any, cb: any) => {
     // Aceitar apenas imagens
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -33,7 +33,7 @@ const upload = multer({
 });
 
 // Rota para upload de foto de perfil
-router.post('/profile-photo', requireAuth, upload.single('photo'), async (req, res) => {
+router.post('/profile-photo', authenticateToken, upload.single('photo'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -59,15 +59,15 @@ router.post('/profile-photo', requireAuth, upload.single('photo'), async (req, r
     if (db) {
       await db.update(users)
         .set({ 
-          profilePhoto: photoUrl
+          photoUrl: photoUrl
         })
         .where(eq(users.id, userId));
     }
 
     // Remover foto antiga se existir
     const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user?.profilePhoto && user.profilePhoto !== photoUrl) {
-      const oldPath = path.join(process.cwd(), user.profilePhoto);
+    if (user?.photoUrl && user.photoUrl !== photoUrl) {
+      const oldPath = path.join(process.cwd(), user.photoUrl);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
       }
@@ -85,16 +85,16 @@ router.post('/profile-photo', requireAuth, upload.single('photo'), async (req, r
 });
 
 // Rota para remover foto de perfil
-router.delete('/profile-photo', requireAuth, async (req, res) => {
+router.delete('/profile-photo', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
 
     // Obter usuário atual
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     
-    if (user?.profilePhoto) {
+    if (user?.photoUrl) {
       // Remover arquivo físico
-      const photoPath = path.join(process.cwd(), user.profilePhoto);
+      const photoPath = path.join(process.cwd(), user.photoUrl);
       if (fs.existsSync(photoPath)) {
         fs.unlinkSync(photoPath);
       }
@@ -102,7 +102,7 @@ router.delete('/profile-photo', requireAuth, async (req, res) => {
       // Limpar campo no banco de dados
       await db.update(users)
         .set({ 
-          profilePhoto: null
+          photoUrl: null
         })
         .where(eq(users.id, userId));
     }

@@ -283,7 +283,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
         date: schedule.massTime.date,
         time: schedule.massTime.time,
         type: 'missa',
-        location: schedule.massTime.location || null,
+        location: null,
         ministerId: minister.id,
         status: 'scheduled',
         notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
