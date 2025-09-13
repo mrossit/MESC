@@ -20,7 +20,7 @@ function getMonthName(month: number): string {
 // router.use(requireRole(['gestor', 'coordenador'])); // Aplicado individualmente nas rotas
 
 // Obter questionário atual (mês corrente)
-router.get('/current', requireAuth, async (req: any, res) => {
+router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
   try {
     const now = new Date();
     const month = now.getMonth() + 1;

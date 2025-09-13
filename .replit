@@ -1,5 +1,5 @@
 run = "NODE_ENV=development node node_modules/.bin/tsx server/index.ts"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 
 [[ports]]
 localPort = 5000

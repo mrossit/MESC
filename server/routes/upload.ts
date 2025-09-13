@@ -67,7 +67,7 @@ router.post('/profile-photo', authenticateToken, upload.single('photo'), async (
     // Remover foto antiga se existir
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (user?.photoUrl && user.photoUrl !== photoUrl) {
-      const oldPath = path.join(process.cwd(), user.photoUrl);
+      const oldPath = path.join(process.cwd(), user.photoUrl.replace(/^\//, ''));
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
       }
@@ -94,7 +94,7 @@ router.delete('/profile-photo', authenticateToken, async (req: AuthRequest, res)
     
     if (user?.photoUrl) {
       // Remover arquivo físico
-      const photoPath = path.join(process.cwd(), user.photoUrl);
+      const photoPath = path.join(process.cwd(), user.photoUrl.replace(/^\//, ''));
       if (fs.existsSync(photoPath)) {
         fs.unlinkSync(photoPath);
       }
