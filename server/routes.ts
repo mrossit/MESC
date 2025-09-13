@@ -326,6 +326,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint temporário para seeding - REMOVER APÓS USO
+  app.post('/api/admin/seed', async (req, res) => {
+    try {
+      const { hashPassword } = await import("./auth");
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      
+      console.log('🔐 Executando seeding via API...');
+      
+      // Dados do administrador master
+      const adminData = {
+        email: 'rossit@icloud.com',
+        password: '123Pegou$&@',
+        name: 'Marco Rossit',
+        role: 'gestor' as const,
+      };
+      
+      // Hash da senha
+      const passwordHash = await hashPassword(adminData.password);
+      
+      // Cria o usuário admin
+      const [admin] = await db
+        .insert(users)
+        .values({
+          email: adminData.email,
+          passwordHash,
+          name: adminData.name,
+          role: adminData.role,
+          status: 'active',
+          requiresPasswordChange: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (admin) {
+        console.log('✅ Usuário administrador criado com sucesso!');
+        res.json({
+          success: true,
+          message: 'Usuário administrador criado com sucesso!',
+          user: {
+            email: adminData.email,
+            name: adminData.name,
+            role: adminData.role
+          }
+        });
+      } else {
+        console.log('ℹ️  Usuário administrador já existe.');
+        res.json({
+          success: true,
+          message: 'Usuário administrador já existe.',
+          user: {
+            email: adminData.email,
+            name: adminData.name,
+            role: adminData.role
+          }
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao criar usuário via API:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao criar usuário administrador',
+        error: error.message
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
