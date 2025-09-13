@@ -41,28 +41,8 @@ app.use((req, res, next) => {
 
 (async () => {
   // Add health check routes before other routes
-  // Root endpoint that handles both health checks and browser requests
-  app.get('/', (req: Request, res: Response, next) => {
-    // Check if this is a health check request (not a browser)
-    const acceptHeader = req.get('Accept') || '';
-    const userAgent = req.get('User-Agent') || '';
-    
-    // If request doesn't accept HTML or looks like a health check probe, respond with health status
-    if (!acceptHeader.includes('text/html') || 
-        userAgent.includes('HealthCheck') || 
-        userAgent.includes('GoogleHC') ||
-        userAgent.includes('kube-probe')) {
-      return res.status(200).json({ 
-        status: 'ok', 
-        message: 'Server is running',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-      });
-    }
-    
-    // Otherwise, let it continue to serve the React app
-    next();
-  });
+  // Root endpoint - removed to let Vite/static handler serve the React app
+  // Health checks should use /health endpoint instead
 
   app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({ 
