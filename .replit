@@ -10,3 +10,6 @@ channel = "stable-24_05"
 
 [env]
 NODE_ENV = "development"
+
+[deployment]
+deploymentTarget = "cloudrun"
