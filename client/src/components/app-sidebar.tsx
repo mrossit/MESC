@@ -13,6 +13,7 @@ import {
   FileText,
   UserCheck,
   ChevronRight,
+  KeyRound,
   LogOut,
   User,
   HelpCircle,
@@ -368,6 +369,7 @@ export function AppSidebar() {
                 )}
                 <DropdownMenuItem asChild>
                   <Link href="/change-password">
+                    <KeyRound className="mr-2 h-4 w-4" />
                     <span>Alterar Senha</span>
                   </Link>
                 </DropdownMenuItem>
