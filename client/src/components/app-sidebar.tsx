@@ -356,15 +356,20 @@ export function AppSidebar() {
                   </Link>
                 </DropdownMenuItem>
                 {user?.role === "ministro" && (
-                  <DropdownMenuItem onClick={() => {
-                    setIsTutorialOpen(true);
-                    // Collapse sidebar on mobile when tutorial opens
-                    if (isMobile) {
-                      setOpenMobile(false);
-                    }
-                  }}>
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Tutorial do Sistema</span>
+                  <DropdownMenuItem asChild>
+                    <button 
+                      onClick={() => {
+                        setIsTutorialOpen(true);
+                        // Collapse sidebar on mobile when tutorial opens
+                        if (isMobile) {
+                          setOpenMobile(false);
+                        }
+                      }}
+                      className="w-full text-left"
+                    >
+                      <HelpCircle className="mr-2 h-4 w-4" />
+                      <span>Tutorial do Sistema</span>
+                    </button>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
