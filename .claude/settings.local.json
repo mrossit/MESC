@@ -30,7 +30,9 @@
       "Bash(echo $PORT)",
       "Bash(echo:*)",
       "Bash(openssl rand:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(NODE_ENV=production npx tsx scripts/create-production-user.ts)",
+      "Bash(NODE_ENV=production npm start)"
     ],
     "deny": [],
     "ask": []
