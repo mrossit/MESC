@@ -379,9 +379,11 @@ export function AppSidebar() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sair</span>
+                <DropdownMenuItem asChild>
+                  <button onClick={handleLogout} className="w-full text-left">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
+                  </button>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
