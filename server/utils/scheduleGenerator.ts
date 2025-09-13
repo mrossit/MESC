@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import { db } from '../db.js';
-import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema.js';
+import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema';
 import { eq, and, gte, lte, desc, sql, ne } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

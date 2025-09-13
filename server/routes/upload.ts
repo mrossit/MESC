@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { db } from '../db-config';
-import { users } from '../../shared/schema-simple';
+import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware';
 

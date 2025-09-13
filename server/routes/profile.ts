@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware';
-import { storage } from '../db-config';
+import { AuthRequest, authenticateToken } from '../auth';
+import { storage } from '../storage';
 
 const router = Router();
 
 // Middleware para autenticação
-router.use(requireAuth);
+router.use(authenticateToken);
 
 // Obter perfil do usuário atual
-router.get('/', async (req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // Atualizar perfil do usuário
-router.put('/', async (req, res) => {
+router.put('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     
@@ -69,11 +69,12 @@ router.post('/photo', async (req, res) => {
 });
 
 // Obter familiares do usuário
-router.get('/family', async (req, res) => {
+// TODO: Implementar funcionalidade de familiares no storage
+router.get('/family', async (req: AuthRequest, res) => {
   try {
-    const userId = req.user!.id;
-    const familyMembers = await storage.getFamilyMembers(userId);
-    return res.json(familyMembers);
+    // const userId = req.user!.id;
+    // const familyMembers = await storage.getFamilyMembers(userId);
+    return res.json([]);
   } catch (error) {
     console.error('Error fetching family:', error);
     res.status(500).json({ error: 'Failed to fetch family members' });
@@ -81,9 +82,10 @@ router.get('/family', async (req, res) => {
 });
 
 // Adicionar familiar
-router.post('/family', async (req, res) => {
+// TODO: Implementar funcionalidade de familiares no storage
+router.post('/family', async (req: AuthRequest, res) => {
   try {
-    const userId = req.user!.id;
+    // const userId = req.user!.id;
     
     const schema = z.object({
       relatedUserId: z.string(),
@@ -93,48 +95,33 @@ router.post('/family', async (req, res) => {
     const { relatedUserId, relationshipType } = schema.parse(req.body);
     
     // Validar que não está adicionando a si mesmo
-    if (relatedUserId === userId) {
-      return res.status(400).json({ error: 'Cannot add yourself as a family member' });
-    }
+    // if (relatedUserId === userId) {
+    //   return res.status(400).json({ error: 'Cannot add yourself as a family member' });
+    // }
     
     // Adicionar no banco de dados
-    const relationship = await storage.addFamilyMember(userId, relatedUserId, relationshipType);
+    // const relationship = await storage.addFamilyMember(userId, relatedUserId, relationshipType);
     
     // Buscar informações do usuário relacionado
-    const relatedUser = await storage.getUser(relatedUserId);
+    // const relatedUser = await storage.getUser(relatedUserId);
     
-    return res.json({ 
-      message: 'Family member added successfully',
-      id: relationship.id,
-      relatedUserId: relationship.relatedUserId,
-      relationshipType: relationship.relationshipType,
-      relatedUser: relatedUser ? {
-        id: relatedUser.id,
-        name: relatedUser.name,
-        email: relatedUser.email,
-        profilePhoto: relatedUser.profilePhoto
-      } : null
+    return res.status(501).json({ 
+      error: 'Family functionality not implemented yet'
     });
   } catch (error) {
     console.error('Error adding family member:', error);
-    if (error instanceof Error && error.message === 'Relationship already exists') {
-      return res.status(400).json({ error: 'This family relationship already exists' });
-    }
     res.status(500).json({ error: 'Failed to add family member' });
   }
 });
 
 // Remover familiar
-router.delete('/family/:id', async (req, res) => {
+// TODO: Implementar funcionalidade de familiares no storage
+router.delete('/family/:id', async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params;
-    const success = await storage.removeFamilyMember(id);
+    // const { id } = req.params;
+    // const success = await storage.removeFamilyMember(id);
     
-    if (success) {
-      return res.json({ message: 'Family member removed successfully' });
-    } else {
-      return res.status(404).json({ error: 'Family relationship not found' });
-    }
+    return res.status(501).json({ error: 'Family functionality not implemented yet' });
   } catch (error) {
     console.error('Error removing family member:', error);
     res.status(500).json({ error: 'Failed to remove family member' });

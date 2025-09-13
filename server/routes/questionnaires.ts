@@ -6,10 +6,10 @@ import {
   questionnaireResponses,
   users,
   notifications
-} from '../../shared/schema';
+} from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
-import { authenticateToken as requireAuth, AuthRequest } from '../auth';
+import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
 
 const router = Router();
 
@@ -75,7 +75,7 @@ function analyzeResponses(responses: any[]) {
 }
 
 // Criar ou atualizar template de questionário para um mês específico
-router.post('/templates', requireAuth, async (req: AuthRequest, res) => {
+router.post('/templates', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
     const schema = z.object({
       month: z.number().min(1).max(12),
@@ -565,7 +565,7 @@ router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, 
 });
 
 // Encerrar questionário (impedir novas respostas)
-router.patch('/admin/templates/:id/close', requireAuth, async (req: AuthRequest, res) => {
+router.patch('/admin/templates/:id/close', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id!;
     const templateId = req.params.id;
@@ -613,7 +613,7 @@ router.patch('/admin/templates/:id/close', requireAuth, async (req: AuthRequest,
 });
 
 // Reabrir questionário (permitir novas respostas)
-router.patch('/admin/templates/:id/reopen', requireAuth, async (req: AuthRequest, res) => {
+router.patch('/admin/templates/:id/reopen', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id!;
     const templateId = req.params.id;

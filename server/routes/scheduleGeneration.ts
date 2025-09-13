@@ -5,7 +5,7 @@ import type { AuthRequest } from '../auth';
 import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator.js';
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
-import { schedules, users } from '@shared/schema.js';
+import { schedules, users } from '@shared/schema';
 import { and, gte, lte, eq, sql } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';

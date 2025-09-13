@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { schedules, substitutionRequests, users } from "../../shared/schema";
-import { authenticateToken as requireAuth, AuthRequest } from "../auth";
+import { schedules, substitutionRequests, users } from "@shared/schema";
+import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 
 // Stub implementations for missing functions
@@ -210,7 +210,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // Create new schedule
-router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can create schedules
     if (!req.user?.id) {
@@ -280,7 +280,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // Update schedule
-router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+router.put("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can update schedules
     if (!req.user?.id) {
@@ -318,7 +318,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // Publish schedule
-router.patch("/:id/publish", requireAuth, async (req: AuthRequest, res: Response) => {
+router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can publish schedules
     if (!req.user?.id) {
@@ -358,7 +358,7 @@ router.patch("/:id/publish", requireAuth, async (req: AuthRequest, res: Response
 });
 
 // Delete schedule
-router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     console.log("DELETE schedule request for ID:", req.params.id);
     
@@ -414,7 +414,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // Unpublish schedule (cancel publication)
-router.patch("/:id/unpublish", requireAuth, async (req: AuthRequest, res: Response) => {
+router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can unpublish schedules
     if (!req.user?.id) {
@@ -452,7 +452,7 @@ router.patch("/:id/unpublish", requireAuth, async (req: AuthRequest, res: Respon
 });
 
 // Generate intelligent schedule
-router.post("/:scheduleId/generate", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/:scheduleId/generate", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can generate schedules
     if (!req.user?.id) {

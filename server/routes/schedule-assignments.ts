@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db-config";
-import { scheduleAssignments, ministers, users } from "../../shared/schema-simple";
+import { scheduleAssignments, ministers, users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 // Usar implementações inline para evitar problemas de import
 const requireAuth = () => (req: any, res: any, next: any) => {

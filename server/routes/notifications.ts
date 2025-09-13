@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { requireAuth } from "../middleware/auth";
-import { db, storage } from "../db-config";
-import { notifications, users } from "@shared/schema-simple";
+import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { db } from "../db";
+import { storage } from "../storage";
+import { notifications, users } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
@@ -17,9 +18,9 @@ const createNotificationSchema = z.object({
 });
 
 // Listar notificações do usuário
-router.get("/", requireAuth(), async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const notifications = await storage.getUserNotifications(req.session.userId!);
+    const notifications = await storage.getUserNotifications(req.user!.id);
     res.json(notifications);
   } catch (error) {
     res.status(500).json({ error: "Erro ao buscar notificações" });
@@ -27,9 +28,11 @@ router.get("/", requireAuth(), async (req: Request, res: Response) => {
 });
 
 // Contar notificações não lidas
-router.get("/unread-count", requireAuth(), async (req: Request, res: Response) => {
+router.get("/unread-count", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const count = await storage.getUnreadNotificationCount(req.session.userId!);
+    // Storage doesn't have getUnreadNotificationCount, use getUserNotifications and filter
+    const allNotifications = await storage.getUserNotifications(req.user!.id);
+    const count = allNotifications.filter(n => !n.read).length;
     res.json({ count });
   } catch (error) {
     res.status(500).json({ error: "Erro ao contar notificações" });
@@ -37,7 +40,7 @@ router.get("/unread-count", requireAuth(), async (req: Request, res: Response) =
 });
 
 // Marcar notificação como lida
-router.patch("/:id/read", requireAuth(), async (req: Request, res: Response) => {
+router.patch("/:id/read", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -46,7 +49,7 @@ router.patch("/:id/read", requireAuth(), async (req: Request, res: Response) => 
       .from(notifications)
       .where(and(
         eq(notifications.id, id),
-        eq(notifications.userId, req.session.userId!)
+        eq(notifications.userId, req.user!.id)
       ))
       .limit(1);
     
@@ -54,33 +57,30 @@ router.patch("/:id/read", requireAuth(), async (req: Request, res: Response) => 
       return res.status(404).json({ error: "Notificação não encontrada" });
     }
     
-    const success = await storage.markNotificationAsRead(id);
-    if (success) {
-      res.json({ message: "Notificação marcada como lida" });
-    } else {
-      res.status(500).json({ error: "Erro ao marcar notificação como lida" });
-    }
+    await storage.markNotificationAsRead(id);
+    res.json({ message: "Notificação marcada como lida" });
   } catch (error) {
     res.status(500).json({ error: "Erro ao processar requisição" });
   }
 });
 
 // Marcar todas as notificações como lidas
-router.patch("/read-all", requireAuth(), async (req: Request, res: Response) => {
+router.patch("/read-all", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const success = await storage.markAllNotificationsAsRead(req.session.userId!);
-    if (success) {
-      res.json({ message: "Todas as notificações foram marcadas como lidas" });
-    } else {
-      res.status(500).json({ error: "Erro ao marcar notificações como lidas" });
-    }
+    // Storage doesn't have markAllNotificationsAsRead, get all and mark each
+    const userNotifications = await storage.getUserNotifications(req.user!.id);
+    const unreadNotifications = userNotifications.filter(n => !n.read);
+    
+    await Promise.all(unreadNotifications.map(n => storage.markNotificationAsRead(n.id)));
+    
+    res.json({ message: "Todas as notificações foram marcadas como lidas" });
   } catch (error) {
     res.status(500).json({ error: "Erro ao processar requisição" });
   }
 });
 
 // Criar notificação de convite para missa (apenas coordenadores e reitores)
-router.post("/mass-invite", requireAuth(["coordenador", "gestor"]), async (req: Request, res: Response) => {
+router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     const { massId, date, time, location, message, urgencyLevel } = req.body;
     
@@ -117,19 +117,15 @@ router.post("/mass-invite", requireAuth(["coordenador", "gestor"]), async (req: 
     const results = await Promise.all(notificationPromises);
     console.log(`Criadas ${results.length} notificações`);
     
-    // Registrar atividade
-    await storage.logActivity({
-      userId: req.session.userId!,
-      action: "mass_invite_sent",
-      description: `Enviou convite para missa de ${date} às ${time}`,
-      metadata: JSON.stringify({ 
-        massId,
-        date,
-        time,
-        location,
-        recipientCount: ministers.length,
-        urgencyLevel 
-      })
+    // Registrar atividade (using console.log since storage.logActivity doesn't exist)
+    console.log(`[Activity Log] mass_invite_sent: Enviou convite para missa de ${date} às ${time}`, {
+      userId: req.user!.id,
+      massId,
+      date,
+      time,
+      location,
+      recipientCount: ministers.length,
+      urgencyLevel 
     });
     
     res.json({ 
@@ -138,12 +134,12 @@ router.post("/mass-invite", requireAuth(["coordenador", "gestor"]), async (req: 
     });
   } catch (error) {
     console.error("Erro ao enviar convite para missa:", error);
-    res.status(500).json({ error: "Erro ao enviar convite", details: error.message });
+    res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 // Criar nova notificação (apenas coordenadores e reitores)
-router.post("/", requireAuth(["coordenador", "gestor"]), async (req: Request, res: Response) => {
+router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     
@@ -155,21 +151,24 @@ router.post("/", requireAuth(["coordenador", "gestor"]), async (req: Request, re
       recipientUserIds = data.recipientIds;
     } else if (data.recipientRole) {
       // Buscar usuários por role
-      let query = db.select({ id: users.id }).from(users);
+      let recipients;
       
       if (data.recipientRole === "all") {
         // Todos os usuários ativos
-        query = query.where(eq(users.status, "active"));
+        recipients = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.status, "active"));
       } else {
         // Role específica
-        query = query.where(and(
-          eq(users.role, data.recipientRole),
-          eq(users.status, "active")
-        ));
+        recipients = await db.select({ id: users.id })
+          .from(users)
+          .where(and(
+            eq(users.role, data.recipientRole),
+            eq(users.status, "active")
+          ));
       }
       
-      const recipients = await query;
-      recipientUserIds = recipients.map(r => r.id);
+      recipientUserIds = recipients.map((r: any) => r.id);
     } else {
       // Por padrão, enviar para todos os ministros ativos
       const recipients = await db.select({ id: users.id })
@@ -178,7 +177,7 @@ router.post("/", requireAuth(["coordenador", "gestor"]), async (req: Request, re
           eq(users.role, "ministro"),
           eq(users.status, "active")
         ));
-      recipientUserIds = recipients.map(r => r.id);
+      recipientUserIds = recipients.map((r: any) => r.id);
     }
     
     // Criar notificações para cada destinatário
@@ -194,15 +193,11 @@ router.post("/", requireAuth(["coordenador", "gestor"]), async (req: Request, re
     
     await Promise.all(notificationPromises);
     
-    // Registrar atividade
-    await storage.logActivity({
-      userId: req.session.userId!,
-      action: "notification_sent",
-      description: `Enviou comunicado: ${data.title}`,
-      metadata: JSON.stringify({ 
-        recipientCount: recipientUserIds.length,
-        type: data.type 
-      })
+    // Registrar atividade (using console.log since storage.logActivity doesn't exist)
+    console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {
+      userId: req.user!.id,
+      recipientCount: recipientUserIds.length,
+      type: data.type 
     });
     
     res.json({ 
@@ -219,12 +214,12 @@ router.post("/", requireAuth(["coordenador", "gestor"]), async (req: Request, re
 });
 
 // Deletar notificação (própria ou coordenadores podem deletar qualquer uma)
-router.delete("/:id", requireAuth(), async (req: Request, res: Response) => {
+router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     
     // Verificar se o usuário é coordenador/reitor
-    const user = await storage.getUser(req.session.userId!);
+    const user = await storage.getUser(req.user!.id);
     const isCoordinator = user && ['coordenador', 'gestor'].includes(user.role);
     
     let notification;
@@ -240,7 +235,7 @@ router.delete("/:id", requireAuth(), async (req: Request, res: Response) => {
         .from(notifications)
         .where(and(
           eq(notifications.id, id),
-          eq(notifications.userId, req.session.userId!)
+          eq(notifications.userId, req.user!.id)
         ))
         .limit(1);
     }
@@ -251,15 +246,11 @@ router.delete("/:id", requireAuth(), async (req: Request, res: Response) => {
     
     await db.delete(notifications).where(eq(notifications.id, id));
     
-    // Registrar atividade
-    await storage.logActivity({
-      userId: req.session.userId!,
-      action: "notification_deleted",
-      description: `Excluiu notificação: ${notification[0].title}`,
-      metadata: JSON.stringify({ 
-        notificationId: id,
-        isAdminDelete: isCoordinator && notification[0].userId !== req.session.userId!
-      })
+    // Registrar atividade (using console.log since storage.logActivity doesn't exist)
+    console.log(`[Activity Log] notification_deleted: Excluiu notificação: ${notification[0].title}`, {
+      userId: req.user!.id,
+      notificationId: id,
+      isAdminDelete: isCoordinator && notification[0].userId !== req.user!.id
     });
     
     res.json({ message: "Notificação excluída com sucesso" });

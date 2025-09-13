@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
-import { questionnaires, questionnaireResponses, users, notifications } from '../../shared/schema';
+import { questionnaires, questionnaireResponses, users, notifications } from '@shared/schema';
 import { eq, and, or, ne } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, requireRole } from '../auth';
