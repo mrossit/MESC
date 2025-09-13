@@ -26,19 +26,6 @@ router.get('/current', requireAuth, async (req: any, res) => {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    if (!db) {
-      const questions = generateQuestionnaireQuestions(month, year);
-      return res.json({
-        month,
-        year,
-        title: `Questionário ${getMonthName(month)} ${year}`,
-        description: `Questionário de disponibilidade para ${getMonthName(month)} de ${year}`,
-        questions,
-        status: 'active',
-        generated: true
-      });
-    }
-
     const [template] = await db.select().from(questionnaires)
       .where(and(
         eq(questionnaires.month, month),
@@ -78,20 +65,6 @@ router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coord
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-
-    if (!db) {
-      // Gerar template sem banco
-      const questions = generateQuestionnaireQuestions(month, year);
-      return res.json({
-        month,
-        year,
-        questions: questions.map(q => ({
-          ...q,
-          editable: q.category === 'custom'
-        })),
-        generated: true
-      });
-    }
 
     const [template] = await db.select().from(questionnaires)
       .where(and(
@@ -133,10 +106,6 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
     const { month, year } = schema.parse(req.body);
     const userId = req.user?.id || req.session?.userId;
     
-    if (!db) {
-      return res.status(503).json({ error: 'Database service unavailable' });
-    }
-
     // Verificar se já existe template NÃO deletado
     const [existingTemplate] = await db.select().from(questionnaires)
       .where(and(
@@ -297,10 +266,6 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
 
     const questionData = schema.parse(req.body);
 
-    if (!db) {
-      return res.status(503).json({ error: 'Database service unavailable' });
-    }
-
     const [template] = await db.select().from(questionnaires)
       .where(and(
         eq(questionnaires.month, month),
@@ -355,10 +320,6 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
 
     const updates = schema.parse(req.body);
 
-    if (!db) {
-      return res.status(503).json({ error: 'Database service unavailable' });
-    }
-
     const [template] = await db.select().from(questionnaires)
       .where(and(
         eq(questionnaires.month, month),
@@ -407,10 +368,6 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     const questionId = req.params.questionId;
-
-    if (!db) {
-      return res.status(503).json({ error: 'Database service unavailable' });
-    }
 
     const [template] = await db.select().from(questionnaires)
       .where(and(

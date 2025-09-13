@@ -44,9 +44,10 @@ router.post('/login', async (req, res) => {
     // Define cookie com o token
     res.cookie('token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV !== 'development', // Secure in all environments except development
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+      path: '/' // Explicitly set path for clarity
     });
     
     res.json({
@@ -168,7 +169,13 @@ router.get('/user', authenticateToken, async (req: AuthRequest, res) => {
 
 // Rota de logout
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  // Clear cookie with same options as when it was set for proper clearing
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'development',
+    sameSite: 'lax',
+    path: '/'
+  });
   res.json({
     success: true,
     message: 'Logout realizado com sucesso'

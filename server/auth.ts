@@ -11,13 +11,14 @@ function getJWTSecret(): string {
     return process.env.JWT_SECRET;
   }
   
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET environment variable is required in production');
+  // Only allow fallback in explicit development environment
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('⚠️  JWT_SECRET não definido, usando valor padrão para desenvolvimento');
+    return 'sjt-mesc-development-secret-2025';
   }
   
-  // Fallback para desenvolvimento (mas deve ser definido mesmo assim)
-  console.warn('⚠️  JWT_SECRET não definido, usando valor padrão para desenvolvimento');
-  return 'sjt-mesc-development-secret-2025';
+  // All other environments (production, staging, test, etc.) require JWT_SECRET
+  throw new Error('JWT_SECRET environment variable is required. Please set this environment variable for security.');
 }
 
 const JWT_SECRET = getJWTSecret();
