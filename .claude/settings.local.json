@@ -35,7 +35,8 @@
       "Bash(NODE_ENV=production npm start)",
       "Bash(PORT=5001 npm run dev)",
       "Bash(sqlite3:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []

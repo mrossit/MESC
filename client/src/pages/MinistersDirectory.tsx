@@ -51,21 +51,36 @@ export default function MinistersDirectory() {
   const [filterRole, setFilterRole] = useState<string>('all');
 
   // Buscar todos os ministros ativos
-  const { data: ministersData, isLoading } = useQuery({
-    queryKey: ['/api/users/ministers'],
+  const { data: ministersData, isLoading, error } = useQuery({
+    queryKey: ['/api/users'],
     queryFn: async () => {
-      const res = await fetch('/api/users/active', { 
+      console.log('Buscando usuários...');
+      const res = await fetch('/api/users', {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-      if (!res.ok) throw new Error('Failed to fetch ministers');
+
+      console.log('Response status:', res.status);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Erro na resposta:', errorText);
+        throw new Error(`Failed to fetch ministers: ${res.status}`);
+      }
+
       const data = await res.json();
-      // Filtrar apenas ministros e coordenadores ativos (sem gestor)
-      return data.filter((user: Minister) => 
-        user.role === 'ministro' || user.role === 'coordenador'
+      console.log('Dados recebidos:', data.length, 'usuários');
+
+      // Filtrar ministros, coordenadores e reitores ativos (excluir gestores e administradores)
+      const filtered = data.filter((user: Minister) =>
+        (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'reitor') &&
+        (!user.status || user.status === 'active')
       );
+
+      console.log('Após filtro:', filtered.length, 'usuários');
+      return filtered;
     }
   });
 
@@ -96,6 +111,7 @@ export default function MinistersDirectory() {
 
   // Agrupar ministros por papel
   const groupedMinisters = {
+    reitor: filteredMinisters.filter((m: Minister) => m.role === 'reitor'),
     coordenador: filteredMinisters.filter((m: Minister) => m.role === 'coordenador'),
     ministro: filteredMinisters.filter((m: Minister) => m.role === 'ministro')
   };
@@ -116,6 +132,7 @@ export default function MinistersDirectory() {
 
   const getRoleBadgeVariant = (role: string) => {
     switch(role) {
+      case 'reitor': return 'purple';
       case 'gestor': return 'gold';
       case 'coordenador': return 'copper';
       default: return 'terracotta';
@@ -124,6 +141,7 @@ export default function MinistersDirectory() {
 
   const getRoleLabel = (role: string) => {
     switch(role) {
+      case 'reitor': return 'Reitor';
       case 'gestor': return 'Gestor';
       case 'coordenador': return 'Coordenador';
       default: return 'Ministro';
@@ -152,6 +170,24 @@ export default function MinistersDirectory() {
     married: 'Casado(a)',
     widowed: 'Viúvo(a)'
   };
+
+  if (error) {
+    console.error('Erro ao carregar ministros:', error);
+    return (
+      <Layout
+        title="Diretório de Ministros"
+        subtitle="Conheça os membros do ministério e seus contatos"
+      >
+        <Card className="border-2 border-neutral-border dark:border-dark-4">
+          <CardContent className="py-12 text-center">
+            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Erro ao carregar ministros</p>
+            <p className="text-sm text-red-500 mt-2">{error.toString()}</p>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -217,7 +253,7 @@ export default function MinistersDirectory() {
                   <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-2">
                     Todos
                   </TabsTrigger>
-                  <TabsTrigger value="gestor" className="text-xs sm:text-sm py-2 px-2">
+                  <TabsTrigger value="reitor" className="text-xs sm:text-sm py-2 px-2">
                     Reitor
                   </TabsTrigger>
                   <TabsTrigger value="coordenador" className="text-xs sm:text-sm py-2 px-2">
@@ -239,6 +275,12 @@ export default function MinistersDirectory() {
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold">{filteredMinisters.length}</p>
               <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+          <Card className="border-2 border-neutral-border dark:border-dark-4">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold">{groupedMinisters.reitor.length}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Reitor</p>
             </CardContent>
           </Card>
           <Card className="border-2 border-neutral-border dark:border-dark-4">

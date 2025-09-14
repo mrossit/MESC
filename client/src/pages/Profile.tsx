@@ -193,28 +193,38 @@ export default function Profile() {
     setSuccess(null);
     
     try {
+      const dataToSend = {
+        name: profile.name,
+        phone: profile.phone || null,
+        ministryStartDate: profile.ministryStartDate || null,
+        baptismDate: profile.baptismDate || null,
+        confirmationDate: profile.confirmationDate || null,
+        marriageDate: profile.marriageDate || null,
+        maritalStatus: profile.maritalStatus || null
+      };
+
+      console.log('Enviando dados do perfil:', dataToSend);
+
       const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          name: profile.name,
-          phone: profile.phone,
-          ministryStartDate: profile.ministryStartDate || null,
-          baptismDate: profile.baptismDate || null,
-          confirmationDate: profile.confirmationDate || null,
-          marriageDate: profile.marriageDate || null,
-          maritalStatus: profile.maritalStatus
-        })
+        body: JSON.stringify(dataToSend)
       });
-      
+
+      console.log('Resposta da API:', res.status);
+
       if (res.ok) {
+        const updatedProfile = await res.json();
+        console.log('Perfil atualizado:', updatedProfile);
+        setProfile(updatedProfile);
         setSuccess('Perfil atualizado com sucesso!');
         setIsEditing(false);
         queryClient.invalidateQueries({ queryKey: ['/api/profile'] });
       } else {
         const errorData = await res.json();
-        setError(errorData.error || 'Erro ao salvar informações do usuário');
+        console.error('Erro da API:', errorData);
+        setError(errorData.message || errorData.error || 'Erro ao salvar informações do usuário');
       }
     } catch (err) {
       setError('Erro ao salvar informações do usuário');
@@ -486,6 +496,8 @@ export default function Profile() {
                       value={dateToInputValue(profile?.ministryStartDate)}
                       onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
                       disabled={!isEditing}
+                      className="w-full"
+                      data-testid="input-ministry-start"
                     />
                   </div>
                   
@@ -498,6 +510,8 @@ export default function Profile() {
                         value={dateToInputValue(profile?.marriageDate)}
                         onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
                         disabled={!isEditing}
+                        className="w-full"
+                        data-testid="input-marriage-date-personal"
                       />
                     </div>
                   )}
@@ -505,9 +519,9 @@ export default function Profile() {
               </TabsContent>
               
               <TabsContent value="sacraments" className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card className="border-opacity-50">
-                    <CardContent className="p-4 sm:pt-6">
+                    <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Batismo</h4>
@@ -517,7 +531,8 @@ export default function Profile() {
                           type="date"
                           value={dateToInputValue(profile?.baptismDate)}
                           onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
-                          className="text-sm"
+                          className="text-sm w-full"
+                          data-testid="input-baptism-date"
                         />
                       ) : (
                         <p className="text-xs sm:text-sm text-gray-600">
@@ -528,7 +543,7 @@ export default function Profile() {
                   </Card>
                   
                   <Card className="border-opacity-50">
-                    <CardContent className="p-4 sm:pt-6">
+                    <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Crisma</h4>
@@ -538,7 +553,8 @@ export default function Profile() {
                           type="date"
                           value={dateToInputValue(profile?.confirmationDate)}
                           onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
-                          className="text-sm"
+                          className="text-sm w-full"
+                          data-testid="input-confirmation-date"
                         />
                       ) : (
                         <p className="text-xs sm:text-sm text-gray-600">
@@ -550,7 +566,7 @@ export default function Profile() {
                   
                   {profile?.maritalStatus === 'married' && (
                     <Card className="border-opacity-50">
-                      <CardContent className="p-4 sm:pt-6">
+                      <CardContent className="p-3 sm:p-4 md:pt-6">
                         <div className="flex items-center gap-2 sm:gap-3 mb-3">
                           <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                           <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
@@ -560,7 +576,8 @@ export default function Profile() {
                             type="date"
                             value={dateToInputValue(profile?.marriageDate)}
                             onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
-                            className="text-sm"
+                            className="text-sm w-full"
+                            data-testid="input-marriage-date"
                           />
                         ) : (
                           <p className="text-xs sm:text-sm text-gray-600">
@@ -572,7 +589,7 @@ export default function Profile() {
                   )}
                   
                   <Card className="border-opacity-50">
-                    <CardContent className="p-4 sm:pt-6">
+                    <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Ministério</h4>
@@ -584,7 +601,8 @@ export default function Profile() {
                             type="date"
                             value={dateToInputValue(profile?.ministryStartDate)}
                             onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
-                            className="text-sm mt-1"
+                            className="text-sm mt-1 w-full"
+                            data-testid="input-ministry-date"
                           />
                         </div>
                       ) : (

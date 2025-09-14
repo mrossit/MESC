@@ -96,6 +96,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile routes
+  app.get('/api/profile', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      res.json(user);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar perfil");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.put('/api/profile', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+
+      // Validar e limpar dados do perfil
+      const profileData = {
+        name: req.body.name,
+        phone: req.body.phone,
+        ministryStartDate: req.body.ministryStartDate,
+        baptismDate: req.body.baptismDate,
+        confirmationDate: req.body.confirmationDate,
+        marriageDate: req.body.marriageDate,
+        maritalStatus: req.body.maritalStatus
+      };
+
+      // Remover campos undefined
+      Object.keys(profileData).forEach(key => {
+        if (profileData[key as keyof typeof profileData] === undefined) {
+          delete profileData[key as keyof typeof profileData];
+        }
+      });
+
+      const updatedUser = await storage.updateUser(userId, profileData);
+      res.json(updatedUser);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "atualizar perfil");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Family routes placeholder
+  app.get('/api/profile/family', authenticateToken, async (req: AuthRequest, res) => {
+    // Por enquanto retorna array vazio
+    res.json([]);
+  });
+
+  app.get('/api/users/active', authenticateToken, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const activeUsers = users.filter(u => u.status === 'active');
+      res.json(activeUsers);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar usuários ativos");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   // Dashboard routes
   app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     try {

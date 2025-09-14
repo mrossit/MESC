@@ -140,13 +140,28 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
 
   const fetchMinisters = async () => {
     try {
-      const response = await fetch("/api/ministers", {
+      const response = await fetch("/api/users", {
         credentials: "include"
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        setMinisters(data);
+        // Filtrar para mostrar ministros, coordenadores e reitores
+        // Excluir apenas gestores e administradores
+        const filteredUsers = data.filter((user: any) =>
+          user.role === 'ministro' ||
+          user.role === 'coordenador' ||
+          user.role === 'reitor'
+        );
+        setMinisters(filteredUsers);
+
+        // Se não houver usuários, mostrar mensagem informativa
+        if (filteredUsers.length === 0) {
+          toast({
+            title: "Informação",
+            description: "Nenhum ministro ou coordenador cadastrado no sistema",
+          });
+        }
       } else {
         toast({
           title: "Erro",
@@ -208,7 +223,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
         birthDate: birthDate?.toISOString()
       };
 
-      const response = await fetch(`/api/ministers/${selectedMinister.id}`, {
+      const response = await fetch(`/api/users/${selectedMinister.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
@@ -245,9 +260,13 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
 
   const toggleActive = async (minister: Minister) => {
     try {
-      const response = await fetch(`/api/ministers/${minister.id}/toggle-active`, {
+      const response = await fetch(`/api/users/${minister.id}`, {
         method: "PATCH",
-        credentials: "include"
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({ status: minister.status === 'active' ? 'inactive' : 'active' })
       });
 
       if (response.ok) {

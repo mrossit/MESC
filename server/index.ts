@@ -23,6 +23,9 @@ app.use(express.urlencoded({ extended: false }));
 // Serve static files from public directory
 app.use(express.static(path.join(process.cwd(), 'public')));
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
