@@ -294,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
       const roleUpdateSchema = z.object({
         role: z.enum(['gestor', 'coordenador', 'ministro'], {
