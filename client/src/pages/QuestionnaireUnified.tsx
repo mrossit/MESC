@@ -498,25 +498,26 @@ export default function QuestionnaireUnified() {
       if (template) {
         template.questions.forEach(question => {
           if (question.metadata?.dependsOn === questionId) {
+            // Extrair valor real da resposta (pode ser string ou objeto yes_no_with_options)
+            const raw = newResponses[question.metadata.dependsOn];
+            const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
+            
             // Verificar se a pergunta dependente deve ser desabilitada
-            const dependencyValue = newResponses[question.metadata.dependsOn];
             let shouldDisable = false;
             
-            if (question.metadata.enabledWhen) {
-              if (Array.isArray(question.metadata.enabledWhen)) {
-                shouldDisable = !question.metadata.enabledWhen.includes(dependencyValue);
+            const expected = question.metadata.enabledWhen ?? question.metadata.showIf;
+            if (expected !== undefined) {
+              if (Array.isArray(expected)) {
+                shouldDisable = !expected.includes(depVal);
               } else {
-                shouldDisable = dependencyValue !== question.metadata.enabledWhen;
+                shouldDisable = depVal !== expected;
               }
-            } else if (question.id === 'daily_mass_availability') {
-              // Para daily_mass_availability, não há dependência, é uma pergunta principal
-              shouldDisable = false;
             }
             
             console.log('handleResponseChange - clearing dependent question:', {
               questionId: question.id,
               dependsOn: question.metadata.dependsOn,
-              dependencyValue,
+              depVal,
               shouldDisable,
               currentValue: prev[question.id]
             });
@@ -1763,20 +1764,19 @@ export default function QuestionnaireUnified() {
                     
                     {template.questions.filter((question) => {
                       // Verificar se a pergunta deve ser exibida baseado em dependências
-                      if (question.metadata?.dependsOn && (question.metadata?.showIf || question.metadata?.enabledWhen)) {
-                        const dependencyValue = responses[question.metadata.dependsOn];
-                        const expectedValue = question.metadata.showIf || question.metadata.enabledWhen;
-                        
-                        // Se a resposta ainda não foi preenchida (string vazia ou undefined), mostrar a pergunta no preview
-                        // mas aplicar lógica condicional quando há resposta real
-                        if (!dependencyValue || dependencyValue === '') {
-                          // No modo preview, mostrar todas as perguntas para facilitar visualização
-                          return template.status === 'draft';
-                        }
-                        
-                        return dependencyValue === expectedValue;
-                      }
-                      return true; // Mostrar perguntas sem dependências
+                      const meta = question.metadata;
+                      if (!meta?.dependsOn) return true;
+                      
+                      // Extrair valor real da resposta (pode ser string ou objeto yes_no_with_options)
+                      const raw = responses[meta.dependsOn];
+                      const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
+                      
+                      // Obter valor esperado (pode ser string ou array)
+                      const expected = meta.enabledWhen ?? meta.showIf;
+                      if (expected === undefined) return true;
+                      
+                      // Comparar com suporte para arrays e strings
+                      return Array.isArray(expected) ? expected.includes(depVal) : depVal === expected;
                     }).map((question) => (
                         <Card 
                           key={question.id} 
