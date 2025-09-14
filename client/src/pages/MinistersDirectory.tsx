@@ -48,7 +48,6 @@ export default function MinistersDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMinister, setSelectedMinister] = useState<Minister | null>(null);
-  const [selectedMinisterFamily, setSelectedMinisterFamily] = useState<MinisterFamily[]>([]);
   const [filterRole, setFilterRole] = useState<string>('all');
 
   // Buscar todos os ministros ativos
@@ -85,37 +84,39 @@ export default function MinistersDirectory() {
     }
   });
 
-  // Buscar família do ministro selecionado
+  // Buscar família do ministro selecionado (apenas para o usuário atual)
   const { data: familyData } = useQuery({
-    queryKey: ['/api/profile/family', selectedMinister?.id],
+    queryKey: ['/api/profile/family'],
     queryFn: async () => {
-      if (!selectedMinister) return [];
-      const res = await fetch(`/api/users/${selectedMinister.id}/family`, { 
+      const res = await fetch('/api/profile/family', { 
         credentials: 'include' 
       });
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedMinister
+    enabled: false // Desabilitado por enquanto até implementar rota correta
   });
 
-  // Filtrar ministros baseado na busca e filtro de papel
-  const filteredMinisters = ministersData?.filter((minister: Minister) => {
+  // Filtrar por busca e status ativo (sem filtro de papel para contadores)
+  const baseFilteredMinisters = ministersData?.filter((minister: Minister) => {
     const matchesSearch = minister.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          minister.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (minister.phone && minister.phone.includes(searchTerm));
     
-    const matchesRole = filterRole === 'all' || minister.role === filterRole;
-    
-    return matchesSearch && matchesRole;
+    return matchesSearch;
   }) || [];
 
-  // Agrupar ministros por papel
+  // Agrupar ministros por papel (para contadores)
   const groupedMinisters = {
-    gestor: filteredMinisters.filter((m: Minister) => m.role === 'gestor'),
-    coordenador: filteredMinisters.filter((m: Minister) => m.role === 'coordenador'),
-    ministro: filteredMinisters.filter((m: Minister) => m.role === 'ministro')
+    gestor: baseFilteredMinisters.filter((m: Minister) => m.role === 'gestor'),
+    coordenador: baseFilteredMinisters.filter((m: Minister) => m.role === 'coordenador'),
+    ministro: baseFilteredMinisters.filter((m: Minister) => m.role === 'ministro')
   };
+
+  // Filtrar ministros para exibição (com filtro de papel)
+  const filteredMinisters = filterRole === 'all' 
+    ? baseFilteredMinisters 
+    : baseFilteredMinisters.filter((minister: Minister) => minister.role === filterRole);
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -149,9 +150,6 @@ export default function MinistersDirectory() {
 
   const handleViewDetails = (minister: Minister) => {
     setSelectedMinister(minister);
-    if (familyData) {
-      setSelectedMinisterFamily(familyData);
-    }
   };
 
   const relationshipLabels: Record<string, string> = {
@@ -252,7 +250,7 @@ export default function MinistersDirectory() {
                   <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
                     <span>Todos</span>
                     <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
-                      {filteredMinisters.length}
+                      {baseFilteredMinisters.length}
                     </span>
                   </TabsTrigger>
                   <TabsTrigger value="gestor" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
@@ -296,9 +294,12 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center">
-                        <Avatar className="h-20 w-20 mb-3">
-                          <AvatarImage src={minister.profilePhoto} />
-                          <AvatarFallback className="text-lg">
+                        <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
+                          <AvatarImage 
+                            src={minister.profilePhoto} 
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                             {getInitials(minister.name)}
                           </AvatarFallback>
                         </Avatar>
@@ -344,9 +345,14 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
-                        <Avatar className="h-12 w-12 sm:h-14 sm:w-14">
-                          <AvatarImage src={minister.profilePhoto} />
-                          <AvatarFallback>{getInitials(minister.name)}</AvatarFallback>
+                        <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
+                          <AvatarImage 
+                            src={minister.profilePhoto} 
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                            {getInitials(minister.name)}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -398,9 +404,12 @@ export default function MinistersDirectory() {
             <div className="space-y-4">
               {/* Foto e Nome */}
               <div className="flex flex-col items-center text-center">
-                <Avatar className="h-24 w-24 mb-3">
-                  <AvatarImage src={selectedMinister.profilePhoto} />
-                  <AvatarFallback className="text-xl">
+                <Avatar className="h-28 w-28 mb-3 border-2 border-gray-200 shadow-lg">
+                  <AvatarImage 
+                    src={selectedMinister.profilePhoto} 
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                     {getInitials(selectedMinister.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -440,15 +449,15 @@ export default function MinistersDirectory() {
                 )}
               </div>
 
-              {/* Familiares no Ministério */}
-              {selectedMinisterFamily && selectedMinisterFamily.length > 0 && (
+              {/* Familiares no Ministério - Comentado até implementar rota correta */}
+              {/* {familyData && familyData.length > 0 && (
                 <div className="pt-4 border-t">
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Familiares no Ministério
                   </h4>
                   <div className="space-y-2">
-                    {selectedMinisterFamily.map((family: MinisterFamily) => (
+                    {familyData.map((family: MinisterFamily) => (
                       <div key={family.id} className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={family.relatedUser.profilePhoto} />
@@ -466,7 +475,7 @@ export default function MinistersDirectory() {
                     ))}
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Ações */}
               <div className="flex gap-2 pt-4">
