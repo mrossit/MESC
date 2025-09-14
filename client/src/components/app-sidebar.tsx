@@ -335,11 +335,9 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton asChild tooltip="Configurações">
-                  <button type="button" className="flex items-center gap-2 w-full">
-                    <Settings />
-                    <span>Configurações</span>
-                  </button>
+                <SidebarMenuButton tooltip="Configurações">
+                  <Settings />
+                  <span>Configurações</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="w-56">

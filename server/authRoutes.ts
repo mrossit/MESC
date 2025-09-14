@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { login, register, changePassword, resetPassword, authenticateToken, requireRole, AuthRequest } from './auth';
 import { z } from 'zod';
+import { db } from './db';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -143,14 +146,64 @@ router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coorde
 // Rota para obter usuário atual
 router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    // Se não tem banco de dados, retorna os dados do token com status padrão
+    if (!db) {
+      res.json({
+        success: true,
+        user: {
+          ...req.user,
+          status: 'active' // Adiciona status padrão
+        }
+      });
+      return;
+    }
+
+    // Busca o usuário completo no banco de dados
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuário não autenticado'
+      });
+    }
+
+    const [user] = await db.select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      status: users.status,
+      requiresPasswordChange: users.requiresPasswordChange,
+      profilePhoto: users.photoUrl,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      phone: users.phone,
+      photoUrl: users.photoUrl
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
     res.json({
       success: true,
-      user: req.user
+      user
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar dados do usuário'
+    console.error('Erro ao buscar dados do usuário:', error);
+    // Em caso de erro, retorna os dados do token com status padrão
+    res.json({
+      success: true,
+      user: {
+        ...req.user,
+        status: 'active' // Adiciona status padrão em caso de erro
+      }
     });
   }
 });
