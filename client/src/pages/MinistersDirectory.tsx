@@ -28,6 +28,7 @@ type Minister = {
   phone?: string;
   profilePhoto?: string;
   role: string;
+  status?: string;
   ministryStartDate?: string;
   maritalStatus?: string;
   createdAt: string;
@@ -73,9 +74,9 @@ export default function MinistersDirectory() {
       const data = await res.json();
       console.log('Dados recebidos:', data.length, 'usuários');
 
-      // Filtrar ministros, coordenadores e reitores ativos (excluir gestores e administradores)
+      // Filtrar ministros, coordenadores e gestores ativos
       const filtered = data.filter((user: Minister) =>
-        (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'reitor') &&
+        (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'gestor') &&
         (!user.status || user.status === 'active')
       );
 
@@ -111,7 +112,7 @@ export default function MinistersDirectory() {
 
   // Agrupar ministros por papel
   const groupedMinisters = {
-    reitor: filteredMinisters.filter((m: Minister) => m.role === 'reitor'),
+    gestor: filteredMinisters.filter((m: Minister) => m.role === 'gestor'),
     coordenador: filteredMinisters.filter((m: Minister) => m.role === 'coordenador'),
     ministro: filteredMinisters.filter((m: Minister) => m.role === 'ministro')
   };
@@ -132,7 +133,6 @@ export default function MinistersDirectory() {
 
   const getRoleBadgeVariant = (role: string) => {
     switch(role) {
-      case 'reitor': return 'purple';
       case 'gestor': return 'gold';
       case 'coordenador': return 'copper';
       default: return 'terracotta';
@@ -141,8 +141,7 @@ export default function MinistersDirectory() {
 
   const getRoleLabel = (role: string) => {
     switch(role) {
-      case 'reitor': return 'Reitor';
-      case 'gestor': return 'Gestor';
+      case 'gestor': return 'Reitor';
       case 'coordenador': return 'Coordenador';
       default: return 'Ministro';
     }
@@ -253,7 +252,7 @@ export default function MinistersDirectory() {
                   <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-2">
                     Todos
                   </TabsTrigger>
-                  <TabsTrigger value="reitor" className="text-xs sm:text-sm py-2 px-2">
+                  <TabsTrigger value="gestor" className="text-xs sm:text-sm py-2 px-2">
                     Reitor
                   </TabsTrigger>
                   <TabsTrigger value="coordenador" className="text-xs sm:text-sm py-2 px-2">
