@@ -27,6 +27,7 @@ type Minister = {
   email: string;
   phone?: string;
   profilePhoto?: string;
+  photoUrl?: string;
   role: string;
   status?: string;
   ministryStartDate?: string;
@@ -72,12 +73,6 @@ export default function MinistersDirectory() {
 
       const data = await res.json();
       console.log('Dados recebidos:', data.length, 'usuários');
-      
-      // Debug: ver os campos disponíveis nos dados
-      if (data.length > 0) {
-        console.log('Primeiro usuário (campos):', Object.keys(data[0]));
-        console.log('Usuário rossit@icloud.com:', data.find((u: any) => u.email === 'rossit@icloud.com'));
-      }
 
       // Filtrar ministros, coordenadores e gestores ativos
       const filtered = data.filter((user: Minister) =>
@@ -86,7 +81,6 @@ export default function MinistersDirectory() {
       );
 
       console.log('Após filtro:', filtered.length, 'usuários');
-      console.log('Usuários filtrados:', filtered.map((u: any) => ({ name: u.name, email: u.email, profilePhoto: u.profilePhoto, photoUrl: u.photoUrl })));
       return filtered;
     }
   });
@@ -303,7 +297,7 @@ export default function MinistersDirectory() {
                       <div className="flex flex-col items-center text-center">
                         <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
                           <AvatarImage 
-                            src={minister.profilePhoto} 
+                            src={minister.profilePhoto || minister.photoUrl} 
                             className="object-cover"
                           />
                           <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
@@ -354,7 +348,7 @@ export default function MinistersDirectory() {
                       <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
                           <AvatarImage 
-                            src={minister.profilePhoto} 
+                            src={minister.profilePhoto || minister.photoUrl} 
                             className="object-cover"
                           />
                           <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
@@ -413,7 +407,7 @@ export default function MinistersDirectory() {
               <div className="flex flex-col items-center text-center">
                 <Avatar className="h-28 w-28 mb-3 border-2 border-gray-200 shadow-lg">
                   <AvatarImage 
-                    src={selectedMinister.profilePhoto} 
+                    src={selectedMinister.profilePhoto || selectedMinister.photoUrl} 
                     className="object-cover"
                   />
                   <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
