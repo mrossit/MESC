@@ -53,7 +53,7 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     
     // Verifica permissões com safe access
     if (allowedRoles && allowedRoles.length > 0) {
-      const userRole = safeGetUserProperty(cachedData, 'role', 'ministro');
+      const userRole = userData.role;
       const hasPermission = allowedRoles.includes(userRole);
       console.log(`[CachedAuthGuard] Cache permission: ${userRole} in [${allowedRoles}] = ${hasPermission}`);
       
@@ -99,7 +99,7 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
   
   // Verifica permissões com safe access
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRole = safeGetUserProperty(data, 'role', 'ministro');
+    const userRole = data.user.role;
     const hasPermission = allowedRoles.includes(userRole);
     console.log(`[CachedAuthGuard] Permission: ${userRole} in [${allowedRoles}] = ${hasPermission}`);
     

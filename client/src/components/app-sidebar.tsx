@@ -346,13 +346,13 @@ export function AppSidebar() {
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/profile">
+                  <Link href="/profile" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Meu Perfil</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">
+                  <Link href="/settings" className="flex items-center">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Configurações</span>
                   </Link>
@@ -375,14 +375,14 @@ export function AppSidebar() {
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link href="/change-password">
+                  <Link href="/change-password" className="flex items-center">
                     <KeyRound className="mr-2 h-4 w-4" />
                     <span>Alterar Senha</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <button onClick={handleLogout} className="w-full text-left">
+                  <button onClick={handleLogout} className="w-full text-left flex items-center">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sair</span>
                   </button>
