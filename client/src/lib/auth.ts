@@ -87,8 +87,31 @@ export function safeGetUserProperty<K extends keyof AuthUser>(
 
 export const authAPI = {
   async login(credentials: LoginCredentials): Promise<{ user: AuthUser }> {
-    const response = await apiRequest("POST", "/api/auth/login", credentials);
-    return response.json();
+    try {
+      const response = await apiRequest("POST", "/api/auth/login", credentials);
+      return response.json();
+    } catch (error: any) {
+      // Extrair mensagem do JSON se possível
+      const errorMessage = error.message || "Erro ao fazer login";
+      
+      // Se o erro contém JSON, extrair a mensagem
+      if (errorMessage.includes('"message":')) {
+        try {
+          const jsonStart = errorMessage.indexOf('{');
+          if (jsonStart !== -1) {
+            const jsonPart = errorMessage.substring(jsonStart);
+            const parsedError = JSON.parse(jsonPart);
+            if (parsedError.message) {
+              throw new Error(parsedError.message);
+            }
+          }
+        } catch (parseError) {
+          // Se não conseguir fazer parse, usa a mensagem original
+        }
+      }
+      
+      throw error;
+    }
   },
 
   async register(data: RegisterData): Promise<{ message: string }> {
