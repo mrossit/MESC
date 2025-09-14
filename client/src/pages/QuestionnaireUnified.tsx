@@ -1766,6 +1766,14 @@ export default function QuestionnaireUnified() {
                       if (question.metadata?.dependsOn && (question.metadata?.showIf || question.metadata?.enabledWhen)) {
                         const dependencyValue = responses[question.metadata.dependsOn];
                         const expectedValue = question.metadata.showIf || question.metadata.enabledWhen;
+                        
+                        // Se a resposta ainda não foi preenchida (string vazia ou undefined), mostrar a pergunta no preview
+                        // mas aplicar lógica condicional quando há resposta real
+                        if (!dependencyValue || dependencyValue === '') {
+                          // No modo preview, mostrar todas as perguntas para facilitar visualização
+                          return template.status === 'draft';
+                        }
+                        
                         return dependencyValue === expectedValue;
                       }
                       return true; // Mostrar perguntas sem dependências
