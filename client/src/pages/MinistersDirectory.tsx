@@ -245,22 +245,34 @@ export default function MinistersDirectory() {
               </div>
             </div>
             
-            {/* Filtros por cargo - Responsivo */}
+            {/* Filtros por cargo com contadores */}
             <div className="mt-6">
               <Tabs value={filterRole} onValueChange={setFilterRole} className="w-full">
                 <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto gap-1 p-1">
-                  <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-2">
-                    Todos
+                  <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
+                    <span>Todos</span>
+                    <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                      {filteredMinisters.length}
+                    </span>
                   </TabsTrigger>
-                  <TabsTrigger value="gestor" className="text-xs sm:text-sm py-2 px-2">
-                    Reitor
+                  <TabsTrigger value="gestor" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
+                    <span>Reitor</span>
+                    <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                      {groupedMinisters.gestor.length}
+                    </span>
                   </TabsTrigger>
-                  <TabsTrigger value="coordenador" className="text-xs sm:text-sm py-2 px-2">
+                  <TabsTrigger value="coordenador" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
                     <span className="hidden sm:inline">Coordenadores</span>
                     <span className="sm:hidden">Coord.</span>
+                    <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                      {groupedMinisters.coordenador.length}
+                    </span>
                   </TabsTrigger>
-                  <TabsTrigger value="ministro" className="text-xs sm:text-sm py-2 px-2">
-                    Ministros
+                  <TabsTrigger value="ministro" className="text-xs sm:text-sm py-2 px-2 flex flex-col gap-1">
+                    <span>Ministros</span>
+                    <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                      {groupedMinisters.ministro.length}
+                    </span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
