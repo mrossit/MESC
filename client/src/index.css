@@ -189,20 +189,13 @@
   /* Melhorias específicas para campos de data */
   input[type="date"] {
     width: 100%;
-    min-width: 0;
     max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
   }
   
   /* Melhorar responsividade em dispositivos móveis */
   @media (max-width: 640px) {
-    input[type="date"] {
-      font-size: 16px; /* Evita zoom no iOS */
-      width: 100%;
-      min-width: 0;
-      max-width: 100%;
-    }
-    
     /* Específico para formulários do profile */
     .profile-form.grid {
       gap: 0.75rem;
