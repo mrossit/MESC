@@ -72,6 +72,12 @@ export default function MinistersDirectory() {
 
       const data = await res.json();
       console.log('Dados recebidos:', data.length, 'usuários');
+      
+      // Debug: ver os campos disponíveis nos dados
+      if (data.length > 0) {
+        console.log('Primeiro usuário (campos):', Object.keys(data[0]));
+        console.log('Usuário rossit@icloud.com:', data.find((u: any) => u.email === 'rossit@icloud.com'));
+      }
 
       // Filtrar ministros, coordenadores e gestores ativos
       const filtered = data.filter((user: Minister) =>
@@ -80,6 +86,7 @@ export default function MinistersDirectory() {
       );
 
       console.log('Após filtro:', filtered.length, 'usuários');
+      console.log('Usuários filtrados:', filtered.map((u: any) => ({ name: u.name, email: u.email, profilePhoto: u.profilePhoto, photoUrl: u.photoUrl })));
       return filtered;
     }
   });
