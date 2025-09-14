@@ -309,13 +309,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Não é possível alterar seu próprio papel" });
       }
       
-      // Se está removendo o papel de gestor, verificar se não é o último
-      if (role !== 'gestor') {
+      // Verificar o usuário alvo antes de fazer mudanças
+      const targetUser = await storage.getUser(req.params.id);
+      
+      // Se está removendo o papel de gestor, verificar se não é o último ativo
+      if (role !== 'gestor' && targetUser?.role === 'gestor') {
         const allUsers = await storage.getAllUsers();
-        const activeGestoresCount = allUsers.filter(u => u.role === 'gestor' && u.status === 'active').length;
+        const activeGestoresCount = allUsers.filter(u => 
+          u.role === 'gestor' && 
+          u.status === 'active' && 
+          u.id !== req.params.id // Excluir o usuário que será modificado da contagem
+        ).length;
         
-        const targetUser = await storage.getUser(req.params.id);
-        if (targetUser?.role === 'gestor' && activeGestoresCount <= 1) {
+        if (activeGestoresCount < 1) {
           return res.status(400).json({ message: "Não é possível remover o último gestor ativo do sistema" });
         }
       }
