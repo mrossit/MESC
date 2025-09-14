@@ -167,6 +167,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/users/pending', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const pendingUsers = users.filter(u => u.status === 'pending');
+      res.json(pendingUsers);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar usuários pendentes");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   // Dashboard routes
   app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     try {
