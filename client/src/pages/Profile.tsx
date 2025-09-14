@@ -456,7 +456,7 @@ export default function Profile() {
                 </div>
                 
                 {/* Informações Pessoais */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="profile-form grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="phone">Telefone</Label>
                     <Input
@@ -489,7 +489,7 @@ export default function Profile() {
                     </Select>
                   </div>
                   
-                  <div>
+                  <div className="min-w-0">
                     <Label htmlFor="ministryStart">Início no Ministério</Label>
                     <Input
                       id="ministryStart"
@@ -503,7 +503,7 @@ export default function Profile() {
                   </div>
                   
                   {profile?.maritalStatus === 'married' && (
-                    <div>
+                    <div className="min-w-0">
                       <Label htmlFor="marriageDate">Data de Casamento</Label>
                       <Input
                         id="marriageDate"
@@ -520,13 +520,14 @@ export default function Profile() {
               </TabsContent>
               
               <TabsContent value="sacraments" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="border-opacity-50">
+                <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="border-opacity-50 min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Batismo</h4>
                       </div>
+                      <div className="min-w-0">
                       {isEditing ? (
                         <Input
                           type="date"
@@ -540,15 +541,17 @@ export default function Profile() {
                           {formatDate(profile?.baptismDate)}
                         </p>
                       )}
+                      </div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="border-opacity-50">
+                  <Card className="border-opacity-50 min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Crisma</h4>
                       </div>
+                      <div className="min-w-0">
                       {isEditing ? (
                         <Input
                           type="date"
@@ -562,16 +565,18 @@ export default function Profile() {
                           {formatDate(profile?.confirmationDate)}
                         </p>
                       )}
+                      </div>
                     </CardContent>
                   </Card>
                   
                   {profile?.maritalStatus === 'married' && (
-                    <Card className="border-opacity-50">
+                    <Card className="border-opacity-50 min-w-0">
                       <CardContent className="p-3 sm:p-4 md:pt-6">
                         <div className="flex items-center gap-2 sm:gap-3 mb-3">
                           <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                           <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
                         </div>
+                        <div className="min-w-0">
                         {isEditing ? (
                           <Input
                             type="date"
@@ -585,16 +590,18 @@ export default function Profile() {
                             {formatDate(profile?.marriageDate)}
                           </p>
                         )}
+                        </div>
                       </CardContent>
                     </Card>
                   )}
                   
-                  <Card className="border-opacity-50">
+                  <Card className="border-opacity-50 min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Ministério</h4>
                       </div>
+                      <div className="min-w-0">
                       {isEditing ? (
                         <div>
                           <label className="text-xs text-gray-500">Data de início:</label>
@@ -611,6 +618,7 @@ export default function Profile() {
                           Servindo desde {formatDate(profile?.ministryStartDate)}
                         </p>
                       )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

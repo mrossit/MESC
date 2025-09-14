@@ -186,6 +186,31 @@
     border-width: 0.5px;
   }
   
+  /* Melhorias específicas para campos de data */
+  input[type="date"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  
+  /* Melhorar responsividade em dispositivos móveis */
+  @media (max-width: 640px) {
+    input[type="date"] {
+      font-size: 16px; /* Evita zoom no iOS */
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    
+    /* Específico para formulários do profile */
+    .profile-form.grid {
+      gap: 0.75rem;
+    }
+    
+    .profile-form.grid > * {
+      min-width: 0 !important;
+    }
+  }
+  
   /* Focus states refinados */
   *:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
