@@ -268,33 +268,6 @@ export default function MinistersDirectory() {
           </CardHeader>
         </Card>
 
-        {/* Estatísticas */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <Card className="border-2 border-neutral-border dark:border-dark-4">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{filteredMinisters.length}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 border-neutral-border dark:border-dark-4">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{groupedMinisters.reitor.length}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Reitor</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 border-neutral-border dark:border-dark-4">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{groupedMinisters.coordenador.length}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Coordenadores</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 border-neutral-border dark:border-dark-4">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{groupedMinisters.ministro.length}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Ministros</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Lista de Ministros */}
         {filteredMinisters.length === 0 ? (
