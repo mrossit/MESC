@@ -263,6 +263,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor']), async (req, res) => {
+    try {
+      const roleUpdateSchema = z.object({
+        role: z.enum(['gestor', 'coordenador', 'ministro'], {
+          errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
+        })
+      });
+      
+      const { role } = roleUpdateSchema.parse(req.body);
+      const user = await storage.updateUser(req.params.id, { role });
+      
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      const errorResponse = handleApiError(error, "atualizar papel do usuário");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      // Bloquear usuário = definir status como 'inactive'
+      const user = await storage.updateUser(req.params.id, { status: 'inactive' });
+      
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "bloquear usuário");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     try {
       await storage.deleteUser(req.params.id);
