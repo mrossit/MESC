@@ -141,7 +141,7 @@ export async function login(email: string, password: string) {
       .limit(1);
 
     if (!user) {
-      throw new Error('Email ou senha inválidos');
+      throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
 
     // Verifica o status do usuário
@@ -158,7 +158,7 @@ export async function login(email: string, password: string) {
     const isValidPassword = await verifyPassword(password, passwordHash);
 
     if (!isValidPassword) {
-      throw new Error('Email ou senha inválidos');
+      throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
 
     // Gera token JWT

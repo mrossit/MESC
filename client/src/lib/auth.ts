@@ -94,10 +94,11 @@ export const authAPI = {
       // Extrair mensagem do JSON se possível
       const errorMessage = error.message || "Erro ao fazer login";
       
-      // Se o erro contém JSON, extrair a mensagem
-      if (errorMessage.includes('"message":')) {
+      // Se o erro contém JSON no formato "status: {json}", extrair a mensagem
+      if (errorMessage.includes('{"success":false,"message":')) {
         try {
-          const jsonStart = errorMessage.indexOf('{');
+          // Encontrar o início do JSON
+          const jsonStart = errorMessage.indexOf('{"success":false');
           if (jsonStart !== -1) {
             const jsonPart = errorMessage.substring(jsonStart);
             const parsedError = JSON.parse(jsonPart);
@@ -106,11 +107,13 @@ export const authAPI = {
             }
           }
         } catch (parseError) {
-          // Se não conseguir fazer parse, usa a mensagem original
+          // Se não conseguir fazer parse, usar mensagem padrão
+          throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
         }
       }
       
-      throw error;
+      // Se não contém JSON válido, usar mensagem padrão
+      throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
   },
 
