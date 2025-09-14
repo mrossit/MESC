@@ -224,10 +224,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  app.put('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
     try {
       const userData = insertUserSchema.partial().parse(req.body);
-      const user = await storage.updateUser(req.params.id, userData);
+      
+      // Remover campos sensíveis que devem usar rotas específicas
+      const { role, status, ...safeUserData } = userData;
+      
+      const user = await storage.updateUser(req.params.id, safeUserData);
       res.json(user);
     } catch (error) {
       const errorResponse = handleApiError(error, "atualizar usuário");
@@ -263,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor']), async (req, res) => {
+  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
     try {
       const roleUpdateSchema = z.object({
         role: z.enum(['gestor', 'coordenador', 'ministro'], {
@@ -272,6 +276,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const { role } = roleUpdateSchema.parse(req.body);
+      
+      // Impedir auto-modificação
+      if (req.user?.id === req.params.id) {
+        return res.status(400).json({ message: "Não é possível alterar seu próprio papel" });
+      }
+      
+      // Se está removendo o papel de gestor, verificar se não é o último
+      if (role !== 'gestor') {
+        const allUsers = await storage.getAllUsers();
+        const gestoresCount = allUsers.filter(u => u.role === 'gestor').length;
+        
+        const targetUser = await storage.getUser(req.params.id);
+        if (targetUser?.role === 'gestor' && gestoresCount <= 1) {
+          return res.status(400).json({ message: "Não é possível remover o último gestor do sistema" });
+        }
+      }
+      
       const user = await storage.updateUser(req.params.id, { role });
       
       if (!user) {
@@ -291,8 +312,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
+      // Impedir auto-bloqueio
+      if (req.user?.id === req.params.id) {
+        return res.status(400).json({ message: "Não é possível bloquear sua própria conta" });
+      }
+      
       // Bloquear usuário = definir status como 'inactive'
       const user = await storage.updateUser(req.params.id, { status: 'inactive' });
       
@@ -307,8 +333,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
     try {
+      // Impedir auto-exclusão
+      if (req.user?.id === req.params.id) {
+        return res.status(400).json({ message: "Não é possível excluir sua própria conta" });
+      }
+      
       await storage.deleteUser(req.params.id);
       res.status(204).send();
     } catch (error) {
