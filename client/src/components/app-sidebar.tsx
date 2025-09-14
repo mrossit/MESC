@@ -335,55 +335,41 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip="Configurações">
+                <SidebarMenuButton className="flex items-center gap-2" tooltip="Configurações">
                   <Settings />
-                  <span>Configurações</span>
+                  Configurações
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="w-56">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="flex items-center">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Meu Perfil</span>
-                  </Link>
+                <DropdownMenuItem onClick={() => window.location.href = '/profile'}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Meu Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Configurações</span>
-                  </Link>
+                <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
                 </DropdownMenuItem>
                 {user?.role === "ministro" && (
-                  <DropdownMenuItem asChild>
-                    <button 
-                      onClick={() => {
-                        setIsTutorialOpen(true);
-                        // Collapse sidebar on mobile when tutorial opens
-                        if (isMobile) {
-                          setOpenMobile(false);
-                        }
-                      }}
-                      className="w-full text-left"
-                    >
-                      <HelpCircle className="mr-2 h-4 w-4" />
-                      <span>Tutorial do Sistema</span>
-                    </button>
+                  <DropdownMenuItem onClick={() => {
+                    setIsTutorialOpen(true);
+                    if (isMobile) {
+                      setOpenMobile(false);
+                    }
+                  }}>
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    <span>Tutorial do Sistema</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem asChild>
-                  <Link href="/change-password" className="flex items-center">
-                    <KeyRound className="mr-2 h-4 w-4" />
-                    <span>Alterar Senha</span>
-                  </Link>
+                <DropdownMenuItem onClick={() => window.location.href = '/change-password'}>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  <span>Alterar Senha</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <button onClick={handleLogout} className="w-full text-left flex items-center">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </button>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
