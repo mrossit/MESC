@@ -96,9 +96,7 @@ export default function Login() {
       } else {
         toast({
           title: "Erro no login",
-          description: error.message === "Invalid credentials" 
-            ? "Email ou senha incorretos" 
-            : error.message || "Erro ao fazer login",
+          description: error.message || "Erro ao fazer login",
           variant: "destructive",
         });
       }
