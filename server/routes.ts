@@ -235,6 +235,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      const statusUpdateSchema = z.object({
+        status: z.enum(['active', 'inactive', 'pending'], {
+          errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
+        })
+      });
+      
+      const { status } = statusUpdateSchema.parse(req.body);
+      const user = await storage.updateUser(req.params.id, { status });
+      
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      const errorResponse = handleApiError(error, "atualizar status do usuário");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     try {
       await storage.deleteUser(req.params.id);
