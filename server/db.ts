@@ -1,15 +1,29 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
 import * as schema from "@shared/schema";
 
-neonConfig.webSocketConstructor = ws;
+let db: any;
+let pool: any;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+if (process.env.DATABASE_URL) {
+  // Production - Use Neon database
+  const { Pool, neonConfig } = await import('@neondatabase/serverless');
+  const { drizzle } = await import('drizzle-orm/neon-serverless');
+  const ws = await import('ws');
+
+  neonConfig.webSocketConstructor = ws.default;
+  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  db = drizzle({ client: pool, schema });
+} else {
+  // Development - Use SQLite
+  console.log('No DATABASE_URL found, using local SQLite database for development');
+  const Database = await import('better-sqlite3');
+  const { drizzle } = await import('drizzle-orm/better-sqlite3');
+
+  const sqlite = new (Database.default)('local.db');
+  db = drizzle(sqlite, { schema });
+
+  // Run migrations automatically in development
+  const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+  migrate(db, { migrationsFolder: './migrations' });
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export { db, pool };

@@ -15,7 +15,7 @@ Desenvolver um sistema web completo para gestão dos Ministros Extraordinários 
 - **Ministros**: ~150 pessoas ativas (uso diário do sistema)
 
 ### 1.3 Problema a Resolver
-- Gestão manual de escalas via WhatsApp é ineficiente
+- Gestão manual de escalas via WhatsApp e Forms (Google) é ineficiente
 - Dificuldade em gerenciar substituições e ausências
 - Falta de controle sobre disponibilidade dos ministros
 - Comunicação fragmentada entre coordenação e ministros

@@ -147,13 +147,7 @@ function Router() {
           <QRCodeShare />
         </AuthGuard>
       </Route>
-      
-      <Route path="/settings">
-        <AuthGuard>
-          <Dashboard />
-        </AuthGuard>
-      </Route>
-      
+
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

@@ -387,7 +387,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
         res.json({
           ...updated,
-          responses: JSON.parse(updated.responses as string)
+          responses: typeof updated.responses === 'string'
+            ? JSON.parse(updated.responses)
+            : updated.responses
         });
       } catch (updateError) {
         console.error('[RESPONSES] Erro ao atualizar resposta:', updateError);
@@ -410,7 +412,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
         res.json({
           ...created,
-          responses: JSON.parse(created.responses as string)
+          responses: typeof created.responses === 'string'
+            ? JSON.parse(created.responses)
+            : created.responses
         });
       } catch (insertError) {
         console.error('[RESPONSES] Erro ao criar resposta:', insertError);
