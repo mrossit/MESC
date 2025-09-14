@@ -8,6 +8,7 @@ import { passwordResetRoutes } from "./passwordResetRoutes";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
+import uploadRoutes from "./routes/upload";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -77,6 +78,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Schedule generation routes
   app.use('/api/schedules', scheduleGenerationRoutes);
   
+  // Upload routes
+  app.use('/api/upload', uploadRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
