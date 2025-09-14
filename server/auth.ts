@@ -67,6 +67,22 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   const secret: string = JWT_SECRET;
 
+  const verifyAndCheckStatus = async (user: any) => {
+    // Verificar status ativo do usuário no banco
+    const [currentUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!currentUser || currentUser.status !== 'active') {
+      return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
+    }
+
+    req.user = user;
+    next();
+  };
+
   if (!token) {
     // Verifica se há token no cookie também
     const cookieToken = req.cookies?.token;
@@ -75,33 +91,38 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     }
     
     // Usa o token do cookie
-    jwt.verify(cookieToken, secret, (err: any, user: any) => {
+    jwt.verify(cookieToken, secret, async (err: any, user: any) => {
       if (err) {
         return res.status(403).json({ message: 'Token inválido ou expirado' });
       }
-      req.user = user;
-      next();
+      await verifyAndCheckStatus(user);
     });
     return;
   }
 
-  jwt.verify(token, secret, (err: any, user: any) => {
+  jwt.verify(token, secret, async (err: any, user: any) => {
     if (err) {
       return res.status(403).json({ message: 'Token inválido ou expirado' });
     }
-    req.user = user;
-    next();
+    await verifyAndCheckStatus(user);
   });
 }
 
-// Middleware para verificar roles
+// Middleware para verificar roles - verifica role atual no banco
 export function requireRole(roles: string[]) {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Não autenticado' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    // Buscar role atual no banco para evitar bypass com tokens antigos
+    const [currentUser] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, req.user.id))
+      .limit(1);
+
+    if (!currentUser || !roles.includes(currentUser.role)) {
       return res.status(403).json({ message: 'Permissão insuficiente para esta ação' });
     }
 

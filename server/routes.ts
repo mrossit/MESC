@@ -190,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User/Minister routes
-  app.get('/api/users', authenticateToken, async (req, res) => {
+  app.get('/api/users', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -200,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/users/:id', authenticateToken, async (req, res) => {
+  app.get('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
       if (!user) {
@@ -213,10 +213,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users', authenticateToken, async (req, res) => {
+  app.post('/api/users', authenticateToken, requireRole(['gestor']), async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(userData);
+      
+      // Forçar padrões seguros - apenas gestor pode criar usuários com roles específicos
+      const safeUserData = {
+        ...userData,
+        role: (userData.role as any) || 'ministro', // padrão ministro
+        status: 'pending' as const // sempre pending para aprovação
+      };
+      
+      const user = await storage.createUser(safeUserData);
       res.status(201).json(user);
     } catch (error) {
       const errorResponse = handleApiError(error, "criar usuário");
@@ -239,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
       const statusUpdateSchema = z.object({
         status: z.enum(['active', 'inactive', 'pending'], {
@@ -248,6 +256,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const { status } = statusUpdateSchema.parse(req.body);
+      
+      // Impedir auto-mudança de status
+      if (req.user?.id === req.params.id) {
+        return res.status(400).json({ message: "Não é possível alterar seu próprio status" });
+      }
+      
+      // Se está inativando um gestor, verificar se não é o último
+      if (status !== 'active') {
+        const targetUser = await storage.getUser(req.params.id);
+        if (targetUser?.role === 'gestor') {
+          const allUsers = await storage.getAllUsers();
+          const activeGestoresCount = allUsers.filter(u => u.role === 'gestor' && u.status === 'active').length;
+          
+          if (activeGestoresCount <= 1) {
+            return res.status(400).json({ message: "Não é possível inativar o último gestor ativo do sistema" });
+          }
+        }
+      }
+      
       const user = await storage.updateUser(req.params.id, { status });
       
       if (!user) {
@@ -285,11 +312,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Se está removendo o papel de gestor, verificar se não é o último
       if (role !== 'gestor') {
         const allUsers = await storage.getAllUsers();
-        const gestoresCount = allUsers.filter(u => u.role === 'gestor').length;
+        const activeGestoresCount = allUsers.filter(u => u.role === 'gestor' && u.status === 'active').length;
         
         const targetUser = await storage.getUser(req.params.id);
-        if (targetUser?.role === 'gestor' && gestoresCount <= 1) {
-          return res.status(400).json({ message: "Não é possível remover o último gestor do sistema" });
+        if (targetUser?.role === 'gestor' && activeGestoresCount <= 1) {
+          return res.status(400).json({ message: "Não é possível remover o último gestor ativo do sistema" });
         }
       }
       
@@ -317,6 +344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Impedir auto-bloqueio
       if (req.user?.id === req.params.id) {
         return res.status(400).json({ message: "Não é possível bloquear sua própria conta" });
+      }
+      
+      // Se está bloqueando um gestor, verificar se não é o último ativo
+      const targetUser = await storage.getUser(req.params.id);
+      if (targetUser?.role === 'gestor') {
+        const allUsers = await storage.getAllUsers();
+        const activeGestoresCount = allUsers.filter(u => u.role === 'gestor' && u.status === 'active').length;
+        
+        if (activeGestoresCount <= 1) {
+          return res.status(400).json({ message: "Não é possível bloquear o último gestor ativo do sistema" });
+        }
       }
       
       // Bloquear usuário = definir status como 'inactive'
@@ -511,75 +549,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint temporário para seeding - REMOVER APÓS USO
-  app.post('/api/admin/seed', async (req, res) => {
-    try {
-      const { hashPassword } = await import("./auth");
-      const { db } = await import("./db");
-      const { users } = await import("@shared/schema");
-      
-      console.log('🔐 Executando seeding via API...');
-      
-      // Dados do administrador master
-      const adminData = {
-        email: 'rossit@icloud.com',
-        password: '123Pegou$&@',
-        name: 'Marco Rossit',
-        role: 'gestor' as const,
-      };
-      
-      // Hash da senha
-      const passwordHash = await hashPassword(adminData.password);
-      
-      // Cria o usuário admin
-      const [admin] = await db
-        .insert(users)
-        .values({
-          email: adminData.email,
-          passwordHash,
-          name: adminData.name,
-          role: adminData.role,
-          status: 'active',
-          requiresPasswordChange: false,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        .onConflictDoNothing()
-        .returning();
-      
-      if (admin) {
-        console.log('✅ Usuário administrador criado com sucesso!');
-        res.json({
-          success: true,
-          message: 'Usuário administrador criado com sucesso!',
-          user: {
-            email: adminData.email,
-            name: adminData.name,
-            role: adminData.role
-          }
-        });
-      } else {
-        console.log('ℹ️  Usuário administrador já existe.');
-        res.json({
-          success: true,
-          message: 'Usuário administrador já existe.',
-          user: {
-            email: adminData.email,
-            name: adminData.name,
-            role: adminData.role
-          }
-        });
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erro ao criar usuário via API:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erro ao criar usuário administrador',
-        error: error.message
-      });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;
