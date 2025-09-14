@@ -1277,14 +1277,13 @@ export default function QuestionnaireUnified() {
                         </Button>
                       )}
                       {/* Botão de Enviar/Reenviar */}
-                      {template.status !== 'sent' ? (
+                      {template.status === 'draft' ? (
                         // Botão de primeiro envio
                         <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
                           <DialogTrigger asChild>
                             <Button 
                               variant="default" 
                               className="flex-1"
-                              disabled={template.status === 'closed'}
                             >
                               <Users className="mr-2 h-4 w-4" />
                               Enviar aos Ministros
@@ -1309,14 +1308,13 @@ export default function QuestionnaireUnified() {
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                      ) : (
+                      ) : template.status === 'sent' ? (
                         // Botão de reenvio
                         <Dialog open={showResendDialog} onOpenChange={setShowResendDialog}>
                           <DialogTrigger asChild>
                             <Button 
                               variant="secondary" 
                               className="flex-1"
-                              disabled={template.status === 'closed'}
                             >
                               <RefreshCw className="mr-2 h-4 w-4" />
                               Reenviar Questionário
@@ -1348,8 +1346,8 @@ export default function QuestionnaireUnified() {
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                      )}
-                      {template.status !== 'sent' && (
+                      ) : null}
+                      {template.status === 'draft' && (
                         <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                           <DialogTrigger asChild>
                             <Button variant="destructive" className="flex-1">
