@@ -575,50 +575,78 @@ export default function UserManagement() {
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               
-                              {/* Alterar Perfil */}
-                              <DropdownMenuItem className="p-0">
-                                <div className="w-full p-2">
-                                  <div className="text-sm font-medium mb-1">Alterar Perfil</div>
-                                  <Select
-                                    value={user.role}
-                                    onValueChange={(value) => updateRoleMutation.mutate({ 
-                                      userId: user.id, 
-                                      role: value 
-                                    })}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="ministro">Ministro</SelectItem>
-                                      <SelectItem value="coordenador">Coordenador</SelectItem>
-                                      <SelectItem value="gestor">Reitor</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+                              {/* Alterar Perfil - Ministro */}
+                              <DropdownMenuItem
+                                onClick={() => updateRoleMutation.mutate({ 
+                                  userId: user.id, 
+                                  role: "ministro" 
+                                })}
+                                disabled={user.role === "ministro"}
+                              >
+                                <User className="mr-2 h-4 w-4" />
+                                Alterar para Ministro
                               </DropdownMenuItem>
                               
-                              {/* Alterar Status */}
-                              <DropdownMenuItem className="p-0">
-                                <div className="w-full p-2">
-                                  <div className="text-sm font-medium mb-1">Alterar Status</div>
-                                  <Select
-                                    value={user.status}
-                                    onValueChange={(value) => updateStatusMutation.mutate({ 
-                                      userId: user.id, 
-                                      status: value 
-                                    })}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="active">Ativo</SelectItem>
-                                      <SelectItem value="inactive">Inativo</SelectItem>
-                                      <SelectItem value="pending">Pendente</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+                              {/* Alterar Perfil - Coordenador */}
+                              <DropdownMenuItem
+                                onClick={() => updateRoleMutation.mutate({ 
+                                  userId: user.id, 
+                                  role: "coordenador" 
+                                })}
+                                disabled={user.role === "coordenador"}
+                              >
+                                <Shield className="mr-2 h-4 w-4" />
+                                Alterar para Coordenador
+                              </DropdownMenuItem>
+                              
+                              {/* Alterar Perfil - Gestor */}
+                              <DropdownMenuItem
+                                onClick={() => updateRoleMutation.mutate({ 
+                                  userId: user.id, 
+                                  role: "gestor" 
+                                })}
+                                disabled={user.role === "gestor"}
+                              >
+                                <Crown className="mr-2 h-4 w-4" />
+                                Alterar para Reitor
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuSeparator />
+                              
+                              {/* Alterar Status - Ativo */}
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ 
+                                  userId: user.id, 
+                                  status: "active" 
+                                })}
+                                disabled={user.status === "active"}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                Ativar Usuário
+                              </DropdownMenuItem>
+                              
+                              {/* Alterar Status - Inativo */}
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ 
+                                  userId: user.id, 
+                                  status: "inactive" 
+                                })}
+                                disabled={user.status === "inactive"}
+                              >
+                                <Ban className="mr-2 h-4 w-4 text-red-600" />
+                                Inativar Usuário
+                              </DropdownMenuItem>
+                              
+                              {/* Alterar Status - Pendente */}
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ 
+                                  userId: user.id, 
+                                  status: "pending" 
+                                })}
+                                disabled={user.status === "pending"}
+                              >
+                                <AlertCircle className="mr-2 h-4 w-4 text-yellow-600" />
+                                Marcar como Pendente
                               </DropdownMenuItem>
                               
                               <DropdownMenuSeparator />
