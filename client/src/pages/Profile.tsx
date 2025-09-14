@@ -360,7 +360,7 @@ export default function Profile() {
   
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto p-6 ml-[-4px] mr-[-4px] pl-[8px] pr-[8px] pt-[14px] pb-[14px]">
+      <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6">
         <Card className="border-opacity-30">
           <CardHeader>
             <div className="flex items-center justify-between">
