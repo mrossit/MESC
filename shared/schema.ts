@@ -79,6 +79,19 @@ export const users = pgTable("users", {
   availableForSpecialEvents: boolean('available_for_special_events').default(true),
   canServeAsCouple: boolean('can_serve_as_couple').default(false),
   spouseMinisterId: uuid('spouse_minister_id'),
+
+  // Extra activities preferences
+  extraActivities: jsonb('extra_activities').$type<{
+    sickCommunion: boolean;
+    mondayAdoration: boolean;
+    helpOtherPastorals: boolean;
+    festiveEvents: boolean;
+  }>().default({
+    sickCommunion: false,
+    mondayAdoration: false,
+    helpOtherPastorals: false,
+    festiveEvents: false
+  }),
   
   // Experience and formation
   ministryStartDate: date('ministry_start_date'),

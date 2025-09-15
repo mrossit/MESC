@@ -164,6 +164,65 @@ router.delete('/family/:id', async (req: AuthRequest, res) => {
   }
 });
 
+// Obter preferências de atividades extras
+router.get('/extra-activities', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await storage.getUser(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Retornar as preferências ou valores padrão
+    const extraActivities = user.extraActivities || {
+      sickCommunion: false,
+      mondayAdoration: false,
+      helpOtherPastorals: false,
+      festiveEvents: false
+    };
+
+    return res.json(extraActivities);
+  } catch (error) {
+    console.error('Error fetching extra activities:', error);
+    res.status(500).json({ error: 'Failed to fetch extra activities' });
+  }
+});
+
+// Atualizar preferências de atividades extras
+router.put('/extra-activities', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+
+    const schema = z.object({
+      sickCommunion: z.boolean(),
+      mondayAdoration: z.boolean(),
+      helpOtherPastorals: z.boolean(),
+      festiveEvents: z.boolean()
+    });
+
+    const extraActivities = schema.parse(req.body);
+
+    // Atualizar no banco de dados
+    const updatedUser = await storage.updateUser(userId, { extraActivities });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Extra activities preferences updated successfully',
+      extraActivities: updatedUser.extraActivities
+    });
+  } catch (error) {
+    console.error('Error updating extra activities:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid data', details: error.errors });
+    }
+    res.status(500).json({ error: 'Failed to update extra activities' });
+  }
+});
+
 // Esta rota foi movida para routes.ts principal
 // router.get('/users/active', ...)
 

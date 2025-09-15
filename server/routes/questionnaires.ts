@@ -476,6 +476,24 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
         return res.json(null);
       }
 
+      console.log('[GET /responses] Buscando respostas para:', {
+        userId: minister.id,
+        month,
+        year
+      });
+
+      // Primeiro, buscar todas as respostas do usuário para debug
+      const allUserResponses = await db.select({
+        id: questionnaireResponses.id,
+        questionnaireId: questionnaireResponses.questionnaireId,
+        month: questionnaires.month,
+        year: questionnaires.year
+      }).from(questionnaireResponses)
+        .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+        .where(eq(questionnaireResponses.userId, minister.id));
+
+      console.log('[GET /responses] Todas as respostas do usuário:', allUserResponses);
+
       const [response] = await db.select({
         id: questionnaireResponses.id,
         userId: questionnaireResponses.userId,
@@ -497,26 +515,291 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
         ))
         .limit(1);
 
+      console.log('[GET /responses] Resposta encontrada:', response ? 'Sim' : 'Não');
+
       if (response) {
-        // Parse JSON fields
-        res.json({
-          ...response,
-          responses: JSON.parse(response.responses as string),
+        console.log('[GET /responses] Tipo do campo responses:', typeof response.responses);
+
+        // Parse JSON fields se necessário
+        const parsedResponses = typeof response.responses === 'string'
+          ? JSON.parse(response.responses)
+          : response.responses;
+
+        const result = {
+          id: response.id,
+          userId: response.userId,
+          responses: parsedResponses,
+          submittedAt: response.submittedAt,
           questionnaireTemplate: response.questionnaireTemplate ? {
             ...response.questionnaireTemplate,
             questions: response.questionnaireTemplate.questions
           } : null
-        });
+        };
+
+        console.log('[GET /responses] Retornando resposta com ID:', result.id);
+        res.json(result);
       } else {
+        console.log('[GET /responses] Nenhuma resposta encontrada para o período');
         res.json(null);
       }
     } catch (dbError) {
+      console.error('[GET /responses] Erro na query do banco:', dbError);
       // If database query fails, return null
       res.json(null);
     }
   } catch (error) {
     console.error('Error fetching questionnaire response:', error);
     res.status(500).json({ error: 'Failed to fetch questionnaire response' });
+  }
+});
+
+// Obter status das respostas para admin/coordenador
+router.get('/admin/responses-status/:year/:month', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const userRole = req.user!.role;
+
+    // Verificar se o usuário tem permissão
+    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    if (!db) {
+      return res.json([]);
+    }
+
+    // Buscar o questionário do mês
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.month, month),
+        eq(questionnaires.year, year)
+      ))
+      .limit(1);
+
+    if (!questionnaire) {
+      return res.json({
+        month,
+        year,
+        templateExists: false,
+        totalMinisters: 0,
+        respondedCount: 0,
+        pendingCount: 0,
+        responseRate: '0%',
+        responses: []
+      });
+    }
+
+    // Buscar todos os ministros ativos
+    const ministers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone
+      })
+      .from(users)
+      .where(and(
+        eq(users.role, 'ministro'),
+        eq(users.status, 'active')
+      ));
+
+    // Buscar todas as respostas para este questionário
+    const responses = await db
+      .select({
+        userId: questionnaireResponses.userId,
+        submittedAt: questionnaireResponses.submittedAt,
+        responses: questionnaireResponses.responses
+      })
+      .from(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
+
+    // Mapear ministros com suas respostas
+    const responseMap = new Map(responses.map(r => [r.userId, r]));
+
+    const ministerResponses = ministers.map(minister => ({
+      id: minister.id,
+      name: minister.name,
+      email: minister.email,
+      phone: minister.phone || '',
+      responded: responseMap.has(minister.id),
+      respondedAt: responseMap.get(minister.id)?.submittedAt?.toISOString() || null,
+      availability: null // Pode ser expandido para incluir disponibilidade
+    }));
+
+    const respondedCount = responses.length;
+    const totalMinisters = ministers.length;
+    const responseRate = totalMinisters > 0
+      ? `${Math.round((respondedCount / totalMinisters) * 100)}%`
+      : '0%';
+
+    res.json({
+      month,
+      year,
+      templateExists: true,
+      templateId: questionnaire.id,
+      templateStatus: questionnaire.status,
+      totalMinisters,
+      respondedCount,
+      pendingCount: totalMinisters - respondedCount,
+      responseRate,
+      responses: ministerResponses
+    });
+
+  } catch (error) {
+    console.error('Error fetching response status:', error);
+    res.status(500).json({ error: 'Failed to fetch response status' });
+  }
+});
+
+// Obter resumo das respostas para admin/coordenador
+router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const userRole = req.user!.role;
+
+    // Verificar se o usuário tem permissão
+    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    if (!db) {
+      return res.json({ totalResponses: 0, questions: [], summary: {} });
+    }
+
+    // Buscar o questionário do mês
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.month, month),
+        eq(questionnaires.year, year)
+      ))
+      .limit(1);
+
+    if (!questionnaire) {
+      return res.json({ totalResponses: 0, questions: [], summary: {} });
+    }
+
+    // Buscar todas as respostas
+    const responses = await db
+      .select()
+      .from(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
+
+    // Processar resumo das respostas
+    const summary: Record<string, Record<string, number>> = {};
+    const questions = questionnaire.questions as any[];
+
+    responses.forEach(response => {
+      const userResponses = typeof response.responses === 'string'
+        ? JSON.parse(response.responses)
+        : response.responses;
+
+      if (Array.isArray(userResponses)) {
+        userResponses.forEach((r: any) => {
+          if (!summary[r.questionId]) {
+            summary[r.questionId] = {};
+          }
+
+          const answer = typeof r.answer === 'string' ? r.answer : JSON.stringify(r.answer);
+          summary[r.questionId][answer] = (summary[r.questionId][answer] || 0) + 1;
+        });
+      }
+    });
+
+    res.json({
+      totalResponses: responses.length,
+      questions,
+      summary
+    });
+
+  } catch (error) {
+    console.error('Error fetching response summary:', error);
+    res.status(500).json({ error: 'Failed to fetch response summary' });
+  }
+});
+
+// Obter detalhes de uma resposta específica (admin/coordenador)
+router.get('/admin/responses/:templateId/:userId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { templateId, userId } = req.params;
+    const userRole = req.user!.role;
+
+    // Verificar se o usuário tem permissão
+    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+
+    // Buscar o questionário
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(eq(questionnaires.id, templateId))
+      .limit(1);
+
+    if (!questionnaire) {
+      return res.status(404).json({ error: 'Questionnaire not found' });
+    }
+
+    // Buscar o usuário
+    const [user] = await db
+      .select({
+        name: users.name,
+        email: users.email,
+        phone: users.phone
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Buscar a resposta
+    const [response] = await db
+      .select()
+      .from(questionnaireResponses)
+      .where(and(
+        eq(questionnaireResponses.questionnaireId, templateId),
+        eq(questionnaireResponses.userId, userId)
+      ))
+      .limit(1);
+
+    if (!response) {
+      return res.status(404).json({ error: 'Response not found' });
+    }
+
+    // Processar respostas
+    const userResponses = typeof response.responses === 'string'
+      ? JSON.parse(response.responses)
+      : response.responses;
+
+    res.json({
+      user,
+      response: {
+        submittedAt: response.submittedAt?.toISOString(),
+        responses: userResponses,
+        availabilities: [] // Pode ser expandido no futuro
+      },
+      template: {
+        questions: questionnaire.questions,
+        month: questionnaire.month,
+        year: questionnaire.year
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching detailed response:', error);
+    res.status(500).json({ error: 'Failed to fetch detailed response' });
   }
 });
 

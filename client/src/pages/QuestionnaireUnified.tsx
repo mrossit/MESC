@@ -270,29 +270,36 @@ export default function QuestionnaireUnified() {
       const responseRes = await fetch(`/api/questionnaires/responses/${selectedYear}/${selectedMonth}`, {
         credentials: 'include'
       });
-      
+
+      console.log('[loadQuestionnaire] Verificando respostas existentes, status:', responseRes.status);
+
       if (responseRes.ok) {
         const responseData = await responseRes.json();
-        if (responseData && templateData && responseData.responses?.length > 0) {
+        console.log('[loadQuestionnaire] Dados de resposta recebidos:', responseData);
+
+        // Verificar se temos dados válidos - o backend pode retornar null
+        if (responseData && responseData.id) {
+          console.log('[loadQuestionnaire] Resposta válida encontrada, ID:', responseData.id);
+          console.log('[loadQuestionnaire] Número de respostas:', responseData.responses?.length);
+
+          // IMPORTANTE: Sempre setar existingResponse se temos um ID válido
+          // Isso garante que o botão e badge sejam atualizados corretamente
           setExistingResponse(responseData);
-          
-          // Preencher respostas existentes
-          const existingResponses: Record<string, any> = {};
-          responseData.responses.forEach((r: Response) => {
-            existingResponses[r.questionId] = r.answer;
-          });
-          
-          // Aplicar lógica condicional para respostas existentes
-          // Nota: As perguntas yes_no_with_options não tem dependsOn, são autônomas
-          // então não precisamos limpar respostas baseadas em dependências
-          
-          setResponses(existingResponses);
+
+          // Preencher respostas existentes se existirem
+          if (responseData.responses && Array.isArray(responseData.responses) && responseData.responses.length > 0) {
+            const existingResponses: Record<string, any> = {};
+            responseData.responses.forEach((r: Response) => {
+              existingResponses[r.questionId] = r.answer;
+            });
+            setResponses(existingResponses);
+          }
         } else {
-          // Mesmo que responseRes.ok, se não há responses válidas, definir como null
+          console.log('[loadQuestionnaire] Resposta retornou null ou sem ID');
           setExistingResponse(null);
         }
       } else {
-        // Resposta não foi encontrada ou erro - definir explicitamente como null
+        console.log('[loadQuestionnaire] Nenhuma resposta encontrada (404 ou erro)');
         setExistingResponse(null);
       }
     } catch (err) {
@@ -655,9 +662,22 @@ export default function QuestionnaireUnified() {
       });
 
       if (res.ok) {
+        const responseData = await res.json();
         setSuccess('Questionário enviado com sucesso!');
-        // Preserve success message when reloading
-        loadQuestionnaire(true);
+
+        // Atualizar existingResponse imediatamente com os dados retornados
+        // O backend retorna o objeto completo da resposta
+        console.log('Resposta recebida do servidor:', responseData);
+        setExistingResponse(responseData);
+
+        // Força re-render imediato para atualizar o botão
+        setTimeout(() => {
+          // Apenas garante que o estado foi processado
+          if (!responseData || !responseData.id) {
+            // Se por algum motivo não temos os dados, recarregar
+            loadQuestionnaire(true);
+          }
+        }, 100);
       } else {
         const responseText = await res.text();
         console.error('Response not OK:', res.status, responseText);
@@ -993,12 +1013,12 @@ export default function QuestionnaireUnified() {
     // Configurações base dos status
     const statusConfig = {
       draft: { color: 'bg-gray-100 text-gray-800', label: 'Rascunho', icon: FileText },
-      sent: { 
+      sent: {
         // Para coordenadores: sempre mostrar "Enviado aos Ministros"
         // Para ministros: mostrar baseado se já respondeu ou não
         admin: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
         pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendente', icon: AlertCircle },
-        responded: { color: 'bg-green-100 text-green-800', label: 'Respondido', icon: CheckCircle }
+        responded: { color: 'bg-green-100 text-green-800', label: 'Enviado', icon: CheckCircle }
       },
       closed: { color: 'bg-red-100 text-red-800', label: 'Encerrado', icon: Lock }
     };
@@ -1837,22 +1857,29 @@ export default function QuestionnaireUnified() {
 
                     {/* Botão de envio */}
                     <div className="flex justify-center mt-8 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border">
-                      <Button
-                        onClick={handleSubmitResponse}
-                        disabled={submitting || template.status === 'closed'}
-                        size="lg"
-                        className="gap-2 px-8 py-3 text-lg font-semibold shadow-lg"
-                        data-testid="button-submit-questionnaire"
-                      >
-                        <Send className="h-5 w-5" />
-                        {template.status === 'closed' 
-                          ? 'Questionário Encerrado'
-                          : submitting 
-                          ? 'Enviando...' 
-                          : existingResponse 
-                          ? 'Atualizar Respostas' 
-                          : 'Enviar Respostas'}
-                      </Button>
+                      {template.status === 'closed' ? (
+                        <Alert variant="destructive">
+                          <Lock className="h-4 w-4" />
+                          <AlertDescription>
+                            Esse questionário não aceita mais respostas
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Button
+                          onClick={handleSubmitResponse}
+                          disabled={submitting}
+                          size="lg"
+                          className="gap-2 px-8 py-3 text-lg font-semibold shadow-lg"
+                          data-testid="button-submit-questionnaire"
+                        >
+                          <Send className="h-5 w-5" />
+                          {submitting
+                            ? 'Enviando...'
+                            : existingResponse?.responses?.length > 0
+                            ? 'Reenviar Respostas'
+                            : 'Enviar Respostas'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (

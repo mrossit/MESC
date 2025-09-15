@@ -409,7 +409,13 @@ export default function QuestionnaireResponses() {
         {status && status.templateExists && (
           <>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <Card className="overflow-hidden border-opacity-30">
+              <Card 
+                className="overflow-hidden border-opacity-30 cursor-pointer hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  setViewMode('list');
+                  setFilterTab('all');
+                }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
                   <CardTitle className="text-sm font-medium">
                     Total de Ministros
@@ -424,7 +430,13 @@ export default function QuestionnaireResponses() {
                 </CardContent>
               </Card>
 
-              <Card className="overflow-hidden border-opacity-30">
+              <Card 
+                className="overflow-hidden border-opacity-30 cursor-pointer hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  setViewMode('list');
+                  setFilterTab('responded');
+                }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50">
                   <CardTitle className="text-sm font-medium">
                     Responderam
@@ -441,7 +453,13 @@ export default function QuestionnaireResponses() {
                 </CardContent>
               </Card>
 
-              <Card className="overflow-hidden border-opacity-30">
+              <Card 
+                className="overflow-hidden border-opacity-30 cursor-pointer hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  setViewMode('list');
+                  setFilterTab('pending');
+                }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950 dark:to-orange-900/50">
                   <CardTitle className="text-sm font-medium">
                     Pendentes
@@ -458,7 +476,13 @@ export default function QuestionnaireResponses() {
                 </CardContent>
               </Card>
 
-              <Card className="overflow-hidden border-opacity-30">
+              <Card 
+                className="overflow-hidden border-opacity-30 cursor-pointer hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  setViewMode('list');
+                  setFilterTab('all');
+                }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950 dark:to-purple-900/50">
                   <CardTitle className="text-sm font-medium">
                     Taxa de Resposta

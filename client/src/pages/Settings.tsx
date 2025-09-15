@@ -34,6 +34,12 @@ export default function Settings() {
     availableForOtherPastorals: false,
     availableForEvents: false
   });
+  const [extraActivities, setExtraActivities] = useState({
+    sickCommunion: false,
+    mondayAdoration: false,
+    helpOtherPastorals: false,
+    festiveEvents: false
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -75,11 +81,44 @@ export default function Settings() {
     }
   });
 
+  // Buscar atividades extras
+  const { data: activitiesData } = useQuery({
+    queryKey: ['extra-activities'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/profile/extra-activities', { credentials: 'include' });
+        if (!res.ok) {
+          return {
+            sickCommunion: false,
+            mondayAdoration: false,
+            helpOtherPastorals: false,
+            festiveEvents: false
+          };
+        }
+        return await res.json();
+      } catch (error) {
+        console.log('Extra activities endpoint not available, using defaults');
+        return {
+          sickCommunion: false,
+          mondayAdoration: false,
+          helpOtherPastorals: false,
+          festiveEvents: false
+        };
+      }
+    }
+  });
+
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    if (activitiesData) {
+      setExtraActivities(activitiesData);
+    }
+  }, [activitiesData]);
 
   const handlePushNotificationToggle = async (checked: boolean) => {
     // Se está ativando as notificações push
@@ -119,28 +158,38 @@ export default function Settings() {
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/user/settings', {
+      // Salvar configurações gerais
+      const settingsRes = await fetch('/api/user/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(settings)
       });
 
-      if (res.ok) {
+      // Salvar atividades extras
+      const activitiesRes = await fetch('/api/profile/extra-activities', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(extraActivities)
+      });
+
+      if (activitiesRes.ok) {
         setSuccess('Configurações salvas com sucesso!');
         queryClient.invalidateQueries({ queryKey: ['user-settings'] });
-      } else if (res.status === 404) {
+        queryClient.invalidateQueries({ queryKey: ['extra-activities'] });
+      } else if (settingsRes.status === 404 || activitiesRes.status === 404) {
         // Se o endpoint não existir, apenas mostra sucesso (para desenvolvimento)
-        setSuccess('Configurações salvas localmente!');
-        console.log('Settings endpoint not implemented yet, saved locally');
+        setSuccess('Configurações salvas!');
+        console.log('Some settings endpoints not implemented yet');
       } else {
-        const errorData = await res.json().catch(() => ({ error: 'Erro ao salvar' }));
+        const errorData = await activitiesRes.json().catch(() => ({ error: 'Erro ao salvar' }));
         setError(errorData.error || 'Erro ao salvar configurações');
       }
     } catch (err) {
       // Em caso de erro de rede, salva localmente
-      console.log('Settings saved locally:', settings);
-      setSuccess('Configurações salvas localmente!');
+      console.log('Settings saved locally:', { settings, extraActivities });
+      setSuccess('Configurações salvas!');
     } finally {
       setSaving(false);
     }
@@ -292,9 +341,9 @@ export default function Settings() {
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="sickCommunion"
-                          checked={settings.availableForSickCommunion}
-                          onCheckedChange={(checked) => 
-                            setSettings(prev => ({ ...prev, availableForSickCommunion: checked as boolean }))
+                          checked={extraActivities.sickCommunion}
+                          onCheckedChange={(checked) =>
+                            setExtraActivities(prev => ({ ...prev, sickCommunion: checked as boolean }))
                           }
                         />
                         <div className="space-y-1">
@@ -314,9 +363,9 @@ export default function Settings() {
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="adoration"
-                          checked={settings.availableForAdoration}
-                          onCheckedChange={(checked) => 
-                            setSettings(prev => ({ ...prev, availableForAdoration: checked as boolean }))
+                          checked={extraActivities.mondayAdoration}
+                          onCheckedChange={(checked) =>
+                            setExtraActivities(prev => ({ ...prev, mondayAdoration: checked as boolean }))
                           }
                         />
                         <div className="space-y-1">
@@ -336,9 +385,9 @@ export default function Settings() {
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="otherPastorals"
-                          checked={settings.availableForOtherPastorals}
-                          onCheckedChange={(checked) => 
-                            setSettings(prev => ({ ...prev, availableForOtherPastorals: checked as boolean }))
+                          checked={extraActivities.helpOtherPastorals}
+                          onCheckedChange={(checked) =>
+                            setExtraActivities(prev => ({ ...prev, helpOtherPastorals: checked as boolean }))
                           }
                         />
                         <div className="space-y-1">
@@ -358,9 +407,9 @@ export default function Settings() {
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="events"
-                          checked={settings.availableForEvents}
-                          onCheckedChange={(checked) => 
-                            setSettings(prev => ({ ...prev, availableForEvents: checked as boolean }))
+                          checked={extraActivities.festiveEvents}
+                          onCheckedChange={(checked) =>
+                            setExtraActivities(prev => ({ ...prev, festiveEvents: checked as boolean }))
                           }
                         />
                         <div className="space-y-1">

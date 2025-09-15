@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "extra_activities" jsonb DEFAULT '{"sickCommunion":false,"mondayAdoration":false,"helpOtherPastorals":false,"festiveEvents":false}'::jsonb;
