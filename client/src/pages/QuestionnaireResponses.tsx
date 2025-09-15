@@ -493,7 +493,7 @@ export default function QuestionnaireResponses() {
                   <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold">{status.responseRate}</div>
+                  <div className="text-2xl font-bold">{status.responseRate}%</div>
                   <Progress 
                     value={Number(status.responseRate)} 
                     className="mt-2"
