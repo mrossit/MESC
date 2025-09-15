@@ -36,21 +36,21 @@ export default function Login() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await fetch("/api/auth/reset-password", {
+      const response = await fetch("/api/password-reset/request-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+      const data = await response.json();
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Erro ao enviar email");
+        throw new Error(data.message || "Erro ao processar solicitação");
       }
-      return response.json();
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
-        title: "Email enviado",
-        description: "Verifique sua caixa de entrada para redefinir sua senha.",
+        title: "Solicitação Enviada!",
+        description: data.message || "Os Coordenadores foram notificados para enviar nova senha, assim que eles receberem a mensagem responderão de imediato.",
       });
       setShowForgotPassword(false);
       setForgotPasswordEmail("");
@@ -58,7 +58,7 @@ export default function Login() {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao enviar email de recuperação",
+        description: error.message || "Erro ao processar solicitação",
         variant: "destructive",
       });
     },
@@ -313,7 +313,7 @@ export default function Login() {
               Recuperar Senha
             </DialogTitle>
             <DialogDescription className="text-center text-neutral-textMedium dark:text-gray-400">
-              Digite seu email cadastrado e enviaremos instruções para redefinir sua senha.
+              Digite seu email cadastrado e os coordenadores serão notificados para auxiliar com uma nova senha.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="space-y-4 mt-4">

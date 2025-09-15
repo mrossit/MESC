@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "./db";
 import { passwordResetRequests, users, notifications } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { hashPassword } from "./auth";
 
 const router = Router();
@@ -67,7 +67,7 @@ router.post("/request-reset", async (req, res) => {
         and(
           eq(users.status, 'active'),
           // Notifica tanto coordenadores quanto gestores
-          db.or(
+          or(
             eq(users.role, 'coordenador'),
             eq(users.role, 'gestor')
           )
