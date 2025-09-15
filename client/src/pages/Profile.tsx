@@ -28,8 +28,11 @@ type UserProfile = {
   photoUrl?: string;
   ministryStartDate?: string;
   baptismDate?: string;
+  baptismParish?: string;
   confirmationDate?: string;
+  confirmationParish?: string;
   marriageDate?: string;
+  marriageParish?: string;
   maritalStatus?: string;
 };
 
@@ -198,8 +201,11 @@ export default function Profile() {
         phone: profile.phone || null,
         ministryStartDate: profile.ministryStartDate || null,
         baptismDate: profile.baptismDate || null,
+        baptismParish: profile.baptismParish || null,
         confirmationDate: profile.confirmationDate || null,
+        confirmationParish: profile.confirmationParish || null,
         marriageDate: profile.marriageDate || null,
+        marriageParish: profile.marriageParish || null,
         maritalStatus: profile.maritalStatus || null
       };
 
