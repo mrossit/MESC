@@ -141,7 +141,10 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
 // Criar nova notificação (apenas coordenadores e reitores)
 router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
+    console.log("POST /api/notifications - Body recebido:", req.body);
+    
     const data = createNotificationSchema.parse(req.body);
+    console.log("Dados após validação:", data);
     
     let recipientUserIds: string[] = [];
     
@@ -180,18 +183,24 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
       recipientUserIds = recipients.map((r: any) => r.id);
     }
     
+    console.log(`Encontrados ${recipientUserIds.length} destinatários:`, recipientUserIds);
+    
     // Criar notificações para cada destinatário
-    const notificationPromises = recipientUserIds.map(userId =>
-      storage.createNotification({
+    const notificationPromises = recipientUserIds.map(userId => {
+      const notificationData = {
         userId,
         title: data.title,
         message: data.message,
         type: data.type,
         read: false,
-      })
-    );
+      };
+      console.log(`Criando notificação para usuário ${userId}:`, notificationData);
+      return storage.createNotification(notificationData);
+    });
     
+    console.log("Executando Promise.all para criar notificações...");
     await Promise.all(notificationPromises);
+    console.log("Notificações criadas com sucesso!");
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
     console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {
@@ -205,9 +214,12 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
       recipientCount: recipientUserIds.length 
     });
   } catch (error) {
+    console.error("Erro detalhado ao criar notificação:", error);
     if (error instanceof z.ZodError) {
+      console.error("Erro de validação Zod:", error.errors);
       res.status(400).json({ error: error.errors[0].message });
     } else {
+      console.error("Erro interno:", error);
       res.status(500).json({ error: "Erro ao criar notificação" });
     }
   }
