@@ -135,8 +135,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone: req.body.phone,
         ministryStartDate: req.body.ministryStartDate,
         baptismDate: req.body.baptismDate,
+        baptismParish: req.body.baptismParish,
         confirmationDate: req.body.confirmationDate,
+        confirmationParish: req.body.confirmationParish,
         marriageDate: req.body.marriageDate,
+        marriageParish: req.body.marriageParish,
         maritalStatus: req.body.maritalStatus
       };
 

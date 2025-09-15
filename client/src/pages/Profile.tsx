@@ -198,7 +198,7 @@ export default function Profile() {
     try {
       const dataToSend = {
         name: profile.name,
-        phone: profile.phone || null,
+        phone: profile.phone ? unformatPhoneNumber(profile.phone) : null,
         ministryStartDate: profile.ministryStartDate || null,
         baptismDate: profile.baptismDate || null,
         baptismParish: profile.baptismParish || null,
@@ -352,6 +352,37 @@ export default function Profile() {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  // Função para formatar telefone brasileiro
+  const formatPhoneNumber = (value: string) => {
+    // Remove tudo que não é dígito
+    const onlyNumbers = value.replace(/\D/g, '');
+
+    // Se tem 9 dígitos, adiciona código de área 15 (Sorocaba)
+    let numbers = onlyNumbers;
+    if (numbers.length === 9) {
+      numbers = '15' + numbers;
+    }
+
+    // Aplica a máscara (00) 00000-0000 ou (00) 0000-0000
+    if (numbers.length <= 2) {
+      return `(${numbers}`;
+    } else if (numbers.length <= 6) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    } else if (numbers.length <= 10) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    } else if (numbers.length === 11) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    }
+
+    // Se passou de 11 dígitos, limita
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  // Função para remover formatação do telefone antes de salvar
+  const unformatPhoneNumber = (value: string) => {
+    return value.replace(/\D/g, '');
+  };
   
   if (userLoading || familyLoading) {
     return (
@@ -454,6 +485,11 @@ export default function Profile() {
                   <div>
                     <h3 className="text-lg sm:text-xl font-semibold text-center sm:text-left">{profile?.name}</h3>
                     <p className="text-xs sm:text-sm text-gray-500 text-center sm:text-left break-all">{profile?.email}</p>
+                    {profile?.phone && (
+                      <p className="text-xs sm:text-sm text-gray-500 text-center sm:text-left">
+                        {formatPhoneNumber(profile.phone)}
+                      </p>
+                    )}
                     <div className="flex justify-center sm:justify-start">
                       <Badge className="mt-2">{profile?.role === 'coordenador' ? 'Coordenador' : profile?.role}</Badge>
                     </div>
@@ -467,10 +503,14 @@ export default function Profile() {
                     <Input
                       id="phone"
                       type="tel"
-                      value={profile?.phone || ''}
-                      onChange={(e) => setProfile(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                      value={formatPhoneNumber(profile?.phone || '')}
+                      onChange={(e) => {
+                        const formatted = formatPhoneNumber(e.target.value);
+                        setProfile(prev => prev ? { ...prev, phone: unformatPhoneNumber(formatted) } : null);
+                      }}
                       disabled={!isEditing}
                       placeholder="(00) 00000-0000"
+                      maxLength={15}
                     />
                   </div>
                   
@@ -532,19 +572,42 @@ export default function Profile() {
                         <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Batismo</h4>
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 space-y-3">
                       {isEditing ? (
-                        <Input
-                          type="date"
-                          value={dateToInputValue(profile?.baptismDate)}
-                          onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
-                          className="text-sm w-full"
-                          data-testid="input-baptism-date"
-                        />
+                        <>
+                          <div>
+                            <label className="text-xs text-gray-500">Data:</label>
+                            <Input
+                              type="date"
+                              value={dateToInputValue(profile?.baptismDate)}
+                              onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
+                              className="text-sm w-full mt-1"
+                              data-testid="input-baptism-date"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500">Paróquia:</label>
+                            <Input
+                              type="text"
+                              value={profile?.baptismParish || ''}
+                              onChange={(e) => setProfile(prev => prev ? { ...prev, baptismParish: e.target.value } : null)}
+                              className="text-sm w-full mt-1"
+                              placeholder="Nome da paróquia"
+                              data-testid="input-baptism-parish"
+                            />
+                          </div>
+                        </>
                       ) : (
-                        <p className="text-xs sm:text-sm text-gray-600">
-                          {formatDate(profile?.baptismDate)}
-                        </p>
+                        <>
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            {formatDate(profile?.baptismDate)}
+                          </p>
+                          {profile?.baptismParish && (
+                            <p className="text-xs sm:text-sm text-gray-500">
+                              {profile.baptismParish}
+                            </p>
+                          )}
+                        </>
                       )}
                       </div>
                     </CardContent>
@@ -556,19 +619,42 @@ export default function Profile() {
                         <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Crisma</h4>
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 space-y-3">
                       {isEditing ? (
-                        <Input
-                          type="date"
-                          value={dateToInputValue(profile?.confirmationDate)}
-                          onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
-                          className="text-sm w-full"
-                          data-testid="input-confirmation-date"
-                        />
+                        <>
+                          <div>
+                            <label className="text-xs text-gray-500">Data:</label>
+                            <Input
+                              type="date"
+                              value={dateToInputValue(profile?.confirmationDate)}
+                              onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
+                              className="text-sm w-full mt-1"
+                              data-testid="input-confirmation-date"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500">Paróquia:</label>
+                            <Input
+                              type="text"
+                              value={profile?.confirmationParish || ''}
+                              onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationParish: e.target.value } : null)}
+                              className="text-sm w-full mt-1"
+                              placeholder="Nome da paróquia"
+                              data-testid="input-confirmation-parish"
+                            />
+                          </div>
+                        </>
                       ) : (
-                        <p className="text-xs sm:text-sm text-gray-600">
-                          {formatDate(profile?.confirmationDate)}
-                        </p>
+                        <>
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            {formatDate(profile?.confirmationDate)}
+                          </p>
+                          {profile?.confirmationParish && (
+                            <p className="text-xs sm:text-sm text-gray-500">
+                              {profile.confirmationParish}
+                            </p>
+                          )}
+                        </>
                       )}
                       </div>
                     </CardContent>
@@ -581,19 +667,42 @@ export default function Profile() {
                           <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                           <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 space-y-3">
                         {isEditing ? (
-                          <Input
-                            type="date"
-                            value={dateToInputValue(profile?.marriageDate)}
-                            onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
-                            className="text-sm w-full"
-                            data-testid="input-marriage-date"
-                          />
+                          <>
+                            <div>
+                              <label className="text-xs text-gray-500">Data:</label>
+                              <Input
+                                type="date"
+                                value={dateToInputValue(profile?.marriageDate)}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
+                                className="text-sm w-full mt-1"
+                                data-testid="input-marriage-date"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500">Paróquia:</label>
+                              <Input
+                                type="text"
+                                value={profile?.marriageParish || ''}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, marriageParish: e.target.value } : null)}
+                                className="text-sm w-full mt-1"
+                                placeholder="Nome da paróquia"
+                                data-testid="input-marriage-parish"
+                              />
+                            </div>
+                          </>
                         ) : (
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            {formatDate(profile?.marriageDate)}
-                          </p>
+                          <>
+                            <p className="text-xs sm:text-sm text-gray-600">
+                              {formatDate(profile?.marriageDate)}
+                            </p>
+                            {profile?.marriageParish && (
+                              <p className="text-xs sm:text-sm text-gray-500">
+                                {profile.marriageParish}
+                              </p>
+                            )}
+                          </>
                         )}
                         </div>
                       </CardContent>
