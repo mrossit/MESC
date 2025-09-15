@@ -41,6 +41,7 @@ export default function Settings() {
     festiveEvents: false
   });
   const [saving, setSaving] = useState(false);
+  const [savingActivities, setSavingActivities] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -119,6 +120,39 @@ export default function Settings() {
       setExtraActivities(activitiesData);
     }
   }, [activitiesData]);
+
+  // Função para salvar apenas as atividades extras
+  const saveExtraActivities = async (activities: typeof extraActivities) => {
+    try {
+      const res = await fetch('/api/profile/extra-activities', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(activities)
+      });
+
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['extra-activities'] });
+        // Não mostrar toast para não ser intrusivo no salvamento automático
+      } else {
+        console.error('Erro ao salvar preferências de atividades');
+      }
+    } catch (err) {
+      console.error('Erro ao salvar preferências:', err);
+    }
+  };
+
+  // Debounce para salvar automaticamente após mudanças
+  useEffect(() => {
+    // Só salvar se já temos dados carregados (evita salvar no primeiro render)
+    if (activitiesData) {
+      const timer = setTimeout(() => {
+        saveExtraActivities(extraActivities);
+      }, 1000); // Aguarda 1 segundo após a última mudança
+
+      return () => clearTimeout(timer);
+    }
+  }, [extraActivities]);
 
   const handlePushNotificationToggle = async (checked: boolean) => {
     // Se está ativando as notificações push
