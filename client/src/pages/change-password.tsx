@@ -235,6 +235,14 @@ export default function ChangePassword() {
               >
                 {changePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-mesc-beige hover:bg-mesc-beige/10"
+                onClick={() => navigate("/dashboard")}
+              >
+                Cancelar
+              </Button>
             </div>
           </form>
 
