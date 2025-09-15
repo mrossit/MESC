@@ -182,6 +182,7 @@ router.get('/extra-activities', async (req: AuthRequest, res) => {
       festiveEvents: false
     };
 
+    console.log(`GET /extra-activities for user ${userId}:`, extraActivities);
     return res.json(extraActivities);
   } catch (error) {
     console.error('Error fetching extra activities:', error);

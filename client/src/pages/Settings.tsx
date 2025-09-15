@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -34,7 +34,12 @@ export default function Settings() {
     availableForOtherPastorals: false,
     availableForEvents: false
   });
-  const [extraActivities, setExtraActivities] = useState({
+  const [extraActivities, setExtraActivities] = useState<{
+    sickCommunion: boolean;
+    mondayAdoration: boolean;
+    helpOtherPastorals: boolean;
+    festiveEvents: boolean;
+  }>({
     sickCommunion: false,
     mondayAdoration: false,
     helpOtherPastorals: false,
@@ -83,30 +88,26 @@ export default function Settings() {
   });
 
   // Buscar atividades extras
-  const { data: activitiesData } = useQuery({
+  const { data: activitiesData, refetch: refetchActivities, isSuccess: activitiesLoaded } = useQuery({
     queryKey: ['extra-activities'],
     queryFn: async () => {
       try {
         const res = await fetch('/api/profile/extra-activities', { credentials: 'include' });
         if (!res.ok) {
-          return {
-            sickCommunion: false,
-            mondayAdoration: false,
-            helpOtherPastorals: false,
-            festiveEvents: false
-          };
+          console.error('Failed to fetch activities, status:', res.status);
+          return null;
         }
-        return await res.json();
+        const data = await res.json();
+        console.log('🔄 Dados recebidos do servidor:', data);
+        return data;
       } catch (error) {
-        console.log('Extra activities endpoint not available, using defaults');
-        return {
-          sickCommunion: false,
-          mondayAdoration: false,
-          helpOtherPastorals: false,
-          festiveEvents: false
-        };
+        console.error('Error fetching activities:', error);
+        return null;
       }
-    }
+    },
+    staleTime: 0, // Sempre buscar dados frescos
+    refetchOnMount: 'always', // Sempre refetch quando o componente é montado
+    refetchOnWindowFocus: false // Desabilitar refetch no focus para evitar conflitos
   });
 
   useEffect(() => {
@@ -115,14 +116,35 @@ export default function Settings() {
     }
   }, [settingsData]);
 
+  // Controle de mudanças
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Carregar dados quando disponíveis
   useEffect(() => {
-    if (activitiesData) {
+    if (activitiesLoaded && activitiesData) {
+      console.log('📋 Atualizando estado com dados do servidor:', activitiesData);
       setExtraActivities(activitiesData);
+      // Reset flag quando novos dados são carregados
+      setHasUserInteracted(false);
+    } else if (activitiesLoaded && !activitiesData) {
+      // Se não há dados, usar valores padrão
+      console.log('📋 Usando valores padrão');
+      setExtraActivities({
+        sickCommunion: false,
+        mondayAdoration: false,
+        helpOtherPastorals: false,
+        festiveEvents: false
+      });
+      setHasUserInteracted(false);
     }
-  }, [activitiesData]);
+  }, [activitiesData, activitiesLoaded]);
 
   // Função para salvar apenas as atividades extras
   const saveExtraActivities = async (activities: typeof extraActivities) => {
+    // Evitar múltiplas chamadas simultâneas
+    if (savingActivities) return;
+
     setSavingActivities(true);
     try {
       const res = await fetch('/api/profile/extra-activities', {
@@ -133,45 +155,48 @@ export default function Settings() {
       });
 
       if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['extra-activities'] });
+        // Atualizar o cache da query diretamente sem invalidar
+        queryClient.setQueryData(['extra-activities'], activities);
+        console.log('✅ Preferências de atividades salvas:', activities);
         // Mostrar indicador de sucesso brevemente
         setTimeout(() => setSavingActivities(false), 500);
       } else {
         console.error('Erro ao salvar preferências de atividades');
         setSavingActivities(false);
+        // Recarregar dados em caso de erro
+        refetchActivities();
       }
     } catch (err) {
       console.error('Erro ao salvar preferências:', err);
       setSavingActivities(false);
+      // Recarregar dados em caso de erro
+      refetchActivities();
     }
   };
 
-  // Estado para controlar se já carregou os dados iniciais
-  const [hasLoadedActivities, setHasLoadedActivities] = useState(false);
-
-  // Marcar que os dados foram carregados
-  useEffect(() => {
-    if (activitiesData && !hasLoadedActivities) {
-      setHasLoadedActivities(true);
-    }
-  }, [activitiesData, hasLoadedActivities]);
-
   // Debounce para salvar automaticamente após mudanças
   useEffect(() => {
-    // Só salvar se já temos dados carregados e não é a primeira renderização
-    if (hasLoadedActivities && activitiesData) {
-      // Verificar se realmente houve mudança
-      const hasChanges = JSON.stringify(extraActivities) !== JSON.stringify(activitiesData);
-
-      if (hasChanges) {
-        const timer = setTimeout(() => {
-          saveExtraActivities(extraActivities);
-        }, 1000); // Aguarda 1 segundo após a última mudança
-
-        return () => clearTimeout(timer);
+    // Só salvar se o usuário interagiu
+    if (hasUserInteracted) {
+      // Limpar timer anterior se existir
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
       }
+
+      // Criar novo timer
+      saveTimerRef.current = setTimeout(() => {
+        console.log('✅ Salvando alterações do usuário:', extraActivities);
+        saveExtraActivities(extraActivities);
+      }, 1000); // Aguarda 1 segundo após a última mudança
     }
-  }, [extraActivities, hasLoadedActivities]);
+
+    // Cleanup
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [extraActivities, hasUserInteracted]);
 
   const handlePushNotificationToggle = async (checked: boolean) => {
     // Se está ativando as notificações push
@@ -250,7 +275,7 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <Layout>
+      <Layout title="Configurações" subtitle="Preferências de notificações e disponibilidade">
         <div className="flex items-center justify-center h-96">
           <div className="text-center">Carregando configurações...</div>
         </div>
@@ -259,7 +284,7 @@ export default function Settings() {
   }
 
   return (
-    <Layout>
+    <Layout title="Configurações" subtitle="Preferências de notificações e disponibilidade">
       <div className="max-w-4xl mx-auto p-4 sm:p-6">
         <Card className="border-opacity-30">
           <CardHeader className="pb-3 sm:pb-6">
@@ -405,9 +430,10 @@ export default function Settings() {
                         <Checkbox
                           id="sickCommunion"
                           checked={extraActivities.sickCommunion}
-                          onCheckedChange={(checked) =>
-                            setExtraActivities(prev => ({ ...prev, sickCommunion: checked as boolean }))
-                          }
+                          onCheckedChange={(checked) => {
+                            setHasUserInteracted(true);
+                            setExtraActivities(prev => ({ ...prev, sickCommunion: checked as boolean }));
+                          }}
                         />
                         <div className="space-y-1">
                           <Label 
@@ -427,9 +453,10 @@ export default function Settings() {
                         <Checkbox
                           id="adoration"
                           checked={extraActivities.mondayAdoration}
-                          onCheckedChange={(checked) =>
-                            setExtraActivities(prev => ({ ...prev, mondayAdoration: checked as boolean }))
-                          }
+                          onCheckedChange={(checked) => {
+                            setHasUserInteracted(true);
+                            setExtraActivities(prev => ({ ...prev, mondayAdoration: checked as boolean }));
+                          }}
                         />
                         <div className="space-y-1">
                           <Label 
@@ -449,9 +476,10 @@ export default function Settings() {
                         <Checkbox
                           id="otherPastorals"
                           checked={extraActivities.helpOtherPastorals}
-                          onCheckedChange={(checked) =>
-                            setExtraActivities(prev => ({ ...prev, helpOtherPastorals: checked as boolean }))
-                          }
+                          onCheckedChange={(checked) => {
+                            setHasUserInteracted(true);
+                            setExtraActivities(prev => ({ ...prev, helpOtherPastorals: checked as boolean }));
+                          }}
                         />
                         <div className="space-y-1">
                           <Label 
@@ -471,9 +499,10 @@ export default function Settings() {
                         <Checkbox
                           id="events"
                           checked={extraActivities.festiveEvents}
-                          onCheckedChange={(checked) =>
-                            setExtraActivities(prev => ({ ...prev, festiveEvents: checked as boolean }))
-                          }
+                          onCheckedChange={(checked) => {
+                            setHasUserInteracted(true);
+                            setExtraActivities(prev => ({ ...prev, festiveEvents: checked as boolean }));
+                          }}
                         />
                         <div className="space-y-1">
                           <Label 
@@ -489,6 +518,13 @@ export default function Settings() {
                         </div>
                       </div>
                     </div>
+
+                    {savingActivities && (
+                      <div className="mt-4 flex items-center justify-center text-sm text-gray-500">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                        Salvando preferências...
+                      </div>
+                    )}
 
                     <Alert className="mt-6">
                       <Sparkles className="h-4 w-4" />

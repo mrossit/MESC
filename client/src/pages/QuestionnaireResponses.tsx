@@ -185,14 +185,17 @@ export default function QuestionnaireResponses() {
       }
       
       const data = await response.json();
+      console.log('Detailed response data:', data);
       setDetailedResponse(data);
     } catch (err) {
+      console.error('Error loading details:', err);
       toast({
         title: 'Erro',
         description: err instanceof Error ? err.message : 'Erro ao carregar detalhes',
         variant: 'destructive'
       });
       setSelectedMinister(null);
+      setDetailedResponse(null);
     } finally {
       setLoadingDetails(false);
     }
@@ -729,7 +732,15 @@ export default function QuestionnaireResponses() {
       </div>
 
       {/* Modal for detailed responses */}
-      <Dialog open={!!selectedMinister} onOpenChange={() => setSelectedMinister(null)}>
+      <Dialog
+        open={!!selectedMinister}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMinister(null);
+            setDetailedResponse(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -759,22 +770,89 @@ export default function QuestionnaireResponses() {
                 <Separator />
                 
                 <div className="space-y-4">
-                  {detailedResponse.response.responses.map((resp: any, index: number) => {
-                    const question = detailedResponse.template.questions.find(
-                      (q: any) => q.id === resp.questionId
-                    );
-                    
-                    if (!question) return null;
-                    
-                    return (
-                      <div key={index} className="space-y-2">
-                        <div className="font-medium text-sm">{question.question}</div>
-                        <div className="p-3 bg-muted/30 rounded-md">
-                          <span className="text-sm">{formatAnswer(resp.answer)}</span>
+                  {(() => {
+                    try {
+                      console.log('DetailedResponse:', detailedResponse);
+                      console.log('Questions:', detailedResponse?.template?.questions);
+                      console.log('Responses:', detailedResponse?.response?.responses);
+
+                      // Verificar estrutura dos dados
+                      if (!detailedResponse?.template?.questions || !Array.isArray(detailedResponse.template.questions)) {
+                        console.log('No questions found in template');
+                        return (
+                          <div className="text-center py-4 text-muted-foreground">
+                            Nenhuma pergunta disponível
+                          </div>
+                        );
+                      }
+
+                      // Converter respostas para formato de objeto se estiverem em array
+                      let responsesObj = {};
+                      const rawResponses = detailedResponse?.response?.responses;
+
+                      if (Array.isArray(rawResponses)) {
+                        // Se for array de objetos {questionId, answer}
+                        rawResponses.forEach(r => {
+                          if (r.questionId) {
+                            responsesObj[r.questionId] = r.answer;
+                          }
+                        });
+                      } else if (typeof rawResponses === 'object') {
+                        // Se já for objeto
+                        responsesObj = rawResponses || {};
+                      }
+
+                      console.log('Converted responses:', responsesObj);
+                      const questionElements = [];
+
+                      for (let i = 0; i < detailedResponse.template.questions.length; i++) {
+                        const question = detailedResponse.template.questions[i];
+                        const answer = responsesObj[question.id];
+
+                        console.log(`Question ${i}:`, question);
+                        console.log(`Answer for question ${question.id}:`, answer);
+
+                        // Pular perguntas condicionais não aplicáveis
+                        if (question.conditional) {
+                          const parentAnswer = responsesObj[question.conditional.questionId];
+                          console.log(`Conditional check - parent answer: ${parentAnswer}, expected: ${question.conditional.value}`);
+                          if (parentAnswer !== question.conditional.value) {
+                            continue;
+                          }
+                        }
+
+                        // Pular se não houver resposta (mas permitir false e 0)
+                        if (answer === undefined || answer === null || answer === '') {
+                          console.log(`Skipping question ${question.id} - no answer`);
+                          continue;
+                        }
+
+                        questionElements.push(
+                          <div key={question.id || `q-${i}`} className="space-y-2">
+                            <div className="font-medium text-sm">
+                              {question.text || question.question || `Pergunta ${i + 1}`}
+                            </div>
+                            <div className="p-3 bg-muted/30 rounded-md">
+                              <span className="text-sm">{formatAnswer(answer)}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return questionElements.length > 0 ? questionElements : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          Nenhuma resposta encontrada
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    } catch (error) {
+                      console.error('Error rendering responses:', error);
+                      return (
+                        <div className="text-center py-4 text-red-500">
+                          Erro ao exibir respostas. Por favor, tente novamente.
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             ) : (

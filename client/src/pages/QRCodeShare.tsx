@@ -269,7 +269,7 @@ export default function QRCodeShare() {
   };
 
   return (
-    <Layout>
+    <Layout title="Compartilhar Aplicativo" subtitle="Compartilhe o aplicativo com outros ministros">
       <div className="max-w-4xl mx-auto p-4 sm:p-6">
         {/* Header com botão voltar */}
         <div className="mb-4">

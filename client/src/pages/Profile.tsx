@@ -349,7 +349,7 @@ export default function Profile() {
   
   if (userLoading || familyLoading) {
     return (
-      <Layout>
+      <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
         <div className="flex items-center justify-center h-96">
           <div className="text-center">Carregando perfil...</div>
         </div>
@@ -358,7 +358,7 @@ export default function Profile() {
   }
   
   return (
-    <Layout>
+    <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
       <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6 overflow-x-hidden">
         <Card className="border-opacity-30">
           <CardHeader>
