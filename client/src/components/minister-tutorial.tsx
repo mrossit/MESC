@@ -152,7 +152,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Overlay escuro */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70"
         onClick={handleSkip}
       />
 
@@ -246,7 +246,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="flex-1"
+                className="flex-1 font-semibold shadow-md border-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Anterior
@@ -255,7 +255,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               {currentStep === tutorialSteps.length - 1 ? (
                 <Button
                   onClick={handleFinish}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg border border-green-500"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   Concluir
@@ -263,7 +263,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               ) : (
                 <Button
                   onClick={handleNext}
-                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-white"
+                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-white font-semibold shadow-lg border border-amber-500"
                 >
                   Próximo
                   <ChevronRight className="h-4 w-4 ml-1" />

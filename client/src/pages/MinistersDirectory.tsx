@@ -53,10 +53,10 @@ export default function MinistersDirectory() {
 
   // Buscar todos os ministros ativos
   const { data: ministersData, isLoading, error } = useQuery({
-    queryKey: ['/api/users'],
+    queryKey: ['/api/users/active'],
     queryFn: async () => {
-      console.log('Buscando usuários...');
-      const res = await fetch('/api/users', {
+      console.log('Buscando usuários ativos...');
+      const res = await fetch('/api/users/active', {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
