@@ -6,8 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { 
-  Search, Users, Phone, Mail, Calendar, Heart, 
+import {
+  Search, Users, Phone, Mail, Calendar, Heart,
   Church, User, Filter, Grid, List, Info
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import { formatPhoneNumber, formatPhoneForCall } from '../utils/phone';
 
 type Minister = {
   id: string;
@@ -314,7 +315,7 @@ export default function MinistersDirectory() {
                           {minister.phone && (
                             <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-gray-600">
                               <Phone className="h-3 w-3" />
-                              <span>{minister.phone}</span>
+                              <span>{formatPhoneNumber(minister.phone)}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
@@ -368,7 +369,7 @@ export default function MinistersDirectory() {
                             {minister.phone && (
                               <span className="text-xs sm:text-sm text-gray-600 flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
-                                {minister.phone}
+                                {formatPhoneNumber(minister.phone)}
                               </span>
                             )}
                             <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
@@ -429,7 +430,7 @@ export default function MinistersDirectory() {
                 {selectedMinister.phone && (
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm">{selectedMinister.phone}</span>
+                    <span className="text-sm">{formatPhoneNumber(selectedMinister.phone)}</span>
                   </div>
                 )}
                 {selectedMinister.ministryStartDate && (
@@ -484,7 +485,7 @@ export default function MinistersDirectory() {
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => window.open(`tel:${selectedMinister.phone}`, '_self')}
+                    onClick={() => window.open(`tel:${formatPhoneForCall(selectedMinister.phone)}`, '_self')}
                   >
                     <Phone className="h-4 w-4 mr-2" />
                     Ligar
