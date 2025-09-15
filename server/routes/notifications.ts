@@ -17,6 +17,22 @@ const createNotificationSchema = z.object({
   recipientRole: z.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
 });
 
+// Mapeamento dos tipos do frontend para o banco
+function mapNotificationType(frontendType: "info" | "warning" | "success" | "error"): "schedule" | "substitution" | "formation" | "announcement" | "reminder" {
+  switch (frontendType) {
+    case "info":
+      return "announcement";
+    case "warning":
+      return "reminder";
+    case "success":
+      return "announcement";
+    case "error":
+      return "reminder";
+    default:
+      return "announcement";
+  }
+}
+
 // Listar notificações do usuário
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
@@ -103,13 +119,16 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
     
     console.log(`Encontrados ${ministers.length} usuários ativos`);
     
+    // Mapear urgência para tipo do banco
+    const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
+    
     // Criar notificação para cada usuário ativo (ministros, coordenadores e reitores)
     const notificationPromises = ministers.map((minister: { id: string; name: string; role: string }) =>
       storage.createNotification({
         userId: minister.id,
         title,
         message: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
-        type: urgencyLevel === "critical" ? "error" : urgencyLevel === "high" ? "warning" : "info",
+        type: mappedType,
         read: false,
       })
     );
@@ -186,12 +205,15 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
     console.log(`Encontrados ${recipientUserIds.length} destinatários:`, recipientUserIds);
     
     // Criar notificações para cada destinatário
+    const mappedType = mapNotificationType(data.type);
+    console.log(`Tipo mapeado: ${data.type} -> ${mappedType}`);
+    
     const notificationPromises = recipientUserIds.map(userId => {
       const notificationData = {
         userId,
         title: data.title,
         message: data.message,
-        type: data.type,
+        type: mappedType,
         read: false,
       };
       console.log(`Criando notificação para usuário ${userId}:`, notificationData);
