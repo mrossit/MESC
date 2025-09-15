@@ -388,9 +388,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { role } = roleUpdateSchema.parse(req.body);
       
-      // Impedir auto-modificação
+      // Permitir que coordenadores alterem seu próprio perfil, mas com restrições
       if (req.user?.id === req.params.id) {
-        return res.status(400).json({ message: "Não é possível alterar seu próprio papel" });
+        // Coordenadores podem se auto-promover ou rebaixar
+        if (req.user?.role === 'coordenador') {
+          // Coordenador pode mudar para ministro (rebaixar) ou gestor (promover)
+          // Mas não pode mudar para o mesmo perfil
+          if (role === 'coordenador') {
+            return res.status(400).json({ message: "Você já é um coordenador" });
+          }
+          // Se está se promovendo a gestor, permitir
+          // Se está se rebaixando a ministro, permitir
+        } else {
+          // Gestores não podem alterar seu próprio papel
+          return res.status(400).json({ message: "Gestores não podem alterar seu próprio papel" });
+        }
       }
       
       // Verificar o usuário alvo antes de fazer mudanças

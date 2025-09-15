@@ -1,58 +1,47 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { eq } from 'drizzle-orm';
-import * as schema from '../shared/schema';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-
-const sqlite = new Database('local.db');
-const db = drizzle(sqlite, { schema });
+import { db } from '../server/db';
+import { users } from '@shared/schema';
+import bcrypt from 'bcrypt';
 
 async function createRossitUser() {
-  const email = 'rossit@icloud.com';
-  const password = '123Pegou$&@';
-  const hashedPassword = await bcrypt.hash(password, 10);
-
   try {
-    const existingUser = db.select()
-      .from(schema.users)
-      .where(eq(schema.users.email, email))
-      .get();
+    console.log('Criando usuário rossit@icloud.com...\n');
 
-    if (existingUser) {
-      db.update(schema.users)
-        .set({
-          password: hashedPassword,
-          status: 'active',
-          mustChangePassword: false,
-          role: 'coordenador'
-        })
-        .where(eq(schema.users.email, email))
-        .run();
-      console.log('✅ Usuário atualizado!');
+    // Definir a senha
+    const plainPassword = 'senha123'; // Senha padrão
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+    // Criar o usuário
+    const [newUser] = await db.insert(users).values({
+      email: 'rossit@icloud.com',
+      name: 'Rossit',
+      passwordHash,
+      role: 'gestor', // Definindo como gestor para ter acesso total
+      status: 'active',
+      phone: '11999999999',
+      ministryStartDate: new Date('2020-01-01'),
+      requiresPasswordChange: false
+    }).returning();
+
+    console.log('✅ Usuário criado com sucesso!');
+    console.log('\n=================================');
+    console.log('DADOS DE ACESSO:');
+    console.log('=================================');
+    console.log('Email: rossit@icloud.com');
+    console.log('Senha: senha123');
+    console.log('Role: gestor (acesso total)');
+    console.log('=================================\n');
+    console.log('⚠️  IMPORTANTE: Por segurança, altere a senha após o primeiro login!');
+
+  } catch (error: any) {
+    if (error.code === '23505') {
+      console.log('ℹ️  O usuário rossit@icloud.com já existe no banco de dados');
+      console.log('\nSe você esqueceu a senha, use a funcionalidade "Esqueci minha senha" na tela de login');
     } else {
-      const userId = uuidv4();
-      db.insert(schema.users).values({
-        id: userId,
-        email,
-        password: hashedPassword,
-        name: 'Coordenador Rossit',
-        role: 'coordenador',
-        status: 'active',
-        mustChangePassword: false
-      }).run();
-      console.log('✅ Usuário criado!');
+      console.error('Erro ao criar usuário:', error);
     }
-
-    console.log(`Email: ${email}`);
-    console.log(`Senha: ${password}`);
-    console.log('Perfil: coordenador');
-
-  } catch (error) {
-    console.error('Erro:', error);
   }
 
-  sqlite.close();
+  process.exit(0);
 }
 
 createRossitUser();

@@ -204,17 +204,18 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              size="lg" 
+            <SidebarMenuButton
+              size="lg"
               asChild
-              tooltip="MESC - Santuário São Judas"
+              tooltip="MESC - Santuário São Judas - Ir para Dashboard"
+              className="cursor-pointer"
             >
               <Link href="/dashboard">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                  <img 
-                    src="/sjtlogo.png" 
-                    alt="Santuário São Judas Tadeu" 
-                    className="h-full w-full object-contain rounded-md"
+                  <img
+                    src="/sjtlogo.png"
+                    alt="Santuário São Judas Tadeu"
+                    className="h-full w-full object-contain rounded-md hover:opacity-90 transition-opacity"
                   />
                 </div>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
@@ -234,21 +235,24 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    size="lg" 
+                  <SidebarMenuButton
+                    size="lg"
+                    asChild
                     tooltip={`${user.name} (${user.role})`}
-                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
                   >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.profilePhoto || user.photoUrl || undefined} />
-                      <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-xs">
-                        {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium leading-none">{user.name}</span>
-                      <span className="text-xs capitalize text-muted-foreground">{user.role === 'coordenador' ? 'Coordenador Sistema' : user.role}</span>
-                    </div>
+                    <Link href="/profile">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.profilePhoto || user.photoUrl || undefined} />
+                        <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-xs">
+                          {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium leading-none">{user.name}</span>
+                        <span className="text-xs capitalize text-muted-foreground">{user.role === 'coordenador' ? 'Coordenador Sistema' : user.role}</span>
+                      </div>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

@@ -35,13 +35,12 @@ type UserProfile = {
 
 type FamilyMember = {
   id: string;
-  relatedUserId: string;
   relationshipType: string;
-  relatedUser: {
+  user?: {
     id: string;
     name: string;
     email: string;
-    profilePhoto?: string;
+    photoUrl?: string;
   };
 };
 
@@ -124,7 +123,7 @@ export default function Profile() {
   useEffect(() => {
     if (usersData) {
       // Filtrar usuários que já são familiares
-      const familyIds = familyMembers.map(f => f.relatedUserId);
+      const familyIds = familyMembers.map(f => f.user?.id).filter(Boolean);
       const filtered = usersData.filter((u: any) => 
         u.id !== profile?.id && !familyIds.includes(u.id)
       );
@@ -699,19 +698,21 @@ export default function Profile() {
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    {familyMembers.map(member => (
+                    {familyMembers
+                      .filter(member => member && member.user) // Filter out invalid members
+                      .map(member => (
                       <Card key={member.id}>
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <Avatar>
-                                <AvatarImage src={member.relatedUser.profilePhoto} />
+                                <AvatarImage src={member.user?.photoUrl || ''} />
                                 <AvatarFallback>
-                                  {getInitials(member.relatedUser.name)}
+                                  {getInitials(member.user?.name || 'U')}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium">{member.relatedUser.name}</p>
+                                <p className="font-medium">{member.user?.name || 'Usuário'}</p>
                                 <p className="text-sm text-gray-500">
                                   {relationshipTypes.find(t => t.value === member.relationshipType)?.label || member.relationshipType}
                                 </p>
