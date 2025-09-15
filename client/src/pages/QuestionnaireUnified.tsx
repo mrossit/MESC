@@ -144,6 +144,9 @@ export default function QuestionnaireUnified() {
       setError(null);
     }
     
+    // Reset existing response para evitar estado "sujo" ao mudar mês/ano
+    setExistingResponse(null);
+    
     console.log('loadQuestionnaire - isAdmin:', isAdmin, 'user:', user);
     
     try {
@@ -270,7 +273,7 @@ export default function QuestionnaireUnified() {
       
       if (responseRes.ok) {
         const responseData = await responseRes.json();
-        if (responseData && templateData) {
+        if (responseData && templateData && responseData.responses?.length > 0) {
           setExistingResponse(responseData);
           
           // Preencher respostas existentes
@@ -284,7 +287,13 @@ export default function QuestionnaireUnified() {
           // então não precisamos limpar respostas baseadas em dependências
           
           setResponses(existingResponses);
+        } else {
+          // Mesmo que responseRes.ok, se não há responses válidas, definir como null
+          setExistingResponse(null);
         }
+      } else {
+        // Resposta não foi encontrada ou erro - definir explicitamente como null
+        setExistingResponse(null);
       }
     } catch (err) {
       console.error('Erro em loadQuestionnaire:', err);
@@ -981,19 +990,42 @@ export default function QuestionnaireUnified() {
   const getStatusBadge = () => {
     if (!template?.status) return null;
     
+    // Configurações base dos status
     const statusConfig = {
       draft: { color: 'bg-gray-100 text-gray-800', label: 'Rascunho', icon: FileText },
-      sent: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
+      sent: { 
+        // Para coordenadores: sempre mostrar "Enviado aos Ministros"
+        // Para ministros: mostrar baseado se já respondeu ou não
+        admin: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
+        pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendente', icon: AlertCircle },
+        responded: { color: 'bg-green-100 text-green-800', label: 'Respondido', icon: CheckCircle }
+      },
       closed: { color: 'bg-red-100 text-red-800', label: 'Encerrado', icon: Lock }
     };
     
-    const config = statusConfig[template.status as keyof typeof statusConfig];
-    if (!config) return null;
+    let config;
+    
+    if (template.status === 'sent') {
+      if (isAdmin) {
+        // Coordenadores sempre veem "Enviado aos Ministros"
+        config = statusConfig.sent.admin;
+      } else {
+        // Ministros veem baseado se já responderam (verificação robusta)
+        const hasResponse = Boolean(existingResponse?.responses?.length > 0);
+        config = hasResponse ? statusConfig.sent.responded : statusConfig.sent.pending;
+      }
+    } else {
+      const baseConfig = statusConfig[template.status as keyof typeof statusConfig];
+      if (!baseConfig || typeof baseConfig !== 'object' || !('color' in baseConfig)) return null;
+      config = baseConfig as { color: string; label: string; icon: any };
+    }
+    
+    if (!config || !('icon' in config)) return null;
     
     const Icon = config.icon;
     
     return (
-      <Badge className={`${config.color} gap-1`}>
+      <Badge className={`${config.color} gap-1`} data-testid={`badge-${template.status}${template.status === 'sent' ? (isAdmin ? '-admin' : (Boolean(existingResponse?.responses?.length > 0) ? '-responded' : '-pending')) : ''}`}>
         <Icon className="h-3 w-3" />
         {config.label}
       </Badge>
