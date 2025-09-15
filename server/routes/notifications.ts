@@ -104,7 +104,7 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
     console.log(`Encontrados ${ministers.length} usuários ativos`);
     
     // Criar notificação para cada usuário ativo (ministros, coordenadores e reitores)
-    const notificationPromises = ministers.map(minister =>
+    const notificationPromises = ministers.map((minister: { id: string; name: string; role: string }) =>
       storage.createNotification({
         userId: minister.id,
         title,

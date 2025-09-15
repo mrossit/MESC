@@ -9,6 +9,7 @@ import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
+import notificationsRoutes from "./routes/notifications";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -80,6 +81,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Upload routes
   app.use('/api/upload', uploadRoutes);
+  
+  // Notification routes
+  app.use('/api/notifications', notificationsRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
@@ -534,26 +538,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Notification routes
-  app.get('/api/notifications', authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const notifications = await storage.getUserNotifications(req.user?.id || '0');
-      res.json(notifications);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      res.status(500).json({ message: "Failed to fetch notifications" });
-    }
-  });
-
-  app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
-    try {
-      await storage.markNotificationAsRead(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-      res.status(500).json({ message: "Failed to mark notification as read" });
-    }
-  });
 
 
   const httpServer = createServer(app);
