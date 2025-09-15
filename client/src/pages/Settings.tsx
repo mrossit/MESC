@@ -123,6 +123,7 @@ export default function Settings() {
 
   // Função para salvar apenas as atividades extras
   const saveExtraActivities = async (activities: typeof extraActivities) => {
+    setSavingActivities(true);
     try {
       const res = await fetch('/api/profile/extra-activities', {
         method: 'PUT',
@@ -133,26 +134,44 @@ export default function Settings() {
 
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ['extra-activities'] });
-        // Não mostrar toast para não ser intrusivo no salvamento automático
+        // Mostrar indicador de sucesso brevemente
+        setTimeout(() => setSavingActivities(false), 500);
       } else {
         console.error('Erro ao salvar preferências de atividades');
+        setSavingActivities(false);
       }
     } catch (err) {
       console.error('Erro ao salvar preferências:', err);
+      setSavingActivities(false);
     }
   };
 
+  // Estado para controlar se já carregou os dados iniciais
+  const [hasLoadedActivities, setHasLoadedActivities] = useState(false);
+
+  // Marcar que os dados foram carregados
+  useEffect(() => {
+    if (activitiesData && !hasLoadedActivities) {
+      setHasLoadedActivities(true);
+    }
+  }, [activitiesData, hasLoadedActivities]);
+
   // Debounce para salvar automaticamente após mudanças
   useEffect(() => {
-    // Só salvar se já temos dados carregados (evita salvar no primeiro render)
-    if (activitiesData) {
-      const timer = setTimeout(() => {
-        saveExtraActivities(extraActivities);
-      }, 1000); // Aguarda 1 segundo após a última mudança
+    // Só salvar se já temos dados carregados e não é a primeira renderização
+    if (hasLoadedActivities && activitiesData) {
+      // Verificar se realmente houve mudança
+      const hasChanges = JSON.stringify(extraActivities) !== JSON.stringify(activitiesData);
 
-      return () => clearTimeout(timer);
+      if (hasChanges) {
+        const timer = setTimeout(() => {
+          saveExtraActivities(extraActivities);
+        }, 1000); // Aguarda 1 segundo após a última mudança
+
+        return () => clearTimeout(timer);
+      }
     }
-  }, [extraActivities]);
+  }, [extraActivities, hasLoadedActivities]);
 
   const handlePushNotificationToggle = async (checked: boolean) => {
     // Se está ativando as notificações push
@@ -365,10 +384,20 @@ export default function Settings() {
               <TabsContent value="availability" className="space-y-6 mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Atividades Extras do Ministério</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      Marque as atividades para as quais você está disponível além das escalas regulares
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base sm:text-lg">Atividades Extras do Ministério</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">
+                          Marque as atividades para as quais você está disponível além das escalas regulares
+                        </CardDescription>
+                      </div>
+                      {savingActivities && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Sparkles className="h-4 w-4 animate-pulse" />
+                          <span>Salvando...</span>
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-4">
