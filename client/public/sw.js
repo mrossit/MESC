@@ -1,10 +1,14 @@
-const CACHE_NAME = 'mesc-v3.0-styles';
+const CACHE_NAME = 'mesc-v4.0-icons';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png'
+  '/images/icon-16.png',
+  '/images/icon-32.png',
+  '/images/icon-180.png',
+  '/images/icon-192.png',
+  '/images/icon-512.png',
+  '/images/icon.icns'
 ];
 
 // Install service worker and cache resources
@@ -94,8 +98,8 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
+      icon: '/images/icon-192.png',
+      badge: '/images/icon-192.png',
       vibrate: [100, 50, 100],
       data: {
         dateOfArrival: Date.now(),
@@ -105,12 +109,12 @@ self.addEventListener('push', (event) => {
         {
           action: 'explore',
           title: 'Ver detalhes',
-          icon: '/pwa-192x192.png'
+          icon: '/images/icon-192.png'
         },
         {
           action: 'close',
           title: 'Fechar',
-          icon: '/pwa-192x192.png'
+          icon: '/images/icon-192.png'
         }
       ]
     };
