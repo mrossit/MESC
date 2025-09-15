@@ -74,12 +74,14 @@ export default function Communication() {
   // Send notification mutation
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/notifications", data);
+      const response = await apiRequest("POST", "/api/notifications", data);
+      return await response.json();
     },
     onSuccess: (data: any) => {
+      const count = data.recipientCount || 0;
       toast({
-        title: "Comunicado enviado",
-        description: `Mensagem enviada para ${data.recipientCount} destinatário(s)`,
+        title: "Comunicado enviado com sucesso",
+        description: `Mensagem enviada para ${count} destinatário${count !== 1 ? 's' : ''}`,
       });
       // Reset form
       setTitle("");
@@ -90,12 +92,13 @@ export default function Communication() {
       setActiveTab("inbox");
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
     },
     onError: (error: any) => {
       toast({
         title: "Erro ao enviar comunicado",
-        description: error.message || "Tente novamente",
+        description: error.message || "Tente novamente mais tarde",
         variant: "destructive",
       });
     },
