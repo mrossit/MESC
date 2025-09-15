@@ -983,7 +983,7 @@ export default function QuestionnaireUnified() {
     
     const statusConfig = {
       draft: { color: 'bg-gray-100 text-gray-800', label: 'Rascunho', icon: FileText },
-      sent: { color: 'bg-blue-100 text-blue-800', label: 'Enviado', icon: Send },
+      sent: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
       closed: { color: 'bg-red-100 text-red-800', label: 'Encerrado', icon: Lock }
     };
     
@@ -1317,7 +1317,7 @@ export default function QuestionnaireUnified() {
                               className="flex-1"
                             >
                               <RefreshCw className="mr-2 h-4 w-4" />
-                              Reenviar Questionário
+                              Reenviar aos Ministros
                             </Button>
                           </DialogTrigger>
                           <DialogContent>

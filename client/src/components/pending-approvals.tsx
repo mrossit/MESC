@@ -11,9 +11,16 @@ import type { User as UserType } from "@/lib/types";
 export function PendingApprovals() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<UserType[]>({
+  const { data, isLoading, error } = useQuery<UserType[]>({
     queryKey: ["/api/users/pending"],
+    refetchInterval: 30000, // Refetch a cada 30 segundos
+    staleTime: 10000, // Considera stale após 10 segundos
   });
+
+  // Debug log
+  console.log('PendingApprovals - data:', data);
+  console.log('PendingApprovals - isLoading:', isLoading);
+  console.log('PendingApprovals - error:', error);
 
   // Garantir que pendingUsers seja sempre um array
   const pendingUsers = Array.isArray(data) ? data : [];
