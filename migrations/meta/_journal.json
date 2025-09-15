@@ -1,1 +1,13 @@
-{"version":"7","dialect":"sqlite","entries":[]}
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1757895755257,
+      "tag": "0000_square_mister_sinister",
+      "breakpoints": true
+    }
+  ]
+}

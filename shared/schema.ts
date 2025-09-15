@@ -111,6 +111,16 @@ export const families = pgTable('families', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Family relationships table
+export const familyRelationships = pgTable('family_relationships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  relatedUserId: varchar('related_user_id').notNull().references(() => users.id),
+  relationshipType: varchar('relationship_type', { length: 50 }).notNull(), // spouse, parent, child, sibling
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Questionnaires table
 export const questionnaires = pgTable('questionnaires', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -381,6 +391,8 @@ export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Family = typeof families.$inferSelect;
+export type FamilyRelationship = typeof familyRelationships.$inferSelect;
+export type InsertFamilyRelationship = typeof familyRelationships.$inferInsert;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type InsertQuestionnaire = z.infer<typeof insertQuestionnaireSchema>;
 export type QuestionnaireResponse = typeof questionnaireResponses.$inferSelect;

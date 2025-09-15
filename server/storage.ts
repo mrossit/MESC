@@ -6,6 +6,7 @@ import {
   substitutionRequests,
   notifications,
   massTimesConfig,
+  familyRelationships,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -17,6 +18,8 @@ import {
   type Notification,
   type MassTimeConfig,
   type InsertMassTime,
+  type FamilyRelationship,
+  type InsertFamilyRelationship,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
@@ -76,6 +79,11 @@ export interface IStorage {
     availableToday: number;
     substitutions: number;
   }>;
+
+  // Family relationship operations
+  getFamilyMembers(userId: string): Promise<FamilyRelationship[]>;
+  addFamilyMember(userId: string, relatedUserId: string, relationshipType: string): Promise<FamilyRelationship>;
+  removeFamilyMember(relationshipId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -366,7 +374,7 @@ export class DatabaseStorage implements IStorage {
     // Get substitutions from the current week
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    
+
     const [substitutionsResult] = await db
       .select({ count: count() })
       .from(substitutionRequests)
@@ -381,6 +389,82 @@ export class DatabaseStorage implements IStorage {
       availableToday: Math.floor(availableTodayResult.count * 0.76), // 76% availability rate
       substitutions: substitutionsResult.count
     };
+  }
+
+  // Family relationship operations
+  async getFamilyMembers(userId: string): Promise<FamilyRelationship[]> {
+    const relationships = await db
+      .select()
+      .from(familyRelationships)
+      .where(eq(familyRelationships.userId, userId));
+    return relationships;
+  }
+
+  async addFamilyMember(userId: string, relatedUserId: string, relationshipType: string): Promise<FamilyRelationship> {
+    // Check if relationship already exists
+    const existingRelationship = await db
+      .select()
+      .from(familyRelationships)
+      .where(and(
+        eq(familyRelationships.userId, userId),
+        eq(familyRelationships.relatedUserId, relatedUserId)
+      ));
+
+    if (existingRelationship.length > 0) {
+      throw new Error('Relationship already exists');
+    }
+
+    // Add the relationship
+    const [relationship] = await db
+      .insert(familyRelationships)
+      .values({
+        userId,
+        relatedUserId,
+        relationshipType
+      })
+      .returning();
+
+    // Add reciprocal relationship for certain types
+    const reciprocalTypes: Record<string, string> = {
+      'spouse': 'spouse',
+      'parent': 'child',
+      'child': 'parent',
+      'sibling': 'sibling'
+    };
+
+    if (reciprocalTypes[relationshipType]) {
+      await db
+        .insert(familyRelationships)
+        .values({
+          userId: relatedUserId,
+          relatedUserId: userId,
+          relationshipType: reciprocalTypes[relationshipType]
+        })
+        .onConflictDoNothing();
+    }
+
+    return relationship;
+  }
+
+  async removeFamilyMember(relationshipId: string): Promise<void> {
+    // Get the relationship to find the reciprocal
+    const [relationship] = await db
+      .select()
+      .from(familyRelationships)
+      .where(eq(familyRelationships.id, relationshipId));
+
+    if (relationship) {
+      // Delete both the relationship and its reciprocal
+      await db
+        .delete(familyRelationships)
+        .where(and(
+          eq(familyRelationships.userId, relationship.relatedUserId),
+          eq(familyRelationships.relatedUserId, relationship.userId)
+        ));
+    }
+
+    // Delete the original relationship
+    await db.delete(familyRelationships).where(eq(familyRelationships.id, relationshipId));
   }
 }
 

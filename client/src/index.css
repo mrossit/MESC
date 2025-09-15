@@ -67,7 +67,12 @@
   
   --border: 220, 214, 203;                /* #DCD6CB - Borda suave */
   --input: var(--white-beige);
-  --ring: var(--peanut);
+  --ring: var(--text-dark);               /* Texto escuro para melhor contraste do focus ring */
+  
+  /* Switch specific colors for better contrast - Light Mode */
+  --switch-checked: 21, 128, 61;           /* #15803D - Verde mais escuro (green-700) */
+  --switch-unchecked: 107, 114, 128;       /* #6B7280 - Cinza mais escuro (gray-500) */
+  --switch-thumb: 0, 0, 0;                 /* #000000 - Polegar preto para light mode */
   
   /* Sidebar Light - Tons Neutros */
   --sidebar-background: var(--chalk-beige);
@@ -145,6 +150,11 @@
   --border: var(--dark-4);                /* #251715 - Bordas sutis */
   --input: var(--dark-6);                 /* #19100E - Inputs */
   --ring: var(--text-gold);               /* Dourado para focus */
+  
+  /* Switch specific colors for better contrast - Dark Mode */
+  --switch-checked: 21, 128, 61;          /* #15803D - Verde mais escuro */
+  --switch-unchecked: 156, 163, 175;      /* #9CA3AF - Cinza mais claro para dark mode */
+  --switch-thumb: 0, 0, 0;                /* #000000 - Polegar preto para dark mode também */
   
   /* Sidebar Dark - Contraste otimizado */
   --sidebar-background: var(--dark-8);    /* #0C0807 - Mesmo fundo das páginas */
