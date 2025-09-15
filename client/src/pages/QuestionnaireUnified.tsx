@@ -1851,7 +1851,7 @@ export default function QuestionnaireUnified() {
                           ? 'Enviando...' 
                           : existingResponse 
                           ? 'Atualizar Respostas' 
-                          : 'Enviar Questionário'}
+                          : 'Enviar Respostas'}
                       </Button>
                     </div>
                   </div>
