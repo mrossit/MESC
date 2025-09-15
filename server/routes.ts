@@ -10,6 +10,7 @@ import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
+import profileRoutes from "./routes/profile";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -154,10 +155,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Family routes placeholder
+  // Family routes
+  // POST /api/profile/family - Add family member
+  app.post('/api/profile/family', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { relatedUserId, relationshipType } = req.body;
+
+      if (!relatedUserId || !relationshipType) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      if (relatedUserId === userId) {
+        return res.status(400).json({ error: 'Cannot add yourself as a family member' });
+      }
+
+      const relatedUser = await storage.getUser(relatedUserId);
+      if (!relatedUser) {
+        return res.status(404).json({ error: 'Related user not found' });
+      }
+
+      const relationship = await storage.addFamilyMember(userId, relatedUserId, relationshipType);
+
+      res.json({
+        message: 'Family member added successfully',
+        relationship: {
+          id: relationship.id,
+          relationshipType: relationship.relationshipType,
+          user: {
+            id: relatedUser.id,
+            name: relatedUser.name,
+            email: relatedUser.email,
+            photoUrl: relatedUser.photoUrl
+          }
+        }
+      });
+    } catch (error: any) {
+      if (error.message === 'Relationship already exists') {
+        return res.status(409).json({ error: 'This family relationship already exists' });
+      }
+      const errorResponse = handleApiError(error, "adicionar familiar");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // GET /api/profile/family - Get family members
   app.get('/api/profile/family', authenticateToken, async (req: AuthRequest, res) => {
-    // Por enquanto retorna array vazio
-    res.json([]);
+    try {
+      const userId = req.user!.id;
+      const relationships = await storage.getFamilyMembers(userId);
+
+      const familyMembers = await Promise.all(
+        relationships.map(async (rel) => {
+          const user = await storage.getUser(rel.relatedUserId);
+          return {
+            id: rel.id,
+            relationshipType: rel.relationshipType,
+            user: user ? {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              photoUrl: user.photoUrl
+            } : null
+          };
+        })
+      );
+
+      res.json(familyMembers.filter(m => m.user !== null));
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar familiares");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // DELETE /api/profile/family/:id - Remove family member
+  app.delete('/api/profile/family/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.removeFamilyMember(id);
+      res.json({ message: 'Family member removed successfully' });
+    } catch (error) {
+      const errorResponse = handleApiError(error, "remover familiar");
+      res.status(errorResponse.status).json(errorResponse);
+    }
   });
 
   app.get('/api/users/active', authenticateToken, async (req, res) => {
