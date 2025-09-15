@@ -59,26 +59,36 @@ router.post("/request-reset", async (req, res) => {
       status: 'pending'
     });
 
-    // Busca administradores para notificar
-    const admins = await db
+    // Busca coordenadores e gestores para notificar
+    const coordinators = await db
       .select()
       .from(users)
-      .where(eq(users.role, 'gestor'));
+      .where(
+        and(
+          eq(users.status, 'active'),
+          // Notifica tanto coordenadores quanto gestores
+          db.or(
+            eq(users.role, 'coordenador'),
+            eq(users.role, 'gestor')
+          )
+        )
+      );
 
-    // Cria notificações para todos os administradores
-    for (const admin of admins) {
+    // Cria notificações para todos os coordenadores e gestores
+    for (const coordinator of coordinators) {
       await db.insert(notifications).values({
-        userId: admin.id,
-        title: "Solicitação de Reset de Senha",
-        message: `${user.name} (${user.email}) solicitou reset de senha.`,
+        userId: coordinator.id,
+        title: "Solicitação de Nova Senha",
+        message: `${user.name} (${user.email}) solicitou uma nova senha. Por favor, entre em contato para auxiliar.`,
         type: 'announcement',
+        priority: 'high',
         read: false
       });
     }
 
-    res.json({ 
-      success: true, 
-      message: "Solicitação enviada com sucesso. O administrador irá processar seu pedido." 
+    res.json({
+      success: true,
+      message: "Os Coordenadores foram notificados para enviar nova senha, assim que eles receberem a mensagem responderão de imediato."
     });
 
   } catch (error) {
