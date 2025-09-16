@@ -467,7 +467,7 @@ export default function Profile() {
                 </div>
                 
                 {/* Informações Pessoais */}
-                <div className="profile-form grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="profile-form grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-hidden">
                   <div>
                     <Label htmlFor="phone">Telefone</Label>
                     <Input
@@ -512,7 +512,7 @@ export default function Profile() {
                       value={dateToInputValue(profile?.ministryStartDate)}
                       onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
                       disabled={!isEditing}
-                      className="w-full"
+                      className="w-full max-w-full min-w-0 overflow-hidden"
                       data-testid="input-ministry-start"
                     />
                   </div>
@@ -526,7 +526,7 @@ export default function Profile() {
                         value={dateToInputValue(profile?.marriageDate)}
                         onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
                         disabled={!isEditing}
-                        className="w-full"
+                        className="w-full max-w-full min-w-0 overflow-hidden"
                         data-testid="input-marriage-date-personal"
                       />
                     </div>
