@@ -422,3 +422,24 @@
     color: black;
   }
 }
+
+/* Mobile-specific fixes for date inputs */
+@media (max-width: 768px) {
+  input[type="date"] {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  
+  .profile-form .min-w-0 {
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+  
+  .profile-form input {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}

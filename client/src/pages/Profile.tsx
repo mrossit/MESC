@@ -535,7 +535,7 @@ export default function Profile() {
               </TabsContent>
               
               <TabsContent value="sacraments" className="space-y-4">
-                <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
                   <Card className="border-opacity-50 min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
@@ -551,7 +551,7 @@ export default function Profile() {
                               type="date"
                               value={dateToInputValue(profile?.baptismDate)}
                               onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
-                              className="text-sm w-full mt-1"
+                              className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
                               data-testid="input-baptism-date"
                             />
                           </div>
@@ -598,7 +598,7 @@ export default function Profile() {
                               type="date"
                               value={dateToInputValue(profile?.confirmationDate)}
                               onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
-                              className="text-sm w-full mt-1"
+                              className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
                               data-testid="input-confirmation-date"
                             />
                           </div>
@@ -637,7 +637,7 @@ export default function Profile() {
                           <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                           <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
                         </div>
-                        <div className="min-w-0 space-y-3">
+                        <div className="min-w-0 space-y-3 overflow-hidden">
                         {isEditing ? (
                           <>
                             <div>
@@ -646,7 +646,7 @@ export default function Profile() {
                                 type="date"
                                 value={dateToInputValue(profile?.marriageDate)}
                                 onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
-                                className="text-sm w-full mt-1"
+                                className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
                                 data-testid="input-marriage-date"
                               />
                             </div>
@@ -685,7 +685,7 @@ export default function Profile() {
                         <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                         <h4 className="font-semibold text-sm sm:text-base">Ministério</h4>
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 overflow-hidden">
                       {isEditing ? (
                         <div>
                           <label className="text-xs text-gray-500">Data de início:</label>
@@ -693,7 +693,7 @@ export default function Profile() {
                             type="date"
                             value={dateToInputValue(profile?.ministryStartDate)}
                             onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
-                            className="text-sm mt-1 w-full"
+                            className="text-sm mt-1 w-full max-w-full min-w-0 overflow-hidden"
                             data-testid="input-ministry-date"
                           />
                         </div>
