@@ -366,7 +366,7 @@ export default function Profile() {
   
   return (
     <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
-      <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto overflow-x-hidden">
         <Card className="border-opacity-30">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
