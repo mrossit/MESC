@@ -536,7 +536,7 @@ export default function Profile() {
               
               <TabsContent value="sacraments" className="space-y-4">
                 <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
-                  <Card className="border-opacity-50 min-w-0">
+                  <Card className="border min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
@@ -583,7 +583,7 @@ export default function Profile() {
                     </CardContent>
                   </Card>
                   
-                  <Card className="border-opacity-50 min-w-0">
+                  <Card className="border min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
@@ -631,7 +631,7 @@ export default function Profile() {
                   </Card>
                   
                   {profile?.maritalStatus === 'married' && (
-                    <Card className="border-opacity-50 min-w-0">
+                    <Card className="border min-w-0">
                       <CardContent className="p-3 sm:p-4 md:pt-6">
                         <div className="flex items-center gap-2 sm:gap-3 mb-3">
                           <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
@@ -679,7 +679,7 @@ export default function Profile() {
                     </Card>
                   )}
                   
-                  <Card className="border-opacity-50 min-w-0">
+                  <Card className="border min-w-0">
                     <CardContent className="p-3 sm:p-4 md:pt-6">
                       <div className="flex items-center gap-2 sm:gap-3 mb-3">
                         <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
