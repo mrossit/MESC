@@ -369,24 +369,24 @@ export default function Profile() {
       <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6 overflow-x-hidden">
         <Card className="border-opacity-30">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="min-w-0 flex-1">
                 <CardTitle>Meu Perfil</CardTitle>
                 <CardDescription>
                   Gerencie suas informações pessoais e familiares
                 </CardDescription>
               </div>
               {!isEditing ? (
-                <Button onClick={() => setIsEditing(true)}>
+                <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto text-sm">
                   Editar Perfil
                 </Button>
               ) : (
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 sm:flex-initial text-sm">
                     Cancelar
                   </Button>
-                  <Button onClick={handleSaveProfile} disabled={saving}>
-                    <Save className="mr-2 h-4 w-4" />
+                  <Button onClick={handleSaveProfile} disabled={saving} className="flex-1 sm:flex-initial text-sm">
+                    <Save className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     {saving ? 'Salvando...' : 'Salvar'}
                   </Button>
                 </div>
