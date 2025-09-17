@@ -1,18 +1,14 @@
 <svg width="800" height="1100" viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" font-family="Arial, sans-serif">
   <defs>
+    <!-- Paths para animação dos ministros -->
     <path id="path-mezanino" d="M 660 110 V 220 H 620 V 460 H 400 V 710 H 220 V 850 H 400" fill="none" stroke-width="1" />
     <path id="path-principal" d="M 660 110 V 220 H 620 V 460 H 400 V 710 H 220" fill="none" stroke-width="1" />
-    <path id="path-lado-esquerdo" d="M 220 710 H 150 V 580" fill="none" stroke-width="1" />
-    <path id="path-lado-direito" d="M 220 710 H 620 V 580" fill="none" stroke-width="1" />
-    <path id="path-cadeiras-24" d="M 220 710 H 300 V 750" fill="none" stroke-width="1" />
-    <path id="path-cadeiras-25" d="M 220 710 H 440 V 765" fill="none" stroke-width="1" />
-    <path id="path-cadeiras-26" d="M 220 710 H 580 V 750" fill="none" stroke-width="1" />
+    <path id="path-lateral-esquerda" d="M 220 710 H 150 V 580 H 90" fill="none" stroke-width="1" />
+    <path id="path-lateral-direita" d="M 220 710 H 620 V 580 H 680" fill="none" stroke-width="1" />
+    <path id="path-cadeiras-24" d="M 220 710 H 300 V 745" fill="none" stroke-width="1" />
+    <path id="path-cadeiras-25" d="M 220 710 H 440 V 760" fill="none" stroke-width="1" />
+    <path id="path-cadeiras-26" d="M 220 710 H 580 V 745" fill="none" stroke-width="1" />
   </defs>
-
-  <rect width="100%" height="100%" fill="#FFFFFF"/>
-
-  <text x="400" y="40" font-size="24" font-weight="bold" text-anchor="middle">MAPA DA IGREJA - SANTUÁRIO SÃO JUDAS TADEU</text>
-  <rect x="150" y="50" width="500" height="2" fill="black"/>
 
   <style>
     .pew { fill: #F0EAD6; stroke: #333333; stroke-width: 2; }
@@ -23,9 +19,41 @@
     .area-box { fill: none; stroke: #333333; stroke-width: 2; }
     .main-label { font-size: 16px; font-weight: bold; text-anchor: middle; }
     .aisle-label { font-size: 14px; font-weight: bold; text-anchor: middle; }
-    .minister-circle { stroke: #000; stroke-width: 1; }
-    .minister-text { font-size: 10px; font-weight: bold; fill: white; text-anchor: middle; dominant-baseline: central; }
+    
+    /* Estilos para os ministros */
+    .minister-circle-mezanino {
+      fill: red;
+      stroke: #333;
+      stroke-width: 1;
+    }
+    .minister-circle-green {
+      fill: green;
+      stroke: #333;
+      stroke-width: 1;
+    }
+    .minister-circle-blue {
+      fill: blue;
+      stroke: #333;
+      stroke-width: 1;
+    }
+    .minister-circle-orange {
+      fill: orange;
+      stroke: #333;
+      stroke-width: 1;
+    }
+    .minister-text {
+      font-size: 12px;
+      font-weight: bold;
+      fill: white;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
   </style>
+
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+
+  <text x="400" y="40" font-size="24" font-weight="bold" text-anchor="middle">MAPA DA IGREJA - SANTUÁRIO SÃO JUDAS TADEU</text>
+  <rect x="150" y="50" width="500" height="2" fill="black"/>
 
   <g id="map-structure">
     <g id="presbiterio">
@@ -42,9 +70,8 @@
     </g>
 
     <g id="musica">
-      <rect x="60" y="80" width="160" height="100" class="area-box" />
-      <path d="M125,150 V110 a10,10 0 1,1 20,0 V150 a10,10 0 1,1 -20,0 M155,145 V105 a10,10 0 1,1 20,0 V145 a10,10 0 1,1 -20,0 M125,110 H175"
-        stroke="black" stroke-width="4" fill="none" />
+        <rect x="60" y="80" width="160" height="100" class="area-box" />
+        <path d="M125,150 V110 a10,10 0 1,1 20,0 V150 a10,10 0 1,1 -20,0 M155,145 V105 a10,10 0 1,1 20,0 V145 a10,10 0 1,1 -20,0 M125,110 H175" stroke="black" stroke-width="4" fill="none" />
     </g>
 
     <text x="215" y="240" class="aisle-label">A</text>
@@ -101,7 +128,6 @@
       <rect x="330" y="480" width="60" height="200" class="pew" />
       <text x="360" y="580" class="label" transform="rotate(-90, 360, 580)">BANCOS</text>
       <text x="360" y="470" class="number-aisle">7</text>
-      
       <text x="400" y="490" class="number-aisle">8</text>
 
       <rect x="410" y="480" width="60" height="200" class="pew" />
@@ -157,7 +183,7 @@
     <rect x="35" y="25" width="730" height="990" fill="none" stroke="black" stroke-width="1.5" />
   </g>
 
-  <!-- Paths de orientação (linhas tracejadas) -->
+  <!-- Paths de orientação (linhas tracejadas semi-transparentes) -->
   <use xlink:href="#path-mezanino" stroke="red" stroke-dasharray="5 5" stroke-opacity="0.3"/>
   <use xlink:href="#path-principal" stroke="green" stroke-dasharray="5 5" stroke-opacity="0.3"/>
 
@@ -165,105 +191,105 @@
   <g id="ministers-animated">
     <!-- Ministros do Mezanino (vermelho) -->
     <g>
-      <circle class="minister-circle" r="8" fill="red"/>
+      <circle class="minister-circle-mezanino" r="10"/>
       <text class="minister-text">13</text>
-      <animateMotion dur="20s" begin="0s" fill="freeze">
+      <animateMotion dur="25s" begin="0s" fill="freeze">
         <mpath xlink:href="#path-mezanino"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="0s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="0s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="red"/>
+      <circle class="minister-circle-mezanino" r="10"/>
       <text class="minister-text">14</text>
-      <animateMotion dur="20s" begin="1s" fill="freeze">
+      <animateMotion dur="25s" begin="1.5s" fill="freeze">
         <mpath xlink:href="#path-mezanino"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="1s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="1.5s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="red"/>
+      <circle class="minister-circle-mezanino" r="10"/>
       <text class="minister-text">15</text>
-      <animateMotion dur="20s" begin="2s" fill="freeze">
+      <animateMotion dur="25s" begin="3s" fill="freeze">
         <mpath xlink:href="#path-mezanino"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="2s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="3s" fill="freeze"/>
     </g>
 
     <!-- Ministros principais (verde) -->
     <g>
-      <circle class="minister-circle" r="8" fill="green"/>
+      <circle class="minister-circle-green" r="10"/>
       <text class="minister-text">1</text>
-      <animateMotion dur="15s" begin="5s" fill="freeze">
+      <animateMotion dur="18s" begin="6s" fill="freeze">
         <mpath xlink:href="#path-principal"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="5s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="6s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="green"/>
+      <circle class="minister-circle-green" r="10"/>
       <text class="minister-text">2</text>
-      <animateMotion dur="15s" begin="5.5s" fill="freeze">
+      <animateMotion dur="18s" begin="7s" fill="freeze">
         <mpath xlink:href="#path-principal"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="5.5s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="7s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="green"/>
+      <circle class="minister-circle-green" r="10"/>
       <text class="minister-text">3</text>
-      <animateMotion dur="15s" begin="6s" fill="freeze">
+      <animateMotion dur="18s" begin="8s" fill="freeze">
         <mpath xlink:href="#path-principal"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="6s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="8s" fill="freeze"/>
     </g>
 
     <!-- Ministros das laterais (azul) -->
     <g>
-      <circle class="minister-circle" r="8" fill="blue"/>
+      <circle class="minister-circle-blue" r="10"/>
       <text class="minister-text">19</text>
-      <animateMotion dur="12s" begin="8s" fill="freeze">
-        <mpath xlink:href="#path-lado-esquerdo"/>
+      <animateMotion dur="15s" begin="10s" fill="freeze">
+        <mpath xlink:href="#path-lateral-esquerda"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="8s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="10s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="blue"/>
+      <circle class="minister-circle-blue" r="10"/>
       <text class="minister-text">12</text>
-      <animateMotion dur="12s" begin="8.5s" fill="freeze">
-        <mpath xlink:href="#path-lado-direito"/>
+      <animateMotion dur="15s" begin="11s" fill="freeze">
+        <mpath xlink:href="#path-lateral-direita"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="8.5s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="11s" fill="freeze"/>
     </g>
 
     <!-- Ministros das cadeiras (laranja) -->
     <g>
-      <circle class="minister-circle" r="8" fill="orange"/>
+      <circle class="minister-circle-orange" r="10"/>
       <text class="minister-text">24</text>
-      <animateMotion dur="10s" begin="10s" fill="freeze">
+      <animateMotion dur="12s" begin="13s" fill="freeze">
         <mpath xlink:href="#path-cadeiras-24"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="10s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="13s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="orange"/>
+      <circle class="minister-circle-orange" r="10"/>
       <text class="minister-text">25</text>
-      <animateMotion dur="10s" begin="10.5s" fill="freeze">
+      <animateMotion dur="12s" begin="14s" fill="freeze">
         <mpath xlink:href="#path-cadeiras-25"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="10.5s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="14s" fill="freeze"/>
     </g>
     
     <g>
-      <circle class="minister-circle" r="8" fill="orange"/>
+      <circle class="minister-circle-orange" r="10"/>
       <text class="minister-text">26</text>
-      <animateMotion dur="10s" begin="11s" fill="freeze">
+      <animateMotion dur="12s" begin="15s" fill="freeze">
         <mpath xlink:href="#path-cadeiras-26"/>
       </animateMotion>
-      <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="11s" fill="freeze"/>
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="15s" fill="freeze"/>
     </g>
   </g>
 </svg>
