@@ -1,0 +1,143 @@
+<svg width="800" height="1100" viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif" >
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+
+  <text x="400" y="40" font-size="24" font-weight="bold" text-anchor="middle">MAPA DA IGREJA - CURA E LIBERTAÇÃO 2023</text>
+  <rect x="150" y="50" width="500" height="2" fill="black"/>
+
+  <style>
+    .pew { fill: #F0EAD6; stroke: #333333; stroke-width: 2; }
+    .chair-area { fill: #F0EAD6; stroke: #333333; stroke-width: 2; }
+    .label { font-size: 14px; text-anchor: middle; fill: #000000; }
+    .number { font-size: 14px; font-weight: bold; text-anchor: middle; fill: #000000; }
+    .area-box { fill: none; stroke: #333333; stroke-width: 2; }
+    .main-label { font-size: 16px; font-weight: bold; text-anchor: middle; }
+    .aisle-label { font-size: 14px; font-weight: bold; text-anchor: middle; }
+  </style>
+
+  <g id="presbiterio">
+    <path d="M 280 180 A 120 100 0 0 1 520 180 L 520 100 L 280 100 Z" fill="#F0EAD6" stroke="#333333" stroke-width="2"/>
+    <circle cx="400" cy="160" r="45" fill="#D3C9A8" stroke="#333333" stroke-width="2" />
+    <text x="400" y="165" class="main-label">PRESBITÉRIO</text>
+    <path d="M 280 140 L 250 140 M 280 150 L 250 150 M 280 160 L 250 160" stroke="#333333" stroke-width="2"/>
+    <path d="M 520 140 L 550 140 M 520 150 L 550 150 M 520 160 L 550 160" stroke="#333333" stroke-width="2"/>
+  </g>
+
+  <g id="capela">
+    <rect x="580" y="80" width="160" height="50" class="area-box"/>
+    <text x="660" y="110" class="main-label">Capela do Santíssimo</text>
+  </g>
+
+  <g id="musica">
+      <rect x="60" y="80" width="160" height="100" class="area-box" />
+      <path d="M125,150 V110 a10,10 0 1,1 20,0 V150 a10,10 0 1,1 -20,0 M155,145 V105 a10,10 0 1,1 20,0 V145 a10,10 0 1,1 -20,0 M125,110 H175"
+        stroke="black" stroke-width="4" fill="none" />
+  </g>
+
+  <text x="215" y="240" class="aisle-label">A</text>
+  <text x="315" y="240" class="aisle-label">A</text>
+  <text x="485" y="240" class="aisle-label">A</text>
+  <text x="585" y="240" class="aisle-label">A</text>
+  <text x="685" y="240" class="aisle-label">A</text>
+  <text x="365" y="250" class="aisle-label">D</text>
+  <text x="435" y="250" class="aisle-label">P</text>
+
+  <g id="fileira-superior">
+    <rect x="60" y="250" width="60" height="200" class="chair-area" />
+    <text x="90" y="350" class="label" transform="rotate(-90, 90, 350)">CADEIRAS</text>
+    <rect x="150" y="250" width="60" height="200" class="pew" />
+    <text x="180" y="350" class="label" transform="rotate(-90, 180, 350)">BANCOS</text>
+    <text x="180" y="270" class="number">3</text>
+    <rect x="240" y="250" width="60" height="200" class="pew" />
+    <text x="270" y="350" class="label" transform="rotate(-90, 270, 350)">BANCOS</text>
+    <text x="270" y="270" class="number">2</text>
+    <rect x="330" y="260" width="60" height="180" class="pew" />
+    <text x="360" y="350" class="label" transform="rotate(-90, 360, 350)">BANCOS</text>
+    <text x="360" y="280" class="number">1</text>
+
+    <rect x="410" y="260" width="60" height="180" class="pew" />
+    <text x="440" y="350" class="label" transform="rotate(-90, 440, 350)">BANCOS</text>
+    <text x="440" y="280" class="number">16</text>
+    <rect x="500" y="250" width="60" height="200" class="pew" />
+    <text x="530" y="350" class="label" transform="rotate(-90, 530, 350)">BANCOS</text>
+    <text x="530" y="270" class="number">17</text>
+    <rect x="590" y="250" width="60" height="200" class="pew" />
+    <text x="620" y="350" class="label" transform="rotate(-90, 620, 350)">BANCOS</text>
+    <text x="620" y="270" class="number">18</text>
+    <rect x="680" y="250" width="60" height="200" class="chair-area" />
+    <text x="710" y="350" class="label" transform="rotate(-90, 710, 350)">CADEIRAS</text>
+  </g>
+  <rect x="580" y="150" width="160" height="50" class="chair-area" />
+  <text x="660" y="180" class="main-label">CADEIRAS</text>
+
+
+  <g id="fileira-inferior">
+    <rect x="60" y="480" width="60" height="200" class="chair-area" />
+    <text x="90" y="580" class="label" transform="rotate(-90, 90, 580)">CADEIRAS</text>
+    <rect x="150" y="480" width="60" height="200" class="pew" />
+    <text x="180" y="580" class="label" transform="rotate(-90, 180, 580)">BANCOS</text>
+    <text x="180" y="500" class="number">19</text>
+    <text x="180" y="470" class="number">4</text>
+    <rect x="240" y="480" width="60" height="200" class="pew" />
+    <text x="270" y="580" class="label" transform="rotate(-90, 270, 580)">BANCOS</text>
+    <text x="270" y="500" class="number">20</text>
+    <text x="270" y="470" class="number">5</text>
+    <rect x="330" y="480" width="60" height="200" class="pew" />
+    <text x="360" y="580" class="label" transform="rotate(-90, 360, 580)">BANCOS</text>
+    <text x="360" y="500" class="number">21</text>
+    <text x="360" y="470" class="number">6</text>
+
+    <rect x="370" y="500" width="60" height="200" class="pew" transform="rotate(90, 400, 600)" />
+    <text x="400" y="605" class="label">BANCOS</text>
+    <text x="400" y="490" class="number">7</text>
+    <text x="400" y="680" class="number">8</text>
+
+     <rect x="470" y="480" width="60" height="200" class="pew" />
+    <text x="500" y="580" class="label" transform="rotate(-90, 500, 580)">BANCOS</text>
+    <text x="500" y="500" class="number">22</text>
+    <text x="500" y="470" class="number">9</text>
+    <rect x="560" y="480" width="60" height="200" class="pew" />
+    <text x="590" y="580" class="label" transform="rotate(-90, 590, 580)">BANCOS</text>
+    <text x="590" y="500" class="number">23</text>
+    <text x="590" y="470" class="number">10</text>
+    <rect x="650" y="480" width="60" height="200" class="pew" />
+    <text x="680" y="580" class="label" transform="rotate(-90, 680, 580)">BANCOS</text>
+    <text x="680" y="500" class="number">12</text>
+    <text x="680" y="470" class="number">11</text>
+    <rect x="710" y="480" width="30" height="200" class="chair-area" /> </g>
+
+  <g id="areas-laterais-inferiores">
+    <rect x="60" y="700" width="80" height="80" class="area-box"/>
+    <text x="100" y="745" class="main-label">Pe.</text>
+    <text x="100" y="765" class="main-label">PIO</text>
+    <rect x="660" y="700" width="80" height="50" class="area-box"/>
+    <text x="700" y="730" class="main-label">DÍZIMO</text>
+  </g>
+
+  <g id="cadeiras-inferiores">
+    <path d="M 220 710 Q 230 700 240 710 L 360 710 Q 370 700 380 710 V 780 H 220 Z" class="chair-area"/>
+    <text x="300" y="750" class="main-label">CADEIRAS</text>
+    <text x="300" y="700" class="number">24</text>
+
+    <rect x="370" y="730" width="140" height="60" class="chair-area" />
+    <text x="440" y="765" class="main-label">CADEIRAS</text>
+    <text x="440" y="720" class="number">25</text>
+
+    <path d="M 500 710 Q 510 700 520 710 L 640 710 Q 650 700 660 710 V 780 H 500 Z" class="chair-area"/>
+    <text x="580" y="750" class="main-label">CADEIRAS</text>
+    <text x="580" y="700" class="number">26</text>
+  </g>
+
+  <g id="mezanino">
+    <rect x="60" y="820" width="680" height="150" class="area-box" />
+    <text x="400" y="850" class="main-label">MEZANINO</text>
+    <rect x="180" y="880" width="200" height="60" class="pew" />
+    <text x="280" y="915" class="label">BANCOS</text>
+    <text x="280" y="870" class="number">13 e 14</text>
+    <rect x="420" y="880" width="200" height="60" class="pew" />
+    <text x="520" y="915" class="label">BANCOS</text>
+  </g>
+
+  <rect x="30" y="20" width="740" height="1000" fill="none" stroke="black" stroke-width="4" />
+  <rect x="35" y="25" width="730" height="990" fill="none" stroke="black" stroke-width="1.5" />
+
+</svg>
