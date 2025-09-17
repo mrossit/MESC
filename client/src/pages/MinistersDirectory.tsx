@@ -209,7 +209,7 @@ export default function MinistersDirectory() {
       title="Diretório de Ministros"
       subtitle="Conheça os membros do ministério e seus contatos"
     >
-      <div className="max-w-7xl mx-auto p-6 ml-[-4px] mr-[-4px] pl-[8px] pr-[8px] pt-[14px] pb-[14px]">
+      <div className="max-w-7xl mx-auto p-6 ml-[-4px] mr-[-4px] pl-[8px] pr-[8px] pt-[8px] pb-[8px]">
         <Card className="border-opacity-30 mb-6">
           <CardHeader>
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
