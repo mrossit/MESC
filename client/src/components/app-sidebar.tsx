@@ -243,7 +243,7 @@ export function AppSidebar() {
                   >
                     <Link href="/profile">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.profilePhoto || user.photoUrl || undefined} />
+                        <AvatarImage src={user.photoUrl || undefined} />
                         <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-xs">
                           {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>

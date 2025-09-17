@@ -168,7 +168,7 @@ export default function Profile() {
       
       if (res.ok) {
         const data = await res.json();
-        setProfile(prev => prev ? { ...prev, profilePhoto: data.photoUrl, photoUrl: data.photoUrl } : null);
+        setProfile(prev => prev ? { ...prev, photoUrl: data.photoUrl } : null);
         setSuccess('Foto atualizada com sucesso!');
         // Invalida as queries para forçar atualização
         queryClient.invalidateQueries({ queryKey: ['/api/profile'] });
@@ -428,7 +428,7 @@ export default function Profile() {
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <div className="relative">
                     <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
-                      <AvatarImage src={profile?.profilePhoto || profile?.photoUrl} />
+                      <AvatarImage src={profile?.photoUrl} />
                       <AvatarFallback className="text-2xl">
                         {profile ? getInitials(profile.name) : '?'}
                       </AvatarFallback>

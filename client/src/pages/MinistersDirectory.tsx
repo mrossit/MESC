@@ -298,7 +298,7 @@ export default function MinistersDirectory() {
                       <div className="flex flex-col items-center text-center">
                         <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
                           <AvatarImage 
-                            src={minister.profilePhoto || minister.photoUrl} 
+                            src={minister.photoUrl} 
                             className="object-cover"
                           />
                           <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
@@ -349,7 +349,7 @@ export default function MinistersDirectory() {
                       <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
                           <AvatarImage 
-                            src={minister.profilePhoto || minister.photoUrl} 
+                            src={minister.photoUrl} 
                             className="object-cover"
                           />
                           <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
@@ -408,7 +408,7 @@ export default function MinistersDirectory() {
               <div className="flex flex-col items-center text-center">
                 <Avatar className="h-28 w-28 mb-3 border-2 border-gray-200 shadow-lg">
                   <AvatarImage 
-                    src={selectedMinister.profilePhoto || selectedMinister.photoUrl} 
+                    src={selectedMinister.photoUrl} 
                     className="object-cover"
                   />
                   <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
@@ -462,7 +462,7 @@ export default function MinistersDirectory() {
                     {familyData.map((family: MinisterFamily) => (
                       <div key={family.id} className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={family.relatedUser.profilePhoto} />
+                          <AvatarImage src={family.relatedUser.photoUrl} />
                           <AvatarFallback className="text-xs">
                             {getInitials(family.relatedUser.name)}
                           </AvatarFallback>
