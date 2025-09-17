@@ -119,7 +119,14 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month - 1, day);
     if (getDay(date) === 0) { // Domingo
-      sundayDates.push(`Domingo ${format(date, 'dd/MM')}`);
+      let sundayLabel = `Domingo ${format(date, 'dd/MM')}`;
+      
+      // Verificar se 12/10 (Nossa Senhora Aparecida) cai em domingo
+      if (month === 10 && day === 12) {
+        sundayLabel = `Domingo (12/10) – Missa em honra à Nossa Senhora Aparecida`;
+      }
+      
+      sundayDates.push(sundayLabel);
     }
   }
 
@@ -437,7 +444,27 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
 
   // Adicionar outros eventos especiais baseados no mês
   const specialEvents = getSpecialEvents(month, year);
-  specialEvents.forEach((event, index) => {
+  
+  // Filtrar eventos especiais para evitar duplicações
+  const filteredEvents = specialEvents.filter(event => {
+    // Remover São Judas Tadeu em outubro (já tem perguntas específicas por horário)
+    if (month === 10 && event.name.includes('São Judas Tadeu')) {
+      return false;
+    }
+    
+    // Remover Nossa Senhora Aparecida quando 12/10 for domingo (já incluído na pergunta dos domingos)
+    if (month === 10 && event.name === 'Nossa Senhora Aparecida') {
+      const date = new Date(year, 9, 12); // outubro = mês 9 (0-indexed)
+      const isOurLadySunday = getDay(date) === 0;
+      if (isOurLadySunday) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
+  filteredEvents.forEach((event, index) => {
     questions.push({
       id: `special_event_${index + 1}`,
       type: 'multiple_choice',
