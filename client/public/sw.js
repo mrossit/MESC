@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mesc-v4.0-icons';
+const CACHE_NAME = 'mesc-v4.2-deployment';
 const urlsToCache = [
   '/',
   '/index.html',
