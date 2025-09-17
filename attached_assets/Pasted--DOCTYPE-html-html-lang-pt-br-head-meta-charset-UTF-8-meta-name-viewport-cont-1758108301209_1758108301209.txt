@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animação do Mapa da Igreja</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+        svg {
+            max-width: 800px;
+            width: 100%;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Animação do Caminho dos Ministros</h1>
+
+    <svg width="800" height="1100" viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" font-family="Arial, sans-serif">
+      <defs>
+        <path id="path-mezanino" d="M 660 110 V 220 H 620 V 460 H 400 V 710 H 220 V 850 H 400" fill="none" stroke-width="1" />
+        
+        <path id="path-principal" d="M 660 110 V 220 H 620 V 460 H 400 V 710 H 220" fill="none" stroke-width="1" />
+      </defs>
+
+      <rect width="100%" height="100%" fill="#FFFFFF"/>
+      <text x="400" y="40" font-size="24" font-weight="bold" text-anchor="middle">MAPA DA IGREJA - SANTUÁRIO SÃO JUDAS TADEU</text>
+      <rect x="150" y="50" width="500" height="2" fill="black"/>
+      <style>
+        .pew { fill: #F0EAD6; stroke: #333333; stroke-width: 2; } .chair-area { fill: #F0EAD6; stroke: #333333; stroke-width: 2; } .label { font-size: 14px; text-anchor: middle; fill: #000000; } .number-pew { font-size: 14px; font-weight: bold; text-anchor: middle; fill: #000000; } .number-aisle { font-size: 14px; font-weight: bold; text-anchor: middle; fill: #000000; } .area-box { fill: none; stroke: #333333; stroke-width: 2; } .main-label { font-size: 16px; font-weight: bold; text-anchor: middle; } .aisle-label { font-size: 14px; font-weight: bold; text-anchor: middle; }
+        .minister-circle { stroke: #000; stroke-width: 1; }
+        .minister-text { font-size: 10px; font-weight: bold; fill: white; text-anchor: middle; dominant-baseline: central; }
+      </style>
+      
+      <g id="map-structure">
+        <g id="presbiterio"> <path d="M 280 180 A 120 100 0 0 1 520 180 L 520 100 L 280 100 Z" fill="#F0EAD6" stroke="#333333" stroke-width="2"/> <circle cx="400" cy="160" r="45" fill="#D3C9A8" stroke="#333333" stroke-width="2" /> <text x="400" y="165" class="main-label">PRESBITÉRIO</text> <path d="M 280 140 L 250 140 M 280 150 L 250 150 M 280 160 L 250 160" stroke="#333333" stroke-width="2"/> <path d="M 520 140 L 550 140 M 520 150 L 550 150 M 520 160 L 550 160" stroke="#333333" stroke-width="2"/> </g>
+        <g id="capela"> <rect x="580" y="80" width="160" height="50" class="area-box"/> <text x="660" y="110" class="main-label">Capela do Santíssimo</text> </g>
+        <g id="musica"> <rect x="60" y="80" width="160" height="100" class="area-box" /> <path d="M125,150 V110 a10,10 0 1,1 20,0 V150 a10,10 0 1,1 -20,0 M155,145 V105 a10,10 0 1,1 20,0 V145 a10,10 0 1,1 -20,0 M125,110 H175" stroke="black" stroke-width="4" fill="none" /> </g>
+        <text x="215" y="240" class="aisle-label">A</text> <text x="315" y="240" class="aisle-label">A</text> <text x="485" y="240" class="aisle-label">A</text> <text x="585" y="240" class="aisle-label">A</text> <text x="685" y="240" class="aisle-label">A</text> <text x="365" y="250" class="aisle-label">D</text> <text x="435" y="250" class="aisle-label">P</text>
+        <g id="fileira-superior"> <rect x="60" y="250" width="60" height="200" class="chair-area" /> <text x="90" y="350" class="label" transform="rotate(-90, 90, 350)">CADEIRAS</text> <text x="90" y="270" class="number-aisle">3</text> <rect x="150" y="250" width="60" height="200" class="pew" /> <text x="180" y="350" class="label" transform="rotate(-90, 180, 350)">BANCOS</text> <text x="180" y="270" class="number-aisle">2</text> <rect x="240" y="250" width="60" height="200" class="pew" /> <text x="270" y="350" class="label" transform="rotate(-90, 270, 350)">BANCOS</text> <text x="270" y="270" class="number-aisle">1</text> <rect x="330" y="260" width="60" height="180" class="pew" /> <text x="360" y="350" class="label" transform="rotate(-90, 360, 350)">BANCOS</text> <text x="360" y="280" class="number-aisle">7</text> <rect x="410" y="260" width="60" height="180" class="pew" /> <text x="440" y="350" class="label" transform="rotate(-90, 440, 350)">BANCOS</text> <text x="440" y="280" class="number-aisle">16</text> <rect x="500" y="250" width="60" height="200" class="pew" /> <text x="530" y="350" class="label" transform="rotate(-90, 530, 350)">BANCOS</text> <text x="530" y="270" class="number-aisle">17</text> <rect x="590" y="250" width="60" height="200" class="pew" /> <text x="620" y="350" class="label" transform="rotate(-90, 620, 350)">BANCOS</text> <text x="620" y="270" class="number-aisle">18</text> <rect x="680" y="250" width="60" height="200" class="chair-area" /> <text x="710" y="350" class="label" transform="rotate(-90, 710, 350)">CADEIRAS</text> </g>
+        <rect x="580" y="150" width="160" height="50" class="chair-area" /> <text x="660" y="180" class="main-label">CADEIRAS</text>
+        <g id="fileira-inferior"> <rect x="60" y="480" width="60" height="200" class="chair-area" /> <text x="90" y="580" class="label" transform="rotate(-90, 90, 580)">CADEIRAS</text> <text x="90" y="500" class="number-pew">19</text> <text x="90" y="470" class="number-aisle">4</text> <rect x="150" y="480" width="60" height="200" class="pew" /> <text x="180" y="580" class="label" transform="rotate(-90, 180, 580)">BANCOS</text> <text x="180" y="500" class="number-aisle">20</text> <text x="180" y="470" class="number-aisle">5</text> <rect x="240" y="480" width="60" height="200" class="pew" /> <text x="270" y="580" class="label" transform="rotate(-90, 270, 580)">BANCOS</text> <text x="270" y="500" class="number-pew">21</text> <text x="270" y="470" class="number-aisle">6</text> <rect x="330" y="480" width="60" height="200" class="pew" /> <text x="360" y="580" class="label" transform="rotate(-90, 360, 580)">BANCOS</text> <text x="360" y="470" class="number-aisle">7</text> <text x="400" y="490" class="number-aisle">8</text> <rect x="410" y="480" width="60" height="200" class="pew" /> <text x="440" y="580" class="label" transform="rotate(-90, 440, 580)">BANCOS</text> <text x="440" y="500" class="number-pew">22</text> <text x="440" y="470" class="number-aisle">9</text> <rect x="500" y="480" width="60" height="200" class="pew" /> <text x="530" y="580" class="label" transform="rotate(-90, 530, 580)">BANCOS</text> <text x="530" y="500" class="number-pew">23</text> <text x="530" y="470" class="number-aisle">10</text> <rect x="590" y="480" width="60" height="200" class="pew" /> <text x="620" y="580" class="label" transform="rotate(-90, 620, 580)">BANCOS</text> <text x="620" y="500" class="number-pew">12</text> <text x="620" y="470" class="number-aisle">11</text> <rect x="680" y="480" width="60" height="200" class="chair-area" /> <text x="710" y="580" class="label" transform="rotate(-90, 710, 580)">CADEIRAS</text> </g>
+        <g id="areas-laterais-inferiores"> <rect x="60" y="700" width="80" height="80" class="area-box"/> <text x="100" y="745" class="main-label">Pe.</text> <text x="100" y="765" class="main-label">PIO</text> <rect x="660" y="700" width="80" height="50" class="area-box"/> <text x="700" y="730" class="main-label">DÍZIMO</text> </g>
+        <g id="cadeiras-inferiores"> <path d="M 220 710 Q 230 700 240 710 L 360 710 Q 370 700 380 710 V 780 H 220 Z" class="chair-area"/> <text x="300" y="750" class="main-label">CADEIRAS</text> <text x="300" y="700" class="number-pew">24</text> <rect x="370" y="730" width="140" height="60" class="chair-area" /> <text x="440" y="765" class="main-label">CADEIRAS</text> <text x="440" y="720" class="number-pew">25</text> <path d="M 500 710 Q 510 700 520 710 L 640 710 Q 650 700 660 710 V 780 H 500 Z" class="chair-area"/> <text x="580" y="750" class="main-label">CADEIRAS</text> <text x="580" y="700" class="number-pew">26</text> </g>
+        <g id="mezanino"> <rect x="60" y="820" width="680" height="150" class="area-box" /> <text x="400" y="850" class="main-label">MEZANINO</text> <rect x="180" y="880" width="200" height="60" class="pew" /> <text x="280" y="915" class="label">BANCOS</text> <text x="280" y="870" class="number-pew">13 e 14</text> <rect x="420" y="880" width="200" height="60" class="pew" /> <text x="520" y="915" class="label">BANCOS</text> <text x="520" y="870" class="number-pew">15</text> </g>
+        <rect x="30" y="20" width="740" height="1000" fill="none" stroke="black" stroke-width="4" /> <rect x="35" y="25" width="730" height="990" fill="none" stroke="black" stroke-width="1.5" />
+    </g>
+
+    <use xlink:href="#path-mezanino" stroke="red" stroke-dasharray="5 5" stroke-opacity="0.5"/>
+    <use xlink:href="#path-principal" stroke="green" stroke-dasharray="5 5" stroke-opacity="0.5"/>
+
+    <g id="ministers-animated">
+        <g> <circle class="minister-circle" r="8" fill="red"/> <text class="minister-text">13</text> <animateMotion dur="20s" begin="0s" fill="freeze"> <mpath xlink:href="#path-mezanino"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="0s" fill="freeze"/> </g>
+        <g> <circle class="minister-circle" r="8" fill="red"/> <text class="minister-text">14</text> <animateMotion dur="20s" begin="1s" fill="freeze"> <mpath xlink:href="#path-mezanino"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="1s" fill="freeze"/> </g>
+        <g> <circle class="minister-circle" r="8" fill="red"/> <text class="minister-text">15</text> <animateMotion dur="20s" begin="2s" fill="freeze"> <mpath xlink:href="#path-mezanino"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="2s" fill="freeze"/> </g>
+
+        <g> <circle class="minister-circle" r="8" fill="green"/> <text class="minister-text">3</text> <animateMotion dur="15s" begin="15s" fill="freeze"> <mpath xlink:href="#path-principal"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="15s" fill="freeze"/> </g>
+        <g> <circle class="minister-circle" r="8" fill="green"/> <text class="minister-text">2</text> <animateMotion dur="15s" begin="15.5s" fill="freeze"> <mpath xlink:href="#path-principal"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="15.5s" fill="freeze"/> </g>
+        <g> <circle class="minister-circle" r="8" fill="green"/> <text class="minister-text">1</text> <animateMotion dur="15s" begin="16s" fill="freeze"> <mpath xlink:href="#path-principal"/> </animateMotion> <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="16s" fill="freeze"/> </g>
+        </g>
+</svg>
+
+</body>
+</html>
