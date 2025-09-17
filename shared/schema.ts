@@ -56,6 +56,8 @@ export const users = pgTable("users", {
   lastLogin: timestamp('last_login'),
   joinDate: date('join_date'),
   photoUrl: text('photo_url'),
+  imageData: text('image_data'), // Base64 encoded image data
+  imageContentType: varchar('image_content_type', { length: 50 }), // MIME type
   familyId: uuid('family_id').references(() => families.id),
   
   // Personal information
