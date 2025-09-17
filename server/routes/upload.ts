@@ -40,37 +40,31 @@ router.post('/profile-photo', authenticateToken, upload.single('photo'), async (
     }
 
     const userId = req.user!.id;
-    const fileExtension = path.extname(req.file.originalname).toLowerCase() || '.jpg';
-    const fileName = `${userId}_${Date.now()}${fileExtension}`;
-    const filePath = path.join(uploadsDir, fileName);
 
     // Processar imagem (redimensionar e otimizar)
-    await sharp(req.file.buffer)
+    const processedImageBuffer = await sharp(req.file.buffer)
       .resize(300, 300, {
         fit: 'cover',
         position: 'center',
       })
       .jpeg({ quality: 80 })
-      .toFile(filePath);
+      .toBuffer();
 
-    // Atualizar URL da foto no banco de dados
-    const photoUrl = `/uploads/profiles/${fileName}`;
+    // Converter para base64 para armazenar no banco
+    const imageData = processedImageBuffer.toString('base64');
+    const contentType = 'image/jpeg';
+    
+    // Atualizar dados da imagem no banco de dados
+    const photoUrl = `/api/users/${userId}/photo`;
     
     if (db) {
       await db.update(users)
         .set({ 
-          photoUrl: photoUrl
+          photoUrl: photoUrl,
+          imageData: imageData,
+          imageContentType: contentType
         })
         .where(eq(users.id, userId));
-    }
-
-    // Remover foto antiga se existir
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user?.photoUrl && user.photoUrl !== photoUrl) {
-      const oldPath = path.join(process.cwd(), user.photoUrl.replace(/^\//, ''));
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
     }
 
     res.json({ 
@@ -89,23 +83,14 @@ router.delete('/profile-photo', authenticateToken, async (req: AuthRequest, res)
   try {
     const userId = req.user!.id;
 
-    // Obter usuário atual
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    
-    if (user?.photoUrl) {
-      // Remover arquivo físico
-      const photoPath = path.join(process.cwd(), user.photoUrl.replace(/^\//, ''));
-      if (fs.existsSync(photoPath)) {
-        fs.unlinkSync(photoPath);
-      }
-
-      // Limpar campo no banco de dados
-      await db.update(users)
-        .set({ 
-          photoUrl: null
-        })
-        .where(eq(users.id, userId));
-    }
+    // Limpar campos de imagem no banco de dados
+    await db.update(users)
+      .set({ 
+        photoUrl: null,
+        imageData: null,
+        imageContentType: null
+      })
+      .where(eq(users.id, userId));
 
     res.json({ 
       success: true, 
