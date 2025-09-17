@@ -485,7 +485,7 @@ export default function MinistersDirectory() {
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => window.open(`tel:${formatPhoneForCall(selectedMinister.phone)}`, '_self')}
+                    onClick={() => window.open(`tel:${formatPhoneForCall(selectedMinister.phone!)}`, '_self')}
                   >
                     <Phone className="h-4 w-4 mr-2" />
                     Ligar
