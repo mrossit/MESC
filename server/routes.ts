@@ -11,9 +11,11 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
+import { db } from './db';
+import { eq } from 'drizzle-orm';
 
 // Função utilitária para tratamento de erro centralizado
 function handleApiError(error: any, operation: string) {
@@ -297,6 +299,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuário");
       res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Rota para servir fotos de perfil
+  app.get('/api/users/:id/photo', async (req, res) => {
+    try {
+      const userId = req.params.id;
+      
+      // Buscar dados da imagem no banco
+      const [user] = await db.select({
+        imageData: users.imageData,
+        imageContentType: users.imageContentType
+      }).from(users).where(eq(users.id, userId));
+      
+      if (!user || !user.imageData) {
+        return res.status(404).json({ error: 'Photo not found' });
+      }
+      
+      // Converter base64 para buffer
+      const imageBuffer = Buffer.from(user.imageData, 'base64');
+      
+      // Headers de cache para otimizar performance
+      res.set({
+        'Content-Type': user.imageContentType || 'image/jpeg',
+        'Content-Length': imageBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=31536000, immutable', // Cache por 1 ano
+        'ETag': `"${userId}-${Buffer.from(user.imageData.substring(0, 32)).toString('hex')}"` // ETag baseado no hash da imagem
+      });
+      
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error('Error serving profile photo:', error);
+      res.status(500).json({ error: 'Failed to load photo' });
     }
   });
 
