@@ -146,7 +146,7 @@ export function AppSidebar() {
       items: [
         { title: "Trilha Liturgia", href: "/formation/liturgy", roles: ["gestor", "coordenador", "ministro"] },
         { title: "Espiritualidade", href: "/formation/spirituality", roles: ["gestor", "coordenador", "ministro"] },
-        { title: "Biblioteca", href: "/formation/library", roles: ["gestor", "coordenador", "ministro"] },
+        { title: "Biblioteca", href: "/formation/library", roles: ["gestor", "coordenador"] },
       ]
     },
     {
