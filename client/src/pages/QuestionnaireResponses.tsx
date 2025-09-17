@@ -514,7 +514,7 @@ export default function QuestionnaireResponses() {
                     Clique no badge de disponibilidade para ver as respostas detalhadas
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6 pl-[10px] pr-[10px] pt-[8px] pb-[8px]">
                   {/* Search */}
                   <div className="mb-4">
                     <div className="relative">
@@ -683,7 +683,7 @@ export default function QuestionnaireResponses() {
                     Visualização consolidada de todas as respostas recebidas
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6 pl-[10px] pr-[10px] pt-[8px] pb-[8px]">
                   {loadingSummary ? (
                     <div className="text-center py-8">
                       <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />

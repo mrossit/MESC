@@ -22,29 +22,95 @@ interface Question {
   order?: number;
 }
 
-// Mapa de temas mensais
-const MONTHLY_THEMES: { [key: number]: string } = {
-  1: 'Renovação',
-  2: 'Amor',
-  3: 'Conversão',
-  4: 'Ressurreição',
-  5: 'Maria',
-  6: 'Sagrado Coração',
-  7: 'Família',
-  8: 'Vocações',
-  9: 'Bíblia',
-  10: 'Missões',
-  11: 'Finados',
-  12: 'Natal'
+// Mapa de temas mensais com concordância correta
+const MONTHLY_THEMES: { [key: number]: { theme: string; article: string } } = {
+  1: { theme: 'Renovação', article: 'à' },
+  2: { theme: 'Amor', article: 'ao' },
+  3: { theme: 'Conversão', article: 'à' },
+  4: { theme: 'Ressurreição', article: 'à' },
+  5: { theme: 'Maria', article: 'à' },
+  6: { theme: 'Sagrado Coração', article: 'ao' },
+  7: { theme: 'Família', article: 'à' },
+  8: { theme: 'Vocações', article: 'às' },
+  9: { theme: 'Bíblia', article: 'à' },
+  10: { theme: 'Missões', article: 'às' },
+  11: { theme: 'Finados', article: 'aos' },
+  12: { theme: 'Natal', article: 'ao' }
 };
+
+// Funções auxiliares para calcular datas de missas especiais
+function getFirstThursdayOfMonth(month: number, year: number): { day: number; isHoliday: boolean } {
+  const firstDay = new Date(year, month - 1, 1);
+  let day = 1;
+  
+  // Encontrar a primeira quinta-feira
+  while (new Date(year, month - 1, day).getDay() !== 4) {
+    day++;
+  }
+  
+  // Verificar se é feriado (simplificado - pode ser expandido)
+  const date = new Date(year, month - 1, day);
+  const isHoliday = isHolidayDate(date);
+  
+  return { day, isHoliday };
+}
+
+function getFirstFridayOfMonth(month: number, year: number): number {
+  let day = 1;
+  while (new Date(year, month - 1, day).getDay() !== 5) {
+    day++;
+  }
+  return day;
+}
+
+function getFirstSaturdayOfMonth(month: number, year: number): number {
+  let day = 1;
+  while (new Date(year, month - 1, day).getDay() !== 6) {
+    day++;
+  }
+  return day;
+}
+
+function isHolidayDate(date: Date): boolean {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  
+  // Feriados fixos nacionais
+  const holidays = [
+    { month: 1, day: 1 },   // Ano Novo
+    { month: 4, day: 21 },  // Tiradentes
+    { month: 5, day: 1 },   // Dia do Trabalho
+    { month: 9, day: 7 },   // Independência
+    { month: 10, day: 12 }, // Nossa Senhora Aparecida
+    { month: 11, day: 2 },  // Finados
+    { month: 11, day: 15 }, // Proclamação da República
+    { month: 11, day: 20 }, // Consciência Negra
+    { month: 12, day: 25 }  // Natal
+  ];
+  
+  return holidays.some(h => h.month === month && h.day === day);
+}
+
+function isOctoberSpecialPeriod(month: number, year: number): boolean {
+  return month === 10; // Outubro - mês especial de São Judas Tadeu
+}
+
+function getOctoberSpecialDates(year: number): { novena: { start: number; end: number }, feast: number } {
+  // Novena: 19 a 27 de outubro (9 dias antes da festa)
+  // Festa: 28 de outubro
+  return {
+    novena: { start: 19, end: 27 },
+    feast: 28
+  };
+}
 
 export function generateQuestionnaireQuestions(month: number, year: number): Question[] {
   logger.debug(`Iniciando geração de questionário para ${month}/${year}`);
   const questions: Question[] = [];
   const monthName = format(new Date(year, month - 1), 'MMMM', { locale: ptBR });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-  const theme = MONTHLY_THEMES[month] || 'do mês';
-  logger.debug(`Tema detectado para questionário: ${theme}`);
+  const themeInfo = MONTHLY_THEMES[month] || { theme: 'do mês', article: 'a' };
+  logger.debug(`Tema detectado para questionário: ${themeInfo.theme}`);
   
   // Obter todos os domingos do mês
   const sundayDates: string[] = [];
@@ -57,11 +123,11 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     }
   }
 
-  // 1. Disponibilidade mensal com tema
+  // 1. Disponibilidade mensal com tema e concordância correta
   questions.push({
     id: 'monthly_availability',
     type: 'multiple_choice',
-    question: `Neste mês de ${capitalizedMonth} dedicado à "${theme}", você tem disponibilidade para servir no seu horário de costume?`,
+    question: `Neste mês de ${capitalizedMonth} dedicado ${themeInfo.article} "${themeInfo.theme}", você tem disponibilidade para servir no seu horário de costume?`,
     options: ['Sim', 'Não'],
     required: true,
     category: 'regular',
@@ -145,6 +211,62 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     order: 6
   });
 
+  // 7. Missas especiais mensais
+  // 7.1 Missa por Cura e Libertação (primeira quinta-feira)
+  const firstThursday = getFirstThursdayOfMonth(month, year);
+  const healingMassTime = firstThursday.isHoliday ? '19h' : '19h30';
+  questions.push({
+    id: 'healing_liberation_mass',
+    type: 'multiple_choice',
+    question: `Você pode servir na Missa por Cura e Libertação - primeira quinta-feira (${firstThursday.day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}) às ${healingMassTime}?`,
+    options: ['Sim', 'Não'],
+    required: false,
+    category: 'special_event',
+    metadata: {
+      dependsOn: 'monthly_availability',
+      showIf: 'Sim',
+      eventDate: `${firstThursday.day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
+      eventName: 'Missa por Cura e Libertação'
+    },
+    order: 7.1
+  });
+
+  // 7.2 Missa votiva ao Sagrado Coração de Jesus (primeira sexta-feira)
+  const firstFriday = getFirstFridayOfMonth(month, year);
+  questions.push({
+    id: 'sacred_heart_mass',
+    type: 'multiple_choice',
+    question: `Você pode servir na Missa votiva ao Sagrado Coração de Jesus - primeira sexta-feira (${firstFriday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}) às 6h30?`,
+    options: ['Sim', 'Não'],
+    required: false,
+    category: 'special_event',
+    metadata: {
+      dependsOn: 'monthly_availability',
+      showIf: 'Sim',
+      eventDate: `${firstFriday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
+      eventName: 'Missa votiva ao Sagrado Coração de Jesus'
+    },
+    order: 7.2
+  });
+
+  // 7.3 Missa votiva ao Imaculado Coração de Maria (primeiro sábado)
+  const firstSaturday = getFirstSaturdayOfMonth(month, year);
+  questions.push({
+    id: 'immaculate_heart_mass',
+    type: 'multiple_choice',
+    question: `Você pode servir na Missa votiva ao Imaculado Coração de Maria - primeiro sábado (${firstSaturday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}) às 6h30?`,
+    options: ['Sim', 'Não'],
+    required: false,
+    category: 'special_event',
+    metadata: {
+      dependsOn: 'monthly_availability',
+      showIf: 'Sim',
+      eventDate: `${firstSaturday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
+      eventName: 'Missa votiva ao Imaculado Coração de Maria'
+    },
+    order: 7.3
+  });
+
   // 8. Adoração segunda-feira 22h
   questions.push({
     id: 'adoration_monday',
@@ -177,6 +299,139 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         showIf: 'Sim'
       },
       order: 9
+    });
+  }
+
+  // Para outubro - Situação especial de São Judas Tadeu
+  if (month === 10) {
+    const octoberDates = getOctoberSpecialDates(year);
+    const feastDate = new Date(year, 9, octoberDates.feast); // outubro = mês 9 (0-indexed)
+    const dayOfWeek = feastDate.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Domingo ou sábado
+    const eveningMassTime = isWeekend ? '19h' : '19h30';
+
+    // Festa de São Judas Tadeu (28/10)
+    questions.push({
+      id: 'saint_judas_feast_7h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às 7h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: 'Festa de São Judas Tadeu - 7h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.1
+    });
+
+    questions.push({
+      id: 'saint_judas_feast_10h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às 10h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: 'Festa de São Judas Tadeu - 10h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.2
+    });
+
+    questions.push({
+      id: 'saint_judas_feast_12h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às 12h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: 'Festa de São Judas Tadeu - 12h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.3
+    });
+
+    questions.push({
+      id: 'saint_judas_feast_15h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às 15h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: 'Festa de São Judas Tadeu - 15h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.4
+    });
+
+    questions.push({
+      id: 'saint_judas_feast_17h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às 17h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: 'Festa de São Judas Tadeu - 17h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.5
+    });
+
+    questions.push({
+      id: 'saint_judas_feast_evening',
+      type: 'multiple_choice',
+      question: `Você pode servir na Festa de São Judas Tadeu - 28/10/${year} às ${eveningMassTime}?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/10',
+        eventName: `Festa de São Judas Tadeu - ${eveningMassTime}`,
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.6
+    });
+
+    // Novena de São Judas Tadeu (19 a 27/10)
+    questions.push({
+      id: 'saint_judas_novena',
+      type: 'checkbox',
+      question: `Você pode servir na Novena de São Judas Tadeu (19 a 27/10/${year})? Marque os dias disponíveis:`,
+      options: [
+        'Nenhum dia',
+        'Segunda 19/10 às 19h30',
+        'Terça 20/10 às 19h30',
+        'Quarta 21/10 às 19h30',
+        'Quinta 22/10 às 19h30',
+        'Sexta 23/10 às 19h30',
+        'Sábado 24/10 às 19h',
+        'Segunda 26/10 às 19h30',
+        'Terça 27/10 às 19h30'
+      ],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '19-27/10',
+        eventName: 'Novena de São Judas Tadeu',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim'
+      },
+      order: 9.7
     });
   }
 
