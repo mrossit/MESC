@@ -666,7 +666,7 @@ export default function UserManagement() {
                                 className="text-red-600"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir/Bloquear
+                                Remover Usuário
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

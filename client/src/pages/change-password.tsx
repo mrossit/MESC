@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Church, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ChangePassword() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -102,16 +103,10 @@ export default function ChangePassword() {
             Alteração de Senha
           </CardTitle>
           <p className="text-muted-foreground text-sm">
-            Para sua segurança, é necessário alterar a senha padrão
+            Crie uma nova senha para manter sua conta segura
           </p>
         </CardHeader>
         <CardContent>
-          <Alert className="mb-6 border-mesc-gold/50 bg-muted/50">
-            <CheckCircle className="h-4 w-4 text-mesc-gold" />
-            <AlertDescription className="text-sm text-muted-foreground">
-              <strong>Primeiro acesso detectado.</strong> Por favor, crie uma nova senha segura para proteger sua conta.
-            </AlertDescription>
-          </Alert>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">

@@ -347,11 +347,21 @@ export function AppSidebar() {
               <DropdownMenuContent align="start" side="top" className="w-56">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.location.href = '/profile'}>
+                <DropdownMenuItem onClick={() => {
+                  navigate('/profile');
+                  if (isMobile) {
+                    setOpenMobile(false);
+                  }
+                }}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Meu Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                <DropdownMenuItem onClick={() => {
+                  navigate('/settings');
+                  if (isMobile) {
+                    setOpenMobile(false);
+                  }
+                }}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
@@ -366,7 +376,12 @@ export function AppSidebar() {
                     <span>Tutorial do Sistema</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => window.location.href = '/change-password'}>
+                <DropdownMenuItem onClick={() => {
+                  navigate('/change-password');
+                  if (isMobile) {
+                    setOpenMobile(false);
+                  }
+                }}>
                   <KeyRound className="mr-2 h-4 w-4" />
                   <span>Alterar Senha</span>
                 </DropdownMenuItem>
