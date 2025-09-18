@@ -74,7 +74,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Clean up old caches
+// Clean up old caches and force activation
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -87,7 +87,18 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      self.clients.claim();
+      // Force immediate control of all clients
+      return self.clients.claim();
+    }).then(() => {
+      // Notify all clients about the update
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_UPDATED', 
+            version: CACHE_NAME
+          });
+        });
+      });
     })
   );
 });
@@ -136,9 +147,20 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Handle app update available
+// Handle app update available and force refresh
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'FORCE_UPDATE') {
+    // Clear all caches and force update
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+    }).then(() => {
+      self.skipWaiting();
+    });
   }
 });
