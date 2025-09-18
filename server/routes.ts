@@ -511,6 +511,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if user has been used in the system (before deletion)
+  app.get('/api/users/:id/check-usage', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+    try {
+      const userId = req.params.id;
+      
+      // Check if user has any activity in the system
+      // For now, we'll assume a user is "used" if they are not a newly created user
+      // This can be expanded to check for specific activities like questionnaire responses, schedules, etc.
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Consider a user as "used" if they have logged in before (not requiring password change)
+      const isUsed = !user.requiresPasswordChange;
+      
+      res.json({
+        isUsed,
+        reason: isUsed ? "Usuário já teve atividade no sistema" : "Usuário nunca fez login"
+      });
+    } catch (error) {
+      console.error("Error checking user usage:", error);
+      res.status(500).json({ message: "Erro ao verificar uso do usuário" });
+    }
+  });
+
   app.delete('/api/users/:id', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
     try {
       // Impedir auto-exclusão

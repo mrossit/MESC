@@ -64,7 +64,7 @@ export default function UserManagement() {
   const [newPassword, setNewPassword] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [userUsage, setUserUsage] = useState<{ isUsed: boolean; usageDetails: string[] } | null>(null);
+  const [userUsage, setUserUsage] = useState<{ isUsed: boolean; reason?: string } | null>(null);
   const { toast } = useToast();
   
   // Get current user info with fresh data
@@ -222,9 +222,7 @@ export default function UserManagement() {
     
     // Check if user has been used in the system
     try {
-      const response = await fetch(`/api/users/${user.id}/check-usage`, {
-        credentials: "include"
-      });
+      const response = await apiRequest("GET", `/api/users/${user.id}/check-usage`);
       const usage = await response.json();
       setUserUsage(usage);
     } catch (error) {
@@ -237,7 +235,9 @@ export default function UserManagement() {
 
   const confirmDeleteOrBlock = () => {
     if (userToDelete) {
-      if (userUsage?.isUsed) {
+      // Coordenadores sempre bloqueiam usuários, não podem deletar
+      // Apenas gestores podem deletar usuários não utilizados
+      if (userUsage?.isUsed || currentUserData?.user?.role === 'coordenador') {
         blockUserMutation.mutate(userToDelete.id);
       } else {
         deleteUserMutation.mutate(userToDelete.id);
@@ -732,12 +732,10 @@ export default function UserManagement() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Este usuário não pode ser excluído pois já foi utilizado no sistema:
-                  <ul className="mt-2 list-disc list-inside text-sm">
-                    {userUsage.usageDetails.map((detail, index) => (
-                      <li key={index}>{detail}</li>
-                    ))}
-                  </ul>
+                  Este usuário não pode ser excluído pois já foi utilizado no sistema.
+                  {userUsage.reason && (
+                    <p className="mt-2 text-sm text-muted-foreground">{userUsage.reason}</p>
+                  )}
                   <p className="mt-2 font-medium">O usuário será bloqueado ao invés de excluído.</p>
                 </AlertDescription>
               </Alert>
