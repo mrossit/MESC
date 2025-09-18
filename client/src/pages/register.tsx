@@ -102,7 +102,7 @@ export default function Register() {
             </p>
             <Button
               onClick={() => navigate("/login")}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-medium"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
               data-testid="button-go-to-login"
             >
               Ir para Login
@@ -251,7 +251,7 @@ export default function Register() {
 
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90 text-white font-medium"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
               disabled={registerMutation.isPending}
               data-testid="button-register"
             >
