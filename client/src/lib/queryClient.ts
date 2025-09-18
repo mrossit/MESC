@@ -27,9 +27,17 @@ export async function apiRequest(
     }
   }
 
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Adicionar token de autenticação se disponível
+  const token = localStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body,
     credentials: "include",
   });
@@ -44,7 +52,15 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Adicionar token de autenticação se disponível
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem('token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
+      headers,
       credentials: "include",
     });
 
