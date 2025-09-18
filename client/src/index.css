@@ -196,7 +196,26 @@
     border-width: 0.5px;
   }
   
-  /* Melhorias específicas para campos de data */
+  /* Gradientes responsivos para dark mode */
+.bg-gradient-responsive {
+  background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%);
+}
+
+.dark .bg-gradient-responsive {
+  background: linear-gradient(135deg, rgb(12, 8, 7) 0%, rgb(31, 20, 18) 100%);
+}
+
+.pattern-bg-responsive {
+  background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.dark .pattern-bg-responsive {
+  background-image: radial-gradient(circle at 1px 1px, rgba(184, 134, 11, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+/* Melhorias específicas para campos de data */
   input[type="date"] {
     width: 100%;
     max-width: 100%;
