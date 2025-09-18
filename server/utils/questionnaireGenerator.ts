@@ -421,14 +421,13 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
       question: `Você pode servir na Novena de São Judas Tadeu (19 a 27/10/${year})? Marque os dias disponíveis:`,
       options: [
         'Nenhum dia',
-        'Segunda 19/10 às 19h30',
-        'Terça 20/10 às 19h30',
-        'Quarta 21/10 às 19h30',
-        'Quinta 22/10 às 19h30',
-        'Sexta 23/10 às 19h30',
-        'Sábado 24/10 às 19h',
-        'Segunda 26/10 às 19h30',
-        'Terça 27/10 às 19h30'
+        'Segunda 20/10 às 19h30',
+        'Terça 21/10 às 19h30',
+        'Quarta 22/10 às 19h30',
+        'Quinta 24/10 às 19h30',
+        'Sexta 25/10 às 19h30',
+        'Sábado 26/10 às 19h',
+        'Segunda 27/10 às 19h30'
       ],
       required: false,
       category: 'special_event',
