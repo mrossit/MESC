@@ -6,6 +6,7 @@ export function PWAUpdatePrompt() {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [lastPromptTime, setLastPromptTime] = useState<number>(0);
+  const [forceUpdateAvailable, setForceUpdateAvailable] = useState(false);
 
   useEffect(() => {
     // Disable PWA update prompts in development mode
@@ -40,6 +41,15 @@ export function PWAUpdatePrompt() {
           setWaitingWorker(registration.waiting);
           setShowUpdatePrompt(true);
           setLastPromptTime(now);
+        }
+      });
+
+      // Listen for service worker updates
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('Service worker updated to version:', event.data.version);
+          setForceUpdateAvailable(true);
+          setShowUpdatePrompt(true);
         }
       });
     }
@@ -84,6 +94,29 @@ export function PWAUpdatePrompt() {
     setShowUpdatePrompt(false);
   };
 
+  const handleForceUpdate = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        if (registration.active) {
+          registration.active.postMessage({ type: 'FORCE_UPDATE' });
+        }
+      });
+    }
+    // Clear all local storage and caches
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
+      });
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Force hard reload after a short delay
+    setTimeout(() => {
+      window.location.href = window.location.href + '?v=' + Date.now();
+    }, 500);
+  };
+
   if (!showUpdatePrompt) return null;
 
   return (
@@ -92,18 +125,33 @@ export function PWAUpdatePrompt() {
         <div className="flex items-start gap-3">
           <RefreshCw className="h-5 w-5 text-neutral-accentWarm dark:text-amber-500 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold text-sm mb-1">Nova versão disponível</h3>
+            <h3 className="font-semibold text-sm mb-1">
+              {forceUpdateAvailable ? 'Atualização instalada' : 'Nova versão disponível'}
+            </h3>
             <p className="text-xs text-muted-foreground mb-3">
-              Uma nova versão do MESC está disponível. Atualize para obter as últimas funcionalidades e melhorias.
+              {forceUpdateAvailable 
+                ? 'Uma nova versão foi instalada. Recarregue para aplicar as mudanças.'
+                : 'Uma nova versão do MESC está disponível. Atualize para obter as últimas funcionalidades e melhorias.'
+              }
             </p>
             <div className="flex gap-2">
               <Button 
                 size="sm" 
-                onClick={handleUpdate}
+                onClick={forceUpdateAvailable ? handleForceUpdate : handleUpdate}
                 className="bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600"
               >
-                Atualizar agora
+                {forceUpdateAvailable ? 'Recarregar' : 'Atualizar agora'}
               </Button>
+              {forceUpdateAvailable && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => window.open('/clear-cache.html', '_blank')}
+                  className="text-xs"
+                >
+                  Limpar Cache
+                </Button>
+              )}
               <Button 
                 size="sm" 
                 variant="ghost" 
