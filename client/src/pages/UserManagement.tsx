@@ -134,7 +134,7 @@ export default function UserManagement() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-      const response = await apiRequest("POST", "/api/auth/reset-password", { userId, newPassword });
+      const response = await apiRequest("POST", "/api/auth/admin-reset-password", { userId, newPassword });
       return response.json();
     },
     onSuccess: () => {

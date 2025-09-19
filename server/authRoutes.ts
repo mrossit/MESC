@@ -280,117 +280,102 @@ const emailResetSchema = z.object({
   email: z.string().min(1, 'Email é obrigatório')
 });
 
-// Rota para resetar senha (suporta reset por email ou reset admin por userId)
-router.post('/reset-password', async (req, res) => {
+// Rota para reset administrativo (SOMENTE coordenadores/gestores autenticados)
+router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
-    const { email, userId, newPassword } = req.body;
+    // Validar dados com schema
+    const { userId, newPassword } = adminResetSchema.parse(req.body);
     
-    // Cenário 1: Reset admin por userId + newPassword (REQUER AUTENTICAÇÃO)
-    if (userId && newPassword) {
-      // Verificar autenticação primeiro
-      return authenticateToken(req as AuthRequest, res, async () => {
-        return requireRole(['gestor', 'coordenador'])(req as AuthRequest, res, async () => {
-          try {
-            // Validar dados com schema
-            const { userId: validUserId, newPassword: validPassword } = adminResetSchema.parse({ userId, newPassword });
-            
-            // Buscar usuário por ID
-            const [user] = await db
-              .select()
-              .from(users)
-              .where(eq(users.id, validUserId))
-              .limit(1);
+    // Buscar usuário por ID
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
-            if (!user) {
-              return res.status(404).json({
-                success: false,
-                message: 'Usuário não encontrado'
-              });
-            }
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
 
-            // Verificar se coordenador não está tentando resetar senha de gestor
-            const currentUser = (req as AuthRequest).user;
-            if (currentUser?.role === 'coordenador' && user.role === 'gestor') {
-              return res.status(403).json({
-                success: false,
-                message: 'Coordenadores não podem resetar senha de gestores'
-              });
-            }
+    // Verificar se coordenador não está tentando resetar senha de gestor
+    const currentUser = req.user;
+    if (currentUser?.role === 'coordenador' && user.role === 'gestor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Coordenadores não podem resetar senha de gestores'
+      });
+    }
 
-            // Hash da nova senha
-            const passwordHash = await hashPassword(validPassword);
+    // Hash da nova senha
+    const passwordHash = await hashPassword(newPassword);
 
-            // Atualizar a senha do usuário e marcar para troca
-            await db
-              .update(users)
-              .set({
-                passwordHash,
-                requiresPasswordChange: true,
-                updatedAt: new Date()
-              })
-              .where(eq(users.id, validUserId));
+    // Atualizar a senha do usuário e marcar para troca
+    await db
+      .update(users)
+      .set({
+        passwordHash,
+        requiresPasswordChange: true,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
 
-            console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usuário ${user.name} (${user.email})`);
+    console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usuário ${user.name} (${user.email})`);
 
-            return res.json({
-              success: true,
-              message: 'Senha resetada com sucesso. O usuário precisará criar uma nova senha no próximo login.'
-            });
-          } catch (validationError: any) {
-            if (validationError instanceof z.ZodError) {
-              return res.status(400).json({
-                success: false,
-                message: 'Dados inválidos',
-                errors: validationError.errors
-              });
-            }
-            throw validationError;
-          }
-        });
+    return res.json({
+      success: true,
+      message: 'Senha resetada com sucesso. O usuário precisará criar uma nova senha no próximo login.'
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dados inválidos',
+        errors: error.errors
       });
     }
     
-    // Cenário 2: Reset por email (funcionalidade original - SEM autenticação)
-    if (email) {
-      try {
-        const { email: validEmail } = emailResetSchema.parse({ email });
-        
-        // Validação básica mais flexível
-        if (!validEmail.includes('@')) {
-          return res.status(400).json({
-            success: false,
-            message: 'Por favor, forneça um endereço de email válido'
-          });
-        }
-        
-        // Normalizar o email
-        const normalizedEmail = validEmail.trim().toLowerCase();
-        
-        const result = await resetPassword(normalizedEmail);
-        
-        return res.json({
-          success: true,
-          ...result
-        });
-      } catch (validationError: any) {
-        if (validationError instanceof z.ZodError) {
-          return res.status(400).json({
-            success: false,
-            message: 'Email é obrigatório'
-          });
-        }
-        throw validationError;
-      }
+    console.error('Erro ao resetar senha administrativamente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao processar solicitação de reset de senha'
+    });
+  }
+});
+
+// Rota para resetar senha por email (SEM autenticação - para usuários esqueceram senha)
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email é obrigatório'
+      });
     }
     
-    // Nenhum parâmetro válido fornecido
-    return res.status(400).json({
-      success: false,
-      message: 'Parâmetros inválidos. Forneça email ou userId + newPassword'
-    });
+    // Validação básica mais flexível
+    if (typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Por favor, forneça um endereço de email válido'
+      });
+    }
     
+    // Normalizar o email
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const result = await resetPassword(normalizedEmail);
+    
+    return res.json({
+      success: true,
+      ...result
+    });
   } catch (error: any) {
-    console.error('Erro ao resetar senha (authRoutes):', error);
+    console.error('Erro ao resetar senha por email:', error);
     res.status(500).json({
       success: false,
       message: 'Erro ao processar solicitação de reset de senha'
