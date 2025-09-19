@@ -11,7 +11,7 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, type User } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, questionnaireResponses, schedules, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
 import { db } from './db';
@@ -516,21 +516,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.params.id;
       
-      // Check if user has any activity in the system
-      // For now, we'll assume a user is "used" if they are not a newly created user
-      // This can be expanded to check for specific activities like questionnaire responses, schedules, etc.
+      // Check if user has any real activity in the system
       const user = await storage.getUser(userId);
       
       if (!user) {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
 
-      // Consider a user as "used" if they have logged in before (not requiring password change)
-      const isUsed = !user.requiresPasswordChange;
+      // Check for real user activity
+      let isUsed = false;
+      let reason = "Usuário nunca teve atividade no sistema";
+      
+      // 1. Check if user has ever logged in
+      if (user.lastLogin) {
+        isUsed = true;
+        reason = "Usuário já fez login no sistema";
+      }
+      
+      // 2. Check if user has submitted questionnaire responses (even if never logged in)
+      if (!isUsed) {
+        try {
+          const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
+          if (responses.length > 0) {
+            isUsed = true;
+            reason = "Usuário já respondeu questionários";
+          }
+        } catch (error) {
+          console.warn("Error checking questionnaire responses:", error);
+        }
+      }
+      
+      // 3. Check if user has any schedule assignments
+      if (!isUsed) {
+        try {
+          // Check if user is assigned as minister or substitute
+          const ministerAssignments = await db.select().from(schedules).where(eq(schedules.ministerId, userId)).limit(1);
+          const substituteAssignments = await db.select().from(schedules).where(eq(schedules.substituteId, userId)).limit(1);
+          
+          if (ministerAssignments.length > 0 || substituteAssignments.length > 0) {
+            isUsed = true;
+            reason = "Usuário já foi escalado para missas";
+          }
+        } catch (error) {
+          console.warn("Error checking schedule assignments:", error);
+        }
+      }
       
       res.json({
         isUsed,
-        reason: isUsed ? "Usuário já teve atividade no sistema" : "Usuário nunca fez login"
+        reason
       });
     } catch (error) {
       console.error("Error checking user usage:", error);
@@ -554,8 +588,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
       
-      // Verificar se usuário foi utilizado no sistema
-      const isUsed = !targetUser.requiresPasswordChange;
+      // Verificar se usuário foi utilizado no sistema usando a mesma lógica do check-usage
+      let isUsed = false;
+      
+      // 1. Check if user has ever logged in
+      if (targetUser.lastLogin) {
+        isUsed = true;
+      }
+      
+      // 2. Check if user has submitted questionnaire responses
+      if (!isUsed) {
+        try {
+          const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
+          if (responses.length > 0) {
+            isUsed = true;
+          }
+        } catch (error) {
+          console.warn("Error checking questionnaire responses for deletion:", error);
+        }
+      }
+      
+      // 3. Check if user has any schedule assignments
+      if (!isUsed) {
+        try {
+          // Check if user is assigned as minister or substitute
+          const ministerAssignments = await db.select().from(schedules).where(eq(schedules.ministerId, userId)).limit(1);
+          const substituteAssignments = await db.select().from(schedules).where(eq(schedules.substituteId, userId)).limit(1);
+          
+          if (ministerAssignments.length > 0 || substituteAssignments.length > 0) {
+            isUsed = true;
+          }
+        } catch (error) {
+          console.warn("Error checking schedule assignments for deletion:", error);
+        }
+      }
+      
       if (isUsed) {
         return res.status(409).json({ 
           message: "Usuário não pode ser excluído pois já foi utilizado no sistema",
