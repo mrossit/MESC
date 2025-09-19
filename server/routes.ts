@@ -11,11 +11,11 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, type User } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
 import { db } from './db';
-import { eq } from 'drizzle-orm';
+import { eq, count, or } from 'drizzle-orm';
 
 // Função utilitária para tratamento de erro centralizado
 function handleApiError(error: any, operation: string) {
@@ -536,6 +536,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check / diagnostic endpoint - útil para debugar problemas de produção
+  app.get('/api/diagnostic/:userId', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Tentar várias operações e ver qual falha
+      const diagnostics = {
+        userExists: false,
+        canQueryUser: false,
+        canQueryQuestionnaireResponses: false,
+        canQueryScheduleAssignments: false,
+        canQuerySubstitutionRequests: false,
+        ministerialActivityCheck: null as boolean | null,
+        userError: null as string | null,
+        questionnaireError: null as string | null,
+        scheduleError: null as string | null,
+        substitutionError: null as string | null,
+        storageError: null as string | null,
+        questionnaireCount: 0,
+        scheduleMinisterCount: 0,
+        scheduleSubstituteCount: 0,
+        substitutionRequestCount: 0
+      };
+      
+      try {
+        const user = await storage.getUser(userId);
+        diagnostics.userExists = !!user;
+        diagnostics.canQueryUser = true;
+      } catch (e) {
+        diagnostics.userError = `Error querying user: ${e}`;
+      }
+      
+      try {
+        // Verificação básica de questionários
+        const [questionnaireCheck] = await db.select({ count: count() })
+          .from(questionnaireResponses)
+          .where(eq(questionnaireResponses.userId, userId));
+        diagnostics.canQueryQuestionnaireResponses = true;
+        diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
+      } catch (e) {
+        diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
+      }
+      
+      try {
+        // Verificação básica de escalas como ministro
+        const [scheduleMinisterCheck] = await db.select({ count: count() })
+          .from(schedules)
+          .where(eq(schedules.ministerId, userId));
+        diagnostics.canQueryScheduleAssignments = true;
+        diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
+        
+        // Verificação básica de escalas como substituto
+        const [scheduleSubstituteCheck] = await db.select({ count: count() })
+          .from(schedules)
+          .where(eq(schedules.substituteId, userId));
+        diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
+      } catch (e) {
+        diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
+      }
+      
+      try {
+        // Verificação de solicitações de substituição
+        const [substitutionCheck] = await db.select({ count: count() })
+          .from(substitutionRequests)
+          .where(or(
+            eq(substitutionRequests.requesterId, userId),
+            eq(substitutionRequests.substituteId, userId)
+          ));
+        diagnostics.canQuerySubstitutionRequests = true;
+        diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
+      } catch (e) {
+        diagnostics.substitutionError = `Error querying substitution requests: ${e}`;
+      }
+      
+      try {
+        // Testar o método que está falhando
+        const result = await storage.checkUserMinisterialActivity(userId);
+        diagnostics.ministerialActivityCheck = result.isUsed;
+      } catch (e) {
+        diagnostics.storageError = `Error in checkUserMinisterialActivity: ${e}`;
+      }
+      
+      res.json(diagnostics);
+    } catch (error) {
+      res.status(500).json({ error: `Diagnostic failed: ${error}` });
+    }
+  });
+
   app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
       const userId = req.params.id;
@@ -552,16 +640,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
       
-      // Verificar se usuário teve atividade ministerial real usando storage layer
-      const activityCheck = await storage.checkUserMinisterialActivity(userId);
+      // Verificação conservadora de atividade ministerial com fallback
+      let hasMinisterialActivity = false;
+      let activityCheckReason = "";
       
-      if (activityCheck.isUsed) {
+      try {
+        const activityCheck = await storage.checkUserMinisterialActivity(userId);
+        hasMinisterialActivity = activityCheck.isUsed;
+        activityCheckReason = activityCheck.reason;
+        
+        // Defesa em profundidade: mesmo se storage funcionar, fazer verificação dupla
+        if (!hasMinisterialActivity) {
+          console.log("Storage returned no activity, performing double-check via direct DB queries...");
+          
+          const [questionnaireCount] = await db.select({ count: count() })
+            .from(questionnaireResponses)
+            .where(eq(questionnaireResponses.userId, userId));
+          
+          const [scheduleMinisterCount] = await db.select({ count: count() })
+            .from(schedules)
+            .where(eq(schedules.ministerId, userId));
+          
+          const [scheduleSubstituteCount] = await db.select({ count: count() })
+            .from(schedules)
+            .where(eq(schedules.substituteId, userId));
+          
+          const [substitutionCount] = await db.select({ count: count() })
+            .from(substitutionRequests)
+            .where(or(
+              eq(substitutionRequests.requesterId, userId),
+              eq(substitutionRequests.substituteId, userId)
+            ));
+          
+          const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
+          const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
+          const directScheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
+          const directSubstitutionActivity = (substitutionCount?.count || 0) > 0;
+          
+          const directHasActivity = directQuestionnaireActivity || directScheduleMinisterActivity || directScheduleSubstituteActivity || directSubstitutionActivity;
+          
+          if (directHasActivity) {
+            // Discrepância detectada! Storage disse que não tem atividade, mas query direta encontrou
+            console.warn("DISCREPANCY DETECTED: Storage said no activity but direct query found activity", {
+              storageResult: activityCheck,
+              directChecks: {
+                questionnaires: directQuestionnaireActivity,
+                scheduleMinister: directScheduleMinisterActivity,
+                scheduleSubstitute: directScheduleSubstituteActivity,
+                substitutions: directSubstitutionActivity
+              }
+            });
+            
+            hasMinisterialActivity = true;
+            const activities = [];
+            if (directQuestionnaireActivity) activities.push('questionários respondidos');
+            if (directScheduleMinisterActivity) activities.push('escalas como ministro');
+            if (directScheduleSubstituteActivity) activities.push('escalas como substituto');
+            if (directSubstitutionActivity) activities.push('solicitações de substituição');
+            activityCheckReason = `ATENÇÃO: Discrepância detectada entre métodos. Verificação direta encontrou: ${activities.join(', ')}`;
+          }
+        }
+      } catch (storageError) {
+        console.error("Storage method failed, trying direct DB queries:", storageError);
+        
+        // Fallback: verificação direta no banco de dados cobrindo TODAS as atividades
+        try {
+          // 1. Verificar questionários respondidos
+          const [questionnaireCount] = await db.select({ count: count() })
+            .from(questionnaireResponses)
+            .where(eq(questionnaireResponses.userId, userId));
+          
+          // 2. Verificar escalas como ministro principal
+          const [scheduleMinisterCount] = await db.select({ count: count() })
+            .from(schedules)
+            .where(eq(schedules.ministerId, userId));
+          
+          // 3. Verificar escalas como substituto
+          const [scheduleSubstituteCount] = await db.select({ count: count() })
+            .from(schedules)
+            .where(eq(schedules.substituteId, userId));
+          
+          // 4. Verificar solicitações de substituição (como solicitante ou substituto)
+          const [substitutionCount] = await db.select({ count: count() })
+            .from(substitutionRequests)
+            .where(or(
+              eq(substitutionRequests.requesterId, userId),
+              eq(substitutionRequests.substituteId, userId)
+            ));
+          
+          const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
+          const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
+          const scheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
+          const substitutionActivity = (substitutionCount?.count || 0) > 0;
+          
+          hasMinisterialActivity = questionnaireActivity || scheduleMinisterActivity || scheduleSubstituteActivity || substitutionActivity;
+          
+          if (hasMinisterialActivity) {
+            const activities = [];
+            if (questionnaireActivity) activities.push('questionários respondidos');
+            if (scheduleMinisterActivity) activities.push('escalas como ministro');
+            if (scheduleSubstituteActivity) activities.push('escalas como substituto');
+            if (substitutionActivity) activities.push('solicitações de substituição');
+            activityCheckReason = `Usuário tem atividade no sistema: ${activities.join(', ')}`;
+          } else {
+            activityCheckReason = "Nenhuma atividade ministerial encontrada - usuário pode ser excluído";
+          }
+        } catch (directError) {
+          console.error("Direct DB query also failed:", directError);
+          // Se nem isso funcionar, ser ultra-conservador e bloquear a exclusão
+          return res.status(500).json({ 
+            message: "Erro interno ao verificar atividades do usuário. Por segurança, a exclusão foi bloqueada.",
+            shouldBlock: true,
+            code: 'DATABASE_CONNECTIVITY_ERROR'
+          });
+        }
+      }
+      
+      if (hasMinisterialActivity) {
         return res.status(409).json({ 
-          message: activityCheck.reason.includes("Não foi possível verificar") 
+          message: activityCheckReason.includes("Não foi possível verificar") 
             ? "Erro ao verificar uso do usuário no banco de dados. Não é possível determinar se o usuário pode ser excluído com segurança."
-            : "Usuário não pode ser excluído pois já foi utilizado no sistema",
+            : activityCheckReason || "Usuário não pode ser excluído pois já foi utilizado no sistema",
           shouldBlock: true,
-          code: activityCheck.reason.includes("Não foi possível verificar") ? 'USAGE_CHECK_FAILED' : 'USER_HAS_ACTIVITY'
+          code: activityCheckReason.includes("Não foi possível verificar") ? 'USAGE_CHECK_FAILED' : 'USER_HAS_ACTIVITY'
         });
       }
       

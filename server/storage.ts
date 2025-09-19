@@ -22,7 +22,7 @@ import {
   type InsertFamilyRelationship,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, count, sql, gte, lte, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -510,6 +510,23 @@ export class DatabaseStorage implements IStorage {
         return {
           isUsed: true,
           reason: "Usuário já foi escalado como substituto"
+        };
+      }
+      
+      // 3. Check if user has any substitution requests (as requester or substitute)
+      const substitutionActivity = await db
+        .select()
+        .from(substitutionRequests)
+        .where(or(
+          eq(substitutionRequests.requesterId, userId),
+          eq(substitutionRequests.substituteId, userId)
+        ))
+        .limit(1);
+        
+      if (substitutionActivity.length > 0) {
+        return {
+          isUsed: true,
+          reason: "Usuário tem solicitações de substituição no sistema"
         };
       }
       
