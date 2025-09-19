@@ -84,6 +84,9 @@ export interface IStorage {
   getFamilyMembers(userId: string): Promise<FamilyRelationship[]>;
   addFamilyMember(userId: string, relatedUserId: string, relationshipType: string): Promise<FamilyRelationship>;
   removeFamilyMember(relationshipId: string): Promise<void>;
+  
+  // User activity checking for deletion safety
+  checkUserMinisterialActivity(userId: string): Promise<{ isUsed: boolean; reason: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -465,6 +468,64 @@ export class DatabaseStorage implements IStorage {
 
     // Delete the original relationship
     await db.delete(familyRelationships).where(eq(familyRelationships.id, relationshipId));
+  }
+
+  async checkUserMinisterialActivity(userId: string): Promise<{ isUsed: boolean; reason: string }> {
+    try {
+      // 1. Check if user has submitted questionnaire responses
+      const responses = await db
+        .select()
+        .from(questionnaireResponses)
+        .where(eq(questionnaireResponses.userId, userId))
+        .limit(1);
+        
+      if (responses.length > 0) {
+        return {
+          isUsed: true,
+          reason: "Usuário já respondeu questionários"
+        };
+      }
+      
+      // 2. Check if user has any schedule assignments (as minister or substitute)
+      const ministerAssignments = await db
+        .select()
+        .from(schedules)
+        .where(eq(schedules.ministerId, userId))
+        .limit(1);
+        
+      if (ministerAssignments.length > 0) {
+        return {
+          isUsed: true,
+          reason: "Usuário já foi escalado para missas"
+        };
+      }
+      
+      const substituteAssignments = await db
+        .select()
+        .from(schedules)
+        .where(eq(schedules.substituteId, userId))
+        .limit(1);
+        
+      if (substituteAssignments.length > 0) {
+        return {
+          isUsed: true,
+          reason: "Usuário já foi escalado como substituto"
+        };
+      }
+      
+      return {
+        isUsed: false,
+        reason: "Usuário nunca teve atividade ministerial no sistema"
+      };
+      
+    } catch (error) {
+      console.warn("Error checking user ministerial activity:", error);
+      // Be conservative - if we can't verify, assume the user is used
+      return {
+        isUsed: true,
+        reason: "Não foi possível verificar a atividade do usuário no banco de dados"
+      };
+    }
   }
 }
 
