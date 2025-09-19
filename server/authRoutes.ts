@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, register, changePassword, resetPassword, authenticateToken, requireRole, AuthRequest } from './auth';
+import { login, register, changePassword, resetPassword, authenticateToken, requireRole, AuthRequest, hashPassword } from './auth';
 import { z } from 'zod';
 import { db } from './db';
 import { users } from '@shared/schema';
@@ -269,28 +269,126 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
   }
 });
 
-// Rota para resetar senha
+// Schema para reset admin
+const adminResetSchema = z.object({
+  userId: z.string().uuid('ID de usuário inválido'),
+  newPassword: z.string().min(8, 'Nova senha deve ter pelo menos 8 caracteres')
+});
+
+// Schema para reset por email
+const emailResetSchema = z.object({
+  email: z.string().min(1, 'Email é obrigatório')
+});
+
+// Rota para resetar senha (suporta reset por email ou reset admin por userId)
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, userId, newPassword } = req.body;
     
-    // Validação básica mais flexível para evitar erro "Email inválido"
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor, forneça um endereço de email válido'
+    // Cenário 1: Reset admin por userId + newPassword (REQUER AUTENTICAÇÃO)
+    if (userId && newPassword) {
+      // Verificar autenticação primeiro
+      return authenticateToken(req as AuthRequest, res, async () => {
+        return requireRole(['gestor', 'coordenador'])(req as AuthRequest, res, async () => {
+          try {
+            // Validar dados com schema
+            const { userId: validUserId, newPassword: validPassword } = adminResetSchema.parse({ userId, newPassword });
+            
+            // Buscar usuário por ID
+            const [user] = await db
+              .select()
+              .from(users)
+              .where(eq(users.id, validUserId))
+              .limit(1);
+
+            if (!user) {
+              return res.status(404).json({
+                success: false,
+                message: 'Usuário não encontrado'
+              });
+            }
+
+            // Verificar se coordenador não está tentando resetar senha de gestor
+            const currentUser = (req as AuthRequest).user;
+            if (currentUser?.role === 'coordenador' && user.role === 'gestor') {
+              return res.status(403).json({
+                success: false,
+                message: 'Coordenadores não podem resetar senha de gestores'
+              });
+            }
+
+            // Hash da nova senha
+            const passwordHash = await hashPassword(validPassword);
+
+            // Atualizar a senha do usuário e marcar para troca
+            await db
+              .update(users)
+              .set({
+                passwordHash,
+                requiresPasswordChange: true,
+                updatedAt: new Date()
+              })
+              .where(eq(users.id, validUserId));
+
+            console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usuário ${user.name} (${user.email})`);
+
+            return res.json({
+              success: true,
+              message: 'Senha resetada com sucesso. O usuário precisará criar uma nova senha no próximo login.'
+            });
+          } catch (validationError: any) {
+            if (validationError instanceof z.ZodError) {
+              return res.status(400).json({
+                success: false,
+                message: 'Dados inválidos',
+                errors: validationError.errors
+              });
+            }
+            throw validationError;
+          }
+        });
       });
     }
     
-    // Normalizar o email
-    const normalizedEmail = email.trim().toLowerCase();
+    // Cenário 2: Reset por email (funcionalidade original - SEM autenticação)
+    if (email) {
+      try {
+        const { email: validEmail } = emailResetSchema.parse({ email });
+        
+        // Validação básica mais flexível
+        if (!validEmail.includes('@')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Por favor, forneça um endereço de email válido'
+          });
+        }
+        
+        // Normalizar o email
+        const normalizedEmail = validEmail.trim().toLowerCase();
+        
+        const result = await resetPassword(normalizedEmail);
+        
+        return res.json({
+          success: true,
+          ...result
+        });
+      } catch (validationError: any) {
+        if (validationError instanceof z.ZodError) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email é obrigatório'
+          });
+        }
+        throw validationError;
+      }
+    }
     
-    const result = await resetPassword(normalizedEmail);
-    
-    res.json({
-      success: true,
-      ...result
+    // Nenhum parâmetro válido fornecido
+    return res.status(400).json({
+      success: false,
+      message: 'Parâmetros inválidos. Forneça email ou userId + newPassword'
     });
+    
   } catch (error: any) {
     console.error('Erro ao resetar senha (authRoutes):', error);
     res.status(500).json({
