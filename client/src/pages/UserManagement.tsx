@@ -75,8 +75,32 @@ export default function UserManagement() {
   });
 
   // Buscar todos os usuários (não apenas os ativos)
-  const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+  const { data: users = [], isLoading, error, refetch, isFetching } = useQuery<User[]>({
+    queryKey: ["/api/users", "no-cache", Date.now()],
+    queryFn: async () => {
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      };
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Cache-busting query param para evitar Service Worker cache
+      const url = `/api/users?ts=${Date.now()}&bust=${Math.random()}`;
+      const res = await fetch(url, {
+        headers,
+        credentials: "include",
+        cache: 'no-store'
+      });
+      
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+      
+      return await res.json();
+    },
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: (failureCount, error: any) => {
@@ -406,14 +430,32 @@ export default function UserManagement() {
                   Gerencie todos os usuários do sistema
                 </CardDescription>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, email ou cidade..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full sm:w-[300px]"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome, email ou cidade..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-full sm:w-[300px]"
+                  />
+                </div>
+                <Button
+                  onClick={async () => {
+                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                    await refetch();
+                    toast({
+                      title: "Dados atualizados",
+                      description: "Lista de usuários recarregada do servidor.",
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-refresh-users"
+                  disabled={isFetching}
+                >
+                  {isFetching ? "Atualizando..." : "Atualizar"}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -696,11 +738,13 @@ export default function UserManagement() {
                 onClick={confirmDeleteOrBlock}
                 disabled={deleteUserMutation.isPending || blockUserMutation.isPending}
               >
-                {deleteUserMutation.isPending || blockUserMutation.isPending ? "Processando..." : 
-                 (() => {
-                   const willBlock = userUsage?.isUsed === true || userUsage === null;
-                   return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
-                 })()}
+                {(() => {
+                  if (deleteUserMutation.isPending || blockUserMutation.isPending) {
+                    return "Processando...";
+                  }
+                  const willBlock = userUsage?.isUsed === true || userUsage === null;
+                  return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
+                })()}
               </Button>
             </DialogFooter>
           </DialogContent>
