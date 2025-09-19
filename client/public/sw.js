@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mesc-v4.2-deployment';
+const CACHE_NAME = 'mesc-v4.3-no-users-cache';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -30,7 +30,21 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Network-first for API calls
+  // Network-only for sensitive API endpoints (no caching to prevent stale data)
+  if (url.pathname === '/api/users' || url.pathname === '/api/auth/me') {
+    event.respondWith(
+      fetch(request).catch(() => {
+        // For these critical endpoints, if network fails, return a proper error
+        return new Response(JSON.stringify({ error: 'Network unavailable' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-first for other API calls (with caching)
   if (url.pathname.startsWith('/api')) {
     event.respondWith(
       fetch(request)

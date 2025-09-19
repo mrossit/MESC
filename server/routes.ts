@@ -281,6 +281,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User/Minister routes
   app.get('/api/users', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
     try {
+      // Prevent caching of sensitive user data
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      });
+      
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
