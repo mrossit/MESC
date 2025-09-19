@@ -24,7 +24,6 @@ import {
   CheckCircle, 
   Search,
   MoreHorizontal,
-  Edit,
   Mail,
   Phone 
 } from "lucide-react";
@@ -230,8 +229,16 @@ export default function UserManagement() {
     // Check if user has been used in the system
     try {
       const response = await apiRequest("GET", `/api/users/${user.id}/check-usage`);
-      const usage = await response.json();
-      setUserUsage(usage);
+      
+      // Check if response is OK and has JSON content
+      if (response.ok) {
+        const usage = await response.json();
+        setUserUsage(usage);
+      } else {
+        // Non-200 response, treat as "cannot verify" (safer default)
+        console.warn(`Check usage returned ${response.status}, defaulting to block`);
+        setUserUsage(null);
+      }
     } catch (error) {
       console.error("Error checking user usage:", error);
       setUserUsage(null);
@@ -629,30 +636,57 @@ export default function UserManagement() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {userUsage?.isUsed ? "Bloquear Usuário" : "Excluir Usuário"}
+                {(() => {
+                  const isCoordinator = currentUserData?.user?.role === 'coordenador';
+                  const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+                  return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
+                })()}
               </DialogTitle>
             </DialogHeader>
             
-            {userUsage?.isUsed ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Este usuário não pode ser excluído pois já foi utilizado no sistema.
-                  {userUsage.reason && (
-                    <p className="mt-2 text-sm text-muted-foreground">{userUsage.reason}</p>
-                  )}
-                  <p className="mt-2 font-medium">O usuário será bloqueado ao invés de excluído.</p>
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Tem certeza que deseja excluir permanentemente o usuário <strong>{userToDelete?.name}</strong>? 
-                  Esta ação não pode ser desfeita.
-                </AlertDescription>
-              </Alert>
-            )}
+            {(() => {
+              const isCoordinator = currentUserData?.user?.role === 'coordenador';
+              const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+              
+              if (willBlock) {
+                return (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {isCoordinator ? (
+                        <>
+                          Como coordenador, você pode apenas bloquear usuários, não excluí-los.
+                          <p className="mt-2 font-medium">O usuário <strong>{userToDelete?.name}</strong> será bloqueado.</p>
+                        </>
+                      ) : userUsage?.isUsed ? (
+                        <>
+                          Este usuário não pode ser excluído pois já foi utilizado no sistema.
+                          {userUsage.reason && (
+                            <p className="mt-2 text-sm text-muted-foreground">{userUsage.reason}</p>
+                          )}
+                          <p className="mt-2 font-medium">O usuário será bloqueado ao invés de excluído.</p>
+                        </>
+                      ) : (
+                        <>
+                          Não foi possível verificar se o usuário foi utilizado no sistema.
+                          <p className="mt-2 font-medium">Por segurança, o usuário será bloqueado ao invés de excluído.</p>
+                        </>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                );
+              } else {
+                return (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Tem certeza que deseja excluir permanentemente o usuário <strong>{userToDelete?.name}</strong>? 
+                      Esta ação não pode ser desfeita.
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+            })()}
             
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
@@ -664,7 +698,11 @@ export default function UserManagement() {
                 disabled={deleteUserMutation.isPending || blockUserMutation.isPending}
               >
                 {deleteUserMutation.isPending || blockUserMutation.isPending ? "Processando..." : 
-                 userUsage?.isUsed ? "Bloquear Usuário" : "Excluir Usuário"}
+                 (() => {
+                   const isCoordinator = currentUserData?.user?.role === 'coordenador';
+                   const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+                   return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
+                 })()}
               </Button>
             </DialogFooter>
           </DialogContent>
