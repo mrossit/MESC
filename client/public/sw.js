@@ -31,7 +31,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Network-only for sensitive API endpoints (no caching to prevent stale data)
-  if (url.pathname === '/api/users' || url.pathname === '/api/auth/me') {
+  if (url.pathname === '/api/users' || url.pathname === '/api/auth/me' || url.pathname === '/api/auth/user') {
     event.respondWith(
       fetch(request).catch(() => {
         // For these critical endpoints, if network fails, return a proper error
