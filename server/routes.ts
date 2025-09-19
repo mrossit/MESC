@@ -523,30 +523,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
 
-      // Check for real user activity
+      // Check for real ministerial activity (not login/navigation)
       let isUsed = false;
-      let reason = "Usuário nunca teve atividade no sistema";
+      let reason = "Usuário nunca teve atividade ministerial no sistema";
       
-      // 1. Check if user has ever logged in
-      if (user.lastLogin) {
-        isUsed = true;
-        reason = "Usuário já fez login no sistema";
-      }
-      
-      // 2. Check if user has submitted questionnaire responses (even if never logged in)
-      if (!isUsed) {
-        try {
-          const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
-          if (responses.length > 0) {
-            isUsed = true;
-            reason = "Usuário já respondeu questionários";
-          }
-        } catch (error) {
-          console.warn("Error checking questionnaire responses:", error);
+      // 1. Check if user has submitted questionnaire responses
+      try {
+        const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
+        if (responses.length > 0) {
+          isUsed = true;
+          reason = "Usuário já respondeu questionários";
         }
+      } catch (error) {
+        console.warn("Error checking questionnaire responses:", error);
       }
       
-      // 3. Check if user has any schedule assignments
+      // 2. Check if user has any schedule assignments
       if (!isUsed) {
         try {
           // Check if user is assigned as minister or substitute
@@ -588,27 +580,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
       
-      // Verificar se usuário foi utilizado no sistema usando a mesma lógica do check-usage
+      // Verificar se usuário teve atividade ministerial real (não login/navegação)
       let isUsed = false;
       
-      // 1. Check if user has ever logged in
-      if (targetUser.lastLogin) {
-        isUsed = true;
-      }
-      
-      // 2. Check if user has submitted questionnaire responses
-      if (!isUsed) {
-        try {
-          const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
-          if (responses.length > 0) {
-            isUsed = true;
-          }
-        } catch (error) {
-          console.warn("Error checking questionnaire responses for deletion:", error);
+      // 1. Check if user has submitted questionnaire responses
+      try {
+        const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
+        if (responses.length > 0) {
+          isUsed = true;
         }
+      } catch (error) {
+        console.warn("Error checking questionnaire responses for deletion:", error);
       }
       
-      // 3. Check if user has any schedule assignments
+      // 2. Check if user has any schedule assignments
       if (!isUsed) {
         try {
           // Check if user is assigned as minister or substitute
