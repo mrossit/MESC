@@ -76,31 +76,7 @@ export default function UserManagement() {
 
   // Buscar todos os usuários (não apenas os ativos)
   const { data: users = [], isLoading, error, refetch, isFetching } = useQuery<User[]>({
-    queryKey: ["/api/users", "no-cache", Date.now()],
-    queryFn: async () => {
-      const headers: Record<string, string> = {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      };
-      const token = localStorage.getItem('token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      // Cache-busting query param para evitar Service Worker cache
-      const url = `/api/users?ts=${Date.now()}&bust=${Math.random()}`;
-      const res = await fetch(url, {
-        headers,
-        credentials: "include",
-        cache: 'no-store'
-      });
-      
-      if (!res.ok) {
-        throw new Error(`${res.status}: ${res.statusText}`);
-      }
-      
-      return await res.json();
-    },
+    queryKey: ["/api/users"],
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: (failureCount, error: any) => {
