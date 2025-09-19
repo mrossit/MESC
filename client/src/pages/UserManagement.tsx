@@ -28,7 +28,7 @@ import {
   Mail,
   Phone 
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,21 +92,28 @@ export default function UserManagement() {
     gcTime: 0
   });
 
-  // Debug logging
-  console.log("UserManagement - Query state:", { 
-    users, 
-    isLoading, 
-    error,
-    userCount: users?.length || 0,
-    currentUser: currentUserData?.user,
-    currentUserRole: currentUserData?.user?.role
-  });
+  // Show loading state
+  if (isLoading) return <Layout><div className="text-center p-6">Carregando usuários...</div></Layout>;
   
-  // Force refetch on mount for debugging
-  React.useEffect(() => {
-    console.log("Component mounted, forcing refetch...");
-    refetch();
-  }, [refetch]);
+  // Show error alert when users query fails
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro ao carregar usuários</AlertTitle>
+            <AlertDescription>
+              {error.message?.includes('401') 
+                ? 'Sessão expirada. Faça login novamente.' 
+                : 'Não foi possível carregar a lista de usuários. Tente novamente mais tarde.'
+              }
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -240,9 +247,11 @@ export default function UserManagement() {
       const isCoordinator = currentUserData?.user?.role === 'coordenador';
       const isUserUsed = userUsage?.isUsed;
       
-      if (isUserUsed || isCoordinator) {
+      // Segurança: se não conseguimos verificar o uso ou se é usado, sempre bloquear
+      if (userUsage === null || isUserUsed || isCoordinator) {
         blockUserMutation.mutate(userToDelete.id);
       } else {
+        // Só deletar se explicitamente não usado (userUsage.isUsed === false)
         deleteUserMutation.mutate(userToDelete.id);
       }
     }
@@ -324,113 +333,6 @@ export default function UserManagement() {
     pending: users.filter(u => u.status === "pending").length,
   };
 
-  if (isLoading) {
-    return (
-      <Layout title="Gestão de Usuários" subtitle="Gerencie perfis e permissões dos usuários">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-6">
-                  <div className="h-8 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded"></div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    const isUnauthorized = errorMessage.includes('401') || errorMessage.includes('Unauthorized');
-    
-    // Log the error for debugging
-    console.error('UserManagement Error:', errorMessage);
-    console.log('Error details:', error);
-    console.log('Current user data:', currentUserData);
-    
-    // TEMPORÁRIO: Ignorar erro e tentar mostrar dados
-    console.warn('IGNORANDO ERRO TEMPORARIAMENTE PARA DEBUG');
-    /* return (
-      <Layout title="Gestão de Usuários" subtitle="Gerencie perfis e permissões dos usuários">
-        <Alert className={isUnauthorized ? "border-yellow-200 bg-yellow-50" : "border-red-200 bg-red-50"}>
-          <AlertCircle className={`h-4 w-4 ${isUnauthorized ? "text-yellow-600" : "text-red-600"}`} />
-          <AlertDescription className={isUnauthorized ? "text-yellow-800" : "text-red-800"}>
-            {isUnauthorized 
-              ? <>
-                  <p>Você não tem permissão para acessar esta página.</p>
-                  <p className="mt-2">Apenas usuários com papel de <strong>coordenador</strong> ou <strong>gestor</strong> podem gerenciar usuários.</p>
-                  {currentUserData?.user ? (
-                    <>
-                      <p className="mt-2">Seu papel atual: <strong className="capitalize">{currentUserData.user.role}</strong></p>
-                      <p className="text-xs mt-1 text-muted-foreground">
-                        Usuário: {currentUserData.user.name} ({currentUserData.user.email})
-                      </p>
-                      {currentUserData.user.role === 'coordenador' || currentUserData.user.role === 'gestor' ? (
-                        <p className="text-xs mt-1 text-yellow-700">
-                          ⚠️ Você tem o papel correto mas está recebendo erro. Tente recarregar a sessão.
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="mt-2 text-sm">Carregando informações do usuário...</p>
-                  )}
-                  <div className="mt-4 flex gap-2">
-                    <Button 
-                      variant="outline"
-                      onClick={async () => {
-                        console.log('Sincronizando sessão...');
-                        try {
-                          // Chama o endpoint para sincronizar a sessão
-                          const response = await apiRequest("POST", "/api/auth/sync-session");
-                          const data = await response.json();
-                          console.log('Sessão sincronizada:', data);
-                          
-                          // Limpa todo o cache
-                          await queryClient.invalidateQueries();
-                          // Força refetch do usuário atual
-                          await refetchUser();
-                          // Aguarda um pouco para garantir que tudo foi atualizado
-                          setTimeout(() => {
-                            refetch();
-                          }, 500);
-                          
-                          toast({
-                            title: "Sessão sincronizada",
-                            description: "Sua sessão foi atualizada com sucesso.",
-                          });
-                        } catch (error) {
-                          console.error('Erro ao sincronizar sessão:', error);
-                          toast({
-                            title: "Erro",
-                            description: "Não foi possível sincronizar a sessão.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                    >
-                      Sincronizar Sessão
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      onClick={() => {
-                        // Força reload completo da página
-                        window.location.reload();
-                      }}
-                    >
-                      Recarregar Página
-                    </Button>
-                  </div>
-                </>
-              : `Erro ao carregar usuários: ${errorMessage}`}
-          </AlertDescription>
-        </Alert>
-      </Layout>
-    ); */
-  }
 
   return (
     <Layout title="Gestão de Usuários" subtitle="Gerencie perfis, permissões e dados dos usuários">
