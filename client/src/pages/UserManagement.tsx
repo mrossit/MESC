@@ -250,13 +250,11 @@ export default function UserManagement() {
 
   const confirmDeleteOrBlock = () => {
     if (userToDelete) {
-      // Coordenadores sempre bloqueiam usuários, não podem deletar
-      // Apenas gestores podem deletar usuários não utilizados
-      const isCoordinator = currentUserData?.user?.role === 'coordenador';
+      // Tanto gestores quanto coordenadores podem deletar usuários não utilizados
       const isUserUsed = userUsage?.isUsed;
       
       // Segurança: se não conseguimos verificar o uso ou se é usado, sempre bloquear
-      if (userUsage === null || isUserUsed || isCoordinator) {
+      if (userUsage === null || isUserUsed) {
         blockUserMutation.mutate(userToDelete.id);
       } else {
         // Só deletar se explicitamente não usado (userUsage.isUsed === false)
@@ -638,28 +636,21 @@ export default function UserManagement() {
             <DialogHeader>
               <DialogTitle>
                 {(() => {
-                  const isCoordinator = currentUserData?.user?.role === 'coordenador';
-                  const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+                  const willBlock = userUsage?.isUsed === true || userUsage === null;
                   return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
                 })()}
               </DialogTitle>
             </DialogHeader>
             
             {(() => {
-              const isCoordinator = currentUserData?.user?.role === 'coordenador';
-              const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+              const willBlock = userUsage?.isUsed === true || userUsage === null;
               
               if (willBlock) {
                 return (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {isCoordinator ? (
-                        <>
-                          Como coordenador, você pode apenas bloquear usuários, não excluí-los.
-                          <p className="mt-2 font-medium">O usuário <strong>{userToDelete?.name}</strong> será bloqueado.</p>
-                        </>
-                      ) : userUsage?.isUsed ? (
+                      {userUsage?.isUsed ? (
                         <>
                           Este usuário não pode ser excluído pois já foi utilizado no sistema.
                           {userUsage.reason && (
@@ -700,8 +691,7 @@ export default function UserManagement() {
               >
                 {deleteUserMutation.isPending || blockUserMutation.isPending ? "Processando..." : 
                  (() => {
-                   const isCoordinator = currentUserData?.user?.role === 'coordenador';
-                   const willBlock = isCoordinator || userUsage?.isUsed === true || userUsage === null;
+                   const willBlock = userUsage?.isUsed === true || userUsage === null;
                    return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
                  })()}
               </Button>
