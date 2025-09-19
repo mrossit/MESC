@@ -272,25 +272,30 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
 // Rota para resetar senha
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const { email } = req.body;
     
-    const result = await resetPassword(email);
+    // Validação básica mais flexível para evitar erro "Email inválido"
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Por favor, forneça um endereço de email válido'
+      });
+    }
+    
+    // Normalizar o email
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const result = await resetPassword(normalizedEmail);
     
     res.json({
       success: true,
       ...result
     });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email inválido'
-      });
-    }
-    
+    console.error('Erro ao resetar senha (authRoutes):', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao resetar senha'
+      message: 'Erro ao processar solicitação de reset de senha'
     });
   }
 });
