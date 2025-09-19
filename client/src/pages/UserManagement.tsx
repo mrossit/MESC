@@ -237,7 +237,10 @@ export default function UserManagement() {
     if (userToDelete) {
       // Coordenadores sempre bloqueiam usuários, não podem deletar
       // Apenas gestores podem deletar usuários não utilizados
-      if (userUsage?.isUsed || currentUserData?.user?.role === 'coordenador') {
+      const isCoordinator = currentUserData?.user?.role === 'coordenador';
+      const isUserUsed = userUsage?.isUsed;
+      
+      if (isUserUsed || isCoordinator) {
         blockUserMutation.mutate(userToDelete.id);
       } else {
         deleteUserMutation.mutate(userToDelete.id);
