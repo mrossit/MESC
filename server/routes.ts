@@ -11,7 +11,7 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
 import { db } from './db';
@@ -540,12 +540,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
+      const userId = req.params.id;
+      const currentUser = req.user;
+      
       // Impedir auto-exclusão
-      if (req.user?.id === req.params.id) {
+      if (currentUser?.id === userId) {
         return res.status(400).json({ message: "Não é possível excluir sua própria conta" });
       }
       
-      await storage.deleteUser(req.params.id);
+      // Get target user
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // Verificar se usuário foi utilizado no sistema
+      const isUsed = !targetUser.requiresPasswordChange;
+      if (isUsed) {
+        return res.status(409).json({ 
+          message: "Usuário não pode ser excluído pois já foi utilizado no sistema",
+          shouldBlock: true 
+        });
+      }
+      
+      // Coordenadores não podem excluir gestores
+      if (currentUser?.role === 'coordenador' && targetUser.role === 'gestor') {
+        return res.status(403).json({ 
+          message: "Coordenadores não podem excluir gestores",
+          shouldBlock: true 
+        });
+      }
+      
+      // Verificar se é o último gestor ativo
+      if (targetUser.role === 'gestor') {
+        const allUsers = await storage.getAllUsers();
+        const activeGestores = allUsers.filter((u: User) => u.role === 'gestor' && u.status === 'active');
+        if (activeGestores.length <= 1) {
+          return res.status(409).json({ 
+            message: "Não é possível excluir o último gestor ativo do sistema",
+            shouldBlock: true 
+          });
+        }
+      }
+      
+      await storage.deleteUser(userId);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting user:", error);

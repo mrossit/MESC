@@ -158,7 +158,8 @@ export default function UserManagement() {
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const response = await apiRequest("DELETE", `/api/users/${userId}`);
-      return response.json();
+      // DELETE returns 204 No Content, no JSON to parse
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -170,6 +171,12 @@ export default function UserManagement() {
       setUserToDelete(null);
     },
     onError: (error: any) => {
+      // Se o backend indicar que deve bloquear ao invés de excluir, fazer o bloqueio automaticamente
+      if (error.shouldBlock && userToDelete) {
+        blockUserMutation.mutate(userToDelete.id);
+        return;
+      }
+      
       toast({
         title: "Erro ao excluir usuário",
         description: error.message || "O usuário não pode ser excluído pois já foi utilizado no sistema.",
