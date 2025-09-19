@@ -538,7 +538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
+  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
     try {
       // Impedir auto-exclusão
       if (req.user?.id === req.params.id) {
