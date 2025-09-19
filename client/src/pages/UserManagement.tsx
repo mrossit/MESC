@@ -91,29 +91,7 @@ export default function UserManagement() {
     gcTime: 0
   });
 
-  // Show loading state
-  if (isLoading) return <Layout><div className="text-center p-6">Carregando usuários...</div></Layout>;
-  
-  // Show error alert when users query fails
-  if (error) {
-    return (
-      <Layout>
-        <div className="container mx-auto p-6">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Erro ao carregar usuários</AlertTitle>
-            <AlertDescription>
-              {error.message?.includes('401') 
-                ? 'Sessão expirada. Faça login novamente.' 
-                : 'Não foi possível carregar a lista de usuários. Tente novamente mais tarde.'
-              }
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
-
+  // All mutations must be defined before any early returns to comply with Rules of Hooks
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       return apiRequest("PATCH", `/api/users/${userId}/role`, { role });
@@ -222,6 +200,29 @@ export default function UserManagement() {
       });
     },
   });
+
+  // Show loading state
+  if (isLoading) return <Layout><div className="text-center p-6">Carregando usuários...</div></Layout>;
+  
+  // Show error alert when users query fails
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro ao carregar usuários</AlertTitle>
+            <AlertDescription>
+              {error.message?.includes('401') 
+                ? 'Sessão expirada. Faça login novamente.' 
+                : 'Não foi possível carregar a lista de usuários. Tente novamente mais tarde.'
+              }
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   const handleDeleteUser = async (user: User) => {
     setUserToDelete(user);
