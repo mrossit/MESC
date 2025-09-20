@@ -1,0 +1,235 @@
+{
+  "project_name": "rest-express",
+  "description": "Sistema de gerenciamento de escalas e ministros para igreja com funcionalidades de agendamento, substituições e comunicação",
+  "tech_stack": {
+    "frontend": {
+      "framework": "React 18.3.1",
+      "routing": "Wouter 3.3.5",
+      "ui_components": "Radix UI + Tailwind CSS + shadcn",
+      "state_management": "TanStack Query 5.60.5",
+      "forms": "React Hook Form 7.62.0",
+      "styling": "Tailwind CSS 3.4.17 + Tailwind Animate",
+      "bundler": "Vite 5.4.19"
+    },
+    "backend": {
+      "runtime": "Node.js",
+      "framework": "Express 4.21.2",
+      "language": "TypeScript 5.6.3",
+      "database": "SQLite (better-sqlite3) / Neon PostgreSQL",
+      "orm": "Drizzle ORM 0.39.3",
+      "authentication": "Passport + JWT + bcrypt",
+      "session": "express-session + memorystore",
+      "validation": "Zod 3.25.76"
+    },
+    "testing": {
+      "framework": "Vitest",
+      "ui_testing": "@testing-library/react",
+      "coverage": "@vitest/coverage-v8"
+    },
+    "deployment": {
+      "build_tools": "esbuild + tsx",
+      "package_manager": "npm"
+    }
+  },
+  "features": [
+    {
+      "name": "Authentication System",
+      "description": "Sistema completo de autenticação com login, registro, reset de senha e sessões",
+      "files": [
+        "server/auth.ts",
+        "server/authRoutes.ts",
+        "client/src/pages/login.tsx",
+        "client/src/pages/register.tsx",
+        "client/src/services/auth.service.ts"
+      ]
+    },
+    {
+      "name": "Minister Management",
+      "description": "Gerenciamento de ministros incluindo perfis, diretório e informações de contato",
+      "files": [
+        "server/routes/ministers.ts",
+        "client/src/pages/Ministers.tsx",
+        "client/src/pages/MinistersDirectory.tsx",
+        "client/src/components/minister-dashboard.tsx"
+      ]
+    },
+    {
+      "name": "Schedule Management",
+      "description": "Sistema de criação, edição e visualização de escalas de serviço",
+      "files": [
+        "server/routes/schedules.ts",
+        "client/src/pages/Schedules.tsx",
+        "client/src/pages/ScheduleEditor.tsx",
+        "client/src/components/ScheduleCard.tsx",
+        "server/utils/scheduleGenerator.ts"
+      ]
+    },
+    {
+      "name": "Auto Schedule Generation",
+      "description": "Geração automática de escalas com algoritmos inteligentes",
+      "files": [
+        "server/routes/scheduleGeneration.ts",
+        "client/src/pages/AutoScheduleGeneration.tsx",
+        "server/utils/scheduleGenerator.ts"
+      ]
+    },
+    {
+      "name": "Substitution System",
+      "description": "Sistema de substituições com aprovações e notificações",
+      "files": [
+        "server/routes/substitutions.ts",
+        "client/src/pages/Substitutions.tsx",
+        "client/src/pages/approvals.tsx"
+      ]
+    },
+    {
+      "name": "Notification System",
+      "description": "Sistema de notificações em tempo real",
+      "files": [
+        "server/routes/notifications.ts",
+        "client/src/components/notification-bell.tsx",
+        "client/src/components/floating-notification-bell.tsx"
+      ]
+    },
+    {
+      "name": "Communication Module",
+      "description": "Módulo de comunicação entre ministros",
+      "files": [
+        "client/src/pages/communication.tsx"
+      ]
+    },
+    {
+      "name": "Formation/Training Module",
+      "description": "Sistema de formação e treinamento de ministros",
+      "files": [
+        "client/src/pages/formation.tsx",
+        "client/src/components/formation-progress.tsx"
+      ]
+    },
+    {
+      "name": "Questionnaire System",
+      "description": "Sistema de questionários e respostas",
+      "files": [
+        "server/routes/questionnaires.ts",
+        "server/routes/questionnaireAdmin.ts",
+        "client/src/pages/QuestionnaireResponses.tsx",
+        "server/utils/questionnaireGenerator.ts"
+      ]
+    },
+    {
+      "name": "QR Code Sharing",
+      "description": "Compartilhamento de informações via QR Code",
+      "files": [
+        "client/src/pages/QRCodeShare.tsx",
+        "client/src/components/QRCodeCard.tsx"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard com estatísticas e visão geral",
+      "files": [
+        "client/src/pages/dashboard.tsx",
+        "client/src/components/dashboard-stats.tsx",
+        "client/src/components/recent-activity.tsx",
+        "client/src/components/schedule-overview.tsx"
+      ]
+    },
+    {
+      "name": "PWA Support",
+      "description": "Suporte para Progressive Web App com instalação e atualizações",
+      "files": [
+        "client/src/components/pwa-install-prompt.tsx",
+        "client/src/components/pwa-update-prompt.tsx",
+        "client/src/components/install-button.tsx"
+      ]
+    },
+    {
+      "name": "Profile Management",
+      "description": "Gerenciamento de perfis de usuário",
+      "files": [
+        "server/routes/profile.ts",
+        "client/src/pages/Profile.tsx"
+      ]
+    },
+    {
+      "name": "File Upload",
+      "description": "Sistema de upload de arquivos",
+      "files": [
+        "server/routes/upload.ts",
+        "server/storage.ts"
+      ]
+    },
+    {
+      "name": "Settings",
+      "description": "Configurações do sistema",
+      "files": [
+        "client/src/pages/Settings.tsx"
+      ]
+    }
+  ],
+  "api_endpoints": {
+    "auth": [
+      "POST /api/auth/register",
+      "POST /api/auth/login",
+      "POST /api/auth/logout",
+      "GET /api/auth/user",
+      "POST /api/auth/reset-password"
+    ],
+    "ministers": [
+      "GET /api/ministers",
+      "GET /api/ministers/:id",
+      "POST /api/ministers",
+      "PUT /api/ministers/:id",
+      "DELETE /api/ministers/:id"
+    ],
+    "schedules": [
+      "GET /api/schedules",
+      "GET /api/schedules/:id",
+      "POST /api/schedules",
+      "PUT /api/schedules/:id",
+      "DELETE /api/schedules/:id"
+    ],
+    "substitutions": [
+      "GET /api/substitutions",
+      "POST /api/substitutions",
+      "PUT /api/substitutions/:id",
+      "DELETE /api/substitutions/:id"
+    ],
+    "notifications": [
+      "GET /api/notifications",
+      "PUT /api/notifications/:id/read"
+    ]
+  },
+  "database_schema": {
+    "tables": [
+      "users",
+      "ministers",
+      "schedules",
+      "schedule_assignments",
+      "substitutions",
+      "notifications",
+      "questionnaires",
+      "questionnaire_responses",
+      "confirmations"
+    ]
+  },
+  "environment_config": {
+    "development": {
+      "port": 5173,
+      "database": "SQLite"
+    },
+    "production": {
+      "port": "process.env.PORT",
+      "database": "PostgreSQL (Neon)"
+    }
+  },
+  "test_coverage": {
+    "unit_tests": true,
+    "integration_tests": false,
+    "e2e_tests": false,
+    "test_files": [
+      "server/__tests__/auth.test.ts",
+      "server/__tests__/ministers.test.ts"
+    ]
+  }
+}
