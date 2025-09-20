@@ -168,6 +168,11 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   canSubstitute: boolean('can_substitute').default(false),
   notes: text('notes'),
   
+  // Family sharing fields
+  sharedWithFamilyIds: jsonb('shared_with_family_ids').$type<string[]>(),
+  isSharedResponse: boolean('is_shared_response').default(false),
+  sharedFromUserId: varchar('shared_from_user_id').references(() => users.id),
+  
   submittedAt: timestamp('submitted_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });

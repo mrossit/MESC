@@ -947,4 +947,21 @@ router.patch('/admin/templates/:id/reopen', requireAuth, requireRole(['coordenad
   }
 });
 
+// Get family members for questionnaire sharing
+router.get('/family-sharing/:questionnaireId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { questionnaireId } = req.params;
+    const userId = req.user!.id;
+    
+    // Import storage dynamically to avoid circular dependency
+    const { storage } = await import('../storage');
+    const familyMembers = await storage.getFamilyMembersForQuestionnaire(userId, questionnaireId);
+    
+    res.json(familyMembers);
+  } catch (error) {
+    console.error('Error fetching family members for questionnaire:', error);
+    res.status(500).json({ error: 'Failed to fetch family members' });
+  }
+});
+
 export default router;

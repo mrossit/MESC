@@ -470,6 +470,58 @@ export class DatabaseStorage implements IStorage {
     await db.delete(familyRelationships).where(eq(familyRelationships.id, relationshipId));
   }
 
+  // Family questionnaire sharing methods
+  async getFamilyMembersForQuestionnaire(userId: string, questionnaireId: string): Promise<Array<{
+    id: string;
+    name: string;
+    email: string;
+    relationshipType: string;
+    hasResponded: boolean;
+    responseData?: any;
+  }>> {
+    // Get family members
+    const relationships = await db
+      .select()
+      .from(familyRelationships)
+      .where(eq(familyRelationships.userId, userId));
+
+    // Get family members with their response status
+    const familyMembers = await Promise.all(
+      relationships.map(async (rel: any) => {
+        const user = await this.getUser(rel.relatedUserId);
+        if (!user) return null;
+
+        // Check if family member has already responded to this questionnaire
+        const response = await db
+          .select()
+          .from(questionnaireResponses)
+          .where(and(
+            eq(questionnaireResponses.questionnaireId, questionnaireId),
+            eq(questionnaireResponses.userId, rel.relatedUserId)
+          ))
+          .limit(1);
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          relationshipType: rel.relationshipType,
+          hasResponded: response.length > 0,
+          responseData: response[0] || null
+        };
+      })
+    );
+
+    return familyMembers.filter(member => member !== null) as Array<{
+      id: string;
+      name: string;
+      email: string;
+      relationshipType: string;
+      hasResponded: boolean;
+      responseData?: any;
+    }>;
+  }
+
   async checkUserMinisterialActivity(userId: string): Promise<{ isUsed: boolean; reason: string }> {
     try {
       // 1. Check if user has submitted questionnaire responses
