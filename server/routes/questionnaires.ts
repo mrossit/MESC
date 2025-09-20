@@ -5,9 +5,10 @@ import {
   questionnaires, 
   questionnaireResponses,
   users,
-  notifications
+  notifications,
+  familyRelationships
 } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
 
@@ -370,6 +371,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     const { availabilities } = analyzeResponses(data.responses);
     console.log('[RESPONSES] Disponibilidades extraídas:', availabilities);
 
+    let result: { responseData: any; isUpdate: boolean };
+
     if (existingResponse) {
       console.log('[RESPONSES] Atualizando resposta existente:', existingResponse.id);
       // Atualizar resposta existente
@@ -386,62 +389,17 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .returning();
         
         console.log('[RESPONSES] Resposta atualizada com sucesso');
-
-        // Compartilhar respostas com familiares selecionados
-        if (data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
-          console.log('[RESPONSES] Compartilhando respostas atualizadas com familiares:', data.sharedWithFamilyIds);
-          
-          for (const familyUserId of data.sharedWithFamilyIds) {
-            try {
-              // Verificar se o familiar já tem resposta para este questionário
-              const [existingFamilyResponse] = await db
-                .select()
-                .from(questionnaireResponses)
-                .where(and(
-                  eq(questionnaireResponses.userId, familyUserId),
-                  eq(questionnaireResponses.questionnaireId, templateId as any)
-                ))
-                .limit(1);
-
-              if (!existingFamilyResponse) {
-                // Criar resposta compartilhada para o familiar
-                await db
-                  .insert(questionnaireResponses)
-                  .values({
-                    userId: familyUserId,
-                    questionnaireId: templateId,
-                    responses: JSON.stringify(data.responses),
-                    isSharedResponse: true,
-                    sharedFromUserId: minister.id,
-                    sharedWithFamilyIds: []
-                  });
-                
-                console.log('[RESPONSES] Resposta compartilhada criada para familiar:', familyUserId);
-              } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
-                // Atualizar resposta compartilhada existente se ela foi originalmente criada por esse usuário
-                await db
-                  .update(questionnaireResponses)
-                  .set({
-                    responses: JSON.stringify(data.responses),
-                    submittedAt: new Date()
-                  })
-                  .where(eq(questionnaireResponses.id, existingFamilyResponse.id));
-                
-                console.log('[RESPONSES] Resposta compartilhada atualizada para familiar:', familyUserId);
-              }
-            } catch (error) {
-              console.error('[RESPONSES] Erro ao compartilhar com familiar:', familyUserId, error);
-              // Não falhar a requisição principal se houver erro no compartilhamento
-            }
-          }
-        }
-
-        res.json({
+        
+        // Armazenar dados para retorno posterior
+        const responseData = {
           ...updated,
           responses: typeof updated.responses === 'string'
             ? JSON.parse(updated.responses)
             : updated.responses
-        });
+        };
+        
+        // Armazenar resultado para processamento posterior
+        result = { responseData, isUpdate: true };
       } catch (updateError) {
         console.error('[RESPONSES] Erro ao atualizar resposta:', updateError);
         throw updateError;
@@ -462,56 +420,113 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .returning();
         
         console.log('[RESPONSES] Resposta criada com sucesso');
-
-        // Compartilhar respostas com familiares selecionados
-        if (data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
-          console.log('[RESPONSES] Compartilhando respostas com familiares:', data.sharedWithFamilyIds);
-          
-          for (const familyUserId of data.sharedWithFamilyIds) {
-            try {
-              // Verificar se o familiar já tem resposta para este questionário
-              const [existingFamilyResponse] = await db
-                .select()
-                .from(questionnaireResponses)
-                .where(and(
-                  eq(questionnaireResponses.userId, familyUserId),
-                  eq(questionnaireResponses.questionnaireId, templateId as any)
-                ))
-                .limit(1);
-
-              if (!existingFamilyResponse) {
-                // Criar resposta compartilhada para o familiar
-                await db
-                  .insert(questionnaireResponses)
-                  .values({
-                    userId: familyUserId,
-                    questionnaireId: templateId,
-                    responses: JSON.stringify(data.responses),
-                    isSharedResponse: true,
-                    sharedFromUserId: minister.id,
-                    sharedWithFamilyIds: []
-                  });
-                
-                console.log('[RESPONSES] Resposta compartilhada criada para familiar:', familyUserId);
-              }
-            } catch (error) {
-              console.error('[RESPONSES] Erro ao compartilhar com familiar:', familyUserId, error);
-              // Não falhar a requisição principal se houver erro no compartilhamento
-            }
-          }
-        }
-
-        res.json({
+        
+        // Armazenar dados para retorno posterior
+        const responseData = {
           ...created,
           responses: typeof created.responses === 'string'
             ? JSON.parse(created.responses)
             : created.responses
-        });
+        };
+        
+        // Armazenar resultado para processamento posterior
+        result = { responseData, isUpdate: false };
       } catch (insertError) {
         console.error('[RESPONSES] Erro ao criar resposta:', insertError);
         throw insertError;
       }
     }
+
+    // Processar compartilhamento familiar após salvar a resposta principal
+    if (data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
+      console.log('[RESPONSES] Processando compartilhamento familiar:', data.sharedWithFamilyIds);
+      
+      // Validar relacionamentos familiares
+      for (const familyUserId of data.sharedWithFamilyIds) {
+        try {
+          // Verificar se o usuário está relacionado familiarmente
+          const [familyMember] = await db
+            .select({ id: users.id, name: users.name })
+            .from(users)
+            .where(and(
+              eq(users.id, familyUserId),
+              eq(users.status, 'active')
+            ))
+            .limit(1);
+
+          if (!familyMember) {
+            console.warn(`[RESPONSES] Usuário não encontrado ou inativo: ${familyUserId}`);
+            continue;
+          }
+
+          // Verificar relacionamento familiar
+          const [familyRelation] = await db
+            .select()
+            .from(familyRelationships)
+            .where(or(
+              and(
+                eq(familyRelationships.userId, minister.id),
+                eq(familyRelationships.relatedUserId, familyUserId)
+              ),
+              and(
+                eq(familyRelationships.userId, familyUserId),
+                eq(familyRelationships.relatedUserId, minister.id)
+              )
+            ))
+            .limit(1);
+
+          if (!familyRelation) {
+            console.warn(`[RESPONSES] Sem relação familiar válida entre ${minister.id} e ${familyUserId}`);
+            continue;
+          }
+
+          // Verificar se o familiar já tem resposta para este questionário
+          const [existingFamilyResponse] = await db
+            .select()
+            .from(questionnaireResponses)
+            .where(and(
+              eq(questionnaireResponses.userId, familyUserId),
+              eq(questionnaireResponses.questionnaireId, templateId as any)
+            ))
+            .limit(1);
+
+          if (!existingFamilyResponse) {
+            // Criar resposta compartilhada para o familiar
+            await db
+              .insert(questionnaireResponses)
+              .values({
+                userId: familyUserId,
+                questionnaireId: templateId,
+                responses: JSON.stringify(data.responses),
+                isSharedResponse: true,
+                sharedFromUserId: minister.id,
+                sharedWithFamilyIds: []
+              });
+            
+            console.log(`[RESPONSES] Resposta compartilhada criada para ${familyMember.name} (${familyUserId})`);
+          } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
+            // Atualizar resposta compartilhada existente se foi originalmente criada por este usuário
+            await db
+              .update(questionnaireResponses)
+              .set({
+                responses: JSON.stringify(data.responses),
+                submittedAt: new Date()
+              })
+              .where(eq(questionnaireResponses.id, existingFamilyResponse.id));
+            
+            console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
+          } else {
+            console.log(`[RESPONSES] ${familyMember.name} já possui resposta própria, não sobrescrevendo`);
+          }
+        } catch (shareError) {
+          console.error(`[RESPONSES] Erro ao compartilhar com familiar ${familyUserId}:`, shareError);
+          // Continuar processamento dos outros familiares
+        }
+      }
+    }
+
+    // Retornar resposta final
+    res.json(result.responseData);
   } catch (error) {
     console.error('[RESPONSES] Erro geral no endpoint:', error);
     if (error instanceof Error) {
