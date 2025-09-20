@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mesc-v4.3-no-users-cache';
+const CACHE_NAME = 'mesc-v4.4-clear-user-cache';
 const urlsToCache = [
   '/',
   '/index.html',

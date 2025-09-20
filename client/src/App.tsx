@@ -105,6 +105,12 @@ function Router() {
         </AuthGuard>
       </Route>
       
+      <Route path="/ministros">
+        <AuthGuard allowedRoles={["gestor", "coordenador"]}>
+          <Ministers />
+        </AuthGuard>
+      </Route>
+      
       <Route path="/ministers-directory">
         <AuthGuard>
           <MinistersDirectory />
