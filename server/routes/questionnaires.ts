@@ -248,7 +248,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           })
         ]),
         metadata: z.any().optional()
-      }))
+      })),
+      sharedWithFamilyIds: z.array(z.string()).optional()
     });
 
     let data;
@@ -359,7 +360,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     const [existingResponse] = await db.select().from(questionnaireResponses)
       .where(and(
         eq(questionnaireResponses.userId, minister.id),
-        eq(questionnaireResponses.questionnaireId, templateId)
+        eq(questionnaireResponses.questionnaireId, templateId as any)
       ))
       .limit(1);
     console.log('[RESPONSES] Resposta existente encontrada?', existingResponse ? 'Sim' : 'Não');
@@ -378,12 +379,62 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .set({
             questionnaireId: templateId,
             responses: JSON.stringify(data.responses),
-            submittedAt: new Date()
+            submittedAt: new Date(),
+            sharedWithFamilyIds: data.sharedWithFamilyIds || []
           })
           .where(eq(questionnaireResponses.id, existingResponse.id))
           .returning();
         
         console.log('[RESPONSES] Resposta atualizada com sucesso');
+
+        // Compartilhar respostas com familiares selecionados
+        if (data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
+          console.log('[RESPONSES] Compartilhando respostas atualizadas com familiares:', data.sharedWithFamilyIds);
+          
+          for (const familyUserId of data.sharedWithFamilyIds) {
+            try {
+              // Verificar se o familiar já tem resposta para este questionário
+              const [existingFamilyResponse] = await db
+                .select()
+                .from(questionnaireResponses)
+                .where(and(
+                  eq(questionnaireResponses.userId, familyUserId),
+                  eq(questionnaireResponses.questionnaireId, templateId as any)
+                ))
+                .limit(1);
+
+              if (!existingFamilyResponse) {
+                // Criar resposta compartilhada para o familiar
+                await db
+                  .insert(questionnaireResponses)
+                  .values({
+                    userId: familyUserId,
+                    questionnaireId: templateId,
+                    responses: JSON.stringify(data.responses),
+                    isSharedResponse: true,
+                    sharedFromUserId: minister.id,
+                    sharedWithFamilyIds: []
+                  });
+                
+                console.log('[RESPONSES] Resposta compartilhada criada para familiar:', familyUserId);
+              } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
+                // Atualizar resposta compartilhada existente se ela foi originalmente criada por esse usuário
+                await db
+                  .update(questionnaireResponses)
+                  .set({
+                    responses: JSON.stringify(data.responses),
+                    submittedAt: new Date()
+                  })
+                  .where(eq(questionnaireResponses.id, existingFamilyResponse.id));
+                
+                console.log('[RESPONSES] Resposta compartilhada atualizada para familiar:', familyUserId);
+              }
+            } catch (error) {
+              console.error('[RESPONSES] Erro ao compartilhar com familiar:', familyUserId, error);
+              // Não falhar a requisição principal se houver erro no compartilhamento
+            }
+          }
+        }
 
         res.json({
           ...updated,
@@ -404,11 +455,51 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .values({
             userId: minister.id,
             questionnaireId: templateId,
-            responses: JSON.stringify(data.responses)
+            responses: JSON.stringify(data.responses),
+            sharedWithFamilyIds: data.sharedWithFamilyIds || [],
+            isSharedResponse: false
           })
           .returning();
         
         console.log('[RESPONSES] Resposta criada com sucesso');
+
+        // Compartilhar respostas com familiares selecionados
+        if (data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
+          console.log('[RESPONSES] Compartilhando respostas com familiares:', data.sharedWithFamilyIds);
+          
+          for (const familyUserId of data.sharedWithFamilyIds) {
+            try {
+              // Verificar se o familiar já tem resposta para este questionário
+              const [existingFamilyResponse] = await db
+                .select()
+                .from(questionnaireResponses)
+                .where(and(
+                  eq(questionnaireResponses.userId, familyUserId),
+                  eq(questionnaireResponses.questionnaireId, templateId as any)
+                ))
+                .limit(1);
+
+              if (!existingFamilyResponse) {
+                // Criar resposta compartilhada para o familiar
+                await db
+                  .insert(questionnaireResponses)
+                  .values({
+                    userId: familyUserId,
+                    questionnaireId: templateId,
+                    responses: JSON.stringify(data.responses),
+                    isSharedResponse: true,
+                    sharedFromUserId: minister.id,
+                    sharedWithFamilyIds: []
+                  });
+                
+                console.log('[RESPONSES] Resposta compartilhada criada para familiar:', familyUserId);
+              }
+            } catch (error) {
+              console.error('[RESPONSES] Erro ao compartilhar com familiar:', familyUserId, error);
+              // Não falhar a requisição principal se houver erro no compartilhamento
+            }
+          }
+        }
 
         res.json({
           ...created,
@@ -617,15 +708,15 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
       .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
 
     // Mapear ministros com suas respostas
-    const responseMap = new Map(responses.map(r => [r.userId, r]));
+    const responseMap = new Map(responses.map((r: any) => [r.userId, r]));
 
-    const ministerResponses = ministers.map(minister => ({
+    const ministerResponses = ministers.map((minister: any) => ({
       id: minister.id,
       name: minister.name,
       email: minister.email,
       phone: minister.phone || '',
       responded: responseMap.has(minister.id),
-      respondedAt: responseMap.get(minister.id)?.submittedAt?.toISOString() || null,
+      respondedAt: responseMap.get(minister.id)?.submittedAt ? new Date((responseMap.get(minister.id) as any).submittedAt).toISOString() : null,
       availability: null // Pode ser expandido para incluir disponibilidade
     }));
 
@@ -694,7 +785,7 @@ router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: Aut
     const summary: Record<string, Record<string, number>> = {};
     const questions = questionnaire.questions as any[];
 
-    responses.forEach(response => {
+    responses.forEach((response: any) => {
       const userResponses = typeof response.responses === 'string'
         ? JSON.parse(response.responses)
         : response.responses;

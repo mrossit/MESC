@@ -96,6 +96,19 @@ export default function QuestionnaireUnified() {
   // Estado para editar pergunta
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   
+  // Estados para compartilhamento familiar
+  const [familyMembers, setFamilyMembers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    relationshipType: string;
+    hasResponded: boolean;
+    responseData?: any;
+  }>>([]);
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
+  const [loadingFamilyMembers, setLoadingFamilyMembers] = useState(false);
+  const [familySharingScenario, setFamilySharingScenario] = useState<'none' | 'some_responded' | 'need_choice'>('none');
+  
   // Buscar informações do usuário
   const { data: authData } = useQuery({
     queryKey: ['/api/auth/me'],
@@ -136,7 +149,51 @@ export default function QuestionnaireUnified() {
     }
   }, [template, isAdmin]);
 
+  // Carregar familiares quando estiver no modo de responder
+  useEffect(() => {
+    if (mode === 'respond' && template?.id && user?.id) {
+      loadFamilyMembers();
+    }
+  }, [mode, template?.id, user?.id]);
 
+
+
+  const loadFamilyMembers = async () => {
+    if (!template?.id) return;
+    
+    setLoadingFamilyMembers(true);
+    try {
+      const res = await fetch(`/api/questionnaires/family-sharing/${template.id}`, {
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        const members = await res.json();
+        setFamilyMembers(members);
+        
+        // Analisar cenário para determinar validação
+        const respondedMembers = members.filter((m: any) => m.hasResponded);
+        
+        if (members.length === 0) {
+          // Não há familiares cadastrados
+          setFamilySharingScenario('none');
+        } else if (respondedMembers.length === 0) {
+          // Cenário 1: Nenhum familiar respondeu ainda
+          setFamilySharingScenario('need_choice');
+        } else if (respondedMembers.length > 0 && respondedMembers.length < members.length) {
+          // Cenário 2: Alguns familiares já responderam
+          setFamilySharingScenario('some_responded');
+        } else {
+          // Todos os familiares já responderam
+          setFamilySharingScenario('none');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar familiares:', error);
+    } finally {
+      setLoadingFamilyMembers(false);
+    }
+  };
 
   const loadQuestionnaire = async (preserveSuccessMessage = false) => {
     setLoading(true);
@@ -632,7 +689,8 @@ export default function QuestionnaireUnified() {
         questionnaireTemplateId: template.id,
         month: selectedMonth,
         year: selectedYear,
-        responses: formattedResponses
+        responses: formattedResponses,
+        sharedWithFamilyIds: selectedFamilyMembers
       };
 
       // Check payload size
@@ -1854,6 +1912,112 @@ export default function QuestionnaireUnified() {
                           </CardContent>
                         </Card>
                     ))}
+
+                    {/* Seção de Compartilhamento Familiar */}
+                    {familySharingScenario !== 'none' && familyMembers.length > 0 && (
+                      <Card className="border-2 border-blue-200 bg-blue-50/30">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="flex items-center gap-2 text-lg text-blue-800">
+                            <Users className="h-5 w-5" />
+                            Compartilhamento Familiar
+                          </CardTitle>
+                          <CardDescription className="text-blue-700">
+                            Você pode compartilhar suas respostas com familiares cadastrados
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {familySharingScenario === 'need_choice' && (
+                            <div className="space-y-4">
+                              <p className="text-sm font-medium text-gray-700">
+                                Marque os familiares que devem receber uma cópia das suas respostas:
+                              </p>
+                              <div className="space-y-3">
+                                {familyMembers.map((member) => (
+                                  <div key={member.id} className="flex items-center space-x-3 p-3 bg-white rounded-lg border">
+                                    <Checkbox
+                                      id={`family-${member.id}`}
+                                      checked={selectedFamilyMembers.includes(member.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedFamilyMembers([...selectedFamilyMembers, member.id]);
+                                        } else {
+                                          setSelectedFamilyMembers(selectedFamilyMembers.filter(id => id !== member.id));
+                                        }
+                                      }}
+                                      data-testid={`checkbox-family-${member.id}`}
+                                    />
+                                    <Label htmlFor={`family-${member.id}`} className="flex-1 cursor-pointer">
+                                      <div className="font-medium">{member.name}</div>
+                                      <div className="text-sm text-gray-500">
+                                        {member.relationshipType === 'spouse' ? 'Cônjuge' :
+                                         member.relationshipType === 'parent' ? 'Pai/Mãe' :
+                                         member.relationshipType === 'child' ? 'Filho(a)' :
+                                         member.relationshipType === 'sibling' ? 'Irmão(ã)' : member.relationshipType}
+                                      </div>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {familySharingScenario === 'some_responded' && (
+                            <div className="space-y-4">
+                              <p className="text-sm font-medium text-gray-700">
+                                Alguns familiares já responderam. Deseja que os demais recebam uma cópia das suas respostas?
+                              </p>
+                              <div className="space-y-3">
+                                {familyMembers.map((member) => (
+                                  <div key={member.id} className="flex items-center space-x-3 p-3 bg-white rounded-lg border">
+                                    <Checkbox
+                                      id={`family-${member.id}`}
+                                      checked={member.hasResponded ? false : selectedFamilyMembers.includes(member.id)}
+                                      disabled={member.hasResponded}
+                                      onCheckedChange={(checked) => {
+                                        if (!member.hasResponded) {
+                                          if (checked) {
+                                            setSelectedFamilyMembers([...selectedFamilyMembers, member.id]);
+                                          } else {
+                                            setSelectedFamilyMembers(selectedFamilyMembers.filter(id => id !== member.id));
+                                          }
+                                        }
+                                      }}
+                                      data-testid={`checkbox-family-${member.id}`}
+                                    />
+                                    <Label htmlFor={`family-${member.id}`} className="flex-1 cursor-pointer">
+                                      <div className="font-medium flex items-center gap-2">
+                                        {member.name}
+                                        {member.hasResponded && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            Já respondeu
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {member.relationshipType === 'spouse' ? 'Cônjuge' :
+                                         member.relationshipType === 'parent' ? 'Pai/Mãe' :
+                                         member.relationshipType === 'child' ? 'Filho(a)' :
+                                         member.relationshipType === 'sibling' ? 'Irmão(ã)' : member.relationshipType}
+                                      </div>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedFamilyMembers.length > 0 && (
+                            <Alert className="mt-4">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription>
+                                Suas respostas serão copiadas para {selectedFamilyMembers.length} familiar(es). 
+                                Eles poderão reenviar o questionário com modificações enquanto estiver aberto.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
 
                     {/* Botão de envio */}
                     <div className="flex justify-center mt-8 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border">
