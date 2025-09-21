@@ -311,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rota para servir fotos de perfil
-  app.get('/api/users/:id/photo', async (req, res) => {
+  app.get('/api/users/:id/photo', authenticateToken, async (req, res) => {
     try {
       const userId = req.params.id;
       

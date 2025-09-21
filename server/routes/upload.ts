@@ -1,8 +1,6 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs';
 import { db } from '../db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -10,11 +8,7 @@ import { authenticateToken, AuthRequest } from '../auth';
 
 const router = Router();
 
-// Criar diretório de uploads se não existir
-const uploadsDir = path.join(process.cwd(), 'uploads', 'profiles');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Note: Fotos são armazenadas no banco de dados como base64, não em arquivos
 
 // Configurar multer para upload temporário
 const upload = multer({
@@ -41,8 +35,32 @@ const upload = multer({
   },
 });
 
+// Middleware para tratar erros do Multer
+const handleMulterError = (err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err) {
+    console.error('Multer error:', err);
+    
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'A imagem deve ter no máximo 5MB' });
+    }
+    
+    if (err.message && err.message.includes('Apenas arquivos de imagem são permitidos')) {
+      return res.status(400).json({ error: 'Apenas arquivos de imagem são permitidos (JPEG, PNG, WebP, HEIC)' });
+    }
+    
+    if (err.message && err.message.includes('Only image files are allowed')) {
+      return res.status(400).json({ error: 'Apenas arquivos de imagem são permitidos (JPEG, PNG, WebP, HEIC)' });
+    }
+    
+    // Erro genérico do multer
+    return res.status(400).json({ error: 'Erro no upload do arquivo. Verifique o formato e tamanho da imagem.' });
+  }
+  
+  next();
+};
+
 // Rota para upload de foto de perfil
-router.post('/profile-photo', authenticateToken, upload.single('photo'), async (req: AuthRequest, res) => {
+router.post('/profile-photo', authenticateToken, upload.single('photo'), handleMulterError, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
