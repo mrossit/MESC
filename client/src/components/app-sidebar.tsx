@@ -342,7 +342,9 @@ export function AppSidebar() {
                     >
                       <Link 
                         href={item.href!}
-                        onClick={() => {
+                        onClick={(e) => {
+                          console.log(`[Sidebar] Clicando em: ${item.title} -> ${item.href}`);
+                          console.log(`[Sidebar] Event:`, e);
                           if (isMobile) {
                             setOpenMobile(false);
                           }
