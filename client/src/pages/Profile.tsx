@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import {
   User, Calendar, Heart, Church, Users, Save, Camera,
-  X, Plus, AlertCircle, CheckCircle, Droplets, Cross
+  X, Plus, AlertCircle, CheckCircle, Droplets, Cross, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -183,6 +183,38 @@ export default function Profile() {
       }
     } catch (err) {
       setError('Erro ao processar imagem');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoRemove = async () => {
+    if (!confirm('Tem certeza que deseja remover sua foto de perfil?')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const res = await fetch('/api/upload/profile-photo', {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        setProfile(prev => prev ? { ...prev, photoUrl: undefined } : null);
+        setSuccess('Foto removida com sucesso!');
+        // Invalida as queries para forçar atualização
+        queryClient.invalidateQueries({ queryKey: ['/api/profile'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      } else {
+        const errorData = await res.json();
+        setError(errorData.error || 'Erro ao remover a foto');
+      }
+    } catch (err) {
+      setError('Erro ao remover foto');
       console.error(err);
     } finally {
       setLoading(false);
@@ -434,14 +466,29 @@ export default function Profile() {
                       </AvatarFallback>
                     </Avatar>
                     {isEditing && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="absolute bottom-0 right-0 rounded-full p-2"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Camera className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="absolute bottom-0 right-0 rounded-full p-2"
+                          onClick={() => fileInputRef.current?.click()}
+                          title="Alterar foto"
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
+                        {profile?.photoUrl && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="absolute bottom-0 left-0 rounded-full p-2"
+                            onClick={handlePhotoRemove}
+                            disabled={loading}
+                            title="Remover foto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
                     )}
                     <input
                       ref={fileInputRef}
