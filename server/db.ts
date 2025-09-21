@@ -5,13 +5,26 @@ let pool: any;
 
 async function initializeDatabase() {
   if (process.env.DATABASE_URL) {
-    // Production - Use Neon database
+    // Production - Use Neon database with connection pooler
     const { Pool, neonConfig } = await import('@neondatabase/serverless');
     const { drizzle } = await import('drizzle-orm/neon-serverless');
     const ws = await import('ws');
 
+    // Configure WebSocket for serverless environments
     neonConfig.webSocketConstructor = ws.default;
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    
+    // Ensure DATABASE_URL uses connection pooler for production
+    let connectionString = process.env.DATABASE_URL;
+    if (connectionString && !connectionString.includes('-pooler')) {
+      // Automatically add -pooler to hostname for production
+      connectionString = connectionString.replace(
+        /(@[\w.-]+)(\.[\w-]+\.[\w-]+\.neon\.tech)/,
+        '$1-pooler$2'
+      );
+      console.log('🔧 Configured DATABASE_URL with connection pooler for production');
+    }
+    
+    pool = new Pool({ connectionString });
     db = drizzle({ client: pool, schema });
   } else {
     // Development - Use SQLite
