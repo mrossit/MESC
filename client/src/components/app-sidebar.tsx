@@ -210,7 +210,14 @@ export function AppSidebar() {
               tooltip="MESC - Santuário São Judas - Ir para Dashboard"
               className="cursor-pointer"
             >
-              <Link href="/dashboard">
+              <Link 
+                href="/dashboard"
+                onClick={() => {
+                  if (isMobile) {
+                    setOpenMobile(false);
+                  }
+                }}
+              >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center">
                   <img
                     src="/sjtlogo.png"
@@ -241,7 +248,14 @@ export function AppSidebar() {
                     tooltip={`${user.name} (${user.role})`}
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
                   >
-                    <Link href="/profile">
+                    <Link 
+                      href="/profile"
+                      onClick={() => {
+                        if (isMobile) {
+                          setOpenMobile(false);
+                        }
+                      }}
+                    >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.photoUrl || undefined} />
                         <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-xs">
@@ -295,7 +309,14 @@ export function AppSidebar() {
                                     asChild
                                     isActive={location === subItem.href}
                                   >
-                                    <Link href={subItem.href}>
+                                    <Link 
+                                      href={subItem.href}
+                                      onClick={() => {
+                                        if (isMobile) {
+                                          setOpenMobile(false);
+                                        }
+                                      }}
+                                    >
                                       <span>{subItem.title}</span>
                                       {subItem.badge && (
                                         <SidebarMenuBadge className="bg-neutral-accentWarm text-neutral-cream dark:bg-dark-terracotta dark:text-text-light font-medium">{subItem.badge}</SidebarMenuBadge>
@@ -318,7 +339,14 @@ export function AppSidebar() {
                       tooltip={item.title}
                       isActive={isActive}
                     >
-                      <Link href={item.href!}>
+                      <Link 
+                        href={item.href!}
+                        onClick={() => {
+                          if (isMobile) {
+                            setOpenMobile(false);
+                          }
+                        }}
+                      >
                         <item.icon />
                         <span>{item.title}</span>
                         {item.badge && (
