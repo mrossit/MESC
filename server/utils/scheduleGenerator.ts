@@ -51,13 +51,13 @@ export class ScheduleGenerator {
   /**
    * Gera escalas automaticamente para um mês específico
    */
-  async generateScheduleForMonth(year: number, month: number): Promise<GeneratedSchedule[]> {
-    logger.info(`Iniciando geração automática de escalas para ${month}/${year}`);
+  async generateScheduleForMonth(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
+    logger.info(`Iniciando geração ${isPreview ? 'de preview' : 'definitiva'} de escalas para ${month}/${year}`);
 
     try {
       // 1. Carregar dados necessários
       await this.loadMinistersData();
-      await this.loadAvailabilityData(year, month);
+      await this.loadAvailabilityData(year, month, isPreview);
       await this.loadMassTimesConfig();
 
       // 2. Gerar horários de missa para o mês
@@ -120,8 +120,13 @@ export class ScheduleGenerator {
   /**
    * Carrega dados de disponibilidade dos questionários
    */
-  private async loadAvailabilityData(year: number, month: number): Promise<void> {
+  private async loadAvailabilityData(year: number, month: number, isPreview: boolean = false): Promise<void> {
     if (!db) return;
+
+    // Definir status permitidos baseado no tipo de geração
+    const allowedStatuses = isPreview 
+      ? ['open', 'sent', 'active'] // Preview: aceita questionários abertos
+      : ['closed']; // Definitivo: apenas questionários fechados
 
     const responses = await db.select().from(questionnaireResponses)
       .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
@@ -130,9 +135,7 @@ export class ScheduleGenerator {
           eq(questionnaires.month, month),
           eq(questionnaires.year, year),
           or(
-            eq(questionnaires.status, 'open'),
-            eq(questionnaires.status, 'sent'),
-            eq(questionnaires.status, 'active')
+            ...allowedStatuses.map(status => eq(questionnaires.status, status))
           )
         )
       );
@@ -407,7 +410,7 @@ export class ScheduleGenerator {
 }
 
 // Função de conveniência para uso direto
-export async function generateAutomaticSchedule(year: number, month: number): Promise<GeneratedSchedule[]> {
+export async function generateAutomaticSchedule(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
   const generator = new ScheduleGenerator();
-  return await generator.generateScheduleForMonth(year, month);
+  return await generator.generateScheduleForMonth(year, month, isPreview);
 }
