@@ -5,29 +5,6 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// Função para converter erros do Zod em mensagens amigáveis
-function formatValidationErrors(errors: z.ZodIssue[]): string {
-  const messages = errors.map(error => {
-    switch (error.path[0]) {
-      case 'password':
-        if (error.code === 'too_small') {
-          return 'A senha precisa ter pelo menos 8 caracteres';
-        }
-        return 'Senha inválida';
-      case 'email':
-        return 'Por favor, digite um email válido';
-      case 'name':
-        if (error.code === 'too_small') {
-          return 'O nome precisa ter pelo menos 3 caracteres';
-        }
-        return 'Nome inválido';
-      default:
-        return error.message;
-    }
-  });
-  return messages[0] || 'Dados inválidos';
-}
-
 const router = Router();
 
 // Schema de validação para login
@@ -85,7 +62,8 @@ router.post('/login', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        message: formatValidationErrors(error.errors)
+        message: 'Dados inválidos',
+        errors: error.errors
       });
     }
     
@@ -117,7 +95,8 @@ router.post('/register', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        message: formatValidationErrors(error.errors)
+        message: 'Dados inválidos',
+        errors: error.errors
       });
     }
     
@@ -152,7 +131,8 @@ router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coorde
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        message: formatValidationErrors(error.errors)
+        message: 'Dados inválidos',
+        errors: error.errors
       });
     }
     
