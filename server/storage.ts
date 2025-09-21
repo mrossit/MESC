@@ -358,19 +358,20 @@ export class DatabaseStorage implements IStorage {
     const [totalMinistersResult] = await db
       .select({ count: count() })
       .from(users)
-      .where(eq(users.status, 'active'));
+      .where(and(eq(users.status, 'active'), eq(users.role, 'ministro')));
 
     const [weeklyMassesResult] = await db
       .select({ count: count() })
       .from(massTimesConfig)
       .where(eq(massTimesConfig.isActive, true));
 
-    // For available today, we'll use a simplified calculation
+    // For available today, we'll use a simplified calculation (only ministers)
     const [availableTodayResult] = await db
       .select({ count: count() })
       .from(users)
       .where(and(
         eq(users.status, 'active'),
+        eq(users.role, 'ministro'),
         eq(users.availableForSpecialEvents, true)
       ));
 
