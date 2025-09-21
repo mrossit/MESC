@@ -166,7 +166,7 @@ export function NotificationBell({ compact = false, showLabel = false, className
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-sm text-neutral-textDark dark:text-text-light">Notificações</h3>
-              <p className="text-xs text-neutral-textMedium dark:text-gray-400 mt-1">
+              <p className="text-xs text-neutral-textMedium dark:text-muted-foreground mt-1">
                 {unreadNotifications.length > 0 
                   ? `${unreadNotifications.length} não lida(s)` 
                   : "Todas lidas"}
@@ -202,11 +202,11 @@ export function NotificationBell({ compact = false, showLabel = false, className
         <ScrollArea className="h-[400px]">
           {recentNotifications.length === 0 ? (
             <div className="p-8 text-center">
-              <Bell className="h-12 w-12 text-neutral-textLight/30 dark:text-gray-600 mx-auto mb-3" />
-              <p className="text-sm text-neutral-textMedium dark:text-gray-400">
+              <Bell className="h-12 w-12 text-neutral-textLight/30 dark:text-dark-copper/30 mx-auto mb-3" />
+              <p className="text-sm text-neutral-textMedium dark:text-muted-foreground">
                 Nenhuma notificação
               </p>
-              <p className="text-xs text-neutral-textLight dark:text-gray-500 mt-1">
+              <p className="text-xs text-neutral-textLight dark:text-muted-foreground/70 mt-1">
                 Você será notificado quando houver novidades
               </p>
             </div>
@@ -232,16 +232,16 @@ export function NotificationBell({ compact = false, showLabel = false, className
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <p className={`text-sm font-medium truncate ${
-                              !notification.read ? "text-neutral-textDark dark:text-text-light" : "text-neutral-textMedium dark:text-gray-400"
+                              !notification.read ? "text-neutral-textDark dark:text-text-light" : "text-neutral-textMedium dark:text-muted-foreground"
                             }`}>
                               {notification.title}
                             </p>
                             <p className={`text-xs mt-1 line-clamp-2 ${
-                              !notification.read ? "text-neutral-textDark/80 dark:text-text-light/80" : "text-neutral-textMedium dark:text-gray-400"
+                              !notification.read ? "text-neutral-textDark/80 dark:text-text-light/80" : "text-neutral-textMedium dark:text-muted-foreground"
                             }`}>
                               {notification.message}
                             </p>
-                            <p className="text-xs text-neutral-textLight dark:text-gray-500 mt-2">
+                            <p className="text-xs text-neutral-textLight dark:text-muted-foreground/70 mt-2">
                               {format(new Date(notification.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
                             </p>
                           </div>

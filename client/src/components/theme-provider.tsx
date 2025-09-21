@@ -26,9 +26,14 @@ export function ThemeProvider({
   storageKey = "mesc-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  const [theme, setTheme] = useState<Theme>(() => {
+    const stored = localStorage.getItem(storageKey) as Theme
+    // Valida se o valor armazenado é válido
+    if (stored && ["dark", "light", "system"].includes(stored)) {
+      return stored
+    }
+    return defaultTheme
+  })
 
   useEffect(() => {
     const root = window.document.documentElement

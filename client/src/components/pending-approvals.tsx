@@ -118,7 +118,7 @@ export function PendingApprovals() {
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="bg-neutral-accentWarm/20 dark:bg-gray-700 text-neutral-accentWarm dark:text-gray-400">
+                      <AvatarFallback className="bg-neutral-accentWarm/20 dark:bg-dark-5 text-neutral-accentWarm dark:text-text-light">
                         <User className="h-5 w-5" />
                       </AvatarFallback>
                     </Avatar>

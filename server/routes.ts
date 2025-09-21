@@ -11,6 +11,7 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
+import reportsRoutes from "./routes/reports";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -87,6 +88,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Notification routes
   app.use('/api/notifications', notificationsRoutes);
+
+  // Reports routes
+  app.use('/api/reports', reportsRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

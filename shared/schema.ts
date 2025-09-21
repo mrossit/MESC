@@ -271,9 +271,32 @@ export const passwordResetRequests = pgTable('password_reset_requests', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Activity logs for tracking user interactions and analytics
+export const activityLogs = pgTable('activity_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  action: varchar('action', { length: 100 }).notNull(), // login, view_schedule, respond_questionnaire, etc
+  details: jsonb('details'), // Additional context for the action
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  sessionId: varchar('session_id', { length: 255 }),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => [
+  index('idx_activity_logs_user').on(table.userId),
+  index('idx_activity_logs_action').on(table.action),
+  index('idx_activity_logs_created').on(table.createdAt)
+]);
+
 // Relations
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)
+}));
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [activityLogs.userId],
+    references: [users.id]
+  })
 }));
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -287,6 +310,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   substitutionRequests: many(substitutionRequests),
   notifications: many(notifications),
   formationProgress: many(formationProgress),
+  activityLogs: many(activityLogs),
   spouse: one(users, {
     fields: [users.spouseMinisterId],
     references: [users.id]

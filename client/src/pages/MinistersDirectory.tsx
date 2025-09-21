@@ -226,6 +226,32 @@ export default function MinistersDirectory() {
                 </div>
               </div>
               <div className="flex gap-2">
+                {/* Ordenação */}
+                <Select
+                  value={`${sortField}_${sortDirection}`}
+                  onValueChange={(value) => {
+                    const [field, direction] = value.split('_') as [keyof Minister, 'asc' | 'desc'];
+                    setSortField(field);
+                    setSortDirection(direction);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px] h-9">
+                    <ArrowUpDown className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name_asc">Nome (A-Z)</SelectItem>
+                    <SelectItem value="name_desc">Nome (Z-A)</SelectItem>
+                    <SelectItem value="role_asc">Perfil (Crescente)</SelectItem>
+                    <SelectItem value="role_desc">Perfil (Decrescente)</SelectItem>
+                    <SelectItem value="email_asc">Email (A-Z)</SelectItem>
+                    <SelectItem value="email_desc">Email (Z-A)</SelectItem>
+                    <SelectItem value="ministryStartDate_desc">Mais recente</SelectItem>
+                    <SelectItem value="ministryStartDate_asc">Mais antigo</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Botões de visualização */}
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'outline'}
                   onClick={() => setViewMode('grid')}

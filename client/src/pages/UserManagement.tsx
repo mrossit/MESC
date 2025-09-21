@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { authAPI } from "@/lib/auth";
+import { useTableSort } from "@/hooks/useTableSort";
+import { SortableTableHeader } from "@/components/ui/sortable-table-header";
 import { 
   Users, 
   Shield, 
@@ -325,7 +327,7 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter(user => {
+  const searchFilteredUsers = users.filter(user => {
     try {
       return user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -335,6 +337,13 @@ export default function UserManagement() {
       return false;
     }
   });
+
+  // Use sorting hook
+  const { sortedData: filteredUsers, sortConfig, handleSort } = useTableSort(
+    searchFilteredUsers,
+    'name' as keyof User,
+    'asc'
+  );
 
   const stats = {
     total: users.length,
@@ -440,11 +449,56 @@ export default function UserManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Contato</TableHead>
-                    <TableHead>Perfil</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Informações</TableHead>
+                    <TableHead>
+                      <SortableTableHeader
+                        sortKey="name"
+                        currentSortKey={sortConfig.key as string | null}
+                        direction={sortConfig.direction}
+                        onSort={() => handleSort('name' as keyof User)}
+                      >
+                        Usuário
+                      </SortableTableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableTableHeader
+                        sortKey="email"
+                        currentSortKey={sortConfig.key as string | null}
+                        direction={sortConfig.direction}
+                        onSort={() => handleSort('email' as keyof User)}
+                      >
+                        Contato
+                      </SortableTableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableTableHeader
+                        sortKey="role"
+                        currentSortKey={sortConfig.key as string | null}
+                        direction={sortConfig.direction}
+                        onSort={() => handleSort('role' as keyof User)}
+                      >
+                        Perfil
+                      </SortableTableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableTableHeader
+                        sortKey="status"
+                        currentSortKey={sortConfig.key as string | null}
+                        direction={sortConfig.direction}
+                        onSort={() => handleSort('status' as keyof User)}
+                      >
+                        Status
+                      </SortableTableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableTableHeader
+                        sortKey="totalServices"
+                        currentSortKey={sortConfig.key as string | null}
+                        direction={sortConfig.direction}
+                        onSort={() => handleSort('totalServices' as keyof User)}
+                      >
+                        Informações
+                      </SortableTableHeader>
+                    </TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>

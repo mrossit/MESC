@@ -255,7 +255,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               {currentStep === tutorialSteps.length - 1 ? (
                 <Button
                   onClick={handleFinish}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-gray-900 dark:text-white font-semibold shadow-lg border border-green-500"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-neutral-cream dark:text-text-light font-semibold shadow-lg border border-green-500"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   Concluir
@@ -263,7 +263,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               ) : (
                 <Button
                   onClick={handleNext}
-                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-gray-900 dark:text-white font-semibold shadow-lg border border-amber-500"
+                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-neutral-textDark dark:text-text-light font-semibold shadow-lg border border-amber-500"
                 >
                   Próximo
                   <ChevronRight className="h-4 w-4 ml-1" />

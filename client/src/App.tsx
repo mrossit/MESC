@@ -32,6 +32,7 @@ import Install from "@/pages/install";
 import UserManagement from "@/pages/UserManagement";
 import QRCodeShare from "@/pages/QRCodeShare";
 import NotFound from "@/pages/not-found";
+import Reports from "@/pages/Reports";
 
 function Router() {
   return (
@@ -128,10 +129,10 @@ function Router() {
           <Communication />
         </AuthGuard>
       </Route>
-      
+
       <Route path="/reports">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
-          <Dashboard />
+          <Reports />
         </AuthGuard>
       </Route>
       
