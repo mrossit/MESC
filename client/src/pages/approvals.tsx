@@ -16,13 +16,7 @@ export default function Approvals() {
   const { data, isLoading, error } = useQuery<UserType[]>({
     queryKey: ["/api/users/pending"],
     initialData: [], // Começar com array vazio
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
   });
-
-  // Debug logs
-  console.log('[Approvals] Query state:', { data, isLoading, error });
-  console.log('[Approvals] Pending users count:', data?.length || 0);
 
   // Garantir que pendingUsers seja sempre um array, mesmo que data seja null/undefined
   const pendingUsers = Array.isArray(data) ? data : [];

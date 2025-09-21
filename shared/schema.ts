@@ -406,18 +406,6 @@ export const insertMassTimeSchema = createInsertSchema(massTimesConfig).pick({
   eventName: true
 });
 
-// Push Notifications subscriptions
-export const pushSubscriptions = pgTable('push_subscriptions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
-  endpoint: text('endpoint').notNull(),
-  p256dh: text('p256dh').notNull(),
-  auth: text('auth').notNull(),
-  userAgent: text('user_agent'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
-});
-
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

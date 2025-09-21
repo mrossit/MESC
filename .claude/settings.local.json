@@ -39,11 +39,7 @@
       "Bash(psql:*)",
       "Bash(for file in client/src/pages/*.tsx)",
       "Bash(do grep -l \"<Layout\" \"$file\")",
-      "Bash(xargs:*)",
-      "Bash(claude mcp add:*)",
-      "Bash(claude mcp remove:*)",
-      "Bash(claude mcp:*)",
-      "mcp__TestSprite__testsprite_generate_code_summary"
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

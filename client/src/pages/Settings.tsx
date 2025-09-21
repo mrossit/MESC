@@ -7,13 +7,12 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Checkbox } from '../components/ui/checkbox';
-import {
-  Bell, Settings2, Heart, Church, Calendar, Users,
+import { 
+  Bell, Settings2, Heart, Church, Calendar, Users, 
   Save, AlertCircle, CheckCircle, Sparkles, Clock,
   HandHeart, PartyPopper
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { NotificationSettings } from '../components/notification-settings';
 
 type UserSettings = {
   pushNotifications: boolean;
@@ -327,14 +326,10 @@ export default function Settings() {
             )}
 
             <Tabs defaultValue="notifications" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="notifications" className="text-xs sm:text-sm">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Gerais
-                </TabsTrigger>
-                <TabsTrigger value="push" className="text-xs sm:text-sm">
-                  <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Push
+                  Notificações
                 </TabsTrigger>
                 <TabsTrigger value="availability" className="text-xs sm:text-sm">
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -409,10 +404,6 @@ export default function Settings() {
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="push" className="space-y-6 mt-6">
-                <NotificationSettings />
               </TabsContent>
 
               <TabsContent value="availability" className="space-y-6 mt-6">
