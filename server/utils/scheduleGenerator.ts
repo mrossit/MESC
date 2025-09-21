@@ -1,7 +1,7 @@
 import { logger } from './logger.js';
 import { db } from '../db.js';
 import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema';
-import { eq, and, gte, lte, desc, sql, ne } from 'drizzle-orm';
+import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -129,7 +129,11 @@ export class ScheduleGenerator {
         and(
           eq(questionnaires.month, month),
           eq(questionnaires.year, year),
-          eq(questionnaires.status, 'active')
+          or(
+            eq(questionnaires.status, 'open'),
+            eq(questionnaires.status, 'sent'),
+            eq(questionnaires.status, 'active')
+          )
         )
       );
 
