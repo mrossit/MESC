@@ -59,8 +59,8 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
       }
     }
 
-    // Gerar escalas automaticamente
-    const generatedSchedules = await generateAutomaticSchedule(year, month);
+    // Gerar escalas automaticamente (definitiva - exige questionário fechado)
+    const generatedSchedules = await generateAutomaticSchedule(year, month, false);
 
     // Salvar no banco se solicitado
     let savedCount = 0;
@@ -180,7 +180,7 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
       });
     }
 
-    const generatedSchedules = await generateAutomaticSchedule(year, month);
+    const generatedSchedules = await generateAutomaticSchedule(year, month, true); // Preview aceita questionários abertos
 
     res.json({
       success: true,
