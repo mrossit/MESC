@@ -210,6 +210,35 @@ export default function UserManagement() {
     },
   });
 
+  // Filter and sort data - MUST be before early returns to respect hooks rules
+  const searchFilteredUsers = users.filter(user => {
+    try {
+      return user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.city && user.city.toLowerCase().includes(searchTerm.toLowerCase()));
+    } catch (err) {
+      console.error("Error filtering user:", user, err);
+      return false;
+    }
+  });
+
+  // Use sorting hook - MUST be called on every render
+  const { sortedData: filteredUsers, sortConfig, handleSort } = useTableSort(
+    searchFilteredUsers,
+    'name' as keyof User,
+    'asc'
+  );
+
+  const stats = {
+    total: users.length,
+    reitores: users.filter(u => u.role === "gestor").length,
+    coordenadores: users.filter(u => u.role === "coordenador").length,
+    ministros: users.filter(u => u.role === "ministro").length,
+    active: users.filter(u => u.status === "active").length,
+    inactive: users.filter(u => u.status === "inactive").length,
+    pending: users.filter(u => u.status === "pending").length,
+  };
+
   // Show loading state
   if (isLoading) return <Layout><div className="text-center p-6">Carregando usuários...</div></Layout>;
   
@@ -327,33 +356,7 @@ export default function UserManagement() {
     }
   };
 
-  const searchFilteredUsers = users.filter(user => {
-    try {
-      return user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.city && user.city.toLowerCase().includes(searchTerm.toLowerCase()));
-    } catch (err) {
-      console.error("Error filtering user:", user, err);
-      return false;
-    }
-  });
-
-  // Use sorting hook
-  const { sortedData: filteredUsers, sortConfig, handleSort } = useTableSort(
-    searchFilteredUsers,
-    'name' as keyof User,
-    'asc'
-  );
-
-  const stats = {
-    total: users.length,
-    reitores: users.filter(u => u.role === "gestor").length,
-    coordenadores: users.filter(u => u.role === "coordenador").length,
-    ministros: users.filter(u => u.role === "ministro").length,
-    active: users.filter(u => u.status === "active").length,
-    inactive: users.filter(u => u.status === "inactive").length,
-    pending: users.filter(u => u.status === "pending").length,
-  };
+  // Helper functions moved here after hooks usage
 
 
   return (

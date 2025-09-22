@@ -66,6 +66,7 @@ const maritalStatusOptions = [
 
 export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [originalProfile, setOriginalProfile] = useState<UserProfile | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -115,6 +116,7 @@ export default function Profile() {
   useEffect(() => {
     if (userData) {
       setProfile(userData);
+      setOriginalProfile(userData);
     }
   }, [userData]);
   
@@ -221,6 +223,26 @@ export default function Profile() {
     }
   };
   
+  const handleCancelEdit = () => {
+    // Restaurar os valores originais
+    if (originalProfile) {
+      setProfile(originalProfile);
+    }
+    setIsEditing(false);
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleStartEdit = () => {
+    // Criar backup dos dados originais antes de editar
+    if (profile) {
+      setOriginalProfile({ ...profile });
+    }
+    setIsEditing(true);
+    setError(null);
+    setSuccess(null);
+  };
+
   const handleSaveProfile = async () => {
     if (!profile) return;
     
@@ -409,12 +431,12 @@ export default function Profile() {
                 </CardDescription>
               </div>
               {!isEditing ? (
-                <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto text-sm">
+                <Button onClick={handleStartEdit} className="w-full sm:w-auto text-sm">
                   Editar Perfil
                 </Button>
               ) : (
                 <div className="flex gap-2 w-full sm:w-auto">
-                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 sm:flex-initial text-sm">
+                  <Button variant="outline" onClick={handleCancelEdit} className="flex-1 sm:flex-initial text-sm">
                     Cancelar
                   </Button>
                   <Button onClick={handleSaveProfile} disabled={saving} className="flex-1 sm:flex-initial text-sm">

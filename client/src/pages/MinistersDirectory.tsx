@@ -7,8 +7,15 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
   Search, Users, Phone, Mail, Calendar, Heart,
-  Church, User, Filter, Grid, List, Info
+  Church, User, Filter, Grid, List, Info, ArrowUpDown
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -51,6 +58,8 @@ export default function MinistersDirectory() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMinister, setSelectedMinister] = useState<Minister | null>(null);
   const [filterRole, setFilterRole] = useState<string>('all');
+  const [sortField, setSortField] = useState<keyof Minister>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Buscar todos os ministros ativos
   const { data: ministersData, isLoading, error } = useQuery({
@@ -116,9 +125,29 @@ export default function MinistersDirectory() {
   };
 
   // Filtrar ministros para exibição (com filtro de papel)
-  const filteredMinisters = filterRole === 'all' 
-    ? baseFilteredMinisters 
+  const roleFilteredMinisters = filterRole === 'all'
+    ? baseFilteredMinisters
     : baseFilteredMinisters.filter((minister: Minister) => minister.role === filterRole);
+
+  // Aplicar ordenação
+  const filteredMinisters = [...roleFilteredMinisters].sort((a, b) => {
+    const aValue = a[sortField];
+    const bValue = b[sortField];
+
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+
+    let comparison = 0;
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      comparison = aValue.localeCompare(bValue);
+    } else if (aValue < bValue) {
+      comparison = -1;
+    } else if (aValue > bValue) {
+      comparison = 1;
+    }
+
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
