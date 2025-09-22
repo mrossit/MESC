@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import cookieParser from "cookie-parser";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { authenticateToken, requireRole, AuthRequest } from "./auth";
 import authRoutes from "./authRoutes";
@@ -333,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const imageBuffer = Buffer.from(user.imageData, 'base64');
       
       // Headers de cache com versioning para permitir atualizações
-      const imageHash = require('crypto').createHash('md5').update(user.imageData).digest('hex');
+      const imageHash = crypto.createHash('md5').update(user.imageData).digest('hex');
       
       res.set({
         'Content-Type': user.imageContentType || 'image/jpeg',
