@@ -105,47 +105,68 @@ export default function Reports() {
   // Fetch summary metrics
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["/api/reports/summary"],
-    queryFn: () => apiRequest("GET", "/api/reports/summary")
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/reports/summary");
+      return response.json();
+    }
   });
 
   // Fetch availability metrics
   const { data: availability, isLoading: availabilityLoading } = useQuery({
     queryKey: ["/api/reports/availability", dateRange],
-    queryFn: () => apiRequest("GET", "/api/reports/availability", null, {
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate,
-      limit: 10
-    })
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate || '',
+        endDate: dateRange.endDate || '',
+        limit: '10'
+      });
+      const response = await apiRequest("GET", `/api/reports/availability?${params}`);
+      return response.json();
+    }
   });
 
   // Fetch substitution metrics
   const { data: substitutions, isLoading: substitutionsLoading } = useQuery({
     queryKey: ["/api/reports/substitutions", dateRange],
-    queryFn: () => apiRequest("GET", "/api/reports/substitutions", null, {
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate
-    })
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate || '',
+        endDate: dateRange.endDate || ''
+      });
+      const response = await apiRequest("GET", `/api/reports/substitutions?${params}`);
+      return response.json();
+    }
   });
 
   // Fetch engagement metrics
   const { data: engagement, isLoading: engagementLoading } = useQuery({
     queryKey: ["/api/reports/engagement", dateRange],
-    queryFn: () => apiRequest("GET", "/api/reports/engagement", null, {
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate
-    })
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate || '',
+        endDate: dateRange.endDate || ''
+      });
+      const response = await apiRequest("GET", `/api/reports/engagement?${params}`);
+      return response.json();
+    }
   });
 
   // Fetch formation metrics
   const { data: formation, isLoading: formationLoading } = useQuery({
     queryKey: ["/api/reports/formation"],
-    queryFn: () => apiRequest("GET", "/api/reports/formation")
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/reports/formation");
+      return response.json();
+    }
   });
 
   // Fetch family metrics
   const { data: families, isLoading: familiesLoading } = useQuery({
     queryKey: ["/api/reports/families"],
-    queryFn: () => apiRequest("GET", "/api/reports/families")
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/reports/families");
+      return response.json();
+    }
   });
 
   // Format data for charts
