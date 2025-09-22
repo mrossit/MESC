@@ -332,12 +332,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Converter base64 para buffer
       const imageBuffer = Buffer.from(user.imageData, 'base64');
       
-      // Headers de cache para otimizar performance
+      // Headers de cache com versioning para permitir atualizações
+      const imageHash = require('crypto').createHash('md5').update(user.imageData).digest('hex');
+      
       res.set({
         'Content-Type': user.imageContentType || 'image/jpeg',
         'Content-Length': imageBuffer.length.toString(),
-        'Cache-Control': 'public, max-age=31536000, immutable', // Cache por 1 ano
-        'ETag': `"${userId}-${Buffer.from(user.imageData.substring(0, 32)).toString('hex')}"` // ETag baseado no hash da imagem
+        'Cache-Control': 'public, max-age=3600', // Cache por 1 hora apenas
+        'ETag': `"${userId}-${imageHash}"`, // ETag baseado no hash completo da imagem
+        'Last-Modified': new Date().toUTCString() // Adicionar data de modificação
       });
       
       res.send(imageBuffer);

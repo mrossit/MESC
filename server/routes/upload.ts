@@ -94,7 +94,9 @@ router.post('/profile-photo', authenticateToken, upload.single('photo'), handleM
     const contentType = 'image/jpeg';
     
     // Atualizar dados da imagem no banco de dados
-    const photoUrl = `/api/users/${userId}/photo`;
+    // Adicionar timestamp para invalidar cache do browser
+    const timestamp = Date.now();
+    const photoUrl = `/api/users/${userId}/photo?v=${timestamp}`;
     
     if (!db) {
       return res.status(500).json({ error: 'Erro interno: banco de dados não disponível' });
