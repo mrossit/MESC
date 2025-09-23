@@ -29,14 +29,17 @@ import {
   Shield,
   Sparkles
 } from "lucide-react";
-import { useParams } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
-import churchMapSvg from "@assets/church-map.svg";
-
-export default function Formation() {
-  const { track } = useParams();
+  const { track, module, lesson } = useParams();
+  const [location, navigate] = useLocation();
   const [mapZoom, setMapZoom] = useState(1);
   const [showMapInfo, setShowMapInfo] = useState(false);
+
+  // Se está visualizando uma aula específica
+  if (lesson) {
+    return <LessonContent module={module} lesson={lesson} />;
+  }
 
   if (track === 'library') {
     return (
@@ -274,6 +277,17 @@ export default function Formation() {
                           <li>• A presença real de Jesus na Eucaristia</li>
                           <li>• A comunhão como participação no Corpo de Cristo</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={() => navigate('/formation/liturgia/1')}
+                            data-testid="button-start-lesson-1"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -297,6 +311,17 @@ export default function Formation() {
                           <li>• Ritos finais e envio missionário</li>
                           <li>• Sinais, símbolos e gestos litúrgicos</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={() => navigate('/formation/liturgia/2')}
+                            data-testid="button-start-lesson-2"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -320,6 +345,17 @@ export default function Formation() {
                           <li>• Responsabilidades e limites do ministério</li>
                           <li>• A dignidade e santidade requeridas</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={() => navigate('/formation/liturgia/3')}
+                            data-testid="button-start-lesson-3"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -343,6 +379,17 @@ export default function Formation() {
                           <li>• Cores litúrgicas e seus significados</li>
                           <li>• Adaptações sazonais na distribuição</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={() => navigate('/formation/liturgia/4')}
+                            data-testid="button-start-lesson-4"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -384,6 +431,17 @@ export default function Formation() {
                           <li>• Adoração eucarística</li>
                           <li>• Preparação espiritual para o ministério</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => navigate('/formation/espiritualidade/1')}
+                            data-testid="button-start-spiritual-1"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -407,6 +465,17 @@ export default function Formation() {
                           <li>• Caridade e compaixão</li>
                           <li>• Prudência e discrição</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => navigate('/formation/espiritualidade/2')}
+                            data-testid="button-start-spiritual-2"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -430,6 +499,17 @@ export default function Formation() {
                           <li>• Participação em retiros</li>
                           <li>• Acompanhamento espiritual</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => navigate('/formation/espiritualidade/3')}
+                            data-testid="button-start-spiritual-3"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -471,6 +551,17 @@ export default function Formation() {
                           <li>• Formação da procissão de comunhão</li>
                           <li>• Retorno ao lugar após o ministério</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => navigate('/formation/pratica/1')}
+                            data-testid="button-start-practical-1"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -495,6 +586,17 @@ export default function Formation() {
                           <li>• Comunhão na mão e na boca</li>
                           <li>• Cuidados com fragmentos</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => navigate('/formation/pratica/2')}
+                            data-testid="button-start-practical-2"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -519,6 +621,17 @@ export default function Formation() {
                           <li>• Pessoas não católicas na fila</li>
                           <li>• Comunhão aos enfermos</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => navigate('/formation/pratica/3')}
+                            data-testid="button-start-practical-3"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -543,6 +656,17 @@ export default function Formation() {
                           <li>• Estado de graça e preparação espiritual</li>
                           <li>• Pontualidade e disponibilidade</li>
                         </ul>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => navigate('/formation/pratica/4')}
+                            data-testid="button-start-practical-4"
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Iniciar Aula
+                          </Button>
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
