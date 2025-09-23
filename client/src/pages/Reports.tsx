@@ -252,16 +252,16 @@ export default function Reports() {
         {/* Filters Section */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col gap-4">
               <div>
                 <CardTitle>Filtros de Período</CardTitle>
                 <CardDescription>
                   Selecione o período para análise dos dados
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Select value={period} onValueChange={setPeriod}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <Calendar className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Período" />
                   </SelectTrigger>
@@ -274,23 +274,25 @@ export default function Reports() {
                   </SelectContent>
                 </Select>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => window.location.reload()}
-                  title="Atualizar dados"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => window.location.reload()}
+                    title="Atualizar dados"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  title="Exportar relatório"
-                  disabled
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="Exportar relatório"
+                    disabled
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -407,32 +409,34 @@ export default function Reports() {
 
         {/* Main Content Tabs */}
         <Card>
-          <CardHeader>
-            <CardTitle>Análise Detalhada</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base sm:text-lg">Análise Detalhada</CardTitle>
+            <CardDescription className="text-sm">
               Explore as métricas detalhadas do ministério por categoria
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-6">
             <Tabs defaultValue="availability" className="space-y-4">
-              <TabsList className="grid grid-cols-2 lg:grid-cols-5 w-full">
-                <TabsTrigger value="availability">Disponibilidade</TabsTrigger>
-                <TabsTrigger value="substitutions">Substituições</TabsTrigger>
-                <TabsTrigger value="engagement">Engajamento</TabsTrigger>
-                <TabsTrigger value="formation">Formação</TabsTrigger>
-                <TabsTrigger value="families">Famílias</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto pb-2">
+                <TabsList className="inline-flex h-auto w-max lg:w-full lg:grid lg:grid-cols-5 gap-1 p-1">
+                  <TabsTrigger value="availability" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Disponibilidade</TabsTrigger>
+                  <TabsTrigger value="substitutions" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Substituições</TabsTrigger>
+                  <TabsTrigger value="engagement" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Engajamento</TabsTrigger>
+                  <TabsTrigger value="formation" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Formação</TabsTrigger>
+                  <TabsTrigger value="families" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Famílias</TabsTrigger>
+                </TabsList>
+              </div>
 
               {/* Availability Tab */}
-              <TabsContent value="availability" className="space-y-4">
+              <TabsContent value="availability" className="space-y-4 mt-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Top 10 Ministros Mais Disponíveis</CardTitle>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-base sm:text-lg">Top 10 Ministros Mais Disponíveis</CardTitle>
                     <CardDescription>
                       Ministros com maior número de dias disponíveis no período
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-2 sm:p-6">
                     {availabilityLoading ? (
                       <div className="flex items-center justify-center h-64">
                         <div className="text-center">
@@ -441,21 +445,25 @@ export default function Reports() {
                         </div>
                       </div>
                     ) : availabilityChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={availabilityChartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="dias" fill="#D4AF37" name="Dias Disponíveis" />
-                          <Bar dataKey="respostas" fill="#B87333" name="Questionários Respondidos" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="w-full overflow-x-auto">
+                        <div className="min-w-[400px]">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={availabilityChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                              <Bar dataKey="dias" fill="#D4AF37" name="Dias Disponíveis" />
+                              <Bar dataKey="respostas" fill="#B87333" name="Questionários Respondidos" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                         <FileText className="h-12 w-12 mb-2" />
-                        <p>Nenhum dado disponível para o período selecionado</p>
+                        <p className="text-center">Nenhum dado disponível para o período selecionado</p>
                       </div>
                     )}
                   </CardContent>
@@ -463,42 +471,46 @@ export default function Reports() {
               </TabsContent>
 
               {/* Substitutions Tab */}
-              <TabsContent value="substitutions" className="space-y-4">
+              <TabsContent value="substitutions" className="space-y-4 mt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Distribuição de Substituições</CardTitle>
                       <CardDescription>Status das substituições no período</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-2 sm:p-6">
                       {substitutionsLoading ? (
                         <div className="flex items-center justify-center h-64">
                           <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                       ) : substitutionPieData.some(d => d.value > 0) ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={substitutionPieData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, value }) => `${name}: ${value}`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {substitutionPieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        <div className="w-full overflow-x-auto">
+                          <div className="min-w-[300px]">
+                            <ResponsiveContainer width="100%" height={300}>
+                              <PieChart>
+                                <Pie
+                                  data={substitutionPieData}
+                                  cx="50%"
+                                  cy="50%"
+                                  labelLine={false}
+                                  label={({ name, value }) => `${name}: ${value}`}
+                                  outerRadius={80}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  {substitutionPieData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                                </Pie>
+                                <Tooltip />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                           <RefreshCw className="h-12 w-12 mb-2" />
-                          <p>Nenhuma substituição no período</p>
+                          <p className="text-center">Nenhuma substituição no período</p>
                         </div>
                       )}
                     </CardContent>
@@ -554,7 +566,7 @@ export default function Reports() {
               </TabsContent>
 
               {/* Engagement Tab */}
-              <TabsContent value="engagement" className="space-y-4">
+              <TabsContent value="engagement" className="space-y-4 mt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
@@ -631,7 +643,7 @@ export default function Reports() {
               </TabsContent>
 
               {/* Formation Tab */}
-              <TabsContent value="formation" className="space-y-4">
+              <TabsContent value="formation" className="space-y-4 mt-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Progresso de Formação</CardTitle>
@@ -639,27 +651,31 @@ export default function Reports() {
                       Ministros com melhor desempenho nos módulos de formação
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-2 sm:p-6">
                     {formationLoading ? (
                       <div className="flex items-center justify-center h-64">
                         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
                       </div>
                     ) : formationChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={formationChartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Area type="monotone" dataKey="completados" stackId="1" stroke="#D4AF37" fill="#D4AF37" name="Completados" />
-                          <Area type="monotone" dataKey="emAndamento" stackId="1" stroke="#B87333" fill="#B87333" name="Em Andamento" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                      <div className="w-full overflow-x-auto">
+                        <div className="min-w-[400px]">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <AreaChart data={formationChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                              <Area type="monotone" dataKey="completados" stackId="1" stroke="#D4AF37" fill="#D4AF37" name="Completados" />
+                              <Area type="monotone" dataKey="emAndamento" stackId="1" stroke="#B87333" fill="#B87333" name="Em Andamento" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                         <BookOpen className="h-12 w-12 mb-2" />
-                        <p>Nenhum dado de formação disponível</p>
+                        <p className="text-center">Nenhum dado de formação disponível</p>
                       </div>
                     )}
                   </CardContent>
@@ -698,7 +714,7 @@ export default function Reports() {
               </TabsContent>
 
               {/* Families Tab */}
-              <TabsContent value="families" className="space-y-4">
+              <TabsContent value="families" className="space-y-4 mt-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Famílias MESC Mais Ativas</CardTitle>
