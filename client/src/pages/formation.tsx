@@ -31,6 +31,32 @@ import {
 } from "lucide-react";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
+
+// Simple component to handle lesson content
+function LessonContent({ module, lesson }: { module: string; lesson: string }) {
+  return (
+    <Layout title={`Aula ${lesson}`} subtitle={`Módulo: ${module}`}>
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Aula {lesson}</h2>
+            <p className="text-muted-foreground mb-4">Módulo: {module}</p>
+            <p className="text-sm">Conteúdo da aula em desenvolvimento.</p>
+            <Button 
+              onClick={() => window.history.back()} 
+              className="mt-4"
+              data-testid="button-back"
+            >
+              Voltar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Layout>
+  );
+}
+
+export default function Formation() {
   const { track, module, lesson } = useParams();
   const [location, navigate] = useLocation();
   const [mapZoom, setMapZoom] = useState(1);
@@ -38,7 +64,7 @@ import { useState } from "react";
 
   // Se está visualizando uma aula específica
   if (lesson) {
-    return <LessonContent module={module} lesson={lesson} />;
+    return <LessonContent module={module || ''} lesson={lesson} />;
   }
 
   if (track === 'library') {
@@ -138,12 +164,16 @@ import { useState } from "react";
                     className="flex justify-center"
                     style={{ transform: `scale(${mapZoom})`, transformOrigin: 'center top' }}
                   >
-                    <img 
-                      src={churchMapSvg} 
-                      alt="Mapa do Santuário São Judas Tadeu" 
-                      className="max-w-full h-auto"
-                      data-testid="img-church-map"
-                    />
+                    <div 
+                      className="w-full max-w-2xl h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600"
+                      data-testid="placeholder-church-map"
+                    >
+                      <div className="text-center">
+                        <Map className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500 dark:text-gray-400 font-medium">Mapa do Santuário</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500">Em desenvolvimento</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
