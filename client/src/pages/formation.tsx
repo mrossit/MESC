@@ -585,7 +585,7 @@ export default function Formation() {
                       <Accordion type="single" collapsible className="w-full">
                         {modules.map((module: FormationModule, index: number) => (
                           <AccordionItem key={module.id} value={`item-${module.id}`}>
-                            <AccordionTrigger>
+                            <AccordionTrigger className="pl-[12px] pr-[12px] pt-[12px] pb-[12px]">
                               <div className="flex items-center gap-2">
                                 <BookOpen className="h-4 w-4" />
                                 <span>{index + 1}. {module.title}</span>
