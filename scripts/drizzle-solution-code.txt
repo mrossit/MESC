@@ -1,0 +1,82 @@
+
+// SOLUÇÃO PARA STORAGE.TS - Fallback SQLite quando Drizzle falha
+
+import Database from 'better-sqlite3';
+
+class DrizzleSQLiteFallback {
+  static sqliteDb = null;
+  
+  static getSQLiteDB() {
+    if (!this.sqliteDb) {
+      this.sqliteDb = new Database('local.db');
+    }
+    return this.sqliteDb;
+  }
+  
+  static async safeQuery(drizzleQuery, fallbackSQL, fallbackMapper = (row) => row) {
+    try {
+      // Tentar Drizzle primeiro
+      return await drizzleQuery();
+    } catch (drizzleError) {
+      if (drizzleError.code === 'SQLITE_ERROR') {
+        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
+        
+        // Usar SQLite direto como fallback
+        const sqlite = this.getSQLiteDB();
+        const result = sqlite.prepare(fallbackSQL).all();
+        return result.map(fallbackMapper);
+      }
+      throw drizzleError;
+    }
+  }
+  
+  static async safeQueryFirst(drizzleQuery, fallbackSQL, fallbackMapper = (row) => row) {
+    try {
+      // Tentar Drizzle primeiro
+      return await drizzleQuery();
+    } catch (drizzleError) {
+      if (drizzleError.code === 'SQLITE_ERROR') {
+        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
+        
+        // Usar SQLite direto como fallback
+        const sqlite = this.getSQLiteDB();
+        const result = sqlite.prepare(fallbackSQL).get();
+        return result ? fallbackMapper(result) : undefined;
+      }
+      throw drizzleError;
+    }
+  }
+}
+
+// APLICAR NO STORAGE.TS:
+
+// Para getAllUsers():
+async getAllUsers(): Promise<User[]> {
+  return await DrizzleSQLiteFallback.safeQuery(
+    () => db.select().from(users).orderBy(desc(users.createdAt)),
+    'SELECT * FROM users ORDER BY createdAt DESC',
+    (row) => ({
+      ...row,
+      requiresPasswordChange: !!row.requires_password_change,
+      passwordHash: row.password_hash || row.passwordHash,
+      firstName: row.first_name || row.firstName,
+      lastName: row.last_name || row.lastName,
+      lastLogin: row.last_login ? new Date(row.last_login) : null
+    })
+  );
+}
+
+// Para getFormationTracks():
+async getFormationTracks(): Promise<FormationTrack[]> {
+  return await DrizzleSQLiteFallback.safeQuery(
+    () => db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title),
+    'SELECT * FROM formation_tracks ORDER BY orderIndex, title',
+    (row) => ({
+      ...row,
+      isActive: !!row.isActive,
+      isRequired: !!row.isRequired,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt)
+    })
+  );
+}

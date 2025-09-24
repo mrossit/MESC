@@ -36,6 +36,61 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or } from "drizzle-orm";
+import Database from 'better-sqlite3';
+
+// SOLUÇÃO DEFINITIVA: Fallback SQLite quando Drizzle falha
+class DrizzleSQLiteFallback {
+  private static sqliteDb: Database.Database | null = null;
+  
+  static getSQLiteDB(): Database.Database {
+    if (!this.sqliteDb) {
+      this.sqliteDb = new Database('local.db');
+    }
+    return this.sqliteDb;
+  }
+  
+  static async safeQuery<T>(
+    drizzleQuery: () => Promise<T>, 
+    fallbackSQL: string, 
+    fallbackMapper: (row: any) => any = (row) => row
+  ): Promise<T> {
+    try {
+      // Tentar Drizzle primeiro
+      return await drizzleQuery();
+    } catch (drizzleError: any) {
+      if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
+        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
+        
+        // Usar SQLite direto como fallback
+        const sqlite = this.getSQLiteDB();
+        const result = sqlite.prepare(fallbackSQL).all();
+        return result.map(fallbackMapper) as T;
+      }
+      throw drizzleError;
+    }
+  }
+  
+  static async safeQueryFirst<T>(
+    drizzleQuery: () => Promise<T>, 
+    fallbackSQL: string, 
+    fallbackMapper: (row: any) => any = (row) => row
+  ): Promise<T> {
+    try {
+      // Tentar Drizzle primeiro
+      return await drizzleQuery();
+    } catch (drizzleError: any) {
+      if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
+        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
+        
+        // Usar SQLite direto como fallback
+        const sqlite = this.getSQLiteDB();
+        const result = sqlite.prepare(fallbackSQL).get();
+        return (result ? fallbackMapper(result) : undefined) as T;
+      }
+      throw drizzleError;
+    }
+  }
+}
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -202,7 +257,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    return await DrizzleSQLiteFallback.safeQuery(
+      () => db.select().from(users).orderBy(desc(users.createdAt)),
+      'SELECT * FROM users ORDER BY createdAt DESC',
+      (row) => ({
+        ...row,
+        requiresPasswordChange: !!row.requires_password_change,
+        passwordHash: row.password_hash || row.passwordHash,
+        firstName: row.first_name || row.firstName,
+        lastName: row.last_name || row.lastName,
+        lastLogin: row.last_login ? new Date(row.last_login) : null,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      })
+    );
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
@@ -643,7 +711,17 @@ export class DatabaseStorage implements IStorage {
 
   // Formation track operations
   async getFormationTracks(): Promise<FormationTrack[]> {
-    return await db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title);
+    return await DrizzleSQLiteFallback.safeQuery(
+      () => db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title),
+      'SELECT * FROM formation_tracks ORDER BY orderIndex, title',
+      (row) => ({
+        ...row,
+        isActive: !!row.isActive,
+        isRequired: !!row.isRequired,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      })
+    );
   }
 
   async getFormationTrackById(id: string): Promise<FormationTrack | undefined> {
