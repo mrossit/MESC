@@ -89,7 +89,14 @@ export const authAPI = {
   async login(credentials: LoginCredentials): Promise<{ user: AuthUser }> {
     try {
       const response = await apiRequest("POST", "/api/auth/login", credentials);
-      return response.json();
+      const data = await response.json();
+      
+      // 🔑 IMPORTANTE: Salvar o token no localStorage para requisições futuras
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      
+      return data;
     } catch (error: any) {
       // Extrair mensagem do JSON se possível
       const errorMessage = error.message || "Erro ao fazer login";
