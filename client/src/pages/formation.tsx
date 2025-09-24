@@ -549,7 +549,12 @@ export default function Formation() {
                     {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
                     {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
                     {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
-                    <span className="text-center break-words leading-tight max-w-full">{track.title}</span>
+                    <span className="text-center break-words leading-tight max-w-full">
+                      {track.id === 'liturgia' ? 'Básico' :
+                       track.id === 'espiritualidade' ? 'Espiritualidade' :
+                       track.id === 'pratica' ? 'Práticas' :
+                       track.title}
+                    </span>
                   </div>
                 </TabsTrigger>
               ))}
@@ -571,7 +576,7 @@ export default function Formation() {
                       {track.description}
                     </p>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-6 pt-0 pl-[18px] pr-[18px]">
                     {modulesLoading ? (
                       <div className="text-center py-8">
                         <div className="animate-spin h-6 w-6 border-b-2 border-gray-900 mx-auto mb-4"></div>
