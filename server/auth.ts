@@ -73,12 +73,12 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   const verifyAndCheckStatus = async (user: any) => {
     console.log('🔍 DEBUG: [AUTH] Verificando status do usuário:', user.id);
     try {
-      // Verificar status ativo do usuário no banco
-      const [currentUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, user.id))
-        .limit(1);
+      // Usar SQLite direto como fallback (mesmo problema de esquema)
+      const Database = require('better-sqlite3');
+      const sqliteDb = new Database('local.db');
+      
+      const currentUser = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+      sqliteDb.close();
 
       console.log('✅ DEBUG: [AUTH] Usuário encontrado no banco:', currentUser ? 'SIM' : 'NÃO');
 
