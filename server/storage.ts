@@ -27,6 +27,7 @@ import {
   type InsertFamilyRelationship,
   type FormationTrack,
   type InsertFormationTrack,
+  type FormationModule,
   type FormationLesson,
   type InsertFormationLesson,
   type FormationLessonSection,
@@ -162,6 +163,9 @@ export interface IStorage {
   createFormationTrack(track: InsertFormationTrack): Promise<FormationTrack>;
   updateFormationTrack(id: string, track: Partial<InsertFormationTrack>): Promise<FormationTrack>;
   deleteFormationTrack(id: string): Promise<void>;
+  
+  // Formation module operations
+  getFormationModules(trackId: string): Promise<FormationModule[]>;
 
   // Formation lesson operations
   getFormationLessons(trackId?: string, moduleId?: string): Promise<FormationLesson[]>;
@@ -727,6 +731,19 @@ export class DatabaseStorage implements IStorage {
   async getFormationTrackById(id: string): Promise<FormationTrack | undefined> {
     const [track] = await db.select().from(formationTracks).where(eq(formationTracks.id, id));
     return track;
+  }
+
+  // Formation module operations
+  async getFormationModules(trackId: string): Promise<FormationModule[]> {
+    return await DrizzleSQLiteFallback.safeQuery(
+      () => db.select().from(formationModules).where(eq(formationModules.trackId, trackId)).orderBy(formationModules.orderIndex, formationModules.title),
+      `SELECT * FROM formation_modules WHERE trackId = '${trackId}' ORDER BY orderIndex, title`,
+      (row) => ({
+        ...row,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      })
+    );
   }
 
   async createFormationTrack(trackData: InsertFormationTrack): Promise<FormationTrack> {

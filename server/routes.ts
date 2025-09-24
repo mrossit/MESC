@@ -992,6 +992,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Formation modules by track
+  app.get('/api/formation/modules/:trackId', authenticateToken, async (req, res) => {
+    try {
+      const { trackId } = req.params;
+      // Map short names to full IDs
+      const trackIdMap: { [key: string]: string } = {
+        'liturgy': 'liturgy-track-1',
+        'spirituality': 'spirituality-track-1', 
+        'practical': 'practical-track-1'
+      };
+      
+      const fullTrackId = trackIdMap[trackId] || trackId;
+      const modules = await storage.getFormationModules(fullTrackId);
+      res.json(modules);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar módulos de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   // Formation lessons
   app.get('/api/formation/lessons', authenticateToken, async (req, res) => {
     try {
