@@ -575,17 +575,17 @@ export default function Formation() {
                         <div className="animate-spin h-6 w-6 border-b-2 border-gray-900 mx-auto mb-4"></div>
                         <p className="text-sm text-muted-foreground">Carregando aulas...</p>
                       </div>
-                    ) : lessons && lessons.length > 0 ? (
+                    ) : modules && modules.length > 0 ? (
                       <Accordion type="single" collapsible className="w-full">
-                        {lessons.map((lesson: FormationLesson, index: number) => (
-                          <AccordionItem key={lesson.id} value={`item-${lesson.lessonNumber}`}>
+                        {modules.map((module: FormationModule, index: number) => (
+                          <AccordionItem key={module.id} value={`item-${module.id}`}>
                             <AccordionTrigger>
                               <div className="flex items-center gap-2">
-                                <Church className="h-4 w-4" />
-                                <span>{lesson.lessonNumber}. {lesson.title}</span>
-                                {lesson.durationMinutes && (
+                                <BookOpen className="h-4 w-4" />
+                                <span>{index + 1}. {module.title}</span>
+                                {module.estimatedDuration && (
                                   <Badge variant="outline" className="ml-2">
-                                    {lesson.durationMinutes} min
+                                    {module.estimatedDuration} min
                                   </Badge>
                                 )}
                               </div>
@@ -593,15 +593,8 @@ export default function Formation() {
                             <AccordionContent>
                               <div className="space-y-3 pt-2">
                                 <p className="text-sm text-muted-foreground">
-                                  {lesson.description}
+                                  {module.description}
                                 </p>
-                                {lesson.objectives && lesson.objectives.length > 0 && (
-                                  <ul className="text-sm space-y-1 ml-4">
-                                    {lesson.objectives.map((objective: string, idx: number) => (
-                                      <li key={idx}>• {objective}</li>
-                                    ))}
-                                  </ul>
-                                )}
                                 <div className="flex gap-2 mt-4">
                                   <Button 
                                     size="sm" 
@@ -610,11 +603,11 @@ export default function Formation() {
                                       track.id === 'espiritualidade' ? 'bg-red-600 hover:bg-red-700' :
                                       'bg-blue-600 hover:bg-blue-700'
                                     }`}
-                                    onClick={() => navigate(`/formation/${track.id}/${lesson.moduleId}/${lesson.lessonNumber}`)}
-                                    data-testid={`button-start-lesson-${track.id}-${lesson.lessonNumber}`}
+                                    onClick={() => navigate(`/formation/${track.id}/${module.id}`)}
+                                    data-testid={`button-start-module-${track.id}-${module.id}`}
                                   >
                                     <PlayCircle className="h-4 w-4 mr-2" />
-                                    Iniciar Aula
+                                    Ver Aulas
                                   </Button>
                                 </div>
                               </div>
