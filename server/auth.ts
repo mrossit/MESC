@@ -187,11 +187,19 @@ export async function login(email: string, password: string) {
 
     // Verifica a senha
     const passwordHash = user.passwordHash || '';
+    console.log('🔍 DEBUG: Verificando senha...');
+    console.log('🔍 DEBUG: Senha fornecida:', password);
+    console.log('🔍 DEBUG: Hash armazenado:', passwordHash.substring(0, 20) + '...');
+    
     const isValidPassword = await verifyPassword(password, passwordHash);
+    console.log('🔍 DEBUG: Resultado da verificação:', isValidPassword);
 
     if (!isValidPassword) {
+      console.log('❌ DEBUG: Senha inválida, rejeitando login');
       throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
+    
+    console.log('✅ DEBUG: Senha válida, continuando login...');
 
     // Gera token JWT
     const token = generateToken(user);
