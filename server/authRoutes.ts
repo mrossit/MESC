@@ -238,23 +238,34 @@ router.post('/logout', (req, res) => {
 // Rota para trocar senha
 router.post('/change-password', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    console.log('🔍 DEBUG: Recebendo dados para mudança de senha...');
+    console.log('🔍 DEBUG: Body recebido:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 DEBUG: User autenticado:', req.user?.id);
+    
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+    console.log('✅ DEBUG: Dados validados com sucesso');
     
     if (!req.user?.id) {
+      console.log('❌ DEBUG: Usuário não autenticado');
       return res.status(401).json({
         success: false,
         message: 'Usuário não autenticado'
       });
     }
     
+    console.log('🔍 DEBUG: Chamando função changePassword...');
     const result = await changePassword(req.user.id, currentPassword, newPassword);
+    console.log('✅ DEBUG: Senha alterada com sucesso!');
     
     res.json({
       success: true,
       message: result.message
     });
   } catch (error: any) {
+    console.log('❌ DEBUG: Erro na mudança de senha:', error);
+    
     if (error instanceof z.ZodError) {
+      console.log('❌ DEBUG: Erro de validação Zod:', error.errors);
       return res.status(400).json({
         success: false,
         message: 'Dados inválidos',
