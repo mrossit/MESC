@@ -309,7 +309,13 @@ export async function changePassword(userId: string, currentPassword: string, ne
     }
 
     // Verifica senha atual
+    console.log('🔍 DEBUG: [CHANGE PASSWORD] Verificando senha atual...');
+    console.log('🔍 DEBUG: [CHANGE PASSWORD] Senha fornecida:', currentPassword);
+    console.log('🔍 DEBUG: [CHANGE PASSWORD] Hash no banco:', user.passwordHash ? 'PRESENTE' : 'AUSENTE');
+    console.log('🔍 DEBUG: [CHANGE PASSWORD] Hash completo:', user.passwordHash);
+    
     const isValidPassword = await verifyPassword(currentPassword, user.passwordHash || '');
+    console.log('🔍 DEBUG: [CHANGE PASSWORD] Resultado da verificação:', isValidPassword);
 
     if (!isValidPassword) {
       sqliteDb.close();
