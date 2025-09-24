@@ -297,14 +297,14 @@ export async function register(userData: {
 // Trocar senha
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   try {
+    // Usar SQLite direto como fallback (mesmo problema de esquema)
+    const sqliteDb = new Database('local.db');
+    
     // Busca usuário
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const user = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
     if (!user) {
+      sqliteDb.close();
       throw new Error('Usuário não encontrado');
     }
 
@@ -312,21 +312,21 @@ export async function changePassword(userId: string, currentPassword: string, ne
     const isValidPassword = await verifyPassword(currentPassword, user.passwordHash || '');
 
     if (!isValidPassword) {
+      sqliteDb.close();
       throw new Error('Senha atual incorreta');
     }
 
     // Hash da nova senha
     const newPasswordHash = await hashPassword(newPassword);
 
-    // Atualiza a senha
-    await db
-      .update(users)
-      .set({
-        passwordHash: newPasswordHash,
-        requiresPasswordChange: false,
-        updatedAt: new Date()
-      })
-      .where(eq(users.id, userId));
+    // Atualiza a senha usando SQLite direto
+    sqliteDb.prepare(`
+      UPDATE users 
+      SET passwordHash = ?, requiresPasswordChange = 0 
+      WHERE id = ?
+    `).run(newPasswordHash, userId);
+    
+    sqliteDb.close();
 
     return { message: 'Senha alterada com sucesso' };
   } catch (error) {
