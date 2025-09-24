@@ -536,7 +536,7 @@ export default function Formation() {
           </Card>
         ) : tracks && tracks.length > 0 ? (
           <Tabs defaultValue={tracks[0]?.id || "liturgia"} className="w-full">
-            <TabsList className="h-auto min-h-[3rem] items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full grid-cols-3 gap-1">
+            <TabsList className="h-auto min-h-[3rem] items-center justify-center rounded-md bg-muted p-2 text-muted-foreground grid w-full grid-cols-3 gap-1">
               {tracks.map((track: FormationTrack) => (
                 <TabsTrigger 
                   key={track.id} 
@@ -548,8 +548,8 @@ export default function Formation() {
                   {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
                   {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
                   {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
-                  <span className="text-center leading-tight truncate w-full">
-                    {/* Versão 2.0 - textos simplificados */}
+                  <span className="text-center leading-tight truncate w-full font-medium">
+                    {/* ✨ V3.0 - CORRIGIDO: textos curtos e responsivos */}
                     {track.id === 'liturgia' ? 'Básico' :
                      track.id === 'espiritualidade' ? 'Espiritual' :
                      track.id === 'pratica' ? 'Práticas' :
