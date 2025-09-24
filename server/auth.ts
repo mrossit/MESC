@@ -64,15 +64,11 @@ export function generateToken(user: any): string {
 
 // Middleware para verificar JWT
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
-  console.log('🔍 DEBUG: [AUTH] Middleware de autenticação chamado');
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   const secret: string = JWT_SECRET;
 
-  console.log('🔍 DEBUG: [AUTH] Token no header:', token ? 'PRESENTE' : 'AUSENTE');
-
   const verifyAndCheckStatus = async (user: any) => {
-    console.log('🔍 DEBUG: [AUTH] Verificando status do usuário:', user.id);
     try {
       // Usar SQLite direto como fallback (mesmo problema de esquema)
       const sqliteDb = new Database('local.db');
@@ -80,18 +76,14 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
       const currentUser = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
       sqliteDb.close();
 
-      console.log('✅ DEBUG: [AUTH] Usuário encontrado no banco:', currentUser ? 'SIM' : 'NÃO');
-
       if (!currentUser || currentUser.status !== 'active') {
-        console.log('❌ DEBUG: [AUTH] Usuário inativo ou não encontrado');
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
       }
 
-      console.log('✅ DEBUG: [AUTH] Usuário ativo, prosseguindo...');
       req.user = user;
       next();
     } catch (error) {
-      console.log('❌ DEBUG: [AUTH] Erro ao verificar usuário no banco:', error);
+      console.error('[AUTH] Database error:', error);
       return res.status(500).json({ message: 'Erro interno de autenticação' });
     }
   };
@@ -146,8 +138,6 @@ export function requireRole(roles: string[]) {
 // Login
 export async function login(email: string, password: string) {
   try {
-    console.log('🔍 DEBUG: Tentando login para:', email);
-    
     // Busca usuário por email
     let user;
     try {
@@ -158,7 +148,6 @@ export async function login(email: string, password: string) {
         .limit(1);
       user = foundUser;
     } catch (dbError) {
-      console.log('❌ DEBUG: Erro no banco Drizzle:', dbError);
       // Fallback para query SQLite direta
       const Database = await import('better-sqlite3');
       const sqlite = new (Database.default)('local.db');
@@ -172,20 +161,10 @@ export async function login(email: string, password: string) {
           passwordHash: sqliteUser.password_hash,
           requiresPasswordChange: !!sqliteUser.requires_password_change
         };
-        console.log('✅ DEBUG: Usando fallback SQLite, usuário encontrado');
-      } else {
-        console.log('❌ DEBUG: Usuário não encontrado nem no Drizzle nem no SQLite');
       }
     }
 
-    console.log('🔍 DEBUG: Usuário encontrado:', user ? 'SIM' : 'NÃO');
-    if (user) {
-      console.log('🔍 DEBUG: Status:', user.status, 'Role:', user.role);
-      console.log('🔍 DEBUG: Tem passwordHash:', !!user.passwordHash);
-    }
-
     if (!user) {
-      console.log('❌ DEBUG: Usuário não encontrado para email:', email);
       throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
 
@@ -200,42 +179,28 @@ export async function login(email: string, password: string) {
 
     // Verifica a senha
     const passwordHash = user.passwordHash || '';
-    console.log('🔍 DEBUG: Verificando senha...');
-    console.log('🔍 DEBUG: Senha fornecida:', password);
-    console.log('🔍 DEBUG: Hash armazenado:', passwordHash.substring(0, 20) + '...');
-    
     const isValidPassword = await verifyPassword(password, passwordHash);
-    console.log('🔍 DEBUG: Resultado da verificação:', isValidPassword);
 
     if (!isValidPassword) {
-      console.log('❌ DEBUG: Senha inválida, rejeitando login');
       throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
-    
-    console.log('✅ DEBUG: Senha válida, continuando login...');
 
     // Gera token JWT
-    console.log('🔍 DEBUG: Gerando token JWT...');
     const token = generateToken(user);
-    console.log('✅ DEBUG: Token JWT gerado com sucesso');
 
     // Atualiza último login
-    console.log('🔍 DEBUG: Atualizando último login...');
     try {
       await db
         .update(users)
         .set({ lastLogin: new Date() })
         .where(eq(users.id, user.id));
-      console.log('✅ DEBUG: Último login atualizado com sucesso');
     } catch (updateError) {
-      console.log('⚠️ DEBUG: Erro ao atualizar último login, mas continuando...', updateError);
+      // Silent fail - não bloquear login por erro de update
     }
 
     // Remove informações sensíveis
-    console.log('🔍 DEBUG: Removendo informações sensíveis...');
     const { passwordHash: _, ...userWithoutPassword } = user;
 
-    console.log('✅ DEBUG: Login completo! Retornando dados...');
     return {
       token,
       user: userWithoutPassword
@@ -310,12 +275,7 @@ export async function changePassword(userId: string, currentPassword: string, ne
 
     // Verifica senha atual (usar campos corretos do SQLite: password ou password_hash)
     const userHash = user.password_hash || user.password || '';
-    console.log('🔍 DEBUG: [CHANGE PASSWORD] Verificando senha atual...');
-    console.log('🔍 DEBUG: [CHANGE PASSWORD] Senha fornecida:', currentPassword);
-    console.log('🔍 DEBUG: [CHANGE PASSWORD] Hash no banco:', userHash ? 'PRESENTE' : 'AUSENTE');
-    
     const isValidPassword = await verifyPassword(currentPassword, userHash);
-    console.log('🔍 DEBUG: [CHANGE PASSWORD] Resultado da verificação:', isValidPassword);
 
     if (!isValidPassword) {
       sqliteDb.close();
