@@ -46,7 +46,7 @@ function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; m
   });
 
   // Fetch all lessons for navigation
-  const { data: allLessons } = useQuery({
+  const { data: allLessons = [] } = useQuery<FormationLesson[]>({
     queryKey: ['/api/formation/lessons', trackId],
     enabled: !!trackId,
   });
@@ -313,18 +313,18 @@ export default function Formation() {
   const [showMapInfo, setShowMapInfo] = useState(false);
 
   // Fetch formation tracks
-  const { data: tracks, isLoading: tracksLoading } = useQuery({
+  const { data: tracks = [], isLoading: tracksLoading } = useQuery<FormationTrack[]>({
     queryKey: ['/api/formation/tracks'],
   });
 
   // Fetch modules for specific track if viewing track modules
-  const { data: modules, isLoading: modulesLoading } = useQuery({
+  const { data: modules = [], isLoading: modulesLoading } = useQuery<FormationModule[]>({
     queryKey: ['/api/formation/modules', track],
     enabled: !!track && track !== 'library',
   });
 
   // Fetch lessons for specific module if viewing module lessons
-  const { data: lessons, isLoading: lessonsLoading } = useQuery({
+  const { data: lessons = [], isLoading: lessonsLoading } = useQuery<FormationLesson[]>({
     queryKey: ['/api/formation/lessons', track, module],
     enabled: !!track && !!module && track !== 'library',
   });
