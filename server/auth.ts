@@ -133,6 +133,8 @@ export function requireRole(roles: string[]) {
 // Login
 export async function login(email: string, password: string) {
   try {
+    console.log('🔍 DEBUG: Tentando login para:', email);
+    
     // Busca usuário por email
     const [user] = await db
       .select()
@@ -140,7 +142,14 @@ export async function login(email: string, password: string) {
       .where(eq(users.email, email))
       .limit(1);
 
+    console.log('🔍 DEBUG: Usuário encontrado:', user ? 'SIM' : 'NÃO');
+    if (user) {
+      console.log('🔍 DEBUG: Status:', user.status, 'Role:', user.role);
+      console.log('🔍 DEBUG: Tem passwordHash:', !!user.passwordHash);
+    }
+
     if (!user) {
+      console.log('❌ DEBUG: Usuário não encontrado para email:', email);
       throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
     }
 
