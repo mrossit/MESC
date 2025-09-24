@@ -63,24 +63,37 @@ export function generateToken(user: any): string {
 
 // Middleware para verificar JWT
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  console.log('🔍 DEBUG: [AUTH] Middleware de autenticação chamado');
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   const secret: string = JWT_SECRET;
 
+  console.log('🔍 DEBUG: [AUTH] Token no header:', token ? 'PRESENTE' : 'AUSENTE');
+
   const verifyAndCheckStatus = async (user: any) => {
-    // Verificar status ativo do usuário no banco
-    const [currentUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1);
+    console.log('🔍 DEBUG: [AUTH] Verificando status do usuário:', user.id);
+    try {
+      // Verificar status ativo do usuário no banco
+      const [currentUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
 
-    if (!currentUser || currentUser.status !== 'active') {
-      return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
+      console.log('✅ DEBUG: [AUTH] Usuário encontrado no banco:', currentUser ? 'SIM' : 'NÃO');
+
+      if (!currentUser || currentUser.status !== 'active') {
+        console.log('❌ DEBUG: [AUTH] Usuário inativo ou não encontrado');
+        return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
+      }
+
+      console.log('✅ DEBUG: [AUTH] Usuário ativo, prosseguindo...');
+      req.user = user;
+      next();
+    } catch (error) {
+      console.log('❌ DEBUG: [AUTH] Erro ao verificar usuário no banco:', error);
+      return res.status(500).json({ message: 'Erro interno de autenticação' });
     }
-
-    req.user = user;
-    next();
   };
 
   if (!token) {

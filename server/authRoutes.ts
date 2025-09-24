@@ -237,6 +237,8 @@ router.post('/logout', (req, res) => {
 
 // Rota para trocar senha
 router.post('/change-password', authenticateToken, async (req: AuthRequest, res) => {
+  console.log('🔍 DEBUG: Rota /change-password foi chamada!');
+  console.log('🔍 DEBUG: User autenticado:', req.user?.id);
   try {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
     
