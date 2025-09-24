@@ -121,7 +121,7 @@ export const routes: RouteConfig[] = [
     icon: 'Calendar'
   },
   {
-    path: '/formation/:track?',
+    path: '/formation/:track?/:module?/:lesson?',
     component: Formation,
     requiresAuth: true,
     title: 'Formação',

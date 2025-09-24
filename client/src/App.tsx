@@ -118,7 +118,7 @@ function Router() {
         </AuthGuard>
       </Route>
       
-      <Route path="/formation/:track?">
+      <Route path="/formation/:track?/:module?/:lesson?">
         <AuthGuard>
           <Formation />
         </AuthGuard>
