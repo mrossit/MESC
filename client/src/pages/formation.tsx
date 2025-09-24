@@ -541,13 +541,13 @@ export default function Formation() {
                 <TabsTrigger 
                   key={track.id} 
                   value={track.id} 
-                  className="flex flex-col items-center justify-center text-center min-h-[2.8rem] px-1 py-2 text-xs sm:text-sm font-medium whitespace-nowrap overflow-hidden"
+                  className="flex flex-col items-center justify-center text-center min-h-[2.8rem] px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap overflow-hidden"
                   data-testid={`tab-${track.id}`}
                 >
-                  {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
-                  {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
-                  {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
-                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
+                  {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
+                  {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
+                  {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
+                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
                   <span className="text-center leading-tight truncate w-full">
                     {/* Versão 2.0 - textos simplificados */}
                     {track.id === 'liturgia' ? 'Básico' :
