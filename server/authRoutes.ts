@@ -239,6 +239,8 @@ router.post('/logout', (req, res) => {
 router.post('/change-password', authenticateToken, async (req: AuthRequest, res) => {
   console.log('🔍 DEBUG: Rota /change-password foi chamada!');
   console.log('🔍 DEBUG: User autenticado:', req.user?.id);
+  console.log('🔍 DEBUG: Dados recebidos no req.body:', req.body);
+  console.log('🔍 DEBUG: Tipo dos dados:', typeof req.body, Object.keys(req.body));
   try {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
     
@@ -256,7 +258,9 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
       message: result.message
     });
   } catch (error: any) {
+    console.log('❌ DEBUG: Erro na rota /change-password:', error);
     if (error instanceof z.ZodError) {
+      console.log('❌ DEBUG: Erro de validação Zod:', error.errors);
       return res.status(400).json({
         success: false,
         message: 'Dados inválidos',
