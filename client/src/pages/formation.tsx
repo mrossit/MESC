@@ -536,12 +536,7 @@ export default function Formation() {
           </Card>
         ) : tracks && tracks.length > 0 ? (
           <Tabs defaultValue={tracks[0]?.id || "liturgia"} className="w-full">
-            <TabsList className={`grid w-full ${
-              tracks.length === 1 ? 'grid-cols-1' :
-              tracks.length === 2 ? 'grid-cols-2' :
-              tracks.length === 3 ? 'grid-cols-3' :
-              'grid-cols-4'
-            }`}>
+            <TabsList className="h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full grid-cols-3 pt-[0px] pb-[0px]">
               {tracks.map((track: FormationTrack) => (
                 <TabsTrigger 
                   key={track.id} 
