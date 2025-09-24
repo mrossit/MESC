@@ -27,8 +27,20 @@ export default function ChangePassword() {
   const queryClient = useQueryClient();
 
   const changePasswordMutation = useMutation({
-    mutationFn: (data: typeof passwords) =>
-      apiRequest("POST", "/api/auth/change-password", data),
+    mutationFn: async (data: typeof passwords) => {
+      console.log('🔍 DEBUG: Iniciando mudança de senha...');
+      console.log('🔍 DEBUG: Dados sendo enviados:', data);
+      console.log('🔍 DEBUG: Token no localStorage:', localStorage.getItem('token') ? 'PRESENTE' : 'AUSENTE');
+      
+      try {
+        const result = await apiRequest("POST", "/api/auth/change-password", data);
+        console.log('✅ DEBUG: Mudança de senha bem-sucedida');
+        return result;
+      } catch (error) {
+        console.log('❌ DEBUG: Erro na mudança de senha:', error);
+        throw error;
+      }
+    },
     onSuccess: () => {
       toast({
         title: "Senha alterada com sucesso",
