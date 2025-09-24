@@ -36,6 +36,7 @@ export const substitutionStatusEnum = pgEnum('substitution_status', ['pending', 
 export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'substitution', 'formation', 'announcement', 'reminder']);
 export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
 export const formationStatusEnum = pgEnum('formation_status', ['not_started', 'in_progress', 'completed']);
+export const lessonContentTypeEnum = pgEnum('lesson_content_type', ['text', 'video', 'audio', 'document', 'quiz', 'interactive']);
 
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
@@ -220,9 +221,23 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Formation tracks (tracks like liturgia, espiritualidade, pratica)
+export const formationTracks = pgTable('formation_tracks', {
+  id: varchar('id').primaryKey(), // liturgia, espiritualidade, pratica
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  category: formationCategoryEnum('category').notNull(),
+  icon: varchar('icon', { length: 50 }),
+  orderIndex: integer('order_index').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Formation modules
 export const formationModules = pgTable('formation_modules', {
   id: uuid('id').primaryKey().defaultRandom(),
+  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
   category: formationCategoryEnum('category').notNull(),
@@ -242,6 +257,56 @@ export const formationProgress = pgTable('formation_progress', {
   progressPercentage: integer('progress_percentage').default(0),
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow()
+});
+
+// Formation lessons (individual lessons within modules)
+export const formationLessons = pgTable('formation_lessons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
+  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  lessonNumber: integer('lesson_number').notNull(),
+  durationMinutes: integer('duration_minutes').default(30),
+  objectives: jsonb('objectives').$type<string[]>(),
+  isActive: boolean('is_active').default(true),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Formation lesson content sections (text, video, etc. within a lesson)
+export const formationLessonSections = pgTable('formation_lesson_sections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id),
+  type: lessonContentTypeEnum('type').notNull(),
+  title: varchar('title', { length: 255 }),
+  content: text('content'), // Text content, video embed code, etc.
+  videoUrl: varchar('video_url', { length: 500 }),
+  audioUrl: varchar('audio_url', { length: 500 }),
+  documentUrl: varchar('document_url', { length: 500 }),
+  imageUrl: varchar('image_url', { length: 500 }),
+  quizData: jsonb('quiz_data'), // For interactive quizzes
+  orderIndex: integer('order_index').default(0),
+  isRequired: boolean('is_required').default(true),
+  estimatedMinutes: integer('estimated_minutes').default(5),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Formation lesson progress (track user progress through individual lessons)
+export const formationLessonProgress = pgTable('formation_lesson_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id),
+  status: formationStatusEnum('status').notNull().default('not_started'),
+  progressPercentage: integer('progress_percentage').default(0),
+  timeSpentMinutes: integer('time_spent_minutes').default(0),
+  completedSections: jsonb('completed_sections').$type<string[]>().default([]),
+  lastAccessedAt: timestamp('last_accessed_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Mass times configuration
@@ -367,8 +432,13 @@ export const substitutionRequestsRelations = relations(substitutionRequests, ({ 
   })
 }));
 
-export const formationModulesRelations = relations(formationModules, ({ many }) => ({
-  progress: many(formationProgress)
+export const formationModulesRelations = relations(formationModules, ({ one, many }) => ({
+  track: one(formationTracks, {
+    fields: [formationModules.trackId],
+    references: [formationTracks.id]
+  }),
+  progress: many(formationProgress),
+  lessons: many(formationLessons)
 }));
 
 export const formationProgressRelations = relations(formationProgress, ({ one }) => ({
@@ -379,6 +449,42 @@ export const formationProgressRelations = relations(formationProgress, ({ one })
   module: one(formationModules, {
     fields: [formationProgress.moduleId],
     references: [formationModules.id]
+  })
+}));
+
+export const formationTracksRelations = relations(formationTracks, ({ many }) => ({
+  modules: many(formationModules),
+  lessons: many(formationLessons)
+}));
+
+export const formationLessonsRelations = relations(formationLessons, ({ one, many }) => ({
+  module: one(formationModules, {
+    fields: [formationLessons.moduleId],
+    references: [formationModules.id]
+  }),
+  track: one(formationTracks, {
+    fields: [formationLessons.trackId],
+    references: [formationTracks.id]
+  }),
+  sections: many(formationLessonSections),
+  progress: many(formationLessonProgress)
+}));
+
+export const formationLessonSectionsRelations = relations(formationLessonSections, ({ one }) => ({
+  lesson: one(formationLessons, {
+    fields: [formationLessonSections.lessonId],
+    references: [formationLessons.id]
+  })
+}));
+
+export const formationLessonProgressRelations = relations(formationLessonProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [formationLessonProgress.userId],
+    references: [users.id]
+  }),
+  lesson: one(formationLessons, {
+    fields: [formationLessonProgress.lessonId],
+    references: [formationLessons.id]
   })
 }));
 
@@ -430,6 +536,52 @@ export const insertMassTimeSchema = createInsertSchema(massTimesConfig).pick({
   eventName: true
 });
 
+export const insertFormationTrackSchema = createInsertSchema(formationTracks).pick({
+  id: true,
+  title: true,
+  description: true,
+  category: true,
+  icon: true,
+  orderIndex: true,
+  isActive: true
+});
+
+export const insertFormationLessonSchema = createInsertSchema(formationLessons).pick({
+  moduleId: true,
+  trackId: true,
+  title: true,
+  description: true,
+  lessonNumber: true,
+  durationMinutes: true,
+  objectives: true,
+  orderIndex: true,
+  isActive: true
+});
+
+export const insertFormationLessonSectionSchema = createInsertSchema(formationLessonSections).pick({
+  lessonId: true,
+  type: true,
+  title: true,
+  content: true,
+  videoUrl: true,
+  audioUrl: true,
+  documentUrl: true,
+  imageUrl: true,
+  quizData: true,
+  orderIndex: true,
+  isRequired: true,
+  estimatedMinutes: true
+});
+
+export const insertFormationLessonProgressSchema = createInsertSchema(formationLessonProgress).pick({
+  userId: true,
+  lessonId: true,
+  status: true,
+  progressPercentage: true,
+  timeSpentMinutes: true,
+  completedSections: true
+});
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -447,3 +599,11 @@ export type FormationModule = typeof formationModules.$inferSelect;
 export type FormationProgress = typeof formationProgress.$inferSelect;
 export type MassTimeConfig = typeof massTimesConfig.$inferSelect;
 export type InsertMassTime = z.infer<typeof insertMassTimeSchema>;
+export type FormationTrack = typeof formationTracks.$inferSelect;
+export type InsertFormationTrack = z.infer<typeof insertFormationTrackSchema>;
+export type FormationLesson = typeof formationLessons.$inferSelect;
+export type InsertFormationLesson = z.infer<typeof insertFormationLessonSchema>;
+export type FormationLessonSection = typeof formationLessonSections.$inferSelect;
+export type InsertFormationLessonSection = z.infer<typeof insertFormationLessonSectionSchema>;
+export type FormationLessonProgress = typeof formationLessonProgress.$inferSelect;
+export type InsertFormationLessonProgress = z.infer<typeof insertFormationLessonProgressSchema>;

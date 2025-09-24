@@ -7,6 +7,11 @@ import {
   notifications,
   massTimesConfig,
   familyRelationships,
+  formationTracks,
+  formationModules,
+  formationLessons,
+  formationLessonSections,
+  formationLessonProgress,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -20,6 +25,14 @@ import {
   type InsertMassTime,
   type FamilyRelationship,
   type InsertFamilyRelationship,
+  type FormationTrack,
+  type InsertFormationTrack,
+  type FormationLesson,
+  type InsertFormationLesson,
+  type FormationLessonSection,
+  type InsertFormationLessonSection,
+  type FormationLessonProgress,
+  type InsertFormationLessonProgress,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or } from "drizzle-orm";
@@ -87,6 +100,36 @@ export interface IStorage {
   
   // User activity checking for deletion safety
   checkUserMinisterialActivity(userId: string): Promise<{ isUsed: boolean; reason: string }>;
+
+  // Formation track operations
+  getFormationTracks(): Promise<FormationTrack[]>;
+  getFormationTrackById(id: string): Promise<FormationTrack | undefined>;
+  createFormationTrack(track: InsertFormationTrack): Promise<FormationTrack>;
+  updateFormationTrack(id: string, track: Partial<InsertFormationTrack>): Promise<FormationTrack>;
+  deleteFormationTrack(id: string): Promise<void>;
+
+  // Formation lesson operations
+  getFormationLessons(trackId?: string, moduleId?: string): Promise<FormationLesson[]>;
+  getFormationLessonById(id: string): Promise<FormationLesson | undefined>;
+  getFormationLessonByNumber(trackId: string, moduleId: string, lessonNumber: number): Promise<FormationLesson | undefined>;
+  createFormationLesson(lesson: InsertFormationLesson): Promise<FormationLesson>;
+  updateFormationLesson(id: string, lesson: Partial<InsertFormationLesson>): Promise<FormationLesson>;
+  deleteFormationLesson(id: string): Promise<void>;
+
+  // Formation lesson section operations
+  getFormationLessonSections(lessonId: string): Promise<FormationLessonSection[]>;
+  getFormationLessonSectionById(id: string): Promise<FormationLessonSection | undefined>;
+  createFormationLessonSection(section: InsertFormationLessonSection): Promise<FormationLessonSection>;
+  updateFormationLessonSection(id: string, section: Partial<InsertFormationLessonSection>): Promise<FormationLessonSection>;
+  deleteFormationLessonSection(id: string): Promise<void>;
+
+  // Formation lesson progress operations
+  getFormationLessonProgress(userId: string, lessonId?: string): Promise<FormationLessonProgress[]>;
+  getFormationLessonProgressById(id: string): Promise<FormationLessonProgress | undefined>;
+  getUserFormationProgress(userId: string, trackId?: string): Promise<FormationLessonProgress[]>;
+  createOrUpdateFormationLessonProgress(progress: InsertFormationLessonProgress): Promise<FormationLessonProgress>;
+  markLessonSectionCompleted(userId: string, lessonId: string, sectionId: string): Promise<FormationLessonProgress>;
+  markLessonCompleted(userId: string, lessonId: string): Promise<FormationLessonProgress>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -596,6 +639,255 @@ export class DatabaseStorage implements IStorage {
         reason: "Não foi possível verificar a atividade do usuário no banco de dados"
       };
     }
+  }
+
+  // Formation track operations
+  async getFormationTracks(): Promise<FormationTrack[]> {
+    return await db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title);
+  }
+
+  async getFormationTrackById(id: string): Promise<FormationTrack | undefined> {
+    const [track] = await db.select().from(formationTracks).where(eq(formationTracks.id, id));
+    return track;
+  }
+
+  async createFormationTrack(trackData: InsertFormationTrack): Promise<FormationTrack> {
+    const [track] = await db
+      .insert(formationTracks)
+      .values(trackData)
+      .returning();
+    return track;
+  }
+
+  async updateFormationTrack(id: string, trackData: Partial<InsertFormationTrack>): Promise<FormationTrack> {
+    const [track] = await db
+      .update(formationTracks)
+      .set({ ...trackData, updatedAt: new Date() })
+      .where(eq(formationTracks.id, id))
+      .returning();
+    return track;
+  }
+
+  async deleteFormationTrack(id: string): Promise<void> {
+    await db.delete(formationTracks).where(eq(formationTracks.id, id));
+  }
+
+  // Formation lesson operations
+  async getFormationLessons(trackId?: string, moduleId?: string): Promise<FormationLesson[]> {
+    const query = db.select().from(formationLessons);
+    
+    if (trackId && moduleId) {
+      return await query
+        .where(and(eq(formationLessons.trackId, trackId), eq(formationLessons.moduleId, moduleId)))
+        .orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+    } else if (trackId) {
+      return await query
+        .where(eq(formationLessons.trackId, trackId))
+        .orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+    } else if (moduleId) {
+      return await query
+        .where(eq(formationLessons.moduleId, moduleId))
+        .orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+    }
+    
+    return await query.orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+  }
+
+  async getFormationLessonById(id: string): Promise<FormationLesson | undefined> {
+    const [lesson] = await db.select().from(formationLessons).where(eq(formationLessons.id, id));
+    return lesson;
+  }
+
+  async getFormationLessonByNumber(trackId: string, moduleId: string, lessonNumber: number): Promise<FormationLesson | undefined> {
+    const [lesson] = await db
+      .select()
+      .from(formationLessons)
+      .where(and(
+        eq(formationLessons.trackId, trackId),
+        eq(formationLessons.moduleId, moduleId),
+        eq(formationLessons.lessonNumber, lessonNumber)
+      ));
+    return lesson;
+  }
+
+  async createFormationLesson(lessonData: InsertFormationLesson): Promise<FormationLesson> {
+    const [lesson] = await db
+      .insert(formationLessons)
+      .values(lessonData)
+      .returning();
+    return lesson;
+  }
+
+  async updateFormationLesson(id: string, lessonData: Partial<InsertFormationLesson>): Promise<FormationLesson> {
+    const [lesson] = await db
+      .update(formationLessons)
+      .set({ ...lessonData, updatedAt: new Date() })
+      .where(eq(formationLessons.id, id))
+      .returning();
+    return lesson;
+  }
+
+  async deleteFormationLesson(id: string): Promise<void> {
+    await db.delete(formationLessons).where(eq(formationLessons.id, id));
+  }
+
+  // Formation lesson section operations
+  async getFormationLessonSections(lessonId: string): Promise<FormationLessonSection[]> {
+    return await db
+      .select()
+      .from(formationLessonSections)
+      .where(eq(formationLessonSections.lessonId, lessonId))
+      .orderBy(formationLessonSections.orderIndex);
+  }
+
+  async getFormationLessonSectionById(id: string): Promise<FormationLessonSection | undefined> {
+    const [section] = await db.select().from(formationLessonSections).where(eq(formationLessonSections.id, id));
+    return section;
+  }
+
+  async createFormationLessonSection(sectionData: InsertFormationLessonSection): Promise<FormationLessonSection> {
+    const [section] = await db
+      .insert(formationLessonSections)
+      .values(sectionData)
+      .returning();
+    return section;
+  }
+
+  async updateFormationLessonSection(id: string, sectionData: Partial<InsertFormationLessonSection>): Promise<FormationLessonSection> {
+    const [section] = await db
+      .update(formationLessonSections)
+      .set({ ...sectionData, updatedAt: new Date() })
+      .where(eq(formationLessonSections.id, id))
+      .returning();
+    return section;
+  }
+
+  async deleteFormationLessonSection(id: string): Promise<void> {
+    await db.delete(formationLessonSections).where(eq(formationLessonSections.id, id));
+  }
+
+  // Formation lesson progress operations
+  async getFormationLessonProgress(userId: string, lessonId?: string): Promise<FormationLessonProgress[]> {
+    const query = db.select().from(formationLessonProgress).where(eq(formationLessonProgress.userId, userId));
+    
+    if (lessonId) {
+      return await query.where(and(eq(formationLessonProgress.userId, userId), eq(formationLessonProgress.lessonId, lessonId)));
+    }
+    
+    return await query.orderBy(desc(formationLessonProgress.lastAccessedAt));
+  }
+
+  async getFormationLessonProgressById(id: string): Promise<FormationLessonProgress | undefined> {
+    const [progress] = await db.select().from(formationLessonProgress).where(eq(formationLessonProgress.id, id));
+    return progress;
+  }
+
+  async getUserFormationProgress(userId: string, trackId?: string): Promise<FormationLessonProgress[]> {
+    if (trackId) {
+      // Join with lessons to filter by trackId
+      return await db
+        .select()
+        .from(formationLessonProgress)
+        .innerJoin(formationLessons, eq(formationLessonProgress.lessonId, formationLessons.id))
+        .where(and(
+          eq(formationLessonProgress.userId, userId),
+          eq(formationLessons.trackId, trackId)
+        ))
+        .orderBy(desc(formationLessonProgress.lastAccessedAt));
+    }
+    
+    return await this.getFormationLessonProgress(userId);
+  }
+
+  async createOrUpdateFormationLessonProgress(progressData: InsertFormationLessonProgress): Promise<FormationLessonProgress> {
+    // Check if progress already exists
+    const [existingProgress] = await db
+      .select()
+      .from(formationLessonProgress)
+      .where(and(
+        eq(formationLessonProgress.userId, progressData.userId),
+        eq(formationLessonProgress.lessonId, progressData.lessonId)
+      ));
+
+    if (existingProgress) {
+      // Update existing progress
+      const [progress] = await db
+        .update(formationLessonProgress)
+        .set({
+          status: progressData.status,
+          progressPercentage: progressData.progressPercentage,
+          timeSpentMinutes: progressData.timeSpentMinutes,
+          completedSections: progressData.completedSections,
+          lastAccessedAt: new Date(),
+          completedAt: progressData.status === 'completed' ? new Date() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(formationLessonProgress.id, existingProgress.id))
+        .returning();
+      return progress;
+    } else {
+      // Create new progress
+      const [progress] = await db
+        .insert(formationLessonProgress)
+        .values({
+          ...progressData,
+          lastAccessedAt: new Date(),
+          completedAt: progressData.status === 'completed' ? new Date() : null
+        })
+        .returning();
+      return progress;
+    }
+  }
+
+  async markLessonSectionCompleted(userId: string, lessonId: string, sectionId: string): Promise<FormationLessonProgress> {
+    // Get current progress
+    const [currentProgress] = await db
+      .select()
+      .from(formationLessonProgress)
+      .where(and(
+        eq(formationLessonProgress.userId, userId),
+        eq(formationLessonProgress.lessonId, lessonId)
+      ));
+
+    const currentSections = currentProgress?.completedSections || [];
+    
+    // Add section if not already completed
+    if (!currentSections.includes(sectionId)) {
+      currentSections.push(sectionId);
+    }
+
+    // Get total sections for this lesson to calculate progress
+    const totalSections = await db
+      .select({ count: count() })
+      .from(formationLessonSections)
+      .where(eq(formationLessonSections.lessonId, lessonId));
+
+    const progressPercentage = Math.round((currentSections.length / (totalSections[0]?.count || 1)) * 100);
+    const status = progressPercentage === 100 ? 'completed' : 'in_progress';
+
+    return await this.createOrUpdateFormationLessonProgress({
+      userId,
+      lessonId,
+      status: status as any,
+      progressPercentage,
+      completedSections: currentSections,
+      timeSpentMinutes: (currentProgress?.timeSpentMinutes || 0) + 1
+    });
+  }
+
+  async markLessonCompleted(userId: string, lessonId: string): Promise<FormationLessonProgress> {
+    // Get all sections for the lesson
+    const sections = await this.getFormationLessonSections(lessonId);
+    const sectionIds = sections.map(s => s.id);
+
+    return await this.createOrUpdateFormationLessonProgress({
+      userId,
+      lessonId,
+      status: 'completed',
+      progressPercentage: 100,
+      completedSections: sectionIds,
+      timeSpentMinutes: 0 // Will be preserved from existing record
+    });
   }
 }
 

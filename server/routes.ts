@@ -13,7 +13,7 @@ import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
 import reportsRoutes from "./routes/reports";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
 import { db } from './db';
@@ -967,7 +967,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Formation routes
+  // Formation tracks
+  app.get('/api/formation/tracks', authenticateToken, async (req, res) => {
+    try {
+      const tracks = await storage.getFormationTracks();
+      res.json(tracks);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar trilhas de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
 
+  app.get('/api/formation/tracks/:id', authenticateToken, async (req, res) => {
+    try {
+      const track = await storage.getFormationTrackById(req.params.id);
+      if (!track) {
+        return res.status(404).json({ message: "Trilha de formação não encontrada" });
+      }
+      res.json(track);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar trilha de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Formation lessons
+  app.get('/api/formation/lessons', authenticateToken, async (req, res) => {
+    try {
+      const { trackId, moduleId } = req.query;
+      const lessons = await storage.getFormationLessons(trackId as string, moduleId as string);
+      res.json(lessons);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aulas de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.get('/api/formation/lessons/:id', authenticateToken, async (req, res) => {
+    try {
+      const lesson = await storage.getFormationLessonById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: "Aula não encontrada" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aula");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Get lesson by track, module and lesson number (for URL like /formation/liturgia/1)
+  app.get('/api/formation/:trackId/:moduleId/:lessonNumber', authenticateToken, async (req, res) => {
+    try {
+      const { trackId, moduleId, lessonNumber } = req.params;
+      const lesson = await storage.getFormationLessonByNumber(trackId, moduleId, parseInt(lessonNumber));
+      
+      if (!lesson) {
+        return res.status(404).json({ message: "Aula não encontrada" });
+      }
+
+      // Get lesson sections
+      const sections = await storage.getFormationLessonSections(lesson.id);
+      
+      // Get user progress if available
+      const userId = (req as AuthRequest).user?.id;
+      let progress = null;
+      if (userId) {
+        const progressData = await storage.getFormationLessonProgress(userId, lesson.id);
+        progress = progressData[0] || null;
+      }
+
+      res.json({
+        lesson,
+        sections,
+        progress
+      });
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aula completa");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Formation lesson sections
+  app.get('/api/formation/lessons/:id/sections', authenticateToken, async (req, res) => {
+    try {
+      const sections = await storage.getFormationLessonSections(req.params.id);
+      res.json(sections);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar seções da aula");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Formation progress
+  app.get('/api/formation/progress', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+
+      const { trackId } = req.query;
+      const progress = await storage.getUserFormationProgress(userId, trackId as string);
+      res.json(progress);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar progresso de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.post('/api/formation/progress', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+
+      const progressData = insertFormationLessonProgressSchema.parse({
+        ...req.body,
+        userId
+      });
+
+      const progress = await storage.createOrUpdateFormationLessonProgress(progressData);
+      res.json(progress);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "atualizar progresso de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Mark lesson section as completed
+  app.post('/api/formation/lessons/:lessonId/sections/:sectionId/complete', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+
+      const { lessonId, sectionId } = req.params;
+      const progress = await storage.markLessonSectionCompleted(userId, lessonId, sectionId);
+      res.json(progress);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "marcar seção como completa");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Mark entire lesson as completed
+  app.post('/api/formation/lessons/:lessonId/complete', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Usuário não autenticado" });
+      }
+
+      const { lessonId } = req.params;
+      const progress = await storage.markLessonCompleted(userId, lessonId);
+      res.json(progress);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "marcar aula como completa");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Admin routes for managing formation content (restricted to coordinators and managers)
+  app.post('/api/formation/tracks', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      const trackData = insertFormationTrackSchema.parse(req.body);
+      const track = await storage.createFormationTrack(trackData);
+      res.status(201).json(track);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "criar trilha de formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.post('/api/formation/lessons', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      const lessonData = insertFormationLessonSchema.parse(req.body);
+      const lesson = await storage.createFormationLesson(lessonData);
+      res.status(201).json(lesson);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "criar aula");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.post('/api/formation/lessons/:id/sections', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+    try {
+      const sectionData = insertFormationLessonSectionSchema.parse({
+        ...req.body,
+        lessonId: req.params.id
+      });
+      const section = await storage.createFormationLessonSection(sectionData);
+      res.status(201).json(section);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "criar seção da aula");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

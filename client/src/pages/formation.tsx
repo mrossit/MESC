@@ -31,27 +31,277 @@ import {
 } from "lucide-react";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { FormationTrack, FormationLesson, FormationLessonSection, FormationLessonProgress } from "@shared/schema";
 
-// Simple component to handle lesson content
-function LessonContent({ module, lesson }: { module: string; lesson: string }) {
+// Component to handle lesson content with API data
+function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; moduleId: string; lessonNumber: string }) {
+  const { toast } = useToast();
+  const [location, navigate] = useLocation();
+  
+  const { data: lessonData, isLoading, error } = useQuery({
+    queryKey: ['/api/formation', trackId, moduleId, lessonNumber],
+  });
+
+  // Fetch all lessons for navigation
+  const { data: allLessons } = useQuery({
+    queryKey: ['/api/formation/lessons', trackId],
+    enabled: !!trackId,
+  });
+
+  // Mutation to mark lesson as completed
+  const markCompletedMutation = useMutation({
+    mutationFn: (lessonId: string) => 
+      apiRequest(`/api/formation/progress/${lessonId}`, {
+        method: 'POST',
+        body: JSON.stringify({ completed: true, progressPercentage: 100 }),
+      }),
+    onSuccess: () => {
+      toast({
+        title: "Aula concluída!",
+        description: "Seu progresso foi registrado com sucesso.",
+      });
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/formation'] });
+    },
+    onError: (error: any) => {
+      const isAuthError = error?.status === 401 || error?.message?.includes('401');
+      toast({
+        title: isAuthError ? "Sessão expirada" : "Erro",
+        description: isAuthError 
+          ? "Faça login novamente para continuar." 
+          : "Não foi possível registrar o progresso. Tente novamente.",
+        variant: "destructive",
+      });
+      
+      if (isAuthError) {
+        // Redirect to login after a short delay
+        setTimeout(() => navigate('/login'), 2000);
+      }
+    },
+  });
+
+  // Helper to find adjacent lessons
+  const getAdjacentLessons = () => {
+    if (!allLessons || !lessonData?.lesson) return { prev: null, next: null };
+    
+    const currentIndex = allLessons.findIndex((l: FormationLesson) => 
+      l.lessonNumber === parseInt(lessonNumber)
+    );
+    
+    return {
+      prev: currentIndex > 0 ? allLessons[currentIndex - 1] : null,
+      next: currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null,
+    };
+  };
+
+  const { prev: prevLesson, next: nextLesson } = getAdjacentLessons();
+
+  if (isLoading) {
+    return (
+      <Layout title="Carregando..." subtitle="Aguarde">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+              <p>Carregando conteúdo da aula...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
+
+  if (error || !lessonData?.lesson) {
+    return (
+      <Layout title="Erro" subtitle="Não foi possível carregar a aula">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-4">Aula não encontrada</h2>
+              <p className="text-muted-foreground mb-4">
+                Não foi possível carregar o conteúdo desta aula.
+              </p>
+              <Button 
+                onClick={() => window.history.back()} 
+                className="mt-4"
+                data-testid="button-back"
+              >
+                Voltar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
+
+  const { lesson, sections, progress } = lessonData;
+
   return (
-    <Layout title={`Aula ${lesson}`} subtitle={`Módulo: ${module}`}>
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Aula {lesson}</h2>
-            <p className="text-muted-foreground mb-4">Módulo: {module}</p>
-            <p className="text-sm">Conteúdo da aula em desenvolvimento.</p>
-            <Button 
-              onClick={() => window.history.back()} 
-              className="mt-4"
-              data-testid="button-back"
-            >
-              Voltar
-            </Button>
+    <Layout title={lesson.title} subtitle={`Módulo: ${lesson.moduleId}`}>
+      <div className="space-y-6">
+        {/* Lesson Header */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl font-bold">{lesson.title}</CardTitle>
+                <p className="text-muted-foreground mt-2">{lesson.description}</p>
+              </div>
+              <Badge variant="outline">
+                Aula {lesson.lessonNumber}
+              </Badge>
+            </div>
+            {lesson.objectives && lesson.objectives.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2">Objetivos da Aula:</h4>
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  {lesson.objectives.map((objective: string, index: number) => (
+                    <li key={index}>• {objective}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                {lesson.durationMinutes} min
+              </div>
+              {progress && (
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {progress.progressPercentage}% concluído
+                </div>
+              )}
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Lesson Sections */}
+        {sections && sections.length > 0 ? (
+          <div className="space-y-4">
+            {sections.map((section: FormationLessonSection, index: number) => (
+              <Card key={section.id}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{section.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose max-w-none">
+                    <p className="whitespace-pre-wrap">{section.content}</p>
+                  </div>
+                  {section.estimatedMinutes && (
+                    <div className="flex items-center gap-1 mt-4 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      ~{section.estimatedMinutes} min
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center">
+                <p className="text-muted-foreground">Conteúdo da aula em desenvolvimento.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Navigation and Progress */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Lesson Navigation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Navegação</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                {prevLesson ? (
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate(`/formation/${trackId}/${prevLesson.moduleId}/${prevLesson.lessonNumber}`)}
+                    data-testid="button-prev-lesson"
+                    className="flex-1 mr-2"
+                  >
+                    ← {prevLesson.title}
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline"
+                    onClick={() => window.history.back()}
+                    data-testid="button-back"
+                    className="flex-1 mr-2"
+                  >
+                    ← Voltar à Trilha
+                  </Button>
+                )}
+                
+                {nextLesson && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate(`/formation/${trackId}/${nextLesson.moduleId}/${nextLesson.lessonNumber}`)}
+                    data-testid="button-next-lesson"
+                    className="flex-1 ml-2"
+                  >
+                    {nextLesson.title} →
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Progress Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Progresso</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {progress && progress.completed ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-medium">Aula Concluída</span>
+                  </div>
+                ) : (
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={() => markCompletedMutation.mutate(lesson.id)}
+                    disabled={markCompletedMutation.isPending}
+                    data-testid="button-complete-lesson"
+                  >
+                    {markCompletedMutation.isPending ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Marcar como Concluída
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                {nextLesson && progress?.completed && (
+                  <Button 
+                    className="w-full"
+                    onClick={() => navigate(`/formation/${trackId}/${nextLesson.moduleId}/${nextLesson.lessonNumber}`)}
+                    data-testid="button-continue-next"
+                  >
+                    Continuar para Próxima Aula →
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </Layout>
   );
 }
@@ -62,9 +312,26 @@ export default function Formation() {
   const [mapZoom, setMapZoom] = useState(1);
   const [showMapInfo, setShowMapInfo] = useState(false);
 
+  // Fetch formation tracks
+  const { data: tracks, isLoading: tracksLoading } = useQuery({
+    queryKey: ['/api/formation/tracks'],
+  });
+
+  // Fetch modules for specific track if viewing track modules
+  const { data: modules, isLoading: modulesLoading } = useQuery({
+    queryKey: ['/api/formation/modules', track],
+    enabled: !!track && track !== 'library',
+  });
+
+  // Fetch lessons for specific module if viewing module lessons
+  const { data: lessons, isLoading: lessonsLoading } = useQuery({
+    queryKey: ['/api/formation/lessons', track, module],
+    enabled: !!track && !!module && track !== 'library',
+  });
+
   // Se está visualizando uma aula específica
-  if (lesson) {
-    return <LessonContent module={module || ''} lesson={lesson} />;
+  if (lesson && track && module) {
+    return <LessonContent trackId={track} moduleId={module} lessonNumber={lesson} />;
   }
 
   if (track === 'library') {
@@ -258,453 +525,122 @@ export default function Formation() {
         </Card>
 
         {/* Módulos de Formação */}
-        <Tabs defaultValue="liturgia" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="liturgia" className="flex items-center gap-2">
-              <Cross className="h-4 w-4" />
-              Liturgia
-            </TabsTrigger>
-            <TabsTrigger value="espiritualidade" className="flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              Espiritualidade
-            </TabsTrigger>
-            <TabsTrigger value="pratica" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Prática
-            </TabsTrigger>
-          </TabsList>
+        {tracksLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                <p>Carregando trilhas de formação...</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : tracks && tracks.length > 0 ? (
+          <Tabs defaultValue={tracks[0]?.id || "liturgia"} className="w-full">
+            <TabsList className={`grid w-full grid-cols-${Math.min(tracks.length, 4)}`}>
+              {tracks.map((track: FormationTrack) => (
+                <TabsTrigger 
+                  key={track.id} 
+                  value={track.id} 
+                  className="flex items-center gap-2"
+                  data-testid={`tab-${track.id}`}
+                >
+                  {track.id === 'liturgia' && <Cross className="h-4 w-4" />}
+                  {track.id === 'espiritualidade' && <Heart className="h-4 w-4" />}
+                  {track.id === 'pratica' && <Users className="h-4 w-4" />}
+                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-4 w-4" />}
+                  {track.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* Módulo Liturgia */}
-          <TabsContent value="liturgia">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Cross className="h-5 w-5 text-amber-600" />
-                  Formação Litúrgica
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Fundamentos da celebração eucarística e o papel do ministro extraordinário
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="flex justify-between">
-                      <div className="flex items-center gap-2">
-                        <Church className="h-4 w-4" />
-                        <span>1. A Sagrada Eucaristia</span>
-                        <Badge variant="outline" className="ml-2">30 min</Badge>
+            {/* Dynamic Track Content */}
+            {tracks && tracks.map((track: FormationTrack) => (
+              <TabsContent key={track.id} value={track.id}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      {track.id === 'liturgia' && <Cross className="h-5 w-5 text-amber-600" />}
+                      {track.id === 'espiritualidade' && <Heart className="h-5 w-5 text-red-600" />}
+                      {track.id === 'pratica' && <Users className="h-5 w-5 text-blue-600" />}
+                      {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-5 w-5 text-green-600" />}
+                      {track.title}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {track.description}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {modulesLoading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin h-6 w-6 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Carregando aulas...</p>
                       </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Compreender o mistério eucarístico como fonte e ápice da vida cristã.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• A instituição da Eucaristia na Última Ceia</li>
-                          <li>• O sacrifício de Cristo presente na Missa</li>
-                          <li>• A presença real de Jesus na Eucaristia</li>
-                          <li>• A comunhão como participação no Corpo de Cristo</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-amber-600 hover:bg-amber-700"
-                            onClick={() => navigate('/formation/liturgia/1')}
-                            data-testid="button-start-lesson-1"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
+                    ) : lessons && lessons.length > 0 ? (
+                      <Accordion type="single" collapsible className="w-full">
+                        {lessons.map((lesson: FormationLesson, index: number) => (
+                          <AccordionItem key={lesson.id} value={`item-${lesson.lessonNumber}`}>
+                            <AccordionTrigger>
+                              <div className="flex items-center gap-2">
+                                <Church className="h-4 w-4" />
+                                <span>{lesson.lessonNumber}. {lesson.title}</span>
+                                {lesson.durationMinutes && (
+                                  <Badge variant="outline" className="ml-2">
+                                    {lesson.durationMinutes} min
+                                  </Badge>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="space-y-3 pt-2">
+                                <p className="text-sm text-muted-foreground">
+                                  {lesson.description}
+                                </p>
+                                {lesson.objectives && lesson.objectives.length > 0 && (
+                                  <ul className="text-sm space-y-1 ml-4">
+                                    {lesson.objectives.map((objective: string, idx: number) => (
+                                      <li key={idx}>• {objective}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <div className="flex gap-2 mt-4">
+                                  <Button 
+                                    size="sm" 
+                                    className={`${
+                                      track.id === 'liturgia' ? 'bg-amber-600 hover:bg-amber-700' :
+                                      track.id === 'espiritualidade' ? 'bg-red-600 hover:bg-red-700' :
+                                      'bg-blue-600 hover:bg-blue-700'
+                                    }`}
+                                    onClick={() => navigate(`/formation/${track.id}/${lesson.moduleId}/${lesson.lessonNumber}`)}
+                                    data-testid={`button-start-lesson-${track.id}-${lesson.lessonNumber}`}
+                                  >
+                                    <PlayCircle className="h-4 w-4 mr-2" />
+                                    Iniciar Aula
+                                  </Button>
+                                </div>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">Nenhuma aula encontrada para esta trilha.</p>
                       </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <BookMarked className="h-4 w-4" />
-                        <span>2. Liturgia da Missa</span>
-                        <Badge variant="outline" className="ml-2">45 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Estrutura e significado das partes da celebração eucarística.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Ritos iniciais e liturgia da palavra</li>
-                          <li>• Liturgia eucarística: ofertório, consagração, comunhão</li>
-                          <li>• Ritos finais e envio missionário</li>
-                          <li>• Sinais, símbolos e gestos litúrgicos</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-amber-600 hover:bg-amber-700"
-                            onClick={() => navigate('/formation/liturgia/2')}
-                            data-testid="button-start-lesson-2"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        <span>3. Ministério Extraordinário</span>
-                        <Badge variant="outline" className="ml-2">40 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          O chamado e a missão do ministro extraordinário da Sagrada Comunhão.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Origem e fundamento teológico do ministério</li>
-                          <li>• Diferença entre ministro ordinário e extraordinário</li>
-                          <li>• Responsabilidades e limites do ministério</li>
-                          <li>• A dignidade e santidade requeridas</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-amber-600 hover:bg-amber-700"
-                            onClick={() => navigate('/formation/liturgia/3')}
-                            data-testid="button-start-lesson-3"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>4. Ano Litúrgico</span>
-                        <Badge variant="outline" className="ml-2">25 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Tempos litúrgicos e suas características específicas.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Advento, Natal, Quaresma, Páscoa</li>
-                          <li>• Tempo Comum e solenidades</li>
-                          <li>• Cores litúrgicas e seus significados</li>
-                          <li>• Adaptações sazonais na distribuição</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-amber-600 hover:bg-amber-700"
-                            onClick={() => navigate('/formation/liturgia/4')}
-                            data-testid="button-start-lesson-4"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Módulo Espiritualidade */}
-          <TabsContent value="espiritualidade">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-red-600" />
-                  Formação Espiritual
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Desenvolvimento da vida espiritual e relacionamento com Cristo Eucarístico
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Cross className="h-4 w-4" />
-                        <span>1. Vida de Oração</span>
-                        <Badge variant="outline" className="ml-2">35 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          A importância da oração na vida do ministro extraordinário.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Oração pessoal e comunitária</li>
-                          <li>• Lectio Divina e meditação</li>
-                          <li>• Adoração eucarística</li>
-                          <li>• Preparação espiritual para o ministério</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => navigate('/formation/espiritualidade/1')}
-                            data-testid="button-start-spiritual-1"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        <span>2. Virtudes Cristãs</span>
-                        <Badge variant="outline" className="ml-2">30 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Cultivar as virtudes necessárias para o serviço eucarístico.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Humildade e serviço</li>
-                          <li>• Reverência e respeito</li>
-                          <li>• Caridade e compaixão</li>
-                          <li>• Prudência e discrição</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => navigate('/formation/espiritualidade/2')}
-                            data-testid="button-start-spiritual-2"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4" />
-                        <span>3. Formação Contínua</span>
-                        <Badge variant="outline" className="ml-2">25 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          O compromisso com o crescimento espiritual permanente.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Estudo das Escrituras</li>
-                          <li>• Leitura espiritual</li>
-                          <li>• Participação em retiros</li>
-                          <li>• Acompanhamento espiritual</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => navigate('/formation/espiritualidade/3')}
-                            data-testid="button-start-spiritual-3"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Módulo Prática */}
-          <TabsContent value="pratica">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Formação Prática
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Orientações práticas para o exercício do ministério
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>1. Posicionamento na Igreja</span>
-                        <Badge variant="outline" className="ml-2">20 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Como se posicionar adequadamente durante a celebração.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Localização nos bancos durante a Missa</li>
-                          <li>• Momento adequado para se aproximar do altar</li>
-                          <li>• Formação da procissão de comunhão</li>
-                          <li>• Retorno ao lugar após o ministério</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => navigate('/formation/pratica/1')}
-                            data-testid="button-start-practical-1"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4" />
-                        <span>2. Distribuição da Comunhão</span>
-                        <Badge variant="outline" className="ml-2">40 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Técnicas e cuidados na distribuição da Sagrada Comunhão.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Recebimento do cibório do celebrante</li>
-                          <li>• Forma correta de segurar e apresentar a hóstia</li>
-                          <li>• Fórmula: "O Corpo de Cristo" - "Amém"</li>
-                          <li>• Comunhão na mão e na boca</li>
-                          <li>• Cuidados com fragmentos</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => navigate('/formation/pratica/2')}
-                            data-testid="button-start-practical-2"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        <span>3. Situações Especiais</span>
-                        <Badge variant="outline" className="ml-2">25 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Como lidar com situações específicas durante o ministério.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Crianças pequenas e primeira comunhão</li>
-                          <li>• Pessoas com deficiência</li>
-                          <li>• Situações de queda da hóstia</li>
-                          <li>• Pessoas não católicas na fila</li>
-                          <li>• Comunhão aos enfermos</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => navigate('/formation/pratica/3')}
-                            data-testid="button-start-practical-3"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <span>4. Vestimenta e Preparação</span>
-                        <Badge variant="outline" className="ml-2">15 min</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3 pt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Preparação pessoal e apresentação adequada.
-                        </p>
-                        <ul className="text-sm space-y-1 ml-4">
-                          <li>• Vestimenta apropriada e discreta</li>
-                          <li>• Higiene das mãos e apresentação pessoal</li>
-                          <li>• Jejum eucarístico</li>
-                          <li>• Estado de graça e preparação espiritual</li>
-                          <li>• Pontualidade e disponibilidade</li>
-                        </ul>
-                        <div className="flex gap-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => navigate('/formation/pratica/4')}
-                            data-testid="button-start-practical-4"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Iniciar Aula
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
         </Tabs>
+        ) : (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center">
+                <p className="text-muted-foreground">Nenhuma trilha de formação encontrada.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recursos de Formação */}
         <Card>
