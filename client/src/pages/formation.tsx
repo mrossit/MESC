@@ -546,14 +546,16 @@ export default function Formation() {
                 <TabsTrigger 
                   key={track.id} 
                   value={track.id} 
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 text-xs sm:text-sm text-center min-h-[2.5rem] px-2 py-1 whitespace-normal leading-tight"
                   data-testid={`tab-${track.id}`}
                 >
-                  {track.id === 'liturgia' && <Cross className="h-4 w-4" />}
-                  {track.id === 'espiritualidade' && <Heart className="h-4 w-4" />}
-                  {track.id === 'pratica' && <Users className="h-4 w-4" />}
-                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-4 w-4" />}
-                  {track.title}
+                  <div className="flex flex-col items-center gap-1 text-center">
+                    {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
+                    {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
+                    {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
+                    {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
+                    <span className="text-center break-words leading-tight max-w-full">{track.title}</span>
+                  </div>
                 </TabsTrigger>
               ))}
             </TabsList>
