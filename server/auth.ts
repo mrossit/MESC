@@ -202,17 +202,27 @@ export async function login(email: string, password: string) {
     console.log('✅ DEBUG: Senha válida, continuando login...');
 
     // Gera token JWT
+    console.log('🔍 DEBUG: Gerando token JWT...');
     const token = generateToken(user);
+    console.log('✅ DEBUG: Token JWT gerado com sucesso');
 
     // Atualiza último login
-    await db
-      .update(users)
-      .set({ lastLogin: new Date() })
-      .where(eq(users.id, user.id));
+    console.log('🔍 DEBUG: Atualizando último login...');
+    try {
+      await db
+        .update(users)
+        .set({ lastLogin: new Date() })
+        .where(eq(users.id, user.id));
+      console.log('✅ DEBUG: Último login atualizado com sucesso');
+    } catch (updateError) {
+      console.log('⚠️ DEBUG: Erro ao atualizar último login, mas continuando...', updateError);
+    }
 
     // Remove informações sensíveis
+    console.log('🔍 DEBUG: Removendo informações sensíveis...');
     const { passwordHash: _, ...userWithoutPassword } = user;
 
+    console.log('✅ DEBUG: Login completo! Retornando dados...');
     return {
       token,
       user: userWithoutPassword
