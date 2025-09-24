@@ -536,26 +536,25 @@ export default function Formation() {
           </Card>
         ) : tracks && tracks.length > 0 ? (
           <Tabs defaultValue={tracks[0]?.id || "liturgia"} className="w-full">
-            <TabsList className="h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full grid-cols-3 pt-[0px] pb-[0px]">
+            <TabsList className="h-auto min-h-[3rem] items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full grid-cols-3 gap-1">
               {tracks.map((track: FormationTrack) => (
                 <TabsTrigger 
                   key={track.id} 
                   value={track.id} 
-                  className="flex items-center gap-1 text-xs sm:text-sm text-center min-h-[2.5rem] px-2 py-1 whitespace-normal leading-tight"
+                  className="flex flex-col items-center justify-center text-center min-h-[2.8rem] px-1 py-2 text-xs sm:text-sm font-medium whitespace-nowrap overflow-hidden"
                   data-testid={`tab-${track.id}`}
                 >
-                  <div className="flex flex-col items-center gap-1 text-center">
-                    {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
-                    {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
-                    {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
-                    {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />}
-                    <span className="text-center break-words leading-tight max-w-full">
-                      {track.id === 'liturgia' ? 'Básico' :
-                       track.id === 'espiritualidade' ? 'Espiritualidade' :
-                       track.id === 'pratica' ? 'Práticas' :
-                       track.title}
-                    </span>
-                  </div>
+                  {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
+                  {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
+                  {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
+                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mb-1 flex-shrink-0" />}
+                  <span className="text-center leading-tight truncate w-full">
+                    {/* Versão 2.0 - textos simplificados */}
+                    {track.id === 'liturgia' ? 'Básico' :
+                     track.id === 'espiritualidade' ? 'Espiritual' :
+                     track.id === 'pratica' ? 'Práticas' :
+                     track.title}
+                  </span>
                 </TabsTrigger>
               ))}
             </TabsList>
