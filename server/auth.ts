@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import Database from 'better-sqlite3';
 
 // JWT secret - deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -74,7 +75,6 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     console.log('🔍 DEBUG: [AUTH] Verificando status do usuário:', user.id);
     try {
       // Usar SQLite direto como fallback (mesmo problema de esquema)
-      const Database = require('better-sqlite3');
       const sqliteDb = new Database('local.db');
       
       const currentUser = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
