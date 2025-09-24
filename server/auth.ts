@@ -136,11 +136,34 @@ export async function login(email: string, password: string) {
     console.log('🔍 DEBUG: Tentando login para:', email);
     
     // Busca usuário por email
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    let user;
+    try {
+      const [foundUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      user = foundUser;
+    } catch (dbError) {
+      console.log('❌ DEBUG: Erro no banco Drizzle:', dbError);
+      // Fallback para query SQLite direta
+      const Database = await import('better-sqlite3');
+      const sqlite = new (Database.default)('local.db');
+      const sqliteUser = sqlite.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      sqlite.close();
+      
+      // Mapear campos SQLite para o formato esperado
+      if (sqliteUser) {
+        user = {
+          ...sqliteUser,
+          passwordHash: sqliteUser.password_hash,
+          requiresPasswordChange: !!sqliteUser.requires_password_change
+        };
+        console.log('✅ DEBUG: Usando fallback SQLite, usuário encontrado');
+      } else {
+        console.log('❌ DEBUG: Usuário não encontrado nem no Drizzle nem no SQLite');
+      }
+    }
 
     console.log('🔍 DEBUG: Usuário encontrado:', user ? 'SIM' : 'NÃO');
     if (user) {
