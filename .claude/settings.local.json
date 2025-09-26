@@ -44,7 +44,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/test-db-connection.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/test-api-production.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-user-status.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/test-auth-debug.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/test-auth-debug.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-schedule-generation.ts)"
     ],
     "deny": [],
     "ask": []

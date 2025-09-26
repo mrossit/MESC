@@ -242,23 +242,42 @@ export class ScheduleGenerator {
   private getAvailableMinistersForMass(massTime: MassTime): Minister[] {
     const dayName = this.getDayName(massTime.dayOfWeek);
     const dateStr = format(new Date(massTime.date!), 'dd/MM');
-    
+
     return this.ministers.filter(minister => {
       const availability = this.availabilityData.get(minister.id);
-      
+
       if (!availability) {
-        logger.warn(`Sem dados de disponibilidade para ministro ${minister.name}`);
-        return false;
+        // Se não há dados de disponibilidade, incluir o ministro apenas para preview
+        // Isso permite gerar escalas mesmo sem questionários respondidos
+        logger.debug(`Sem dados de disponibilidade para ministro ${minister.name} - incluindo no preview`);
+        return true; // Retorna true para incluir no preview
       }
 
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
         const sundayStr = `Domingo ${dateStr}`;
-        return availability.availableSundays.includes(sundayStr);
+
+        // Se o ministro marcou "Nenhum domingo", ele não está disponível
+        if (availability.availableSundays.includes('Nenhum domingo')) {
+          return false;
+        }
+
+        // Se há domingos específicos marcados, verificar se inclui este
+        if (availability.availableSundays.length > 0) {
+          return availability.availableSundays.includes(sundayStr);
+        }
+
+        // Se não há dados específicos, considerar disponível para preview
+        return true;
       }
 
       // Verificar disponibilidade para missas diárias
-      return availability.dailyMassAvailability.includes(dayName);
+      if (availability.dailyMassAvailability.length > 0) {
+        return availability.dailyMassAvailability.includes(dayName);
+      }
+
+      // Se não há dados específicos, considerar disponível para preview
+      return true;
     });
   }
 
