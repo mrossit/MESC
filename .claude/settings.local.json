@@ -45,7 +45,9 @@
       "Bash(NODE_ENV=production npx tsx scripts/test-api-production.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-user-status.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/test-auth-debug.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/test-schedule-generation.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/test-schedule-generation.ts)",
+      "Bash(NODE_ENV=development npm run dev)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-ministers-data.ts)"
     ],
     "deny": [],
     "ask": []
