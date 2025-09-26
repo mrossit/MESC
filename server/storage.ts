@@ -171,6 +171,7 @@ export interface IStorage {
   getFormationLessons(trackId?: string, moduleId?: string): Promise<FormationLesson[]>;
   getFormationLessonById(id: string): Promise<FormationLesson | undefined>;
   getFormationLessonByNumber(trackId: string, moduleId: string, lessonNumber: number): Promise<FormationLesson | undefined>;
+  getFormationLessonsByTrackAndModule(trackId: string, moduleId: string): Promise<FormationLesson[]>;
   createFormationLesson(lesson: InsertFormationLesson): Promise<FormationLesson>;
   updateFormationLesson(id: string, lesson: Partial<InsertFormationLesson>): Promise<FormationLesson>;
   deleteFormationLesson(id: string): Promise<void>;
@@ -803,6 +804,18 @@ export class DatabaseStorage implements IStorage {
         eq(formationLessons.lessonNumber, lessonNumber)
       ));
     return lesson;
+  }
+
+  async getFormationLessonsByTrackAndModule(trackId: string, moduleId: string): Promise<FormationLesson[]> {
+    const lessons = await db
+      .select()
+      .from(formationLessons)
+      .where(and(
+        eq(formationLessons.trackId, trackId),
+        eq(formationLessons.moduleId, moduleId)
+      ))
+      .orderBy(formationLessons.lessonNumber);
+    return lessons;
   }
 
   async createFormationLesson(lessonData: InsertFormationLesson): Promise<FormationLesson> {

@@ -1037,7 +1037,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get lesson by track, module and lesson number (for URL like /formation/liturgia/1)
+  // Get lesson by track, module and lesson number - also support legacy URLs
+  app.get('/api/formation/lessons/:trackId/:moduleId', authenticateToken, async (req, res) => {
+    try {
+      const { trackId, moduleId } = req.params;
+      const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
+      if (!lessons || lessons.length === 0) {
+        return res.status(404).json({ message: "Aulas não encontradas para este módulo" });
+      }
+      res.json(lessons);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aulas do módulo");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  // Get specific lesson by track, module and lesson number (for URL like /formation/liturgia/1/1)
   app.get('/api/formation/:trackId/:moduleId/:lessonNumber', authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId, lessonNumber } = req.params;
