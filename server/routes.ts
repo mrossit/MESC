@@ -996,11 +996,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/formation/modules/:trackId', authenticateToken, async (req, res) => {
     try {
       const { trackId } = req.params;
-      // Map short names to full IDs
+      // Map short names to actual database IDs (development environment)
       const trackIdMap: { [key: string]: string } = {
         'liturgy': 'liturgy-track-1',
         'spirituality': 'spirituality-track-1', 
-        'practical': 'practical-track-1'
+        'practical': 'practical-track-1',
+        'liturgia': 'liturgy-track-1',
+        'espiritualidade': 'spirituality-track-1', 
+        'pratica': 'practical-track-1'
       };
       
       const fullTrackId = trackIdMap[trackId] || trackId;
@@ -1041,12 +1044,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/formation/lessons/:trackId/:moduleId', authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId } = req.params;
+      console.log(`[DEBUG ROUTE] trackId: ${trackId}, moduleId: ${moduleId}`);
       const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
+      console.log(`[DEBUG ROUTE] lessons result:`, lessons);
       if (!lessons || lessons.length === 0) {
         return res.status(404).json({ message: "Aulas não encontradas para este módulo" });
       }
       res.json(lessons);
     } catch (error) {
+      console.error(`[DEBUG ROUTE ERROR]`, error);
       const errorResponse = handleApiError(error, "buscar aulas do módulo");
       res.status(errorResponse.status).json(errorResponse);
     }

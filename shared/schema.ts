@@ -237,13 +237,13 @@ export const formationTracks = pgTable('formation_tracks', {
 // Formation modules
 export const formationModules = pgTable('formation_modules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
+  trackId: varchar('trackId').notNull().references(() => formationTracks.id),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
   category: formationCategoryEnum('category').notNull(),
   content: text('content'),
   videoUrl: varchar('video_url', { length: 255 }),
-  durationMinutes: integer('duration_minutes'),
+  durationMinutes: integer('durationMinutes'),
   orderIndex: integer('order_index'),
   createdAt: timestamp('created_at').defaultNow()
 });
@@ -252,7 +252,7 @@ export const formationModules = pgTable('formation_modules', {
 export const formationProgress = pgTable('formation_progress', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id').notNull().references(() => users.id),
-  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
+  moduleId: uuid('moduleId').notNull().references(() => formationModules.id),
   status: formationStatusEnum('status').notNull().default('not_started'),
   progressPercentage: integer('progress_percentage').default(0),
   completedAt: timestamp('completed_at'),
@@ -262,13 +262,13 @@ export const formationProgress = pgTable('formation_progress', {
 // Formation lessons (individual lessons within modules)
 export const formationLessons = pgTable('formation_lessons', {
   id: uuid('id').primaryKey().defaultRandom(),
-  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
-  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
+  moduleId: uuid('moduleId').notNull().references(() => formationModules.id),
+  trackId: varchar('trackId').notNull().references(() => formationTracks.id),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
-  lessonNumber: integer('lesson_number').notNull(),
-  durationMinutes: integer('duration_minutes').default(30),
-  objectives: jsonb('objectives').$type<string[]>(),
+  lessonNumber: integer('lessonNumber').notNull(),
+  estimatedDuration: integer('estimatedDuration').default(30),
+  // objectives: jsonb('objectives').$type<string[]>(), // Not in SQLite local
   isActive: boolean('is_active').default(true),
   orderIndex: integer('order_index').default(0),
   createdAt: timestamp('created_at').defaultNow(),

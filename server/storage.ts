@@ -807,15 +807,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFormationLessonsByTrackAndModule(trackId: string, moduleId: string): Promise<FormationLesson[]> {
-    const lessons = await db
-      .select()
-      .from(formationLessons)
-      .where(and(
-        eq(formationLessons.trackId, trackId),
-        eq(formationLessons.moduleId, moduleId)
-      ))
-      .orderBy(formationLessons.lessonNumber);
-    return lessons;
+    try {
+      console.log(`[DEBUG] Searching lessons for trackId: ${trackId}, moduleId: ${moduleId}`);
+      // Use raw SQL to bypass Drizzle schema issues
+      const rawQuery = `
+        SELECT id, moduleId, trackId, title, description, lessonNumber, 
+               estimatedDuration, orderIndex, createdAt, updatedAt
+        FROM formation_lessons 
+        WHERE trackId = ? AND moduleId = ? 
+        ORDER BY lessonNumber
+      `;
+      console.log(`[DEBUG] Running raw SQL:`, rawQuery, [trackId, moduleId]);
+      const lessons = await (db as any).all(rawQuery, [trackId, moduleId]);
+      console.log(`[DEBUG] Found ${lessons.length} lessons via raw SQL`);
+      return lessons as FormationLesson[];
+    } catch (error) {
+      console.error('[ERROR] getFormationLessonsByTrackAndModule failed:', error);
+      throw error;
+    }
   }
 
   async createFormationLesson(lessonData: InsertFormationLesson): Promise<FormationLesson> {
