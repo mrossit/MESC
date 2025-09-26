@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes" />
+    <title>MESC - Sistema de Gestão de Ministros da Sagrada Comunhão</title>
+    
+    <!-- Theme detection and initialization -->
+    <script>
+      // Detect and apply theme before React loads to prevent flash
+      (function() {
+        const theme = localStorage.getItem('mesc-ui-theme') || 'system';
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const shouldUseDark = theme === 'dark' || (theme === 'system' && prefersDark);
+        
+        if (shouldUseDark) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    
+    <!-- Cache bust: v2025-08-31-01:38 -->
+    <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#5C4033">
+    <meta name="color-scheme" content="light dark">
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="MESC">
+    <link rel="apple-touch-icon" href="/images/icon-180.png">
+    
+    <!-- Icons -->
+    <link rel="shortcut icon" href="/images/icon.icns" type="image/x-icon">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/icon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/icon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/images/icon-192.png">
+    
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#5C4033">
+    <meta name="msapplication-TileImage" content="/images/icon-192.png">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MESC - Sistema de Gestão">
+    <meta property="og:description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão">
+    <meta property="og:image" content="/images/icon-512.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Security -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="format-detection" content="telephone=no">
+    <script type="module" crossorigin src="/assets/index-3eby4267.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C9bLTq53.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- PWA Update Prompt -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(
+            (registration) => {
+              console.log('ServiceWorker registration successful:', registration.scope);
+              
+              // Only check for updates in production
+              if (location.hostname !== 'localhost' && !location.hostname.includes('replit.dev')) {
+                registration.update();
+              }
+            },
+            (err) => {
+              console.log('ServiceWorker registration failed:', err);
+            }
+          );
+        });
+      }
+    </script>
+    
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+  </body>
+</html>

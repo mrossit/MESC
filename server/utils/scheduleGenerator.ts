@@ -1,5 +1,4 @@
 import { logger } from './logger.js';
-import { db } from '../db.js';
 import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema';
 import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay } from 'date-fns';
@@ -47,13 +46,19 @@ export class ScheduleGenerator {
   private ministers: Minister[] = [];
   private availabilityData: Map<string, AvailabilityData> = new Map();
   private massTimes: MassTime[] = [];
+  private db: any;
 
   /**
    * Gera escalas automaticamente para um mês específico
    */
   async generateScheduleForMonth(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
+    // Importar db dinamicamente para garantir que está inicializado
+    const { db } = await import('../db.js');
+    this.db = db;
+
     logger.info(`Iniciando geração ${isPreview ? 'de preview' : 'definitiva'} de escalas para ${month}/${year}`);
     console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
+    console.log(`[SCHEDULE_GEN] Database status:`, { hasDb: !!this.db, nodeEnv: process.env.NODE_ENV });
 
     try {
       // 1. Carregar dados necessários
@@ -91,12 +96,22 @@ export class ScheduleGenerator {
    * Carrega dados dos ministros do banco
    */
   private async loadMinistersData(): Promise<void> {
-    if (!db) {
-      logger.warn('Database não disponível, usando dados mock');
+    if (!this.db) {
+      logger.warn('Database não disponível, criando dados mock para preview');
+      console.log('[SCHEDULE_GEN] Creating mock ministers data for preview');
+
+      // Dados mock para preview quando banco não estiver disponível
+      this.ministers = [
+        { id: '1', name: 'João Silva', role: 'ministro', totalServices: 5, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7 },
+        { id: '2', name: 'Maria Santos', role: 'ministro', totalServices: 3, lastService: null, preferredTimes: ['08:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8 },
+        { id: '3', name: 'Pedro Costa', role: 'ministro', totalServices: 4, lastService: null, preferredTimes: ['19:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6 },
+        { id: '4', name: 'Ana Lima', role: 'ministro', totalServices: 2, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75 },
+        { id: '5', name: 'Carlos Oliveira', role: 'coordenador', totalServices: 6, lastService: null, preferredTimes: ['08:00', '10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9 }
+      ];
       return;
     }
 
-    const ministersData = await db.select({
+    const ministersData = await this.db.select({
       id: users.id,
       name: users.name,
       role: users.role,
@@ -128,14 +143,65 @@ export class ScheduleGenerator {
    * Carrega dados de disponibilidade dos questionários
    */
   private async loadAvailabilityData(year: number, month: number, isPreview: boolean = false): Promise<void> {
-    if (!db) return;
+    if (!this.db) {
+      console.log('[SCHEDULE_GEN] Creating mock availability data for preview');
+      logger.warn('Database não disponível, criando dados de disponibilidade mock');
+
+      // Dados mock de disponibilidade para preview
+      this.availabilityData.set('1', {
+        ministerId: '1',
+        availableSundays: ['1', '2', '3', '4'],
+        preferredMassTimes: ['10:00'],
+        alternativeTimes: ['08:00', '19:00'],
+        canSubstitute: true,
+        dailyMassAvailability: []
+      });
+
+      this.availabilityData.set('2', {
+        ministerId: '2',
+        availableSundays: ['1', '2', '4'],
+        preferredMassTimes: ['08:00'],
+        alternativeTimes: ['10:00'],
+        canSubstitute: true,
+        dailyMassAvailability: []
+      });
+
+      this.availabilityData.set('3', {
+        ministerId: '3',
+        availableSundays: ['2', '3', '4'],
+        preferredMassTimes: ['19:00'],
+        alternativeTimes: ['10:00'],
+        canSubstitute: false,
+        dailyMassAvailability: []
+      });
+
+      this.availabilityData.set('4', {
+        ministerId: '4',
+        availableSundays: ['1', '3', '4'],
+        preferredMassTimes: ['10:00'],
+        alternativeTimes: ['08:00', '19:00'],
+        canSubstitute: true,
+        dailyMassAvailability: []
+      });
+
+      this.availabilityData.set('5', {
+        ministerId: '5',
+        availableSundays: ['1', '2', '3', '4'],
+        preferredMassTimes: ['08:00', '10:00'],
+        alternativeTimes: ['19:00'],
+        canSubstitute: true,
+        dailyMassAvailability: []
+      });
+
+      return;
+    }
 
     // Definir status permitidos baseado no tipo de geração
     const allowedStatuses = isPreview 
       ? ['open', 'sent', 'active'] // Preview: aceita questionários abertos
       : ['closed']; // Definitivo: apenas questionários fechados
 
-    const responses = await db.select().from(questionnaireResponses)
+    const responses = await this.db.select().from(questionnaireResponses)
       .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
       .where(
         and(
@@ -165,17 +231,19 @@ export class ScheduleGenerator {
    * Carrega configuração dos horários de missa
    */
   private async loadMassTimesConfig(): Promise<void> {
-    if (!db) {
-      // Configuração padrão para desenvolvimento
+    if (!this.db) {
+      console.error('[SCHEDULE_GEN] Database is null/undefined in loadMassTimesConfig!');
+      // Configuração padrão para fallback
       this.massTimes = [
         { id: '1', dayOfWeek: 0, time: '08:00', minMinisters: 3, maxMinisters: 6 },
         { id: '2', dayOfWeek: 0, time: '10:00', minMinisters: 4, maxMinisters: 8 },
         { id: '3', dayOfWeek: 0, time: '19:00', minMinisters: 3, maxMinisters: 6 }
       ];
+      logger.warn('Using default mass times configuration due to missing database');
       return;
     }
 
-    const config = await db.select().from(massTimesConfig)
+    const config = await this.db.select().from(massTimesConfig)
       .where(eq(massTimesConfig.isActive, true));
 
     this.massTimes = config.map(c => ({

@@ -60,7 +60,9 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     }
 
     // Gerar escalas automaticamente (definitiva - exige questionário fechado)
+    console.log('[ROUTE] Calling generateAutomaticSchedule with:', { year, month, saveToDatabase, isPreview: false });
     const generatedSchedules = await generateAutomaticSchedule(year, month, false);
+    console.log('[ROUTE] Generated schedules count:', generatedSchedules.length);
 
     // Salvar no banco se solicitado
     let savedCount = 0;
@@ -180,7 +182,9 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
       });
     }
 
+    console.log('[PREVIEW ROUTE] Calling generateAutomaticSchedule with:', { year, month, isPreview: true });
     const generatedSchedules = await generateAutomaticSchedule(year, month, true); // Preview aceita questionários abertos
+    console.log('[PREVIEW ROUTE] Generated schedules count:', generatedSchedules.length);
 
     res.json({
       success: true,
