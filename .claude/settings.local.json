@@ -40,7 +40,11 @@
       "Bash(for file in client/src/pages/*.tsx)",
       "Bash(do grep -l \"<Layout\" \"$file\")",
       "Bash(xargs:*)",
-      "Bash(npx kill-port:*)"
+      "Bash(npx kill-port:*)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-db-connection.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-api-production.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-user-status.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-auth-debug.ts)"
     ],
     "deny": [],
     "ask": []

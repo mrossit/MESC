@@ -4,7 +4,6 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import Database from 'better-sqlite3';
 
 // JWT secret - deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -70,13 +69,19 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   const verifyAndCheckStatus = async (user: any) => {
     try {
-      // Usar SQLite direto como fallback (mesmo problema de esquema)
-      const sqliteDb = new Database('local.db');
-      
-      const currentUser = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-      sqliteDb.close();
+      console.log('[AUTH] Verifying user:', user.id, user.email);
+
+      // Use Drizzle ORM for database access (works with both SQLite and PostgreSQL)
+      const [currentUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
+
+      console.log('[AUTH] User from DB:', currentUser?.id, currentUser?.status);
 
       if (!currentUser || currentUser.status !== 'active') {
+        console.log('[AUTH] User blocked - Status:', currentUser?.status);
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
       }
 
@@ -139,30 +144,11 @@ export function requireRole(roles: string[]) {
 export async function login(email: string, password: string) {
   try {
     // Busca usuário por email
-    let user;
-    try {
-      const [foundUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      user = foundUser;
-    } catch (dbError) {
-      // Fallback para query SQLite direta
-      const Database = await import('better-sqlite3');
-      const sqlite = new (Database.default)('local.db');
-      const sqliteUser = sqlite.prepare('SELECT * FROM users WHERE email = ?').get(email);
-      sqlite.close();
-      
-      // Mapear campos SQLite para o formato esperado
-      if (sqliteUser) {
-        user = {
-          ...sqliteUser,
-          passwordHash: sqliteUser.password_hash,
-          requiresPasswordChange: !!sqliteUser.requires_password_change
-        };
-      }
-    }
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
     if (!user) {
       throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');

@@ -44,6 +44,10 @@ class DrizzleSQLiteFallback {
   private static sqliteDb: Database.Database | null = null;
   
   static getSQLiteDB(): Database.Database {
+    // Only allow SQLite in development mode
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SQLite fallback not allowed in production');
+    }
     if (!this.sqliteDb) {
       this.sqliteDb = new Database('local.db');
     }
@@ -51,17 +55,22 @@ class DrizzleSQLiteFallback {
   }
   
   static async safeQuery<T>(
-    drizzleQuery: () => Promise<T>, 
-    fallbackSQL: string, 
+    drizzleQuery: () => Promise<T>,
+    fallbackSQL: string,
     fallbackMapper: (row: any) => any = (row) => row
   ): Promise<T> {
+    // In production, always use Drizzle (no fallback)
+    if (process.env.NODE_ENV === 'production') {
+      return await drizzleQuery();
+    }
+
+    // In development, try Drizzle first then fallback to SQLite
     try {
-      // Tentar Drizzle primeiro
       return await drizzleQuery();
     } catch (drizzleError: any) {
       if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
-        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
-        
+        console.warn('[FALLBACK] Drizzle failed in dev, using SQLite directly:', drizzleError.message);
+
         // Usar SQLite direto como fallback
         const sqlite = this.getSQLiteDB();
         const result = sqlite.prepare(fallbackSQL).all();
@@ -72,12 +81,17 @@ class DrizzleSQLiteFallback {
   }
   
   static async safeQueryFirst<T>(
-    drizzleQuery: () => Promise<T>, 
-    fallbackSQL: string, 
+    drizzleQuery: () => Promise<T>,
+    fallbackSQL: string,
     fallbackMapper: (row: any) => any = (row) => row
   ): Promise<T> {
+    // In production, always use Drizzle (no fallback)
+    if (process.env.NODE_ENV === 'production') {
+      return await drizzleQuery();
+    }
+
+    // In development, try Drizzle first then fallback to SQLite
     try {
-      // Tentar Drizzle primeiro
       return await drizzleQuery();
     } catch (drizzleError: any) {
       if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
