@@ -53,15 +53,22 @@ export class ScheduleGenerator {
    */
   async generateScheduleForMonth(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
     logger.info(`Iniciando geração ${isPreview ? 'de preview' : 'definitiva'} de escalas para ${month}/${year}`);
+    console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
 
     try {
       // 1. Carregar dados necessários
       await this.loadMinistersData();
+      console.log(`[SCHEDULE_GEN] Ministers loaded: ${this.ministers.length}`);
+
       await this.loadAvailabilityData(year, month, isPreview);
+      console.log(`[SCHEDULE_GEN] Availability data loaded: ${this.availabilityData.size} entries`);
+
       await this.loadMassTimesConfig();
+      console.log(`[SCHEDULE_GEN] Mass times config loaded: ${this.massTimes.length} times`);
 
       // 2. Gerar horários de missa para o mês
       const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
+      console.log(`[SCHEDULE_GEN] Generated ${monthlyMassTimes.length} mass times for the month`);
 
       // 3. Executar algoritmo de distribuição
       const generatedSchedules: GeneratedSchedule[] = [];
@@ -215,12 +222,15 @@ export class ScheduleGenerator {
    */
   private async generateScheduleForMass(massTime: MassTime): Promise<GeneratedSchedule> {
     logger.debug(`Gerando escala para ${massTime.date} ${massTime.time}`);
+    console.log(`[SCHEDULE_GEN] Generating for mass: ${massTime.date} at ${massTime.time}`);
 
     // 1. Filtrar ministros disponíveis
     const availableMinsters = this.getAvailableMinistersForMass(massTime);
+    console.log(`[SCHEDULE_GEN] Available ministers for this mass: ${availableMinsters.length}`);
 
     // 2. Aplicar algoritmo de seleção inteligente
     const selectedMinisters = this.selectOptimalMinisters(availableMinsters, massTime);
+    console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
 
     // 3. Selecionar ministros de backup
     const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);

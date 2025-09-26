@@ -204,6 +204,78 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
 });
 
 /**
+ * DEBUG: Verificar dados para geração
+ * GET /api/schedules/debug/:year/:month
+ */
+router.get('/debug/:year/:month', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+
+    // Importar as classes necessárias
+    const { ScheduleGenerator } = await import('../utils/scheduleGenerator.js');
+    const generator = new ScheduleGenerator();
+
+    // Dados dos ministros
+    const ministersData = await db.select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      status: users.status,
+      totalServices: users.totalServices
+    }).from(users).where(
+      and(
+        eq(users.status, 'active'),
+        ne(users.role, 'gestor')
+      )
+    );
+
+    // Horários de missa
+    const massTimesData = await db.select().from(massTimesConfig)
+      .where(eq(massTimesConfig.isActive, true));
+
+    // Respostas de questionários
+    const responsesData = await db.select().from(questionnaireResponses)
+      .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+      .where(
+        and(
+          eq(questionnaires.month, month),
+          eq(questionnaires.year, year)
+        )
+      );
+
+    res.json({
+      success: true,
+      debug: {
+        environment: process.env.NODE_ENV,
+        database: !!db,
+        month,
+        year,
+        ministers: {
+          total: ministersData.length,
+          list: ministersData
+        },
+        massTimes: {
+          total: massTimesData.length,
+          list: massTimesData
+        },
+        questionnaireResponses: {
+          total: responsesData.length,
+          hasData: responsesData.length > 0
+        }
+      }
+    });
+  } catch (error: any) {
+    logger.error('Erro no debug:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+/**
  * Obter métricas de qualidade das escalas atuais
  * GET /api/schedules/quality-metrics/:year/:month
  */
