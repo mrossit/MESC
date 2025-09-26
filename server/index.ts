@@ -82,10 +82,19 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  const isDevelopment = process.env.NODE_ENV === "development";
+  console.log(`Environment: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
+  
+  if (isDevelopment) {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    try {
+      serveStatic(app);
+      console.log("Static file serving configured for production");
+    } catch (error) {
+      console.error("Failed to configure static file serving:", error);
+      process.exit(1);
+    }
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -93,11 +102,22 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
+  server.on('error', (error: any) => {
+    console.error('Server error:', error);
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use`);
+    }
+    process.exit(1);
+  });
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    console.log(`Server successfully started on http://0.0.0.0:${port}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
   });
 })();
