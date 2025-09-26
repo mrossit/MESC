@@ -35,7 +35,11 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
+  // Construir URL da API corretamente para desenvolvimento e produção
+  const apiBaseURL = import.meta.env.VITE_API_URL || '';
+  const fullUrl = apiBaseURL ? `${apiBaseURL}${url}` : url;
+
+  const res = await fetch(fullUrl, {
     method,
     headers,
     body,
@@ -59,7 +63,12 @@ export const getQueryFn: <T>(options: {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(queryKey.join("/") as string, {
+    // Construir URL da API corretamente para desenvolvimento e produção
+    const path = queryKey.join("/") as string;
+    const apiBaseURL = import.meta.env.VITE_API_URL || '';
+    const fullUrl = apiBaseURL ? `${apiBaseURL}${path}` : path;
+
+    const res = await fetch(fullUrl, {
       headers,
       credentials: "include",
     });
