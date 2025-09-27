@@ -275,7 +275,7 @@ export class ScheduleGenerator {
     const startDate = startOfMonth(new Date(year, month - 1));
     const endDate = endOfMonth(new Date(year, month - 1));
     
-    console.log(`[SCHEDULE_GEN] 🕐 Gerando horários para ${month}/${year} com NOVAS REGRAS!`);
+    console.log(`[SCHEDULE_GEN] 🕐 Gerando horários para ${month}/${year} com REGRAS ANTI-CONFLITO!`);
 
     let currentDate = startDate;
     while (currentDate <= endDate) {
@@ -283,8 +283,12 @@ export class ScheduleGenerator {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       const dayOfMonth = getDate(currentDate);
       
+      // 🚨 REGRA ESPECIAL: Dia 28 São Judas = SEM MISSA DIÁRIA
+      const isDayOfSaintJudas = dayOfMonth === 28;
+      
       // REGRA 1: Missas diárias (Segunda a Sábado, 6h30-7h)
-      if (dayOfWeek >= 1 && dayOfWeek <= 6) { // Segunda (1) a Sábado (6)
+      // ❌ EXCETO no dia 28 (São Judas) 
+      if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) { // Segunda (1) a Sábado (6)
         monthlyTimes.push({
           id: `daily-${dateStr}`,
           dayOfWeek,
@@ -294,6 +298,9 @@ export class ScheduleGenerator {
           maxMinisters: 4,
           type: 'missa_diaria'
         });
+        console.log(`[SCHEDULE_GEN] ✅ Missa diária adicionada: ${dateStr} 06:30`);
+      } else if (isDayOfSaintJudas) {
+        console.log(`[SCHEDULE_GEN] 🚫 Dia ${dateStr} é São Judas - SUPRIMINDO missa diária`);
       }
       
       // REGRA 2: Missas dominicais (Domingos 8h, 10h, 19h)
@@ -363,10 +370,66 @@ export class ScheduleGenerator {
     // const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
     // monthlyTimes.push(...specialMasses);
 
-    console.log(`[SCHEDULE_GEN] 🕐 Total de missas geradas: ${monthlyTimes.length}`);
-    return monthlyTimes.sort((a, b) => 
+    // 🔧 APLICAR FILTRO DE CONFLITOS: Missa especial sobrepõe missa normal no mesmo horário
+    const filteredTimes = this.resolveTimeConflicts(monthlyTimes);
+    
+    console.log(`[SCHEDULE_GEN] ✅ Total de ${monthlyTimes.length} horários → ${filteredTimes.length} após filtro de conflitos!`);
+    return filteredTimes.sort((a, b) => 
       a.date!.localeCompare(b.date!) || a.time.localeCompare(b.time)
     );
+  }
+  
+  /**
+   * Resolve conflitos de horário: missa especial substitui missa normal
+   */
+  private resolveTimeConflicts(massTimes: MassTime[]): MassTime[] {
+    console.log(`[SCHEDULE_GEN] 🔧 Resolvendo conflitos entre ${massTimes.length} missas...`);
+    
+    // Agrupar por data e horário
+    const timeSlots = new Map<string, MassTime[]>();
+    
+    for (const mass of massTimes) {
+      const key = `${mass.date}-${mass.time}`;
+      if (!timeSlots.has(key)) {
+        timeSlots.set(key, []);
+      }
+      timeSlots.get(key)!.push(mass);
+    }
+    
+    const resolvedTimes: MassTime[] = [];
+    
+    for (const [key, conflicts] of timeSlots) {
+      if (conflicts.length === 1) {
+        // Sem conflito
+        resolvedTimes.push(conflicts[0]);
+      } else {
+        // Há conflito - aplicar prioridade
+        console.log(`[SCHEDULE_GEN] ⚠️ CONFLITO em ${key}: ${conflicts.map(m => m.type).join(' vs ')}`);
+        
+        // Ordem de prioridade: especiais > dominicais > diárias  
+        const priorityOrder = [
+          'missa_sao_judas_festa', 'missa_sao_judas', 'missa_cura_libertacao',
+          'missa_sagrado_coracao', 'missa_imaculado_coracao',
+          'missa_dominical', 'missa_diaria'
+        ];
+        
+        // Selecionar a missa com maior prioridade
+        let selected = conflicts[0];
+        for (const mass of conflicts) {
+          const currentPriority = priorityOrder.indexOf(mass.type || 'missa_diaria');
+          const selectedPriority = priorityOrder.indexOf(selected.type || 'missa_diaria');
+          
+          if (currentPriority < selectedPriority) { // Menor índice = maior prioridade
+            selected = mass;
+          }
+        }
+        
+        console.log(`[SCHEDULE_GEN] ✅ RESOLVIDO: ${selected.type} prevaleceu em ${key}`);
+        resolvedTimes.push(selected);
+      }
+    }
+    
+    return resolvedTimes;
   }
 
   /**
