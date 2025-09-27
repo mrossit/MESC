@@ -289,18 +289,18 @@ export class ScheduleGenerator {
       console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING ${dateStr}: dayOfMonth=${dayOfMonth}, isDayOfSaintJudas=${isDayOfSaintJudas}, dayOfWeek=${dayOfWeek}`);
       
       // REGRA 1: Missas diárias (Segunda a Sábado, 6h30-7h)
-      // ❌ EXCETO no dia 28 (São Judas) 
+      // ❌ EXCETO no dia 28 (São Judas)
       if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) { // Segunda (1) a Sábado (6)
         monthlyTimes.push({
           id: `daily-${dateStr}`,
           dayOfWeek,
           time: '06:30',
           date: dateStr,
-          minMinisters: 2,
-          maxMinisters: 4,
+          minMinisters: 5,  // AJUSTADO: 5 ministros para missas diárias
+          maxMinisters: 5,  // AJUSTADO: Exatamente 5 ministros
           type: 'missa_diaria'
         });
-        console.log(`[SCHEDULE_GEN] ✅ Missa diária adicionada: ${dateStr} 06:30`);
+        console.log(`[SCHEDULE_GEN] ✅ Missa diária adicionada: ${dateStr} 06:30 (5 ministros)`);
       } else if (isDayOfSaintJudas) {
         console.log(`[SCHEDULE_GEN] 🚫 Dia ${dateStr} é São Judas - SUPRIMINDO missa diária`);
         console.log(`[SCHEDULE_GEN] 🚫 DEBUG: dayOfWeek=${dayOfWeek}, isDayOfSaintJudas=${isDayOfSaintJudas}`);
@@ -308,16 +308,24 @@ export class ScheduleGenerator {
       
       // REGRA 2: Missas dominicais (Domingos 8h, 10h, 19h)
       if (dayOfWeek === 0) { // Domingo
-        ['08:00', '10:00', '19:00'].forEach(time => {
+        // Configuração específica para cada horário de domingo
+        const sundayConfigs = [
+          { time: '08:00', minMinisters: 15, maxMinisters: 15 },  // 15 ministros às 8h
+          { time: '10:00', minMinisters: 20, maxMinisters: 20 },  // 20 ministros às 10h
+          { time: '19:00', minMinisters: 20, maxMinisters: 20 }   // 20 ministros às 19h
+        ];
+
+        sundayConfigs.forEach(config => {
           monthlyTimes.push({
-            id: `sunday-${dateStr}-${time}`,
+            id: `sunday-${dateStr}-${config.time}`,
             dayOfWeek,
-            time,
+            time: config.time,
             date: dateStr,
-            minMinisters: 4,
-            maxMinisters: 8,
+            minMinisters: config.minMinisters,
+            maxMinisters: config.maxMinisters,
             type: 'missa_dominical'
           });
+          console.log(`[SCHEDULE_GEN] ✅ Missa dominical: ${dateStr} ${config.time} (${config.minMinisters} ministros)`);
         });
       }
       
@@ -328,36 +336,39 @@ export class ScheduleGenerator {
           dayOfWeek,
           time: '19:30', // TODO: Verificar se é feriado para usar 19h
           date: dateStr,
-          minMinisters: 3,
-          maxMinisters: 6,
+          minMinisters: 26,  // AJUSTADO: 26 ministros para Cura e Libertação
+          maxMinisters: 26,  // AJUSTADO: Exatamente 26 ministros
           type: 'missa_cura_libertacao'
         });
+        console.log(`[SCHEDULE_GEN] ✅ Missa Cura e Libertação: ${dateStr} 19:30 (26 ministros)`);
       }
       
-      // REGRA 4: Missa Sagrado Coração (Primeiro sábado, 6h30)
-      if (isSaturday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 6)) { // 6 = sábado
+      // REGRA 4: Missa Sagrado Coração de Jesus (Primeira SEXTA-feira, 6h30)
+      if (isFriday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 5)) { // 5 = sexta
         monthlyTimes.push({
           id: `sacred-heart-${dateStr}`,
           dayOfWeek,
           time: '06:30',
           date: dateStr,
-          minMinisters: 2,
-          maxMinisters: 4,
+          minMinisters: 6,  // AJUSTADO: 6 ministros para missas especiais às 6h30
+          maxMinisters: 6,  // AJUSTADO: Exatamente 6 ministros
           type: 'missa_sagrado_coracao'
         });
+        console.log(`[SCHEDULE_GEN] ✅ Missa Sagrado Coração de Jesus (1ª sexta): ${dateStr} 06:30 (6 ministros)`);
       }
       
-      // REGRA 5: Missa Imaculado Coração (Primeira sexta, 6h30)
-      if (isFriday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 5)) { // 5 = sexta
+      // REGRA 5: Missa Imaculado Coração de Maria (Primeiro SÁBADO, 6h30)
+      if (isSaturday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 6)) { // 6 = sábado
         monthlyTimes.push({
           id: `immaculate-heart-${dateStr}`,
           dayOfWeek,
           time: '06:30',
           date: dateStr,
-          minMinisters: 2,
-          maxMinisters: 4,
+          minMinisters: 6,  // AJUSTADO: 6 ministros para missas especiais às 6h30
+          maxMinisters: 6,  // AJUSTADO: Exatamente 6 ministros
           type: 'missa_imaculado_coracao'
         });
+        console.log(`[SCHEDULE_GEN] ✅ Missa Imaculado Coração de Maria (1º sábado): ${dateStr} 06:30 (6 ministros)`);
       }
       
       // REGRA 6: Missas São Judas (dia 28)
@@ -474,53 +485,83 @@ export class ScheduleGenerator {
     
     // Outubro tem regras especiais (festa)
     if (month === 10) {
-      // 28/10: 7h, 10h, 12h, 15h, 17h, 19h30
-      ['07:00', '10:00', '12:00', '15:00', '17:00', '19:30'].forEach(time => {
+      // 28/10: 7h, 10h, 12h, 15h, 17h, 19h30 - Festa de São Judas
+      const festConfigs = [
+        { time: '07:00', minMinisters: 10, maxMinisters: 10 },
+        { time: '10:00', minMinisters: 15, maxMinisters: 15 },
+        { time: '12:00', minMinisters: 10, maxMinisters: 10 },
+        { time: '15:00', minMinisters: 10, maxMinisters: 10 },
+        { time: '17:00', minMinisters: 10, maxMinisters: 10 },
+        { time: '19:30', minMinisters: 20, maxMinisters: 20 }
+      ];
+
+      festConfigs.forEach(config => {
         masses.push({
-          id: `st-jude-feast-${dateStr}-${time}`,
+          id: `st-jude-feast-${dateStr}-${config.time}`,
           dayOfWeek,
-          time,
+          time: config.time,
           date: dateStr,
-          minMinisters: 4,
-          maxMinisters: 8,
+          minMinisters: config.minMinisters,
+          maxMinisters: config.maxMinisters,
           type: 'missa_sao_judas_festa'
         });
+        console.log(`[SCHEDULE_GEN] 🙏 Festa São Judas: ${dateStr} ${config.time} (${config.minMinisters} ministros)`);
       });
     } else {
       // Regras normais para dia 28
       if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Segunda a sexta
-        ['07:00', '10:00', '19:30'].forEach(time => {
+        const weekdayConfigs = [
+          { time: '07:00', minMinisters: 8, maxMinisters: 8 },
+          { time: '10:00', minMinisters: 10, maxMinisters: 10 },
+          { time: '19:30', minMinisters: 15, maxMinisters: 15 }
+        ];
+
+        weekdayConfigs.forEach(config => {
           masses.push({
-            id: `st-jude-weekday-${dateStr}-${time}`,
+            id: `st-jude-weekday-${dateStr}-${config.time}`,
             dayOfWeek,
-            time,
+            time: config.time,
             date: dateStr,
-            minMinisters: 3,
-            maxMinisters: 6,
+            minMinisters: config.minMinisters,
+            maxMinisters: config.maxMinisters,
             type: 'missa_sao_judas'
           });
         });
       } else if (dayOfWeek === 6) { // Sábado
-        ['07:00', '10:00', '19:00'].forEach(time => {
+        const saturdayConfigs = [
+          { time: '07:00', minMinisters: 8, maxMinisters: 8 },
+          { time: '10:00', minMinisters: 10, maxMinisters: 10 },
+          { time: '19:00', minMinisters: 15, maxMinisters: 15 }
+        ];
+
+        saturdayConfigs.forEach(config => {
           masses.push({
-            id: `st-jude-saturday-${dateStr}-${time}`,
+            id: `st-jude-saturday-${dateStr}-${config.time}`,
             dayOfWeek,
-            time,
+            time: config.time,
             date: dateStr,
-            minMinisters: 3,
-            maxMinisters: 6,
+            minMinisters: config.minMinisters,
+            maxMinisters: config.maxMinisters,
             type: 'missa_sao_judas'
           });
         });
       } else if (dayOfWeek === 0) { // Domingo
-        ['08:00', '10:00', '15:00', '17:00', '19:00'].forEach(time => {
+        const sundayConfigs = [
+          { time: '08:00', minMinisters: 15, maxMinisters: 15 },
+          { time: '10:00', minMinisters: 20, maxMinisters: 20 },
+          { time: '15:00', minMinisters: 15, maxMinisters: 15 },
+          { time: '17:00', minMinisters: 15, maxMinisters: 15 },
+          { time: '19:00', minMinisters: 20, maxMinisters: 20 }
+        ];
+
+        sundayConfigs.forEach(config => {
           masses.push({
-            id: `st-jude-sunday-${dateStr}-${time}`,
+            id: `st-jude-sunday-${dateStr}-${config.time}`,
             dayOfWeek,
-            time,
+            time: config.time,
             date: dateStr,
-            minMinisters: 4,
-            maxMinisters: 8,
+            minMinisters: config.minMinisters,
+            maxMinisters: config.maxMinisters,
             type: 'missa_sao_judas'
           });
         });
@@ -602,10 +643,10 @@ export class ScheduleGenerator {
       const availability = this.availabilityData.get(minister.id);
 
       if (!availability) {
-        // Se não há dados de disponibilidade, incluir o ministro apenas para preview
-        // Isso permite gerar escalas mesmo sem questionários respondidos
-        logger.debug(`Sem dados de disponibilidade para ministro ${minister.name} - incluindo no preview`);
-        return true; // Retorna true para incluir no preview
+        // Se não há dados de disponibilidade, EXCLUIR o ministro
+        // Ministros só devem ser incluídos se responderam ao questionário
+        logger.debug(`Sem dados de disponibilidade para ministro ${minister.name} - EXCLUINDO da escala`);
+        return false; // ALTERADO: Retorna false para excluir ministros sem resposta
       }
 
       // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
@@ -628,17 +669,29 @@ export class ScheduleGenerator {
           return availability.availableSundays.includes(sundayStr);
         }
 
-        // Se não há dados específicos, considerar disponível para preview
-        return true;
+        // Se não marcou nenhum domingo específico, NÃO está disponível
+        return false; // ALTERADO: Excluir se não marcou disponibilidade
       }
 
-      // Verificar disponibilidade para missas diárias
-      if (availability.dailyMassAvailability.length > 0) {
+      // Verificar disponibilidade para missas diárias (segunda a sábado)
+      if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
+        // Se não respondeu sobre missas diárias, NÃO está disponível
+        if (!availability.dailyMassAvailability || availability.dailyMassAvailability.length === 0) {
+          logger.debug(`${minister.name} não respondeu sobre missas diárias - EXCLUINDO`);
+          return false; // ALTERADO: Excluir se não respondeu
+        }
+
+        // Se marcou "Não posso" para missas diárias, não está disponível
+        if (availability.dailyMassAvailability.includes('Não posso')) {
+          return false;
+        }
+
+        // Verificar se marcou disponibilidade para este dia específico
         return availability.dailyMassAvailability.includes(dayName);
       }
 
-      // Se não há dados específicos, considerar disponível para preview
-      return true;
+      // Para outros casos, considerar não disponível por padrão
+      return false; // ALTERADO: Comportamento padrão é excluir
     });
   }
 
@@ -691,19 +744,23 @@ export class ScheduleGenerator {
     // 2. Ordenar por score (maior primeiro)
     scoredMinisters.sort((a, b) => b.score - a.score);
 
-    // 3. Aplicar lógica de casais se necessário
+    // 3. IMPORTANTE: Definir quantidade alvo (usar minMinisters que agora é igual a maxMinisters)
+    const targetCount = massTime.minMinisters;
+    logger.info(`[SCHEDULE_GEN] Selecionando exatamente ${targetCount} ministros para ${massTime.date} ${massTime.time}`);
+
+    // 4. Aplicar lógica de casais se necessário
     const selected: Minister[] = [];
     const used = new Set<string>();
 
     for (const { minister } of scoredMinisters) {
-      if (used.has(minister.id) || selected.length >= massTime.maxMinisters) {
-        continue;
+      if (used.has(minister.id) || selected.length >= targetCount) {
+        break; // Parar quando atingir a quantidade exata
       }
 
       // Se pode servir como casal e cônjuge está disponível
       if (minister.canServeAsCouple && minister.spouseMinisterId) {
         const spouse = available.find(m => m.id === minister.spouseMinisterId);
-        if (spouse && !used.has(spouse.id) && selected.length + 1 < massTime.maxMinisters) {
+        if (spouse && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
           selected.push(minister, spouse);
           used.add(minister.id);
           used.add(spouse.id);
@@ -715,13 +772,23 @@ export class ScheduleGenerator {
       // Adicionar ministro individual
       selected.push(minister);
       used.add(minister.id);
+    }
 
-      // Parar se atingiu mínimo necessário
-      if (selected.length >= massTime.minMinisters && selected.length >= 4) {
-        break;
+    // 5. Verificar se conseguiu a quantidade necessária
+    if (selected.length < targetCount) {
+      logger.warn(`⚠️ [SCHEDULE_GEN] Apenas ${selected.length} ministros disponíveis de ${targetCount} necessários para ${massTime.date} ${massTime.time}`);
+
+      // Se não há ministros suficientes, continuar tentando adicionar os disponíveis restantes
+      for (const { minister } of scoredMinisters) {
+        if (!used.has(minister.id) && selected.length < targetCount) {
+          selected.push(minister);
+          used.add(minister.id);
+        }
+        if (selected.length >= targetCount) break;
       }
     }
 
+    logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length} ministros para ${massTime.date} ${massTime.time}`);
     return selected;
   }
 
