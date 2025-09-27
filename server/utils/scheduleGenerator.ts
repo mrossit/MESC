@@ -531,6 +531,12 @@ export class ScheduleGenerator {
         return true; // Retorna true para incluir no preview
       }
 
+      // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
+      if (massTime.type && !this.isAvailableForSpecialMass(minister.id, massTime.type)) {
+        console.log(`[SCHEDULE_GEN] ❌ ${minister.name} não disponível para ${massTime.type}`);
+        return false;
+      }
+
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
         const sundayStr = `Domingo ${dateStr}`;
@@ -557,6 +563,42 @@ export class ScheduleGenerator {
       // Se não há dados específicos, considerar disponível para preview
       return true;
     });
+  }
+
+  /**
+   * Verifica se o ministro está disponível para um tipo específico de missa
+   */
+  private isAvailableForSpecialMass(ministerId: string, massType: string): boolean {
+    const availability = this.availabilityData.get(ministerId);
+    if (!availability) return false;
+    
+    // Mapear tipos de missa para campos do questionário
+    const massTypeMapping: { [key: string]: string } = {
+      'missa_cura_libertacao': 'healing_liberation_mass',
+      'missa_sagrado_coracao': 'sacred_heart_mass', 
+      'missa_imaculado_coracao': 'immaculate_heart_mass',
+      'missa_sao_judas': 'saint_judas_novena',
+      'missa_sao_judas_festa': 'saint_judas_feast'
+    };
+    
+    const questionKey = massTypeMapping[massType];
+    if (!questionKey) {
+      // Para missas regulares (diárias, dominicais), permitir se tem disponibilidade básica
+      return true;
+    }
+    
+    // Verificar se respondeu positivamente no questionário para esta missa específica
+    const specialEvents = (availability as any).specialEvents;
+    if (!specialEvents || typeof specialEvents !== 'object') {
+      console.log(`[SCHEDULE_GEN] ⚠️ Sem dados de eventos especiais para ministro ${ministerId}`);
+      return false;
+    }
+    
+    const response = specialEvents[questionKey];
+    const isAvailable = response === 'Sim' || response === true;
+    
+    console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
+    return isAvailable;
   }
 
   /**
