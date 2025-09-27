@@ -276,20 +276,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await DrizzleSQLiteFallback.safeQuery(
-      () => db.select().from(users).orderBy(desc(users.createdAt)),
-      'SELECT * FROM users ORDER BY createdAt DESC',
-      (row) => ({
-        ...row,
-        requiresPasswordChange: !!row.requires_password_change,
-        passwordHash: row.password_hash || row.passwordHash,
-        firstName: row.first_name || row.firstName,
-        lastName: row.last_name || row.lastName,
-        lastLogin: row.last_login ? new Date(row.last_login) : null,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
-      })
-    );
+    return await db.select().from(users).orderBy(desc(users.createdAt));
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
