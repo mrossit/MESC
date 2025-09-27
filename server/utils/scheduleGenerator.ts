@@ -286,6 +286,8 @@ export class ScheduleGenerator {
       // 🚨 REGRA ESPECIAL: Dia 28 São Judas = SEM MISSA DIÁRIA
       const isDayOfSaintJudas = dayOfMonth === 28;
       
+      console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING ${dateStr}: dayOfMonth=${dayOfMonth}, isDayOfSaintJudas=${isDayOfSaintJudas}, dayOfWeek=${dayOfWeek}`);
+      
       // REGRA 1: Missas diárias (Segunda a Sábado, 6h30-7h)
       // ❌ EXCETO no dia 28 (São Judas) 
       if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) { // Segunda (1) a Sábado (6)
@@ -301,6 +303,7 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Missa diária adicionada: ${dateStr} 06:30`);
       } else if (isDayOfSaintJudas) {
         console.log(`[SCHEDULE_GEN] 🚫 Dia ${dateStr} é São Judas - SUPRIMINDO missa diária`);
+        console.log(`[SCHEDULE_GEN] 🚫 DEBUG: dayOfWeek=${dayOfWeek}, isDayOfSaintJudas=${isDayOfSaintJudas}`);
       }
       
       // REGRA 2: Missas dominicais (Domingos 8h, 10h, 19h)
@@ -385,10 +388,21 @@ export class ScheduleGenerator {
   private resolveTimeConflicts(massTimes: MassTime[]): MassTime[] {
     console.log(`[SCHEDULE_GEN] 🔧 Resolvendo conflitos entre ${massTimes.length} missas...`);
     
+    // 🚨 REGRA ESPECIAL: REMOVER TODAS as missas diárias do dia 28 (São Judas)
+    const filteredMasses = massTimes.filter(mass => {
+      if (mass.date && mass.date.endsWith('-28') && mass.type === 'missa_diaria') {
+        console.log(`[SCHEDULE_GEN] 🚫 REMOVENDO missa diária do dia 28: ${mass.date} ${mass.time}`);
+        return false; // Remover missa diária do dia 28
+      }
+      return true; // Manter todas as outras
+    });
+    
+    console.log(`[SCHEDULE_GEN] 📊 Filtro dia 28: ${massTimes.length} → ${filteredMasses.length} missas`);
+    
     // Agrupar por data e horário
     const timeSlots = new Map<string, MassTime[]>();
     
-    for (const mass of massTimes) {
+    for (const mass of filteredMasses) {
       const key = `${mass.date}-${mass.time}`;
       if (!timeSlots.has(key)) {
         timeSlots.set(key, []);

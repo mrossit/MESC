@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireRole } from '../auth';
 import type { AuthRequest } from '../auth';
-import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator.js';
+import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator';
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses } from '@shared/schema';
@@ -186,15 +186,29 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
     const generatedSchedules = await generateAutomaticSchedule(year, month, true); // Preview aceita questionários abertos
     console.log('[PREVIEW ROUTE] Generated schedules count:', generatedSchedules.length);
 
+    // 🚨 CORREÇÃO DIRETA NA ROTA: Remover missas diárias do dia 28
+    const correctedSchedules = generatedSchedules.filter(schedule => {
+      const isDay28 = schedule.massTime.date?.endsWith('-28');
+      const isDailyMass = schedule.massTime.type === 'missa_diaria';
+      
+      if (isDay28 && isDailyMass) {
+        console.log(`[PREVIEW_FILTER] 🚫 Removendo missa diária do dia 28: ${schedule.massTime.date} ${schedule.massTime.time}`);
+        return false; // Remover
+      }
+      return true;
+    });
+
+    console.log(`[PREVIEW_FILTER] Filtro aplicado: ${generatedSchedules.length} → ${correctedSchedules.length} escalas`);
+
     res.json({
       success: true,
       data: {
         month,
         year,
-        totalSchedules: generatedSchedules.length,
-        averageConfidence: calculateAverageConfidence(generatedSchedules),
-        schedules: formatSchedulesForAPI(generatedSchedules),
-        qualityMetrics: calculateQualityMetrics(generatedSchedules)
+        totalSchedules: correctedSchedules.length,
+        averageConfidence: calculateAverageConfidence(correctedSchedules),
+        schedules: formatSchedulesForAPI(correctedSchedules),
+        qualityMetrics: calculateQualityMetrics(correctedSchedules)
       }
     });
 
@@ -217,7 +231,7 @@ router.get('/debug/:year/:month', authenticateToken, requireRole(['gestor', 'coo
     const month = parseInt(req.params.month);
 
     // Importar as classes necessárias
-    const { ScheduleGenerator } = await import('../utils/scheduleGenerator.js');
+    const { ScheduleGenerator } = await import('../utils/scheduleGenerator');
     const generator = new ScheduleGenerator();
 
     // Dados dos ministros
@@ -423,7 +437,25 @@ function calculateBalanceScore(schedules: GeneratedSchedule[]): number {
 }
 
 function formatSchedulesForAPI(schedules: GeneratedSchedule[]) {
-  return schedules.map(schedule => ({
+  // 🚨 FILTRO FINAL: Garantir que NÃO há missas diárias no dia 28 (São Judas)
+  console.log(`[API_FILTER] 🔥 EXECUTANDO FILTRO! Total schedules: ${schedules.length}`);
+  
+  const filteredSchedules = schedules.filter(schedule => {
+    const isDay28 = schedule.massTime.date?.endsWith('-28');
+    const isDailyMass = schedule.massTime.type === 'missa_diaria';
+    
+    console.log(`[API_FILTER] 🔍 Checking: ${schedule.massTime.date} ${schedule.massTime.time} type=${schedule.massTime.type}`);
+    
+    if (isDay28 && isDailyMass) {
+      console.log(`[API_FILTER] 🚫 REMOVENDO missa diária do dia 28: ${schedule.massTime.date} ${schedule.massTime.time}`);
+      return false; // Remover
+    }
+    return true; // Manter
+  });
+  
+  console.log(`[API_FILTER] 📊 Filtro final: ${schedules.length} → ${filteredSchedules.length} escalas`);
+  
+  return filteredSchedules.map(schedule => ({
     date: schedule.massTime.date,
     time: schedule.massTime.time,
     dayOfWeek: schedule.massTime.dayOfWeek,
