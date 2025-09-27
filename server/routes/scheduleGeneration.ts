@@ -427,6 +427,7 @@ function formatSchedulesForAPI(schedules: GeneratedSchedule[]) {
     date: schedule.massTime.date,
     time: schedule.massTime.time,
     dayOfWeek: schedule.massTime.dayOfWeek,
+    type: schedule.massTime.type || 'missa', // Incluir tipo da missa
     ministers: schedule.ministers.map(m => ({
       id: m.id,
       name: m.name,

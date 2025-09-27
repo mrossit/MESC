@@ -1,7 +1,7 @@
 import { logger } from './logger.js';
 import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema';
 import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
-import { format, addDays, startOfMonth, endOfMonth, getDay } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // 🚨 DEBUG: CONFIRMAR QUE O CÓDIGO ATUALIZADO ESTÁ SENDO EXECUTADO
@@ -37,6 +37,7 @@ export interface MassTime {
   minMinisters: number;
   maxMinisters: number;
   date?: string; // Para missas específicas
+  type?: string; // Tipo da missa (missa_diaria, missa_dominical, etc)
 }
 
 export interface GeneratedSchedule {
@@ -267,33 +268,190 @@ export class ScheduleGenerator {
   }
 
   /**
-   * Gera horários de missa para todas as datas do mês
+   * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
    */
   private generateMonthlyMassTimes(year: number, month: number): MassTime[] {
     const monthlyTimes: MassTime[] = [];
     const startDate = startOfMonth(new Date(year, month - 1));
     const endDate = endOfMonth(new Date(year, month - 1));
+    
+    console.log(`[SCHEDULE_GEN] 🕐 Gerando horários para ${month}/${year} com NOVAS REGRAS!`);
 
     let currentDate = startDate;
     while (currentDate <= endDate) {
       const dayOfWeek = getDay(currentDate);
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+      const dayOfMonth = getDate(currentDate);
       
-      // Encontrar missas configuradas para este dia da semana
-      const dayMassTimes = this.massTimes.filter(mt => mt.dayOfWeek === dayOfWeek);
-      
-      dayMassTimes.forEach(massTime => {
+      // REGRA 1: Missas diárias (Segunda a Sábado, 6h30-7h)
+      if (dayOfWeek >= 1 && dayOfWeek <= 6) { // Segunda (1) a Sábado (6)
         monthlyTimes.push({
-          ...massTime,
-          date: format(currentDate, 'yyyy-MM-dd')
+          id: `daily-${dateStr}`,
+          dayOfWeek,
+          time: '06:30',
+          date: dateStr,
+          minMinisters: 2,
+          maxMinisters: 4,
+          type: 'missa_diaria'
         });
-      });
+      }
+      
+      // REGRA 2: Missas dominicais (Domingos 8h, 10h, 19h)
+      if (dayOfWeek === 0) { // Domingo
+        ['08:00', '10:00', '19:00'].forEach(time => {
+          monthlyTimes.push({
+            id: `sunday-${dateStr}-${time}`,
+            dayOfWeek,
+            time,
+            date: dateStr,
+            minMinisters: 4,
+            maxMinisters: 8,
+            type: 'missa_dominical'
+          });
+        });
+      }
+      
+      // REGRA 3: Missa Cura e Libertação (Primeira quinta-feira, 19h30)
+      if (isThursday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 4)) { // 4 = quinta
+        monthlyTimes.push({
+          id: `healing-${dateStr}`,
+          dayOfWeek,
+          time: '19:30', // TODO: Verificar se é feriado para usar 19h
+          date: dateStr,
+          minMinisters: 3,
+          maxMinisters: 6,
+          type: 'missa_cura_libertacao'
+        });
+      }
+      
+      // REGRA 4: Missa Sagrado Coração (Primeiro sábado, 6h30)
+      if (isSaturday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 6)) { // 6 = sábado
+        monthlyTimes.push({
+          id: `sacred-heart-${dateStr}`,
+          dayOfWeek,
+          time: '06:30',
+          date: dateStr,
+          minMinisters: 2,
+          maxMinisters: 4,
+          type: 'missa_sagrado_coracao'
+        });
+      }
+      
+      // REGRA 5: Missa Imaculado Coração (Primeira sexta, 6h30)
+      if (isFriday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 5)) { // 5 = sexta
+        monthlyTimes.push({
+          id: `immaculate-heart-${dateStr}`,
+          dayOfWeek,
+          time: '06:30',
+          date: dateStr,
+          minMinisters: 2,
+          maxMinisters: 4,
+          type: 'missa_imaculado_coracao'
+        });
+      }
+      
+      // REGRA 6: Missas São Judas (dia 28)
+      if (dayOfMonth === 28) {
+        const stJudeMasses = this.generateStJudeMasses(currentDate);
+        monthlyTimes.push(...stJudeMasses);
+      }
 
       currentDate = addDays(currentDate, 1);
     }
 
+    // TODO: REGRA 7: Carregar missas especiais do questionário
+    // const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
+    // monthlyTimes.push(...specialMasses);
+
+    console.log(`[SCHEDULE_GEN] 🕐 Total de missas geradas: ${monthlyTimes.length}`);
     return monthlyTimes.sort((a, b) => 
       a.date!.localeCompare(b.date!) || a.time.localeCompare(b.time)
     );
+  }
+
+  /**
+   * Verifica se é a primeira ocorrência do dia da semana no mês
+   */
+  private isFirstOccurrenceInMonth(date: Date, targetDayOfWeek: number): boolean {
+    const startOfMonthDate = startOfMonth(date);
+    let firstOccurrence = startOfMonthDate;
+    
+    // Avançar até encontrar o primeiro dia da semana alvo
+    while (getDay(firstOccurrence) !== targetDayOfWeek) {
+      firstOccurrence = addDays(firstOccurrence, 1);
+    }
+    
+    return format(date, 'yyyy-MM-dd') === format(firstOccurrence, 'yyyy-MM-dd');
+  }
+  
+  /**
+   * Gera horários das missas de São Judas (dia 28) com regras complexas
+   */
+  private generateStJudeMasses(date: Date): MassTime[] {
+    const masses: MassTime[] = [];
+    const dayOfWeek = getDay(date);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const month = date.getMonth() + 1;
+    
+    console.log(`[SCHEDULE_GEN] 🙏 Gerando missas de São Judas para ${dateStr} (${dayOfWeek})`);
+    
+    // Outubro tem regras especiais (festa)
+    if (month === 10) {
+      // 28/10: 7h, 10h, 12h, 15h, 17h, 19h30
+      ['07:00', '10:00', '12:00', '15:00', '17:00', '19:30'].forEach(time => {
+        masses.push({
+          id: `st-jude-feast-${dateStr}-${time}`,
+          dayOfWeek,
+          time,
+          date: dateStr,
+          minMinisters: 4,
+          maxMinisters: 8,
+          type: 'missa_sao_judas_festa'
+        });
+      });
+    } else {
+      // Regras normais para dia 28
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Segunda a sexta
+        ['07:00', '10:00', '19:30'].forEach(time => {
+          masses.push({
+            id: `st-jude-weekday-${dateStr}-${time}`,
+            dayOfWeek,
+            time,
+            date: dateStr,
+            minMinisters: 3,
+            maxMinisters: 6,
+            type: 'missa_sao_judas'
+          });
+        });
+      } else if (dayOfWeek === 6) { // Sábado
+        ['07:00', '10:00', '19:00'].forEach(time => {
+          masses.push({
+            id: `st-jude-saturday-${dateStr}-${time}`,
+            dayOfWeek,
+            time,
+            date: dateStr,
+            minMinisters: 3,
+            maxMinisters: 6,
+            type: 'missa_sao_judas'
+          });
+        });
+      } else if (dayOfWeek === 0) { // Domingo
+        ['08:00', '10:00', '15:00', '17:00', '19:00'].forEach(time => {
+          masses.push({
+            id: `st-jude-sunday-${dateStr}-${time}`,
+            dayOfWeek,
+            time,
+            date: dateStr,
+            minMinisters: 4,
+            maxMinisters: 8,
+            type: 'missa_sao_judas'
+          });
+        });
+      }
+    }
+    
+    console.log(`[SCHEDULE_GEN] 🙏 São Judas: ${masses.length} missas geradas`);
+    return masses;
   }
 
   /**
