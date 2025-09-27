@@ -122,7 +122,10 @@ export class ScheduleGenerator {
       spouseMinisterId: users.spouseMinisterId
     }).from(users).where(
       and(
-        eq(users.status, 'active'),
+        or(
+          eq(users.status, 'active'),
+          sql`${users.status} IS NULL` // Incluir usuários com status null
+        ),
         ne(users.role, 'gestor') // Excluir gestores das escalas
       )
     );
