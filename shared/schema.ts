@@ -552,8 +552,6 @@ export const insertFormationLessonSchema = createInsertSchema(formationLessons).
   title: true,
   description: true,
   lessonNumber: true,
-  durationMinutes: true,
-  objectives: true,
   orderIndex: true,
   isActive: true
 });

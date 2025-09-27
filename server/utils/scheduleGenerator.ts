@@ -127,7 +127,7 @@ export class ScheduleGenerator {
       )
     );
 
-    this.ministers = ministersData.map(m => ({
+    this.ministers = ministersData.map((m: any) => ({
       ...m,
       totalServices: m.totalServices || 0,
       preferredTimes: m.preferredTimes || [],
@@ -213,7 +213,7 @@ export class ScheduleGenerator {
         )
       );
 
-    responses.forEach(r => {
+    responses.forEach((r: any) => {
       this.availabilityData.set(r.questionnaire_responses.userId, {
         ministerId: r.questionnaire_responses.userId,
         availableSundays: r.questionnaire_responses.availableSundays || [],
@@ -246,7 +246,7 @@ export class ScheduleGenerator {
     const config = await this.db.select().from(massTimesConfig)
       .where(eq(massTimesConfig.isActive, true));
 
-    this.massTimes = config.map(c => ({
+    this.massTimes = config.map((c: any) => ({
       id: c.id,
       dayOfWeek: c.dayOfWeek,
       time: c.time,
