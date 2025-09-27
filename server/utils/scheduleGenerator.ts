@@ -4,6 +4,9 @@ import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// 🚨 DEBUG: CONFIRMAR QUE O CÓDIGO ATUALIZADO ESTÁ SENDO EXECUTADO
+console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM CORREÇÕES! Timestamp:', new Date().toISOString());
+
 export interface Minister {
   id: string;
   name: string;
@@ -15,6 +18,7 @@ export interface Minister {
   spouseMinisterId: string | null;
   availabilityScore: number;
   preferenceScore: number;
+  position?: number; // Posição litúrgica atribuída
 }
 
 export interface AvailabilityData {
@@ -47,6 +51,7 @@ export class ScheduleGenerator {
   private availabilityData: Map<string, AvailabilityData> = new Map();
   private massTimes: MassTime[] = [];
   private db: any;
+  private dailyAssignments: Map<string, Set<string>> = new Map(); // Rastrear ministros já escalados por dia
 
   /**
    * Gera escalas automaticamente para um mês específico
@@ -55,6 +60,9 @@ export class ScheduleGenerator {
     // Importar db dinamicamente para garantir que está inicializado
     const { db } = await import('../db.js');
     this.db = db;
+    
+    // 🔧 CORREÇÃO: Limpar assignments diários para nova geração
+    this.dailyAssignments = new Map();
 
     logger.info(`Iniciando geração ${isPreview ? 'de preview' : 'definitiva'} de escalas para ${month}/${year}`);
     console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
@@ -309,12 +317,43 @@ export class ScheduleGenerator {
     // 4. Calcular score de confiança
     const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
 
-    return {
+    // 5. Rastrear ministros escalados no dia DEPOIS da seleção
+    const dateKey = massTime.date!;
+    if (!this.dailyAssignments.has(dateKey)) {
+      this.dailyAssignments.set(dateKey, new Set());
+    }
+    const dayAssignments = this.dailyAssignments.get(dateKey)!;
+    selectedMinisters.forEach(minister => dayAssignments.add(minister.id));
+    
+    // 6. Atribuir posições litúrgicas aos ministros
+    console.log('[SCHEDULE_GEN] ✅ DEBUGGING: Atribuindo posições aos ministros!');
+    const ministersWithPositions = selectedMinisters.map((minister, index) => {
+      const ministerWithPosition = {
+        ...minister,
+        position: index + 1 // Atribuir posições sequenciais
+      };
+      console.log(`[SCHEDULE_GEN] ✅ Ministro ${minister.name} recebeu posição ${index + 1}`);
+      return ministerWithPosition;
+    });
+
+    const backupWithPositions = backupMinisters.map((minister, index) => ({
+      ...minister,
+      position: selectedMinisters.length + index + 1
+    }));
+
+    // 🚨 DEBUG FINAL: VERIFICAR SE ESTA PARTE É EXECUTADA
+    console.log('[SCHEDULE_GEN] 🚨 RETORNANDO RESULTADO COM POSIÇÕES! ministersWithPositions:', ministersWithPositions.length);
+    console.log('[SCHEDULE_GEN] 🚨 Primeiro ministro com posição:', JSON.stringify(ministersWithPositions[0], null, 2));
+    
+    const result = {
       massTime,
-      ministers: selectedMinisters,
-      backupMinisters,
+      ministers: ministersWithPositions,
+      backupMinisters: backupWithPositions,
       confidence
     };
+    
+    console.log('[SCHEDULE_GEN] 🚨 RESULTADO FINAL:', JSON.stringify(result, null, 2).substring(0, 500));
+    return result;
   }
 
   /**
@@ -443,11 +482,17 @@ export class ScheduleGenerator {
       score += 0.3; // Bonus para quem nunca serviu
     }
 
-    // 3. Preferência de horário (20% do peso)
+    // 3. Preferência de horário (30% do peso - aumentado para forçar diversificação)
     if (massTime) {
       const availability = this.availabilityData.get(minister.id);
-      if (availability?.preferredMassTimes.includes(`${massTime.time.substring(0, 2)}h`)) {
-        score += 0.2;
+      const timeHour = `${massTime.time.substring(0, 2)}h`;
+      
+      if (availability?.preferredMassTimes.includes(timeHour)) {
+        // Bonus maior para preferência exata de horário
+        score += 0.5;
+      } else if (availability?.preferredMassTimes && availability.preferredMassTimes.length > 0) {
+        // Penalidade para ministros que preferem outros horários
+        score -= 0.3;
       }
     }
 
@@ -455,6 +500,15 @@ export class ScheduleGenerator {
     const availability = this.availabilityData.get(minister.id);
     if (availability?.canSubstitute) {
       score += 0.1;
+    }
+    
+    // 5. Penalidade para ministros já escalados no mesmo dia (40% do peso - FORTE penalidade)
+    if (massTime && massTime.date) {
+      const dayAssignments = this.dailyAssignments.get(massTime.date);
+      if (dayAssignments && dayAssignments.has(minister.id)) {
+        score -= 0.8; // Penalidade muito forte para evitar duplicações no mesmo domingo
+        console.log(`[SCHEDULE_GEN] ⚠️ Penalidade aplicada a ${minister.name} - já escalado hoje (${massTime.date})`);
+      }
     }
 
     return score;

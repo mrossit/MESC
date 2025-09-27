@@ -308,8 +308,8 @@ router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['ges
 
     const metrics = {
       totalSchedules: existingSchedules.length,
-      uniqueMinisters: new Set(existingSchedules.map(s => s.schedules.ministerId)).size,
-      averageSchedulesPerMinister: existingSchedules.length / new Set(existingSchedules.map(s => s.schedules.ministerId)).size,
+      uniqueMinisters: new Set(existingSchedules.map((s: any) => s.schedules.ministerId)).size,
+      averageSchedulesPerMinister: existingSchedules.length / new Set(existingSchedules.map((s: any) => s.schedules.ministerId)).size,
       distributionBalance: calculateDistributionBalance(existingSchedules),
       coverageByDay: calculateCoverageByDay(existingSchedules),
       substitutionRate: 0 // TODO: calcular com base em substituições
@@ -432,12 +432,14 @@ function formatSchedulesForAPI(schedules: GeneratedSchedule[]) {
       name: m.name,
       role: m.role,
       totalServices: m.totalServices,
-      availabilityScore: Math.round(m.availabilityScore * 100) / 100
+      availabilityScore: Math.round(m.availabilityScore * 100) / 100,
+      position: m.position
     })),
     backupMinisters: schedule.backupMinisters.map(m => ({
       id: m.id,
       name: m.name,
-      role: m.role
+      role: m.role,
+      position: m.position
     })),
     confidence: Math.round(schedule.confidence * 100) / 100,
     qualityScore: calculateScheduleQuality(schedule)

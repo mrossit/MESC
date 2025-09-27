@@ -49,6 +49,7 @@ interface Minister {
   role: string;
   totalServices: number;
   availabilityScore: number;
+  position?: number; // 🔧 CORREÇÃO: Adicionar campo position
 }
 
 interface QualityMetrics {
@@ -407,7 +408,7 @@ export default function AutoScheduleGeneration() {
                         <div className="flex items-center gap-3">
                           <div>
                             <h4 className="font-semibold">
-                              {formatDayOfWeek(schedule.dayOfWeek)} - {format(new Date(schedule.date), 'dd/MM/yyyy')}
+                              {format(new Date(schedule.date + 'T00:00:00'), 'EEEE', { locale: ptBR })} - {format(new Date(schedule.date + 'T00:00:00'), 'dd/MM/yyyy')}
                             </h4>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
@@ -434,7 +435,7 @@ export default function AutoScheduleGeneration() {
                           <span className="text-sm font-medium">Ministros:</span>
                           {schedule.ministers.map((minister, idx) => (
                             <Badge key={minister.id} variant="outline" className="text-xs">
-                              {minister.name}
+                              {minister.position && `${minister.position}. `}{minister.name}
                               <span className="ml-1 text-muted-foreground">
                                 ({minister.totalServices}x)
                               </span>
