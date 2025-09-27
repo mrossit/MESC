@@ -1,6 +1,6 @@
 import { db } from '../server/db.js';
 import { users, questionnaireResponses, questionnaires } from '../shared/schema.js';
-import { eq, and, or, ne } from 'drizzle-orm';
+import { eq, and, or, ne, desc } from 'drizzle-orm';
 
 async function checkAvailabilityIssues() {
   console.log('\n🔍 VERIFICANDO PROBLEMAS DE DISPONIBILIDADE\n');
@@ -24,11 +24,11 @@ async function checkAvailabilityIssues() {
 
     console.log(`\n📊 Total de ministros ativos: ${ministers.length}`);
 
-    // 2. Buscar questionário do mês atual
+    // 2. Buscar questionário mais recente ou do mês atual
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
-    const activeQuestionnaire = await db.select()
+    let activeQuestionnaire = await db.select()
       .from(questionnaires)
       .where(
         and(
@@ -36,6 +36,15 @@ async function checkAvailabilityIssues() {
           eq(questionnaires.year, currentYear)
         )
       );
+
+    // Se não encontrou do mês atual, buscar o mais recente
+    if (activeQuestionnaire.length === 0) {
+      console.log('\n📌 Buscando questionário mais recente...');
+      activeQuestionnaire = await db.select()
+        .from(questionnaires)
+        .orderBy(desc(questionnaires.year), desc(questionnaires.month))
+        .limit(1);
+    }
 
     if (activeQuestionnaire.length === 0) {
       console.log('\n❌ Nenhum questionário encontrado para o mês atual');
