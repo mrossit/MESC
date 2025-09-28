@@ -1,117 +1,156 @@
-import fetch from 'node-fetch';
-
-const API_URL = 'http://localhost:5000';
+import { generateAutomaticSchedule } from '../server/utils/scheduleGenerator';
+import { db } from '../server/db';
+import { questionnaires, questionnaireResponses, massTimesConfig } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 async function testScheduleGeneration() {
-  console.log('🔍 Testing schedule generation...\n');
+  console.log('🔍 Testando geração de escalas...\n');
 
   try {
-    // 1. Login como coordenador
-    console.log('1. Fazendo login...');
-    const loginRes = await fetch(`${API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'rossit@icloud.com',
-        password: '123Pegou'
-      })
+    // 1. Verificar questionários existentes
+    console.log('📋 Verificando questionários existentes...');
+    const allQuestionnaires = await db
+      .select()
+      .from(questionnaires)
+      .orderBy(questionnaires.year, questionnaires.month);
+
+    console.log(`   Total de questionários: ${allQuestionnaires.length}`);
+    allQuestionnaires.forEach(q => {
+      console.log(`   - ${q.title} (${q.month}/${q.year}) - Status: ${q.status}`);
     });
 
-    if (!loginRes.ok) {
-      console.log('❌ Login falhou');
+    // 2. Verificar respostas
+    console.log('\n📊 Verificando respostas aos questionários...');
+    for (const q of allQuestionnaires) {
+      const responses = await db
+        .select()
+        .from(questionnaireResponses)
+        .where(eq(questionnaireResponses.questionnaireId, q.id));
+
+      console.log(`   ${q.title}: ${responses.length} respostas`);
+
+      // Mostrar algumas respostas
+      if (responses.length > 0) {
+        const sample = responses[0];
+        console.log(`     Exemplo de disponibilidade:`);
+        console.log(`     - Domingos: ${sample.availableSundays?.join(', ') || 'Não informado'}`);
+        console.log(`     - Horários preferidos: ${sample.preferredMassTimes?.join(', ') || 'Não informado'}`);
+        console.log(`     - Pode substituir: ${sample.canSubstitute ? 'Sim' : 'Não'}`);
+      }
+    }
+
+    // 3. Verificar configuração de horários de missa
+    console.log('\n⛪ Verificando configuração de horários de missa...');
+    const massTimes = await db
+      .select()
+      .from(massTimesConfig)
+      .orderBy(massTimesConfig.dayOfWeek, massTimesConfig.time);
+
+    console.log(`   Total de horários configurados: ${massTimes.length}`);
+    massTimes.forEach(mt => {
+      const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+      console.log(`   - ${days[mt.dayOfWeek]} ${mt.time} (Min: ${mt.minMinisters}, Max: ${mt.maxMinisters})`);
+    });
+
+    // 4. Tentar gerar escalas para outubro/2025
+    const targetMonth = 10;
+    const targetYear = 2025;
+
+    console.log(`\n🎯 Testando geração para ${targetMonth}/${targetYear}...`);
+
+    // Verificar se há questionário para este período
+    const targetQuestionnaire = allQuestionnaires.find(
+      q => q.month === targetMonth && q.year === targetYear
+    );
+
+    if (!targetQuestionnaire) {
+      console.log('   ❌ Não há questionário para este período');
       return;
     }
 
-    const loginData = await loginRes.json();
-    const token = loginData.token;
-    console.log('✅ Login bem-sucedido\n');
+    console.log(`   ✅ Questionário encontrado: ${targetQuestionnaire.title} (Status: ${targetQuestionnaire.status})`);
 
-    // 2. Testar preview de geração (aceita questionários abertos)
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
+    // Testar geração preview (aceita questionários abertos)
+    console.log('\n📝 Testando geração PREVIEW (aceita questionários abertos)...');
+    try {
+      const previewSchedules = await generateAutomaticSchedule(targetYear, targetMonth, true);
+      console.log(`   ✅ Preview gerado: ${previewSchedules.length} escalas`);
 
-    console.log(`2. Testando preview para ${currentMonth}/${currentYear}...`);
-    const previewRes = await fetch(`${API_URL}/api/schedules/preview/${currentYear}/${currentMonth}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+      // Mostrar algumas escalas geradas
+      if (previewSchedules.length > 0) {
+        console.log('\n   Primeiras 3 escalas geradas:');
+        previewSchedules.slice(0, 3).forEach((s, i) => {
+          console.log(`\n   ${i + 1}. ${s.massTime.date} ${s.massTime.time}`);
+          console.log(`      Ministros: ${s.ministers.map(m => m.name).join(', ') || 'Nenhum'}`);
+          console.log(`      Confiança: ${(s.confidence * 100).toFixed(0)}%`);
+        });
       }
-    });
-
-    console.log(`   Status: ${previewRes.status}`);
-
-    if (previewRes.ok) {
-      const previewData = await previewRes.json();
-
-      if (previewData.success) {
-        console.log('✅ Preview gerado com sucesso!');
-        console.log(`   Total de escalas: ${previewData.data.totalSchedules}`);
-        console.log(`   Confiança média: ${previewData.data.averageConfidence}`);
-
-        if (previewData.data.schedules && previewData.data.schedules.length > 0) {
-          console.log('\n   Primeiras 3 escalas:');
-          previewData.data.schedules.slice(0, 3).forEach((s: any) => {
-            console.log(`     - ${s.date} às ${s.time}: ${s.ministers.length} ministros`);
-          });
-        }
-
-        if (previewData.data.qualityMetrics) {
-          console.log('\n   Métricas de qualidade:');
-          console.log(`     - Ministros únicos: ${previewData.data.qualityMetrics.uniqueMinistersUsed}`);
-          console.log(`     - Média por missa: ${previewData.data.qualityMetrics.averageMinistersPerMass}`);
-          console.log(`     - Alta confiança: ${previewData.data.qualityMetrics.highConfidenceSchedules}`);
-          console.log(`     - Baixa confiança: ${previewData.data.qualityMetrics.lowConfidenceSchedules}`);
-        }
-      } else {
-        console.log('❌ Preview falhou:', previewData.message);
-      }
-    } else {
-      const error = await previewRes.text();
-      console.log(`❌ Erro na API: ${error}`);
+    } catch (error) {
+      console.log(`   ❌ Erro na geração preview: ${error instanceof Error ? error.message : error}`);
     }
 
-    // 3. Verificar se há questionários no banco
-    console.log('\n3. Verificando questionários...');
-    const questRes = await fetch(`${API_URL}/api/questionnaires`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    // Testar geração definitiva (requer questionário fechado)
+    console.log('\n📝 Testando geração DEFINITIVA (requer questionário fechado)...');
 
-    if (questRes.ok) {
-      const questionnaires = await questRes.json();
-      console.log(`   Questionários encontrados: ${questionnaires.length}`);
+    if (targetQuestionnaire.status !== 'closed') {
+      console.log(`   ⚠️  Questionário com status "${targetQuestionnaire.status}" - precisa estar "closed" para geração definitiva`);
 
-      if (questionnaires.length > 0) {
-        const current = questionnaires.find((q: any) =>
-          q.month === currentMonth && q.year === currentYear
+      // Tentar fechar o questionário temporariamente para teste
+      console.log('   🔧 Fechando questionário temporariamente para teste...');
+      await db
+        .update(questionnaires)
+        .set({ status: 'closed' })
+        .where(eq(questionnaires.id, targetQuestionnaire.id));
+    }
+
+    try {
+      const definitiveSchedules = await generateAutomaticSchedule(targetYear, targetMonth, false);
+      console.log(`   ✅ Geração definitiva: ${definitiveSchedules.length} escalas`);
+
+      // Análise das escalas geradas
+      if (definitiveSchedules.length > 0) {
+        const sundaySchedules = definitiveSchedules.filter(s => s.massTime.dayOfWeek === 0);
+        const weekdaySchedules = definitiveSchedules.filter(s => s.massTime.dayOfWeek !== 0);
+
+        console.log(`\n   📊 Análise das escalas geradas:`);
+        console.log(`      - Missas dominicais: ${sundaySchedules.length}`);
+        console.log(`      - Missas de semana: ${weekdaySchedules.length}`);
+
+        const totalMinisters = new Set(
+          definitiveSchedules.flatMap(s => s.ministers.map(m => m.id))
+        ).size;
+        console.log(`      - Total de ministros escalados: ${totalMinisters}`);
+
+        const avgConfidence = definitiveSchedules.reduce((sum, s) => sum + s.confidence, 0) / definitiveSchedules.length;
+        console.log(`      - Confiança média: ${(avgConfidence * 100).toFixed(0)}%`);
+
+        // Verificar se está usando dados reais
+        const hasRealAvailability = definitiveSchedules.some(s =>
+          s.ministers.some(m => m.availabilityScore > 0)
         );
-
-        if (current) {
-          console.log(`   Questionário do mês atual:`, {
-            status: current.status,
-            questions: current.questions?.length || 0,
-            responses: current.responseCount || 0
-          });
-        }
+        console.log(`      - Usando dados de disponibilidade: ${hasRealAvailability ? '✅ Sim' : '❌ Não'}`);
       }
+    } catch (error) {
+      console.log(`   ❌ Erro na geração definitiva: ${error instanceof Error ? error.message : error}`);
     }
 
-    // 4. Verificar respostas do questionário
-    console.log('\n4. Verificando respostas de questionário...');
-    const responseRes = await fetch(`${API_URL}/api/questionnaires/responses`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (responseRes.ok) {
-      const responses = await responseRes.json();
-      console.log(`   Total de respostas: ${responses.length}`);
+    // Restaurar status original se foi alterado
+    if (targetQuestionnaire.status !== 'closed') {
+      console.log(`\n   🔄 Restaurando status original do questionário para "${targetQuestionnaire.status}"...`);
+      await db
+        .update(questionnaires)
+        .set({ status: targetQuestionnaire.status })
+        .where(eq(questionnaires.id, targetQuestionnaire.id));
     }
+
+    console.log('\n✅ Teste concluído!');
 
   } catch (error) {
-    console.error('❌ Erro:', error);
+    console.error('❌ Erro no teste:', error);
+    process.exit(1);
   }
+
+  process.exit(0);
 }
 
-testScheduleGeneration();
+testScheduleGeneration().catch(console.error);

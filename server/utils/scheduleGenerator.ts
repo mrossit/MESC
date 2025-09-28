@@ -92,6 +92,42 @@ export class ScheduleGenerator {
         generatedSchedules.push(schedule);
       }
 
+      // 4. Analisar e reportar escalas incompletas
+      const incompleteSchedules = generatedSchedules.filter(s =>
+        s.ministers.length < s.massTime.minMinisters
+      );
+
+      if (incompleteSchedules.length > 0) {
+        console.log(`\n[SCHEDULE_GEN] ⚠️ ATENÇÃO: ${incompleteSchedules.length} escalas incompletas detectadas:`);
+        console.log(`[SCHEDULE_GEN] =========================================================`);
+
+        incompleteSchedules.forEach(s => {
+          const shortage = s.massTime.minMinisters - s.ministers.length;
+          console.log(`[SCHEDULE_GEN] 🚨 ${s.massTime.date} ${s.massTime.time} (${s.massTime.type})`);
+          console.log(`[SCHEDULE_GEN]    Ministros: ${s.ministers.length}/${s.massTime.minMinisters} (faltam ${shortage})`);
+          console.log(`[SCHEDULE_GEN]    Confiança: ${(s.confidence * 100).toFixed(0)}%`);
+        });
+
+        // Resumo por tipo de missa
+        const byType = incompleteSchedules.reduce((acc, s) => {
+          const type = s.massTime.type || 'outros';
+          if (!acc[type]) acc[type] = { count: 0, totalShortage: 0 };
+          acc[type].count++;
+          acc[type].totalShortage += s.massTime.minMinisters - s.ministers.length;
+          return acc;
+        }, {} as Record<string, { count: number; totalShortage: number }>);
+
+        console.log(`\n[SCHEDULE_GEN] 📊 RESUMO POR TIPO DE MISSA:`);
+        Object.entries(byType).forEach(([type, data]) => {
+          console.log(`[SCHEDULE_GEN]    ${type}: ${data.count} escalas incompletas, faltam ${data.totalShortage} ministros no total`);
+        });
+
+        console.log(`[SCHEDULE_GEN] =========================================================\n`);
+        logger.warn(`${incompleteSchedules.length} escalas incompletas detectadas para ${month}/${year}`);
+      } else {
+        console.log(`[SCHEDULE_GEN] ✅ Todas as escalas atingiram o número mínimo de ministros!`);
+      }
+
       logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year}`);
       return generatedSchedules;
 
@@ -221,41 +257,61 @@ export class ScheduleGenerator {
     }
 
     // Definir status permitidos baseado no tipo de geração
-    const allowedStatuses = isPreview 
-      ? ['open', 'sent', 'active'] // Preview: aceita questionários abertos
+    const allowedStatuses = isPreview
+      ? ['open', 'sent', 'active', 'closed'] // Preview: aceita qualquer status
       : ['closed']; // Definitivo: apenas questionários fechados
 
-    const responses = await this.db.select().from(questionnaireResponses)
-      .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+    // Primeiro buscar o questionário do período
+    const [targetQuestionnaire] = await this.db.select()
+      .from(questionnaires)
       .where(
         and(
           eq(questionnaires.month, month),
-          eq(questionnaires.year, year),
-          or(
-            ...allowedStatuses.map(status => eq(questionnaires.status, status))
-          )
+          eq(questionnaires.year, year)
         )
-      );
+      )
+      .limit(1);
+
+    if (!targetQuestionnaire) {
+      console.log(`[SCHEDULE_GEN] Nenhum questionário encontrado para ${month}/${year}`);
+      return;
+    }
+
+    console.log(`[SCHEDULE_GEN] Questionário encontrado: ${targetQuestionnaire.title} (Status: ${targetQuestionnaire.status})`);
+
+    // Verificar se o status é permitido
+    if (!allowedStatuses.includes(targetQuestionnaire.status)) {
+      console.log(`[SCHEDULE_GEN] Questionário com status ${targetQuestionnaire.status} não permitido para ${isPreview ? 'preview' : 'geração definitiva'}`);
+      if (!isPreview) {
+        throw new Error(`Questionário precisa estar fechado para geração definitiva. Status atual: ${targetQuestionnaire.status}`);
+      }
+      return;
+    }
+
+    // Buscar as respostas deste questionário
+    const responses = await this.db.select()
+      .from(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
 
     console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
-    
+
     responses.forEach((r: any, index: number) => {
       console.log(`[SCHEDULE_GEN] 📝 RESPOSTA ${index + 1}:`, {
-        userId: r.questionnaire_responses.userId,
-        availableSundays: r.questionnaire_responses.availableSundays,
-        preferredMassTimes: r.questionnaire_responses.preferredMassTimes,
-        alternativeTimes: r.questionnaire_responses.alternativeTimes,
-        canSubstitute: r.questionnaire_responses.canSubstitute,
-        dailyMassAvailability: r.questionnaire_responses.dailyMassAvailability,
-        specialEvents: r.questionnaire_responses.specialEvents
+        userId: r.userId,
+        availableSundays: r.availableSundays,
+        preferredMassTimes: r.preferredMassTimes,
+        alternativeTimes: r.alternativeTimes,
+        canSubstitute: r.canSubstitute,
+        dailyMassAvailability: r.dailyMassAvailability,
+        specialEvents: r.specialEvents
       });
-      
+
       // Processar JSONs se necessário
-      let availableSundays = r.questionnaire_responses.availableSundays || [];
-      let preferredMassTimes = r.questionnaire_responses.preferredMassTimes || [];
-      let alternativeTimes = r.questionnaire_responses.alternativeTimes || [];
-      let dailyMassAvailability = r.questionnaire_responses.dailyMassAvailability || [];
-      let specialEvents = r.questionnaire_responses.specialEvents || {};
+      let availableSundays = r.availableSundays || [];
+      let preferredMassTimes = r.preferredMassTimes || [];
+      let alternativeTimes = r.alternativeTimes || [];
+      let dailyMassAvailability = r.dailyMassAvailability || [];
+      let specialEvents = r.specialEvents || {};
       
       // Se são strings JSON, fazer parse
       if (typeof availableSundays === 'string') {
@@ -275,18 +331,18 @@ export class ScheduleGenerator {
       }
       
       const processedData = {
-        ministerId: r.questionnaire_responses.userId,
+        ministerId: r.userId,
         availableSundays,
         preferredMassTimes,
         alternativeTimes,
-        canSubstitute: r.questionnaire_responses.canSubstitute || false,
+        canSubstitute: r.canSubstitute || false,
         dailyMassAvailability,
         specialEvents
       };
-      
-      console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.questionnaire_responses.userId}:`, processedData);
-      
-      this.availabilityData.set(r.questionnaire_responses.userId, processedData);
+
+      console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.userId}:`, processedData);
+
+      this.availabilityData.set(r.userId, processedData);
     });
 
     console.log(`[SCHEDULE_GEN] ✅ Carregadas respostas de ${responses.length} ministros no availabilityData`);
@@ -728,15 +784,25 @@ export class ScheduleGenerator {
         return false;
       }
 
+      // Verificar disponibilidade para missas diárias (segunda a sábado)
+      if (massTime.dayOfWeek > 0 && massTime.type === 'missa_diaria') {
+        const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const dayName = daysOfWeek[massTime.dayOfWeek];
+
+        if (!availability.dailyMassAvailability || !availability.dailyMassAvailability.includes(dayName)) {
+          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} não disponível para ${dayName}`);
+          return false;
+        }
+      }
+
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
-        // Verificar múltiplos formatos de data nas respostas
-        const possibleFormats = [
-          `Domingo ${dateStr}`,  // "Domingo 05/10"
-          dateStr,                // "05/10"
-          `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
-          parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
-        ];
+        // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
+        const date = new Date(massTime.date!);
+        const dayOfMonth = date.getDate();
+        const sundayOfMonth = Math.ceil(dayOfMonth / 7); // 1-7 = 1º domingo, 8-14 = 2º domingo, etc.
+
+        console.log(`[AVAILABILITY_CHECK] Domingo ${sundayOfMonth} do mês (${massTime.date})`);
 
         // Se o ministro marcou "Nenhum domingo", ele não está disponível
         if (availability.availableSundays?.includes('Nenhum domingo')) {
@@ -745,14 +811,30 @@ export class ScheduleGenerator {
         }
 
         // Verificar se está disponível para este domingo específico
+        // Os domingos são armazenados como "1", "2", "3", "4", "5"
         let availableForSunday = false;
         if (availability.availableSundays && availability.availableSundays.length > 0) {
-          for (const format of possibleFormats) {
-            if (availability.availableSundays.some(sunday =>
-              sunday.includes(format) || sunday === format
-            )) {
-              availableForSunday = true;
-              break;
+          // Verificar se o domingo atual está na lista
+          availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} disponível nos domingos: ${availability.availableSundays.join(', ')}`);
+          console.log(`[AVAILABILITY_CHECK] Verificando domingo ${sundayOfMonth}: ${availableForSunday ? '✅ SIM' : '❌ NÃO'}`);
+
+          if (!availableForSunday) {
+            // Tentar também com múltiplos formatos legados
+            const possibleFormats = [
+              `Domingo ${dateStr}`,  // "Domingo 05/10"
+              dateStr,                // "05/10"
+              `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
+              parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
+            ];
+
+            for (const format of possibleFormats) {
+              if (availability.availableSundays.some(sunday =>
+                sunday.includes(format) || sunday === format
+              )) {
+                availableForSunday = true;
+                break;
+              }
             }
           }
         }
@@ -769,17 +851,27 @@ export class ScheduleGenerator {
 
         // Se está disponível para o domingo, verificar compatibilidade de horário
         if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
-          // Se tem horários preferidos, verificar se corresponde
-          const hasPreferredTime = availability.preferredMassTimes.includes(timeStr);
-          const hasAlternativeTime = availability.alternativeTimes?.includes(timeStr);
+          // Verificar se o horário atual está nas preferências ou alternativas
+          const hasPreferredTime = availability.preferredMassTimes.some(time =>
+            time === massTime.time || time === timeStr || time.includes(hour.toString())
+          );
+          const hasAlternativeTime = availability.alternativeTimes?.some(time =>
+            time === massTime.time || time === timeStr || time.includes(hour.toString())
+          );
 
-          if (!hasPreferredTime && !hasAlternativeTime && availability.preferredMassTimes.length > 0) {
-            // Tem preferência por outros horários, não escalar neste
-            logger.debug(`${minister.name} prefere outros horários, não ${timeStr}`);
-            return false;
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários preferidos: ${availability.preferredMassTimes.join(', ')}`);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários alternativos: ${availability.alternativeTimes?.join(', ') || 'nenhum'}`);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time} (${timeStr}): preferido=${hasPreferredTime}, alternativo=${hasAlternativeTime}`);
+
+          // Se não tem nem preferência nem alternativa para este horário, dar prioridade menor mas não excluir
+          // Excluir apenas se explicitamente não pode neste horário
+          if (!hasPreferredTime && !hasAlternativeTime) {
+            // Ainda assim está disponível, mas com prioridade menor
+            logger.debug(`${minister.name} disponível mas sem preferência para ${timeStr}`);
           }
         }
 
+        console.log(`[AVAILABILITY_CHECK] ✅ ${minister.name} DISPONÍVEL para domingo ${massTime.date} ${massTime.time}`);
         return true; // Disponível para o domingo
       }
 
@@ -810,34 +902,55 @@ export class ScheduleGenerator {
   private isAvailableForSpecialMass(ministerId: string, massType: string): boolean {
     const availability = this.availabilityData.get(ministerId);
     if (!availability) return false;
-    
-    // Mapear tipos de missa para campos do questionário
+
+    // Para missas diárias regulares, verificar disponibilidade para dias de semana
+    if (massType === 'missa_diaria') {
+      // Se tem disponibilidade para missas diárias, está disponível
+      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0;
+    }
+
+    // Para missas especiais (primeira sexta, primeiro sábado, cura e libertação)
+    // Como não temos dados específicos no questionário atual, vamos considerar:
+    // - Primeira sexta/sábado: verificar se tem disponibilidade para missas diárias
+    // - Cura e libertação (quinta): verificar se tem disponibilidade para quinta-feira
+    if (massType === 'missa_sagrado_coracao' || massType === 'missa_imaculado_coracao') {
+      // Missas especiais de primeira sexta/sábado - aceitar quem tem disponibilidade diária
+      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0;
+    }
+
+    if (massType === 'missa_cura_libertacao') {
+      // Missa de cura e libertação (quinta-feira)
+      return availability.dailyMassAvailability?.includes('Quinta-feira') || false;
+    }
+
+    // Mapear tipos de missa para campos do questionário (para futuro)
     const massTypeMapping: { [key: string]: string } = {
       'missa_cura_libertacao': 'healing_liberation_mass',
-      'missa_sagrado_coracao': 'sacred_heart_mass', 
+      'missa_sagrado_coracao': 'sacred_heart_mass',
       'missa_imaculado_coracao': 'immaculate_heart_mass',
       'missa_sao_judas': 'saint_judas_novena',
       'missa_sao_judas_festa': 'saint_judas_feast'
     };
-    
+
     const questionKey = massTypeMapping[massType];
     if (!questionKey) {
-      // Para missas regulares (diárias, dominicais), permitir se tem disponibilidade básica
+      // Para outros tipos não mapeados, permitir
       return true;
     }
-    
-    // Verificar se respondeu positivamente no questionário para esta missa específica
+
+    // Se temos dados de eventos especiais, verificar
     const specialEvents = (availability as any).specialEvents;
-    if (!specialEvents || typeof specialEvents !== 'object') {
-      console.log(`[SCHEDULE_GEN] ⚠️ Sem dados de eventos especiais para ministro ${ministerId}`);
-      return false;
+    if (specialEvents && typeof specialEvents === 'object') {
+      const response = specialEvents[questionKey];
+      const isAvailable = response === 'Sim' || response === true;
+      console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
+      return isAvailable;
     }
-    
-    const response = specialEvents[questionKey];
-    const isAvailable = response === 'Sim' || response === true;
-    
-    console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
-    return isAvailable;
+
+    // Se não há dados específicos, mas é uma missa especial conhecida
+    // usar lógica padrão baseada em disponibilidade geral
+    console.log(`[SCHEDULE_GEN] ℹ️ Usando disponibilidade geral para ${massType}`);
+    return availability.canSubstitute || false;
   }
 
   /**
@@ -855,7 +968,15 @@ export class ScheduleGenerator {
 
     // 3. IMPORTANTE: Definir quantidade alvo (usar minMinisters que agora é igual a maxMinisters)
     const targetCount = massTime.minMinisters;
-    logger.info(`[SCHEDULE_GEN] Selecionando exatamente ${targetCount} ministros para ${massTime.date} ${massTime.time}`);
+    const availableCount = available.length;
+
+    // Log de aviso se não há ministros suficientes
+    if (availableCount < targetCount) {
+      logger.warn(`⚠️ ATENÇÃO: Apenas ${availableCount} ministros disponíveis para ${massTime.date} ${massTime.time} (${massTime.type}), mas são necessários ${targetCount}`);
+      console.log(`[SCHEDULE_GEN] ⚠️ INSUFICIENTE: ${availableCount}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
+    } else {
+      logger.info(`[SCHEDULE_GEN] ✅ Selecionando ${targetCount} de ${availableCount} ministros disponíveis para ${massTime.date} ${massTime.time}`);
+    }
 
     // 4. Aplicar lógica de casais se necessário
     const selected: Minister[] = [];
@@ -885,7 +1006,7 @@ export class ScheduleGenerator {
 
     // 5. Verificar se conseguiu a quantidade necessária
     if (selected.length < targetCount) {
-      logger.warn(`⚠️ [SCHEDULE_GEN] Apenas ${selected.length} ministros disponíveis de ${targetCount} necessários para ${massTime.date} ${massTime.time}`);
+      logger.warn(`⚠️ [SCHEDULE_GEN] ESCALA INCOMPLETA: Apenas ${selected.length}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
 
       // Se não há ministros suficientes, continuar tentando adicionar os disponíveis restantes
       for (const { minister } of scoredMinisters) {
@@ -895,9 +1016,17 @@ export class ScheduleGenerator {
         }
         if (selected.length >= targetCount) break;
       }
+
+      // Adicionar metadado de escala incompleta
+      console.log(`[SCHEDULE_GEN] 🚨 MARCANDO ESCALA COMO INCOMPLETA: ${selected.length}/${targetCount} ministros`);
+      selected.forEach(m => {
+        (m as any).scheduleIncomplete = true;
+        (m as any).requiredCount = targetCount;
+        (m as any).actualCount = selected.length;
+      });
     }
 
-    logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length} ministros para ${massTime.date} ${massTime.time}`);
+    logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length}/${targetCount} ministros para ${massTime.date} ${massTime.time}`);
     return selected;
   }
 
@@ -973,21 +1102,35 @@ export class ScheduleGenerator {
   private calculateScheduleConfidence(ministers: Minister[], massTime: MassTime): number {
     let confidence = 0;
 
-    // 1. Cobertura adequada (50% do peso)
-    if (ministers.length >= massTime.minMinisters) {
-      confidence += 0.5;
-      if (ministers.length >= massTime.minMinisters + 1) {
-        confidence += 0.1; // Bonus por cobertura extra
+    // 1. Cobertura adequada (60% do peso) - MAIS IMPORTANTE
+    const fillRate = ministers.length / massTime.minMinisters;
+
+    if (fillRate >= 1.0) {
+      // Atingiu o mínimo necessário
+      confidence += 0.6;
+      if (ministers.length > massTime.minMinisters) {
+        confidence += 0.05; // Pequeno bônus por ministros extras
       }
+    } else {
+      // NÃO atingiu o mínimo - penalizar proporcionalmente
+      confidence += fillRate * 0.3; // Máximo de 30% se não atingir mínimo
+      console.log(`[CONFIDENCE] ⚠️ Escala incompleta: ${ministers.length}/${massTime.minMinisters} (${(fillRate * 100).toFixed(0)}%)`);
     }
 
-    // 2. Qualidade dos ministros escalados (30% do peso)
-    const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
-    confidence += Math.min(avgScore / 10, 0.3);
+    // 2. Qualidade dos ministros escalados (25% do peso)
+    if (ministers.length > 0) {
+      const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
+      confidence += Math.min(avgScore / 10, 0.25);
+    }
 
-    // 3. Balanceamento (20% do peso)
+    // 3. Balanceamento (15% do peso)
     const serviceVariance = this.calculateServiceVariance(ministers);
-    confidence += Math.max(0, 0.2 - serviceVariance / 100);
+    confidence += Math.max(0, 0.15 - serviceVariance / 100);
+
+    // Limitar confiança máxima para escalas incompletas
+    if (fillRate < 1.0) {
+      confidence = Math.min(confidence, 0.5); // Máximo 50% para escalas incompletas
+    }
 
     return Math.min(confidence, 1);
   }
