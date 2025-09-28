@@ -237,17 +237,60 @@ export class ScheduleGenerator {
         )
       );
 
-    responses.forEach((r: any) => {
-      this.availabilityData.set(r.questionnaire_responses.userId, {
-        ministerId: r.questionnaire_responses.userId,
-        availableSundays: r.questionnaire_responses.availableSundays || [],
-        preferredMassTimes: r.questionnaire_responses.preferredMassTimes || [],
-        alternativeTimes: r.questionnaire_responses.alternativeTimes || [],
-        canSubstitute: r.questionnaire_responses.canSubstitute || false,
-        dailyMassAvailability: r.questionnaire_responses.dailyMassAvailability || []
+    console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
+    
+    responses.forEach((r: any, index: number) => {
+      console.log(`[SCHEDULE_GEN] 📝 RESPOSTA ${index + 1}:`, {
+        userId: r.questionnaire_responses.userId,
+        availableSundays: r.questionnaire_responses.availableSundays,
+        preferredMassTimes: r.questionnaire_responses.preferredMassTimes,
+        alternativeTimes: r.questionnaire_responses.alternativeTimes,
+        canSubstitute: r.questionnaire_responses.canSubstitute,
+        dailyMassAvailability: r.questionnaire_responses.dailyMassAvailability,
+        specialEvents: r.questionnaire_responses.specialEvents
       });
+      
+      // Processar JSONs se necessário
+      let availableSundays = r.questionnaire_responses.availableSundays || [];
+      let preferredMassTimes = r.questionnaire_responses.preferredMassTimes || [];
+      let alternativeTimes = r.questionnaire_responses.alternativeTimes || [];
+      let dailyMassAvailability = r.questionnaire_responses.dailyMassAvailability || [];
+      let specialEvents = r.questionnaire_responses.specialEvents || {};
+      
+      // Se são strings JSON, fazer parse
+      if (typeof availableSundays === 'string') {
+        try { availableSundays = JSON.parse(availableSundays); } catch (e) { availableSundays = []; }
+      }
+      if (typeof preferredMassTimes === 'string') {
+        try { preferredMassTimes = JSON.parse(preferredMassTimes); } catch (e) { preferredMassTimes = []; }
+      }
+      if (typeof alternativeTimes === 'string') {
+        try { alternativeTimes = JSON.parse(alternativeTimes); } catch (e) { alternativeTimes = []; }
+      }
+      if (typeof dailyMassAvailability === 'string') {
+        try { dailyMassAvailability = JSON.parse(dailyMassAvailability); } catch (e) { dailyMassAvailability = []; }
+      }
+      if (typeof specialEvents === 'string') {
+        try { specialEvents = JSON.parse(specialEvents); } catch (e) { specialEvents = {}; }
+      }
+      
+      const processedData = {
+        ministerId: r.questionnaire_responses.userId,
+        availableSundays,
+        preferredMassTimes,
+        alternativeTimes,
+        canSubstitute: r.questionnaire_responses.canSubstitute || false,
+        dailyMassAvailability,
+        specialEvents
+      };
+      
+      console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.questionnaire_responses.userId}:`, processedData);
+      
+      this.availabilityData.set(r.questionnaire_responses.userId, processedData);
     });
 
+    console.log(`[SCHEDULE_GEN] ✅ Carregadas respostas de ${responses.length} ministros no availabilityData`);
+    console.log(`[SCHEDULE_GEN] 📊 AvailabilityData size: ${this.availabilityData.size}`);
     logger.info(`Carregadas respostas de ${responses.length} ministros`);
   }
 
@@ -655,18 +698,26 @@ export class ScheduleGenerator {
     const hour = parseInt(massTime.time.substring(0, 2));
     const timeStr = hour + 'h'; // Converter "08:00" para "8h", "10:00" para "10h"
 
+    console.log(`[AVAILABILITY_CHECK] 🔍 Verificando disponibilidade para ${massTime.date} ${massTime.time} (${massTime.type})`);
+    console.log(`[AVAILABILITY_CHECK] 📊 Total ministros: ${this.ministers.length}, AvailabilityData size: ${this.availabilityData.size}`);
+
     return this.ministers.filter(minister => {
       const availability = this.availabilityData.get(minister.id);
+      
+      console.log(`[AVAILABILITY_CHECK] 👤 Verificando ${minister.name} (${minister.id})`);
+      console.log(`[AVAILABILITY_CHECK] 📋 Dados de disponibilidade:`, availability);
 
       if (!availability) {
         // Se não há dados de disponibilidade, incluir em modo preview
         // mas excluir em produção
         if (this.availabilityData.size === 0) {
           // Se não há nenhuma resposta, estamos em modo preview
+          console.log(`[AVAILABILITY_CHECK] ✅ Modo preview: incluindo ${minister.name} sem dados de disponibilidade`);
           logger.debug(`Modo preview: incluindo ${minister.name} sem dados de disponibilidade`);
           return true;
         }
         // Em produção com respostas, excluir quem não respondeu
+        console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} não respondeu ao questionário - excluindo`);
         logger.debug(`${minister.name} não respondeu ao questionário - excluindo`);
         return false;
       }
