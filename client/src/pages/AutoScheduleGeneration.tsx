@@ -261,8 +261,8 @@ export default function AutoScheduleGeneration() {
                 Preview
               </Button>
               
-              <Button 
-                onClick={() => handleGenerate(false)}
+              <Button
+                onClick={() => handleGenerate(true)}
                 disabled={isGenerating}
                 data-testid="button-generate"
               >
@@ -352,7 +352,7 @@ export default function AutoScheduleGeneration() {
               
               <div className="flex gap-2">
                 <Button 
-                  onClick={() => handleGenerate(false)}
+                  onClick={() => handleGenerate(true)}
                   variant="outline"
                   size="sm"
                   data-testid="button-regenerate"
@@ -477,7 +477,7 @@ export default function AutoScheduleGeneration() {
                   <Eye className="h-4 w-4 mr-2" />
                   Fazer Preview
                 </Button>
-                <Button onClick={() => handleGenerate(false)}>
+                <Button onClick={() => handleGenerate(true)}>
                   <Zap className="h-4 w-4 mr-2" />
                   Gerar Escalas
                 </Button>
