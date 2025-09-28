@@ -81,6 +81,106 @@ function analyzeResponses(responses: any[]) {
   return { availabilities };
 }
 
+// Nova função para extrair dados estruturados das respostas do questionário
+function extractQuestionnaireData(responses: any[]) {
+  const data: {
+    availableSundays: string[] | null;
+    preferredMassTimes: string[] | null;
+    alternativeTimes: string[] | null;
+    dailyMassAvailability: string[] | null;
+    specialEvents: any;
+    canSubstitute: boolean | null;
+    notes: string | null;
+  } = {
+    availableSundays: null,
+    preferredMassTimes: null,
+    alternativeTimes: null,
+    dailyMassAvailability: null,
+    specialEvents: null,
+    canSubstitute: null,
+    notes: null
+  };
+
+  responses.forEach(r => {
+    const { questionId, answer } = r;
+
+    // Mapear os questionIds reais do sistema
+    switch(questionId) {
+      case 'available_sundays':
+        if (Array.isArray(answer)) {
+          data.availableSundays = answer;
+        }
+        break;
+
+      case 'main_service_time':
+      case 'preferred_mass_times':
+        if (answer) {
+          if (!data.preferredMassTimes) data.preferredMassTimes = [];
+          if (Array.isArray(answer)) {
+            data.preferredMassTimes.push(...answer);
+          } else {
+            data.preferredMassTimes.push(String(answer));
+          }
+        }
+        break;
+
+      case 'other_times_available':
+      case 'alternative_times':
+        if (typeof answer === 'object' && answer.answer === 'Sim' && answer.selectedOptions) {
+          data.alternativeTimes = answer.selectedOptions;
+        } else if (Array.isArray(answer)) {
+          data.alternativeTimes = answer;
+        } else if (answer === 'Sim') {
+          // Se respondeu sim mas não selecionou opções, deixar vazio
+          data.alternativeTimes = [];
+        }
+        break;
+
+      case 'daily_mass_availability':
+      case 'daily_mass':
+        if (answer === 'Sim' || answer === true) {
+          data.dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+        } else if (typeof answer === 'object' && answer.selectedOptions) {
+          data.dailyMassAvailability = answer.selectedOptions;
+        } else if (Array.isArray(answer)) {
+          data.dailyMassAvailability = answer;
+        }
+        break;
+
+      case 'can_substitute':
+        if (answer === 'Sim' || answer === true) {
+          data.canSubstitute = true;
+        } else if (answer === 'Não' || answer === false) {
+          data.canSubstitute = false;
+        }
+        break;
+
+      case 'notes':
+      case 'observations':
+        if (answer && typeof answer === 'string') {
+          data.notes = answer;
+        }
+        break;
+
+      case 'special_events':
+        if (answer) {
+          data.specialEvents = answer;
+        }
+        break;
+    }
+
+    // Verificar se é um evento especial
+    if (questionId.includes('special_event_') && answer === 'Sim') {
+      if (!data.specialEvents) data.specialEvents = [];
+      if (Array.isArray(data.specialEvents)) {
+        data.specialEvents.push(questionId.replace('special_event_', ''));
+      }
+    }
+  });
+
+  return data;
+}
+
 // Criar ou atualizar template de questionário para um mês específico
 router.post('/templates', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
@@ -372,10 +472,10 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       .limit(1);
     console.log('[RESPONSES] Resposta existente encontrada?', existingResponse ? 'Sim' : 'Não');
 
-    // Analisar respostas para extrair disponibilidades
+    // Analisar respostas para extrair disponibilidades e campos específicos
     console.log('[RESPONSES] Analisando respostas');
-    const { availabilities } = analyzeResponses(data.responses);
-    console.log('[RESPONSES] Disponibilidades extraídas:', availabilities);
+    const extractedData = extractQuestionnaireData(data.responses);
+    console.log('[RESPONSES] Dados extraídos:', extractedData);
 
     let result: { responseData: any; isUpdate: boolean };
 
@@ -388,6 +488,13 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .set({
             questionnaireId: templateId,
             responses: JSON.stringify(data.responses),
+            availableSundays: extractedData.availableSundays,
+            preferredMassTimes: extractedData.preferredMassTimes,
+            alternativeTimes: extractedData.alternativeTimes,
+            dailyMassAvailability: extractedData.dailyMassAvailability,
+            specialEvents: extractedData.specialEvents,
+            canSubstitute: extractedData.canSubstitute,
+            notes: extractedData.notes,
             submittedAt: new Date(),
             sharedWithFamilyIds: data.sharedWithFamilyIds || []
           })
@@ -420,6 +527,13 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
             userId: minister.id,
             questionnaireId: templateId,
             responses: JSON.stringify(data.responses),
+            availableSundays: extractedData.availableSundays,
+            preferredMassTimes: extractedData.preferredMassTimes,
+            alternativeTimes: extractedData.alternativeTimes,
+            dailyMassAvailability: extractedData.dailyMassAvailability,
+            specialEvents: extractedData.specialEvents,
+            canSubstitute: extractedData.canSubstitute,
+            notes: extractedData.notes,
             sharedWithFamilyIds: data.sharedWithFamilyIds || [],
             isSharedResponse: false
           })

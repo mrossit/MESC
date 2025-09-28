@@ -271,46 +271,88 @@ export async function getQuestionnaireResponsesForExport(
     }
 
     // Priority 2: If no structured data, try to extract from JSON responses field
-    if (formattedResponses.length === 0 && response.responses && typeof response.responses === 'object') {
-      const responseObj = response.responses as any;
+    if (formattedResponses.length === 0 && response.responses) {
+      // Se responses é um array (novo formato)
+      if (Array.isArray(response.responses)) {
+        response.responses.forEach((r: any) => {
+          const { questionId, answer } = r;
 
-      // Handle nested availability object
-      if (responseObj.availability && typeof responseObj.availability === 'object') {
-        const avail = responseObj.availability;
+          // Mapear questionIds para textos legíveis
+          const questionTextMap: Record<string, string> = {
+            'monthly_availability': 'Disponibilidade Mensal',
+            'main_service_time': 'Horário Principal de Serviço',
+            'can_substitute': 'Pode Substituir',
+            'available_sundays': 'Domingos Disponíveis',
+            'other_times_available': 'Outros Horários Disponíveis',
+            'preferred_mass_times': 'Horários Preferidos',
+            'alternative_times': 'Horários Alternativos',
+            'daily_mass': 'Missas Diárias',
+            'daily_mass_availability': 'Disponibilidade para Missas Diárias',
+            'special_events': 'Eventos Especiais',
+            'notes': 'Observações',
+            'observations': 'Observações'
+          };
 
-        if (avail.sundays && Array.isArray(avail.sundays)) {
+          // Determinar o tipo de pergunta baseado na resposta
+          let questionType = 'text';
+          if (Array.isArray(answer)) {
+            questionType = 'checkbox';
+          } else if (typeof answer === 'boolean' || answer === 'Sim' || answer === 'Não') {
+            questionType = 'yes_no';
+          } else if (typeof answer === 'object' && answer.answer) {
+            questionType = 'yes_no_with_options';
+          }
+
           formattedResponses.push({
-            questionId: 'available_sundays',
-            questionText: 'Domingos Disponíveis',
-            questionType: 'checkbox',
-            answer: avail.sundays
+            questionId,
+            questionText: questionTextMap[questionId] || questionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            questionType,
+            answer
           });
-        }
-
-        if (avail.preferences && Array.isArray(avail.preferences)) {
-          formattedResponses.push({
-            questionId: 'preferred_mass_times',
-            questionText: 'Horários Preferidos',
-            questionType: 'checkbox',
-            answer: avail.preferences
-          });
-        }
+        });
       }
+      // Se responses é um objeto (formato antigo ou mal formatado)
+      else if (typeof response.responses === 'object') {
+        const responseObj = response.responses as any;
 
-      // Handle other fields at root level
-      Object.entries(responseObj).forEach(([key, value]) => {
-        if (key !== 'availability' && value !== null && value !== undefined) {
-          // Skip if already added
-          if (!formattedResponses.find(r => r.questionId === key)) {
+        // Handle nested availability object
+        if (responseObj.availability && typeof responseObj.availability === 'object') {
+          const avail = responseObj.availability;
+
+          if (avail.sundays && Array.isArray(avail.sundays)) {
             formattedResponses.push({
-              questionId: key,
-              questionText: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              questionType: 'text',
-              answer: value
+              questionId: 'available_sundays',
+              questionText: 'Domingos Disponíveis',
+              questionType: 'checkbox',
+              answer: avail.sundays
+            });
+          }
+
+          if (avail.preferences && Array.isArray(avail.preferences)) {
+            formattedResponses.push({
+              questionId: 'preferred_mass_times',
+              questionText: 'Horários Preferidos',
+              questionType: 'checkbox',
+              answer: avail.preferences
             });
           }
         }
-      });
+
+        // Handle other fields at root level
+        Object.entries(responseObj).forEach(([key, value]) => {
+          if (key !== 'availability' && value !== null && value !== undefined) {
+            // Skip if already added
+            if (!formattedResponses.find(r => r.questionId === key)) {
+              formattedResponses.push({
+                questionId: key,
+                questionText: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                questionType: 'text',
+                answer: value
+              });
+            }
+          }
+        });
+      }
     }
 
     return {
