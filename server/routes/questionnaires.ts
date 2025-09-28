@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
-import { 
-  questionnaires, 
+import {
+  questionnaires,
   questionnaireResponses,
   users,
   notifications,
@@ -11,6 +11,12 @@ import {
 import { eq, and, or } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
+import {
+  getQuestionnaireResponsesForExport,
+  getMonthlyResponsesForExport,
+  createDetailedCSV,
+  convertResponsesToCSV
+} from '../utils/csvExporter';
 
 const router = Router();
 
@@ -1067,6 +1073,77 @@ router.get('/family-sharing/:questionnaireId', requireAuth, async (req: AuthRequ
   } catch (error) {
     console.error('Error fetching family members for questionnaire:', error);
     res.status(500).json({ error: 'Failed to fetch family members' });
+  }
+});
+
+// Export questionnaire responses as CSV
+router.get('/:questionnaireId/export/csv', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
+  try {
+    const { questionnaireId } = req.params;
+    const { format = 'detailed' } = req.query as { format?: 'simple' | 'detailed' };
+
+    // Fetch and format data for CSV export
+    const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
+
+    // Generate CSV content based on format preference
+    const csvContent = format === 'detailed'
+      ? createDetailedCSV(exportData)
+      : convertResponsesToCSV(exportData);
+
+    // Get questionnaire for filename
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(eq(questionnaires.id, questionnaireId))
+      .limit(1);
+
+    const filename = questionnaire
+      ? `respostas_${questionnaire.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`
+      : `respostas_questionario_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting questionnaire responses:', error);
+    res.status(500).json({ error: 'Failed to export questionnaire responses' });
+  }
+});
+
+// Export monthly responses as CSV
+router.get('/export/:year/:month/csv', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const { format = 'detailed' } = req.query as { format?: 'simple' | 'detailed' };
+
+    // Validate parameters
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: 'Invalid month or year' });
+    }
+
+    // Fetch and format data for CSV export
+    const exportData = await getMonthlyResponsesForExport(month, year);
+
+    // Generate CSV content based on format preference
+    const csvContent = format === 'detailed'
+      ? createDetailedCSV(exportData)
+      : convertResponsesToCSV(exportData);
+
+    const monthName = monthNames[month - 1];
+    const filename = `respostas_${monthName}_${year}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting monthly responses:', error);
+    const message = error instanceof Error ? error.message : 'Failed to export monthly responses';
+    res.status(500).json({ error: message });
   }
 });
 

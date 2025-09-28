@@ -55,7 +55,11 @@
       "Bash(NODE_ENV=production npx tsx scripts/list-all-questionnaires.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-real-october-data.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-any-questionnaire.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/check-database-tables.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/check-database-tables.ts)",
+      "Bash(npx tsc:*)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-csv-export.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-csv-export-full.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-response-structure.ts)"
     ],
     "deny": [],
     "ask": []

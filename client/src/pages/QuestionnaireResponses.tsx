@@ -223,31 +223,91 @@ export default function QuestionnaireResponses() {
     return matchesSearch;
   }) || [];
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
     if (!status) return;
-    
-    const csvContent = [
-      ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
-      ...status.responses.map(r => [
-        r.name,
-        r.email,
-        r.phone || '',
-        r.responded ? 'Sim' : 'Não',
-        r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
-        r.availability || ''
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
-    link.click();
-    
-    toast({
-      title: 'Exportação concluída',
-      description: 'Arquivo CSV baixado com sucesso'
-    });
+
+    try {
+      // Use the new API endpoint to export CSV with full questionnaire data
+      const response = await fetch(`/api/questionnaires/export/${selectedYear}/${selectedMonth}/csv?format=detailed`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Extract filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+        const filename = filenameMatch ? filenameMatch[1] : `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Exportação completa realizada',
+          description: 'O arquivo CSV com todas as perguntas e respostas foi baixado com sucesso.',
+        });
+      } else {
+        // Fallback to basic export if API fails
+        const csvContent = [
+          ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
+          ...status.responses.map(r => [
+            r.name,
+            r.email,
+            r.phone || '',
+            r.responded ? 'Sim' : 'Não',
+            r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
+            r.availability || ''
+          ])
+        ].map(row => row.join(',')).join('\n');
+
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
+        link.click();
+
+        toast({
+          title: 'Exportação básica realizada',
+          description: 'Foi exportada uma versão simplificada dos dados.',
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+
+      // Fallback to basic export on error
+      const csvContent = [
+        ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
+        ...status.responses.map(r => [
+          r.name,
+          r.email,
+          r.phone || '',
+          r.responded ? 'Sim' : 'Não',
+          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
+          r.availability || ''
+        ])
+      ].map(row => row.join(',')).join('\n');
+
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
+      link.click();
+
+      toast({
+        title: 'Exportação básica realizada',
+        description: 'Não foi possível exportar os dados completos, mas uma versão simplificada foi baixada.',
+        variant: 'default',
+      });
+    }
   };
 
   const formatAnswer = (answer: any): string => {
@@ -371,14 +431,15 @@ export default function QuestionnaireResponses() {
                   Atualizar
                 </Button>
                 
-                <Button 
-                  onClick={exportToCSV} 
-                  disabled={!status}
+                <Button
+                  onClick={exportToCSV}
+                  disabled={!status || !status.templateExists}
                   variant="outline"
                   size="sm"
+                  title="Exporta o CSV com todas as perguntas e respostas"
                 >
                   <FileDown className="h-4 w-4 mr-2" />
-                  Exportar
+                  Exportar CSV
                 </Button>
               </div>
             </div>
