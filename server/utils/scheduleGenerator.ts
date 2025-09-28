@@ -106,10 +106,16 @@ export class ScheduleGenerator {
    */
   private async loadMinistersData(): Promise<void> {
     if (!this.db) {
-      logger.warn('Database não disponível, criando dados mock para preview');
-      console.log('[SCHEDULE_GEN] Creating mock ministers data for preview');
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
+      
+      if (isProduction) {
+        throw new Error('Banco de dados indisponível. Não é possível gerar escalas sem dados reais dos ministros.');
+      }
+      
+      logger.warn('Database não disponível, criando dados mock para preview em desenvolvimento');
+      console.log('[SCHEDULE_GEN] Creating mock ministers data for development preview only');
 
-      // Dados mock para preview quando banco não estiver disponível
+      // Dados mock APENAS para desenvolvimento quando banco não estiver disponível
       this.ministers = [
         { id: '1', name: 'João Silva', role: 'ministro', totalServices: 5, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7 },
         { id: '2', name: 'Maria Santos', role: 'ministro', totalServices: 3, lastService: null, preferredTimes: ['08:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8 },
@@ -156,10 +162,16 @@ export class ScheduleGenerator {
    */
   private async loadAvailabilityData(year: number, month: number, isPreview: boolean = false): Promise<void> {
     if (!this.db) {
-      console.log('[SCHEDULE_GEN] Creating mock availability data for preview');
-      logger.warn('Database não disponível, criando dados de disponibilidade mock');
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
+      
+      if (isProduction) {
+        throw new Error('Banco de dados indisponível. Não é possível gerar escalas sem dados reais de disponibilidade.');
+      }
+      
+      console.log('[SCHEDULE_GEN] Creating mock availability data for development preview only');
+      logger.warn('Database não disponível, criando dados de disponibilidade mock apenas para desenvolvimento');
 
-      // Dados mock de disponibilidade para preview
+      // Dados mock de disponibilidade APENAS para desenvolvimento
       this.availabilityData.set('1', {
         ministerId: '1',
         availableSundays: ['1', '2', '3', '4'],
