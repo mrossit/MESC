@@ -52,7 +52,10 @@
       "Bash(NODE_ENV=production npx tsx scripts/check-availability-issues.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-all-questionnaires.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-october-questionnaire.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/list-all-questionnaires.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/list-all-questionnaires.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-real-october-data.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-any-questionnaire.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-database-tables.ts)"
     ],
     "deny": [],
     "ask": []

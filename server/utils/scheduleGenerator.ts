@@ -639,14 +639,24 @@ export class ScheduleGenerator {
     const dayName = this.getDayName(massTime.dayOfWeek);
     const dateStr = format(new Date(massTime.date!), 'dd/MM');
 
+    // Converter horário para formato usado nas respostas (8h, 10h, 19h)
+    const hour = parseInt(massTime.time.substring(0, 2));
+    const timeStr = hour + 'h'; // Converter "08:00" para "8h", "10:00" para "10h"
+
     return this.ministers.filter(minister => {
       const availability = this.availabilityData.get(minister.id);
 
       if (!availability) {
-        // Se não há dados de disponibilidade, EXCLUIR o ministro
-        // Ministros só devem ser incluídos se responderam ao questionário
-        logger.debug(`Sem dados de disponibilidade para ministro ${minister.name} - EXCLUINDO da escala`);
-        return false; // ALTERADO: Retorna false para excluir ministros sem resposta
+        // Se não há dados de disponibilidade, incluir em modo preview
+        // mas excluir em produção
+        if (this.availabilityData.size === 0) {
+          // Se não há nenhuma resposta, estamos em modo preview
+          logger.debug(`Modo preview: incluindo ${minister.name} sem dados de disponibilidade`);
+          return true;
+        }
+        // Em produção com respostas, excluir quem não respondeu
+        logger.debug(`${minister.name} não respondeu ao questionário - excluindo`);
+        return false;
       }
 
       // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
@@ -657,41 +667,77 @@ export class ScheduleGenerator {
 
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
-        const sundayStr = `Domingo ${dateStr}`;
+        // Verificar múltiplos formatos de data nas respostas
+        const possibleFormats = [
+          `Domingo ${dateStr}`,  // "Domingo 05/10"
+          dateStr,                // "05/10"
+          `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
+          parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
+        ];
 
         // Se o ministro marcou "Nenhum domingo", ele não está disponível
-        if (availability.availableSundays.includes('Nenhum domingo')) {
+        if (availability.availableSundays?.includes('Nenhum domingo')) {
+          logger.debug(`${minister.name} marcou "Nenhum domingo" - excluindo`);
           return false;
         }
 
-        // Se há domingos específicos marcados, verificar se inclui este
-        if (availability.availableSundays.length > 0) {
-          return availability.availableSundays.includes(sundayStr);
+        // Verificar se está disponível para este domingo específico
+        let availableForSunday = false;
+        if (availability.availableSundays && availability.availableSundays.length > 0) {
+          for (const format of possibleFormats) {
+            if (availability.availableSundays.some(sunday =>
+              sunday.includes(format) || sunday === format
+            )) {
+              availableForSunday = true;
+              break;
+            }
+          }
         }
 
-        // Se não marcou nenhum domingo específico, NÃO está disponível
-        return false; // ALTERADO: Excluir se não marcou disponibilidade
+        // Se não está disponível para o domingo, verificar se pelo menos tem o horário preferido
+        if (!availableForSunday) {
+          // Se não marcou domingos mas marcou horário preferido, pode estar disponível
+          if (availability.preferredMassTimes?.includes(timeStr)) {
+            logger.debug(`${minister.name} tem preferência pelo horário ${timeStr}, considerando disponível`);
+            return true;
+          }
+          return false;
+        }
+
+        // Se está disponível para o domingo, verificar compatibilidade de horário
+        if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
+          // Se tem horários preferidos, verificar se corresponde
+          const hasPreferredTime = availability.preferredMassTimes.includes(timeStr);
+          const hasAlternativeTime = availability.alternativeTimes?.includes(timeStr);
+
+          if (!hasPreferredTime && !hasAlternativeTime && availability.preferredMassTimes.length > 0) {
+            // Tem preferência por outros horários, não escalar neste
+            logger.debug(`${minister.name} prefere outros horários, não ${timeStr}`);
+            return false;
+          }
+        }
+
+        return true; // Disponível para o domingo
       }
 
       // Verificar disponibilidade para missas diárias (segunda a sábado)
       if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
-        // Se não respondeu sobre missas diárias, NÃO está disponível
-        if (!availability.dailyMassAvailability || availability.dailyMassAvailability.length === 0) {
-          logger.debug(`${minister.name} não respondeu sobre missas diárias - EXCLUINDO`);
-          return false; // ALTERADO: Excluir se não respondeu
-        }
-
         // Se marcou "Não posso" para missas diárias, não está disponível
-        if (availability.dailyMassAvailability.includes('Não posso')) {
+        if (availability.dailyMassAvailability?.includes('Não posso')) {
           return false;
         }
 
-        // Verificar se marcou disponibilidade para este dia específico
-        return availability.dailyMassAvailability.includes(dayName);
+        // Se tem dados de missas diárias, verificar o dia específico
+        if (availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0) {
+          return availability.dailyMassAvailability.includes(dayName);
+        }
+
+        // Se não respondeu sobre missas diárias, considerar não disponível
+        return false;
       }
 
-      // Para outros casos, considerar não disponível por padrão
-      return false; // ALTERADO: Comportamento padrão é excluir
+      // Para outros casos, considerar disponível se tem resposta
+      return true;
     });
   }
 
