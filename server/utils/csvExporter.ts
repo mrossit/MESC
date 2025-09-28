@@ -206,7 +206,7 @@ export async function getQuestionnaireResponsesForExport(
   const exportData: CSVExportData[] = responsesWithUsers.map(({ response, user }) => {
     const formattedResponses: any[] = [];
 
-    // Handle availability data stored in separate columns
+    // Priority 1: Use structured columns if they have data
     if (response.availableSundays && response.availableSundays.length > 0) {
       formattedResponses.push({
         questionId: 'available_sundays',
@@ -243,6 +243,15 @@ export async function getQuestionnaireResponsesForExport(
       });
     }
 
+    if (response.specialEvents) {
+      formattedResponses.push({
+        questionId: 'special_events',
+        questionText: 'Eventos Especiais',
+        questionType: 'text',
+        answer: response.specialEvents
+      });
+    }
+
     if (response.canSubstitute !== null && response.canSubstitute !== undefined) {
       formattedResponses.push({
         questionId: 'can_substitute',
@@ -261,14 +270,15 @@ export async function getQuestionnaireResponsesForExport(
       });
     }
 
-    // Also check if there's structured response data
-    if (response.responses && typeof response.responses === 'object') {
+    // Priority 2: If no structured data, try to extract from JSON responses field
+    if (formattedResponses.length === 0 && response.responses && typeof response.responses === 'object') {
       const responseObj = response.responses as any;
 
-      // Handle availability object if present
-      if (responseObj.availability) {
+      // Handle nested availability object
+      if (responseObj.availability && typeof responseObj.availability === 'object') {
         const avail = responseObj.availability;
-        if (avail.sundays && !response.availableSundays) {
+
+        if (avail.sundays && Array.isArray(avail.sundays)) {
           formattedResponses.push({
             questionId: 'available_sundays',
             questionText: 'Domingos Disponíveis',
@@ -276,7 +286,8 @@ export async function getQuestionnaireResponsesForExport(
             answer: avail.sundays
           });
         }
-        if (avail.preferences && !response.preferredMassTimes) {
+
+        if (avail.preferences && Array.isArray(avail.preferences)) {
           formattedResponses.push({
             questionId: 'preferred_mass_times',
             questionText: 'Horários Preferidos',
@@ -286,15 +297,18 @@ export async function getQuestionnaireResponsesForExport(
         }
       }
 
-      // Handle other response fields
+      // Handle other fields at root level
       Object.entries(responseObj).forEach(([key, value]) => {
-        if (key !== 'availability' && !formattedResponses.find(r => r.questionId === key)) {
-          formattedResponses.push({
-            questionId: key,
-            questionText: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            questionType: 'text',
-            answer: value
-          });
+        if (key !== 'availability' && value !== null && value !== undefined) {
+          // Skip if already added
+          if (!formattedResponses.find(r => r.questionId === key)) {
+            formattedResponses.push({
+              questionId: key,
+              questionText: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              questionType: 'text',
+              answer: value
+            });
+          }
         }
       });
     }
