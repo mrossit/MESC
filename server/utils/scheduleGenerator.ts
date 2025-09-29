@@ -296,46 +296,85 @@ export class ScheduleGenerator {
     console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
 
     responses.forEach((r: any, index: number) => {
-      console.log(`[SCHEDULE_GEN] 📝 RESPOSTA ${index + 1}:`, {
-        userId: r.userId,
-        availableSundays: r.availableSundays,
-        preferredMassTimes: r.preferredMassTimes,
-        alternativeTimes: r.alternativeTimes,
-        canSubstitute: r.canSubstitute,
-        dailyMassAvailability: r.dailyMassAvailability,
-        specialEvents: r.specialEvents
-      });
+      // CORREÇÃO: Os dados estão no campo JSONB "responses", não nos campos específicos
+      let availableSundays = [];
+      let preferredMassTimes = [];
+      let alternativeTimes = [];
+      let dailyMassAvailability = [];
+      let canSubstitute = false;
+      let specialEvents = {};
 
-      // Processar JSONs se necessário
-      let availableSundays = r.availableSundays || [];
-      let preferredMassTimes = r.preferredMassTimes || [];
-      let alternativeTimes = r.alternativeTimes || [];
-      let dailyMassAvailability = r.dailyMassAvailability || [];
-      let specialEvents = r.specialEvents || {};
-      
-      // Se são strings JSON, fazer parse
-      if (typeof availableSundays === 'string') {
-        try { availableSundays = JSON.parse(availableSundays); } catch (e) { availableSundays = []; }
+      // Processar o campo JSONB responses que contém um array de respostas
+      if (r.responses) {
+        try {
+          let responsesArray = r.responses;
+
+          // Se for string, fazer parse
+          if (typeof responsesArray === 'string') {
+            responsesArray = JSON.parse(responsesArray);
+          }
+
+          // Processar cada resposta do array
+          if (Array.isArray(responsesArray)) {
+            responsesArray.forEach((item: any) => {
+              switch(item.questionId) {
+                case 'available_sundays':
+                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                  break;
+                case 'main_service_time':
+                  // Converter horário principal em array
+                  preferredMassTimes = item.answer ? [item.answer] : [];
+                  break;
+                case 'other_times_available':
+                  // Processar horários alternativos
+                  if (item.answer && item.answer !== 'Não') {
+                    alternativeTimes = Array.isArray(item.answer) ? item.answer : [item.answer];
+                  }
+                  break;
+                case 'can_substitute':
+                  canSubstitute = item.answer === 'Sim' || item.answer === true;
+                  break;
+                case 'daily_mass_availability':
+                  if (item.answer && item.answer !== 'Não') {
+                    dailyMassAvailability = Array.isArray(item.answer) ? item.answer : [item.answer];
+                  }
+                  break;
+                // Eventos especiais
+                case 'healing_liberation_mass':
+                case 'sacred_heart_mass':
+                case 'immaculate_heart_mass':
+                case 'saint_judas_feast_7h':
+                case 'saint_judas_feast_10h':
+                case 'saint_judas_feast_12h':
+                case 'adoration_monday':
+                  specialEvents[item.questionId] = item.answer;
+                  break;
+              }
+            });
+          }
+        } catch (e) {
+          console.log(`[SCHEDULE_GEN] ⚠️ Erro ao processar responses para usuário ${r.userId}:`, e);
+        }
       }
-      if (typeof preferredMassTimes === 'string') {
-        try { preferredMassTimes = JSON.parse(preferredMassTimes); } catch (e) { preferredMassTimes = []; }
+
+      // Fallback para campos específicos se existirem (backward compatibility)
+      if (!availableSundays.length && r.availableSundays) {
+        availableSundays = typeof r.availableSundays === 'string'
+          ? JSON.parse(r.availableSundays)
+          : r.availableSundays;
       }
-      if (typeof alternativeTimes === 'string') {
-        try { alternativeTimes = JSON.parse(alternativeTimes); } catch (e) { alternativeTimes = []; }
+      if (!preferredMassTimes.length && r.preferredMassTimes) {
+        preferredMassTimes = typeof r.preferredMassTimes === 'string'
+          ? JSON.parse(r.preferredMassTimes)
+          : r.preferredMassTimes;
       }
-      if (typeof dailyMassAvailability === 'string') {
-        try { dailyMassAvailability = JSON.parse(dailyMassAvailability); } catch (e) { dailyMassAvailability = []; }
-      }
-      if (typeof specialEvents === 'string') {
-        try { specialEvents = JSON.parse(specialEvents); } catch (e) { specialEvents = {}; }
-      }
-      
+
       const processedData = {
         ministerId: r.userId,
         availableSundays,
         preferredMassTimes,
         alternativeTimes,
-        canSubstitute: r.canSubstitute || false,
+        canSubstitute,
         dailyMassAvailability,
         specialEvents
       };
