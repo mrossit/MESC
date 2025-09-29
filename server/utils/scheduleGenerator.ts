@@ -178,6 +178,12 @@ export class ScheduleGenerator {
     
     let ministersData;
     try {
+      // Tentar primeira query mais simples para debug
+      console.log(`[SCHEDULE_GEN] Tentando query simples first...`);
+      const simpleQuery = await this.db.select({ id: users.id, name: users.name }).from(users).limit(1);
+      console.log(`[SCHEDULE_GEN] Simple query OK, found ${simpleQuery.length} users`);
+      
+      // Agora a query completa
       ministersData = await this.db.select({
         id: users.id,
         name: users.name,
@@ -201,6 +207,7 @@ export class ScheduleGenerator {
       
     } catch (queryError) {
       console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR:`, queryError);
+      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR STACK:`, queryError.stack);
       throw new Error(`Erro na consulta de ministros: ${queryError.message || queryError}`);
     }
 
