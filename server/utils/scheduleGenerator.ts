@@ -152,7 +152,9 @@ export class ScheduleGenerator {
    */
   private async loadMinistersData(): Promise<void> {
     if (!this.db) {
-      const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
+      const isProduction = process.env.NODE_ENV === 'production' ||
+                       process.env.REPLIT_DEPLOYMENT === '1' ||
+                       (!!process.env.REPL_SLUG && !process.env.DATABASE_URL);
       
       if (isProduction) {
         throw new Error('Banco de dados indisponível. Não é possível gerar escalas sem dados reais dos ministros.');
@@ -208,7 +210,9 @@ export class ScheduleGenerator {
    */
   private async loadAvailabilityData(year: number, month: number, isPreview: boolean = false): Promise<void> {
     if (!this.db) {
-      const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
+      const isProduction = process.env.NODE_ENV === 'production' ||
+                       process.env.REPLIT_DEPLOYMENT === '1' ||
+                       (!!process.env.REPL_SLUG && !process.env.DATABASE_URL);
       
       if (isProduction) {
         throw new Error('Banco de dados indisponível. Não é possível gerar escalas sem dados reais de disponibilidade.');
