@@ -135,15 +135,15 @@ export class ScheduleGenerator {
       return generatedSchedules;
 
     } catch (error) {
-      console.error(`[SCHEDULE_GEN] ❌ ERRO DETALHADO:`, error);
+      console.error(`[SCHEDULE_GEN] ❌ ERRO DETALHADO NO MAIN FUNCTION:`, error);
+      console.error(`[SCHEDULE_GEN] ❌ ERROR TYPE:`, typeof error);
+      console.error(`[SCHEDULE_GEN] ❌ ERROR NAME:`, (error as any)?.name);
+      console.error(`[SCHEDULE_GEN] ❌ ERROR MESSAGE:`, (error as any)?.message);
+      console.error(`[SCHEDULE_GEN] ❌ ERROR STACK:`, (error as any)?.stack);
       logger.error('Erro ao gerar escalas automáticas:', error);
       
-      // Preservar detalhes do erro original
-      if (error instanceof Error) {
-        throw new Error(`Falha na geração automática de escalas: ${error.message}`);
-      } else {
-        throw new Error(`Falha na geração automática de escalas: ${JSON.stringify(error)}`);
-      }
+      // Re-lançar o erro original sem modificar para preservar stack trace e mensagem
+      throw error;
     }
   }
 

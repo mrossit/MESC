@@ -60,9 +60,18 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     }
 
     // Gerar escalas automaticamente (definitiva - exige questionário fechado)
-    console.log('[ROUTE] Calling generateAutomaticSchedule with:', { year, month, saveToDatabase, isPreview: false });
-    const generatedSchedules = await generateAutomaticSchedule(year, month, false);
-    console.log('[ROUTE] Generated schedules count:', generatedSchedules.length);
+    console.log('[ROUTE] ⏳ INICIANDO generateAutomaticSchedule com:', { year, month, saveToDatabase, isPreview: false });
+    
+    let generatedSchedules;
+    try {
+      generatedSchedules = await generateAutomaticSchedule(year, month, false);
+      console.log('[ROUTE] ✅ Generated schedules count:', generatedSchedules.length);
+    } catch (genError: any) {
+      console.error('[ROUTE] ❌ ERRO NA FUNÇÃO generateAutomaticSchedule:', genError);
+      console.error('[ROUTE] ❌ genError.message:', genError.message);
+      console.error('[ROUTE] ❌ genError.stack:', genError.stack);
+      throw genError; // Re-throw para ser capturado pelo catch principal
+    }
 
     // Salvar no banco se solicitado
     let savedCount = 0;
@@ -94,15 +103,18 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
   } catch (error: any) {
     console.error('❌ [ROUTE] ERRO DETALHADO NO GENERATE:', error);
     console.error('❌ [ROUTE] ERRO STACK:', error.stack);
+    console.error('❌ [ROUTE] ERRO NAME:', error.name);
+    console.error('❌ [ROUTE] ERRO MESSAGE:', error.message);
     logger.error('Erro ao gerar escalas automáticas:', error);
     
+    // SEMPRE retornar detalhes do erro para debugging
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro interno do servidor',
-      error: {
+      message: error.message || 'Falha na geração automática de escalas',
+      errorDetails: {
         message: error.message,
-        stack: error.stack,
-        name: error.name
+        name: error.name,
+        stack: error.stack
       }
     });
   }
