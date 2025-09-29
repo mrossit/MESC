@@ -92,11 +92,18 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     res.json(response);
 
   } catch (error: any) {
+    console.error('❌ [ROUTE] ERRO DETALHADO NO GENERATE:', error);
+    console.error('❌ [ROUTE] ERRO STACK:', error.stack);
     logger.error('Erro ao gerar escalas automáticas:', error);
+    
     res.status(500).json({
       success: false,
       message: error.message || 'Erro interno do servidor',
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      }
     });
   }
 });
