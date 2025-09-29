@@ -71,12 +71,15 @@ export class ScheduleGenerator {
 
     try {
       // 1. Carregar dados necessários
+      console.log(`[SCHEDULE_GEN] Step 1: Loading ministers data...`);
       await this.loadMinistersData();
       console.log(`[SCHEDULE_GEN] Ministers loaded: ${this.ministers.length}`);
 
+      console.log(`[SCHEDULE_GEN] Step 2: Loading availability data...`);
       await this.loadAvailabilityData(year, month, isPreview);
       console.log(`[SCHEDULE_GEN] Availability data loaded: ${this.availabilityData.size} entries`);
 
+      console.log(`[SCHEDULE_GEN] Step 3: Loading mass times config...`);
       await this.loadMassTimesConfig();
       console.log(`[SCHEDULE_GEN] Mass times config loaded: ${this.massTimes.length} times`);
 
@@ -132,8 +135,15 @@ export class ScheduleGenerator {
       return generatedSchedules;
 
     } catch (error) {
+      console.error(`[SCHEDULE_GEN] ❌ ERRO DETALHADO:`, error);
       logger.error('Erro ao gerar escalas automáticas:', error);
-      throw new Error('Falha na geração automática de escalas');
+      
+      // Preservar detalhes do erro original
+      if (error instanceof Error) {
+        throw new Error(`Falha na geração automática de escalas: ${error.message}`);
+      } else {
+        throw new Error(`Falha na geração automática de escalas: ${JSON.stringify(error)}`);
+      }
     }
   }
 
