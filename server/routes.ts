@@ -13,6 +13,7 @@ import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
 import reportsRoutes from "./routes/reports";
+import ministersRoutes from "./routes/ministers";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -92,6 +93,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Reports routes
   app.use('/api/reports', reportsRoutes);
+
+  // Ministers routes
+  app.use('/api/ministers', ministersRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
