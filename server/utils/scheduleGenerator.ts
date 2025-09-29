@@ -174,33 +174,44 @@ export class ScheduleGenerator {
       return;
     }
 
-    const ministersData = await this.db.select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      totalServices: users.totalServices,
-      lastService: users.lastService,
-      preferredTimes: users.preferredTimes,
-      canServeAsCouple: users.canServeAsCouple,
-      spouseMinisterId: users.spouseMinisterId
-    }).from(users).where(
-      and(
-        or(
-          eq(users.status, 'active'),
-          sql`${users.status} IS NULL` // Incluir usuários com status null
-        ),
-        ne(users.role, 'gestor') // Excluir gestores das escalas
-      )
-    );
+    console.log(`[SCHEDULE_GEN] About to query ministers data...`);
+    
+    let ministersData;
+    try {
+      ministersData = await this.db.select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        totalServices: users.totalServices,
+        lastService: users.lastService,
+        preferredTimes: users.preferredTimes,
+        canServeAsCouple: users.canServeAsCouple,
+        spouseMinisterId: users.spouseMinisterId
+      }).from(users).where(
+        and(
+          or(
+            eq(users.status, 'active'),
+            sql`${users.status} IS NULL` // Incluir usuários com status null
+          ),
+          ne(users.role, 'gestor') // Excluir gestores das escalas
+        )
+      );
+      
+      console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
+      
+    } catch (queryError) {
+      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR:`, queryError);
+      throw new Error(`Erro na consulta de ministros: ${queryError.message || queryError}`);
+    }
 
     this.ministers = ministersData.map((m: any) => ({
-      ...m,
-      totalServices: m.totalServices || 0,
-      preferredTimes: m.preferredTimes || [],
-      canServeAsCouple: m.canServeAsCouple || false,
-      availabilityScore: this.calculateAvailabilityScore(m),
-      preferenceScore: this.calculatePreferenceScore(m)
-    }));
+        ...m,
+        totalServices: m.totalServices || 0,
+        preferredTimes: m.preferredTimes || [],
+        canServeAsCouple: m.canServeAsCouple || false,
+        availabilityScore: this.calculateAvailabilityScore(m),
+        preferenceScore: this.calculatePreferenceScore(m)
+      }));
 
     logger.info(`Carregados ${this.ministers.length} ministros ativos`);
   }
