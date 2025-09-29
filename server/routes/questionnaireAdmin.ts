@@ -787,8 +787,8 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
       .where(eq(questionnaireResponses.questionnaireId, template.id));
     
     // Mapear ministros com suas respostas
-    const ministersWithResponses = allMinisters.map(minister => {
-      const response = responses.find(r => r.userId === minister.id);
+    const ministersWithResponses = allMinisters.map((minister: any) => {
+      const response = responses.find((r: any) => r.userId === minister.id);
       
       if (response) {
         // Parse responses to get availability answer
@@ -843,14 +843,14 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
     });
     
     // Ordenar: não respondidos primeiro, depois por nome
-    ministersWithResponses.sort((a, b) => {
+    ministersWithResponses.sort((a: any, b: any) => {
       if (a.responded !== b.responded) {
         return a.responded ? 1 : -1; // Não respondidos primeiro
       }
       return a.name.localeCompare(b.name);
     });
     
-    const respondedCount = ministersWithResponses.filter(m => m.responded).length;
+    const respondedCount = ministersWithResponses.filter((m: any) => m.responded).length;
     const totalMinisters = allMinisters.length;
     
     res.json({
@@ -962,7 +962,7 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
     const summary: Record<string, Record<string, number>> = {};
     const questions = template.questions as any[];
     
-    responses.forEach(response => {
+    responses.forEach((response: any) => {
       const parsedResponses = JSON.parse(response.responses as string);
       
       parsedResponses.forEach((resp: any) => {
