@@ -704,7 +704,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
     const schema = z.object({
       date: z.string(),
       time: z.string(),
-      ministers: z.array(z.string()) // Array de IDs de ministros na ordem desejada
+      ministers: z.array(z.string().nullable()) // Array de IDs de ministros (null = VACANTE)
     });
 
     const { date, time, ministers } = schema.parse(req.body);
@@ -726,7 +726,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       const newSchedules = ministers.map((ministerId, index) => ({
         date,
         time,
-        ministerId,
+        ministerId: ministerId, // Pode ser null para VACANTE
         position: index + 1, // Posição começa em 1
         type: 'missa',
         status: 'scheduled'
