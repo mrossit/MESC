@@ -186,6 +186,7 @@ export const schedules = pgTable('schedules', {
   type: scheduleTypeEnum('type').notNull().default('missa'),
   location: varchar('location', { length: 255 }),
   ministerId: varchar('minister_id').references(() => users.id),
+  position: integer('position').default(0), // Order position for ministers at same date/time
   status: varchar('status', { length: 20 }).notNull().default('scheduled'),
   substituteId: varchar('substitute_id').references(() => users.id),
   notes: text('notes'),

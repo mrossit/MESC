@@ -386,14 +386,16 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
       );
     }
 
-    // Inserir ministros escalados
-    for (const minister of schedule.ministers) {
+    // Inserir ministros escalados com posição para manter a ordem
+    for (let i = 0; i < schedule.ministers.length; i++) {
+      const minister = schedule.ministers[i];
       await db.insert(schedules).values({
         date: schedule.massTime.date,
         time: schedule.massTime.time,
         type: 'missa',
         location: null,
         ministerId: minister.id,
+        position: (minister as any).position || (i + 1), // Usar position do ministro ou index + 1
         status: 'scheduled',
         notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
       });
@@ -684,12 +686,13 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
         eq(schedules.time, time)
       ));
 
-    // Adicionar novos ministros
+    // Adicionar novos ministros com posição para manter a ordem
     if (ministers.length > 0) {
-      const newSchedules = ministers.map(ministerId => ({
+      const newSchedules = ministers.map((ministerId, index) => ({
         date,
         time,
         ministerId,
+        position: index + 1, // Posição começa em 1
         type: 'missa',
         status: 'scheduled'
       }));
