@@ -235,8 +235,8 @@ export function ScheduleEditDialog({
                 data-testid="input-search-minister"
               />
               
-              <div className="relative">
-                <ScrollArea className="h-48 rounded-md border backdrop-blur-md bg-background/95">
+              <div className="relative rounded-md border backdrop-blur-xl bg-background/80 shadow-lg">
+                <ScrollArea className="h-48">
                   <div className="p-2">
                     {filteredMinisters.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
