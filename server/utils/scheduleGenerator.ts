@@ -923,12 +923,14 @@ export class ScheduleGenerator {
         // Se está disponível para o domingo, verificar compatibilidade de horário
         if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
           // Verificar se o horário atual está nas preferências ou alternativas
-          const hasPreferredTime = availability.preferredMassTimes.some(time =>
-            time === massTime.time || time === timeStr || time.includes(hour.toString())
-          );
-          const hasAlternativeTime = availability.alternativeTimes?.some(time =>
-            time === massTime.time || time === timeStr || time.includes(hour.toString())
-          );
+          const hasPreferredTime = availability.preferredMassTimes.some(time => {
+            const timeValue = String(time);
+            return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
+          });
+          const hasAlternativeTime = availability.alternativeTimes?.some(time => {
+            const timeValue = String(time);
+            return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
+          });
 
           console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários preferidos: ${availability.preferredMassTimes.join(', ')}`);
           console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários alternativos: ${availability.alternativeTimes?.join(', ') || 'nenhum'}`);
