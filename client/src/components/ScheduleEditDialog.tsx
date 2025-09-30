@@ -3,12 +3,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Minister {
   id: string;
@@ -35,8 +34,8 @@ export function ScheduleEditDialog({
   const [ministers, setMinisters] = useState<Minister[]>(initialMinisters);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [selectedMinisterId, setSelectedMinisterId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const { toast } = useToast();
 
   // Buscar lista de todos os ministros disponíveis
@@ -106,7 +105,15 @@ export function ScheduleEditDialog({
 
     setMinisters([...ministers, { id: minister.id, name: minister.name }]);
     setSelectedMinisterId('');
+    setSearchQuery('');
   };
+
+  // Filtrar ministros baseado na busca
+  const filteredMinisters = Array.isArray(allMinisters) 
+    ? allMinisters.filter((m: any) => 
+        m.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   const handleSave = async () => {
     try {
@@ -220,52 +227,51 @@ export function ScheduleEditDialog({
           {/* Adicionar ministro */}
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Adicionar Ministro</h4>
-            <div className="flex gap-2">
-              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={searchOpen}
-                    className="flex-1 justify-between"
-                    data-testid="select-minister"
-                  >
-                    {selectedMinisterId
-                      ? Array.isArray(allMinisters) && allMinisters.find((m: any) => m.id === selectedMinisterId)?.name
-                      : "Selecione ou busque um ministro..."}
-                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0 backdrop-blur-md bg-background/95 border-2">
-                  <Command>
-                    <CommandInput placeholder="Digite para buscar ministro..." />
-                    <CommandList>
-                      <CommandEmpty>Nenhum ministro encontrado.</CommandEmpty>
-                      <CommandGroup>
-                        {Array.isArray(allMinisters) && allMinisters.map((minister: any) => (
-                          <CommandItem
-                            key={minister.id}
-                            value={minister.name}
-                            onSelect={() => {
-                              setSelectedMinisterId(minister.id);
-                              setSearchOpen(false);
-                            }}
-                          >
-                            {minister.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div className="space-y-2">
+              <Input
+                placeholder="Digite para buscar ministro..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-minister"
+              />
+              
+              <div className="relative">
+                <ScrollArea className="h-48 rounded-md border backdrop-blur-md bg-background/95">
+                  <div className="p-2">
+                    {filteredMinisters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum ministro encontrado.
+                      </p>
+                    ) : (
+                      filteredMinisters.map((minister: any) => (
+                        <button
+                          key={minister.id}
+                          onClick={() => {
+                            setSelectedMinisterId(minister.id);
+                            setSearchQuery(minister.name);
+                          }}
+                          className={`
+                            w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
+                            ${selectedMinisterId === minister.id ? 'bg-accent' : ''}
+                          `}
+                          data-testid={`option-minister-${minister.id}`}
+                        >
+                          {minister.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+
               <Button
                 onClick={handleAddMinister}
                 disabled={!selectedMinisterId}
                 data-testid="button-add-minister"
+                className="w-full"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Adicionar
+                Adicionar Ministro
               </Button>
             </div>
           </div>
