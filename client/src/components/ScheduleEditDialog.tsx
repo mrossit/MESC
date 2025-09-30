@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, X, Plus, Save } from 'lucide-react';
+import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -70,6 +70,20 @@ export function ScheduleEditDialog({
     setMinisters(ministers.filter((_, i) => i !== index));
   };
 
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const newMinisters = [...ministers];
+    [newMinisters[index - 1], newMinisters[index]] = [newMinisters[index], newMinisters[index - 1]];
+    setMinisters(newMinisters);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === ministers.length - 1) return;
+    const newMinisters = [...ministers];
+    [newMinisters[index], newMinisters[index + 1]] = [newMinisters[index + 1], newMinisters[index]];
+    setMinisters(newMinisters);
+  };
+
   const handleAddMinister = () => {
     if (!selectedMinisterId || !allMinisters) return;
     
@@ -127,7 +141,7 @@ export function ScheduleEditDialog({
         <DialogHeader>
           <DialogTitle>Editar Escala</DialogTitle>
           <DialogDescription>
-            {date} às {time} - Arraste para reordenar os ministros
+            {date} às {time} - Use os botões ↑↓ para reordenar os ministros
           </DialogDescription>
         </DialogHeader>
 
@@ -156,20 +170,44 @@ export function ScheduleEditDialog({
                     data-testid={`minister-${index}`}
                   >
                     <div className="flex items-center gap-3">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                      <GripVertical className="h-4 w-4 text-muted-foreground hidden sm:block" />
                       <Badge variant="outline" className="w-8 justify-center">
                         {index + 1}
                       </Badge>
                       <span className="font-medium">{minister.name}</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveMinister(index)}
-                      data-testid={`button-remove-${index}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {/* Botões de reordenação para mobile */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        data-testid={`button-move-up-${index}`}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === ministers.length - 1}
+                        data-testid={`button-move-down-${index}`}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveMinister(index)}
+                        data-testid={`button-remove-${index}`}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
