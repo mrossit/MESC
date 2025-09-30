@@ -169,6 +169,48 @@ export default function AutoScheduleGeneration() {
     }
   };
 
+  const handleReprocessResponses = async () => {
+    try {
+      setIsGenerating(true);
+      toast({
+        title: "Atualizando respostas...",
+        description: "Processando as respostas dos questionários. Isso pode levar alguns segundos."
+      });
+
+      // Primeiro, buscar o questionário mais recente
+      const questionnairesResponse = await apiRequest('GET', `/api/questionnaires/templates/${selectedYear}/${selectedMonth}`);
+      const questionnaireData = await questionnairesResponse.json();
+      
+      if (!questionnaireData.id) {
+        throw new Error('Questionário não encontrado para este mês/ano');
+      }
+
+      // Reprocessar as respostas
+      const response = await apiRequest('POST', '/api/questionnaires/admin/reprocess-responses', {
+        questionnaireId: questionnaireData.id
+      });
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Respostas atualizadas com sucesso!",
+        description: `${result.processedCount || 0} respostas foram atualizadas. Agora você pode gerar as escalas.`
+      });
+      
+      // Invalidar cache para forçar recarga dos dados
+      queryClient.invalidateQueries({ queryKey: ['/api/questionnaires'] });
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar respostas",
+        description: error.message || "Ocorreu um erro ao processar as respostas.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const getConfidenceBadgeVariant = (confidence: number) => {
     if (confidence >= 0.8) return 'default';
     if (confidence >= 0.6) return 'secondary';
@@ -279,6 +321,26 @@ export default function AutoScheduleGeneration() {
                 )}
               </Button>
             </div>
+            
+            <Separator className="my-4" />
+            
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Primeira vez gerando escalas?</AlertTitle>
+              <AlertDescription className="mt-2">
+                <p className="mb-3">Se as escalas não tiverem ministros ou se os ministros não estiverem sendo distribuídos corretamente, clique no botão abaixo para atualizar as respostas dos questionários:</p>
+                <Button 
+                  onClick={handleReprocessResponses}
+                  variant="outline"
+                  size="sm"
+                  disabled={isGenerating}
+                  data-testid="button-reprocess"
+                >
+                  <Shuffle className="h-4 w-4 mr-2" />
+                  Atualizar Respostas dos Questionários
+                </Button>
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
 

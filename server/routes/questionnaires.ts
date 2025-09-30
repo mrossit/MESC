@@ -879,15 +879,18 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
     // Mapear ministros com suas respostas
     const responseMap = new Map(responses.map((r: any) => [r.userId, r]));
 
-    const ministerResponses = ministers.map((minister: any) => ({
-      id: minister.id,
-      name: minister.name,
-      email: minister.email,
-      phone: minister.phone || '',
-      responded: responseMap.has(minister.id),
-      respondedAt: responseMap.get(minister.id)?.submittedAt ? new Date((responseMap.get(minister.id) as any).submittedAt).toISOString() : null,
-      availability: null // Pode ser expandido para incluir disponibilidade
-    }));
+    const ministerResponses = ministers.map((minister: any) => {
+      const response = responseMap.get(minister.id);
+      return {
+        id: minister.id,
+        name: minister.name,
+        email: minister.email,
+        phone: minister.phone || '',
+        responded: responseMap.has(minister.id),
+        respondedAt: response && (response as any).submittedAt ? new Date((response as any).submittedAt).toISOString() : null,
+        availability: null // Pode ser expandido para incluir disponibilidade
+      };
+    });
 
     const respondedCount = responses.length;
     const totalMinisters = ministers.length;
