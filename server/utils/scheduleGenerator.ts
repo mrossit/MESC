@@ -825,10 +825,15 @@ export class ScheduleGenerator {
     const hour = parseInt(massTime.time.substring(0, 2));
     const timeStr = hour + 'h'; // Converter "08:00" para "8h", "10:00" para "10h"
 
-    console.log(`[AVAILABILITY_CHECK] 🔍 Verificando disponibilidade para ${massTime.date} ${massTime.time} (${massTime.type})`);
+    console.log(`\n[AVAILABILITY_CHECK] 🔍 ========================================`);
+    console.log(`[AVAILABILITY_CHECK] Verificando disponibilidade para:`);
+    console.log(`[AVAILABILITY_CHECK]   Data: ${massTime.date}`);
+    console.log(`[AVAILABILITY_CHECK]   Hora: ${massTime.time}`);
+    console.log(`[AVAILABILITY_CHECK]   Tipo: ${massTime.type}`);
+    console.log(`[AVAILABILITY_CHECK]   Dia da semana: ${dayName} (${massTime.dayOfWeek})`);
     console.log(`[AVAILABILITY_CHECK] 📊 Total ministros: ${this.ministers.length}, AvailabilityData size: ${this.availabilityData.size}`);
 
-    return this.ministers.filter(minister => {
+    const availableList = this.ministers.filter(minister => {
       const availability = this.availabilityData.get(minister.id);
       
       console.log(`[AVAILABILITY_CHECK] 👤 Verificando ${minister.name} (${minister.id})`);
@@ -850,8 +855,11 @@ export class ScheduleGenerator {
       }
 
       // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
-      if (massTime.type && !this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time)) {
-        console.log(`[SCHEDULE_GEN] ❌ ${minister.name} não disponível para ${massTime.type} às ${massTime.time}`);
+      const isAvailableForType = massTime.type ? this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time) : true;
+      console.log(`[AVAILABILITY_CHECK] ${minister.name} disponível para tipo ${massTime.type}? ${isAvailableForType}`);
+      
+      if (massTime.type && !isAvailableForType) {
+        console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} REJEITADO por tipo de missa`);
         return false;
       }
 
@@ -939,23 +947,40 @@ export class ScheduleGenerator {
 
       // Verificar disponibilidade para missas diárias (segunda a sábado)
       if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
+        console.log(`[AVAILABILITY_CHECK] Verificando dia específico para ${minister.name}`);
+        console.log(`[AVAILABILITY_CHECK]   dailyMassAvailability: ${JSON.stringify(availability.dailyMassAvailability)}`);
+        console.log(`[AVAILABILITY_CHECK]   Procurando por: "${dayName}"`);
+        
         // Se marcou "Não posso" para missas diárias, não está disponível
         if (availability.dailyMassAvailability?.includes('Não posso')) {
+          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} marcou "Não posso"`);
           return false;
         }
 
         // Se tem dados de missas diárias, verificar o dia específico
         if (availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0) {
-          return availability.dailyMassAvailability.includes(dayName);
+          const isAvailable = availability.dailyMassAvailability.includes(dayName);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailable ? '✅ DISPONÍVEL' : '❌ NÃO disponível'} para ${dayName}`);
+          return isAvailable;
         }
 
         // Se não respondeu sobre missas diárias, considerar não disponível
+        console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} sem dados de disponibilidade diária`);
         return false;
       }
 
       // Para outros casos, considerar disponível se tem resposta
+      console.log(`[AVAILABILITY_CHECK] ✅ ${minister.name} disponível (outros casos)`);
       return true;
     });
+
+    console.log(`\n[AVAILABILITY_CHECK] 📋 RESULTADO: ${availableList.length} ministros disponíveis de ${this.ministers.length} total`);
+    if (availableList.length > 0) {
+      console.log(`[AVAILABILITY_CHECK] Ministros disponíveis: ${availableList.map(m => m.name).join(', ')}`);
+    }
+    console.log(`[AVAILABILITY_CHECK] ========================================\n`);
+    
+    return availableList;
   }
 
   /**
