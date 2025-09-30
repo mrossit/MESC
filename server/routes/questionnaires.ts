@@ -1310,12 +1310,32 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
 
     const { questionnaireId } = req.body;
 
-    // Buscar todas as respostas do questionário
-    const allResponses = await db.select()
-      .from(questionnaireResponses)
-      .where(questionnaireId ? eq(questionnaireResponses.questionnaireId, questionnaireId) : undefined);
+    console.log(`[REPROCESS] 🔄 Iniciando reprocessamento...`);
+    console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
 
-    console.log(`[REPROCESS] Reprocessando ${allResponses.length} respostas...`);
+    // Se questionnaireId for fornecido, verificar se existe
+    if (questionnaireId) {
+      const [questionnaire] = await db.select()
+        .from(questionnaires)
+        .where(eq(questionnaires.id, questionnaireId))
+        .limit(1);
+      
+      if (!questionnaire) {
+        console.log(`[REPROCESS] ❌ Questionário ${questionnaireId} não encontrado!`);
+        return res.status(404).json({ error: 'Questionário não encontrado' });
+      }
+      
+      console.log(`[REPROCESS] ✅ Questionário encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
+    }
+
+    // Buscar todas as respostas do questionário
+    const allResponses = questionnaireId 
+      ? await db.select()
+          .from(questionnaireResponses)
+          .where(eq(questionnaireResponses.questionnaireId, questionnaireId))
+      : await db.select().from(questionnaireResponses);
+
+    console.log(`[REPROCESS] 📝 Encontradas ${allResponses.length} respostas para reprocessar...`);
 
     let updated = 0;
     let errors = 0;
