@@ -7,7 +7,6 @@ import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-reac
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Minister {
   id: string;
@@ -235,33 +234,31 @@ export function ScheduleEditDialog({
                 data-testid="input-search-minister"
               />
               
-              <div className="relative rounded-md border backdrop-blur-xl bg-background/80 shadow-lg">
-                <ScrollArea className="h-48">
-                  <div className="p-2">
-                    {filteredMinisters.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhum ministro encontrado.
-                      </p>
-                    ) : (
-                      filteredMinisters.map((minister: any) => (
-                        <button
-                          key={minister.id}
-                          onClick={() => {
-                            setSelectedMinisterId(minister.id);
-                            setSearchQuery(minister.name);
-                          }}
-                          className={`
-                            w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
-                            ${selectedMinisterId === minister.id ? 'bg-accent' : ''}
-                          `}
-                          data-testid={`option-minister-${minister.id}`}
-                        >
-                          {minister.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
+              <div className="relative rounded-md border backdrop-blur-xl bg-background/80 shadow-lg h-48 overflow-y-auto">
+                <div className="p-2">
+                  {filteredMinisters.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhum ministro encontrado.
+                    </p>
+                  ) : (
+                    filteredMinisters.map((minister: any) => (
+                      <button
+                        key={minister.id}
+                        onClick={() => {
+                          setSelectedMinisterId(minister.id);
+                          setSearchQuery(minister.name);
+                        }}
+                        className={`
+                          w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
+                          ${selectedMinisterId === minister.id ? 'bg-accent' : ''}
+                        `}
+                        data-testid={`option-minister-${minister.id}`}
+                      >
+                        {minister.name}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
 
               <Button
