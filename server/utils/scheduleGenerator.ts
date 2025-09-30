@@ -855,17 +855,6 @@ export class ScheduleGenerator {
         return false;
       }
 
-      // Verificar disponibilidade para missas diárias (segunda a sábado)
-      if (massTime.dayOfWeek > 0 && massTime.type === 'missa_diaria') {
-        const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-        const dayName = daysOfWeek[massTime.dayOfWeek];
-
-        if (!availability.dailyMassAvailability || !availability.dailyMassAvailability.includes(dayName)) {
-          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} não disponível para ${dayName}`);
-          return false;
-        }
-      }
-
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
         // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
@@ -977,15 +966,19 @@ export class ScheduleGenerator {
     const availability = this.availabilityData.get(ministerId);
     if (!availability) return false;
 
-    // Para missas diárias regulares, verificar disponibilidade para dias de semana
+    // Para missas diárias regulares, verificar disponibilidade geral (não por dia específico)
     if (massType === 'missa_diaria') {
       // Se marcou explicitamente "Não posso", não está disponível
       if (availability.dailyMassAvailability?.includes('Não posso')) {
+        console.log(`[SCHEDULE_GEN] ${ministerId} marcou "Não posso" para missas diárias`);
         return false;
       }
-      // CORREÇÃO: Permitir que a verificação específica por dia da semana seja feita depois
-      // Não rejeitar aqui se não tem dados, deixar a verificação detalhada decidir
-      return true;
+      // Se tem ALGUMA disponibilidade para missas diárias, considerar disponível
+      // A verificação do dia específico será feita depois em getAvailableMinistersForMass
+      const hasAnyDailyAvailability = availability.dailyMassAvailability && 
+                                      availability.dailyMassAvailability.length > 0;
+      console.log(`[SCHEDULE_GEN] ${ministerId} tem disponibilidade diária: ${hasAnyDailyAvailability}`);
+      return hasAnyDailyAvailability;
     }
 
     // Mapear tipos de missa para campos do questionário
