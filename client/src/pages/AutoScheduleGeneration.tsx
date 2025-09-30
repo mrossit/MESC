@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Select,
   SelectContent,
@@ -25,13 +26,18 @@ import {
   Download,
   Shuffle,
   Save,
-  Eye
+  Eye,
+  Edit,
+  X,
+  Plus,
+  GripVertical
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/layout';
+import { ScheduleEditDialog } from '@/components/ScheduleEditDialog';
 
 interface GeneratedSchedule {
   date: string;
@@ -80,6 +86,7 @@ export default function AutoScheduleGeneration() {
   const [generatedData, setGeneratedData] = useState<GenerationResponse['data'] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<{ date: string; time: string; ministers: { id: string; name: string }[] } | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -483,6 +490,19 @@ export default function AutoScheduleGeneration() {
                         </div>
                         
                         <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingSchedule({
+                              date: schedule.date,
+                              time: schedule.time,
+                              ministers: schedule.ministers.map(m => ({ id: m.id, name: m.name }))
+                            })}
+                            data-testid={`button-edit-${index}`}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </Button>
                           <Badge 
                             variant={getConfidenceBadgeVariant(schedule.confidence)}
                             data-testid={`badge-quality-${index}`}
@@ -549,6 +569,49 @@ export default function AutoScheduleGeneration() {
               </div>
             </CardContent>
           </Card>
+        )}
+        
+        {/* Dialog de edição de escala */}
+        {editingSchedule && (
+          <ScheduleEditDialog
+            open={!!editingSchedule}
+            onOpenChange={(open) => !open && setEditingSchedule(null)}
+            date={editingSchedule.date}
+            time={editingSchedule.time}
+            initialMinisters={editingSchedule.ministers}
+            onSave={async () => {
+              // Após salvar, atualizar apenas a escala específica editada
+              if (generatedData && editingSchedule) {
+                try {
+                  const response = await apiRequest('GET', `/api/schedules/${editingSchedule.date}/${editingSchedule.time}`);
+                  const updatedSchedule = await response.json();
+                  
+                  // Atualizar os dados exibidos com a escala editada
+                  setGeneratedData({
+                    ...generatedData,
+                    schedules: generatedData.schedules.map(s => 
+                      s.date === editingSchedule.date && s.time === editingSchedule.time
+                        ? {
+                            ...s,
+                            ministers: updatedSchedule.ministers.map((m: any) => ({
+                              id: m.ministerId,
+                              name: m.ministerName,
+                              role: '',
+                              totalServices: 0,
+                              availabilityScore: 0
+                            }))
+                          }
+                        : s
+                    )
+                  });
+                  
+                  setHasUnsavedChanges(true);
+                } catch (error) {
+                  console.error('Erro ao recarregar escala:', error);
+                }
+              }
+            }}
+          />
         )}
       </div>
     </Layout>
