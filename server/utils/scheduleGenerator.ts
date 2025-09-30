@@ -360,7 +360,14 @@ export class ScheduleGenerator {
                 case 'other_times_available':
                   // Processar horários alternativos
                   if (item.answer && item.answer !== 'Não') {
-                    alternativeTimes = Array.isArray(item.answer) ? item.answer : [item.answer];
+                    // 🔧 CORREÇÃO: answer pode ser um objeto com { answer: "Sim", selectedOptions: [...] }
+                    if (typeof item.answer === 'object' && item.answer.selectedOptions) {
+                      alternativeTimes = item.answer.selectedOptions;
+                    } else if (Array.isArray(item.answer)) {
+                      alternativeTimes = item.answer;
+                    } else if (typeof item.answer === 'string') {
+                      alternativeTimes = [item.answer];
+                    }
                   }
                   break;
                 case 'can_substitute':
@@ -378,6 +385,9 @@ export class ScheduleGenerator {
                 case 'saint_judas_feast_7h':
                 case 'saint_judas_feast_10h':
                 case 'saint_judas_feast_12h':
+                case 'saint_judas_feast_15h':
+                case 'saint_judas_feast_17h':
+                case 'saint_judas_feast_evening':
                 case 'adoration_monday':
                   specialEvents[item.questionId] = item.answer;
                   break;
@@ -401,14 +411,24 @@ export class ScheduleGenerator {
           : r.preferredMassTimes;
       }
 
+      // 🔧 NORMALIZAÇÃO: Converter domingos de texto para números (1-5)
+      const normalizedSundays = this.normalizeSundayFormat(availableSundays, month, year);
+
+      // 🔧 NORMALIZAÇÃO: Padronizar horários para formato "Xh" (8h, 10h, 19h)
+      const normalizedPreferredTimes = this.normalizeTimeFormat(preferredMassTimes);
+      const normalizedAlternativeTimes = this.normalizeTimeFormat(alternativeTimes);
+
+      // 🔧 NORMALIZAÇÃO: Converter booleanos em strings para eventos especiais
+      const normalizedSpecialEvents = this.normalizeSpecialEvents(specialEvents);
+
       const processedData = {
         ministerId: r.userId,
-        availableSundays,
-        preferredMassTimes,
-        alternativeTimes,
+        availableSundays: normalizedSundays,
+        preferredMassTimes: normalizedPreferredTimes,
+        alternativeTimes: normalizedAlternativeTimes,
         canSubstitute,
         dailyMassAvailability,
-        specialEvents
+        specialEvents: normalizedSpecialEvents
       };
 
       console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.userId}:`, processedData);
@@ -419,6 +439,103 @@ export class ScheduleGenerator {
     console.log(`[SCHEDULE_GEN] ✅ Carregadas respostas de ${responses.length} ministros no availabilityData`);
     console.log(`[SCHEDULE_GEN] 📊 AvailabilityData size: ${this.availabilityData.size}`);
     logger.info(`Carregadas respostas de ${responses.length} ministros`);
+  }
+
+  /**
+   * 🔧 NORMALIZAÇÃO: Converte domingos de formato texto para números (1-5)
+   * Exemplos de entrada:
+   *   - "Domingo 05/10" → "1" (se 05/10 for o primeiro domingo)
+   *   - "Domingo (12/10) – Missa em honra à Nossa Senhora Aparecida" → "2"
+   */
+  private normalizeSundayFormat(sundays: string[], month: number, year: number): string[] {
+    if (!sundays || sundays.length === 0) return [];
+
+    // Se já está no formato de números, retornar como está
+    if (sundays.every(s => /^[1-5]$/.test(s))) {
+      return sundays;
+    }
+
+    // Se tem "Nenhum domingo", retornar como está
+    if (sundays.includes('Nenhum domingo')) {
+      return sundays;
+    }
+
+    const normalized: string[] = [];
+
+    for (const sunday of sundays) {
+      // Extrair data no formato DD/MM ou DD/10
+      const dateMatch = sunday.match(/(\d{1,2})\/(\d{1,2})/);
+
+      if (dateMatch) {
+        const day = parseInt(dateMatch[1]);
+        const monthFromText = parseInt(dateMatch[2]);
+
+        // Verificar se o mês bate (segurança)
+        if (monthFromText === month || monthFromText === 10) {
+          // Calcular qual domingo do mês é esse
+          const sundayOfMonth = Math.ceil(day / 7);
+          normalized.push(sundayOfMonth.toString());
+          console.log(`[NORMALIZE] "${sunday}" → domingo ${sundayOfMonth} do mês`);
+        }
+      } else {
+        // Se não conseguiu parsear, manter original
+        console.log(`[NORMALIZE] ⚠️ Não foi possível normalizar: "${sunday}"`);
+        normalized.push(sunday);
+      }
+    }
+
+    return normalized;
+  }
+
+  /**
+   * 🔧 NORMALIZAÇÃO: Padroniza horários para formato "Xh" (8h, 10h, 19h)
+   * Aceita: "8h", "08:00", "8:00", "08h00"
+   */
+  private normalizeTimeFormat(times: string[]): string[] {
+    if (!times || times.length === 0) return [];
+
+    return times.map(time => {
+      // Garantir que é string
+      if (typeof time !== 'string') {
+        console.log(`[NORMALIZE] ⚠️ Horário não é string: ${time} (tipo: ${typeof time})`);
+        return String(time);
+      }
+
+      // Se já está no formato "Xh", retornar como está
+      if (/^\d{1,2}h$/.test(time)) {
+        return time;
+      }
+
+      // Extrair hora de formatos como "08:00", "8:00"
+      const hourMatch = time.match(/^(\d{1,2})/);
+      if (hourMatch) {
+        const hour = parseInt(hourMatch[1]);
+        return `${hour}h`;
+      }
+
+      // Se não conseguiu parsear, retornar original
+      return time;
+    });
+  }
+
+  /**
+   * 🔧 NORMALIZAÇÃO: Converte valores booleanos em strings para eventos especiais
+   * false → "Não", true → "Sim"
+   */
+  private normalizeSpecialEvents(events: any): any {
+    if (!events || typeof events !== 'object') return events;
+
+    const normalized: any = {};
+
+    for (const [key, value] of Object.entries(events)) {
+      if (typeof value === 'boolean') {
+        normalized[key] = value ? 'Sim' : 'Não';
+      } else {
+        normalized[key] = value;
+      }
+    }
+
+    return normalized;
   }
 
   /**
@@ -1035,6 +1152,7 @@ export class ScheduleGenerator {
         const specialEvents = (availability as any).specialEvents;
         if (specialEvents && typeof specialEvents === 'object') {
           const response = specialEvents[questionKey];
+          // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos
           const isAvailable = response === 'Sim' || response === true;
           console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
           return isAvailable;
@@ -1052,7 +1170,9 @@ export class ScheduleGenerator {
     const specialEvents = (availability as any).specialEvents;
     if (specialEvents && typeof specialEvents === 'object') {
       const response = specialEvents[questionKey];
+      // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos
       const isAvailable = response === 'Sim' || response === true;
+      // "Não", false, null, undefined = não disponível
       console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
       return isAvailable;
     }

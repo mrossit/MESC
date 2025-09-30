@@ -62,7 +62,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/check-response-structure.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/inspect-real-data.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/verify-csv-export.ts)",
-      "Bash(env NODE_ENV=production npx tsx:*)"
+      "Bash(env NODE_ENV=production npx tsx:*)",
+      "Bash(1)"
     ],
     "deny": [],
     "ask": []
