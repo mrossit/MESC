@@ -983,8 +983,9 @@ export class ScheduleGenerator {
       if (availability.dailyMassAvailability?.includes('Não posso')) {
         return false;
       }
-      // Se tem disponibilidade para missas diárias, está disponível
-      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0 && !availability.dailyMassAvailability.includes('Não posso');
+      // CORREÇÃO: Permitir que a verificação específica por dia da semana seja feita depois
+      // Não rejeitar aqui se não tem dados, deixar a verificação detalhada decidir
+      return true;
     }
 
     // Mapear tipos de missa para campos do questionário
