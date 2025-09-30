@@ -538,4 +538,170 @@ function calculateCoverageByDay(schedules: any[]) {
   return coverage;
 }
 
+/**
+ * Buscar ministros escalados para uma data/hora específica
+ * GET /api/schedules/:date/:time
+ */
+router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { date, time } = req.params;
+    
+    if (!db) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+
+    const scheduledMinisters = await db
+      .select({
+        id: schedules.id,
+        ministerId: schedules.ministerId,
+        ministerName: users.name,
+        status: schedules.status,
+        notes: schedules.notes,
+        type: schedules.type,
+        location: schedules.location
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(and(
+        eq(schedules.date, date),
+        eq(schedules.time, time)
+      ));
+
+    res.json({
+      date,
+      time,
+      ministers: scheduledMinisters
+    });
+  } catch (error: any) {
+    logger.error('Error fetching schedule:', error);
+    res.status(500).json({ error: 'Failed to fetch schedule' });
+  }
+});
+
+/**
+ * Adicionar ministro a uma escala
+ * POST /api/schedules/add-minister
+ */
+router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      date: z.string(),
+      time: z.string(),
+      ministerId: z.string(),
+      type: z.string().default('missa'),
+      location: z.string().optional(),
+      notes: z.string().optional()
+    });
+
+    const data = schema.parse(req.body);
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+
+    // Verificar se o ministro já está escalado nesta data/hora
+    const [existing] = await db
+      .select()
+      .from(schedules)
+      .where(and(
+        eq(schedules.date, data.date),
+        eq(schedules.time, data.time),
+        eq(schedules.ministerId, data.ministerId)
+      ))
+      .limit(1);
+
+    if (existing) {
+      return res.status(400).json({ error: 'Ministro já escalado neste horário' });
+    }
+
+    // Inserir novo ministro
+    const [newSchedule] = await db
+      .insert(schedules)
+      .values({
+        date: data.date,
+        time: data.time,
+        type: data.type,
+        location: data.location,
+        ministerId: data.ministerId,
+        notes: data.notes,
+        status: 'scheduled'
+      })
+      .returning();
+
+    res.json(newSchedule);
+  } catch (error: any) {
+    logger.error('Error adding minister to schedule:', error);
+    res.status(500).json({ error: 'Failed to add minister to schedule' });
+  }
+});
+
+/**
+ * Remover ministro de uma escala
+ * DELETE /api/schedules/:id
+ */
+router.delete('/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+
+    await db
+      .delete(schedules)
+      .where(eq(schedules.id, id));
+
+    res.json({ success: true, message: 'Ministro removido da escala' });
+  } catch (error: any) {
+    logger.error('Error removing minister from schedule:', error);
+    res.status(500).json({ error: 'Failed to remove minister from schedule' });
+  }
+});
+
+/**
+ * Atualizar múltiplos ministros de uma vez (útil para drag and drop)
+ * PATCH /api/schedules/batch-update
+ */
+router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      date: z.string(),
+      time: z.string(),
+      ministers: z.array(z.string()) // Array de IDs de ministros na ordem desejada
+    });
+
+    const { date, time, ministers } = schema.parse(req.body);
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+
+    // Remover todos os ministros atuais
+    await db
+      .delete(schedules)
+      .where(and(
+        eq(schedules.date, date),
+        eq(schedules.time, time)
+      ));
+
+    // Adicionar novos ministros
+    if (ministers.length > 0) {
+      const newSchedules = ministers.map(ministerId => ({
+        date,
+        time,
+        ministerId,
+        type: 'missa',
+        status: 'scheduled'
+      }));
+
+      await db.insert(schedules).values(newSchedules);
+    }
+
+    res.json({ success: true, message: 'Escala atualizada com sucesso' });
+  } catch (error: any) {
+    logger.error('Error batch updating schedule:', error);
+    res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
+
 export default router;
