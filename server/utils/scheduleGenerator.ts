@@ -850,8 +850,8 @@ export class ScheduleGenerator {
       }
 
       // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
-      if (massTime.type && !this.isAvailableForSpecialMass(minister.id, massTime.type)) {
-        console.log(`[SCHEDULE_GEN] ❌ ${minister.name} não disponível para ${massTime.type}`);
+      if (massTime.type && !this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time)) {
+        console.log(`[SCHEDULE_GEN] ❌ ${minister.name} não disponível para ${massTime.type} às ${massTime.time}`);
         return false;
       }
 
@@ -971,39 +971,52 @@ export class ScheduleGenerator {
 
   /**
    * Verifica se o ministro está disponível para um tipo específico de missa
+   * Agora suporta verificação por horário específico para missas de São Judas
    */
-  private isAvailableForSpecialMass(ministerId: string, massType: string): boolean {
+  private isAvailableForSpecialMass(ministerId: string, massType: string, massTime?: string): boolean {
     const availability = this.availabilityData.get(ministerId);
     if (!availability) return false;
 
     // Para missas diárias regulares, verificar disponibilidade para dias de semana
     if (massType === 'missa_diaria') {
+      // Se marcou explicitamente "Não posso", não está disponível
+      if (availability.dailyMassAvailability?.includes('Não posso')) {
+        return false;
+      }
       // Se tem disponibilidade para missas diárias, está disponível
-      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0;
+      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0 && !availability.dailyMassAvailability.includes('Não posso');
     }
 
-    // Para missas especiais (primeira sexta, primeiro sábado, cura e libertação)
-    // Como não temos dados específicos no questionário atual, vamos considerar:
-    // - Primeira sexta/sábado: verificar se tem disponibilidade para missas diárias
-    // - Cura e libertação (quinta): verificar se tem disponibilidade para quinta-feira
-    if (massType === 'missa_sagrado_coracao' || massType === 'missa_imaculado_coracao') {
-      // Missas especiais de primeira sexta/sábado - aceitar quem tem disponibilidade diária
-      return availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0;
-    }
-
-    if (massType === 'missa_cura_libertacao') {
-      // Missa de cura e libertação (quinta-feira)
-      return availability.dailyMassAvailability?.includes('Quinta-feira') || false;
-    }
-
-    // Mapear tipos de missa para campos do questionário (para futuro)
+    // Mapear tipos de missa para campos do questionário
     const massTypeMapping: { [key: string]: string } = {
-      'missa_cura_libertacao': 'healing_liberation_mass',
-      'missa_sagrado_coracao': 'sacred_heart_mass',
-      'missa_imaculado_coracao': 'immaculate_heart_mass',
-      'missa_sao_judas': 'saint_judas_novena',
-      'missa_sao_judas_festa': 'saint_judas_feast'
+      'missa_cura_libertacao': 'healing_liberation',
+      'missa_sagrado_coracao': 'sacred_heart',
+      'missa_imaculado_coracao': 'immaculate_heart',
+      'missa_sao_judas': 'saint_judas_novena'
     };
+
+    // Para missas de São Judas festa, mapear o horário específico
+    if (massType === 'missa_sao_judas_festa' && massTime) {
+      const timeToQuestionKey: { [key: string]: string } = {
+        '07:00': 'saint_judas_feast_7h',
+        '10:00': 'saint_judas_feast_10h',
+        '12:00': 'saint_judas_feast_12h',
+        '15:00': 'saint_judas_feast_15h',
+        '17:00': 'saint_judas_feast_17h',
+        '19:30': 'saint_judas_feast_evening'
+      };
+
+      const questionKey = timeToQuestionKey[massTime];
+      if (questionKey) {
+        const specialEvents = (availability as any).specialEvents;
+        if (specialEvents && typeof specialEvents === 'object') {
+          const response = specialEvents[questionKey];
+          const isAvailable = response === 'Sim' || response === true;
+          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
+          return isAvailable;
+        }
+      }
+    }
 
     const questionKey = massTypeMapping[massType];
     if (!questionKey) {
@@ -1023,7 +1036,7 @@ export class ScheduleGenerator {
     // Se não há dados específicos, mas é uma missa especial conhecida
     // usar lógica padrão baseada em disponibilidade geral
     console.log(`[SCHEDULE_GEN] ℹ️ Usando disponibilidade geral para ${massType}`);
-    return availability.canSubstitute || false;
+    return false; // Alterado: Se não tem resposta explícita, não está disponível
   }
 
   /**
