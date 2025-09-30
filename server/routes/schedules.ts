@@ -116,7 +116,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(eq(schedules.id, schedule[0].id))
-      .orderBy(schedules.time);
+      .orderBy(schedules.time, schedules.position);
     
     // Filter assignments for the specific date in JavaScript
     const dayAssignments = allAssignments.filter(a => {

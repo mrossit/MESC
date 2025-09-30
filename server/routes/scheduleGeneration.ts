@@ -6,7 +6,7 @@ import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleG
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses } from '@shared/schema';
-import { and, gte, lte, eq, sql, ne } from 'drizzle-orm';
+import { and, gte, lte, eq, sql, ne, desc } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 
@@ -28,6 +28,7 @@ const saveSchedulesSchema = z.object({
     type: z.string().default('missa'),
     location: z.string().optional(),
     ministerId: z.string(),
+    position: z.number().optional(), // Order position for ministers at same date/time
     notes: z.string().optional()
   })),
   replaceExisting: z.boolean().default(false)
@@ -152,16 +153,32 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
       logger.info(`Removidas escalas existentes entre ${firstDate} e ${lastDate}`);
     }
 
-    // Inserir novas escalas
-    const schedulesToInsert = schedulesToSave.map(s => ({
-      date: s.date,
-      time: s.time,
-      type: s.type as any,
-      location: s.location || null,
-      ministerId: s.ministerId,
-      notes: s.notes || null,
-      status: 'scheduled' as const
-    }));
+    // Inserir novas escalas com position
+    // Agrupar por date+time para atribuir positions sequenciais
+    const groupedByDateTime: { [key: string]: typeof schedulesToSave } = {};
+    schedulesToSave.forEach(s => {
+      const key = `${s.date}_${s.time}`;
+      if (!groupedByDateTime[key]) {
+        groupedByDateTime[key] = [];
+      }
+      groupedByDateTime[key].push(s);
+    });
+
+    const schedulesToInsert = schedulesToSave.map((s, globalIndex) => {
+      const key = `${s.date}_${s.time}`;
+      const groupIndex = groupedByDateTime[key].indexOf(s);
+      
+      return {
+        date: s.date,
+        time: s.time,
+        type: s.type as any,
+        location: s.location || null,
+        ministerId: s.ministerId,
+        position: s.position ?? (groupIndex + 1), // Use provided position or calculate from group index
+        notes: s.notes || null,
+        status: 'scheduled' as const
+      };
+    });
 
     const saved = await db.insert(schedules).values(schedulesToInsert).returning();
 
@@ -560,14 +577,16 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
         status: schedules.status,
         notes: schedules.notes,
         type: schedules.type,
-        location: schedules.location
+        location: schedules.location,
+        position: schedules.position
       })
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(and(
         eq(schedules.date, date),
         eq(schedules.time, time)
-      ));
+      ))
+      .orderBy(schedules.position);
 
     res.json({
       date,
@@ -616,6 +635,21 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       return res.status(400).json({ error: 'Ministro já escalado neste horário' });
     }
 
+    // Contar quantos ministros já estão escalados para calcular a posição
+    const existingMinisters = await db
+      .select({ position: schedules.position })
+      .from(schedules)
+      .where(and(
+        eq(schedules.date, data.date),
+        eq(schedules.time, data.time)
+      ))
+      .orderBy(desc(schedules.position));
+    
+    // Nova posição é a maior posição existente + 1, ou 1 se não há ninguém
+    const newPosition = existingMinisters.length > 0 && existingMinisters[0].position 
+      ? existingMinisters[0].position + 1 
+      : 1;
+
     // Inserir novo ministro
     const [newSchedule] = await db
       .insert(schedules)
@@ -625,6 +659,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
         type: data.type,
         location: data.location,
         ministerId: data.ministerId,
+        position: newPosition,
         notes: data.notes,
         status: 'scheduled'
       })
