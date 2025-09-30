@@ -8,7 +8,7 @@ import { ptBR } from 'date-fns/locale';
 console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM CORREÇÕES! Timestamp:', new Date().toISOString());
 
 export interface Minister {
-  id: string;
+  id: string | null; // null = VACANTE
   name: string;
   role: string;
   totalServices: number;
@@ -781,7 +781,9 @@ export class ScheduleGenerator {
       this.dailyAssignments.set(dateKey, new Set());
     }
     const dayAssignments = this.dailyAssignments.get(dateKey)!;
-    selectedMinisters.forEach(minister => dayAssignments.add(minister.id));
+    selectedMinisters.forEach(minister => {
+      if (minister.id) dayAssignments.add(minister.id);
+    });
     
     // 6. Atribuir posições litúrgicas aos ministros
     console.log('[SCHEDULE_GEN] ✅ DEBUGGING: Atribuindo posições aos ministros!');
@@ -834,6 +836,9 @@ export class ScheduleGenerator {
     console.log(`[AVAILABILITY_CHECK] 📊 Total ministros: ${this.ministers.length}, AvailabilityData size: ${this.availabilityData.size}`);
 
     const availableList = this.ministers.filter(minister => {
+      // VACANTE (id null) não deve ser incluído na filtragem automática
+      if (!minister.id) return false;
+      
       const availability = this.availabilityData.get(minister.id);
       
       console.log(`[AVAILABILITY_CHECK] 👤 Verificando ${minister.name} (${minister.id})`);
@@ -1088,6 +1093,9 @@ export class ScheduleGenerator {
     const used = new Set<string>();
 
     for (const { minister } of scoredMinisters) {
+      // VACANTE não deve chegar aqui (já foi filtrado), mas guard defensivo
+      if (!minister.id) continue;
+      
       if (used.has(minister.id) || selected.length >= targetCount) {
         break; // Parar quando atingir a quantidade exata
       }
@@ -1095,7 +1103,7 @@ export class ScheduleGenerator {
       // Se pode servir como casal e cônjuge está disponível
       if (minister.canServeAsCouple && minister.spouseMinisterId) {
         const spouse = available.find(m => m.id === minister.spouseMinisterId);
-        if (spouse && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
+        if (spouse && spouse.id && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
           selected.push(minister, spouse);
           used.add(minister.id);
           used.add(spouse.id);
@@ -1115,6 +1123,7 @@ export class ScheduleGenerator {
 
       // Se não há ministros suficientes, continuar tentando adicionar os disponíveis restantes
       for (const { minister } of scoredMinisters) {
+        if (!minister.id) continue; // Guard defensivo
         if (!used.has(minister.id) && selected.length < targetCount) {
           selected.push(minister);
           used.add(minister.id);
@@ -1139,9 +1148,9 @@ export class ScheduleGenerator {
    * Seleciona ministros de backup
    */
   private selectBackupMinisters(available: Minister[], selected: Minister[], count: number): Minister[] {
-    const selectedIds = new Set(selected.map(m => m.id));
+    const selectedIds = new Set(selected.map(m => m.id).filter(id => id !== null));
     const backup = available
-      .filter(m => !selectedIds.has(m.id))
+      .filter(m => m.id && !selectedIds.has(m.id))
       .sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null))
       .slice(0, count);
 
@@ -1170,7 +1179,7 @@ export class ScheduleGenerator {
     }
 
     // 3. Preferência de horário (30% do peso - aumentado para forçar diversificação)
-    if (massTime) {
+    if (massTime && minister.id) {
       const availability = this.availabilityData.get(minister.id);
       const timeHour = `${massTime.time.substring(0, 2)}h`;
       
@@ -1184,13 +1193,15 @@ export class ScheduleGenerator {
     }
 
     // 4. Disponibilidade para substituição (10% do peso)
-    const availability = this.availabilityData.get(minister.id);
-    if (availability?.canSubstitute) {
-      score += 0.1;
+    if (minister.id) {
+      const availability = this.availabilityData.get(minister.id);
+      if (availability?.canSubstitute) {
+        score += 0.1;
+      }
     }
     
     // 5. Penalidade para ministros já escalados no mesmo dia (40% do peso - FORTE penalidade)
-    if (massTime && massTime.date) {
+    if (massTime && massTime.date && minister.id) {
       const dayAssignments = this.dailyAssignments.get(massTime.date);
       if (dayAssignments && dayAssignments.has(minister.id)) {
         score -= 0.8; // Penalidade muito forte para evitar duplicações no mesmo domingo

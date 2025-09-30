@@ -27,7 +27,7 @@ const saveSchedulesSchema = z.object({
     time: z.string(),
     type: z.string().default('missa'),
     location: z.string().optional(),
-    ministerId: z.string(),
+    ministerId: z.string().nullable(), // Permite null para posições VACANTE
     position: z.number().optional(), // Order position for ministers at same date/time
     notes: z.string().optional()
   })),
@@ -411,7 +411,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
         time: schedule.massTime.time,
         type: 'missa',
         location: null,
-        ministerId: minister.id,
+        ministerId: minister.id, // Pode ser null para VACANTE
         position: (minister as any).position || (i + 1), // Usar position do ministro ou index + 1
         status: 'scheduled',
         notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
