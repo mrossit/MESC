@@ -7,13 +7,15 @@ import { storage } from "../storage";
 
 const router = Router();
 
-// Get all ministers (users with role 'ministro')
+// Get all ministers (users with role 'ministro' OR 'coordenador')
 router.get("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const ministersList = await db
       .select()
       .from(users)
-      .where(eq(users.role, "ministro"));
+      .where(
+        sql`${users.role} IN ('ministro', 'coordenador')`
+      );
 
     res.json(ministersList);
   } catch (error) {

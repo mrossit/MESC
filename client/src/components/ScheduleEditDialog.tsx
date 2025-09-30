@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 
 interface Minister {
-  id: string;
+  id: string | null; // null = VACANTE
   name: string;
 }
 
@@ -183,7 +183,11 @@ export function ScheduleEditDialog({
                       <Badge variant="outline" className="w-8 justify-center">
                         {index + 1}
                       </Badge>
-                      <span className="font-medium">{minister.name}</span>
+                      {minister.id === null ? (
+                        <span className="font-medium text-muted-foreground italic">VACANTE</span>
+                      ) : (
+                        <span className="font-medium">{minister.name}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       {/* Botões de reordenação para mobile */}
@@ -261,15 +265,28 @@ export function ScheduleEditDialog({
                 </div>
               </div>
 
-              <Button
-                onClick={handleAddMinister}
-                disabled={!selectedMinisterId}
-                data-testid="button-add-minister"
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Ministro
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleAddMinister}
+                  disabled={!selectedMinisterId}
+                  data-testid="button-add-minister"
+                  className="flex-1"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Ministro
+                </Button>
+                <Button
+                  onClick={() => {
+                    setMinisters([...ministers, { id: null, name: 'VACANTE' }]);
+                  }}
+                  variant="outline"
+                  data-testid="button-add-vacant"
+                  className="flex-1"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Vaga VACANTE
+                </Button>
+              </div>
             </div>
           </div>
         </div>
