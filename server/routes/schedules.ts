@@ -43,7 +43,8 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
         time: schedules.time,
         type: schedules.type,
         location: schedules.location,
-        notes: schedules.notes
+        notes: schedules.notes,
+        position: schedules.position
       })
       .from(schedules)
       .where(
@@ -61,7 +62,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       id: assignment.id,
       date: assignment.date,
       massTime: assignment.time,
-      position: 'ministro',
+      position: assignment.position || 0,
       confirmed: true,
       scheduleId: assignment.id,
       scheduleTitle: assignment.type,
@@ -110,7 +111,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         ministerId: schedules.ministerId,
         date: schedules.date,
         massTime: schedules.time,
-        position: sql`'ministro'`,
+        position: schedules.position,
         confirmed: sql`true`
       })
       .from(schedules)
@@ -165,7 +166,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             ministerId: schedule.ministerId,
             date: schedule.date,
             massTime: schedule.time,
-            position: 'ministro',
+            position: schedule.position || 0,
             confirmed: true,
             ministerName: null // Would need join with users table
           }))
