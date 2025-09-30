@@ -184,7 +184,9 @@ export default function AutoScheduleGeneration() {
       
       const result = await response.json();
       
-      if (result.processedCount === 0) {
+      const processedCount = result.data?.updated || result.processedCount || 0;
+      
+      if (processedCount === 0) {
         toast({
           title: "Nenhuma resposta encontrada",
           description: "Não há respostas de questionários no sistema para processar. Certifique-se de que os ministros já responderam aos questionários.",
@@ -193,7 +195,7 @@ export default function AutoScheduleGeneration() {
       } else {
         toast({
           title: "Respostas atualizadas com sucesso!",
-          description: `${result.processedCount} respostas foram atualizadas. Agora você pode gerar as escalas.`
+          description: `${processedCount} respostas foram atualizadas. Agora você pode gerar as escalas.`
         });
       }
       
