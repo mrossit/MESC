@@ -138,8 +138,12 @@ function extractQuestionnaireData(responses: any[]) {
 
       case 'daily_mass_availability':
       case 'daily_mass':
+      case 'daily_mass_days':
         if (answer === 'Sim' || answer === true) {
-          data.dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+          data.dailyMassAvailability = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        } else if (answer === 'Não' || answer === false) {
+          // Explicitamente NÃO pode em missas diárias
+          data.dailyMassAvailability = ['Não posso'];
         } else if (typeof answer === 'object' && answer.selectedOptions) {
           data.dailyMassAvailability = answer.selectedOptions;
         } else if (Array.isArray(answer)) {
@@ -169,12 +173,42 @@ function extractQuestionnaireData(responses: any[]) {
         break;
     }
 
-    // Verificar se é um evento especial
-    if (questionId.includes('special_event_') && answer === 'Sim') {
-      if (!data.specialEvents) data.specialEvents = [];
-      if (Array.isArray(data.specialEvents)) {
-        data.specialEvents.push(questionId.replace('special_event_', ''));
+    // Processar perguntas específicas de eventos especiais
+    const specialEventMappings: { [key: string]: string } = {
+      'healing_liberation_mass': 'healing_liberation',
+      'sacred_heart_mass': 'sacred_heart',
+      'immaculate_heart_mass': 'immaculate_heart',
+      'saint_judas_feast_7h': 'saint_judas_feast_7h',
+      'saint_judas_feast_10h': 'saint_judas_feast_10h',
+      'saint_judas_feast_12h': 'saint_judas_feast_12h',
+      'saint_judas_feast_15h': 'saint_judas_feast_15h',
+      'saint_judas_feast_17h': 'saint_judas_feast_17h',
+      'saint_judas_feast_evening': 'saint_judas_feast_evening',
+      'saint_judas_novena': 'saint_judas_novena',
+      'adoration_monday': 'adoration_monday'
+    };
+
+    // Processar eventos especiais mapeados
+    if (specialEventMappings[questionId]) {
+      if (!data.specialEvents) data.specialEvents = {};
+      
+      // Armazenar resposta (Sim/Não ou array de datas)
+      if (answer === 'Sim' || answer === true) {
+        data.specialEvents[specialEventMappings[questionId]] = true;
+      } else if (answer === 'Não' || answer === false) {
+        data.specialEvents[specialEventMappings[questionId]] = false;
+      } else if (Array.isArray(answer)) {
+        // Para novenas e outros eventos com múltiplas datas
+        data.specialEvents[specialEventMappings[questionId]] = answer;
+      } else if (answer) {
+        data.specialEvents[specialEventMappings[questionId]] = answer;
       }
+    }
+
+    // Verificar se é um evento especial genérico
+    if (questionId.includes('special_event_') && answer === 'Sim') {
+      if (!data.specialEvents) data.specialEvents = {};
+      data.specialEvents[questionId.replace('special_event_', '')] = true;
     }
   });
 
@@ -1258,6 +1292,85 @@ router.get('/export/:year/:month/csv', requireAuth, requireRole(['coordenador', 
     console.error('Error exporting monthly responses:', error);
     const message = error instanceof Error ? error.message : 'Failed to export monthly responses';
     res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * ADMIN: Reprocessar respostas existentes para preencher colunas estruturadas
+ * POST /api/questionnaires/admin/reprocess-responses
+ */
+router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
+    const { questionnaireId } = req.body;
+
+    // Buscar todas as respostas do questionário
+    const allResponses = await db.select()
+      .from(questionnaireResponses)
+      .where(questionnaireId ? eq(questionnaireResponses.questionnaireId, questionnaireId) : undefined);
+
+    console.log(`[REPROCESS] Reprocessando ${allResponses.length} respostas...`);
+
+    let updated = 0;
+    let errors = 0;
+
+    for (const response of allResponses) {
+      try {
+        // Parse responses se for string
+        const responsesArray = typeof response.responses === 'string' 
+          ? JSON.parse(response.responses) 
+          : response.responses;
+
+        // Extrair dados estruturados
+        const extractedData = extractQuestionnaireData(responsesArray);
+
+        console.log(`[REPROCESS] Resposta ${response.id}:`, {
+          availableSundays: extractedData.availableSundays?.length || 0,
+          dailyMass: extractedData.dailyMassAvailability?.length || 0,
+          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
+        });
+
+        // Atualizar resposta com dados estruturados
+        await db.update(questionnaireResponses)
+          .set({
+            availableSundays: extractedData.availableSundays,
+            preferredMassTimes: extractedData.preferredMassTimes,
+            alternativeTimes: extractedData.alternativeTimes,
+            dailyMassAvailability: extractedData.dailyMassAvailability,
+            specialEvents: extractedData.specialEvents,
+            canSubstitute: extractedData.canSubstitute,
+            notes: extractedData.notes
+          })
+          .where(eq(questionnaireResponses.id, response.id));
+
+        updated++;
+      } catch (error: any) {
+        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
+        errors++;
+      }
+    }
+
+    console.log(`[REPROCESS] ✅ Concluído: ${updated} atualizadas, ${errors} erros`);
+
+    res.json({
+      success: true,
+      message: `Reprocessadas ${updated} respostas com sucesso`,
+      data: {
+        total: allResponses.length,
+        updated,
+        errors
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[REPROCESS] Erro geral:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erro ao reprocessar respostas'
+    });
   }
 });
 
