@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Minister {
   id: string;
@@ -34,6 +36,7 @@ export function ScheduleEditDialog({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [selectedMinisterId, setSelectedMinisterId] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { toast } = useToast();
 
   // Buscar lista de todos os ministros disponíveis
@@ -218,18 +221,44 @@ export function ScheduleEditDialog({
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Adicionar Ministro</h4>
             <div className="flex gap-2">
-              <Select value={selectedMinisterId} onValueChange={setSelectedMinisterId}>
-                <SelectTrigger className="flex-1" data-testid="select-minister">
-                  <SelectValue placeholder="Selecione um ministro" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.isArray(allMinisters) && allMinisters.map((minister: any) => (
-                    <SelectItem key={minister.id} value={minister.id}>
-                      {minister.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={searchOpen}
+                    className="flex-1 justify-between"
+                    data-testid="select-minister"
+                  >
+                    {selectedMinisterId
+                      ? Array.isArray(allMinisters) && allMinisters.find((m: any) => m.id === selectedMinisterId)?.name
+                      : "Selecione ou busque um ministro..."}
+                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Digite para buscar ministro..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum ministro encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {Array.isArray(allMinisters) && allMinisters.map((minister: any) => (
+                          <CommandItem
+                            key={minister.id}
+                            value={minister.name}
+                            onSelect={() => {
+                              setSelectedMinisterId(minister.id);
+                              setSearchOpen(false);
+                            }}
+                          >
+                            {minister.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <Button
                 onClick={handleAddMinister}
                 disabled={!selectedMinisterId}
