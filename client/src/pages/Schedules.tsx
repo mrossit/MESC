@@ -690,9 +690,9 @@ export default function Schedules() {
                       </Button>
                     )}
                     
-                    {/* Editor Detalhado só aparece para escalas não publicadas e coordenadores */}
-                    {currentSchedule && currentSchedule.status !== "published" && isCoordinator && (
-                      <Button 
+                    {/* Editor Detalhado para coordenadores */}
+                    {currentSchedule && isCoordinator && (
+                      <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => window.location.href = '/schedule-editor'}
@@ -1021,123 +1021,117 @@ export default function Schedules() {
                     <AlertCircle className="h-4 w-4" />
                     <span>Legenda</span>
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                     {currentSchedule.status === "published" && (
                       <>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 border-2 border-amber-500 rounded-lg flex items-center justify-center ring-2 ring-amber-400 ring-offset-1 shadow-md flex-shrink-0">
-                            <Star className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 fill-amber-500 animate-pulse" />
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 border-2 border-amber-500 rounded-lg flex items-center justify-center ring-2 ring-amber-400 ring-offset-1 shadow-md flex-shrink-0">
+                            <Star className="h-4 w-4 text-amber-600 fill-amber-500 animate-pulse" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Escalado</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-amber-700 dark:text-amber-400">Você está escalado</span>
-                            <p className="text-xs text-muted-foreground">Clique para ver detalhes da sua escala</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 border-2 border-red-500 rounded-lg flex items-center justify-center ring-2 ring-red-400 ring-offset-1 shadow-md flex-shrink-0">
-                            <UserX className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 fill-red-400 animate-pulse" />
-                          </div>
-                          <span className="text-xs font-medium sm:hidden">Pendente</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-red-700 dark:text-red-400">Substituição solicitada</span>
-                            <p className="text-xs text-muted-foreground">Aguardando alguém aceitar substituir</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 leading-tight">Você está escalado</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Clique para ver detalhes</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 border-2 border-green-500 rounded-lg flex items-center justify-center ring-2 ring-green-400 ring-offset-1 shadow-md flex-shrink-0">
-                            <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 fill-green-400 animate-pulse" />
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 border-2 border-red-500 rounded-lg flex items-center justify-center ring-2 ring-red-400 ring-offset-1 shadow-md flex-shrink-0">
+                            <UserX className="h-4 w-4 text-red-600 fill-red-400 animate-pulse" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Confirmado</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-green-700 dark:text-green-400">Substituto confirmado</span>
-                            <p className="text-xs text-muted-foreground">Alguém já aceitou te substituir</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
-                            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                          </div>
-                          <span className="text-xs font-medium sm:hidden">Escalados</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Ministros escalados</span>
-                            <p className="text-xs text-muted-foreground">Número de ministros confirmados</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-red-700 dark:text-red-400 leading-tight">Substituição solicitada</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Aguardando resposta</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700 flex-shrink-0">
-                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400" />
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 border-2 border-green-500 rounded-lg flex items-center justify-center ring-2 ring-green-400 ring-offset-1 shadow-md flex-shrink-0">
+                            <Check className="h-4 w-4 text-green-600 fill-green-400 animate-pulse" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Vagas</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-orange-700 dark:text-orange-400">Vagas disponíveis</span>
-                            <p className="text-xs text-muted-foreground">Posições ainda não preenchidas</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
-                            <span className="font-bold text-xs sm:text-sm text-primary">H</span>
-                          </div>
-                          <span className="text-xs font-medium sm:hidden">Hoje</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia atual</span>
-                            <p className="text-xs text-muted-foreground">Data de hoje</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-green-700 dark:text-green-400 leading-tight">Substituto confirmado</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Já tem substituto</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs sm:text-sm font-medium">D</span>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <Users className="h-4 w-4 text-primary" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Selecionado</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia selecionado</span>
-                            <p className="text-xs text-muted-foreground">Dia que você clicou</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Ministros escalados</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Número de confirmados</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 border rounded-lg flex items-center justify-center bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700 flex-shrink-0">
+                            <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-orange-700 dark:text-orange-400 leading-tight">Vagas disponíveis</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Posições não preenchidas</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <span className="font-bold text-sm text-primary">H</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Dia atual</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Data de hoje</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-medium">D</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Dia selecionado</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Dia que você clicou</p>
                           </div>
                         </div>
                       </>
                     )}
                     {currentSchedule.status === "draft" && isCoordinator && (
                       <>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
-                            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Horários</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Horários de missa</span>
-                            <p className="text-xs text-muted-foreground">Dias com missas disponíveis</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
-                            <span className="font-bold text-xs sm:text-sm text-primary">H</span>
-                          </div>
-                          <span className="text-xs font-medium sm:hidden">Hoje</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia atual</span>
-                            <p className="text-xs text-muted-foreground">Data de hoje</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Horários de missa</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Dias com missas</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs sm:text-sm font-medium">D</span>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <span className="font-bold text-sm text-primary">H</span>
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Selecionado</span>
-                          <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia selecionado</span>
-                            <p className="text-xs text-muted-foreground">Dia que você clicou</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Dia atual</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Data de hoje</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-10 h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-medium">D</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 dark:text-slate-300 leading-tight">Dia selecionado</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Dia que você clicou</p>
                           </div>
                         </div>
                       </>
                     )}
                   </div>
                   {currentSchedule.status === "published" && (
-                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                      <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                        <CalendarIcon className="h-3 w-3" />
-                        <span className="hidden sm:inline">Dica: Clique em qualquer dia para ver os detalhes da escala</span>
-                        <span className="sm:hidden">Toque para detalhes</span>
-                      </p>
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                        <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Dica</p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                            Clique em qualquer dia para ver os detalhes da escala e gerenciar suas escalações
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1298,11 +1292,28 @@ export default function Schedules() {
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([massTime, assignments]) => (
                     <div key={massTime} className="space-y-2 sm:space-y-3">
-                      <div className="flex items-center gap-2 pb-2 border-b">
-                        <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                        <h3 className="font-semibold text-sm sm:text-lg">
-                          Missa das {massTime}
-                        </h3>
+                      <div className="flex items-center justify-between gap-2 pb-2 border-b">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                          <h3 className="font-semibold text-sm sm:text-lg">
+                            Missa das {massTime}
+                          </h3>
+                        </div>
+                        {isCoordinator && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedMassTime(massTime);
+                              setIsAssignmentDialogOpen(true);
+                              setIsViewScheduleDialogOpen(false);
+                            }}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Adicionar
+                          </Button>
+                        )}
                       </div>
 
                       <div className="grid gap-2 pl-0 sm:pl-7">
@@ -1356,21 +1367,88 @@ export default function Schedules() {
                                   </div>
                                 </div>
 
-                                {isCurrentUser && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full text-orange-600 hover:text-orange-700 text-[11px] sm:text-sm h-8 sm:h-9"
-                                    onClick={() => {
-                                      setSelectedAssignmentForSubstitution(assignment);
-                                      setIsSubstitutionDialogOpen(true);
-                                    }}
-                                  >
-                                    <UserX className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
-                                    <span className="hidden sm:inline">Solicitar Substituição</span>
-                                    <span className="sm:hidden">Solicitar Substituto</span>
-                                  </Button>
-                                )}
+                                <div className="flex gap-2">
+                                  {isCurrentUser && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="flex-1 text-orange-600 hover:text-orange-700 text-[11px] sm:text-sm h-8 sm:h-9"
+                                      onClick={() => {
+                                        setSelectedAssignmentForSubstitution(assignment);
+                                        setIsSubstitutionDialogOpen(true);
+                                      }}
+                                    >
+                                      <UserX className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                                      <span className="hidden sm:inline">Solicitar Substituição</span>
+                                      <span className="sm:hidden">Solicitar Substituto</span>
+                                    </Button>
+                                  )}
+                                  {isCoordinator && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
+                                        onClick={async () => {
+                                          // Abrir diálogo de edição com dados pré-preenchidos
+                                          setSelectedMassTime(assignment.massTime);
+                                          setSelectedPosition(assignment.position);
+                                          setSelectedMinisterId(assignment.ministerId);
+                                          setIsAssignmentDialogOpen(true);
+                                          setIsViewScheduleDialogOpen(false);
+
+                                          // Remover a escalação atual primeiro
+                                          try {
+                                            await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                              method: "DELETE",
+                                              credentials: "include"
+                                            });
+                                          } catch (error) {
+                                            console.error("Error removing assignment:", error);
+                                          }
+                                        }}
+                                      >
+                                        <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                                        <span className="hidden sm:inline">Editar</span>
+                                        <span className="sm:hidden">✎</span>
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={cn("text-destructive hover:text-destructive text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
+                                        onClick={async () => {
+                                          try {
+                                            const response = await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                              method: "DELETE",
+                                              credentials: "include"
+                                            });
+
+                                            if (response.ok) {
+                                              toast({
+                                                title: "Sucesso",
+                                                description: "Ministro removido da escala"
+                                              });
+                                              await fetchScheduleForDate(selectedDate);
+                                              await fetchSchedules();
+                                            } else {
+                                              throw new Error("Erro ao remover");
+                                            }
+                                          } catch (error) {
+                                            toast({
+                                              title: "Erro",
+                                              description: "Erro ao remover ministro da escala",
+                                              variant: "destructive"
+                                            });
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                                        <span className="hidden sm:inline">Remover</span>
+                                        <span className="sm:hidden">✕</span>
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
