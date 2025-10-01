@@ -59,6 +59,11 @@ const capitalizeFirst = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
+// Helper function to format time from "HH:MM:SS" to "HH:MM"
+const formatMassTime = (time: string) => {
+  return time.substring(0, 5);
+};
+
 interface Schedule {
   id: string;
   title: string;
@@ -1296,7 +1301,7 @@ export default function Schedules() {
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                           <h3 className="font-semibold text-sm sm:text-lg">
-                            Missa das {massTime}
+                            Missa das {formatMassTime(massTime)}
                           </h3>
                         </div>
                         {isCoordinator && (
@@ -1501,11 +1506,15 @@ export default function Schedules() {
                   <SelectValue placeholder="Selecione o horário" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedDate && getMassTimesForDate(selectedDate).map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
+                  {selectedDate && getMassTimesForDate(selectedDate).map((time) => {
+                    // Formatar horário para exibição (remover segundos)
+                    const displayTime = time.substring(0, 5);
+                    return (
+                      <SelectItem key={time} value={time}>
+                        {displayTime}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -1571,7 +1580,7 @@ export default function Schedules() {
                   <strong>
                     {format(new Date(selectedAssignmentForSubstitution.date), "dd 'de' MMMM", { locale: ptBR })}
                   </strong>{" "}
-                  na missa das <strong>{selectedAssignmentForSubstitution.massTime}</strong> como{" "}
+                  na missa das <strong>{formatMassTime(selectedAssignmentForSubstitution.massTime)}</strong> como{" "}
                   <strong>{LITURGICAL_POSITIONS[selectedAssignmentForSubstitution.position]}</strong>.
                 </>
               )}

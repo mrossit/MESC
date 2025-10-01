@@ -38,42 +38,58 @@ export const MASS_TIMES_BY_DAY: string[][] = [
   ["06:30:00"],                          // Tuesday (Terça) - 6h30 exceto novena de outubro
   ["06:30:00"],                          // Wednesday (Quarta) - 6h30 exceto novena de outubro
   ["06:30:00"],                          // Thursday (Quinta) - 6h30 exceto novena de outubro
-  ["06:30:00", "19:00:00"],             // Friday (Sexta) - 6h30 + 19h (Sagrado Coração)
+  ["06:30:00"],                          // Friday (Sexta) - 6h30 apenas (19h só na 1ª sexta)
   ["06:30:00"]                           // Saturday (Sábado) - Apenas 1º sábado (Imaculado Coração)
 ];
 
 // All unique mass times
-export const ALL_MASS_TIMES: string[] = ["06:30:00", "08:00:00", "10:00:00", "19:00:00", "19:30:00"];
+export const ALL_MASS_TIMES: string[] = ["06:30:00", "08:00:00", "10:00:00", "16:00:00", "19:00:00", "19:30:00"];
 
 /**
  * Get mass times for a specific date, considering special rules:
- * - Saturdays: Only first Saturday of month has 6:30 mass (Immaculate Heart of Mary)
- * - October novena (20-27): Weekday morning mass (6:30) replaced by evening mass (19:30)
+ * - First Thursday: Adds 19:30 mass (Cura e Libertação) - all months
+ * - First Friday: Adds 19:00 mass (Sagrado Coração de Jesus) - all months
+ * - First Saturday: 6:30 mass (Imaculado Coração de Maria) - all months
+ * - First Saturday October: Adds 16:00 mass (Preciosas do Pai)
+ * - October novena (20-27): Adds 19:30 (Mon-Fri) and 19:00 (Sat) to regular masses
  */
 export function getMassTimesForDate(date: Date): string[] {
   const dayOfWeek = date.getDay();
   const dayOfMonth = date.getDate();
   const month = date.getMonth() + 1; // 0-indexed, so +1
+  const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
+  const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
 
-  // Saturday special rule: Only first Saturday has mass
+  // October novena (days 20-27): Special schedule - novena masses replace morning masses
+  if (isNovena) {
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+      return ["19:30:00"]; // Only evening novena mass
+    }
+    if (dayOfWeek === 6) { // Saturday
+      return ["19:00:00"]; // Only evening novena mass (different time)
+    }
+  }
+
+  // First Thursday: 6:30 + 19:30 (Cura e Libertação)
+  if (dayOfWeek === 4 && isFirstWeek) {
+    return ["06:30:00", "19:30:00"];
+  }
+
+  // First Friday: only 6:30 (Sagrado Coração - same morning mass)
+  // No additional evening mass on first Friday
+
+  // Saturday special rules
   if (dayOfWeek === 6) {
-    // First Saturday of the month (between day 1-7)
-    if (dayOfMonth >= 1 && dayOfMonth <= 7) {
+    // First Saturday: 6:30 (Imaculado Coração)
+    if (isFirstWeek) {
+      // In October: add 16:00 (Preciosas do Pai)
+      if (month === 10) {
+        return ["06:30:00", "16:00:00"];
+      }
       return ["06:30:00"];
     }
     // Other Saturdays: no mass
     return [];
-  }
-
-  // October novena (days 20-27): Replace 6:30 with 19:30 on weekdays
-  if (month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27) {
-    if (dayOfWeek >= 1 && dayOfWeek <= 4) { // Monday to Thursday
-      return ["19:30:00"];
-    }
-    // Friday during novena: keep 19:00 (Sagrado Coração)
-    if (dayOfWeek === 5) {
-      return ["19:00:00", "19:30:00"];
-    }
   }
 
   // Default schedule by day of week
