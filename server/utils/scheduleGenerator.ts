@@ -374,11 +374,32 @@ export class ScheduleGenerator {
                   canSubstitute = item.answer === 'Sim' || item.answer === true;
                   break;
                 case 'daily_mass_availability':
-                  if (item.answer && item.answer !== 'Não') {
-                    dailyMassAvailability = Array.isArray(item.answer) ? item.answer : [item.answer];
+                  if (item.answer && item.answer !== 'Não posso' && item.answer !== 'Não') {
+                    // 🔧 CORREÇÃO: answer pode ser um objeto com { answer: "Apenas em alguns dias", selectedOptions: [...] }
+                    if (typeof item.answer === 'object' && item.answer.selectedOptions) {
+                      dailyMassAvailability = item.answer.selectedOptions;
+                    } else if (item.answer === 'Sim') {
+                      // "Sim" significa disponível todos os dias da semana
+                      dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                    } else if (Array.isArray(item.answer)) {
+                      dailyMassAvailability = item.answer;
+                    } else if (typeof item.answer === 'string') {
+                      dailyMassAvailability = [item.answer];
+                    }
                   }
                   break;
-                // Eventos especiais
+                // Novena de São Judas (array de dias)
+                case 'saint_judas_novena':
+                  // Array com strings como ["Sexta 23/10 às 19h30", "Terça 20/10 às 19h30"]
+                  if (Array.isArray(item.answer)) {
+                    specialEvents[item.questionId] = item.answer;
+                  } else if (item.answer === 'Nenhum dia') {
+                    specialEvents[item.questionId] = [];
+                  } else {
+                    specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                  }
+                  break;
+                // Eventos especiais (respostas Sim/Não)
                 case 'healing_liberation_mass':
                 case 'sacred_heart_mass':
                 case 'immaculate_heart_mass':
@@ -670,7 +691,30 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Missa Imaculado Coração de Maria (1º sábado): ${dateStr} 06:30 (6 ministros)`);
       }
       
-      // REGRA 6: Missas São Judas (dia 28)
+      // REGRA 6: Novena de São Judas (dias 20-27 de outubro às 19h30)
+      if (month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27) {
+        // Determinar qual dia da novena é
+        const novenaDayNumber = dayOfMonth - 19; // Dia 20 = 1ª novena, dia 27 = 8ª novena
+
+        // Horário depende do dia da semana
+        let novenaTime = '19:30';
+        if (dayOfWeek === 6) { // Sábado (dia 24)
+          novenaTime = '19:00';
+        }
+
+        monthlyTimes.push({
+          id: `novena-sao-judas-${dateStr}`,
+          dayOfWeek,
+          time: novenaTime,
+          date: dateStr,
+          minMinisters: 26,
+          maxMinisters: 26,
+          type: 'missa_sao_judas'
+        });
+        console.log(`[SCHEDULE_GEN] 🙏 Novena São Judas (${novenaDayNumber}º dia): ${dateStr} ${novenaTime} (26 ministros)`);
+      }
+
+      // REGRA 7: Festa de São Judas (dia 28)
       if (dayOfMonth === 28) {
         const stJudeMasses = this.generateStJudeMasses(currentDate);
         monthlyTimes.push(...stJudeMasses);
@@ -977,7 +1021,7 @@ export class ScheduleGenerator {
       }
 
       // VERIFICAÇÃO ESPECÍFICA POR TIPO DE MISSA
-      const isAvailableForType = massTime.type ? this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time) : true;
+      const isAvailableForType = massTime.type ? this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time, massTime.date) : true;
       console.log(`[AVAILABILITY_CHECK] ${minister.name} disponível para tipo ${massTime.type}? ${isAvailableForType}`);
       
       if (massTime.type && !isAvailableForType) {
@@ -1109,7 +1153,7 @@ export class ScheduleGenerator {
    * Verifica se o ministro está disponível para um tipo específico de missa
    * Agora suporta verificação por horário específico para missas de São Judas
    */
-  private isAvailableForSpecialMass(ministerId: string, massType: string, massTime?: string): boolean {
+  private isAvailableForSpecialMass(ministerId: string, massType: string, massTime?: string, massDate?: string): boolean {
     const availability = this.availabilityData.get(ministerId);
     if (!availability) return false;
 
@@ -1130,9 +1174,9 @@ export class ScheduleGenerator {
 
     // Mapear tipos de missa para campos do questionário
     const massTypeMapping: { [key: string]: string } = {
-      'missa_cura_libertacao': 'healing_liberation',
-      'missa_sagrado_coracao': 'sacred_heart',
-      'missa_imaculado_coracao': 'immaculate_heart',
+      'missa_cura_libertacao': 'healing_liberation_mass',
+      'missa_sagrado_coracao': 'sacred_heart_mass',
+      'missa_imaculado_coracao': 'immaculate_heart_mass',
       'missa_sao_judas': 'saint_judas_novena'
     };
 
@@ -1170,7 +1214,35 @@ export class ScheduleGenerator {
     const specialEvents = (availability as any).specialEvents;
     if (specialEvents && typeof specialEvents === 'object') {
       const response = specialEvents[questionKey];
-      // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos
+
+      // 🔧 CORREÇÃO ESPECIAL: Para novena de São Judas, verificar se a data/dia específico está no array
+      if (questionKey === 'saint_judas_novena' && Array.isArray(response)) {
+        // Resposta é array como ["Sexta 23/10 às 19h30", "Terça 20/10 às 19h30"]
+        // Precisamos verificar se a data da missa está nesse array
+        if (massDate) {
+          // Extrair dia do mês da data (ex: "2025-10-23" -> "23")
+          const dayOfMonth = parseInt(massDate.split('-')[2]);
+
+          // Verificar se algum item do array contém esse dia
+          const isAvailable = response.some((day: string) => {
+            // Procurar padrões como "23/10" ou "23"
+            // Usar regex para extrair o dia: \d{1,2}/10
+            const match = day.match(/(\d{1,2})\/10/);
+            if (match) {
+              const responseDay = parseInt(match[1]);
+              return responseDay === dayOfMonth;
+            }
+            return false;
+          });
+
+          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para novena dia ${dayOfMonth}/10: ${isAvailable} (tem: ${response.join(', ')})`);
+          return isAvailable;
+        }
+        // Se não temos data, mas tem respostas, considerar disponível
+        return response.length > 0 && !response.includes('Nenhum dia');
+      }
+
+      // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos para outros eventos
       const isAvailable = response === 'Sim' || response === true;
       // "Não", false, null, undefined = não disponível
       console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
