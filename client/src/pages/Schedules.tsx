@@ -1180,7 +1180,7 @@ export default function Schedules() {
                 (() => {
                   console.log('📋 Rendering assignments:', selectedDateAssignments);
                   const grouped = selectedDateAssignments.reduce((acc, assignment) => {
-                    const massTime = assignment.massTime || assignment.time || 'Sem horário';
+                    const massTime = assignment.massTime || 'Sem horário';
                     if (!acc[massTime]) {
                       acc[massTime] = [];
                     }
