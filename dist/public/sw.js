@@ -1,4 +1,6 @@
-const CACHE_NAME = 'mesc-v4.4-clear-user-cache';
+const VERSION = '5.1.0';
+const BUILD_TIMESTAMP = '__BUILD_TIMESTAMP__'; // Será substituído durante o build
+const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 const urlsToCache = [
   '/',
   '/index.html',
@@ -64,7 +66,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for other resources
+  // Network-first for JS/CSS to always get latest version
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.jsx') || url.pathname.endsWith('.tsx')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // If network fails, try cache as fallback
+          return caches.match(request);
+        })
+    );
+    return;
+  }
+
+  // Cache-first for images and other static resources
   event.respondWith(
     caches.match(request)
       .then((response) => {
