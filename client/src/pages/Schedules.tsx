@@ -51,7 +51,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES } from "@shared/constants";
+import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 
 // Helper function to capitalize first letter of a string
 const capitalizeFirst = (str: string) => {
@@ -164,30 +164,33 @@ export default function Schedules() {
 
   const fetchScheduleForDate = async (date: Date) => {
     setLoadingDateAssignments(true);
+    setSelectedDateAssignments([]); // Reset assignments before loading
+    setIsViewScheduleDialogOpen(true); // Open dialog immediately
+
     try {
       const response = await fetch(`/api/schedules/by-date/${date.toISOString()}`, {
         credentials: "include"
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+        console.log('📅 Schedule data for date:', data);
+
         if (data.assignments && data.assignments.length > 0) {
           setSelectedDateAssignments(data.assignments);
-          setIsViewScheduleDialogOpen(true);
         } else {
-          toast({
-            title: "Informação",
-            description: data.message || "Nenhuma escala publicada para esta data",
-          });
+          // Keep dialog open but show empty state with message
+          setSelectedDateAssignments([]);
         }
       } else {
         const errorData = await response.json();
+        console.error('Error response:', errorData);
         toast({
           title: "Erro",
           description: errorData.message || "Erro ao buscar escala",
           variant: "destructive"
         });
+        setIsViewScheduleDialogOpen(false); // Close on error
       }
     } catch (error) {
       console.error("Error fetching schedule for date:", error);
@@ -196,6 +199,7 @@ export default function Schedules() {
         description: "Erro ao buscar escala para a data",
         variant: "destructive"
       });
+      setIsViewScheduleDialogOpen(false); // Close on error
     } finally {
       setLoadingDateAssignments(false);
     }
@@ -798,8 +802,7 @@ export default function Schedules() {
                   const isSelected = isSameDay(day, selectedDate);
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const substitutionStatus = getUserSubstitutionStatus(day);
-                  const dayOfWeek = day.getDay();
-                  const availableMassTimes = MASS_TIMES_BY_DAY[dayOfWeek];
+                  const availableMassTimes = getMassTimesForDate(day);
                   
                   return (
                     <div
@@ -876,16 +879,16 @@ export default function Schedules() {
                             {isUserScheduled ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 {substitutionStatus === 'pending' ? (
-                                  <UserX className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                                  <UserX className="h-4 w-4 text-red-600 dark:text-red-400 fill-red-400" />
                                 ) : substitutionStatus === 'approved' ? (
-                                  <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                                  <Check className="h-4 w-4 text-green-600 dark:text-green-400 fill-green-400" />
                                 ) : (
-                                  <UserCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                  <Star className="h-4 w-4 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse" />
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
                               <div className="flex items-center justify-center">
-                                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                <Users className="h-3.5 w-3.5 text-primary" />
                               </div>
                             ) : null}
                           </>
@@ -900,29 +903,29 @@ export default function Schedules() {
                               <div className="space-y-0.5">
                                 {substitutionStatus === 'pending' ? (
                                   <div className="flex items-center gap-1">
-                                    <UserX className="h-3.5 w-3.5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                                    <UserX className="h-4 w-4 text-red-600 dark:text-red-400 fill-red-400 flex-shrink-0" />
                                     <span className="text-[10px] font-bold text-red-700 dark:text-red-300 truncate">Aguardando</span>
                                   </div>
                                 ) : substitutionStatus === 'approved' ? (
                                   <div className="flex items-center gap-1">
-                                    <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 fill-green-400 flex-shrink-0" />
                                     <span className="text-[10px] font-bold text-green-700 dark:text-green-300 truncate">Substituído</span>
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1">
-                                    <UserCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                    <Star className="h-4 w-4 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse flex-shrink-0" />
                                     <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 truncate">Escalado</span>
                                   </div>
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
                               <div className="flex items-center gap-1 text-primary">
-                                <Users className="h-3 w-3 flex-shrink-0" />
+                                <Users className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="text-[10px] font-medium truncate">{dayAssignments.length} escalados</span>
                               </div>
-                            ) : (
+                            ) : availableMassTimes.length > 0 ? (
                               <p className="text-[10px] text-muted-foreground truncate">Sem escalas</p>
-                            )}
+                            ) : null}
                           </>)
                         ) : currentSchedule?.status === "draft" && isCoordinator ? (
                           // Rascunho - mostrar horários para coordenador
@@ -1055,8 +1058,7 @@ export default function Schedules() {
                 {getDaysInMonth().map((day) => {
                   const dayAssignments = getAssignmentsForDate(day);
                   const isUserScheduled = isUserScheduledOnDate(day);
-                  const dayOfWeek = day.getDay();
-                  const availableMassTimes = MASS_TIMES_BY_DAY[dayOfWeek];
+                  const availableMassTimes = getMassTimesForDate(day);
                   
                   if (dayAssignments.length === 0 && !isCoordinator) return null;
                   
@@ -1171,18 +1173,23 @@ export default function Schedules() {
               {loadingDateAssignments ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
                 </div>
-              ) : selectedDateAssignments.length > 0 ? (
+              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ?
                 // Agrupar por horário de missa
-                (Object.entries(
-                  selectedDateAssignments.reduce((acc, assignment) => {
-                    if (!acc[assignment.massTime]) {
-                      acc[assignment.massTime] = [];
+                (() => {
+                  console.log('📋 Rendering assignments:', selectedDateAssignments);
+                  const grouped = selectedDateAssignments.reduce((acc, assignment) => {
+                    const massTime = assignment.massTime || assignment.time || 'Sem horário';
+                    if (!acc[massTime]) {
+                      acc[massTime] = [];
                     }
-                    acc[assignment.massTime].push(assignment);
+                    acc[massTime].push(assignment);
                     return acc;
-                  }, {} as Record<string, ScheduleAssignment[]>)
-                )
+                  }, {} as Record<string, ScheduleAssignment[]>);
+                  console.log('📊 Grouped by time:', grouped);
+                  return Object.entries(grouped);
+                })()
                   .sort(([a], [b]) => a.localeCompare(b))
                   .map(([massTime, assignments]) => (
                     <div key={massTime} className="space-y-3">
@@ -1192,16 +1199,16 @@ export default function Schedules() {
                           Missa das {massTime}
                         </h3>
                       </div>
-                      
+
                       <div className="grid gap-2 pl-7">
                         {assignments
                           .sort((a, b) => a.position - b.position)
                           .map((assignment) => {
                             const currentMinister = ministers.find(m => m.id === user?.id);
                             const isCurrentUser = currentMinister && assignment.ministerId === currentMinister.id;
-                            
+
                             return (
-                              <div 
+                              <div
                                 key={assignment.id}
                                 className={cn(
                                   "flex flex-col p-3 rounded-lg border bg-card",
@@ -1224,7 +1231,7 @@ export default function Schedules() {
                                       )}
                                     </div>
                                   </div>
-                                  
+
                                   <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                                     {assignment.confirmed ? (
                                       <div className="flex items-center gap-1 text-green-600">
@@ -1239,7 +1246,7 @@ export default function Schedules() {
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 {isCurrentUser && (
                                   <Button
                                     size="sm"
@@ -1260,8 +1267,8 @@ export default function Schedules() {
                           })}
                       </div>
                     </div>
-                  )))
-              ) : (
+                  ))
+               : (
                 <div className="text-center py-8 text-muted-foreground">
                   <CalendarIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>Nenhuma escala encontrada para esta data</p>
@@ -1296,7 +1303,7 @@ export default function Schedules() {
                   <SelectValue placeholder="Selecione o horário" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedDate && MASS_TIMES_BY_DAY[selectedDate.getDay()].map((time) => (
+                  {selectedDate && getMassTimesForDate(selectedDate).map((time) => (
                     <SelectItem key={time} value={time}>
                       {time}
                     </SelectItem>
