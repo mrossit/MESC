@@ -848,6 +848,15 @@ var init_storage = __esm({
         ];
         return months[month - 1] || "M\xEAs";
       }
+      formatMassTime(time2) {
+        if (!time2) return "";
+        const timeStr = typeof time2 === "string" ? time2 : time2.toString();
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        if (minutes === 0 || minutes === void 0) {
+          return `${hours}h`;
+        }
+        return `${hours}h${String(minutes).padStart(2, "0")}`;
+      }
       async getSchedulesByDate(date2) {
         const dateOnly = date2.split("T")[0];
         const assignments = await db.select({
@@ -861,7 +870,18 @@ var init_storage = __esm({
           notes: schedules.notes,
           ministerName: users.name
         }).from(schedules).leftJoin(users, eq(schedules.ministerId, users.id)).where(eq(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
-        return assignments;
+        return assignments.map((a) => ({
+          id: a.id,
+          date: a.date,
+          massTime: this.formatMassTime(a.time),
+          type: a.type,
+          ministerId: a.ministerId,
+          ministerName: a.ministerName,
+          position: a.position,
+          status: a.status,
+          confirmed: a.status === "approved",
+          notes: a.notes
+        }));
       }
       async getMonthAssignments(month, year) {
         const currentYear = year || (/* @__PURE__ */ new Date()).getFullYear();
@@ -887,7 +907,7 @@ var init_storage = __esm({
           ministerId: a.ministerId,
           ministerName: a.ministerName,
           date: a.date,
-          massTime: a.massTime,
+          massTime: this.formatMassTime(a.massTime),
           position: a.position,
           confirmed: a.status === "approved"
         }));
@@ -7858,7 +7878,19 @@ var vite_config_default = defineConfig({
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true
+    emptyOutDir: true,
+    // Gerar hash nos arquivos para cache busting automático
+    rollupOptions: {
+      output: {
+        // Hash nos nomes dos arquivos JS/CSS
+        entryFileNames: "assets/[name].[hash].js",
+        chunkFileNames: "assets/[name].[hash].js",
+        assetFileNames: "assets/[name].[hash].[ext]"
+      }
+    },
+    // Desabilitar minificação de nomes para facilitar debug (opcional)
+    minify: "terser",
+    sourcemap: false
   },
   server: {
     proxy: {
@@ -7939,11 +7971,34 @@ function serveStatic(app2) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app2.use(express.static(distPath));
+  app2.use("/assets", express.static(path2.join(distPath, "assets"), {
+    maxAge: "1y",
+    // Cache por 1 ano
+    immutable: true
+    // Assets com hash são imutáveis
+  }));
+  app2.use(express.static(distPath, {
+    maxAge: "1d",
+    // 1 dia de cache
+    setHeaders: (res, filepath) => {
+      if (filepath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else if (filepath.endsWith("sw.js")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      }
+    }
+  }));
   app2.use("*", (req, res) => {
     if (req.originalUrl.startsWith("/api/")) {
       return res.status(404).json({ error: "API endpoint not found" });
     }
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path2.resolve(distPath, "index.html"));
   });
 }

@@ -38,10 +38,26 @@ export function ScheduleEditDialog({
   const { toast } = useToast();
 
   // Buscar lista de todos os ministros disponíveis
-  const { data: allMinisters } = useQuery({
+  const { data: allMinisters, isLoading: loadingMinisters, error: ministersError } = useQuery({
     queryKey: ['/api/ministers'],
     enabled: open
   });
+
+  // Debug: log quando os dados de ministros mudarem e mostrar erro se necessário
+  useEffect(() => {
+    if (open) {
+      console.log('[ScheduleEditDialog] Ministers data:', { allMinisters, loadingMinisters, ministersError });
+
+      if (ministersError) {
+        console.error('[ScheduleEditDialog] Error loading ministers:', ministersError);
+        toast({
+          title: "Erro ao carregar ministros",
+          description: ministersError.message || "Não foi possível carregar a lista de ministros.",
+          variant: "destructive"
+        });
+      }
+    }
+  }, [allMinisters, loadingMinisters, ministersError, open, toast]);
 
   useEffect(() => {
     setMinisters(initialMinisters);
@@ -236,13 +252,22 @@ export function ScheduleEditDialog({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="input-search-minister"
+                disabled={loadingMinisters}
               />
-              
+
               <div className="relative rounded-md border backdrop-blur-xl bg-background/80 shadow-lg h-48 overflow-y-auto">
                 <div className="p-2">
-                  {filteredMinisters.length === 0 ? (
+                  {loadingMinisters ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      Nenhum ministro encontrado.
+                      Carregando ministros...
+                    </p>
+                  ) : ministersError ? (
+                    <p className="text-sm text-destructive text-center py-4">
+                      Erro ao carregar ministros: {ministersError.message}
+                    </p>
+                  ) : filteredMinisters.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {searchQuery ? 'Nenhum ministro encontrado.' : 'Digite para buscar um ministro.'}
                     </p>
                   ) : (
                     filteredMinisters.map((minister: any) => (
