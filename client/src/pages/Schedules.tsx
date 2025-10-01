@@ -1479,21 +1479,34 @@ export default function Schedules() {
                                         variant="outline"
                                         className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
                                         onClick={async () => {
-                                          // Abrir diálogo de edição com dados pré-preenchidos
-                                          setSelectedMassTime(assignment.massTime);
-                                          setSelectedPosition(assignment.position);
-                                          setSelectedMinisterId(assignment.ministerId);
-                                          setIsAssignmentDialogOpen(true);
-                                          setIsViewScheduleDialogOpen(false);
-
-                                          // Remover a escalação atual primeiro
                                           try {
-                                            await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                            // Primeiro, deletar a escalação atual
+                                            const deleteResponse = await fetch(`/api/schedule-assignments/${assignment.id}`, {
                                               method: "DELETE",
                                               credentials: "include"
                                             });
+
+                                            if (!deleteResponse.ok) {
+                                              throw new Error("Erro ao remover escalação");
+                                            }
+
+                                            // Atualizar a lista de escalas
+                                            await fetchSchedules();
+                                            await fetchScheduleForDate(selectedDate);
+
+                                            // Depois, abrir diálogo com dados pré-preenchidos
+                                            setSelectedMassTime(assignment.massTime);
+                                            setSelectedPosition(assignment.position);
+                                            setSelectedMinisterId(assignment.ministerId);
+                                            setIsViewScheduleDialogOpen(false);
+                                            setIsAssignmentDialogOpen(true);
                                           } catch (error) {
-                                            console.error("Error removing assignment:", error);
+                                            console.error("Error editing assignment:", error);
+                                            toast({
+                                              title: "Erro",
+                                              description: "Erro ao editar escalação",
+                                              variant: "destructive"
+                                            });
                                           }
                                         }}
                                       >
