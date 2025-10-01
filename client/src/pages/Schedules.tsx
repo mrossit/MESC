@@ -164,13 +164,19 @@ export default function Schedules() {
       const response = await fetch("/api/ministers", {
         credentials: "include"
       });
-      
+
       if (response.ok) {
         const data = await response.json();
+        console.log('📋 Ministers loaded:', data);
         setMinisters(data.filter((m: any) => m.active));
       }
     } catch (error) {
       console.error("Error fetching ministers:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar lista de ministros",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1341,7 +1347,15 @@ export default function Schedules() {
                       return acc;
                     }, {} as Record<string, ScheduleAssignment[]>)
                   )
-                    .sort(([a], [b]) => a.localeCompare(b))
+                    .sort(([a], [b]) => {
+                      // Ordenar por horário correto (converter para minutos)
+                      const timeToMinutes = (time: string) => {
+                        if (time === 'Sem horário') return 9999;
+                        const [hours, minutes] = time.split(':').map(Number);
+                        return hours * 60 + minutes;
+                      };
+                      return timeToMinutes(a) - timeToMinutes(b);
+                    })
                     .map(([massTime, assignments]) => (
                     <div key={massTime} className="space-y-2 sm:space-y-3">
                       <div className="flex items-center justify-between gap-2 pb-2 border-b">
