@@ -922,6 +922,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NOTA: Rota movida para scheduleGenerationRouter em /api/schedules/by-date/:date
+  // Mantida aqui comentada para referência
+  /*
   app.get('/api/schedules/by-date/:date', authenticateToken, async (req, res) => {
     try {
       const date = req.params.date;
@@ -932,6 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch schedules by date" });
     }
   });
+  */
 
   app.get('/api/schedules/:id/assignments', authenticateToken, async (req, res) => {
     try {
