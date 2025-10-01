@@ -1480,19 +1480,41 @@ export default function Schedules() {
                                         className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
                                         onClick={async () => {
                                           try {
+                                            console.log('🔄 Iniciando edição do assignment:', assignment);
+
+                                            // Verificar se o assignment tem um ID válido
+                                            if (!assignment.id || assignment.id === 'temp-' || assignment.id.startsWith('temp-')) {
+                                              console.log('⚠️ Assignment sem ID válido (gerado pela IA), apenas abrindo diálogo');
+                                              // Se não tem ID (foi gerado pela IA), apenas abrir o diálogo
+                                              setSelectedMassTime(assignment.massTime);
+                                              setSelectedPosition(assignment.position);
+                                              setSelectedMinisterId(assignment.ministerId);
+                                              setIsViewScheduleDialogOpen(false);
+                                              setIsAssignmentDialogOpen(true);
+                                              return;
+                                            }
+
                                             // Primeiro, deletar a escalação atual
                                             const deleteResponse = await fetch(`/api/schedule-assignments/${assignment.id}`, {
                                               method: "DELETE",
                                               credentials: "include"
                                             });
 
+                                            console.log('🗑️ Response da deleção:', deleteResponse.status);
+
                                             if (!deleteResponse.ok) {
-                                              throw new Error("Erro ao remover escalação");
+                                              const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
+                                              console.error('❌ Erro ao deletar:', errorData);
+                                              throw new Error(errorData.message || "Erro ao remover escalação");
                                             }
+
+                                            console.log('✅ Escalação removida, atualizando listas...');
 
                                             // Atualizar a lista de escalas
                                             await fetchSchedules();
                                             await fetchScheduleForDate(selectedDate);
+
+                                            console.log('📝 Abrindo diálogo de edição...');
 
                                             // Depois, abrir diálogo com dados pré-preenchidos
                                             setSelectedMassTime(assignment.massTime);
@@ -1500,11 +1522,11 @@ export default function Schedules() {
                                             setSelectedMinisterId(assignment.ministerId);
                                             setIsViewScheduleDialogOpen(false);
                                             setIsAssignmentDialogOpen(true);
-                                          } catch (error) {
-                                            console.error("Error editing assignment:", error);
+                                          } catch (error: any) {
+                                            console.error("❌ Error editing assignment:", error);
                                             toast({
                                               title: "Erro",
-                                              description: "Erro ao editar escalação",
+                                              description: error.message || "Erro ao editar escalação",
                                               variant: "destructive"
                                             });
                                           }
