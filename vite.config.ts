@@ -27,6 +27,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Gerar hash nos arquivos para cache busting automático
+    rollupOptions: {
+      output: {
+        // Hash nos nomes dos arquivos JS/CSS
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
+      },
+    },
+    // Desabilitar minificação de nomes para facilitar debug (opcional)
+    minify: 'terser',
+    sourcemap: false,
   },
   server: {
     proxy: {

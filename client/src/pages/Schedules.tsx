@@ -1228,8 +1228,8 @@ export default function Schedules() {
                                         )}
                                       >
                                         <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2 py-0 sm:py-0.5 flex-shrink-0">
-                                          <span className="hidden sm:inline">{LITURGICAL_POSITIONS[assignment.position] || 'Posição'}</span>
-                                          <span className="sm:hidden">{(LITURGICAL_POSITIONS[assignment.position] || 'Pos').slice(0, 3)}</span>
+                                          <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position] || 'Posição'}</span>
+                                          <span className="sm:hidden">{assignment.position}</span>
                                         </Badge>
                                         <span className={cn("truncate flex-1 min-w-0 text-[11px] sm:text-sm", isCurrentUser && "font-medium")}>
                                           {assignment.ministerName || "Ministro"}
@@ -1322,7 +1322,7 @@ export default function Schedules() {
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <Badge variant={isCurrentUser ? "default" : "secondary"} className="flex-shrink-0">
-                                      {LITURGICAL_POSITIONS[assignment.position]}
+                                      {assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}
                                     </Badge>
                                     <div className="min-w-0 flex-1">
                                       <p className={cn("font-medium truncate", isCurrentUser && "text-amber-900 dark:text-amber-100")}>
