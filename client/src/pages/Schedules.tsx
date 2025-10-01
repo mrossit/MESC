@@ -1081,9 +1081,9 @@ export default function Schedules() {
                           </Badge>
                         )}
                       </h3>
-                      
+
                       <div className="space-y-3 sm:space-y-4">
-                        {availableMassTimes.map((time) => {
+                        {availableMassTimes && availableMassTimes.map((time) => {
                           const timeAssignments = dayAssignments.filter(a => a.massTime === time);
                           
                           return (
@@ -1124,8 +1124,8 @@ export default function Schedules() {
                                         )}
                                       >
                                         <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2 py-0 sm:py-0.5 flex-shrink-0">
-                                          <span className="hidden sm:inline">{LITURGICAL_POSITIONS[assignment.position]}</span>
-                                          <span className="sm:hidden">{LITURGICAL_POSITIONS[assignment.position].slice(0, 3)}</span>
+                                          <span className="hidden sm:inline">{LITURGICAL_POSITIONS[assignment.position] || 'Posição'}</span>
+                                          <span className="sm:hidden">{(LITURGICAL_POSITIONS[assignment.position] || 'Pos').slice(0, 3)}</span>
                                         </Badge>
                                         <span className={cn("truncate flex-1 min-w-0 text-[11px] sm:text-sm", isCurrentUser && "font-medium")}>
                                           {assignment.ministerName || "Ministro"}
