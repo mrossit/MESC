@@ -5,10 +5,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Download, FileText, Table, Image } from "lucide-react";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useState } from "react";
 
 interface ScheduleAssignment {
   id: string;
@@ -24,9 +34,55 @@ interface ScheduleExportProps {
 }
 
 export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
-  const exportToCSV = () => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "text" | "html">("csv");
+  const [selectedMasses, setSelectedMasses] = useState<string[]>([]);
+
+  // Identificar as missas disponíveis no dia
+  const availableMasses = Array.from(new Set(assignments.map(a => a.massTime))).sort();
+  const handleExportClick = (format: "csv" | "text" | "html") => {
+    // Se houver mais de uma missa, abrir diálogo de seleção
+    if (availableMasses.length > 1) {
+      setExportFormat(format);
+      setSelectedMasses(availableMasses); // Selecionar todas por padrão
+      setIsDialogOpen(true);
+    } else {
+      // Se houver apenas uma missa, exportar diretamente
+      performExport(format, assignments);
+    }
+  };
+
+  const toggleMassSelection = (massTime: string) => {
+    setSelectedMasses(prev =>
+      prev.includes(massTime)
+        ? prev.filter(m => m !== massTime)
+        : [...prev, massTime]
+    );
+  };
+
+  const handleConfirmExport = () => {
+    const filteredAssignments = assignments.filter(a => selectedMasses.includes(a.massTime));
+    performExport(exportFormat, filteredAssignments);
+    setIsDialogOpen(false);
+  };
+
+  const performExport = (format: "csv" | "text" | "html", assignmentsToExport: ScheduleAssignment[]) => {
+    switch (format) {
+      case "csv":
+        exportToCSV(assignmentsToExport);
+        break;
+      case "text":
+        exportToText(assignmentsToExport);
+        break;
+      case "html":
+        exportToHTML(assignmentsToExport);
+        break;
+    }
+  };
+
+  const exportToCSV = (assignmentsToExport: ScheduleAssignment[]) => {
     // Agrupar por horário
-    const grouped = assignments.reduce((acc, a) => {
+    const grouped = assignmentsToExport.reduce((acc, a) => {
       if (!acc[a.massTime]) acc[a.massTime] = [];
       acc[a.massTime].push(a);
       return acc;
@@ -57,9 +113,9 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
     document.body.removeChild(link);
   };
 
-  const exportToText = () => {
+  const exportToText = (assignmentsToExport: ScheduleAssignment[]) => {
     // Agrupar por horário
-    const grouped = assignments.reduce((acc, a) => {
+    const grouped = assignmentsToExport.reduce((acc, a) => {
       if (!acc[a.massTime]) acc[a.massTime] = [];
       acc[a.massTime].push(a);
       return acc;
@@ -104,9 +160,9 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
     URL.revokeObjectURL(url);
   };
 
-  const exportToHTML = () => {
+  const exportToHTML = (assignmentsToExport: ScheduleAssignment[]) => {
     // Agrupar por horário
-    const grouped = assignments.reduce((acc, a) => {
+    const grouped = assignmentsToExport.reduce((acc, a) => {
       if (!acc[a.massTime]) acc[a.massTime] = [];
       acc[a.massTime].push(a);
       return acc;
@@ -282,28 +338,88 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">Exportar Escala</span>
-          <span className="sm:hidden">Exportar</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={exportToCSV}>
-          <Table className="mr-2 h-4 w-4" />
-          <span>Exportar como CSV</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportToText}>
-          <FileText className="mr-2 h-4 w-4" />
-          <span>Exportar como Texto</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportToHTML}>
-          <Image className="mr-2 h-4 w-4" />
-          <span>Exportar como HTML (Imprimir)</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Exportar Escala</span>
+            <span className="sm:hidden">Exportar</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => handleExportClick("csv")}>
+            <Table className="mr-2 h-4 w-4" />
+            <span>Exportar como CSV</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExportClick("text")}>
+            <FileText className="mr-2 h-4 w-4" />
+            <span>Exportar como Texto</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExportClick("html")}>
+            <Image className="mr-2 h-4 w-4" />
+            <span>Exportar como HTML (Imprimir)</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Dialog para seleção de missas */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar Missas para Exportar</DialogTitle>
+            <DialogDescription>
+              Escolha quais missas deseja incluir na exportação do dia {format(date, "dd/MM/yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4">
+            {availableMasses.map((massTime) => {
+              const massAssignments = assignments.filter(a => a.massTime === massTime);
+              const confirmedCount = massAssignments.filter(a => a.ministerName !== 'VACANT').length;
+
+              return (
+                <div key={massTime} className="flex items-start space-x-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                  <Checkbox
+                    id={`mass-${massTime}`}
+                    checked={selectedMasses.includes(massTime)}
+                    onCheckedChange={() => toggleMassSelection(massTime)}
+                  />
+                  <div className="flex-1 space-y-1">
+                    <label
+                      htmlFor={`mass-${massTime}`}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      Missa das {massTime}
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      {confirmedCount} ministros escalados
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmExport}
+              disabled={selectedMasses.length === 0}
+              className="w-full sm:w-auto"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar {selectedMasses.length > 0 ? `(${selectedMasses.length})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

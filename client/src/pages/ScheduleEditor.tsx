@@ -107,17 +107,14 @@ export default function ScheduleEditor() {
     fetchScheduleData();
   }, [currentMonth]);
 
-  // Verificar se a escala está publicada e bloquear edição
+  // Avisar quando estiver editando escala publicada
   useEffect(() => {
     if (schedule && schedule.status === "published") {
       toast({
-        title: "Aviso",
-        description: "Escalas publicadas não podem ser editadas. Cancele a publicação primeiro.",
-        variant: "destructive"
+        title: "Atenção",
+        description: "Você está editando uma escala publicada. As alterações serão visíveis para todos os ministros.",
+        variant: "default"
       });
-      setTimeout(() => {
-        window.location.href = "/schedules";
-      }, 2000);
     }
   }, [schedule]);
 
