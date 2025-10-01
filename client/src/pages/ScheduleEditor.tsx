@@ -11,14 +11,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Calendar, Save, Edit, Trash2, Plus, Users, Clock,
   CheckCircle, AlertCircle, ArrowLeft, ArrowRight,
-  RefreshCw, Download, Eye
+  RefreshCw, Download, Eye, X
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, WEEKDAY_NAMES } from '@shared/constants';
+import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, WEEKDAY_NAMES, getMassTimesForDate } from '@shared/constants';
 import { clearEditCache } from '@/lib/cacheManager';
 
 interface ScheduleAssignment {
@@ -65,6 +65,9 @@ export default function ScheduleEditor() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [loading, setLoading] = useState(true);
+  const [showOnlyVacant, setShowOnlyVacant] = useState(false);
+  const [ministerSearch, setMinisterSearch] = useState('');
+  const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
 
   // Função para obter dados da escala
   const fetchScheduleData = async () => {
@@ -85,11 +88,16 @@ export default function ScheduleEditor() {
         }
       }
 
-      // Buscar ministros
+      // Buscar TODOS os ministros (ativos e inativos) para permitir edição completa
       const ministersResponse = await fetch('/api/ministers', { credentials: 'include' });
       if (ministersResponse.ok) {
         const ministersData = await ministersResponse.json();
-        setMinisters(ministersData);
+        // Ordenar por nome
+        const sortedMinisters = ministersData.sort((a: Minister, b: Minister) =>
+          a.user.name.localeCompare(b.user.name)
+        );
+        setMinisters(sortedMinisters);
+        console.log(`📋 Carregados ${sortedMinisters.length} ministros (ativos + inativos)`);
       }
 
     } catch (error) {
@@ -270,11 +278,20 @@ export default function ScheduleEditor() {
                 </Button>
                 <div>
                   <CardTitle>{schedule.title}</CardTitle>
-                  <CardDescription>
+                  <CardDescription className="flex items-center gap-2 flex-wrap">
                     <Badge variant={schedule.status === 'published' ? 'default' : 'secondary'}>
                       {schedule.status === 'published' ? 'Publicada' : 'Rascunho'}
                     </Badge>
-                    {` • ${assignments.length} escalações`}
+                    <span>•</span>
+                    <span>{assignments.length} escalações</span>
+                    {assignments.filter(a => a.ministerName === 'VACANT').length > 0 && (
+                      <>
+                        <span>•</span>
+                        <Badge variant="destructive" className="animate-pulse">
+                          {assignments.filter(a => a.ministerName === 'VACANT').length} vagas
+                        </Badge>
+                      </>
+                    )}
                   </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
@@ -283,6 +300,14 @@ export default function ScheduleEditor() {
               </div>
               
               <div className="flex items-center gap-2">
+                <Button
+                  variant={showOnlyVacant ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyVacant(!showOnlyVacant)}
+                >
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {showOnlyVacant ? 'Mostrar Todos' : 'Apenas Vagas'}
+                </Button>
                 <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
                   <TabsList>
                     <TabsTrigger value="table">Tabela</TabsTrigger>
@@ -319,12 +344,19 @@ export default function ScheduleEditor() {
                   </TableHeader>
                   <TableBody>
                     {getDaysInMonth().map(day => {
-                      const dayOfWeek = getDay(day);
-                      const massTimes = MASS_TIMES_BY_DAY[dayOfWeek];
-                      
+                      const massTimes = getMassTimesForDate(day);
+
+                      // Não renderizar dias sem missas
+                      if (massTimes.length === 0) return null;
+
                       return massTimes.map((time, timeIndex) => {
                         const timeAssignments = getAssignmentsForDateAndTime(day, time);
-                        
+
+                        // Filtrar por VACANT se ativado
+                        if (showOnlyVacant && !timeAssignments.some(a => a.ministerName === 'VACANT')) {
+                          return null;
+                        }
+
                         // Agrupar por posições
                         const auxiliares = timeAssignments.filter(a => a.position <= 2);
                         const recolher = timeAssignments.filter(a => a.position >= 3 && a.position <= 4);
@@ -348,16 +380,19 @@ export default function ScheduleEditor() {
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {auxiliares.map(a => (
-                                  <Badge 
-                                    key={a.id} 
-                                    variant="outline" 
-                                    className="cursor-pointer hover:bg-accent"
+                                  <Badge
+                                    key={a.id}
+                                    variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
+                                    className={cn(
+                                      "cursor-pointer hover:bg-accent transition-all",
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                    )}
                                     onClick={() => {
                                       setEditingAssignment(a);
                                       setIsEditDialogOpen(true);
                                     }}
                                   >
-                                    {a.ministerName}
+                                    {a.ministerName === 'VACANT' ? '⚠️ VAGA' : a.ministerName}
                                   </Badge>
                                 ))}
                               </div>
@@ -365,16 +400,19 @@ export default function ScheduleEditor() {
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {recolher.map(a => (
-                                  <Badge 
-                                    key={a.id} 
-                                    variant="outline" 
-                                    className="cursor-pointer hover:bg-accent"
+                                  <Badge
+                                    key={a.id}
+                                    variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
+                                    className={cn(
+                                      "cursor-pointer hover:bg-accent transition-all",
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                    )}
                                     onClick={() => {
                                       setEditingAssignment(a);
                                       setIsEditDialogOpen(true);
                                     }}
                                   >
-                                    {a.ministerName}
+                                    {a.ministerName === 'VACANT' ? '⚠️ VAGA' : a.ministerName}
                                   </Badge>
                                 ))}
                               </div>
@@ -382,16 +420,19 @@ export default function ScheduleEditor() {
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {velas.map(a => (
-                                  <Badge 
-                                    key={a.id} 
-                                    variant="outline" 
-                                    className="cursor-pointer hover:bg-accent"
+                                  <Badge
+                                    key={a.id}
+                                    variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
+                                    className={cn(
+                                      "cursor-pointer hover:bg-accent transition-all",
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                    )}
                                     onClick={() => {
                                       setEditingAssignment(a);
                                       setIsEditDialogOpen(true);
                                     }}
                                   >
-                                    {a.ministerName}
+                                    {a.ministerName === 'VACANT' ? '⚠️ VAGA' : a.ministerName}
                                   </Badge>
                                 ))}
                               </div>
@@ -399,16 +440,19 @@ export default function ScheduleEditor() {
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {adoracao.map(a => (
-                                  <Badge 
-                                    key={a.id} 
-                                    variant="outline" 
-                                    className="cursor-pointer hover:bg-accent"
+                                  <Badge
+                                    key={a.id}
+                                    variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
+                                    className={cn(
+                                      "cursor-pointer hover:bg-accent transition-all",
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                    )}
                                     onClick={() => {
                                       setEditingAssignment(a);
                                       setIsEditDialogOpen(true);
                                     }}
                                   >
-                                    {a.ministerName}
+                                    {a.ministerName === 'VACANT' ? '⚠️ VAGA' : a.ministerName}
                                   </Badge>
                                 ))}
                               </div>
@@ -416,16 +460,19 @@ export default function ScheduleEditor() {
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {purificar.map(a => (
-                                  <Badge 
-                                    key={a.id} 
-                                    variant="outline" 
-                                    className="cursor-pointer hover:bg-accent"
+                                  <Badge
+                                    key={a.id}
+                                    variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
+                                    className={cn(
+                                      "cursor-pointer hover:bg-accent transition-all",
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                    )}
                                     onClick={() => {
                                       setEditingAssignment(a);
                                       setIsEditDialogOpen(true);
                                     }}
                                   >
-                                    {a.ministerName}
+                                    {a.ministerName === 'VACANT' ? '⚠️ VAGA' : a.ministerName}
                                   </Badge>
                                 ))}
                               </div>
@@ -465,43 +512,171 @@ export default function ScheduleEditor() {
         )}
 
         {/* Dialog para editar escalação */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            // Limpar estados ao fechar
+            setMinisterSearch('');
+            setFilterByPreferredPosition(false);
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Editar Escalação</DialogTitle>
+              <DialogTitle>
+                {editingAssignment?.ministerName === 'VACANT' ? '⚠️ Preencher Vaga' : 'Editar Escalação'}
+              </DialogTitle>
               <DialogDescription>
-                Altere o ministro ou posição desta escalação
+                {editingAssignment && (
+                  <div className="mt-2 space-y-1">
+                    <p>📅 Data: {format(new Date(editingAssignment.date), "dd 'de' MMMM", { locale: ptBR })}</p>
+                    <p>⏰ Horário: {editingAssignment.massTime}</p>
+                    <p>📍 Posição: {LITURGICAL_POSITIONS[editingAssignment.position]}</p>
+                  </div>
+                )}
               </DialogDescription>
             </DialogHeader>
-            
+
             {editingAssignment && (
               <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Ministro</label>
-                  <Select 
-                    value={editingAssignment.ministerId} 
-                    onValueChange={(value) => 
-                      setEditingAssignment({...editingAssignment, ministerId: value})
-                    }
+                {editingAssignment.ministerName === 'VACANT' && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-amber-900 dark:text-amber-100">Vaga Disponível</p>
+                        <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                          Selecione um ministro da lista completa. Use a busca para filtrar.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Ministro</label>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {ministers.filter(m => m.active).length} ativos
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {ministers.length} total
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Barra de pesquisa */}
+                  <div className="relative">
+                    <Input
+                      placeholder="Buscar ministro pelo nome..."
+                      value={ministerSearch}
+                      onChange={(e) => setMinisterSearch(e.target.value)}
+                      className="pr-10"
+                    />
+                    {ministerSearch && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                        onClick={() => setMinisterSearch('')}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Filtros */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={filterByPreferredPosition ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterByPreferredPosition(!filterByPreferredPosition)}
+                      className="text-xs"
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      {filterByPreferredPosition ? 'Todos' : 'Por Preferência'}
+                    </Button>
+                  </div>
+
+                  {/* Seletor de ministro */}
+                  <Select
+                    value={editingAssignment.ministerId}
+                    onValueChange={(value) => {
+                      setEditingAssignment({...editingAssignment, ministerId: value});
+                      setMinisterSearch(''); // Limpar busca ao selecionar
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o ministro" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {ministers.map(minister => (
-                        <SelectItem key={minister.id} value={minister.id}>
-                          {minister.user.name}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-[300px]">
+                      {(() => {
+                        // Filtrar ministros
+                        let filteredMinisters = ministers;
+
+                        // Filtro por busca
+                        if (ministerSearch.trim()) {
+                          filteredMinisters = filteredMinisters.filter(m =>
+                            m.user.name.toLowerCase().includes(ministerSearch.toLowerCase())
+                          );
+                        }
+
+                        // Filtro por posição preferida
+                        if (filterByPreferredPosition && editingAssignment.position) {
+                          filteredMinisters = filteredMinisters.filter(m =>
+                            m.preferredPosition === editingAssignment.position
+                          );
+                        }
+
+                        // Ordenar: ativos primeiro, depois por nome
+                        const sortedFiltered = filteredMinisters.sort((a, b) => {
+                          if (a.active && !b.active) return -1;
+                          if (!a.active && b.active) return 1;
+                          return a.user.name.localeCompare(b.user.name);
+                        });
+
+                        if (sortedFiltered.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                              Nenhum ministro encontrado
+                            </div>
+                          );
+                        }
+
+                        return sortedFiltered.map(minister => (
+                          <SelectItem key={minister.id} value={minister.id}>
+                            <div className="flex items-center gap-2 w-full">
+                              <span className={cn(!minister.active && "text-muted-foreground")}>
+                                {minister.user.name}
+                              </span>
+                              <div className="flex items-center gap-1 ml-auto">
+                                {!minister.active && (
+                                  <Badge variant="outline" className="text-xs bg-slate-100">
+                                    Inativo
+                                  </Badge>
+                                )}
+                                {minister.preferredPosition && (
+                                  <Badge
+                                    variant={minister.preferredPosition === editingAssignment.position ? "default" : "outline"}
+                                    className="text-xs"
+                                  >
+                                    {LITURGICAL_POSITIONS[minister.preferredPosition]}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium">Posição Litúrgica</label>
-                  <Select 
-                    value={editingAssignment.position.toString()} 
-                    onValueChange={(value) => 
+                  <Select
+                    value={editingAssignment.position.toString()}
+                    onValueChange={(value) =>
                       setEditingAssignment({...editingAssignment, position: parseInt(value)})
                     }
                   >
