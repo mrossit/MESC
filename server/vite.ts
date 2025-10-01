@@ -81,7 +81,30 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Servir assets com cache longo (hash nos nomes garante invalidação)
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y', // Cache por 1 ano
+    immutable: true, // Assets com hash são imutáveis
+  }));
+
+  // Servir outros arquivos estáticos com cache moderado
+  app.use(express.static(distPath, {
+    maxAge: '1d', // 1 dia de cache
+    setHeaders: (res, filepath) => {
+      // index.html sem cache (sempre buscar versão mais recente)
+      if (filepath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+      // Service Worker sem cache (sempre buscar versão mais recente)
+      else if (filepath.endsWith('sw.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    }
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (req, res) => {
@@ -89,6 +112,10 @@ export function serveStatic(app: Express) {
     if (req.originalUrl.startsWith('/api/')) {
       return res.status(404).json({ error: 'API endpoint not found' });
     }
+    // index.html sempre sem cache
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
