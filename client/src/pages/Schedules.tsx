@@ -1059,7 +1059,10 @@ export default function Schedules() {
                   const dayAssignments = getAssignmentsForDate(day);
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const availableMassTimes = getMassTimesForDate(day);
-                  
+
+                  // Não renderizar dias sem missas disponíveis
+                  if (availableMassTimes.length === 0) return null;
+
                   if (dayAssignments.length === 0 && !isCoordinator) return null;
                   
                   return (
