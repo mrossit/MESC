@@ -155,26 +155,35 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
 
     // Inserir novas escalas com position
     // Agrupar por date+time para atribuir positions sequenciais
-    const groupedByDateTime: { [key: string]: typeof schedulesToSave } = {};
-    schedulesToSave.forEach(s => {
+    const groupedByDateTime: { [key: string]: Array<typeof schedulesToSave[0] & { _index: number }> } = {};
+    schedulesToSave.forEach((s, idx) => {
       const key = `${s.date}_${s.time}`;
       if (!groupedByDateTime[key]) {
         groupedByDateTime[key] = [];
       }
-      groupedByDateTime[key].push(s);
+      groupedByDateTime[key].push({ ...s, _index: idx });
     });
 
     const schedulesToInsert = schedulesToSave.map((s, globalIndex) => {
       const key = `${s.date}_${s.time}`;
-      const groupIndex = groupedByDateTime[key].indexOf(s);
-      
+      const group = groupedByDateTime[key];
+
+      // Find this schedule's position within its group
+      let positionInGroup = 1;
+      for (let i = 0; i < group.length; i++) {
+        if (group[i]._index === globalIndex) {
+          positionInGroup = i + 1;
+          break;
+        }
+      }
+
       return {
         date: s.date,
         time: s.time,
         type: s.type as any,
         location: s.location || null,
         ministerId: s.ministerId,
-        position: s.position ?? (groupIndex + 1), // Use provided position or calculate from group index
+        position: s.position ?? positionInGroup, // Use provided position or calculated group position
         notes: s.notes || null,
         status: 'scheduled' as const
       };
@@ -587,7 +596,28 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
       .where(eq(schedules.date, dateOnly))
       .orderBy(schedules.time, schedules.position);
 
-    res.json(assignments);
+    // Map assignments to expected format (massTime instead of time)
+    const formattedAssignments = assignments.map(a => ({
+      id: a.id,
+      date: a.date,
+      massTime: a.time, // Frontend expects 'massTime' field
+      type: a.type,
+      ministerId: a.ministerId,
+      position: a.position,
+      status: a.status,
+      notes: a.notes,
+      ministerName: a.ministerName,
+      confirmed: a.status === 'scheduled' // Map status to confirmed boolean
+    }));
+
+    if (formattedAssignments.length === 0) {
+      return res.json({
+        message: "Nenhuma escala publicada para esta data",
+        assignments: []
+      });
+    }
+
+    res.json({ assignments: formattedAssignments });
   } catch (error: any) {
     logger.error('Error fetching schedule by date:', error);
     res.status(500).json({ error: 'Failed to fetch schedule' });
