@@ -410,6 +410,19 @@ export class DatabaseStorage implements IStorage {
     return months[month - 1] || 'Mês';
   }
 
+  private formatMassTime(time: any): string {
+    // Converter do formato HH:mm:ss ou Time object para "HHh" ou "HHhMM"
+    if (!time) return '';
+
+    const timeStr = typeof time === 'string' ? time : time.toString();
+    const [hours, minutes] = timeStr.split(':').map(Number);
+
+    if (minutes === 0 || minutes === undefined) {
+      return `${hours}h`;
+    }
+    return `${hours}h${String(minutes).padStart(2, '0')}`;
+  }
+
   async getSchedulesByDate(date: string): Promise<any[]> {
     // Buscar todas as atribuições para uma data específica
     const dateOnly = date.split('T')[0]; // Extrair apenas a parte da data (YYYY-MM-DD)
@@ -431,7 +444,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schedules.date, dateOnly))
       .orderBy(schedules.time, schedules.position);
 
-    return assignments;
+    // Mapear para o formato esperado pelo frontend
+    return assignments.map(a => ({
+      id: a.id,
+      date: a.date,
+      massTime: this.formatMassTime(a.time),
+      type: a.type,
+      ministerId: a.ministerId,
+      ministerName: a.ministerName,
+      position: a.position,
+      status: a.status,
+      confirmed: a.status === 'approved',
+      notes: a.notes
+    }));
   }
 
   async getMonthAssignments(month?: number, year?: number): Promise<any[]> {
@@ -472,7 +497,7 @@ export class DatabaseStorage implements IStorage {
       ministerId: a.ministerId,
       ministerName: a.ministerName,
       date: a.date,
-      massTime: a.massTime,
+      massTime: this.formatMassTime(a.massTime),
       position: a.position,
       confirmed: a.status === 'approved'
     }));

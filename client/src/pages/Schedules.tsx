@@ -884,7 +884,7 @@ export default function Schedules() {
                       </div>
                       {/* Mini indicadores de missas - mobile simplificado */}
                       <div className="sm:hidden">
-                        {currentSchedule?.status === "published" && (
+                        {currentSchedule?.status === "published" && isSameMonth(day, currentMonth) && (
                           <>
                             {isUserScheduled ? (
                               <div className="flex flex-col items-center gap-0.5">
@@ -898,20 +898,23 @@ export default function Schedules() {
                               </div>
                             ) : dayAssignments.length > 0 ? (
                               (() => {
-                                const totalPositions = availableMassTimes.length * 20;
-                                const filled = dayAssignments.length;
-                                const vacant = totalPositions - filled;
+                                // Total de escalados = todos os assignments (incluindo VACANTES)
+                                const totalAssigned = dayAssignments.length;
+                                // Confirmados = ministros reais (não VACANTES)
+                                const confirmed = dayAssignments.filter(a => a.ministerName !== 'VACANT').length;
+                                // À confirmar = ministros VACANTES
+                                const toConfirm = dayAssignments.filter(a => a.ministerName === 'VACANT').length;
 
                                 return (
                                   <div className="flex flex-col items-center gap-0.5">
                                     <div className="flex items-center gap-0.5">
                                       <Users className="h-3 w-3 text-primary" />
-                                      <span className="text-[9px] font-medium text-primary">{filled}</span>
+                                      <span className="text-[9px] font-medium text-primary">{totalAssigned}</span>
                                     </div>
-                                    {vacant > 0 && (
+                                    {toConfirm > 0 && (
                                       <div className="flex items-center gap-0.5">
                                         <AlertCircle className="h-3 w-3 text-orange-500" />
-                                        <span className="text-[9px] font-medium text-orange-600 dark:text-orange-400">{vacant}</span>
+                                        <span className="text-[9px] font-medium text-orange-600 dark:text-orange-400">{toConfirm}</span>
                                       </div>
                                     )}
                                   </div>
@@ -927,7 +930,7 @@ export default function Schedules() {
                       </div>
                       {/* Mini indicadores de missas - desktop completo */}
                       <div className="hidden sm:block space-y-0.5">
-                        {currentSchedule?.status === "published" ? (
+                        {currentSchedule?.status === "published" && isSameMonth(day, currentMonth) ? (
                           // Escala publicada - mostrar clicável
                           (<>
                             {isUserScheduled ? (
@@ -951,21 +954,23 @@ export default function Schedules() {
                               </div>
                             ) : dayAssignments.length > 0 ? (
                               (() => {
-                                // Calcular total de posições necessárias (20 posições por missa)
-                                const totalPositions = availableMassTimes.length * 20;
-                                const filled = dayAssignments.length;
-                                const vacant = totalPositions - filled;
+                                // Total de escalados = todos os assignments (incluindo VACANTES)
+                                const totalAssigned = dayAssignments.length;
+                                // Confirmados = ministros reais (não VACANTES)
+                                const confirmed = dayAssignments.filter(a => a.ministerName !== 'VACANT').length;
+                                // À confirmar = ministros VACANTES
+                                const toConfirm = dayAssignments.filter(a => a.ministerName === 'VACANT').length;
 
                                 return (
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1 text-primary">
                                       <Users className="h-3.5 w-3.5 flex-shrink-0" />
-                                      <span className="text-[10px] font-medium truncate">{filled} escalados</span>
+                                      <span className="text-[10px] font-medium truncate">{totalAssigned} escalados</span>
                                     </div>
-                                    {vacant > 0 && (
+                                    {toConfirm > 0 && (
                                       <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                                         <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                        <span className="text-[10px] font-medium truncate">{vacant} vagas</span>
+                                        <span className="text-[10px] font-medium truncate">{toConfirm} à confirmar</span>
                                       </div>
                                     )}
                                   </div>
@@ -1015,7 +1020,7 @@ export default function Schedules() {
                     <AlertCircle className="h-4 w-4" />
                     <span>Legenda</span>
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                     {currentSchedule.status === "published" && (
                       <>
                         <div className="flex items-center gap-2 sm:gap-3">
@@ -1151,6 +1156,9 @@ export default function Schedules() {
             <CardContent className="p-2 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {getDaysInMonth().map((day) => {
+                  // Filtrar apenas dias do mês atual
+                  if (!isSameMonth(day, currentMonth)) return null;
+
                   const dayAssignments = getAssignmentsForDate(day);
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const availableMassTimes = getMassTimesForDate(day);
@@ -1158,6 +1166,7 @@ export default function Schedules() {
                   // Não renderizar dias sem missas disponíveis
                   if (availableMassTimes.length === 0) return null;
 
+                  // Se não é coordenador e não tem assignments, não mostrar
                   if (dayAssignments.length === 0 && !isCoordinator) return null;
                   
                   return (
