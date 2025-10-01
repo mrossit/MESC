@@ -1176,21 +1176,19 @@ export default function Schedules() {
                   <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
                 </div>
               ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
-                (() => {
-                  console.log('📋 Rendering assignments:', selectedDateAssignments);
-                  const grouped = selectedDateAssignments.reduce((acc, assignment) => {
-                    const massTime = assignment.massTime || 'Sem horário';
-                    if (!acc[massTime]) {
-                      acc[massTime] = [];
-                    }
-                    acc[massTime].push(assignment);
-                    return acc;
-                  }, {} as Record<string, ScheduleAssignment[]>);
-                  console.log('📊 Grouped by time:', grouped);
-                  return Object.entries(grouped);
-                })()
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([massTime, assignments]) => (
+                <>
+                  {Object.entries(
+                    selectedDateAssignments.reduce((acc, assignment) => {
+                      const massTime = assignment.massTime || 'Sem horário';
+                      if (!acc[massTime]) {
+                        acc[massTime] = [];
+                      }
+                      acc[massTime].push(assignment);
+                      return acc;
+                    }, {} as Record<string, ScheduleAssignment[]>)
+                  )
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([massTime, assignments]) => (
                     <div key={massTime} className="space-y-3">
                       <div className="flex items-center gap-2 pb-2 border-b">
                         <Clock className="h-5 w-5 text-primary" />
@@ -1266,7 +1264,8 @@ export default function Schedules() {
                           })}
                       </div>
                     </div>
-                  ))
+                  ))}
+                </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <CalendarIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
