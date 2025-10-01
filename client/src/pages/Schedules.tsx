@@ -1175,8 +1175,7 @@ export default function Schedules() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
                 </div>
-              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ?
-                // Agrupar por horário de missa
+              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
                 (() => {
                   console.log('📋 Rendering assignments:', selectedDateAssignments);
                   const grouped = selectedDateAssignments.reduce((acc, assignment) => {
@@ -1268,7 +1267,7 @@ export default function Schedules() {
                       </div>
                     </div>
                   ))
-               : (
+              ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <CalendarIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>Nenhuma escala encontrada para esta data</p>
