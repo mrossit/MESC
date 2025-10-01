@@ -1503,9 +1503,14 @@ export default function Schedules() {
                                             console.log('🗑️ Response da deleção:', deleteResponse.status);
 
                                             if (!deleteResponse.ok) {
-                                              const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
-                                              console.error('❌ Erro ao deletar:', errorData);
-                                              throw new Error(errorData.message || "Erro ao remover escalação");
+                                              // Se for 404, o assignment não existe (já foi deletado ou nunca foi salvo)
+                                              if (deleteResponse.status === 404) {
+                                                console.log('⚠️ Assignment não encontrado (404), continuando com edição...');
+                                              } else {
+                                                const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
+                                                console.error('❌ Erro ao deletar:', errorData);
+                                                throw new Error(errorData.message || "Erro ao remover escalação");
+                                              }
                                             }
 
                                             console.log('✅ Escalação removida, atualizando listas...');
