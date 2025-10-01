@@ -893,8 +893,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = req.query.month ? parseInt(req.query.month as string) : undefined;
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
 
-      const schedules = await storage.getSchedulesSummary(month, year);
-      res.json(schedules);
+      const scheduleSummary = await storage.getSchedulesSummary(month, year);
+      const assignments = await storage.getMonthAssignments(month, year);
+      const substitutionsData = await storage.getMonthSubstitutions(month, year);
+
+      res.json({
+        schedules: scheduleSummary,
+        assignments: assignments,
+        substitutions: substitutionsData
+      });
     } catch (error) {
       console.error("Error fetching schedules:", error);
       res.status(500).json({ message: "Failed to fetch schedules" });

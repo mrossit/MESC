@@ -434,6 +434,56 @@ export class DatabaseStorage implements IStorage {
     return assignments;
   }
 
+  async getMonthAssignments(month?: number, year?: number): Promise<any[]> {
+    // Buscar todas as atribuições de um mês específico
+    const currentYear = year || new Date().getFullYear();
+    const currentMonth = month || new Date().getMonth() + 1;
+
+    // Calcular primeiro e último dia do mês
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = month === 12
+      ? `${currentYear + 1}-01-01`
+      : `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+
+    const scheduleId = `schedule-${currentYear}-${currentMonth}`;
+
+    const rawAssignments = await db
+      .select({
+        id: schedules.id,
+        ministerId: schedules.ministerId,
+        ministerName: users.name,
+        date: schedules.date,
+        massTime: schedules.time,
+        position: schedules.position,
+        status: schedules.status
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(and(
+        gte(schedules.date, startDate),
+        lte(schedules.date, endDate)
+      ))
+      .orderBy(schedules.date, schedules.time, schedules.position);
+
+    // Mapear para o formato esperado pelo frontend
+    return rawAssignments.map(a => ({
+      id: a.id,
+      scheduleId,
+      ministerId: a.ministerId,
+      ministerName: a.ministerName,
+      date: a.date,
+      massTime: a.massTime,
+      position: a.position,
+      confirmed: a.status === 'approved'
+    }));
+  }
+
+  async getMonthSubstitutions(month?: number, year?: number): Promise<any[]> {
+    // Por enquanto, retornar array vazio
+    // TODO: Implementar query correta quando houver pedidos de substituição
+    return [];
+  }
+
   async getScheduleById(id: string): Promise<Schedule | undefined> {
     const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
     return schedule;
