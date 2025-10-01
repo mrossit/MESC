@@ -620,18 +620,23 @@ export default function Schedules() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-muted-foreground">Carregando escalas...</div>
-      </div>
-    );
-  }
-
-  const currentSchedule = schedules.find(s => 
-    s.month === currentMonth.getMonth() + 1 && 
+  const currentSchedule = schedules.find(s =>
+    s.month === currentMonth.getMonth() + 1 &&
     s.year === currentMonth.getFullYear()
   );
+
+  if (loading) {
+    return (
+      <Layout
+        title="Escalas Litúrgicas"
+        subtitle="Gerenciar escalas de ministros para as celebrações"
+      >
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-muted-foreground">Carregando escalas...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout 
