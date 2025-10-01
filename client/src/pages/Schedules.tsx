@@ -930,7 +930,7 @@ export default function Schedules() {
                         ) : currentSchedule?.status === "draft" && isCoordinator ? (
                           // Rascunho - mostrar horários para coordenador
                           (<>
-                            {availableMassTimes.slice(0, 3).map((time) => {
+                            {availableMassTimes && availableMassTimes.slice(0, 3).map((time) => {
                               const timeAssignments = dayAssignments.filter(a => a.massTime === time);
                               return (
                                 <div key={time} className="flex items-center gap-1">
@@ -944,7 +944,7 @@ export default function Schedules() {
                                 </div>
                               );
                             })}
-                            {availableMassTimes.length > 3 && (
+                            {availableMassTimes && availableMassTimes.length > 3 && (
                               <span className="text-xs text-muted-foreground">
                                 +{availableMassTimes.length - 3} mais
                               </span>
