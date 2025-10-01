@@ -220,6 +220,8 @@ var init_schema = __esm({
       type: scheduleTypeEnum("type").notNull().default("missa"),
       location: varchar("location", { length: 255 }),
       ministerId: varchar("minister_id").references(() => users.id),
+      position: integer("position").default(0),
+      // Order position for ministers at same date/time
       status: varchar("status", { length: 20 }).notNull().default("scheduled"),
       substituteId: varchar("substitute_id").references(() => users.id),
       notes: text("notes"),
@@ -549,8 +551,6 @@ var init_schema = __esm({
       title: true,
       description: true,
       lessonNumber: true,
-      durationMinutes: true,
-      objectives: true,
       orderIndex: true,
       isActive: true
     });
@@ -641,7 +641,7 @@ __export(storage_exports, {
   DatabaseStorage: () => DatabaseStorage,
   storage: () => storage
 });
-import { eq, and, desc, count, gte, or } from "drizzle-orm";
+import { eq, and, desc, count, sql as sql2, gte, lte, or } from "drizzle-orm";
 import Database2 from "better-sqlite3";
 var DrizzleSQLiteFallback, DatabaseStorage, storage;
 var init_storage = __esm({
@@ -746,20 +746,7 @@ var init_storage = __esm({
         await db.delete(users).where(eq(users.id, id));
       }
       async getAllUsers() {
-        return await DrizzleSQLiteFallback.safeQuery(
-          () => db.select().from(users).orderBy(desc(users.createdAt)),
-          "SELECT * FROM users ORDER BY createdAt DESC",
-          (row) => ({
-            ...row,
-            requiresPasswordChange: !!row.requires_password_change,
-            passwordHash: row.password_hash || row.passwordHash,
-            firstName: row.first_name || row.firstName,
-            lastName: row.last_name || row.lastName,
-            lastLogin: row.last_login ? new Date(row.last_login) : null,
-            createdAt: new Date(row.createdAt),
-            updatedAt: new Date(row.updatedAt)
-          })
-        );
+        return await db.select().from(users).orderBy(desc(users.createdAt));
       }
       async getUsersByRole(role) {
         return await db.select().from(users).where(eq(users.role, role));
@@ -817,6 +804,96 @@ var init_storage = __esm({
       }
       async getSchedules() {
         return await db.select().from(schedules).orderBy(desc(schedules.createdAt));
+      }
+      async getSchedulesSummary(month, year) {
+        const currentYear = year || (/* @__PURE__ */ new Date()).getFullYear();
+        const currentMonth = month || (/* @__PURE__ */ new Date()).getMonth() + 1;
+        const startDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+        const endDate = month === 12 ? `${currentYear + 1}-01-01` : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+        const assignments = await db.select().from(schedules).where(and(
+          gte(schedules.date, startDate),
+          sql2`${schedules.date} < ${endDate}`
+        ));
+        if (assignments.length === 0) {
+          return [];
+        }
+        const summary = {
+          id: `schedule-${currentYear}-${currentMonth}`,
+          title: `Escala de ${this.getMonthName(currentMonth)}/${currentYear}`,
+          month: currentMonth,
+          year: currentYear,
+          status: "published",
+          // Assumir publicada se há atribuições
+          createdBy: "system",
+          createdAt: assignments[0]?.createdAt || /* @__PURE__ */ new Date(),
+          publishedAt: assignments[0]?.createdAt || /* @__PURE__ */ new Date(),
+          totalAssignments: assignments.length
+        };
+        return [summary];
+      }
+      getMonthName(month) {
+        const months = [
+          "Janeiro",
+          "Fevereiro",
+          "Mar\xE7o",
+          "Abril",
+          "Maio",
+          "Junho",
+          "Julho",
+          "Agosto",
+          "Setembro",
+          "Outubro",
+          "Novembro",
+          "Dezembro"
+        ];
+        return months[month - 1] || "M\xEAs";
+      }
+      async getSchedulesByDate(date2) {
+        const dateOnly = date2.split("T")[0];
+        const assignments = await db.select({
+          id: schedules.id,
+          date: schedules.date,
+          time: schedules.time,
+          type: schedules.type,
+          ministerId: schedules.ministerId,
+          position: schedules.position,
+          status: schedules.status,
+          notes: schedules.notes,
+          ministerName: users.name
+        }).from(schedules).leftJoin(users, eq(schedules.ministerId, users.id)).where(eq(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+        return assignments;
+      }
+      async getMonthAssignments(month, year) {
+        const currentYear = year || (/* @__PURE__ */ new Date()).getFullYear();
+        const currentMonth = month || (/* @__PURE__ */ new Date()).getMonth() + 1;
+        const startDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+        const endDate = month === 12 ? `${currentYear + 1}-01-01` : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+        const scheduleId = `schedule-${currentYear}-${currentMonth}`;
+        const rawAssignments = await db.select({
+          id: schedules.id,
+          ministerId: schedules.ministerId,
+          ministerName: users.name,
+          date: schedules.date,
+          massTime: schedules.time,
+          position: schedules.position,
+          status: schedules.status
+        }).from(schedules).leftJoin(users, eq(schedules.ministerId, users.id)).where(and(
+          gte(schedules.date, startDate),
+          lte(schedules.date, endDate)
+        )).orderBy(schedules.date, schedules.time, schedules.position);
+        return rawAssignments.map((a) => ({
+          id: a.id,
+          scheduleId,
+          ministerId: a.ministerId,
+          ministerName: a.ministerName,
+          date: a.date,
+          massTime: a.massTime,
+          position: a.position,
+          confirmed: a.status === "approved"
+        }));
+      }
+      async getMonthSubstitutions(month, year) {
+        return [];
       }
       async getScheduleById(id) {
         const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
@@ -1264,8 +1341,8 @@ __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
   generateAutomaticSchedule: () => generateAutomaticSchedule
 });
-import { eq as eq7, and as and5, or as or5, ne as ne2 } from "drizzle-orm";
-import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2 } from "date-fns";
+import { eq as eq8, and as and6, or as or5, sql as sql3, ne as ne2 } from "drizzle-orm";
+import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday } from "date-fns";
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
   return await generator.generateScheduleForMonth(year, month, isPreview);
@@ -1276,25 +1353,32 @@ var init_scheduleGenerator = __esm({
     "use strict";
     init_logger();
     init_schema();
+    console.log("\u{1F680} [SCHEDULE_GENERATOR] M\xD3DULO CARREGADO - VERS\xC3O COM CORRE\xC7\xD5ES! Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
     ScheduleGenerator = class {
       ministers = [];
       availabilityData = /* @__PURE__ */ new Map();
       massTimes = [];
       db;
+      dailyAssignments = /* @__PURE__ */ new Map();
+      // Rastrear ministros já escalados por dia
       /**
        * Gera escalas automaticamente para um mês específico
        */
       async generateScheduleForMonth(year, month, isPreview = false) {
         const { db: db2 } = await init_db().then(() => db_exports);
         this.db = db2;
+        this.dailyAssignments = /* @__PURE__ */ new Map();
         logger.info(`Iniciando gera\xE7\xE3o ${isPreview ? "de preview" : "definitiva"} de escalas para ${month}/${year}`);
         console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
         console.log(`[SCHEDULE_GEN] Database status:`, { hasDb: !!this.db, nodeEnv: process.env.NODE_ENV });
         try {
+          console.log(`[SCHEDULE_GEN] Step 1: Loading ministers data...`);
           await this.loadMinistersData();
           console.log(`[SCHEDULE_GEN] Ministers loaded: ${this.ministers.length}`);
+          console.log(`[SCHEDULE_GEN] Step 2: Loading availability data...`);
           await this.loadAvailabilityData(year, month, isPreview);
           console.log(`[SCHEDULE_GEN] Availability data loaded: ${this.availabilityData.size} entries`);
+          console.log(`[SCHEDULE_GEN] Step 3: Loading mass times config...`);
           await this.loadMassTimesConfig();
           console.log(`[SCHEDULE_GEN] Mass times config loaded: ${this.massTimes.length} times`);
           const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
@@ -1304,11 +1388,47 @@ var init_scheduleGenerator = __esm({
             const schedule = await this.generateScheduleForMass(massTime);
             generatedSchedules.push(schedule);
           }
+          const incompleteSchedules = generatedSchedules.filter(
+            (s) => s.ministers.length < s.massTime.minMinisters
+          );
+          if (incompleteSchedules.length > 0) {
+            console.log(`
+[SCHEDULE_GEN] \u26A0\uFE0F ATEN\xC7\xC3O: ${incompleteSchedules.length} escalas incompletas detectadas:`);
+            console.log(`[SCHEDULE_GEN] =========================================================`);
+            incompleteSchedules.forEach((s) => {
+              const shortage = s.massTime.minMinisters - s.ministers.length;
+              console.log(`[SCHEDULE_GEN] \u{1F6A8} ${s.massTime.date} ${s.massTime.time} (${s.massTime.type})`);
+              console.log(`[SCHEDULE_GEN]    Ministros: ${s.ministers.length}/${s.massTime.minMinisters} (faltam ${shortage})`);
+              console.log(`[SCHEDULE_GEN]    Confian\xE7a: ${(s.confidence * 100).toFixed(0)}%`);
+            });
+            const byType = incompleteSchedules.reduce((acc, s) => {
+              const type = s.massTime.type || "outros";
+              if (!acc[type]) acc[type] = { count: 0, totalShortage: 0 };
+              acc[type].count++;
+              acc[type].totalShortage += s.massTime.minMinisters - s.ministers.length;
+              return acc;
+            }, {});
+            console.log(`
+[SCHEDULE_GEN] \u{1F4CA} RESUMO POR TIPO DE MISSA:`);
+            Object.entries(byType).forEach(([type, data]) => {
+              console.log(`[SCHEDULE_GEN]    ${type}: ${data.count} escalas incompletas, faltam ${data.totalShortage} ministros no total`);
+            });
+            console.log(`[SCHEDULE_GEN] =========================================================
+`);
+            logger.warn(`${incompleteSchedules.length} escalas incompletas detectadas para ${month}/${year}`);
+          } else {
+            console.log(`[SCHEDULE_GEN] \u2705 Todas as escalas atingiram o n\xFAmero m\xEDnimo de ministros!`);
+          }
           logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year}`);
           return generatedSchedules;
         } catch (error) {
+          console.error(`[SCHEDULE_GEN] \u274C ERRO DETALHADO NO MAIN FUNCTION:`, error);
+          console.error(`[SCHEDULE_GEN] \u274C ERROR TYPE:`, typeof error);
+          console.error(`[SCHEDULE_GEN] \u274C ERROR NAME:`, error?.name);
+          console.error(`[SCHEDULE_GEN] \u274C ERROR MESSAGE:`, error?.message);
+          console.error(`[SCHEDULE_GEN] \u274C ERROR STACK:`, error?.stack);
           logger.error("Erro ao gerar escalas autom\xE1ticas:", error);
-          throw new Error("Falha na gera\xE7\xE3o autom\xE1tica de escalas");
+          throw error;
         }
       }
       /**
@@ -1316,8 +1436,12 @@ var init_scheduleGenerator = __esm({
        */
       async loadMinistersData() {
         if (!this.db) {
-          logger.warn("Database n\xE3o dispon\xEDvel, criando dados mock para preview");
-          console.log("[SCHEDULE_GEN] Creating mock ministers data for preview");
+          const isProduction2 = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1" || !!process.env.REPL_SLUG && !process.env.DATABASE_URL;
+          if (isProduction2) {
+            throw new Error("Banco de dados indispon\xEDvel. N\xE3o \xE9 poss\xEDvel gerar escalas sem dados reais dos ministros.");
+          }
+          logger.warn("Database n\xE3o dispon\xEDvel, criando dados mock para preview em desenvolvimento");
+          console.log("[SCHEDULE_GEN] Creating mock ministers data for development preview only");
           this.ministers = [
             { id: "1", name: "Jo\xE3o Silva", role: "ministro", totalServices: 5, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7 },
             { id: "2", name: "Maria Santos", role: "ministro", totalServices: 3, lastService: null, preferredTimes: ["08:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8 },
@@ -1327,22 +1451,38 @@ var init_scheduleGenerator = __esm({
           ];
           return;
         }
-        const ministersData = await this.db.select({
-          id: users.id,
-          name: users.name,
-          role: users.role,
-          totalServices: users.totalServices,
-          lastService: users.lastService,
-          preferredTimes: users.preferredTimes,
-          canServeAsCouple: users.canServeAsCouple,
-          spouseMinisterId: users.spouseMinisterId
-        }).from(users).where(
-          and5(
-            eq7(users.status, "active"),
-            ne2(users.role, "gestor")
-            // Excluir gestores das escalas
-          )
-        );
+        console.log(`[SCHEDULE_GEN] About to query ministers data...`);
+        let ministersData;
+        try {
+          console.log(`[SCHEDULE_GEN] Tentando query simples first...`);
+          const simpleQuery = await this.db.select({ id: users.id, name: users.name }).from(users).limit(1);
+          console.log(`[SCHEDULE_GEN] Simple query OK, found ${simpleQuery.length} users`);
+          ministersData = await this.db.select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+            totalServices: users.totalServices,
+            lastService: users.lastService,
+            preferredTimes: users.preferredTimes,
+            canServeAsCouple: users.canServeAsCouple,
+            spouseMinisterId: users.spouseMinisterId
+          }).from(users).where(
+            and6(
+              or5(
+                eq8(users.status, "active"),
+                sql3`${users.status} IS NULL`
+                // Incluir usuários com status null
+              ),
+              ne2(users.role, "gestor")
+              // Excluir gestores das escalas
+            )
+          );
+          console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
+        } catch (queryError) {
+          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR:`, queryError);
+          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR STACK:`, queryError.stack);
+          throw new Error(`Erro na consulta de ministros: ${queryError.message || queryError}`);
+        }
         this.ministers = ministersData.map((m) => ({
           ...m,
           totalServices: m.totalServices || 0,
@@ -1358,8 +1498,12 @@ var init_scheduleGenerator = __esm({
        */
       async loadAvailabilityData(year, month, isPreview = false) {
         if (!this.db) {
-          console.log("[SCHEDULE_GEN] Creating mock availability data for preview");
-          logger.warn("Database n\xE3o dispon\xEDvel, criando dados de disponibilidade mock");
+          const isProduction2 = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1" || !!process.env.REPL_SLUG && !process.env.DATABASE_URL;
+          if (isProduction2) {
+            throw new Error("Banco de dados indispon\xEDvel. N\xE3o \xE9 poss\xEDvel gerar escalas sem dados reais de disponibilidade.");
+          }
+          console.log("[SCHEDULE_GEN] Creating mock availability data for development preview only");
+          logger.warn("Database n\xE3o dispon\xEDvel, criando dados de disponibilidade mock apenas para desenvolvimento");
           this.availabilityData.set("1", {
             ministerId: "1",
             availableSundays: ["1", "2", "3", "4"],
@@ -1402,27 +1546,201 @@ var init_scheduleGenerator = __esm({
           });
           return;
         }
-        const allowedStatuses = isPreview ? ["open", "sent", "active"] : ["closed"];
-        const responses = await this.db.select().from(questionnaireResponses).innerJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(
-          and5(
-            eq7(questionnaires.month, month),
-            eq7(questionnaires.year, year),
-            or5(
-              ...allowedStatuses.map((status) => eq7(questionnaires.status, status))
-            )
+        const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
+        const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
+          and6(
+            eq8(questionnaires.month, month),
+            eq8(questionnaires.year, year)
           )
-        );
-        responses.forEach((r) => {
-          this.availabilityData.set(r.questionnaire_responses.userId, {
-            ministerId: r.questionnaire_responses.userId,
-            availableSundays: r.questionnaire_responses.availableSundays || [],
-            preferredMassTimes: r.questionnaire_responses.preferredMassTimes || [],
-            alternativeTimes: r.questionnaire_responses.alternativeTimes || [],
-            canSubstitute: r.questionnaire_responses.canSubstitute || false,
-            dailyMassAvailability: r.questionnaire_responses.dailyMassAvailability || []
-          });
+        ).limit(1);
+        if (!targetQuestionnaire) {
+          console.log(`[SCHEDULE_GEN] Nenhum question\xE1rio encontrado para ${month}/${year}`);
+          return;
+        }
+        console.log(`[SCHEDULE_GEN] Question\xE1rio encontrado: ${targetQuestionnaire.title} (Status: ${targetQuestionnaire.status})`);
+        if (!allowedStatuses.includes(targetQuestionnaire.status)) {
+          console.log(`[SCHEDULE_GEN] Question\xE1rio com status ${targetQuestionnaire.status} n\xE3o permitido para ${isPreview ? "preview" : "gera\xE7\xE3o definitiva"}`);
+          if (!isPreview) {
+            throw new Error(`Question\xE1rio precisa estar fechado para gera\xE7\xE3o definitiva. Status atual: ${targetQuestionnaire.status}`);
+          }
+          return;
+        }
+        const responses = await this.db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
+        responses.forEach((r, index2) => {
+          let availableSundays = [];
+          let preferredMassTimes = [];
+          let alternativeTimes = [];
+          let dailyMassAvailability = [];
+          let canSubstitute = false;
+          let specialEvents = {};
+          if (r.responses) {
+            try {
+              let responsesArray = r.responses;
+              if (typeof responsesArray === "string") {
+                responsesArray = JSON.parse(responsesArray);
+              }
+              if (Array.isArray(responsesArray)) {
+                responsesArray.forEach((item) => {
+                  switch (item.questionId) {
+                    case "available_sundays":
+                      availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                      break;
+                    case "main_service_time":
+                      preferredMassTimes = item.answer ? [item.answer] : [];
+                      break;
+                    case "other_times_available":
+                      if (item.answer && item.answer !== "N\xE3o") {
+                        if (typeof item.answer === "object" && item.answer.selectedOptions) {
+                          alternativeTimes = item.answer.selectedOptions;
+                        } else if (Array.isArray(item.answer)) {
+                          alternativeTimes = item.answer;
+                        } else if (typeof item.answer === "string") {
+                          alternativeTimes = [item.answer];
+                        }
+                      }
+                      break;
+                    case "can_substitute":
+                      canSubstitute = item.answer === "Sim" || item.answer === true;
+                      break;
+                    case "daily_mass_availability":
+                      if (item.answer && item.answer !== "N\xE3o posso" && item.answer !== "N\xE3o") {
+                        if (typeof item.answer === "object" && item.answer.selectedOptions) {
+                          dailyMassAvailability = item.answer.selectedOptions;
+                        } else if (item.answer === "Sim") {
+                          dailyMassAvailability = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+                        } else if (Array.isArray(item.answer)) {
+                          dailyMassAvailability = item.answer;
+                        } else if (typeof item.answer === "string") {
+                          dailyMassAvailability = [item.answer];
+                        }
+                      }
+                      break;
+                    // Novena de São Judas (array de dias)
+                    case "saint_judas_novena":
+                      if (Array.isArray(item.answer)) {
+                        specialEvents[item.questionId] = item.answer;
+                      } else if (item.answer === "Nenhum dia") {
+                        specialEvents[item.questionId] = [];
+                      } else {
+                        specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                      }
+                      break;
+                    // Eventos especiais (respostas Sim/Não)
+                    case "healing_liberation_mass":
+                    case "sacred_heart_mass":
+                    case "immaculate_heart_mass":
+                    case "saint_judas_feast_7h":
+                    case "saint_judas_feast_10h":
+                    case "saint_judas_feast_12h":
+                    case "saint_judas_feast_15h":
+                    case "saint_judas_feast_17h":
+                    case "saint_judas_feast_evening":
+                    case "adoration_monday":
+                      specialEvents[item.questionId] = item.answer;
+                      break;
+                  }
+                });
+              }
+            } catch (e) {
+              console.log(`[SCHEDULE_GEN] \u26A0\uFE0F Erro ao processar responses para usu\xE1rio ${r.userId}:`, e);
+            }
+          }
+          if (!availableSundays.length && r.availableSundays) {
+            availableSundays = typeof r.availableSundays === "string" ? JSON.parse(r.availableSundays) : r.availableSundays;
+          }
+          if (!preferredMassTimes.length && r.preferredMassTimes) {
+            preferredMassTimes = typeof r.preferredMassTimes === "string" ? JSON.parse(r.preferredMassTimes) : r.preferredMassTimes;
+          }
+          const normalizedSundays = this.normalizeSundayFormat(availableSundays, month, year);
+          const normalizedPreferredTimes = this.normalizeTimeFormat(preferredMassTimes);
+          const normalizedAlternativeTimes = this.normalizeTimeFormat(alternativeTimes);
+          const normalizedSpecialEvents = this.normalizeSpecialEvents(specialEvents);
+          const processedData = {
+            ministerId: r.userId,
+            availableSundays: normalizedSundays,
+            preferredMassTimes: normalizedPreferredTimes,
+            alternativeTimes: normalizedAlternativeTimes,
+            canSubstitute,
+            dailyMassAvailability,
+            specialEvents: normalizedSpecialEvents
+          };
+          console.log(`[SCHEDULE_GEN] \u{1F4BE} DADOS PROCESSADOS para ${r.userId}:`, processedData);
+          this.availabilityData.set(r.userId, processedData);
         });
+        console.log(`[SCHEDULE_GEN] \u2705 Carregadas respostas de ${responses.length} ministros no availabilityData`);
+        console.log(`[SCHEDULE_GEN] \u{1F4CA} AvailabilityData size: ${this.availabilityData.size}`);
         logger.info(`Carregadas respostas de ${responses.length} ministros`);
+      }
+      /**
+       * 🔧 NORMALIZAÇÃO: Converte domingos de formato texto para números (1-5)
+       * Exemplos de entrada:
+       *   - "Domingo 05/10" → "1" (se 05/10 for o primeiro domingo)
+       *   - "Domingo (12/10) – Missa em honra à Nossa Senhora Aparecida" → "2"
+       */
+      normalizeSundayFormat(sundays, month, year) {
+        if (!sundays || sundays.length === 0) return [];
+        if (sundays.every((s) => /^[1-5]$/.test(s))) {
+          return sundays;
+        }
+        if (sundays.includes("Nenhum domingo")) {
+          return sundays;
+        }
+        const normalized = [];
+        for (const sunday of sundays) {
+          const dateMatch = sunday.match(/(\d{1,2})\/(\d{1,2})/);
+          if (dateMatch) {
+            const day = parseInt(dateMatch[1]);
+            const monthFromText = parseInt(dateMatch[2]);
+            if (monthFromText === month || monthFromText === 10) {
+              const sundayOfMonth = Math.ceil(day / 7);
+              normalized.push(sundayOfMonth.toString());
+              console.log(`[NORMALIZE] "${sunday}" \u2192 domingo ${sundayOfMonth} do m\xEAs`);
+            }
+          } else {
+            console.log(`[NORMALIZE] \u26A0\uFE0F N\xE3o foi poss\xEDvel normalizar: "${sunday}"`);
+            normalized.push(sunday);
+          }
+        }
+        return normalized;
+      }
+      /**
+       * 🔧 NORMALIZAÇÃO: Padroniza horários para formato "Xh" (8h, 10h, 19h)
+       * Aceita: "8h", "08:00", "8:00", "08h00"
+       */
+      normalizeTimeFormat(times) {
+        if (!times || times.length === 0) return [];
+        return times.map((time2) => {
+          if (typeof time2 !== "string") {
+            console.log(`[NORMALIZE] \u26A0\uFE0F Hor\xE1rio n\xE3o \xE9 string: ${time2} (tipo: ${typeof time2})`);
+            return String(time2);
+          }
+          if (/^\d{1,2}h$/.test(time2)) {
+            return time2;
+          }
+          const hourMatch = time2.match(/^(\d{1,2})/);
+          if (hourMatch) {
+            const hour = parseInt(hourMatch[1]);
+            return `${hour}h`;
+          }
+          return time2;
+        });
+      }
+      /**
+       * 🔧 NORMALIZAÇÃO: Converte valores booleanos em strings para eventos especiais
+       * false → "Não", true → "Sim"
+       */
+      normalizeSpecialEvents(events) {
+        if (!events || typeof events !== "object") return events;
+        const normalized = {};
+        for (const [key, value] of Object.entries(events)) {
+          if (typeof value === "boolean") {
+            normalized[key] = value ? "Sim" : "N\xE3o";
+          } else {
+            normalized[key] = value;
+          }
+        }
+        return normalized;
       }
       /**
        * Carrega configuração dos horários de missa
@@ -1438,7 +1756,7 @@ var init_scheduleGenerator = __esm({
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq7(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq8(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -1448,27 +1766,280 @@ var init_scheduleGenerator = __esm({
         }));
       }
       /**
-       * Gera horários de missa para todas as datas do mês
+       * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
        */
       generateMonthlyMassTimes(year, month) {
         const monthlyTimes = [];
         const startDate = startOfMonth(new Date(year, month - 1));
         const endDate = endOfMonth(new Date(year, month - 1));
+        console.log(`[SCHEDULE_GEN] \u{1F550} Gerando hor\xE1rios para ${month}/${year} com REGRAS ANTI-CONFLITO!`);
         let currentDate = startDate;
         while (currentDate <= endDate) {
           const dayOfWeek = getDay2(currentDate);
-          const dayMassTimes = this.massTimes.filter((mt) => mt.dayOfWeek === dayOfWeek);
-          dayMassTimes.forEach((massTime) => {
+          const dateStr = format2(currentDate, "yyyy-MM-dd");
+          const dayOfMonth = getDate(currentDate);
+          const isDayOfSaintJudas = dayOfMonth === 28;
+          console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING ${dateStr}: dayOfMonth=${dayOfMonth}, isDayOfSaintJudas=${isDayOfSaintJudas}, dayOfWeek=${dayOfWeek}`);
+          if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) {
             monthlyTimes.push({
-              ...massTime,
-              date: format2(currentDate, "yyyy-MM-dd")
+              id: `daily-${dateStr}`,
+              dayOfWeek,
+              time: "06:30",
+              date: dateStr,
+              minMinisters: 5,
+              // AJUSTADO: 5 ministros para missas diárias
+              maxMinisters: 5,
+              // AJUSTADO: Exatamente 5 ministros
+              type: "missa_diaria"
             });
-          });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa di\xE1ria adicionada: ${dateStr} 06:30 (5 ministros)`);
+          } else if (isDayOfSaintJudas) {
+            console.log(`[SCHEDULE_GEN] \u{1F6AB} Dia ${dateStr} \xE9 S\xE3o Judas - SUPRIMINDO missa di\xE1ria`);
+            console.log(`[SCHEDULE_GEN] \u{1F6AB} DEBUG: dayOfWeek=${dayOfWeek}, isDayOfSaintJudas=${isDayOfSaintJudas}`);
+          }
+          if (dayOfWeek === 0) {
+            const sundayConfigs = [
+              { time: "08:00", minMinisters: 15, maxMinisters: 15 },
+              // 15 ministros às 8h
+              { time: "10:00", minMinisters: 20, maxMinisters: 20 },
+              // 20 ministros às 10h
+              { time: "19:00", minMinisters: 20, maxMinisters: 20 }
+              // 20 ministros às 19h
+            ];
+            sundayConfigs.forEach((config) => {
+              monthlyTimes.push({
+                id: `sunday-${dateStr}-${config.time}`,
+                dayOfWeek,
+                time: config.time,
+                date: dateStr,
+                minMinisters: config.minMinisters,
+                maxMinisters: config.maxMinisters,
+                type: "missa_dominical"
+              });
+              console.log(`[SCHEDULE_GEN] \u2705 Missa dominical: ${dateStr} ${config.time} (${config.minMinisters} ministros)`);
+            });
+          }
+          if (isThursday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 4)) {
+            monthlyTimes.push({
+              id: `healing-${dateStr}`,
+              dayOfWeek,
+              time: "19:30",
+              // TODO: Verificar se é feriado para usar 19h
+              date: dateStr,
+              minMinisters: 26,
+              // AJUSTADO: 26 ministros para Cura e Libertação
+              maxMinisters: 26,
+              // AJUSTADO: Exatamente 26 ministros
+              type: "missa_cura_libertacao"
+            });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa Cura e Liberta\xE7\xE3o: ${dateStr} 19:30 (26 ministros)`);
+          }
+          if (isFriday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 5)) {
+            monthlyTimes.push({
+              id: `sacred-heart-${dateStr}`,
+              dayOfWeek,
+              time: "06:30",
+              date: dateStr,
+              minMinisters: 6,
+              // AJUSTADO: 6 ministros para missas especiais às 6h30
+              maxMinisters: 6,
+              // AJUSTADO: Exatamente 6 ministros
+              type: "missa_sagrado_coracao"
+            });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa Sagrado Cora\xE7\xE3o de Jesus (1\xAA sexta): ${dateStr} 06:30 (6 ministros)`);
+          }
+          if (isSaturday(currentDate) && this.isFirstOccurrenceInMonth(currentDate, 6)) {
+            monthlyTimes.push({
+              id: `immaculate-heart-${dateStr}`,
+              dayOfWeek,
+              time: "06:30",
+              date: dateStr,
+              minMinisters: 6,
+              // AJUSTADO: 6 ministros para missas especiais às 6h30
+              maxMinisters: 6,
+              // AJUSTADO: Exatamente 6 ministros
+              type: "missa_imaculado_coracao"
+            });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa Imaculado Cora\xE7\xE3o de Maria (1\xBA s\xE1bado): ${dateStr} 06:30 (6 ministros)`);
+          }
+          if (month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27) {
+            const novenaDayNumber = dayOfMonth - 19;
+            let novenaTime = "19:30";
+            if (dayOfWeek === 6) {
+              novenaTime = "19:00";
+            }
+            monthlyTimes.push({
+              id: `novena-sao-judas-${dateStr}`,
+              dayOfWeek,
+              time: novenaTime,
+              date: dateStr,
+              minMinisters: 26,
+              maxMinisters: 26,
+              type: "missa_sao_judas"
+            });
+            console.log(`[SCHEDULE_GEN] \u{1F64F} Novena S\xE3o Judas (${novenaDayNumber}\xBA dia): ${dateStr} ${novenaTime} (26 ministros)`);
+          }
+          if (dayOfMonth === 28) {
+            const stJudeMasses = this.generateStJudeMasses(currentDate);
+            monthlyTimes.push(...stJudeMasses);
+          }
           currentDate = addDays(currentDate, 1);
         }
-        return monthlyTimes.sort(
+        const filteredTimes = this.resolveTimeConflicts(monthlyTimes);
+        console.log(`[SCHEDULE_GEN] \u2705 Total de ${monthlyTimes.length} hor\xE1rios \u2192 ${filteredTimes.length} ap\xF3s filtro de conflitos!`);
+        return filteredTimes.sort(
           (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)
         );
+      }
+      /**
+       * Resolve conflitos de horário: missa especial substitui missa normal
+       */
+      resolveTimeConflicts(massTimes) {
+        console.log(`[SCHEDULE_GEN] \u{1F527} Resolvendo conflitos entre ${massTimes.length} missas...`);
+        const filteredMasses = massTimes.filter((mass) => {
+          if (mass.date && mass.date.endsWith("-28") && mass.type === "missa_diaria") {
+            console.log(`[SCHEDULE_GEN] \u{1F6AB} REMOVENDO missa di\xE1ria do dia 28: ${mass.date} ${mass.time}`);
+            return false;
+          }
+          return true;
+        });
+        console.log(`[SCHEDULE_GEN] \u{1F4CA} Filtro dia 28: ${massTimes.length} \u2192 ${filteredMasses.length} missas`);
+        const timeSlots = /* @__PURE__ */ new Map();
+        for (const mass of filteredMasses) {
+          const key = `${mass.date}-${mass.time}`;
+          if (!timeSlots.has(key)) {
+            timeSlots.set(key, []);
+          }
+          timeSlots.get(key).push(mass);
+        }
+        const resolvedTimes = [];
+        for (const [key, conflicts] of timeSlots) {
+          if (conflicts.length === 1) {
+            resolvedTimes.push(conflicts[0]);
+          } else {
+            console.log(`[SCHEDULE_GEN] \u26A0\uFE0F CONFLITO em ${key}: ${conflicts.map((m) => m.type).join(" vs ")}`);
+            const priorityOrder = [
+              "missa_sao_judas_festa",
+              "missa_sao_judas",
+              "missa_cura_libertacao",
+              "missa_sagrado_coracao",
+              "missa_imaculado_coracao",
+              "missa_dominical",
+              "missa_diaria"
+            ];
+            let selected = conflicts[0];
+            for (const mass of conflicts) {
+              const currentPriority = priorityOrder.indexOf(mass.type || "missa_diaria");
+              const selectedPriority = priorityOrder.indexOf(selected.type || "missa_diaria");
+              if (currentPriority < selectedPriority) {
+                selected = mass;
+              }
+            }
+            console.log(`[SCHEDULE_GEN] \u2705 RESOLVIDO: ${selected.type} prevaleceu em ${key}`);
+            resolvedTimes.push(selected);
+          }
+        }
+        return resolvedTimes;
+      }
+      /**
+       * Verifica se é a primeira ocorrência do dia da semana no mês
+       */
+      isFirstOccurrenceInMonth(date2, targetDayOfWeek) {
+        const startOfMonthDate = startOfMonth(date2);
+        let firstOccurrence = startOfMonthDate;
+        while (getDay2(firstOccurrence) !== targetDayOfWeek) {
+          firstOccurrence = addDays(firstOccurrence, 1);
+        }
+        return format2(date2, "yyyy-MM-dd") === format2(firstOccurrence, "yyyy-MM-dd");
+      }
+      /**
+       * Gera horários das missas de São Judas (dia 28) com regras complexas
+       */
+      generateStJudeMasses(date2) {
+        const masses = [];
+        const dayOfWeek = getDay2(date2);
+        const dateStr = format2(date2, "yyyy-MM-dd");
+        const month = date2.getMonth() + 1;
+        console.log(`[SCHEDULE_GEN] \u{1F64F} Gerando missas de S\xE3o Judas para ${dateStr} (${dayOfWeek})`);
+        if (month === 10) {
+          const festConfigs = [
+            { time: "07:00", minMinisters: 10, maxMinisters: 10 },
+            { time: "10:00", minMinisters: 15, maxMinisters: 15 },
+            { time: "12:00", minMinisters: 10, maxMinisters: 10 },
+            { time: "15:00", minMinisters: 10, maxMinisters: 10 },
+            { time: "17:00", minMinisters: 10, maxMinisters: 10 },
+            { time: "19:30", minMinisters: 20, maxMinisters: 20 }
+          ];
+          festConfigs.forEach((config) => {
+            masses.push({
+              id: `st-jude-feast-${dateStr}-${config.time}`,
+              dayOfWeek,
+              time: config.time,
+              date: dateStr,
+              minMinisters: config.minMinisters,
+              maxMinisters: config.maxMinisters,
+              type: "missa_sao_judas_festa"
+            });
+            console.log(`[SCHEDULE_GEN] \u{1F64F} Festa S\xE3o Judas: ${dateStr} ${config.time} (${config.minMinisters} ministros)`);
+          });
+        } else {
+          if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            const weekdayConfigs = [
+              { time: "07:00", minMinisters: 8, maxMinisters: 8 },
+              { time: "10:00", minMinisters: 10, maxMinisters: 10 },
+              { time: "19:30", minMinisters: 15, maxMinisters: 15 }
+            ];
+            weekdayConfigs.forEach((config) => {
+              masses.push({
+                id: `st-jude-weekday-${dateStr}-${config.time}`,
+                dayOfWeek,
+                time: config.time,
+                date: dateStr,
+                minMinisters: config.minMinisters,
+                maxMinisters: config.maxMinisters,
+                type: "missa_sao_judas"
+              });
+            });
+          } else if (dayOfWeek === 6) {
+            const saturdayConfigs = [
+              { time: "07:00", minMinisters: 8, maxMinisters: 8 },
+              { time: "10:00", minMinisters: 10, maxMinisters: 10 },
+              { time: "19:00", minMinisters: 15, maxMinisters: 15 }
+            ];
+            saturdayConfigs.forEach((config) => {
+              masses.push({
+                id: `st-jude-saturday-${dateStr}-${config.time}`,
+                dayOfWeek,
+                time: config.time,
+                date: dateStr,
+                minMinisters: config.minMinisters,
+                maxMinisters: config.maxMinisters,
+                type: "missa_sao_judas"
+              });
+            });
+          } else if (dayOfWeek === 0) {
+            const sundayConfigs = [
+              { time: "08:00", minMinisters: 15, maxMinisters: 15 },
+              { time: "10:00", minMinisters: 20, maxMinisters: 20 },
+              { time: "15:00", minMinisters: 15, maxMinisters: 15 },
+              { time: "17:00", minMinisters: 15, maxMinisters: 15 },
+              { time: "19:00", minMinisters: 20, maxMinisters: 20 }
+            ];
+            sundayConfigs.forEach((config) => {
+              masses.push({
+                id: `st-jude-sunday-${dateStr}-${config.time}`,
+                dayOfWeek,
+                time: config.time,
+                date: dateStr,
+                minMinisters: config.minMinisters,
+                maxMinisters: config.maxMinisters,
+                type: "missa_sao_judas"
+              });
+            });
+          }
+        }
+        console.log(`[SCHEDULE_GEN] \u{1F64F} S\xE3o Judas: ${masses.length} missas geradas`);
+        return masses;
       }
       /**
        * Gera escala para uma missa específica
@@ -1482,12 +2053,38 @@ var init_scheduleGenerator = __esm({
         console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
         const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);
         const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
-        return {
+        const dateKey = massTime.date;
+        if (!this.dailyAssignments.has(dateKey)) {
+          this.dailyAssignments.set(dateKey, /* @__PURE__ */ new Set());
+        }
+        const dayAssignments = this.dailyAssignments.get(dateKey);
+        selectedMinisters.forEach((minister) => {
+          if (minister.id) dayAssignments.add(minister.id);
+        });
+        console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros!");
+        const ministersWithPositions = selectedMinisters.map((minister, index2) => {
+          const ministerWithPosition = {
+            ...minister,
+            position: index2 + 1
+            // Atribuir posições sequenciais
+          };
+          console.log(`[SCHEDULE_GEN] \u2705 Ministro ${minister.name} recebeu posi\xE7\xE3o ${index2 + 1}`);
+          return ministerWithPosition;
+        });
+        const backupWithPositions = backupMinisters.map((minister, index2) => ({
+          ...minister,
+          position: selectedMinisters.length + index2 + 1
+        }));
+        console.log("[SCHEDULE_GEN] \u{1F6A8} RETORNANDO RESULTADO COM POSI\xC7\xD5ES! ministersWithPositions:", ministersWithPositions.length);
+        console.log("[SCHEDULE_GEN] \u{1F6A8} Primeiro ministro com posi\xE7\xE3o:", JSON.stringify(ministersWithPositions[0], null, 2));
+        const result = {
           massTime,
-          ministers: selectedMinisters,
-          backupMinisters,
+          ministers: ministersWithPositions,
+          backupMinisters: backupWithPositions,
           confidence
         };
+        console.log("[SCHEDULE_GEN] \u{1F6A8} RESULTADO FINAL:", JSON.stringify(result, null, 2).substring(0, 500));
+        return result;
       }
       /**
        * Filtra ministros disponíveis para uma missa específica
@@ -1495,27 +2092,197 @@ var init_scheduleGenerator = __esm({
       getAvailableMinistersForMass(massTime) {
         const dayName = this.getDayName(massTime.dayOfWeek);
         const dateStr = format2(new Date(massTime.date), "dd/MM");
-        return this.ministers.filter((minister) => {
+        const hour = parseInt(massTime.time.substring(0, 2));
+        const timeStr = hour + "h";
+        console.log(`
+[AVAILABILITY_CHECK] \u{1F50D} ========================================`);
+        console.log(`[AVAILABILITY_CHECK] Verificando disponibilidade para:`);
+        console.log(`[AVAILABILITY_CHECK]   Data: ${massTime.date}`);
+        console.log(`[AVAILABILITY_CHECK]   Hora: ${massTime.time}`);
+        console.log(`[AVAILABILITY_CHECK]   Tipo: ${massTime.type}`);
+        console.log(`[AVAILABILITY_CHECK]   Dia da semana: ${dayName} (${massTime.dayOfWeek})`);
+        console.log(`[AVAILABILITY_CHECK] \u{1F4CA} Total ministros: ${this.ministers.length}, AvailabilityData size: ${this.availabilityData.size}`);
+        const availableList = this.ministers.filter((minister) => {
+          if (!minister.id) return false;
           const availability = this.availabilityData.get(minister.id);
+          console.log(`[AVAILABILITY_CHECK] \u{1F464} Verificando ${minister.name} (${minister.id})`);
+          console.log(`[AVAILABILITY_CHECK] \u{1F4CB} Dados de disponibilidade:`, availability);
           if (!availability) {
-            logger.debug(`Sem dados de disponibilidade para ministro ${minister.name} - incluindo no preview`);
-            return true;
+            if (this.availabilityData.size === 0) {
+              console.log(`[AVAILABILITY_CHECK] \u2705 Modo preview: incluindo ${minister.name} sem dados de disponibilidade`);
+              logger.debug(`Modo preview: incluindo ${minister.name} sem dados de disponibilidade`);
+              return true;
+            }
+            console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} n\xE3o respondeu ao question\xE1rio - excluindo`);
+            logger.debug(`${minister.name} n\xE3o respondeu ao question\xE1rio - excluindo`);
+            return false;
+          }
+          const isAvailableForType = massTime.type ? this.isAvailableForSpecialMass(minister.id, massTime.type, massTime.time, massTime.date) : true;
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} dispon\xEDvel para tipo ${massTime.type}? ${isAvailableForType}`);
+          if (massTime.type && !isAvailableForType) {
+            console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} REJEITADO por tipo de missa`);
+            return false;
           }
           if (massTime.dayOfWeek === 0) {
-            const sundayStr = `Domingo ${dateStr}`;
-            if (availability.availableSundays.includes("Nenhum domingo")) {
+            const date2 = new Date(massTime.date);
+            const dayOfMonth = date2.getDate();
+            const sundayOfMonth = Math.ceil(dayOfMonth / 7);
+            console.log(`[AVAILABILITY_CHECK] Domingo ${sundayOfMonth} do m\xEAs (${massTime.date})`);
+            if (availability.availableSundays?.includes("Nenhum domingo")) {
+              logger.debug(`${minister.name} marcou "Nenhum domingo" - excluindo`);
               return false;
             }
-            if (availability.availableSundays.length > 0) {
-              return availability.availableSundays.includes(sundayStr);
+            let availableForSunday = false;
+            if (availability.availableSundays && availability.availableSundays.length > 0) {
+              availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} dispon\xEDvel nos domingos: ${availability.availableSundays.join(", ")}`);
+              console.log(`[AVAILABILITY_CHECK] Verificando domingo ${sundayOfMonth}: ${availableForSunday ? "\u2705 SIM" : "\u274C N\xC3O"}`);
+              if (!availableForSunday) {
+                const possibleFormats = [
+                  `Domingo ${dateStr}`,
+                  // "Domingo 05/10"
+                  dateStr,
+                  // "05/10"
+                  `${dateStr.split("/")[0]}/10`,
+                  // "05/10" para outubro
+                  parseInt(dateStr.split("/")[0]).toString()
+                  // "5" ao invés de "05"
+                ];
+                for (const format4 of possibleFormats) {
+                  if (availability.availableSundays.some(
+                    (sunday) => sunday.includes(format4) || sunday === format4
+                  )) {
+                    availableForSunday = true;
+                    break;
+                  }
+                }
+              }
             }
+            if (!availableForSunday) {
+              if (availability.preferredMassTimes?.includes(timeStr)) {
+                logger.debug(`${minister.name} tem prefer\xEAncia pelo hor\xE1rio ${timeStr}, considerando dispon\xEDvel`);
+                return true;
+              }
+              return false;
+            }
+            if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
+              const hasPreferredTime = availability.preferredMassTimes.some((time2) => {
+                const timeValue = String(time2);
+                return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
+              });
+              const hasAlternativeTime = availability.alternativeTimes?.some((time2) => {
+                const timeValue = String(time2);
+                return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
+              });
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Hor\xE1rios preferidos: ${availability.preferredMassTimes.join(", ")}`);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Hor\xE1rios alternativos: ${availability.alternativeTimes?.join(", ") || "nenhum"}`);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time} (${timeStr}): preferido=${hasPreferredTime}, alternativo=${hasAlternativeTime}`);
+              if (!hasPreferredTime && !hasAlternativeTime) {
+                logger.debug(`${minister.name} dispon\xEDvel mas sem prefer\xEAncia para ${timeStr}`);
+              }
+            }
+            console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} DISPON\xCDVEL para domingo ${massTime.date} ${massTime.time}`);
             return true;
           }
-          if (availability.dailyMassAvailability.length > 0) {
-            return availability.dailyMassAvailability.includes(dayName);
+          if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
+            console.log(`[AVAILABILITY_CHECK] Verificando dia espec\xEDfico para ${minister.name}`);
+            console.log(`[AVAILABILITY_CHECK]   dailyMassAvailability: ${JSON.stringify(availability.dailyMassAvailability)}`);
+            console.log(`[AVAILABILITY_CHECK]   Procurando por: "${dayName}"`);
+            if (availability.dailyMassAvailability?.includes("N\xE3o posso")) {
+              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} marcou "N\xE3o posso"`);
+              return false;
+            }
+            if (availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0) {
+              const isAvailable = availability.dailyMassAvailability.includes(dayName);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailable ? "\u2705 DISPON\xCDVEL" : "\u274C N\xC3O dispon\xEDvel"} para ${dayName}`);
+              return isAvailable;
+            }
+            console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} sem dados de disponibilidade di\xE1ria`);
+            return false;
           }
+          console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} dispon\xEDvel (outros casos)`);
           return true;
         });
+        console.log(`
+[AVAILABILITY_CHECK] \u{1F4CB} RESULTADO: ${availableList.length} ministros dispon\xEDveis de ${this.ministers.length} total`);
+        if (availableList.length > 0) {
+          console.log(`[AVAILABILITY_CHECK] Ministros dispon\xEDveis: ${availableList.map((m) => m.name).join(", ")}`);
+        }
+        console.log(`[AVAILABILITY_CHECK] ========================================
+`);
+        return availableList;
+      }
+      /**
+       * Verifica se o ministro está disponível para um tipo específico de missa
+       * Agora suporta verificação por horário específico para missas de São Judas
+       */
+      isAvailableForSpecialMass(ministerId, massType, massTime, massDate) {
+        const availability = this.availabilityData.get(ministerId);
+        if (!availability) return false;
+        if (massType === "missa_diaria") {
+          if (availability.dailyMassAvailability?.includes("N\xE3o posso")) {
+            console.log(`[SCHEDULE_GEN] ${ministerId} marcou "N\xE3o posso" para missas di\xE1rias`);
+            return false;
+          }
+          const hasAnyDailyAvailability = availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0;
+          console.log(`[SCHEDULE_GEN] ${ministerId} tem disponibilidade di\xE1ria: ${hasAnyDailyAvailability}`);
+          return hasAnyDailyAvailability;
+        }
+        const massTypeMapping = {
+          "missa_cura_libertacao": "healing_liberation_mass",
+          "missa_sagrado_coracao": "sacred_heart_mass",
+          "missa_imaculado_coracao": "immaculate_heart_mass",
+          "missa_sao_judas": "saint_judas_novena"
+        };
+        if (massType === "missa_sao_judas_festa" && massTime) {
+          const timeToQuestionKey = {
+            "07:00": "saint_judas_feast_7h",
+            "10:00": "saint_judas_feast_10h",
+            "12:00": "saint_judas_feast_12h",
+            "15:00": "saint_judas_feast_15h",
+            "17:00": "saint_judas_feast_17h",
+            "19:30": "saint_judas_feast_evening"
+          };
+          const questionKey2 = timeToQuestionKey[massTime];
+          if (questionKey2) {
+            const specialEvents2 = availability.specialEvents;
+            if (specialEvents2 && typeof specialEvents2 === "object") {
+              const response = specialEvents2[questionKey2];
+              const isAvailable = response === "Sim" || response === true;
+              console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (${questionKey2}): ${response} = ${isAvailable}`);
+              return isAvailable;
+            }
+          }
+        }
+        const questionKey = massTypeMapping[massType];
+        if (!questionKey) {
+          return true;
+        }
+        const specialEvents = availability.specialEvents;
+        if (specialEvents && typeof specialEvents === "object") {
+          const response = specialEvents[questionKey];
+          if (questionKey === "saint_judas_novena" && Array.isArray(response)) {
+            if (massDate) {
+              const dayOfMonth = parseInt(massDate.split("-")[2]);
+              const isAvailable2 = response.some((day) => {
+                const match = day.match(/(\d{1,2})\/10/);
+                if (match) {
+                  const responseDay = parseInt(match[1]);
+                  return responseDay === dayOfMonth;
+                }
+                return false;
+              });
+              console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para novena dia ${dayOfMonth}/10: ${isAvailable2} (tem: ${response.join(", ")})`);
+              return isAvailable2;
+            }
+            return response.length > 0 && !response.includes("Nenhum dia");
+          }
+          const isAvailable = response === "Sim" || response === true;
+          console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
+          return isAvailable;
+        }
+        console.log(`[SCHEDULE_GEN] \u2139\uFE0F Usando disponibilidade geral para ${massType}`);
+        return false;
       }
       /**
        * Seleciona ministros ideais usando algoritmo de pontuação
@@ -1526,15 +2293,24 @@ var init_scheduleGenerator = __esm({
           score: this.calculateMinisterScore(minister, massTime)
         }));
         scoredMinisters.sort((a, b) => b.score - a.score);
+        const targetCount = massTime.minMinisters;
+        const availableCount = available.length;
+        if (availableCount < targetCount) {
+          logger.warn(`\u26A0\uFE0F ATEN\xC7\xC3O: Apenas ${availableCount} ministros dispon\xEDveis para ${massTime.date} ${massTime.time} (${massTime.type}), mas s\xE3o necess\xE1rios ${targetCount}`);
+          console.log(`[SCHEDULE_GEN] \u26A0\uFE0F INSUFICIENTE: ${availableCount}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
+        } else {
+          logger.info(`[SCHEDULE_GEN] \u2705 Selecionando ${targetCount} de ${availableCount} ministros dispon\xEDveis para ${massTime.date} ${massTime.time}`);
+        }
         const selected = [];
         const used = /* @__PURE__ */ new Set();
         for (const { minister } of scoredMinisters) {
-          if (used.has(minister.id) || selected.length >= massTime.maxMinisters) {
-            continue;
+          if (!minister.id) continue;
+          if (used.has(minister.id) || selected.length >= targetCount) {
+            break;
           }
           if (minister.canServeAsCouple && minister.spouseMinisterId) {
             const spouse = available.find((m) => m.id === minister.spouseMinisterId);
-            if (spouse && !used.has(spouse.id) && selected.length + 1 < massTime.maxMinisters) {
+            if (spouse && spouse.id && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
               selected.push(minister, spouse);
               used.add(minister.id);
               used.add(spouse.id);
@@ -1544,18 +2320,33 @@ var init_scheduleGenerator = __esm({
           }
           selected.push(minister);
           used.add(minister.id);
-          if (selected.length >= massTime.minMinisters && selected.length >= 4) {
-            break;
-          }
         }
+        if (selected.length < targetCount) {
+          logger.warn(`\u26A0\uFE0F [SCHEDULE_GEN] ESCALA INCOMPLETA: Apenas ${selected.length}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
+          for (const { minister } of scoredMinisters) {
+            if (!minister.id) continue;
+            if (!used.has(minister.id) && selected.length < targetCount) {
+              selected.push(minister);
+              used.add(minister.id);
+            }
+            if (selected.length >= targetCount) break;
+          }
+          console.log(`[SCHEDULE_GEN] \u{1F6A8} MARCANDO ESCALA COMO INCOMPLETA: ${selected.length}/${targetCount} ministros`);
+          selected.forEach((m) => {
+            m.scheduleIncomplete = true;
+            m.requiredCount = targetCount;
+            m.actualCount = selected.length;
+          });
+        }
+        logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length}/${targetCount} ministros para ${massTime.date} ${massTime.time}`);
         return selected;
       }
       /**
        * Seleciona ministros de backup
        */
       selectBackupMinisters(available, selected, count5) {
-        const selectedIds = new Set(selected.map((m) => m.id));
-        const backup = available.filter((m) => !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count5);
+        const selectedIds = new Set(selected.map((m) => m.id).filter((id) => id !== null));
+        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count5);
         return backup;
       }
       /**
@@ -1574,15 +2365,27 @@ var init_scheduleGenerator = __esm({
         } else {
           score += 0.3;
         }
-        if (massTime) {
-          const availability2 = this.availabilityData.get(minister.id);
-          if (availability2?.preferredMassTimes.includes(`${massTime.time.substring(0, 2)}h`)) {
-            score += 0.2;
+        if (massTime && minister.id) {
+          const availability = this.availabilityData.get(minister.id);
+          const timeHour = `${massTime.time.substring(0, 2)}h`;
+          if (availability?.preferredMassTimes.includes(timeHour)) {
+            score += 0.5;
+          } else if (availability?.preferredMassTimes && availability.preferredMassTimes.length > 0) {
+            score -= 0.3;
           }
         }
-        const availability = this.availabilityData.get(minister.id);
-        if (availability?.canSubstitute) {
-          score += 0.1;
+        if (minister.id) {
+          const availability = this.availabilityData.get(minister.id);
+          if (availability?.canSubstitute) {
+            score += 0.1;
+          }
+        }
+        if (massTime && massTime.date && minister.id) {
+          const dayAssignments = this.dailyAssignments.get(massTime.date);
+          if (dayAssignments && dayAssignments.has(minister.id)) {
+            score -= 0.8;
+            console.log(`[SCHEDULE_GEN] \u26A0\uFE0F Penalidade aplicada a ${minister.name} - j\xE1 escalado hoje (${massTime.date})`);
+          }
         }
         return score;
       }
@@ -1591,16 +2394,25 @@ var init_scheduleGenerator = __esm({
        */
       calculateScheduleConfidence(ministers, massTime) {
         let confidence = 0;
-        if (ministers.length >= massTime.minMinisters) {
-          confidence += 0.5;
-          if (ministers.length >= massTime.minMinisters + 1) {
-            confidence += 0.1;
+        const fillRate = ministers.length / massTime.minMinisters;
+        if (fillRate >= 1) {
+          confidence += 0.6;
+          if (ministers.length > massTime.minMinisters) {
+            confidence += 0.05;
           }
+        } else {
+          confidence += fillRate * 0.3;
+          console.log(`[CONFIDENCE] \u26A0\uFE0F Escala incompleta: ${ministers.length}/${massTime.minMinisters} (${(fillRate * 100).toFixed(0)}%)`);
         }
-        const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
-        confidence += Math.min(avgScore / 10, 0.3);
+        if (ministers.length > 0) {
+          const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
+          confidence += Math.min(avgScore / 10, 0.25);
+        }
         const serviceVariance = this.calculateServiceVariance(ministers);
-        confidence += Math.max(0, 0.2 - serviceVariance / 100);
+        confidence += Math.max(0, 0.15 - serviceVariance / 100);
+        if (fillRate < 1) {
+          confidence = Math.min(confidence, 0.5);
+        }
         return Math.min(confidence, 1);
       }
       /**
@@ -3536,7 +4348,297 @@ await init_db();
 init_schema();
 import { Router as Router4 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq6, and as and4, or as or4 } from "drizzle-orm";
+import { eq as eq7, and as and5, or as or4 } from "drizzle-orm";
+
+// server/utils/csvExporter.ts
+await init_db();
+init_schema();
+import { eq as eq6, and as and4 } from "drizzle-orm";
+function convertResponsesToCSV(data) {
+  if (data.length === 0) {
+    return "Sem dados para exportar";
+  }
+  const allQuestions = /* @__PURE__ */ new Set();
+  data.forEach((entry) => {
+    entry.responses.forEach((response) => {
+      allQuestions.add(response.questionId);
+    });
+  });
+  const headers = [
+    "ID do Ministro",
+    "Nome do Ministro",
+    "Email do Ministro",
+    "T\xEDtulo do Question\xE1rio",
+    "Data de Envio",
+    ...Array.from(allQuestions)
+  ];
+  const rows = data.map((entry) => {
+    const responseMap = new Map(
+      entry.responses.map((r) => [r.questionId, formatAnswer(r.answer, r.questionType)])
+    );
+    return [
+      entry.ministerId,
+      entry.ministerName,
+      entry.ministerEmail,
+      entry.questionnaireTitle,
+      entry.submittedAt ? new Date(entry.submittedAt).toLocaleString("pt-BR") : "N\xE3o enviado",
+      ...Array.from(allQuestions).map((questionId) => responseMap.get(questionId) || "")
+    ];
+  });
+  const csvContent = [
+    headers.map(escapeCSVField).join(","),
+    ...rows.map((row) => row.map(escapeCSVField).join(","))
+  ].join("\n");
+  return "\uFEFF" + csvContent;
+}
+function createDetailedCSV(data) {
+  if (data.length === 0) {
+    return "Sem dados para exportar";
+  }
+  const questionMap = /* @__PURE__ */ new Map();
+  data.forEach((entry) => {
+    entry.responses.forEach((response) => {
+      if (!questionMap.has(response.questionId)) {
+        questionMap.set(response.questionId, response.questionText);
+      }
+    });
+  });
+  const headers = [
+    "Nome do Ministro",
+    "Email",
+    "Data de Envio",
+    ...Array.from(questionMap.values())
+  ];
+  const rows = data.map((entry) => {
+    const responseMap = new Map(
+      entry.responses.map((r) => [r.questionId, formatAnswer(r.answer, r.questionType)])
+    );
+    return [
+      entry.ministerName,
+      entry.ministerEmail,
+      entry.submittedAt ? new Date(entry.submittedAt).toLocaleString("pt-BR") : "N\xE3o enviado",
+      ...Array.from(questionMap.keys()).map((questionId) => responseMap.get(questionId) || "N\xE3o respondido")
+    ];
+  });
+  const csvContent = [
+    headers.map(escapeCSVField).join(","),
+    ...rows.map((row) => row.map(escapeCSVField).join(","))
+  ].join("\n");
+  return "\uFEFF" + csvContent;
+}
+function formatAnswer(answer, questionType) {
+  if (answer === null || answer === void 0) {
+    return "";
+  }
+  switch (questionType) {
+    case "multiple_choice":
+    case "checkbox":
+      if (Array.isArray(answer)) {
+        return answer.join("; ");
+      }
+      return String(answer);
+    case "yes_no":
+      return answer === true ? "Sim" : answer === false ? "N\xE3o" : String(answer);
+    case "yes_no_with_options":
+      if (typeof answer === "object" && answer !== null) {
+        const mainAnswer = answer.answer === "Sim" ? "Sim" : "N\xE3o";
+        if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
+          return `${mainAnswer}: ${answer.selectedOptions.join("; ")}`;
+        }
+        return mainAnswer;
+      }
+      return String(answer);
+    case "text":
+    case "textarea":
+    default:
+      return String(answer);
+  }
+}
+function escapeCSVField(field) {
+  const str = String(field);
+  if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+async function getQuestionnaireResponsesForExport(questionnaireId) {
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  const [questionnaire] = await db.select().from(questionnaires).where(eq6(questionnaires.id, questionnaireId)).limit(1);
+  if (!questionnaire) {
+    throw new Error("Questionnaire not found");
+  }
+  const responsesWithUsers = await db.select({
+    response: questionnaireResponses,
+    user: users
+  }).from(questionnaireResponses).innerJoin(users, eq6(questionnaireResponses.userId, users.id)).where(eq6(questionnaireResponses.questionnaireId, questionnaireId));
+  const exportData = responsesWithUsers.map(({ response, user }) => {
+    const formattedResponses = [];
+    if (response.availableSundays && response.availableSundays.length > 0) {
+      formattedResponses.push({
+        questionId: "available_sundays",
+        questionText: "Domingos Dispon\xEDveis",
+        questionType: "checkbox",
+        answer: response.availableSundays
+      });
+    }
+    if (response.preferredMassTimes && response.preferredMassTimes.length > 0) {
+      formattedResponses.push({
+        questionId: "preferred_mass_times",
+        questionText: "Hor\xE1rios Preferidos",
+        questionType: "checkbox",
+        answer: response.preferredMassTimes
+      });
+    }
+    if (response.alternativeTimes && response.alternativeTimes.length > 0) {
+      formattedResponses.push({
+        questionId: "alternative_times",
+        questionText: "Hor\xE1rios Alternativos",
+        questionType: "checkbox",
+        answer: response.alternativeTimes
+      });
+    }
+    if (response.dailyMassAvailability && response.dailyMassAvailability.length > 0) {
+      formattedResponses.push({
+        questionId: "daily_mass",
+        questionText: "Missas Di\xE1rias",
+        questionType: "checkbox",
+        answer: response.dailyMassAvailability
+      });
+    }
+    if (response.specialEvents) {
+      formattedResponses.push({
+        questionId: "special_events",
+        questionText: "Eventos Especiais",
+        questionType: "text",
+        answer: response.specialEvents
+      });
+    }
+    if (response.canSubstitute !== null && response.canSubstitute !== void 0) {
+      formattedResponses.push({
+        questionId: "can_substitute",
+        questionText: "Pode Substituir",
+        questionType: "yes_no",
+        answer: response.canSubstitute
+      });
+    }
+    if (response.notes) {
+      formattedResponses.push({
+        questionId: "notes",
+        questionText: "Observa\xE7\xF5es",
+        questionType: "text",
+        answer: response.notes
+      });
+    }
+    if (formattedResponses.length === 0 && response.responses) {
+      if (Array.isArray(response.responses)) {
+        response.responses.forEach((r) => {
+          const { questionId, answer } = r;
+          const questionTextMap = {
+            "monthly_availability": "Disponibilidade Mensal",
+            "main_service_time": "Hor\xE1rio Principal de Servi\xE7o",
+            "can_substitute": "Pode Substituir",
+            "available_sundays": "Domingos Dispon\xEDveis",
+            "other_times_available": "Outros Hor\xE1rios Dispon\xEDveis",
+            "preferred_mass_times": "Hor\xE1rios Preferidos",
+            "alternative_times": "Hor\xE1rios Alternativos",
+            "daily_mass": "Missas Di\xE1rias",
+            "daily_mass_availability": "Disponibilidade para Missas Di\xE1rias",
+            "special_events": "Eventos Especiais",
+            "notes": "Observa\xE7\xF5es",
+            "observations": "Observa\xE7\xF5es"
+          };
+          let questionType = "text";
+          if (Array.isArray(answer)) {
+            questionType = "checkbox";
+          } else if (typeof answer === "boolean" || answer === "Sim" || answer === "N\xE3o") {
+            questionType = "yes_no";
+          } else if (typeof answer === "object" && answer.answer) {
+            questionType = "yes_no_with_options";
+          }
+          formattedResponses.push({
+            questionId,
+            questionText: questionTextMap[questionId] || questionId.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+            questionType,
+            answer
+          });
+        });
+      } else if (typeof response.responses === "object") {
+        const responseObj = response.responses;
+        if (responseObj.availability && typeof responseObj.availability === "object") {
+          const avail = responseObj.availability;
+          if (avail.sundays && Array.isArray(avail.sundays)) {
+            formattedResponses.push({
+              questionId: "available_sundays",
+              questionText: "Domingos Dispon\xEDveis",
+              questionType: "checkbox",
+              answer: avail.sundays
+            });
+          }
+          if (avail.preferences && Array.isArray(avail.preferences)) {
+            formattedResponses.push({
+              questionId: "preferred_mass_times",
+              questionText: "Hor\xE1rios Preferidos",
+              questionType: "checkbox",
+              answer: avail.preferences
+            });
+          }
+        }
+        Object.entries(responseObj).forEach(([key, value]) => {
+          if (key !== "availability" && value !== null && value !== void 0) {
+            if (!formattedResponses.find((r) => r.questionId === key)) {
+              formattedResponses.push({
+                questionId: key,
+                questionText: key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+                questionType: "text",
+                answer: value
+              });
+            }
+          }
+        });
+      }
+    }
+    return {
+      ministerId: user.id,
+      ministerName: user.name,
+      ministerEmail: user.email,
+      questionnaireTitle: questionnaire.title,
+      submittedAt: response.submittedAt,
+      responses: formattedResponses
+    };
+  });
+  const respondedUserIds = new Set(responsesWithUsers.map((r) => r.user.id));
+  if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
+    const nonRespondents = await db.select().from(users).where(eq6(users.role, "ministro"));
+    nonRespondents.filter((user) => !respondedUserIds.has(user.id)).forEach((user) => {
+      exportData.push({
+        ministerId: user.id,
+        ministerName: user.name,
+        ministerEmail: user.email,
+        questionnaireTitle: questionnaire.title,
+        submittedAt: null,
+        responses: []
+      });
+    });
+  }
+  return exportData;
+}
+async function getMonthlyResponsesForExport(month, year) {
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  const [questionnaire] = await db.select().from(questionnaires).where(and4(
+    eq6(questionnaires.month, month),
+    eq6(questionnaires.year, year)
+  )).limit(1);
+  if (!questionnaire) {
+    throw new Error(`No questionnaire found for ${month}/${year}`);
+  }
+  return getQuestionnaireResponsesForExport(questionnaire.id);
+}
+
+// server/routes/questionnaires.ts
 var router4 = Router4();
 var monthNames = [
   "Janeiro",
@@ -3552,44 +4654,108 @@ var monthNames = [
   "Novembro",
   "Dezembro"
 ];
-function analyzeResponses(responses) {
-  const availabilities = {
-    sundays: [],
-    massTimes: [],
-    dailyMass: false,
-    dailyMassDays: [],
-    alternativeTimes: [],
-    specialEvents: []
+function extractQuestionnaireData(responses) {
+  const data = {
+    availableSundays: null,
+    preferredMassTimes: null,
+    alternativeTimes: null,
+    dailyMassAvailability: null,
+    specialEvents: null,
+    canSubstitute: null,
+    notes: null
   };
   responses.forEach((r) => {
     const { questionId, answer } = r;
-    if (questionId === "sundays_available" && Array.isArray(answer)) {
-      availabilities.sundays = answer;
+    switch (questionId) {
+      case "available_sundays":
+        if (Array.isArray(answer)) {
+          data.availableSundays = answer;
+        }
+        break;
+      case "main_service_time":
+      case "preferred_mass_times":
+        if (answer) {
+          if (!data.preferredMassTimes) data.preferredMassTimes = [];
+          if (Array.isArray(answer)) {
+            data.preferredMassTimes.push(...answer);
+          } else {
+            data.preferredMassTimes.push(String(answer));
+          }
+        }
+        break;
+      case "other_times_available":
+      case "alternative_times":
+        if (typeof answer === "object" && answer.answer === "Sim" && answer.selectedOptions) {
+          data.alternativeTimes = answer.selectedOptions;
+        } else if (Array.isArray(answer)) {
+          data.alternativeTimes = answer;
+        } else if (answer === "Sim") {
+          data.alternativeTimes = [];
+        }
+        break;
+      case "daily_mass_availability":
+      case "daily_mass":
+      case "daily_mass_days":
+        if (answer === "Sim" || answer === true) {
+          data.dailyMassAvailability = ["Segunda-feira", "Ter\xE7a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S\xE1bado"];
+        } else if (answer === "N\xE3o" || answer === false) {
+          data.dailyMassAvailability = ["N\xE3o posso"];
+        } else if (typeof answer === "object" && answer.selectedOptions) {
+          data.dailyMassAvailability = answer.selectedOptions;
+        } else if (Array.isArray(answer)) {
+          data.dailyMassAvailability = answer;
+        }
+        break;
+      case "can_substitute":
+        if (answer === "Sim" || answer === true) {
+          data.canSubstitute = true;
+        } else if (answer === "N\xE3o" || answer === false) {
+          data.canSubstitute = false;
+        }
+        break;
+      case "notes":
+      case "observations":
+        if (answer && typeof answer === "string") {
+          data.notes = answer;
+        }
+        break;
+      case "special_events":
+        if (answer) {
+          data.specialEvents = answer;
+        }
+        break;
     }
-    if (questionId === "primary_mass_time" && typeof answer === "string") {
-      availabilities.massTimes.push(answer);
-    }
-    if (questionId === "daily_mass_availability") {
-      if (answer === "Sim") {
-        availabilities.dailyMass = true;
-        availabilities.dailyMassDays = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta"];
-      } else if (answer === "Apenas em alguns dias") {
-        availabilities.dailyMass = true;
-      }
-    }
-    if (questionId === "daily_mass_days" && Array.isArray(answer)) {
-      availabilities.dailyMassDays = answer;
-    }
-    if (questionId === "other_times_available") {
-      if (typeof answer === "object" && answer.answer === "Sim" && answer.selectedOptions) {
-        availabilities.alternativeTimes = answer.selectedOptions;
+    const specialEventMappings = {
+      "healing_liberation_mass": "healing_liberation",
+      "sacred_heart_mass": "sacred_heart",
+      "immaculate_heart_mass": "immaculate_heart",
+      "saint_judas_feast_7h": "saint_judas_feast_7h",
+      "saint_judas_feast_10h": "saint_judas_feast_10h",
+      "saint_judas_feast_12h": "saint_judas_feast_12h",
+      "saint_judas_feast_15h": "saint_judas_feast_15h",
+      "saint_judas_feast_17h": "saint_judas_feast_17h",
+      "saint_judas_feast_evening": "saint_judas_feast_evening",
+      "saint_judas_novena": "saint_judas_novena",
+      "adoration_monday": "adoration_monday"
+    };
+    if (specialEventMappings[questionId]) {
+      if (!data.specialEvents) data.specialEvents = {};
+      if (answer === "Sim" || answer === true) {
+        data.specialEvents[specialEventMappings[questionId]] = true;
+      } else if (answer === "N\xE3o" || answer === false) {
+        data.specialEvents[specialEventMappings[questionId]] = false;
+      } else if (Array.isArray(answer)) {
+        data.specialEvents[specialEventMappings[questionId]] = answer;
+      } else if (answer) {
+        data.specialEvents[specialEventMappings[questionId]] = answer;
       }
     }
     if (questionId.includes("special_event_") && answer === "Sim") {
-      availabilities.specialEvents.push(questionId.replace("special_event_", ""));
+      if (!data.specialEvents) data.specialEvents = {};
+      data.specialEvents[questionId.replace("special_event_", "")] = true;
     }
   });
-  return { availabilities };
+  return data;
 }
 router4.post("/templates", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
@@ -3602,16 +4768,16 @@ router4.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+    const [existingTemplate] = await db.select().from(questionnaires).where(and5(
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     )).limit(1);
     const questions = generateQuestionnaireQuestions(month, year);
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq6(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq7(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -3628,9 +4794,9 @@ router4.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
         id: users.id,
         name: users.name,
         email: users.email
-      }).from(users).where(and4(
-        eq6(users.role, "ministro"),
-        eq6(users.status, "active")
+      }).from(users).where(and5(
+        eq7(users.role, "ministro"),
+        eq7(users.status, "active")
       ));
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -3666,9 +4832,9 @@ router4.get("/templates/:year/:month", authenticateToken, async (req, res) => {
       });
     }
     try {
-      const [template] = await db.select().from(questionnaires).where(and4(
-        eq6(questionnaires.month, month),
-        eq6(questionnaires.year, year)
+      const [template] = await db.select().from(questionnaires).where(and5(
+        eq7(questionnaires.month, month),
+        eq7(questionnaires.year, year)
       )).limit(1);
       if (!template) {
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado para este per\xEDodo" });
@@ -3737,7 +4903,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service temporarily unavailable. Please try again later." });
     }
     if (data.questionnaireId) {
-      const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, data.questionnaireId)).limit(1);
+      const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, data.questionnaireId)).limit(1);
       if (template && template.status === "closed") {
         return res.status(400).json({ error: "Este question\xE1rio foi encerrado e n\xE3o aceita mais respostas" });
       }
@@ -3745,7 +4911,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Buscando usu\xE1rio para userId:", userId);
     let minister = null;
     try {
-      const [foundUser] = await db.select().from(users).where(eq6(users.id, userId)).limit(1);
+      const [foundUser] = await db.select().from(users).where(eq7(users.id, userId)).limit(1);
       console.log("[RESPONSES] Usu\xE1rio encontrado:", foundUser);
       if (foundUser && foundUser.role === "ministro") {
         minister = {
@@ -3775,9 +4941,9 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Template ID inicial:", templateId);
     if (!templateId) {
       console.log("[RESPONSES] Buscando template para m\xEAs:", data.month, "ano:", data.year);
-      const [template] = await db.select().from(questionnaires).where(and4(
-        eq6(questionnaires.month, data.month),
-        eq6(questionnaires.year, data.year)
+      const [template] = await db.select().from(questionnaires).where(and5(
+        eq7(questionnaires.month, data.month),
+        eq7(questionnaires.year, data.year)
       )).limit(1);
       if (template) {
         templateId = template.id;
@@ -3798,14 +4964,14 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     }
     console.log("[RESPONSES] Template ID final:", templateId);
     console.log("[RESPONSES] Verificando resposta existente para userId:", minister.id, "templateId:", templateId);
-    const [existingResponse] = await db.select().from(questionnaireResponses).where(and4(
-      eq6(questionnaireResponses.userId, minister.id),
-      eq6(questionnaireResponses.questionnaireId, templateId)
+    const [existingResponse] = await db.select().from(questionnaireResponses).where(and5(
+      eq7(questionnaireResponses.userId, minister.id),
+      eq7(questionnaireResponses.questionnaireId, templateId)
     )).limit(1);
     console.log("[RESPONSES] Resposta existente encontrada?", existingResponse ? "Sim" : "N\xE3o");
     console.log("[RESPONSES] Analisando respostas");
-    const { availabilities } = analyzeResponses(data.responses);
-    console.log("[RESPONSES] Disponibilidades extra\xEDdas:", availabilities);
+    const extractedData = extractQuestionnaireData(data.responses);
+    console.log("[RESPONSES] Dados extra\xEDdos:", extractedData);
     let result;
     if (existingResponse) {
       console.log("[RESPONSES] Atualizando resposta existente:", existingResponse.id);
@@ -3813,9 +4979,16 @@ router4.post("/responses", authenticateToken, async (req, res) => {
         const [updated] = await db.update(questionnaireResponses).set({
           questionnaireId: templateId,
           responses: JSON.stringify(data.responses),
+          availableSundays: extractedData.availableSundays,
+          preferredMassTimes: extractedData.preferredMassTimes,
+          alternativeTimes: extractedData.alternativeTimes,
+          dailyMassAvailability: extractedData.dailyMassAvailability,
+          specialEvents: extractedData.specialEvents,
+          canSubstitute: extractedData.canSubstitute,
+          notes: extractedData.notes,
           submittedAt: /* @__PURE__ */ new Date(),
           sharedWithFamilyIds: data.sharedWithFamilyIds || []
-        }).where(eq6(questionnaireResponses.id, existingResponse.id)).returning();
+        }).where(eq7(questionnaireResponses.id, existingResponse.id)).returning();
         console.log("[RESPONSES] Resposta atualizada com sucesso");
         const responseData = {
           ...updated,
@@ -3833,6 +5006,13 @@ router4.post("/responses", authenticateToken, async (req, res) => {
           userId: minister.id,
           questionnaireId: templateId,
           responses: JSON.stringify(data.responses),
+          availableSundays: extractedData.availableSundays,
+          preferredMassTimes: extractedData.preferredMassTimes,
+          alternativeTimes: extractedData.alternativeTimes,
+          dailyMassAvailability: extractedData.dailyMassAvailability,
+          specialEvents: extractedData.specialEvents,
+          canSubstitute: extractedData.canSubstitute,
+          notes: extractedData.notes,
           sharedWithFamilyIds: data.sharedWithFamilyIds || [],
           isSharedResponse: false
         }).returning();
@@ -3851,31 +5031,31 @@ router4.post("/responses", authenticateToken, async (req, res) => {
       console.log("[RESPONSES] Processando compartilhamento familiar:", data.sharedWithFamilyIds);
       for (const familyUserId of data.sharedWithFamilyIds) {
         try {
-          const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and4(
-            eq6(users.id, familyUserId),
-            eq6(users.status, "active")
+          const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and5(
+            eq7(users.id, familyUserId),
+            eq7(users.status, "active")
           )).limit(1);
           if (!familyMember) {
             console.warn(`[RESPONSES] Usu\xE1rio n\xE3o encontrado ou inativo: ${familyUserId}`);
             continue;
           }
           const [familyRelation] = await db.select().from(familyRelationships).where(or4(
-            and4(
-              eq6(familyRelationships.userId, minister.id),
-              eq6(familyRelationships.relatedUserId, familyUserId)
+            and5(
+              eq7(familyRelationships.userId, minister.id),
+              eq7(familyRelationships.relatedUserId, familyUserId)
             ),
-            and4(
-              eq6(familyRelationships.userId, familyUserId),
-              eq6(familyRelationships.relatedUserId, minister.id)
+            and5(
+              eq7(familyRelationships.userId, familyUserId),
+              eq7(familyRelationships.relatedUserId, minister.id)
             )
           )).limit(1);
           if (!familyRelation) {
             console.warn(`[RESPONSES] Sem rela\xE7\xE3o familiar v\xE1lida entre ${minister.id} e ${familyUserId}`);
             continue;
           }
-          const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and4(
-            eq6(questionnaireResponses.userId, familyUserId),
-            eq6(questionnaireResponses.questionnaireId, templateId)
+          const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and5(
+            eq7(questionnaireResponses.userId, familyUserId),
+            eq7(questionnaireResponses.questionnaireId, templateId)
           )).limit(1);
           if (!existingFamilyResponse) {
             await db.insert(questionnaireResponses).values({
@@ -3891,7 +5071,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
             await db.update(questionnaireResponses).set({
               responses: JSON.stringify(data.responses),
               submittedAt: /* @__PURE__ */ new Date()
-            }).where(eq6(questionnaireResponses.id, existingFamilyResponse.id));
+            }).where(eq7(questionnaireResponses.id, existingFamilyResponse.id));
             console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
           } else {
             console.log(`[RESPONSES] ${familyMember.name} j\xE1 possui resposta pr\xF3pria, n\xE3o sobrescrevendo`);
@@ -3932,7 +5112,7 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       return res.json(null);
     }
     try {
-      const [user] = await db.select().from(users).where(eq6(users.id, userId)).limit(1);
+      const [user] = await db.select().from(users).where(eq7(users.id, userId)).limit(1);
       const minister = user && (user.role === "ministro" || user.role === "coordenador" || user.role === "gestor") ? {
         id: user.id,
         userId: user.id
@@ -3950,7 +5130,7 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
         questionnaireId: questionnaireResponses.questionnaireId,
         month: questionnaires.month,
         year: questionnaires.year
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq6(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq6(questionnaireResponses.userId, minister.id));
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq7(questionnaireResponses.userId, minister.id));
       console.log("[GET /responses] Todas as respostas do usu\xE1rio:", allUserResponses);
       const [response] = await db.select({
         id: questionnaireResponses.id,
@@ -3964,10 +5144,10 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
           questions: questionnaires.questions,
           status: questionnaires.status
         }
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq6(questionnaireResponses.questionnaireId, questionnaires.id)).where(and4(
-        eq6(questionnaireResponses.userId, minister.id),
-        eq6(questionnaires.month, month),
-        eq6(questionnaires.year, year)
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(and5(
+        eq7(questionnaireResponses.userId, minister.id),
+        eq7(questionnaires.month, month),
+        eq7(questionnaires.year, year)
       )).limit(1);
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
@@ -4009,9 +5189,9 @@ router4.get("/admin/responses-status/:year/:month", authenticateToken, async (re
     if (!db) {
       return res.json([]);
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+    const [questionnaire] = await db.select().from(questionnaires).where(and5(
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({
@@ -4030,26 +5210,29 @@ router4.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(and4(
-      eq6(users.role, "ministro"),
-      eq6(users.status, "active")
+    }).from(users).where(and5(
+      eq7(users.role, "ministro"),
+      eq7(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
     const responseMap = new Map(responses.map((r) => [r.userId, r]));
-    const ministerResponses = ministers.map((minister) => ({
-      id: minister.id,
-      name: minister.name,
-      email: minister.email,
-      phone: minister.phone || "",
-      responded: responseMap.has(minister.id),
-      respondedAt: responseMap.get(minister.id)?.submittedAt ? new Date(responseMap.get(minister.id).submittedAt).toISOString() : null,
-      availability: null
-      // Pode ser expandido para incluir disponibilidade
-    }));
+    const ministerResponses = ministers.map((minister) => {
+      const response = responseMap.get(minister.id);
+      return {
+        id: minister.id,
+        name: minister.name,
+        email: minister.email,
+        phone: minister.phone || "",
+        responded: responseMap.has(minister.id),
+        respondedAt: response && response.submittedAt ? new Date(response.submittedAt).toISOString() : null,
+        availability: null
+        // Pode ser expandido para incluir disponibilidade
+      };
+    });
     const respondedCount = responses.length;
     const totalMinisters = ministers.length;
     const responseRate = totalMinisters > 0 ? `${Math.round(respondedCount / totalMinisters * 100)}%` : "0%";
@@ -4081,14 +5264,14 @@ router4.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
     if (!db) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+    const [questionnaire] = await db.select().from(questionnaires).where(and5(
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
@@ -4123,7 +5306,7 @@ router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     if (!db) {
       return res.status(500).json({ error: "Database not available" });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
@@ -4131,13 +5314,13 @@ router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq6(users.id, userId)).limit(1);
+    }).from(users).where(eq7(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const [response] = await db.select().from(questionnaireResponses).where(and4(
-      eq6(questionnaireResponses.questionnaireId, templateId),
-      eq6(questionnaireResponses.userId, userId)
+    const [response] = await db.select().from(questionnaireResponses).where(and5(
+      eq7(questionnaireResponses.questionnaireId, templateId),
+      eq7(questionnaireResponses.userId, userId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -4189,9 +5372,9 @@ router4.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
         month: questionnaires.month,
         year: questionnaires.year
       }
-    }).from(questionnaireResponses).leftJoin(users, eq6(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq6(questionnaireResponses.questionnaireId, questionnaires.id)).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+    }).from(questionnaireResponses).leftJoin(users, eq7(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(and5(
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     ));
     res.json(responses);
   } catch (error) {
@@ -4209,7 +5392,7 @@ router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -4219,7 +5402,7 @@ router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     const [updated] = await db.update(questionnaires).set({
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, templateId)).returning();
+    }).where(eq7(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -4239,7 +5422,7 @@ router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -4249,7 +5432,7 @@ router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, templateId)).returning();
+    }).where(eq7(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -4271,6 +5454,105 @@ router4.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
     res.status(500).json({ error: "Failed to fetch family members" });
   }
 });
+router4.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { questionnaireId } = req.params;
+    const { format: format4 = "detailed" } = req.query;
+    const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
+    const csvContent = format4 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
+    const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error("Error exporting questionnaire responses:", error);
+    res.status(500).json({ error: "Failed to export questionnaire responses" });
+  }
+});
+router4.get("/export/:year/:month/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const { format: format4 = "detailed" } = req.query;
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: "Invalid month or year" });
+    }
+    const exportData = await getMonthlyResponsesForExport(month, year);
+    const csvContent = format4 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const monthName = monthNames[month - 1];
+    const filename = `respostas_${monthName}_${year}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error("Error exporting monthly responses:", error);
+    const message = error instanceof Error ? error.message : "Failed to export monthly responses";
+    res.status(500).json({ error: message });
+  }
+});
+router4.post("/admin/reprocess-responses", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ error: "Database not available" });
+    }
+    const { questionnaireId } = req.body;
+    console.log(`[REPROCESS] \u{1F504} Iniciando reprocessamento...`);
+    console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
+    if (questionnaireId) {
+      const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
+      if (!questionnaire) {
+        console.log(`[REPROCESS] \u274C Question\xE1rio ${questionnaireId} n\xE3o encontrado!`);
+        return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado" });
+      }
+      console.log(`[REPROCESS] \u2705 Question\xE1rio encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
+    }
+    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
+    console.log(`[REPROCESS] \u{1F4DD} Encontradas ${allResponses.length} respostas para reprocessar...`);
+    let updated = 0;
+    let errors = 0;
+    for (const response of allResponses) {
+      try {
+        const responsesArray = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+        const extractedData = extractQuestionnaireData(responsesArray);
+        console.log(`[REPROCESS] Resposta ${response.id}:`, {
+          availableSundays: extractedData.availableSundays?.length || 0,
+          dailyMass: extractedData.dailyMassAvailability?.length || 0,
+          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
+        });
+        await db.update(questionnaireResponses).set({
+          availableSundays: extractedData.availableSundays,
+          preferredMassTimes: extractedData.preferredMassTimes,
+          alternativeTimes: extractedData.alternativeTimes,
+          dailyMassAvailability: extractedData.dailyMassAvailability,
+          specialEvents: extractedData.specialEvents,
+          canSubstitute: extractedData.canSubstitute,
+          notes: extractedData.notes
+        }).where(eq7(questionnaireResponses.id, response.id));
+        updated++;
+      } catch (error) {
+        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
+        errors++;
+      }
+    }
+    console.log(`[REPROCESS] \u2705 Conclu\xEDdo: ${updated} atualizadas, ${errors} erros`);
+    res.json({
+      success: true,
+      message: `Reprocessadas ${updated} respostas com sucesso`,
+      data: {
+        total: allResponses.length,
+        updated,
+        errors
+      }
+    });
+  } catch (error) {
+    console.error("[REPROCESS] Erro geral:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao reprocessar respostas"
+    });
+  }
+});
 var questionnaires_default = router4;
 
 // server/routes/scheduleGeneration.ts
@@ -4280,7 +5562,7 @@ init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and6, gte as gte3, lte as lte3, eq as eq8, sql as sql4, ne as ne3 } from "drizzle-orm";
+import { and as and7, gte as gte3, lte as lte3, eq as eq9, sql as sql4, ne as ne3, desc as desc4 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
 var router5 = Router5();
@@ -4296,7 +5578,10 @@ var saveSchedulesSchema = z4.object({
     time: z4.string(),
     type: z4.string().default("missa"),
     location: z4.string().optional(),
-    ministerId: z4.string(),
+    ministerId: z4.string().nullable(),
+    // Permite null para posições VACANTE
+    position: z4.number().optional(),
+    // Order position for ministers at same date/time
     notes: z4.string().optional()
   })),
   replaceExisting: z4.boolean().default(false)
@@ -4315,9 +5600,17 @@ router5.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
         });
       }
     }
-    console.log("[ROUTE] Calling generateAutomaticSchedule with:", { year, month, saveToDatabase, isPreview: false });
-    const generatedSchedules = await generateAutomaticSchedule(year, month, false);
-    console.log("[ROUTE] Generated schedules count:", generatedSchedules.length);
+    console.log("[ROUTE] \u23F3 INICIANDO generateAutomaticSchedule com:", { year, month, saveToDatabase, isPreview: false });
+    let generatedSchedules;
+    try {
+      generatedSchedules = await generateAutomaticSchedule(year, month, false);
+      console.log("[ROUTE] \u2705 Generated schedules count:", generatedSchedules.length);
+    } catch (genError) {
+      console.error("[ROUTE] \u274C ERRO NA FUN\xC7\xC3O generateAutomaticSchedule:", genError);
+      console.error("[ROUTE] \u274C genError.message:", genError.message);
+      console.error("[ROUTE] \u274C genError.stack:", genError.stack);
+      throw genError;
+    }
     let savedCount = 0;
     if (saveToDatabase && db) {
       savedCount = await saveGeneratedSchedules(generatedSchedules, replaceExisting);
@@ -4340,11 +5633,19 @@ router5.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     logger.info(`Gera\xE7\xE3o conclu\xEDda: ${generatedSchedules.length} escalas, confidence m\xE9dia: ${response.data.averageConfidence}`);
     res.json(response);
   } catch (error) {
+    console.error("\u274C [ROUTE] ERRO DETALHADO NO GENERATE:", error);
+    console.error("\u274C [ROUTE] ERRO STACK:", error.stack);
+    console.error("\u274C [ROUTE] ERRO NAME:", error.name);
+    console.error("\u274C [ROUTE] ERRO MESSAGE:", error.message);
     logger.error("Erro ao gerar escalas autom\xE1ticas:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro interno do servidor",
-      error: process.env.NODE_ENV === "development" ? error.stack : void 0
+      message: error.message || "Falha na gera\xE7\xE3o autom\xE1tica de escalas",
+      errorDetails: {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      }
     });
   }
 });
@@ -4362,22 +5663,43 @@ router5.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
       const firstDate = sortedSchedules[0].date;
       const lastDate = sortedSchedules[sortedSchedules.length - 1].date;
       await db.delete(schedules).where(
-        and6(
+        and7(
           gte3(schedules.date, firstDate),
           lte3(schedules.date, lastDate)
         )
       );
       logger.info(`Removidas escalas existentes entre ${firstDate} e ${lastDate}`);
     }
-    const schedulesToInsert = schedulesToSave.map((s) => ({
-      date: s.date,
-      time: s.time,
-      type: s.type,
-      location: s.location || null,
-      ministerId: s.ministerId,
-      notes: s.notes || null,
-      status: "scheduled"
-    }));
+    const groupedByDateTime = {};
+    schedulesToSave.forEach((s, idx) => {
+      const key = `${s.date}_${s.time}`;
+      if (!groupedByDateTime[key]) {
+        groupedByDateTime[key] = [];
+      }
+      groupedByDateTime[key].push({ ...s, _index: idx });
+    });
+    const schedulesToInsert = schedulesToSave.map((s, globalIndex) => {
+      const key = `${s.date}_${s.time}`;
+      const group = groupedByDateTime[key];
+      let positionInGroup = 1;
+      for (let i = 0; i < group.length; i++) {
+        if (group[i]._index === globalIndex) {
+          positionInGroup = i + 1;
+          break;
+        }
+      }
+      return {
+        date: s.date,
+        time: s.time,
+        type: s.type,
+        location: s.location || null,
+        ministerId: s.ministerId,
+        position: s.position ?? positionInGroup,
+        // Use provided position or calculated group position
+        notes: s.notes || null,
+        status: "scheduled"
+      };
+    });
     const saved = await db.insert(schedules).values(schedulesToInsert).returning();
     logger.info(`Salvas ${saved.length} escalas no banco de dados`);
     res.json({
@@ -4409,15 +5731,25 @@ router5.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "
     console.log("[PREVIEW ROUTE] Calling generateAutomaticSchedule with:", { year, month, isPreview: true });
     const generatedSchedules = await generateAutomaticSchedule(year, month, true);
     console.log("[PREVIEW ROUTE] Generated schedules count:", generatedSchedules.length);
+    const correctedSchedules = generatedSchedules.filter((schedule) => {
+      const isDay28 = schedule.massTime.date?.endsWith("-28");
+      const isDailyMass = schedule.massTime.type === "missa_diaria";
+      if (isDay28 && isDailyMass) {
+        console.log(`[PREVIEW_FILTER] \u{1F6AB} Removendo missa di\xE1ria do dia 28: ${schedule.massTime.date} ${schedule.massTime.time}`);
+        return false;
+      }
+      return true;
+    });
+    console.log(`[PREVIEW_FILTER] Filtro aplicado: ${generatedSchedules.length} \u2192 ${correctedSchedules.length} escalas`);
     res.json({
       success: true,
       data: {
         month,
         year,
-        totalSchedules: generatedSchedules.length,
-        averageConfidence: calculateAverageConfidence(generatedSchedules),
-        schedules: formatSchedulesForAPI(generatedSchedules),
-        qualityMetrics: calculateQualityMetrics(generatedSchedules)
+        totalSchedules: correctedSchedules.length,
+        averageConfidence: calculateAverageConfidence(correctedSchedules),
+        schedules: formatSchedulesForAPI(correctedSchedules),
+        qualityMetrics: calculateQualityMetrics(correctedSchedules)
       }
     });
   } catch (error) {
@@ -4441,16 +5773,16 @@ router5.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       status: users.status,
       totalServices: users.totalServices
     }).from(users).where(
-      and6(
-        eq8(users.status, "active"),
+      and7(
+        eq9(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq8(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(
-      and6(
-        eq8(questionnaires.month, month),
-        eq8(questionnaires.year, year)
+    const massTimesData = await db.select().from(massTimesConfig).where(eq9(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+      and7(
+        eq9(questionnaires.month, month),
+        eq9(questionnaires.year, year)
       )
     );
     res.json({
@@ -4493,8 +5825,8 @@ router5.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq8(schedules.ministerId, users.id)).where(
-      and6(
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(
+      and7(
         sql4`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
         sql4`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
       )
@@ -4532,19 +5864,23 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
     if (!schedule.massTime.date) continue;
     if (replaceExisting) {
       await db.delete(schedules).where(
-        and6(
-          eq8(schedules.date, schedule.massTime.date),
-          eq8(schedules.time, schedule.massTime.time)
+        and7(
+          eq9(schedules.date, schedule.massTime.date),
+          eq9(schedules.time, schedule.massTime.time)
         )
       );
     }
-    for (const minister of schedule.ministers) {
+    for (let i = 0; i < schedule.ministers.length; i++) {
+      const minister = schedule.ministers[i];
       await db.insert(schedules).values({
         date: schedule.massTime.date,
         time: schedule.massTime.time,
         type: "missa",
         location: null,
         ministerId: minister.id,
+        // Pode ser null para VACANTE
+        position: minister.position || i + 1,
+        // Usar position do ministro ou index + 1
         status: "scheduled",
         notes: `Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
       });
@@ -4594,21 +5930,37 @@ function calculateBalanceScore(schedules3) {
   return Math.max(0, 1 - Math.sqrt(variance) / avg2);
 }
 function formatSchedulesForAPI(schedules3) {
-  return schedules3.map((schedule) => ({
+  console.log(`[API_FILTER] \u{1F525} EXECUTANDO FILTRO! Total schedules: ${schedules3.length}`);
+  const filteredSchedules = schedules3.filter((schedule) => {
+    const isDay28 = schedule.massTime.date?.endsWith("-28");
+    const isDailyMass = schedule.massTime.type === "missa_diaria";
+    console.log(`[API_FILTER] \u{1F50D} Checking: ${schedule.massTime.date} ${schedule.massTime.time} type=${schedule.massTime.type}`);
+    if (isDay28 && isDailyMass) {
+      console.log(`[API_FILTER] \u{1F6AB} REMOVENDO missa di\xE1ria do dia 28: ${schedule.massTime.date} ${schedule.massTime.time}`);
+      return false;
+    }
+    return true;
+  });
+  console.log(`[API_FILTER] \u{1F4CA} Filtro final: ${schedules3.length} \u2192 ${filteredSchedules.length} escalas`);
+  return filteredSchedules.map((schedule) => ({
     date: schedule.massTime.date,
     time: schedule.massTime.time,
     dayOfWeek: schedule.massTime.dayOfWeek,
+    type: schedule.massTime.type || "missa",
+    // Incluir tipo da missa
     ministers: schedule.ministers.map((m) => ({
       id: m.id,
       name: m.name,
       role: m.role,
       totalServices: m.totalServices,
-      availabilityScore: Math.round(m.availabilityScore * 100) / 100
+      availabilityScore: Math.round(m.availabilityScore * 100) / 100,
+      position: m.position
     })),
     backupMinisters: schedule.backupMinisters.map((m) => ({
       id: m.id,
       name: m.name,
-      role: m.role
+      role: m.role,
+      position: m.position
     })),
     confidence: Math.round(schedule.confidence * 100) / 100,
     qualityScore: calculateScheduleQuality(schedule)
@@ -4645,6 +5997,170 @@ function calculateCoverageByDay(schedules3) {
   });
   return coverage;
 }
+router5.get("/by-date/:date", authenticateToken, async (req, res) => {
+  try {
+    const { date: date2 } = req.params;
+    const dateOnly = date2.split("T")[0];
+    if (!db) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+    const assignments = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      ministerName: users.name
+    }).from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(eq9(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+    const formattedAssignments = assignments.map((a) => ({
+      id: a.id,
+      date: a.date,
+      massTime: a.time,
+      // Frontend expects 'massTime' field
+      type: a.type,
+      ministerId: a.ministerId,
+      position: a.position,
+      status: a.status,
+      notes: a.notes,
+      ministerName: a.ministerName,
+      confirmed: a.status === "scheduled"
+      // Map status to confirmed boolean
+    }));
+    if (formattedAssignments.length === 0) {
+      return res.json({
+        message: "Nenhuma escala publicada para esta data",
+        assignments: []
+      });
+    }
+    res.json({ assignments: formattedAssignments });
+  } catch (error) {
+    logger.error("Error fetching schedule by date:", error);
+    res.status(500).json({ error: "Failed to fetch schedule" });
+  }
+});
+router5.get("/:date/:time", authenticateToken, async (req, res) => {
+  try {
+    const { date: date2, time: time2 } = req.params;
+    if (!db) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+    const scheduledMinisters = await db.select({
+      id: schedules.id,
+      ministerId: schedules.ministerId,
+      ministerName: users.name,
+      status: schedules.status,
+      notes: schedules.notes,
+      type: schedules.type,
+      location: schedules.location,
+      position: schedules.position
+    }).from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(and7(
+      eq9(schedules.date, date2),
+      eq9(schedules.time, time2)
+    )).orderBy(schedules.position);
+    res.json({
+      date: date2,
+      time: time2,
+      ministers: scheduledMinisters
+    });
+  } catch (error) {
+    logger.error("Error fetching schedule:", error);
+    res.status(500).json({ error: "Failed to fetch schedule" });
+  }
+});
+router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const schema = z4.object({
+      date: z4.string(),
+      time: z4.string(),
+      ministerId: z4.string(),
+      type: z4.string().default("missa"),
+      location: z4.string().optional(),
+      notes: z4.string().optional()
+    });
+    const data = schema.parse(req.body);
+    if (!db) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+    const [existing] = await db.select().from(schedules).where(and7(
+      eq9(schedules.date, data.date),
+      eq9(schedules.time, data.time),
+      eq9(schedules.ministerId, data.ministerId)
+    )).limit(1);
+    if (existing) {
+      return res.status(400).json({ error: "Ministro j\xE1 escalado neste hor\xE1rio" });
+    }
+    const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and7(
+      eq9(schedules.date, data.date),
+      eq9(schedules.time, data.time)
+    )).orderBy(desc4(schedules.position));
+    const newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
+    const [newSchedule] = await db.insert(schedules).values({
+      date: data.date,
+      time: data.time,
+      type: data.type,
+      location: data.location,
+      ministerId: data.ministerId,
+      position: newPosition,
+      notes: data.notes,
+      status: "scheduled"
+    }).returning();
+    res.json(newSchedule);
+  } catch (error) {
+    logger.error("Error adding minister to schedule:", error);
+    res.status(500).json({ error: "Failed to add minister to schedule" });
+  }
+});
+router5.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!db) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+    await db.delete(schedules).where(eq9(schedules.id, id));
+    res.json({ success: true, message: "Ministro removido da escala" });
+  } catch (error) {
+    logger.error("Error removing minister from schedule:", error);
+    res.status(500).json({ error: "Failed to remove minister from schedule" });
+  }
+});
+router5.patch("/batch-update", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const schema = z4.object({
+      date: z4.string(),
+      time: z4.string(),
+      ministers: z4.array(z4.string().nullable())
+      // Array de IDs de ministros (null = VACANTE)
+    });
+    const { date: date2, time: time2, ministers } = schema.parse(req.body);
+    if (!db) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+    await db.delete(schedules).where(and7(
+      eq9(schedules.date, date2),
+      eq9(schedules.time, time2)
+    ));
+    if (ministers.length > 0) {
+      const newSchedules = ministers.map((ministerId, index2) => ({
+        date: date2,
+        time: time2,
+        ministerId,
+        // Pode ser null para VACANTE
+        position: index2 + 1,
+        // Posição começa em 1
+        type: "missa",
+        status: "scheduled"
+      }));
+      await db.insert(schedules).values(newSchedules);
+    }
+    res.json({ success: true, message: "Escala atualizada com sucesso" });
+  } catch (error) {
+    logger.error("Error batch updating schedule:", error);
+    res.status(500).json({ error: "Failed to update schedule" });
+  }
+});
 var scheduleGeneration_default = router5;
 
 // server/routes/upload.ts
@@ -4653,7 +6169,7 @@ init_schema();
 import { Router as Router6 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq9 } from "drizzle-orm";
+import { eq as eq10 } from "drizzle-orm";
 var router6 = Router6();
 var upload = multer({
   storage: multer.memoryStorage(),
@@ -4720,7 +6236,7 @@ router6.post("/profile-photo", authenticateToken, upload.single("photo"), handle
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq9(users.id, userId));
+    }).where(eq10(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -4752,7 +6268,7 @@ router6.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq9(users.id, userId));
+    }).where(eq10(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -4770,7 +6286,7 @@ import { z as z5 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq10, and as and7 } from "drizzle-orm";
+import { eq as eq11, and as and8 } from "drizzle-orm";
 var router7 = Router7();
 var createNotificationSchema = z5.object({
   title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
@@ -4814,9 +6330,9 @@ router7.get("/unread-count", authenticateToken, async (req, res) => {
 router7.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await db.select().from(notifications).where(and7(
-      eq10(notifications.id, id),
-      eq10(notifications.userId, req.user.id)
+    const notification = await db.select().from(notifications).where(and8(
+      eq11(notifications.id, id),
+      eq11(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -4843,7 +6359,7 @@ router7.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ges
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq10(users.status, "active")
+      eq11(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -4885,18 +6401,18 @@ router7.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq10(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq11(users.status, "active"));
       } else {
-        recipients = await db.select({ id: users.id }).from(users).where(and7(
-          eq10(users.role, data.recipientRole),
-          eq10(users.status, "active")
+        recipients = await db.select({ id: users.id }).from(users).where(and8(
+          eq11(users.role, data.recipientRole),
+          eq11(users.status, "active")
         ));
       }
       recipientUserIds = recipients.map((r) => r.id);
     } else {
-      const recipients = await db.select({ id: users.id }).from(users).where(and7(
-        eq10(users.role, "ministro"),
-        eq10(users.status, "active")
+      const recipients = await db.select({ id: users.id }).from(users).where(and8(
+        eq11(users.role, "ministro"),
+        eq11(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
     }
@@ -4939,17 +6455,17 @@ router7.delete("/:id", authenticateToken, async (req, res) => {
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq10(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq11(notifications.id, id)).limit(1);
     } else {
-      notification = await db.select().from(notifications).where(and7(
-        eq10(notifications.id, id),
-        eq10(notifications.userId, req.user.id)
+      notification = await db.select().from(notifications).where(and8(
+        eq11(notifications.id, id),
+        eq11(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq10(notifications.id, id));
+    await db.delete(notifications).where(eq11(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -4966,7 +6482,7 @@ var notifications_default = router7;
 await init_db();
 init_schema();
 import { Router as Router8 } from "express";
-import { eq as eq11, sql as sql5, and as and8, gte as gte4, lte as lte4, desc as desc5, asc, count as count3, avg } from "drizzle-orm";
+import { eq as eq12, sql as sql5, and as and9, gte as gte4, lte as lte4, desc as desc6, asc, count as count3, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
 await init_db();
@@ -5018,12 +6534,12 @@ router8.get("/availability", authenticateToken, requireRole(["gestor", "coordena
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq11(users.id, questionnaireResponses.userId)).where(
-      and8(
+    }).from(questionnaireResponses).leftJoin(users, eq12(users.id, questionnaireResponses.userId)).where(
+      and9(
         startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql5`true`,
         endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql5`true`
       )
-    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc5(sql5`available_days`)).limit(Number(limit));
+    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql5`available_days`)).limit(Number(limit));
     res.json({
       topAvailable: availabilityData,
       period: { startDate, endDate }
@@ -5048,12 +6564,12 @@ router8.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
       pendingRequests: sql5`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq11(users.id, substitutionRequests.requesterId)).where(
-      and8(
+    }).from(substitutionRequests).leftJoin(users, eq12(users.id, substitutionRequests.requesterId)).where(
+      and9(
         startDate ? gte4(substitutionRequests.createdAt, new Date(startDate)) : sql5`true`,
         endDate ? lte4(substitutionRequests.createdAt, new Date(endDate)) : sql5`true`
       )
-    ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc5(count3(substitutionRequests.id))).limit(10);
+    ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc6(count3(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
       userId: schedules.ministerId,
       userName: users.name,
@@ -5064,13 +6580,13 @@ router8.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
            ${startDate ? sql5`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql5``}
            ${endDate ? sql5`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql5``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq11(users.id, schedules.ministerId)).where(
-      and8(
-        schedules.status ? eq11(schedules.status, "published") : sql5`true`,
+    }).from(schedules).leftJoin(users, eq12(users.id, schedules.ministerId)).where(
+      and9(
+        schedules.status ? eq12(schedules.status, "published") : sql5`true`,
         startDate ? gte4(schedules.createdAt, new Date(startDate)) : sql5`true`,
         endDate ? lte4(schedules.createdAt, new Date(endDate)) : sql5`true`
       )
-    ).groupBy(schedules.ministerId, users.name).having(sql5`COUNT(${schedules.id}) > 0`).orderBy(asc(sql5`substitution_requests`), desc5(count3(schedules.id))).limit(10);
+    ).groupBy(schedules.ministerId, users.name).having(sql5`COUNT(${schedules.id}) > 0`).orderBy(asc(sql5`substitution_requests`), desc6(count3(schedules.id))).limit(10);
     res.json({
       mostRequests,
       reliableServers,
@@ -5094,12 +6610,12 @@ router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
       uniqueDays: sql5`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq11(users.id, activityLogs.userId)).where(
-      and8(
+    }).from(activityLogs).leftJoin(users, eq12(users.id, activityLogs.userId)).where(
+      and9(
         startDate ? gte4(activityLogs.createdAt, new Date(startDate)) : sql5`true`,
         endDate ? lte4(activityLogs.createdAt, new Date(endDate)) : sql5`true`
       )
-    ).groupBy(activityLogs.userId, users.name).orderBy(desc5(count3(activityLogs.id))).limit(Number(limit));
+    ).groupBy(activityLogs.userId, users.name).orderBy(desc6(count3(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
       totalMinisters: count3(users.id),
       respondedMinisters: sql5`
@@ -5114,12 +6630,12 @@ router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
         `.as("response_rate")
     }).from(users).leftJoin(
       questionnaireResponses,
-      and8(
-        eq11(users.id, questionnaireResponses.userId),
+      and9(
+        eq12(users.id, questionnaireResponses.userId),
         startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql5`true`,
         endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql5`true`
       )
-    ).where(eq11(users.status, "active"));
+    ).where(eq12(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -5145,7 +6661,7 @@ router8.get("/formation", authenticateToken, requireRole(["gestor", "coordenador
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq11(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc5(sql5`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq12(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql5`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
       totalModules: sql5`
           (SELECT COUNT(*) FROM formation_modules)
@@ -5176,7 +6692,7 @@ router8.get("/families", authenticateToken, requireRole(["gestor", "coordenador"
       totalServices: sql5`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq11(users.familyId, families.id)).groupBy(families.id, families.name).having(sql5`COUNT(${users.id}) > 1`).orderBy(desc5(sql5`active_members`), desc5(sql5`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq12(users.familyId, families.id)).groupBy(families.id, families.name).having(sql5`COUNT(${users.id}) > 1`).orderBy(desc6(sql5`active_members`), desc6(sql5`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -5192,21 +6708,21 @@ router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
     const now = /* @__PURE__ */ new Date();
     const startOfMonth2 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq11(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq12(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count3(),
       approved: sql5`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved")
     }).from(substitutionRequests).where(
-      and8(
+      and9(
         gte4(substitutionRequests.createdAt, startOfMonth2),
         lte4(substitutionRequests.createdAt, endOfMonth2)
       )
     );
     const formationThisMonth = await db.select({ count: count3() }).from(formationProgress).where(
-      and8(
-        eq11(formationProgress.status, "completed"),
+      and9(
+        eq12(formationProgress.status, "completed"),
         formationProgress.completedAt ? gte4(formationProgress.completedAt, startOfMonth2) : sql5`false`,
         formationProgress.completedAt ? lte4(formationProgress.completedAt, endOfMonth2) : sql5`false`
       )
@@ -5220,7 +6736,7 @@ router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
           )
         `.as("avg_days")
     }).from(questionnaireResponses).where(
-      and8(
+      and9(
         gte4(questionnaireResponses.submittedAt, startOfMonth2),
         lte4(questionnaireResponses.submittedAt, endOfMonth2)
       )
@@ -5245,12 +6761,125 @@ router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
 });
 var reports_default = router8;
 
+// server/routes/ministers.ts
+await init_db();
+init_schema();
+import { Router as Router9 } from "express";
+import { eq as eq13, and as and10, sql as sql6 } from "drizzle-orm";
+var router9 = Router9();
+router9.get("/", authenticateToken, async (req, res) => {
+  try {
+    const ministersList = await db.select().from(users).where(
+      sql6`${users.role} IN ('ministro', 'coordenador')`
+    );
+    res.json(ministersList);
+  } catch (error) {
+    console.error("Error fetching ministers:", error);
+    res.status(500).json({ message: "Erro ao buscar ministros" });
+  }
+});
+router9.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const minister = await db.select().from(users).where(and10(
+      eq13(users.id, req.params.id),
+      eq13(users.role, "ministro")
+    )).limit(1);
+    if (minister.length === 0) {
+      return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
+    }
+    res.json(minister[0]);
+  } catch (error) {
+    console.error("Error fetching minister:", error);
+    res.status(500).json({ message: "Erro ao buscar ministro" });
+  }
+});
+router9.patch("/:id", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const currentUser = req.user;
+    if (currentUser.role !== "gestor" && currentUser.role !== "coordenador" && currentUser.id !== userId) {
+      return res.status(403).json({ message: "Sem permiss\xE3o para editar este ministro" });
+    }
+    const allowedFields = [
+      "birthDate",
+      "address",
+      "city",
+      "zipCode",
+      "emergencyContact",
+      "emergencyPhone",
+      "preferredPosition",
+      "preferredTimes",
+      "availableForSpecialEvents",
+      "canServeAsCouple",
+      "spouseUserId",
+      "experience",
+      "specialSkills",
+      "liturgicalTraining",
+      "observations",
+      "active"
+    ];
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== void 0) {
+        if (field === "preferredTimes") {
+          updateData[field] = req.body[field];
+        } else if (field === "specialSkills") {
+          updateData[field] = typeof req.body[field] === "string" ? req.body[field] : JSON.stringify(req.body[field]);
+        } else if (["liturgicalTraining", "formationCompleted"].includes(field)) {
+          updateData[field] = Boolean(req.body[field]);
+        } else {
+          updateData[field] = req.body[field];
+        }
+      }
+    }
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "Nenhum campo para atualizar" });
+    }
+    updateData.updatedAt = /* @__PURE__ */ new Date();
+    const result = await db.update(users).set(updateData).where(and10(
+      eq13(users.id, userId),
+      eq13(users.role, "ministro")
+    )).returning();
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
+    }
+    console.log(`[Activity Log] UPDATE_MINISTER: Dados do ministro ${result[0].name} atualizados`, { ministerId: userId, fields: Object.keys(updateData) });
+    res.json(result[0]);
+  } catch (error) {
+    console.error("Error updating minister:", error);
+    res.status(500).json({ message: "Erro ao atualizar ministro" });
+  }
+});
+router9.get("/:id/stats", authenticateToken, async (req, res) => {
+  try {
+    const ministerId = req.params.id;
+    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and10(
+      eq13(users.id, ministerId),
+      eq13(users.role, "ministro")
+    )).limit(1);
+    if (minister.length === 0) {
+      return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
+    }
+    const threeMonthsAgo = /* @__PURE__ */ new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const recentAssignments = 0;
+    res.json({
+      totalServices: minister[0].totalServices || 0,
+      recentAssignments
+    });
+  } catch (error) {
+    console.error("Error fetching minister stats:", error);
+    res.status(500).json({ message: "Erro ao buscar estat\xEDsticas" });
+  }
+});
+var ministers_default = router9;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z6 } from "zod";
-import { eq as eq12, count as count4, or as or6 } from "drizzle-orm";
+import { eq as eq14, count as count4, or as or6 } from "drizzle-orm";
 function handleApiError(error, operation) {
   if (error instanceof z6.ZodError) {
     return {
@@ -5299,6 +6928,7 @@ async function registerRoutes(app2) {
   app2.use("/api/upload", upload_default);
   app2.use("/api/notifications", notifications_default);
   app2.use("/api/reports", reports_default);
+  app2.use("/api/ministers", ministers_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -5494,7 +7124,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq12(users.id, userId));
+      }).from(users).where(eq14(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -5693,25 +7323,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq12(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
         const [substitutionCheck] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-          eq12(substitutionRequests.requesterId, userId),
-          eq12(substitutionRequests.substituteId, userId)
+          eq14(substitutionRequests.requesterId, userId),
+          eq14(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -5748,12 +7378,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq12(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq12(substitutionRequests.requesterId, userId),
-            eq12(substitutionRequests.substituteId, userId)
+            eq14(substitutionRequests.requesterId, userId),
+            eq14(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -5782,12 +7412,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq12(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq12(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq12(substitutionRequests.requesterId, userId),
-            eq12(substitutionRequests.substituteId, userId)
+            eq14(substitutionRequests.requesterId, userId),
+            eq14(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -5909,8 +7539,16 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/schedules", authenticateToken, async (req, res) => {
     try {
-      const schedules3 = await storage.getSchedules();
-      res.json(schedules3);
+      const month = req.query.month ? parseInt(req.query.month) : void 0;
+      const year = req.query.year ? parseInt(req.query.year) : void 0;
+      const scheduleSummary = await storage.getSchedulesSummary(month, year);
+      const assignments = await storage.getMonthAssignments(month, year);
+      const substitutionsData = await storage.getMonthSubstitutions(month, year);
+      res.json({
+        schedules: scheduleSummary,
+        assignments,
+        substitutions: substitutionsData
+      });
     } catch (error) {
       console.error("Error fetching schedules:", error);
       res.status(500).json({ message: "Failed to fetch schedules" });
