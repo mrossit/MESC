@@ -333,6 +333,14 @@ export default function Schedules() {
         setSelectedMinisterId("");
         setSelectedMassTime("");
         setSelectedPosition(1);
+      } else {
+        const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
+        console.error("Error response:", errorData);
+        toast({
+          title: "Erro",
+          description: errorData.message || "Erro ao escalar ministro",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error("Error assigning minister:", error);
@@ -1624,14 +1632,9 @@ export default function Schedules() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Ministro</label>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {ministers.filter(m => m.active).length} ativos
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {ministers.length} total
-                  </Badge>
-                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {ministers.length} ministros
+                </Badge>
               </div>
 
               {/* Barra de pesquisa */}
@@ -1712,15 +1715,10 @@ export default function Schedules() {
                     return filteredMinisters.map((minister) => (
                       <SelectItem key={minister.id} value={minister.id}>
                         <div className="flex items-center gap-2 w-full">
-                          <span className={cn(!minister.active && "text-muted-foreground")}>
+                          <span>
                             {minister.name}
                           </span>
                           <div className="flex items-center gap-1 ml-auto">
-                            {!minister.active && (
-                              <Badge variant="outline" className="text-xs bg-slate-100">
-                                Inativo
-                              </Badge>
-                            )}
                             {minister.preferredPosition && (
                               <Badge
                                 variant={minister.preferredPosition === selectedPosition ? "default" : "outline"}

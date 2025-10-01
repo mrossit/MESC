@@ -68,7 +68,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/test-schedules-api.ts)",
       "Bash(node:*)",
       "Read(//home/runner/**)",
-      "Bash(NODE_ENV=production npx tsx scripts/fix-schedule-positions.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/fix-schedule-positions.ts)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

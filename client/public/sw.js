@@ -1,4 +1,4 @@
-const VERSION = '5.1.0';
+const VERSION = '5.2.0';
 const BUILD_TIMESTAMP = '__BUILD_TIMESTAMP__'; // Será substituído durante o build
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 const urlsToCache = [
