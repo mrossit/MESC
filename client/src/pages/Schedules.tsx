@@ -52,6 +52,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
+import { ScheduleExport } from "@/components/ScheduleExport";
 
 // Helper function to capitalize first letter of a string
 const capitalizeFirst = (str: string) => {
@@ -1265,17 +1266,17 @@ export default function Schedules() {
 
       {/* Dialog para visualizar escala publicada */}
       <Dialog open={isViewScheduleDialogOpen} onOpenChange={setIsViewScheduleDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
+          <DialogHeader className="space-y-1 sm:space-y-2">
+            <DialogTitle className="text-base sm:text-lg leading-tight">
               Escala do dia {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Confira os ministros escalados para as celebrações deste dia
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[60vh] -mx-4 px-4 sm:mx-0 sm:px-0">
+          <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
             <div className="space-y-4 pr-2 sm:pr-4">
               {loadingDateAssignments ? (
                 <div className="flex items-center justify-center py-8">
@@ -1296,15 +1297,15 @@ export default function Schedules() {
                   )
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([massTime, assignments]) => (
-                    <div key={massTime} className="space-y-3">
+                    <div key={massTime} className="space-y-2 sm:space-y-3">
                       <div className="flex items-center gap-2 pb-2 border-b">
-                        <Clock className="h-5 w-5 text-primary" />
-                        <h3 className="font-semibold text-lg">
+                        <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                        <h3 className="font-semibold text-sm sm:text-lg">
                           Missa das {massTime}
                         </h3>
                       </div>
 
-                      <div className="grid gap-2 pl-7">
+                      <div className="grid gap-2 pl-0 sm:pl-7">
                         {assignments
                           .sort((a, b) => a.position - b.position)
                           .map((assignment) => {
@@ -1315,37 +1316,41 @@ export default function Schedules() {
                               <div
                                 key={assignment.id}
                                 className={cn(
-                                  "flex flex-col p-3 rounded-lg border bg-card",
+                                  "flex flex-col p-2 sm:p-3 rounded-lg border bg-card",
                                   isCurrentUser && "bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700"
                                 )}
                               >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <Badge variant={isCurrentUser ? "default" : "secondary"} className="flex-shrink-0">
-                                      {assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                                  <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                    <Badge variant={isCurrentUser ? "default" : "secondary"} className="flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1">
+                                      <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
+                                      <span className="sm:hidden">{assignment.position}</span>
                                     </Badge>
                                     <div className="min-w-0 flex-1">
-                                      <p className={cn("font-medium truncate", isCurrentUser && "text-amber-900 dark:text-amber-100")}>
+                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-amber-900 dark:text-amber-100")}>
                                         {assignment.ministerName || "Ministro"}
                                       </p>
+                                      <p className="text-[10px] sm:hidden text-muted-foreground truncate mt-0.5">
+                                        {LITURGICAL_POSITIONS[assignment.position]}
+                                      </p>
                                       {isCurrentUser && (
-                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                                        <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-300 mt-0.5">
                                           Você está escalado nesta posição
                                         </p>
                                       )}
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                  <div className="flex items-center gap-1 flex-shrink-0 sm:ml-2">
                                     {assignment.confirmed ? (
                                       <div className="flex items-center gap-1 text-green-600">
-                                        <Check className="h-4 w-4" />
-                                        <span className="text-xs hidden sm:inline">Confirmado</span>
+                                        <Check className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        <span className="text-[10px] sm:text-xs">Confirmado</span>
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1 text-yellow-600">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <span className="text-xs hidden sm:inline">Pendente</span>
+                                        <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        <span className="text-[10px] sm:text-xs">Pendente</span>
                                       </div>
                                     )}
                                   </div>
@@ -1355,15 +1360,15 @@ export default function Schedules() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="w-full text-orange-600 hover:text-orange-700 mt-2 text-xs sm:text-sm"
+                                    className="w-full text-orange-600 hover:text-orange-700 text-[11px] sm:text-sm h-8 sm:h-9"
                                     onClick={() => {
                                       setSelectedAssignmentForSubstitution(assignment);
                                       setIsSubstitutionDialogOpen(true);
                                     }}
                                   >
-                                    <UserX className="h-3.5 w-3.5 mr-1" />
+                                    <UserX className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                                     <span className="hidden sm:inline">Solicitar Substituição</span>
-                                    <span className="sm:hidden">Substituir</span>
+                                    <span className="sm:hidden">Solicitar Substituto</span>
                                   </Button>
                                 )}
                               </div>
@@ -1382,8 +1387,18 @@ export default function Schedules() {
             </div>
           </ScrollArea>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsViewScheduleDialogOpen(false)}>
+          <DialogFooter className="mt-3 sm:mt-4 flex-col sm:flex-row gap-2">
+            {selectedDateAssignments && selectedDateAssignments.length > 0 && selectedDate && (
+              <ScheduleExport
+                date={selectedDate}
+                assignments={selectedDateAssignments}
+              />
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setIsViewScheduleDialogOpen(false)}
+              className="w-full sm:w-auto text-sm"
+            >
               Fechar
             </Button>
           </DialogFooter>
