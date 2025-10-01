@@ -48,7 +48,7 @@ import {
   UserX,
   Send
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
@@ -133,7 +133,7 @@ export default function Schedules() {
       const response = await fetch(`/api/schedules?month=${currentMonth.getMonth() + 1}&year=${currentMonth.getFullYear()}`, {
         credentials: "include"
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSchedules(data.schedules || []);
@@ -168,7 +168,9 @@ export default function Schedules() {
     setIsViewScheduleDialogOpen(true); // Open dialog immediately
 
     try {
-      const response = await fetch(`/api/schedules/by-date/${date.toISOString()}`, {
+      // Format date as YYYY-MM-DD to avoid timezone issues
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
         credentials: "include"
       });
 
@@ -275,6 +277,9 @@ export default function Schedules() {
         return;
       }
 
+      // Format date as YYYY-MM-DD to avoid timezone issues
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
       const response = await fetch("/api/schedule-assignments", {
         method: "POST",
         headers: {
@@ -284,7 +289,7 @@ export default function Schedules() {
         body: JSON.stringify({
           scheduleId: currentSchedule.id,
           ministerId: selectedMinisterId,
-          date: selectedDate.toISOString(),
+          date: dateStr,
           massTime: selectedMassTime,
           position: selectedPosition
         })
@@ -494,9 +499,14 @@ export default function Schedules() {
   };
 
   const getAssignmentsForDate = (date: Date) => {
-    return assignments.filter(a => 
-      isSameDay(new Date(a.date), date)
-    );
+    return assignments.filter(a => {
+      // Parse date string directly to avoid timezone issues
+      // The date from API is in format YYYY-MM-DD
+      const assignmentDate = typeof a.date === 'string'
+        ? parseISO(a.date.split('T')[0]) // Handle both YYYY-MM-DD and full ISO strings
+        : a.date;
+      return isSameDay(assignmentDate, date);
+    });
   };
 
   const isUserScheduledOnDate = (date: Date) => {
@@ -887,8 +897,29 @@ export default function Schedules() {
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
+                              (() => {
+                                const totalPositions = availableMassTimes.length * 20;
+                                const filled = dayAssignments.length;
+                                const vacant = totalPositions - filled;
+
+                                return (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="flex items-center gap-0.5">
+                                      <Users className="h-3 w-3 text-primary" />
+                                      <span className="text-[9px] font-medium text-primary">{filled}</span>
+                                    </div>
+                                    {vacant > 0 && (
+                                      <div className="flex items-center gap-0.5">
+                                        <AlertCircle className="h-3 w-3 text-orange-500" />
+                                        <span className="text-[9px] font-medium text-orange-600 dark:text-orange-400">{vacant}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            ) : availableMassTimes.length > 0 ? (
                               <div className="flex items-center justify-center">
-                                <Users className="h-3.5 w-3.5 text-primary" />
+                                <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
                               </div>
                             ) : null}
                           </>
@@ -919,12 +950,32 @@ export default function Schedules() {
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
-                              <div className="flex items-center gap-1 text-primary">
-                                <Users className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="text-[10px] font-medium truncate">{dayAssignments.length} escalados</span>
-                              </div>
+                              (() => {
+                                // Calcular total de posições necessárias (20 posições por missa)
+                                const totalPositions = availableMassTimes.length * 20;
+                                const filled = dayAssignments.length;
+                                const vacant = totalPositions - filled;
+
+                                return (
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-1 text-primary">
+                                      <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                                      <span className="text-[10px] font-medium truncate">{filled} escalados</span>
+                                    </div>
+                                    {vacant > 0 && (
+                                      <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                        <span className="text-[10px] font-medium truncate">{vacant} vagas</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()
                             ) : availableMassTimes.length > 0 ? (
-                              <p className="text-[10px] text-muted-foreground truncate">Sem escalas</p>
+                              <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="text-[10px] font-medium truncate">{availableMassTimes.length * 20} vagas</span>
+                              </div>
                             ) : null}
                           </>)
                         ) : currentSchedule?.status === "draft" && isCoordinator ? (
@@ -1001,34 +1052,78 @@ export default function Schedules() {
                           <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
                             <Users className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                           </div>
-                          <span className="text-xs font-medium sm:hidden">Com escala</span>
+                          <span className="text-xs font-medium sm:hidden">Escalados</span>
                           <div className="hidden sm:block">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Tem escala</span>
-                            <p className="text-xs text-muted-foreground">Clique para ver quem está escalado</p>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Ministros escalados</span>
+                            <p className="text-xs text-muted-foreground">Número de ministros confirmados</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700 flex-shrink-0">
+                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Vagas</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-orange-700 dark:text-orange-400">Vagas disponíveis</span>
+                            <p className="text-xs text-muted-foreground">Posições ainda não preenchidas</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <span className="font-bold text-xs sm:text-sm text-primary">H</span>
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Hoje</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia atual</span>
+                            <p className="text-xs text-muted-foreground">Data de hoje</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs sm:text-sm font-medium">D</span>
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Selecionado</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia selecionado</span>
+                            <p className="text-xs text-muted-foreground">Dia que você clicou</p>
                           </div>
                         </div>
                       </>
                     )}
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
-                        <span className="font-bold text-xs sm:text-sm text-primary">H</span>
-                      </div>
-                      <span className="text-xs font-medium sm:hidden">Hoje</span>
-                      <div className="hidden sm:block">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">Hoje</span>
-                        <p className="text-xs text-muted-foreground">Data atual</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs sm:text-sm font-medium">D</span>
-                      </div>
-                      <span className="text-xs font-medium sm:hidden">Selecionado</span>
-                      <div className="hidden sm:block">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">Data selecionada</span>
-                        <p className="text-xs text-muted-foreground">Dia que você clicou</p>
-                      </div>
-                    </div>
+                    {currentSchedule.status === "draft" && isCoordinator && (
+                      <>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 border rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Horários</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Horários de missa</span>
+                            <p className="text-xs text-muted-foreground">Dias com missas disponíveis</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-primary rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 flex-shrink-0">
+                            <span className="font-bold text-xs sm:text-sm text-primary">H</span>
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Hoje</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia atual</span>
+                            <p className="text-xs text-muted-foreground">Data de hoje</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent border rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs sm:text-sm font-medium">D</span>
+                          </div>
+                          <span className="text-xs font-medium sm:hidden">Selecionado</span>
+                          <div className="hidden sm:block">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Dia selecionado</span>
+                            <p className="text-xs text-muted-foreground">Dia que você clicou</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                   {currentSchedule.status === "published" && (
                     <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">

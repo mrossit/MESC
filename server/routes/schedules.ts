@@ -80,10 +80,9 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
 router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.params;
-    const targetDate = new Date(date);
-    
-    // Find schedules for the target date
-    const targetDateStr = targetDate.toISOString().split('T')[0];
+    // Parse date string directly to avoid timezone issues
+    // Expected format: ISO date string (YYYY-MM-DD) or full ISO datetime
+    const targetDateStr = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
     const schedule = await db
       .select()
       .from(schedules)
@@ -144,17 +143,24 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     let query = db.select().from(schedules);
     
     if (month && year) {
-      // Calculate date range for the month
-      const startDate = new Date(parseInt(year as string), parseInt(month as string) - 1, 1);
-      const endDate = new Date(parseInt(year as string), parseInt(month as string), 0);
-      
+      // Calculate date range for the month using string formatting to avoid timezone issues
+      const yearNum = parseInt(year as string);
+      const monthNum = parseInt(month as string);
+
+      // Format dates as YYYY-MM-DD strings directly
+      const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-01`;
+
+      // Calculate last day of month
+      const lastDay = new Date(yearNum, monthNum, 0).getDate();
+      const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
       const schedulesList = await db
         .select()
         .from(schedules)
         .where(
           and(
-            gte(schedules.date, startDate.toISOString().split('T')[0]),
-            lte(schedules.date, endDate.toISOString().split('T')[0])
+            gte(schedules.date, startDateStr),
+            lte(schedules.date, endDateStr)
           )
         );
 
