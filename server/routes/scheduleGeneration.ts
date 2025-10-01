@@ -558,6 +558,43 @@ function calculateCoverageByDay(schedules: any[]) {
 }
 
 /**
+ * Buscar todas as atribuições para uma data específica
+ * GET /api/schedules/by-date/:date
+ */
+router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { date } = req.params;
+    const dateOnly = date.split('T')[0]; // Extrair apenas a parte da data (YYYY-MM-DD)
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+
+    const assignments = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        type: schedules.type,
+        ministerId: schedules.ministerId,
+        position: schedules.position,
+        status: schedules.status,
+        notes: schedules.notes,
+        ministerName: users.name
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(eq(schedules.date, dateOnly))
+      .orderBy(schedules.time, schedules.position);
+
+    res.json(assignments);
+  } catch (error: any) {
+    logger.error('Error fetching schedule by date:', error);
+    res.status(500).json({ error: 'Failed to fetch schedule' });
+  }
+});
+
+/**
  * Buscar ministros escalados para uma data/hora específica
  * GET /api/schedules/:date/:time
  */
