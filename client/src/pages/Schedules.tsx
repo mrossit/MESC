@@ -6,6 +6,7 @@ import { invalidateScheduleCache } from "@/lib/cacheManager";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { 
   Dialog,
@@ -620,11 +621,6 @@ export default function Schedules() {
     }
   };
 
-  const currentSchedule = schedules.find(s =>
-    s.month === currentMonth.getMonth() + 1 &&
-    s.year === currentMonth.getFullYear()
-  );
-
   if (loading) {
     return (
       <Layout
@@ -637,6 +633,11 @@ export default function Schedules() {
       </Layout>
     );
   }
+
+  const currentSchedule = schedules.find(s =>
+    s.month === currentMonth.getMonth() + 1 &&
+    s.year === currentMonth.getFullYear()
+  );
 
   return (
     <Layout 
