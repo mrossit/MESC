@@ -130,6 +130,7 @@ export default function Schedules() {
   const [submittingSubstitution, setSubmittingSubstitution] = useState(false);
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -291,8 +292,8 @@ export default function Schedules() {
     }
 
     try {
-      const currentSchedule = schedules.find(s => 
-        s.month === currentMonth.getMonth() + 1 && 
+      const currentSchedule = schedules.find(s =>
+        s.month === currentMonth.getMonth() + 1 &&
         s.year === currentMonth.getFullYear()
       );
 
@@ -308,31 +309,52 @@ export default function Schedules() {
       // Format date as YYYY-MM-DD to avoid timezone issues
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-      const response = await fetch("/api/schedule-assignments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          scheduleId: currentSchedule.id,
-          ministerId: selectedMinisterId,
-          date: dateStr,
-          massTime: selectedMassTime,
-          position: selectedPosition
-        })
-      });
+      let response;
+
+      // Se estamos editando, usar PATCH para atualizar
+      if (editingAssignmentId) {
+        console.log('📝 Atualizando assignment existente:', editingAssignmentId);
+        response = await fetch(`/api/schedule-assignments/${editingAssignmentId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            ministerId: selectedMinisterId,
+            position: selectedPosition
+          })
+        });
+      } else {
+        // Criar novo assignment
+        console.log('➕ Criando novo assignment');
+        response = await fetch("/api/schedule-assignments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            scheduleId: currentSchedule.id,
+            ministerId: selectedMinisterId,
+            date: dateStr,
+            massTime: selectedMassTime,
+            position: selectedPosition
+          })
+        });
+      }
 
       if (response.ok) {
         toast({
           title: "Sucesso",
-          description: "Ministro escalado com sucesso"
+          description: editingAssignmentId ? "Escala atualizada com sucesso" : "Ministro escalado com sucesso"
         });
         fetchSchedules();
         setIsAssignmentDialogOpen(false);
         setSelectedMinisterId("");
         setSelectedMassTime("");
         setSelectedPosition(1);
+        setEditingAssignmentId(null); // Limpar modo de edição
       } else {
         const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
         console.error("Error response:", errorData);
@@ -1525,6 +1547,7 @@ export default function Schedules() {
                                             setSelectedMassTime(assignment.massTime);
                                             setSelectedPosition(assignment.position);
                                             setSelectedMinisterId(assignment.ministerId);
+                                            setEditingAssignmentId(assignment.id); // Marcar que estamos editando
                                             setIsViewScheduleDialogOpen(false);
                                             setIsAssignmentDialogOpen(true);
                                           } catch (error: any) {
@@ -1622,6 +1645,7 @@ export default function Schedules() {
           // Limpar estados ao fechar
           setMinisterSearch('');
           setFilterByPreferredPosition(false);
+          setEditingAssignmentId(null); // Limpar modo de edição ao fechar
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">

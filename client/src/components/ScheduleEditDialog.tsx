@@ -134,11 +134,14 @@ export function ScheduleEditDialog({
     try {
       setSaving(true);
 
+      const ministerIds = ministers.map(m => m.id);
+      console.log('[ScheduleEditDialog] Salvando escala:', { date, time, ministerIds, ministers });
+
       // Atualizar escala usando o endpoint batch-update
       await apiRequest('PATCH', '/api/schedules/batch-update', {
         date,
         time,
-        ministers: ministers.map(m => m.id)
+        ministers: ministerIds
       });
 
       toast({
@@ -150,6 +153,7 @@ export function ScheduleEditDialog({
       onSave();
       onOpenChange(false);
     } catch (error: any) {
+      console.error('[ScheduleEditDialog] Erro ao salvar:', error);
       toast({
         title: "Erro ao salvar",
         description: error.message || "Ocorreu um erro ao salvar as alterações.",
@@ -245,10 +249,10 @@ export function ScheduleEditDialog({
 
           {/* Adicionar ministro */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Adicionar Ministro</h4>
+            <h4 className="text-sm font-medium">Adicionar Ministro (clique no nome para adicionar)</h4>
             <div className="space-y-2">
               <Input
-                placeholder="Digite para buscar ministro..."
+                placeholder="Digite para buscar e clicar no ministro..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="input-search-minister"
@@ -274,8 +278,25 @@ export function ScheduleEditDialog({
                       <button
                         key={minister.id}
                         onClick={() => {
-                          setSelectedMinisterId(minister.id);
-                          setSearchQuery(minister.name);
+                          // Verificar se já está na lista
+                          if (ministers.some(m => m.id === minister.id)) {
+                            toast({
+                              title: "Ministro já escalado",
+                              description: `${minister.name} já está nesta escala.`,
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          
+                          // Adicionar direto ao clicar
+                          setMinisters([...ministers, { id: minister.id, name: minister.name }]);
+                          setSearchQuery('');
+                          setSelectedMinisterId('');
+                          
+                          toast({
+                            title: "Ministro adicionado",
+                            description: `${minister.name} foi adicionado à escala.`
+                          });
                         }}
                         className={`
                           w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
@@ -290,28 +311,21 @@ export function ScheduleEditDialog({
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleAddMinister}
-                  disabled={!selectedMinisterId}
-                  data-testid="button-add-minister"
-                  className="flex-1"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Ministro
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMinisters([...ministers, { id: null, name: 'VACANTE' }]);
-                  }}
-                  variant="outline"
-                  data-testid="button-add-vacant"
-                  className="flex-1"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Vaga VACANTE
-                </Button>
-              </div>
+              <Button
+                onClick={() => {
+                  setMinisters([...ministers, { id: null, name: 'VACANTE' }]);
+                  toast({
+                    title: "Vaga adicionada",
+                    description: "Posição VACANTE adicionada à escala."
+                  });
+                }}
+                variant="outline"
+                data-testid="button-add-vacant"
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Vaga VACANTE
+              </Button>
             </div>
           </div>
         </div>
