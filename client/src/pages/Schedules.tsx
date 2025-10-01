@@ -127,6 +127,8 @@ export default function Schedules() {
   const [selectedAssignmentForSubstitution, setSelectedAssignmentForSubstitution] = useState<ScheduleAssignment | null>(null);
   const [substitutionReason, setSubstitutionReason] = useState("");
   const [submittingSubstitution, setSubmittingSubstitution] = useState(false);
+  const [ministerSearch, setMinisterSearch] = useState("");
+  const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -168,7 +170,14 @@ export default function Schedules() {
       if (response.ok) {
         const data = await response.json();
         console.log('📋 Ministers loaded:', data);
-        setMinisters(data.filter((m: any) => m.active));
+        // Carregar TODOS os ministros (não filtrar por ativo) para permitir edição completa
+        // Ordenar: ativos primeiro, depois alfabeticamente
+        const sortedMinisters = data.sort((a: any, b: any) => {
+          if (a.active && !b.active) return -1;
+          if (!a.active && b.active) return 1;
+          return a.name.localeCompare(b.name);
+        });
+        setMinisters(sortedMinisters);
       }
     } catch (error) {
       console.error("Error fetching ministers:", error);
@@ -1550,7 +1559,17 @@ export default function Schedules() {
       </Dialog>
 
       {/* Dialog para escalar ministro */}
-      <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+      <Dialog open={isAssignmentDialogOpen} onOpenChange={(open) => {
+        setIsAssignmentDialogOpen(open);
+        if (open) {
+          console.log('🔄 Recarregando ministros ao abrir diálogo de edição');
+          fetchMinisters();
+        } else {
+          // Limpar estados ao fechar
+          setMinisterSearch('');
+          setFilterByPreferredPosition(false);
+        }
+      }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Escalar Ministro</DialogTitle>
@@ -1596,23 +1615,119 @@ export default function Schedules() {
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Ministro</label>
-              <Select value={selectedMinisterId} onValueChange={setSelectedMinisterId}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Ministro</label>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {ministers.filter(m => m.active).length} ativos
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {ministers.length} total
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Barra de pesquisa */}
+              <div className="relative">
+                <Input
+                  placeholder="Buscar ministro pelo nome..."
+                  value={ministerSearch}
+                  onChange={(e) => setMinisterSearch(e.target.value)}
+                  className="pr-10"
+                />
+                {ministerSearch && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => setMinisterSearch('')}
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Filtros */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={filterByPreferredPosition ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterByPreferredPosition(!filterByPreferredPosition)}
+                  className="text-xs"
+                >
+                  <Users className="h-3 w-3 mr-1" />
+                  {filterByPreferredPosition ? 'Todos' : 'Por Preferência'}
+                </Button>
+              </div>
+
+              {/* Seletor de ministro */}
+              <Select
+                value={selectedMinisterId}
+                onValueChange={(value) => {
+                  setSelectedMinisterId(value);
+                  setMinisterSearch('');
+                }}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o ministro" />
+                  <SelectValue placeholder={ministers.length === 0 ? "Carregando ministros..." : "Selecione o ministro"} />
                 </SelectTrigger>
-                <SelectContent>
-                  {ministers.map((minister) => (
-                    <SelectItem key={minister.id} value={minister.id}>
-                      {minister.name}
-                      {minister.preferredPosition && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (Pref: {LITURGICAL_POSITIONS[minister.preferredPosition]})
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[300px]">
+                  {ministers.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      Carregando...
+                    </div>
+                  ) : (() => {
+                    // Filtrar ministros
+                    let filteredMinisters = ministers;
+
+                    // Filtro por busca
+                    if (ministerSearch.trim()) {
+                      filteredMinisters = filteredMinisters.filter(m =>
+                        m.name.toLowerCase().includes(ministerSearch.toLowerCase())
+                      );
+                    }
+
+                    // Filtro por posição preferida
+                    if (filterByPreferredPosition && selectedPosition) {
+                      filteredMinisters = filteredMinisters.filter(m =>
+                        m.preferredPosition === selectedPosition
+                      );
+                    }
+
+                    if (filteredMinisters.length === 0) {
+                      return (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          Nenhum ministro encontrado
+                        </div>
+                      );
+                    }
+
+                    return filteredMinisters.map((minister) => (
+                      <SelectItem key={minister.id} value={minister.id}>
+                        <div className="flex items-center gap-2 w-full">
+                          <span className={cn(!minister.active && "text-muted-foreground")}>
+                            {minister.name}
+                          </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            {!minister.active && (
+                              <Badge variant="outline" className="text-xs bg-slate-100">
+                                Inativo
+                              </Badge>
+                            )}
+                            {minister.preferredPosition && (
+                              <Badge
+                                variant={minister.preferredPosition === selectedPosition ? "default" : "outline"}
+                                className="text-xs"
+                              >
+                                {LITURGICAL_POSITIONS[minister.preferredPosition]}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </div>
