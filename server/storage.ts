@@ -133,6 +133,8 @@ export interface IStorage {
   // Schedule operations
   createSchedule(schedule: any): Promise<Schedule>;
   getSchedules(): Promise<Schedule[]>;
+  getSchedulesSummary(month?: number, year?: number): Promise<any[]>;
+  getSchedulesByDate(date: string): Promise<any[]>;
   getScheduleById(id: string): Promise<Schedule | undefined>;
   getScheduleAssignments(scheduleId: string): Promise<any[]>;
   updateSchedule(id: string, schedule: any): Promise<Schedule>;
@@ -361,6 +363,75 @@ export class DatabaseStorage implements IStorage {
 
   async getSchedules(): Promise<Schedule[]> {
     return await db.select().from(schedules).orderBy(desc(schedules.createdAt));
+  }
+
+  async getSchedulesSummary(month?: number, year?: number): Promise<any[]> {
+    // Agrupa atribuições por mês/ano e retorna um resumo compatível com o frontend
+    const currentYear = year || new Date().getFullYear();
+    const currentMonth = month || new Date().getMonth() + 1;
+
+    // Buscar atribuições do mês
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = month === 12
+      ? `${currentYear + 1}-01-01`
+      : `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+
+    const assignments = await db
+      .select()
+      .from(schedules)
+      .where(and(
+        gte(schedules.date, startDate),
+        sql`${schedules.date} < ${endDate}`
+      ));
+
+    if (assignments.length === 0) {
+      return [];
+    }
+
+    // Criar um objeto de resumo da escala mensal
+    const summary = {
+      id: `schedule-${currentYear}-${currentMonth}`,
+      title: `Escala de ${this.getMonthName(currentMonth)}/${currentYear}`,
+      month: currentMonth,
+      year: currentYear,
+      status: 'published', // Assumir publicada se há atribuições
+      createdBy: 'system',
+      createdAt: assignments[0]?.createdAt || new Date(),
+      publishedAt: assignments[0]?.createdAt || new Date(),
+      totalAssignments: assignments.length
+    };
+
+    return [summary];
+  }
+
+  private getMonthName(month: number): string {
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return months[month - 1] || 'Mês';
+  }
+
+  async getSchedulesByDate(date: string): Promise<any[]> {
+    // Buscar todas as atribuições para uma data específica
+    const dateOnly = date.split('T')[0]; // Extrair apenas a parte da data (YYYY-MM-DD)
+
+    const assignments = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        type: schedules.type,
+        ministerId: schedules.ministerId,
+        position: schedules.position,
+        status: schedules.status,
+        notes: schedules.notes,
+        ministerName: users.name
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(eq(schedules.date, dateOnly))
+      .orderBy(schedules.time, schedules.position);
+
+    return assignments;
   }
 
   async getScheduleById(id: string): Promise<Schedule | undefined> {

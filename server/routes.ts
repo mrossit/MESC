@@ -890,7 +890,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Schedule routes
   app.get('/api/schedules', authenticateToken, async (req, res) => {
     try {
-      const schedules = await storage.getSchedules();
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+
+      const schedules = await storage.getSchedulesSummary(month, year);
       res.json(schedules);
     } catch (error) {
       console.error("Error fetching schedules:", error);
@@ -909,6 +912,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating schedule:", error);
       res.status(500).json({ message: "Failed to create schedule" });
+    }
+  });
+
+  app.get('/api/schedules/by-date/:date', authenticateToken, async (req, res) => {
+    try {
+      const date = req.params.date;
+      const schedules = await storage.getSchedulesByDate(date);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching schedules by date:", error);
+      res.status(500).json({ message: "Failed to fetch schedules by date" });
     }
   });
 
