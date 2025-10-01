@@ -1,5 +1,6 @@
 import { api } from './api';
 import { User, ApiResponse } from '@/types';
+import { clearCacheOnLogout } from '@/lib/cacheManager';
 
 interface LoginCredentials {
   email: string;
@@ -34,7 +35,8 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    localStorage.removeItem('token');
+    // Limpa todo o cache antes de fazer logout
+    clearCacheOnLogout();
     window.location.href = '/login';
   }
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { CachedAuthGuard as AuthGuard } from "@/components/cached-auth-guard";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { checkCacheVersion } from "@/lib/cacheManager";
 
 // Pages
 import Login from "@/pages/login";
@@ -162,6 +163,11 @@ function Router() {
 }
 
 function App() {
+  // Verificar versão do cache ao iniciar a aplicação
+  useEffect(() => {
+    checkCacheVersion();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="mesc-ui-theme">

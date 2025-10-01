@@ -8,8 +8,8 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { 
-  Calendar, Save, Edit, Trash2, Plus, Users, Clock, 
+import {
+  Calendar, Save, Edit, Trash2, Plus, Users, Clock,
   CheckCircle, AlertCircle, ArrowLeft, ArrowRight,
   RefreshCw, Download, Eye
 } from 'lucide-react';
@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, WEEKDAY_NAMES } from '@shared/constants';
+import { clearEditCache } from '@/lib/cacheManager';
 
 interface ScheduleAssignment {
   id: string;
@@ -106,6 +107,14 @@ export default function ScheduleEditor() {
   useEffect(() => {
     fetchScheduleData();
   }, [currentMonth]);
+
+  // Limpar cache ao desmontar o componente (quando sair da edição)
+  useEffect(() => {
+    return () => {
+      console.log('[ScheduleEditor] Limpando cache ao sair da edição');
+      clearEditCache();
+    };
+  }, []);
 
   // Avisar quando estiver editando escala publicada
   useEffect(() => {
