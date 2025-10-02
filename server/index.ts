@@ -17,6 +17,32 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
+
+// CRITICAL: Health check endpoints MUST be registered FIRST
+// before any middleware that might delay the response
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Root path handler for deployment health checks
+app.get('/', (_req: Request, res: Response, next) => {
+  // In production, this will be overridden by static file serving
+  // But it ensures health checks work during initialization
+  if (res.headersSent) return;
+  
+  // If headers not sent yet and we're not serving a file, respond with OK
+  const acceptHeader = _req.get('accept') || '';
+  if (acceptHeader.includes('application/json') || acceptHeader.includes('text/html') === false) {
+    return res.status(200).json({ status: 'ok' });
+  }
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -43,17 +69,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Add health check routes before other routes
-  // Root endpoint - removed to let Vite/static handler serve the React app
-  // Health checks should use /health endpoint instead
-
-  app.get('/health', (_req: Request, res: Response) => {
-    res.status(200).json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
 
   const server = await registerRoutes(app);
 
