@@ -83,18 +83,31 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
     // Parse date string directly to avoid timezone issues
     // Expected format: ISO date string (YYYY-MM-DD) or full ISO datetime
     const targetDateStr = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
-    const schedule = await db
-      .select()
+    
+    // Buscar TODOS os ministros escalados naquela data (não apenas 1!)
+    const allAssignments = await db
+      .select({
+        id: schedules.id,
+        scheduleId: schedules.id,
+        ministerId: schedules.ministerId,
+        ministerName: users.name,
+        date: schedules.date,
+        massTime: schedules.time,
+        position: schedules.position,
+        confirmed: sql`true`,
+        status: schedules.status
+      })
       .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(
         and(
           eq(schedules.date, targetDateStr),
           eq(schedules.status, "scheduled")
         )
       )
-      .limit(1);
+      .orderBy(schedules.time, schedules.position);
     
-    if (schedule.length === 0) {
+    if (allAssignments.length === 0) {
       return res.json({ 
         schedule: null, 
         assignments: [],
@@ -102,32 +115,13 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       });
     }
     
-    // Note: scheduleAssignments table doesn't exist - using single schedule entry
-    const allAssignments = await db
-      .select({
-        id: schedules.id,
-        scheduleId: schedules.id,
-        ministerId: schedules.ministerId,
-        date: schedules.date,
-        massTime: schedules.time,
-        position: schedules.position,
-        confirmed: sql`true`
-      })
-      .from(schedules)
-      .leftJoin(users, eq(schedules.ministerId, users.id))
-      .where(eq(schedules.id, schedule[0].id))
-      .orderBy(schedules.time, schedules.position);
-    
-    // Filter assignments for the specific date in JavaScript
-    const dayAssignments = allAssignments.filter(a => {
-      // Since date is a string from the database, parse it directly
-      const assignmentDateStr = a.date; // This should already be in YYYY-MM-DD format
-      return assignmentDateStr === targetDateStr;
-    });
-    
     res.json({
-      schedule: schedule[0],
-      assignments: dayAssignments
+      schedule: {
+        id: allAssignments[0].scheduleId,
+        date: targetDateStr,
+        status: "scheduled"
+      },
+      assignments: allAssignments
     });
   } catch (error) {
     console.error("Error fetching schedule by date:", error);
