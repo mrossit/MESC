@@ -1442,11 +1442,12 @@ export default function Schedules() {
                                         className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
                                         onClick={async () => {
                                           try {
-                                            console.log('🔄 Iniciando edição do assignment:', assignment);
+                                            console.log('🔄 [EDIT] Iniciando edição do assignment:', assignment);
+                                            console.log('🔄 [EDIT] ATENÇÃO: Este fluxo VAI DELETAR o registro antes de abrir o modal!');
 
                                             // Verificar se o assignment tem um ID válido
                                             if (!assignment.id || assignment.id === 'temp-' || assignment.id.startsWith('temp-')) {
-                                              console.log('⚠️ Assignment sem ID válido (gerado pela IA), apenas abrindo diálogo');
+                                              console.log('⚠️ [EDIT] Assignment sem ID válido (gerado pela IA), apenas abrindo diálogo');
                                               // Se não tem ID (foi gerado pela IA), apenas abrir o diálogo
                                               setSelectedMassTime(assignment.massTime);
                                               setSelectedPosition(assignment.position);
@@ -1456,13 +1457,14 @@ export default function Schedules() {
                                               return;
                                             }
 
+                                            console.log('🗑️ [EDIT] DELETANDO registro ID:', assignment.id);
                                             // Deletar a escalação usando o endpoint correto
                                             const deleteResponse = await fetch(`/api/schedules/${assignment.id}`, {
                                               method: "DELETE",
                                               credentials: "include"
                                             });
 
-                                            console.log('🗑️ Response da deleção:', deleteResponse.status);
+                                            console.log('🗑️ [EDIT] Response da deleção:', deleteResponse.status);
 
                                             if (!deleteResponse.ok) {
                                               // Se for 404, o assignment não existe (já foi deletado ou nunca foi salvo)
@@ -1749,7 +1751,11 @@ export default function Schedules() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAssignmentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              console.log('🚫 [CANCEL] Cancelando modal de escalação');
+              console.log('🚫 [CANCEL] Estado atual:', { selectedDate, selectedMassTime, selectedMinisterId, selectedPosition });
+              setIsAssignmentDialogOpen(false);
+            }}>
               Cancelar
             </Button>
             <Button onClick={handleAssignMinister}>
