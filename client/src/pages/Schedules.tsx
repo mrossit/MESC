@@ -309,7 +309,7 @@ export default function Schedules() {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       // Usar o endpoint correto: /api/schedules/add-minister
-      console.log('➕ Adicionando ministro à escala');
+      console.log('➕ Adicionando ministro à escala na posição:', selectedPosition);
       const response = await fetch("/api/schedules/add-minister", {
         method: "POST",
         headers: {
@@ -320,6 +320,7 @@ export default function Schedules() {
           date: dateStr,
           time: selectedMassTime,
           ministerId: selectedMinisterId,
+          position: selectedPosition, // Envia a posição desejada
           type: 'missa'
         })
       });
