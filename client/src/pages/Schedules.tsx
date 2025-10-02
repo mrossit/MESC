@@ -282,11 +282,7 @@ export default function Schedules() {
   };
 
   const handleAssignMinister = async () => {
-    console.log('🎯 [ASSIGN] Iniciando - selectedDate:', selectedDate, 'selectedMassTime:', selectedMassTime, 'selectedMinisterId:', selectedMinisterId);
-    console.log('🎯 [ASSIGN] Modo edição?', editingAssignmentId ? `Sim, editando ID: ${editingAssignmentId}` : 'Não, criando novo');
-    
     if (!selectedDate || !selectedMassTime || !selectedMinisterId) {
-      console.log('⚠️ [ASSIGN] Campos vazios!', { selectedDate, selectedMassTime, selectedMinisterId });
       toast({
         title: "Atenção",
         description: "Preencha todos os campos",
@@ -298,7 +294,6 @@ export default function Schedules() {
     try {
       // Se estamos editando, deletar o assignment antigo primeiro
       if (editingAssignmentId) {
-        console.log('🗑️ [ASSIGN] Deletando assignment antigo:', editingAssignmentId);
         const deleteResponse = await fetch(`/api/schedules/${editingAssignmentId}`, {
           method: "DELETE",
           credentials: "include"
@@ -308,7 +303,6 @@ export default function Schedules() {
           const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
           throw new Error(errorData.message || "Erro ao remover escalação anterior");
         }
-        console.log('✅ [ASSIGN] Assignment antigo deletado');
       }
 
       const currentSchedule = schedules.find(s =>
@@ -316,10 +310,7 @@ export default function Schedules() {
         s.year === currentMonth.getFullYear()
       );
 
-      console.log('📅 [ASSIGN] currentSchedule:', currentSchedule);
-
       if (!currentSchedule) {
-        console.log('❌ [ASSIGN] Nenhuma escala encontrada para este mês!');
         toast({
           title: "Erro",
           description: "Crie uma escala para este mês primeiro",
@@ -336,12 +327,9 @@ export default function Schedules() {
         date: dateStr,
         time: selectedMassTime,
         ministerId: selectedMinisterId,
-        position: selectedPosition, // Envia a posição desejada
+        position: selectedPosition,
         type: 'missa'
       };
-      
-      console.log('➕ [FRONTEND] Adicionando ministro à escala:', requestData);
-      console.log('➕ [FRONTEND] selectedPosition type:', typeof selectedPosition, 'value:', selectedPosition);
       
       const response = await fetch("/api/schedules/add-minister", {
         method: "POST",
@@ -374,12 +362,10 @@ export default function Schedules() {
         });
       }
     } catch (error) {
-      console.error("❌ [ASSIGN] Error assigning minister:", error);
-      console.error("❌ [ASSIGN] Error stack:", error instanceof Error ? error.stack : 'No stack');
-      console.error("❌ [ASSIGN] Error message:", error instanceof Error ? error.message : String(error));
+      console.error("Error assigning minister:", error);
       toast({
         title: "Erro",
-        description: `Erro ao escalar ministro: ${error instanceof Error ? error.message : String(error)}`,
+        description: error instanceof Error ? error.message : "Erro ao escalar ministro",
         variant: "destructive"
       });
     }
@@ -1460,9 +1446,6 @@ export default function Schedules() {
                                         variant="outline"
                                         className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
                                         onClick={() => {
-                                          console.log('✏️ [EDIT] Abrindo modal de edição para assignment:', assignment);
-                                          console.log('✏️ [EDIT] Setting position to:', assignment.position);
-                                          
                                           // Salvar o ID do assignment que está sendo editado
                                           setEditingAssignmentId(assignment.id);
                                           
@@ -1474,8 +1457,6 @@ export default function Schedules() {
                                           // Fechar dialog de visualização e abrir dialog de edição
                                           setIsViewScheduleDialogOpen(false);
                                           setIsAssignmentDialogOpen(true);
-                                          
-                                          console.log('✏️ [EDIT] Modal aberto. Se cancelar, nada será deletado.');
                                         }}
                                       >
                                         <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
@@ -1557,13 +1538,12 @@ export default function Schedules() {
       <Dialog open={isAssignmentDialogOpen} onOpenChange={(open) => {
         setIsAssignmentDialogOpen(open);
         if (open) {
-          console.log('🔄 Recarregando ministros ao abrir diálogo de edição');
           fetchMinisters();
         } else {
           // Limpar estados ao fechar
           setMinisterSearch('');
           setFilterByPreferredPosition(false);
-          setEditingAssignmentId(null); // Limpar modo de edição
+          setEditingAssignmentId(null);
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
@@ -1602,16 +1582,12 @@ export default function Schedules() {
                 min="1"
                 max="50"
                 value={selectedPosition}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  console.log('🔢 [INPUT] Position changed to:', val, 'type:', typeof val);
-                  setSelectedPosition(val || 1);
-                }}
+                onChange={(e) => setSelectedPosition(parseInt(e.target.value) || 1)}
                 placeholder="Digite a posição (1, 2, 3...)"
                 data-testid="input-position"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Define a ordem em que o ministro aparece na lista (1 = primeiro). <strong>Valor atual: {selectedPosition}</strong>
+                Define a ordem em que o ministro aparece na lista (1 = primeiro)
               </p>
             </div>
 
@@ -1725,12 +1701,8 @@ export default function Schedules() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => {
-              console.log('🚫 [CANCEL] Cancelando modal de escalação');
-              console.log('🚫 [CANCEL] Estado atual:', { selectedDate, selectedMassTime, selectedMinisterId, selectedPosition });
-              console.log('🚫 [CANCEL] Editando?', editingAssignmentId ? `Sim, ID: ${editingAssignmentId}` : 'Não');
               setIsAssignmentDialogOpen(false);
-              setEditingAssignmentId(null); // Limpar modo de edição
-              console.log('✅ [CANCEL] Modal fechado sem deletar nada');
+              setEditingAssignmentId(null);
             }}>
               Cancelar
             </Button>
