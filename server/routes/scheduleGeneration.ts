@@ -676,6 +676,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       date: z.string(),
       time: z.string(),
       ministerId: z.string(),
+      position: z.number().optional(), // NOVO: aceita posição opcional
       type: z.string().default('missa'),
       location: z.string().optional(),
       notes: z.string().optional()
@@ -702,20 +703,27 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       return res.status(400).json({ error: 'Ministro já escalado neste horário' });
     }
 
-    // Contar quantos ministros já estão escalados para calcular a posição
-    const existingMinisters = await db
-      .select({ position: schedules.position })
-      .from(schedules)
-      .where(and(
-        eq(schedules.date, data.date),
-        eq(schedules.time, data.time)
-      ))
-      .orderBy(desc(schedules.position));
+    // Se posição foi fornecida, usar ela. Caso contrário, calcular automaticamente
+    let newPosition: number;
     
-    // Nova posição é a maior posição existente + 1, ou 1 se não há ninguém
-    const newPosition = existingMinisters.length > 0 && existingMinisters[0].position 
-      ? existingMinisters[0].position + 1 
-      : 1;
+    if (data.position !== undefined) {
+      // Usar a posição fornecida (útil para edição/substituição)
+      newPosition = data.position;
+    } else {
+      // Calcular automaticamente: última posição + 1
+      const existingMinisters = await db
+        .select({ position: schedules.position })
+        .from(schedules)
+        .where(and(
+          eq(schedules.date, data.date),
+          eq(schedules.time, data.time)
+        ))
+        .orderBy(desc(schedules.position));
+      
+      newPosition = existingMinisters.length > 0 && existingMinisters[0].position 
+        ? existingMinisters[0].position + 1 
+        : 1;
+    }
 
     // Inserir novo ministro
     const [newSchedule] = await db
