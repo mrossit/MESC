@@ -694,6 +694,8 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     }
 
     // Verificar se o ministro já está escalado nesta data/hora
+    logger.info(`[ADD_MINISTER] 🔍 Verificando duplicação: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
+    
     const [existing] = await db
       .select()
       .from(schedules)
@@ -705,9 +707,11 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       .limit(1);
 
     if (existing) {
-      logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário`);
+      logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário (ID do registro existente: ${existing.id})`);
       return res.status(400).json({ error: 'Ministro já escalado neste horário' });
     }
+    
+    logger.info(`[ADD_MINISTER] ✅ Nenhuma duplicação encontrada, prosseguindo...`);
 
     // Se posição foi fornecida, usar ela. Caso contrário, calcular automaticamente
     let newPosition: number;
