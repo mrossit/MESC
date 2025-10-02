@@ -34,9 +34,10 @@ app.get('/', (_req: Request, res: Response, next) => {
   // But it ensures health checks work during initialization
   if (res.headersSent) return;
   
-  // If headers not sent yet and we're not serving a file, respond with OK
+  // Only respond with JSON if explicitly requesting JSON (for health checks)
+  // Otherwise, let Vite or static file serving handle it
   const acceptHeader = _req.get('accept') || '';
-  if (acceptHeader.includes('application/json') || acceptHeader.includes('text/html') === false) {
+  if (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html')) {
     return res.status(200).json({ status: 'ok' });
   }
   
