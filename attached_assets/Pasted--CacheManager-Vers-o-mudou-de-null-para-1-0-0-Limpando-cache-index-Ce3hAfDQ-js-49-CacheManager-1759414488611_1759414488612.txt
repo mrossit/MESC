@@ -1,0 +1,27 @@
+[CacheManager] Versão mudou de null para 1.0.0. Limpando cache...
+index.Ce3hAfDQ.js:49 [CacheManager] Limpando todo o cache...
+index.Ce3hAfDQ.js:49 [CacheManager] Cache limpo com sucesso
+?v=1759414319971:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) <input type=​"password" class=​"flex h-10 w-full min-w-0 max-w-full rounded-md border px-3 py-2 text-base sm:​text-sm font-normal leading-tight ring-offset-background file:​border-0 file:​bg-transparent file:​text-sm file:​font-medium file:​text-foreground placeholder:​text-muted-foreground focus-visible:​outline-none focus-visible:​ring-2 focus-visible:​ring-ring focus-visible:​ring-offset-2 disabled:​cursor-not-allowed disabled:​opacity-50 bg-background border-border focus:​border-primary focus:​ring-primary pr-12 transition-all duration-200" id=​"password" placeholder=​"Sua senha" required data-testid=​"input-password" value=​"123pEgou$&@">​
+VM15:6 ServiceWorker registration successful: https://saojudastadeu.replit.app/
+?v=1759414319971:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] Cached data for /dashboard: Object
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] State: Object
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] Access granted from cache
+3index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] Cached data for /schedules: Object
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] State: Object
+index.Ce3hAfDQ.js:49 [CachedAuthGuard] Access granted from cache
+index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+index.Ce3hAfDQ.js:49 [CacheManager] Invalidando cache de escalas...
+index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+index.Ce3hAfDQ.js:49 📋 Ministers loaded: Array(128)
+2index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+index.Ce3hAfDQ.js:49 📅 Schedule data for date: Object
+9index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+schedules:1 Blocked aria-hidden on an element because its descendant retained focus. The focus must not be hidden from assistive technology users. Avoid using aria-hidden on a focused element or its ancestor. Consider using the inert attribute instead, which will also prevent focus. For more details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
+Element with focus: <input.flex h-10 w-full min-w-0 max-w-full rounded-md border border-border bg-input px-3 py-2 text-base sm:text-sm font-normal leading-tight ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 pr-10>
+Ancestor with aria-hidden: <div.fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-background/95 backdrop-blur-md shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6#radix-:r1k:> <div role=​"dialog" id=​"radix-:​r1k:​" aria-describedby=​"radix-:​r1m:​" aria-labelledby=​"radix-:​r1l:​" data-state=​"open" class=​"fixed left-[50%]​ top-[50%]​ z-50 grid w-full translate-x-[-50%]​ translate-y-[-50%]​ gap-4 border border-border bg-background/​95 backdrop-blur-md shadow-lg duration-200 data-[state=open]​:​animate-in data-[state=closed]​:​animate-out data-[state=closed]​:​fade-out-0 data-[state=open]​:​fade-in-0 data-[state=closed]​:​zoom-out-95 data-[state=open]​:​zoom-in-95 data-[state=closed]​:​slide-out-to-left-1/​2 data-[state=closed]​:​slide-out-to-top-[48%]​ data-[state=open]​:​slide-in-from-left-1/​2 data-[state=open]​:​slide-in-from-top-[48%]​ sm:​rounded-lg sm:​max-w-[500px]​ max-w-[calc(100vw-2rem)​]​ mx-auto p-4 sm:​p-6" tabindex=​"-1" style=​"pointer-events:​ auto;​">​…​</div>​gridUnderstand this warning
+index.Ce3hAfDQ.js:49 AppSidebar - User role: coordenador
+api/schedules/add-minister:1  Failed to load resource: the server responded with a status of 400 ()Understand this error
+index.Ce3hAfDQ.js:49 Error response: Object
+onClick @ index.Ce3hAfDQ.js:49Understand this error
