@@ -46,20 +46,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for other API calls (with caching)
+  // Network-first for other API calls (with caching for GET only)
   if (url.pathname.startsWith('/api')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone the response before caching
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+          // Only cache GET requests (Cache API doesn't support POST/PUT/DELETE)
+          if (request.method === 'GET') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If network fails, try cache
+          // If network fails, try cache (only works for GET requests)
           return caches.match(request);
         })
     );
