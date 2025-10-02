@@ -471,7 +471,10 @@ function calculateBalanceScore(schedules: GeneratedSchedule[]): number {
   
   schedules.forEach(schedule => {
     schedule.ministers.forEach(minister => {
-      ministerCounts[minister.id] = (ministerCounts[minister.id] || 0) + 1;
+      // Ignorar posições VACANT (minister.id null) no cálculo de balanceamento
+      if (minister.id !== null) {
+        ministerCounts[minister.id] = (ministerCounts[minister.id] || 0) + 1;
+      }
     });
   });
 
@@ -597,7 +600,7 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
       .orderBy(schedules.time, schedules.position);
 
     // Map assignments to expected format (massTime instead of time)
-    const formattedAssignments = assignments.map(a => ({
+    const formattedAssignments = assignments.map((a: any) => ({
       id: a.id,
       date: a.date,
       massTime: a.time, // Frontend expects 'massTime' field
@@ -683,6 +686,8 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     });
 
     const data = schema.parse(req.body);
+    
+    logger.info(`[ADD_MINISTER] 📥 Recebido: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}, position=${data.position}`);
 
     if (!db) {
       return res.status(503).json({ error: 'Database unavailable' });
@@ -700,6 +705,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       .limit(1);
 
     if (existing) {
+      logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário`);
       return res.status(400).json({ error: 'Ministro já escalado neste horário' });
     }
 
@@ -709,6 +715,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     if (data.position !== undefined) {
       // Usar a posição fornecida (útil para edição/substituição)
       newPosition = data.position;
+      logger.info(`[ADD_MINISTER] ✅ Usando posição fornecida: ${newPosition}`);
     } else {
       // Calcular automaticamente: última posição + 1
       const existingMinisters = await db
@@ -723,6 +730,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position 
         ? existingMinisters[0].position + 1 
         : 1;
+      logger.info(`[ADD_MINISTER] 🔢 Posição calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
     }
 
     // Inserir novo ministro
@@ -740,6 +748,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       })
       .returning();
 
+    logger.info(`[ADD_MINISTER] ✅ Ministro adicionado com sucesso: id=${newSchedule.id}, position=${newSchedule.position}`);
     res.json(newSchedule);
   } catch (error: any) {
     logger.error('Error adding minister to schedule:', error);
