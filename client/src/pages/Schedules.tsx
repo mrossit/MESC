@@ -130,6 +130,7 @@ export default function Schedules() {
   const [submittingSubstitution, setSubmittingSubstitution] = useState(false);
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -282,6 +283,7 @@ export default function Schedules() {
 
   const handleAssignMinister = async () => {
     console.log('🎯 [ASSIGN] Iniciando - selectedDate:', selectedDate, 'selectedMassTime:', selectedMassTime, 'selectedMinisterId:', selectedMinisterId);
+    console.log('🎯 [ASSIGN] Modo edição?', editingAssignmentId ? `Sim, editando ID: ${editingAssignmentId}` : 'Não, criando novo');
     
     if (!selectedDate || !selectedMassTime || !selectedMinisterId) {
       console.log('⚠️ [ASSIGN] Campos vazios!', { selectedDate, selectedMassTime, selectedMinisterId });
@@ -294,6 +296,21 @@ export default function Schedules() {
     }
 
     try {
+      // Se estamos editando, deletar o assignment antigo primeiro
+      if (editingAssignmentId) {
+        console.log('🗑️ [ASSIGN] Deletando assignment antigo:', editingAssignmentId);
+        const deleteResponse = await fetch(`/api/schedules/${editingAssignmentId}`, {
+          method: "DELETE",
+          credentials: "include"
+        });
+        
+        if (!deleteResponse.ok && deleteResponse.status !== 404) {
+          const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
+          throw new Error(errorData.message || "Erro ao remover escalação anterior");
+        }
+        console.log('✅ [ASSIGN] Assignment antigo deletado');
+      }
+
       const currentSchedule = schedules.find(s =>
         s.month === currentMonth.getMonth() + 1 &&
         s.year === currentMonth.getFullYear()
@@ -336,15 +353,17 @@ export default function Schedules() {
       });
 
       if (response.ok) {
+        const action = editingAssignmentId ? "atualizado" : "escalado";
         toast({
           title: "Sucesso",
-          description: "Ministro escalado com sucesso"
+          description: `Ministro ${action} com sucesso`
         });
         fetchSchedules();
         setIsAssignmentDialogOpen(false);
         setSelectedMinisterId("");
         setSelectedMassTime("");
         setSelectedPosition(1);
+        setEditingAssignmentId(null); // Limpar modo de edição
       } else {
         const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
         console.error("Error response:", errorData);
@@ -1440,70 +1459,23 @@ export default function Schedules() {
                                         size="sm"
                                         variant="outline"
                                         className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
-                                        onClick={async () => {
-                                          try {
-                                            console.log('🔄 [EDIT] Iniciando edição do assignment:', assignment);
-                                            console.log('🔄 [EDIT] ATENÇÃO: Este fluxo VAI DELETAR o registro antes de abrir o modal!');
-
-                                            // Verificar se o assignment tem um ID válido
-                                            if (!assignment.id || assignment.id === 'temp-' || assignment.id.startsWith('temp-')) {
-                                              console.log('⚠️ [EDIT] Assignment sem ID válido (gerado pela IA), apenas abrindo diálogo');
-                                              // Se não tem ID (foi gerado pela IA), apenas abrir o diálogo
-                                              setSelectedMassTime(assignment.massTime);
-                                              setSelectedPosition(assignment.position);
-                                              setSelectedMinisterId(assignment.ministerId);
-                                              setIsViewScheduleDialogOpen(false);
-                                              setIsAssignmentDialogOpen(true);
-                                              return;
-                                            }
-
-                                            console.log('🗑️ [EDIT] DELETANDO registro ID:', assignment.id);
-                                            // Deletar a escalação usando o endpoint correto
-                                            const deleteResponse = await fetch(`/api/schedules/${assignment.id}`, {
-                                              method: "DELETE",
-                                              credentials: "include"
-                                            });
-
-                                            console.log('🗑️ [EDIT] Response da deleção:', deleteResponse.status);
-
-                                            if (!deleteResponse.ok) {
-                                              // Se for 404, o assignment não existe (já foi deletado ou nunca foi salvo)
-                                              if (deleteResponse.status === 404) {
-                                                console.log('⚠️ Assignment não encontrado (404), continuando com edição...');
-                                              } else {
-                                                const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
-                                                console.error('❌ Erro ao deletar:', errorData);
-                                                throw new Error(errorData.message || "Erro ao remover escalação");
-                                              }
-                                            }
-
-                                            console.log('✅ Escalação removida, atualizando listas...');
-
-                                            // Atualizar a lista de escalas
-                                            await fetchSchedules();
-                                            await fetchScheduleForDate(selectedDate);
-
-                                            console.log('📝 Abrindo diálogo de edição...');
-                                            console.log('📝 [EDIT] Assignment data:', assignment);
-                                            console.log('📝 [EDIT] Setting position to:', assignment.position);
-
-                                            // Depois, abrir diálogo com dados pré-preenchidos
-                                            setSelectedMassTime(assignment.massTime);
-                                            setSelectedPosition(assignment.position);
-                                            setSelectedMinisterId(assignment.ministerId);
-                                            setIsViewScheduleDialogOpen(false);
-                                            setIsAssignmentDialogOpen(true);
-                                            
-                                            // Log após setar os valores
-                                            console.log('📝 [EDIT] After setting - selectedPosition:', assignment.position);
-                                          } catch (error: any) {
-                                            console.error("❌ Error editing assignment:", error);
-                                            toast({
-                                              title: "Erro",
-                                              description: error.message || "Erro ao editar escalação",
-                                              variant: "destructive"
-                                            });
-                                          }
+                                        onClick={() => {
+                                          console.log('✏️ [EDIT] Abrindo modal de edição para assignment:', assignment);
+                                          console.log('✏️ [EDIT] Setting position to:', assignment.position);
+                                          
+                                          // Salvar o ID do assignment que está sendo editado
+                                          setEditingAssignmentId(assignment.id);
+                                          
+                                          // Preencher o modal com os dados atuais
+                                          setSelectedMassTime(assignment.massTime);
+                                          setSelectedPosition(assignment.position);
+                                          setSelectedMinisterId(assignment.ministerId || "");
+                                          
+                                          // Fechar dialog de visualização e abrir dialog de edição
+                                          setIsViewScheduleDialogOpen(false);
+                                          setIsAssignmentDialogOpen(true);
+                                          
+                                          console.log('✏️ [EDIT] Modal aberto. Se cancelar, nada será deletado.');
                                         }}
                                       >
                                         <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
@@ -1591,6 +1563,7 @@ export default function Schedules() {
           // Limpar estados ao fechar
           setMinisterSearch('');
           setFilterByPreferredPosition(false);
+          setEditingAssignmentId(null); // Limpar modo de edição
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
@@ -1754,7 +1727,10 @@ export default function Schedules() {
             <Button variant="outline" onClick={() => {
               console.log('🚫 [CANCEL] Cancelando modal de escalação');
               console.log('🚫 [CANCEL] Estado atual:', { selectedDate, selectedMassTime, selectedMinisterId, selectedPosition });
+              console.log('🚫 [CANCEL] Editando?', editingAssignmentId ? `Sim, ID: ${editingAssignmentId}` : 'Não');
               setIsAssignmentDialogOpen(false);
+              setEditingAssignmentId(null); // Limpar modo de edição
+              console.log('✅ [CANCEL] Modal fechado sem deletar nada');
             }}>
               Cancelar
             </Button>
