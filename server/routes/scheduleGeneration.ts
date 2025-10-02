@@ -691,7 +691,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     logger.info(`[ADD_MINISTER] 📥 Recebido: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}, position=${data.position}, skipDuplicateCheck=${data.skipDuplicateCheck}`);
 
     if (!db) {
-      return res.status(503).json({ error: 'Database unavailable' });
+      return res.status(503).json({ message: 'Database unavailable' });
     }
 
     // Verificar duplicação apenas se não for uma edição/substituição
@@ -710,7 +710,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
 
       if (existing) {
         logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário (ID do registro existente: ${existing.id})`);
-        return res.status(400).json({ error: 'Ministro já escalado neste horário' });
+        return res.status(400).json({ message: 'Ministro já escalado neste horário' });
       }
       
       logger.info(`[ADD_MINISTER] ✅ Nenhuma duplicação encontrada, prosseguindo...`);
@@ -760,8 +760,9 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     logger.info(`[ADD_MINISTER] ✅ Ministro adicionado com sucesso: id=${newSchedule.id}, position=${newSchedule.position}`);
     res.json(newSchedule);
   } catch (error: any) {
-    logger.error('Error adding minister to schedule:', error);
-    res.status(500).json({ error: 'Failed to add minister to schedule' });
+    logger.error('[ADD_MINISTER] ❌ Erro ao adicionar ministro:', error);
+    logger.error('[ADD_MINISTER] ❌ Stack:', error.stack);
+    res.status(500).json({ message: error.message || 'Erro ao adicionar ministro na escala' });
   }
 });
 
