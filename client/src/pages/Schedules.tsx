@@ -281,7 +281,10 @@ export default function Schedules() {
   };
 
   const handleAssignMinister = async () => {
+    console.log('🎯 [ASSIGN] Iniciando - selectedDate:', selectedDate, 'selectedMassTime:', selectedMassTime, 'selectedMinisterId:', selectedMinisterId);
+    
     if (!selectedDate || !selectedMassTime || !selectedMinisterId) {
+      console.log('⚠️ [ASSIGN] Campos vazios!', { selectedDate, selectedMassTime, selectedMinisterId });
       toast({
         title: "Atenção",
         description: "Preencha todos os campos",
@@ -296,7 +299,10 @@ export default function Schedules() {
         s.year === currentMonth.getFullYear()
       );
 
+      console.log('📅 [ASSIGN] currentSchedule:', currentSchedule);
+
       if (!currentSchedule) {
+        console.log('❌ [ASSIGN] Nenhuma escala encontrada para este mês!');
         toast({
           title: "Erro",
           description: "Crie uma escala para este mês primeiro",
@@ -349,10 +355,12 @@ export default function Schedules() {
         });
       }
     } catch (error) {
-      console.error("Error assigning minister:", error);
+      console.error("❌ [ASSIGN] Error assigning minister:", error);
+      console.error("❌ [ASSIGN] Error stack:", error instanceof Error ? error.stack : 'No stack');
+      console.error("❌ [ASSIGN] Error message:", error instanceof Error ? error.message : String(error));
       toast({
         title: "Erro",
-        description: "Erro ao escalar ministro",
+        description: `Erro ao escalar ministro: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive"
       });
     }
