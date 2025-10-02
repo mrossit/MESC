@@ -130,7 +130,6 @@ export default function Schedules() {
   const [submittingSubstitution, setSubmittingSubstitution] = useState(false);
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
-  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -309,52 +308,32 @@ export default function Schedules() {
       // Format date as YYYY-MM-DD to avoid timezone issues
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-      let response;
-
-      // Se estamos editando, usar PATCH para atualizar
-      if (editingAssignmentId) {
-        console.log('📝 Atualizando assignment existente:', editingAssignmentId);
-        response = await fetch(`/api/schedule-assignments/${editingAssignmentId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            ministerId: selectedMinisterId,
-            position: selectedPosition
-          })
-        });
-      } else {
-        // Criar novo assignment
-        console.log('➕ Criando novo assignment');
-        response = await fetch("/api/schedule-assignments", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            scheduleId: currentSchedule.id,
-            ministerId: selectedMinisterId,
-            date: dateStr,
-            massTime: selectedMassTime,
-            position: selectedPosition
-          })
-        });
-      }
+      // Usar o endpoint correto: /api/schedules/add-minister
+      console.log('➕ Adicionando ministro à escala');
+      const response = await fetch("/api/schedules/add-minister", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          date: dateStr,
+          time: selectedMassTime,
+          ministerId: selectedMinisterId,
+          type: 'missa'
+        })
+      });
 
       if (response.ok) {
         toast({
           title: "Sucesso",
-          description: editingAssignmentId ? "Escala atualizada com sucesso" : "Ministro escalado com sucesso"
+          description: "Ministro escalado com sucesso"
         });
         fetchSchedules();
         setIsAssignmentDialogOpen(false);
         setSelectedMinisterId("");
         setSelectedMassTime("");
         setSelectedPosition(1);
-        setEditingAssignmentId(null); // Limpar modo de edição
       } else {
         const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
         console.error("Error response:", errorData);
@@ -458,67 +437,15 @@ export default function Schedules() {
   };
 
   const handleRequestSubstitution = async () => {
-    if (!selectedAssignmentForSubstitution || !substitutionReason.trim()) {
-      toast({
-        title: "Atenção",
-        description: "Por favor, informe o motivo da substituição",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSubmittingSubstitution(true);
-    try {
-      const currentMinister = ministers.find(m => m.id === user?.id);
-      if (!currentMinister) {
-        toast({
-          title: "Erro",
-          description: "Ministro não encontrado",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const response = await fetch("/api/substitutions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          assignmentId: selectedAssignmentForSubstitution.id,
-          requestingMinisterId: currentMinister.id,
-          reason: substitutionReason,
-          urgency: "medium"
-        })
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Solicitação de substituição enviada com sucesso"
-        });
-        setIsSubstitutionDialogOpen(false);
-        setSubstitutionReason("");
-        setSelectedAssignmentForSubstitution(null);
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Erro",
-          description: error.message || "Erro ao solicitar substituição",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Error requesting substitution:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao solicitar substituição",
-        variant: "destructive"
-      });
-    } finally {
-      setSubmittingSubstitution(false);
-    }
+    // Funcionalidade de substituições ainda não implementada no backend
+    toast({
+      title: "Em desenvolvimento",
+      description: "A funcionalidade de substituições será implementada em breve. Por enquanto, entre em contato com o coordenador.",
+      variant: "default"
+    });
+    setIsSubstitutionDialogOpen(false);
+    setSubstitutionReason("");
+    setSelectedAssignmentForSubstitution(null);
   };
 
   const handleGenerateSchedule = async (scheduleId: string) => {
@@ -1516,8 +1443,8 @@ export default function Schedules() {
                                               return;
                                             }
 
-                                            // Primeiro, deletar a escalação atual
-                                            const deleteResponse = await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                            // Deletar a escalação usando o endpoint correto
+                                            const deleteResponse = await fetch(`/api/schedules/${assignment.id}`, {
                                               method: "DELETE",
                                               credentials: "include"
                                             });
@@ -1547,7 +1474,6 @@ export default function Schedules() {
                                             setSelectedMassTime(assignment.massTime);
                                             setSelectedPosition(assignment.position);
                                             setSelectedMinisterId(assignment.ministerId);
-                                            setEditingAssignmentId(assignment.id); // Marcar que estamos editando
                                             setIsViewScheduleDialogOpen(false);
                                             setIsAssignmentDialogOpen(true);
                                           } catch (error: any) {
@@ -1570,7 +1496,7 @@ export default function Schedules() {
                                         className={cn("text-destructive hover:text-destructive text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
                                         onClick={async () => {
                                           try {
-                                            const response = await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                            const response = await fetch(`/api/schedules/${assignment.id}`, {
                                               method: "DELETE",
                                               credentials: "include"
                                             });
@@ -1645,7 +1571,6 @@ export default function Schedules() {
           // Limpar estados ao fechar
           setMinisterSearch('');
           setFilterByPreferredPosition(false);
-          setEditingAssignmentId(null); // Limpar modo de edição ao fechar
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
