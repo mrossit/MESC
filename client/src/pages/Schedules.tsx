@@ -1544,6 +1544,12 @@ export default function Schedules() {
           setMinisterSearch('');
           setFilterByPreferredPosition(false);
           setEditingAssignmentId(null);
+          
+          // Recarregar a lista para evitar cache/inconsistências
+          if (selectedDate) {
+            fetchScheduleForDate(selectedDate);
+          }
+          fetchSchedules();
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
