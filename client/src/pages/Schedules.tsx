@@ -1604,19 +1604,19 @@ export default function Schedules() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Posição Litúrgica</label>
-              <Select value={selectedPosition.toString()} onValueChange={(v) => setSelectedPosition(parseInt(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => (
-                    <SelectItem key={key} value={key}>
-                      {value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="text-sm font-medium">Ordem/Posição na Escala</label>
+              <Input
+                type="number"
+                min="1"
+                max="50"
+                value={selectedPosition}
+                onChange={(e) => setSelectedPosition(parseInt(e.target.value) || 1)}
+                placeholder="Digite a posição (1, 2, 3...)"
+                data-testid="input-position"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Define a ordem em que o ministro aparece na lista (1 = primeiro)
+              </p>
             </div>
 
             <div className="space-y-3">
