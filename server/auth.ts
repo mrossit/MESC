@@ -248,37 +248,36 @@ export async function register(userData: {
 // Trocar senha
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   try {
-    // Usar SQLite direto como fallback (mesmo problema de esquema)
-    const sqliteDb = new Database('local.db');
-    
-    // Busca usuário
-    const user = sqliteDb.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    // Busca usuário usando Drizzle ORM com PostgreSQL
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
     if (!user) {
-      sqliteDb.close();
       throw new Error('Usuário não encontrado');
     }
 
-    // Verifica senha atual (usar campos corretos do SQLite: password ou password_hash)
-    const userHash = user.password_hash || user.password || '';
-    const isValidPassword = await verifyPassword(currentPassword, userHash);
+    // Verifica senha atual
+    const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
 
     if (!isValidPassword) {
-      sqliteDb.close();
       throw new Error('Senha atual incorreta');
     }
 
     // Hash da nova senha
     const newPasswordHash = await hashPassword(newPassword);
 
-    // Atualiza a senha usando SQLite direto (usar campos corretos)
-    sqliteDb.prepare(`
-      UPDATE users 
-      SET password_hash = ?, password = ?, requires_password_change = 0 
-      WHERE id = ?
-    `).run(newPasswordHash, newPasswordHash, userId);
-    
-    sqliteDb.close();
+    // Atualiza a senha e remove flag de troca obrigatória
+    await db
+      .update(users)
+      .set({
+        passwordHash: newPasswordHash,
+        requiresPasswordChange: false,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
 
     return { message: 'Senha alterada com sucesso' };
   } catch (error) {
