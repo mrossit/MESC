@@ -328,7 +328,8 @@ export default function Schedules() {
         time: selectedMassTime,
         ministerId: selectedMinisterId,
         position: selectedPosition,
-        type: 'missa'
+        type: 'missa',
+        skipDuplicateCheck: !!editingAssignmentId // NOVO: permitir edição sem verificação de duplicação
       };
       
       const response = await fetch("/api/schedules/add-minister", {

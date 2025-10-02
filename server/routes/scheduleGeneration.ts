@@ -682,36 +682,41 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       position: z.number().optional(), // NOVO: aceita posição opcional
       type: z.string().default('missa'),
       location: z.string().optional(),
-      notes: z.string().optional()
+      notes: z.string().optional(),
+      skipDuplicateCheck: z.boolean().optional() // NOVO: flag para permitir substituição durante edição
     });
 
     const data = schema.parse(req.body);
     
-    logger.info(`[ADD_MINISTER] 📥 Recebido: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}, position=${data.position}`);
+    logger.info(`[ADD_MINISTER] 📥 Recebido: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}, position=${data.position}, skipDuplicateCheck=${data.skipDuplicateCheck}`);
 
     if (!db) {
       return res.status(503).json({ error: 'Database unavailable' });
     }
 
-    // Verificar se o ministro já está escalado nesta data/hora
-    logger.info(`[ADD_MINISTER] 🔍 Verificando duplicação: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
-    
-    const [existing] = await db
-      .select()
-      .from(schedules)
-      .where(and(
-        eq(schedules.date, data.date),
-        eq(schedules.time, data.time),
-        eq(schedules.ministerId, data.ministerId)
-      ))
-      .limit(1);
+    // Verificar duplicação apenas se não for uma edição/substituição
+    if (!data.skipDuplicateCheck) {
+      logger.info(`[ADD_MINISTER] 🔍 Verificando duplicação: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
+      
+      const [existing] = await db
+        .select()
+        .from(schedules)
+        .where(and(
+          eq(schedules.date, data.date),
+          eq(schedules.time, data.time),
+          eq(schedules.ministerId, data.ministerId)
+        ))
+        .limit(1);
 
-    if (existing) {
-      logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário (ID do registro existente: ${existing.id})`);
-      return res.status(400).json({ error: 'Ministro já escalado neste horário' });
+      if (existing) {
+        logger.warn(`[ADD_MINISTER] ⚠️ Ministro ${data.ministerId} já escalado neste horário (ID do registro existente: ${existing.id})`);
+        return res.status(400).json({ error: 'Ministro já escalado neste horário' });
+      }
+      
+      logger.info(`[ADD_MINISTER] ✅ Nenhuma duplicação encontrada, prosseguindo...`);
+    } else {
+      logger.info(`[ADD_MINISTER] ⏩ Pulando verificação de duplicação (modo edição)`);
     }
-    
-    logger.info(`[ADD_MINISTER] ✅ Nenhuma duplicação encontrada, prosseguindo...`);
 
     // Se posição foi fornecida, usar ela. Caso contrário, calcular automaticamente
     let newPosition: number;
