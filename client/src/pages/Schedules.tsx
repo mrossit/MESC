@@ -309,20 +309,24 @@ export default function Schedules() {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       // Usar o endpoint correto: /api/schedules/add-minister
-      console.log('➕ Adicionando ministro à escala na posição:', selectedPosition);
+      const requestData = {
+        date: dateStr,
+        time: selectedMassTime,
+        ministerId: selectedMinisterId,
+        position: selectedPosition, // Envia a posição desejada
+        type: 'missa'
+      };
+      
+      console.log('➕ [FRONTEND] Adicionando ministro à escala:', requestData);
+      console.log('➕ [FRONTEND] selectedPosition type:', typeof selectedPosition, 'value:', selectedPosition);
+      
       const response = await fetch("/api/schedules/add-minister", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         credentials: "include",
-        body: JSON.stringify({
-          date: dateStr,
-          time: selectedMassTime,
-          ministerId: selectedMinisterId,
-          position: selectedPosition, // Envia a posição desejada
-          type: 'missa'
-        })
+        body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
@@ -1470,6 +1474,8 @@ export default function Schedules() {
                                             await fetchScheduleForDate(selectedDate);
 
                                             console.log('📝 Abrindo diálogo de edição...');
+                                            console.log('📝 [EDIT] Assignment data:', assignment);
+                                            console.log('📝 [EDIT] Setting position to:', assignment.position);
 
                                             // Depois, abrir diálogo com dados pré-preenchidos
                                             setSelectedMassTime(assignment.massTime);
@@ -1477,6 +1483,9 @@ export default function Schedules() {
                                             setSelectedMinisterId(assignment.ministerId);
                                             setIsViewScheduleDialogOpen(false);
                                             setIsAssignmentDialogOpen(true);
+                                            
+                                            // Log após setar os valores
+                                            console.log('📝 [EDIT] After setting - selectedPosition:', assignment.position);
                                           } catch (error: any) {
                                             console.error("❌ Error editing assignment:", error);
                                             toast({
@@ -1610,12 +1619,16 @@ export default function Schedules() {
                 min="1"
                 max="50"
                 value={selectedPosition}
-                onChange={(e) => setSelectedPosition(parseInt(e.target.value) || 1)}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  console.log('🔢 [INPUT] Position changed to:', val, 'type:', typeof val);
+                  setSelectedPosition(val || 1);
+                }}
                 placeholder="Digite a posição (1, 2, 3...)"
                 data-testid="input-position"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Define a ordem em que o ministro aparece na lista (1 = primeiro)
+                Define a ordem em que o ministro aparece na lista (1 = primeiro). <strong>Valor atual: {selectedPosition}</strong>
               </p>
             </div>
 
