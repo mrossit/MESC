@@ -32,7 +32,8 @@ export const userRoleEnum = pgEnum('user_role', ['gestor', 'coordenador', 'minis
 export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
 export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
-export const substitutionStatusEnum = pgEnum('substitution_status', ['pending', 'approved', 'rejected', 'cancelled']);
+export const substitutionStatusEnum = pgEnum('substitution_status', ['pending', 'approved', 'rejected', 'cancelled', 'auto_approved']);
+export const urgencyLevelEnum = pgEnum('urgency_level', ['low', 'medium', 'high', 'critical']);
 export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'substitution', 'formation', 'announcement', 'reminder']);
 export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
 export const formationStatusEnum = pgEnum('formation_status', ['not_started', 'in_progress', 'completed']);
@@ -196,15 +197,23 @@ export const schedules = pgTable('schedules', {
 // Substitution requests
 export const substitutionRequests = pgTable('substitution_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
-  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id),
-  requesterId: varchar('requester_id').notNull().references(() => users.id),
-  substituteId: varchar('substitute_id').references(() => users.id),
-  reason: text('reason'),
+  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  requesterId: varchar('requester_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  substituteId: varchar('substitute_id').references(() => users.id, { onDelete: 'set null' }),
+  reason: text('reason'), // Opcional - ministro pode ou não informar motivo
   status: substitutionStatusEnum('status').notNull().default('pending'),
+  urgency: urgencyLevelEnum('urgency').notNull().default('medium'),
   approvedBy: varchar('approved_by').references(() => users.id),
   approvedAt: timestamp('approved_at'),
-  createdAt: timestamp('created_at').defaultNow()
-});
+  responseMessage: text('response_message'), // Mensagem do substituto ao aceitar/rejeitar
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_substitution_requester').on(table.requesterId),
+  index('idx_substitution_substitute').on(table.substituteId),
+  index('idx_substitution_status').on(table.status),
+  index('idx_substitution_schedule').on(table.scheduleId)
+]);
 
 // Notifications
 export const notifications = pgTable('notifications', {
