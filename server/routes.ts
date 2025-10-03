@@ -15,6 +15,7 @@ import profileRoutes from "./routes/profile";
 import reportsRoutes from "./routes/reports";
 import ministersRoutes from "./routes/ministers";
 import sessionRoutes from "./routes/session";
+import substitutionsRoutes from "./routes/substitutions";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
