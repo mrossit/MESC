@@ -131,6 +131,9 @@ export default function Schedules() {
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [availableSubstitutes, setAvailableSubstitutes] = useState<any[]>([]);
+  const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
+  const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -472,16 +475,75 @@ export default function Schedules() {
     }
   };
 
+  // Buscar substitutos disponíveis quando abrir o dialog
+  useEffect(() => {
+    const fetchAvailableSubstitutes = async () => {
+      if (!isSubstitutionDialogOpen || !selectedAssignmentForSubstitution) return;
+
+      setLoadingSubstitutes(true);
+      try {
+        const response = await fetch(`/api/substitutions/available/${selectedAssignmentForSubstitution.id}`, {
+          credentials: "include"
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubstitutes(data.data || []);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar substitutos:", error);
+      } finally {
+        setLoadingSubstitutes(false);
+      }
+    };
+
+    fetchAvailableSubstitutes();
+  }, [isSubstitutionDialogOpen, selectedAssignmentForSubstitution]);
+
   const handleRequestSubstitution = async () => {
-    // Funcionalidade de substituições ainda não implementada no backend
-    toast({
-      title: "Em desenvolvimento",
-      description: "A funcionalidade de substituições será implementada em breve. Por enquanto, entre em contato com o coordenador.",
-      variant: "default"
-    });
-    setIsSubstitutionDialogOpen(false);
-    setSubstitutionReason("");
-    setSelectedAssignmentForSubstitution(null);
+    if (!selectedAssignmentForSubstitution) return;
+
+    setSubmittingSubstitution(true);
+    try {
+      const response = await fetch("/api/substitutions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          scheduleId: selectedAssignmentForSubstitution.id,
+          substituteId: selectedSubstituteId || null,
+          reason: substitutionReason || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao criar solicitação");
+      }
+
+      toast({
+        title: data.isAutoApproved ? "Solicitação Auto-aprovada!" : "Solicitação Enviada!",
+        description: data.message,
+      });
+
+      setIsSubstitutionDialogOpen(false);
+      setSubstitutionReason("");
+      setSelectedSubstituteId("");
+      setSelectedAssignmentForSubstitution(null);
+      setAvailableSubstitutes([]);
+
+      // Recarregar escalas
+      fetchSchedules();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao criar solicitação de substituição",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingSubstitution(false);
+    }
   };
 
   const handleGenerateSchedule = async (scheduleId: string) => {
