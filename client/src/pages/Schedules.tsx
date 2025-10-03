@@ -294,15 +294,20 @@ export default function Schedules() {
     try {
       // Se estamos editando, deletar o assignment antigo primeiro
       if (editingAssignmentId) {
+        console.log('🗑️ Removendo assignment antigo:', editingAssignmentId);
+
         const deleteResponse = await fetch(`/api/schedules/${editingAssignmentId}`, {
           method: "DELETE",
           credentials: "include"
         });
-        
+
         if (!deleteResponse.ok && deleteResponse.status !== 404) {
           const errorData = await deleteResponse.json().catch(() => ({ message: "Erro ao remover" }));
+          console.error('❌ Erro ao deletar:', errorData);
           throw new Error(errorData.message || "Erro ao remover escalação anterior");
         }
+
+        console.log('✅ Assignment antigo removido com sucesso');
       }
 
       const currentSchedule = schedules.find(s =>
@@ -331,7 +336,9 @@ export default function Schedules() {
         type: 'missa',
         skipDuplicateCheck: !!editingAssignmentId // NOVO: permitir edição sem verificação de duplicação
       };
-      
+
+      console.log('📤 Enviando requisição de adição:', requestData);
+
       const response = await fetch("/api/schedules/add-minister", {
         method: "POST",
         headers: {
@@ -341,13 +348,23 @@ export default function Schedules() {
         body: JSON.stringify(requestData)
       });
 
+      console.log('📥 Resposta recebida - Status:', response.status);
+
       if (response.ok) {
         const action = editingAssignmentId ? "atualizado" : "escalado";
         toast({
           title: "Sucesso",
           description: `Ministro ${action} com sucesso`
         });
-        fetchSchedules();
+
+        // Atualizar AMBAS as listas - schedule geral E assignments da data selecionada
+        await fetchSchedules();
+
+        // Se o modal de visualização estava aberto, atualizar também
+        if (isViewScheduleDialogOpen && selectedDate) {
+          await fetchScheduleForDate(selectedDate);
+        }
+
         setIsAssignmentDialogOpen(false);
         setSelectedMinisterId("");
         setSelectedMassTime("");

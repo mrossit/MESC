@@ -618,18 +618,18 @@ var init_db = __esm({
       }
     } else if (isDevelopment && !isProduction) {
       console.log("\u{1F527} Development mode detected, using local SQLite database");
-      const Database3 = await import("better-sqlite3");
+      const Database2 = await import("better-sqlite3");
       const { drizzle } = await import("drizzle-orm/better-sqlite3");
-      const sqlite = new Database3.default("local.db");
+      const sqlite = new Database2.default("local.db");
       db = drizzle(sqlite, { schema: schema_exports });
     } else if (false) {
       console.log("\u26A0\uFE0F This code path should not be reached");
     } else {
       console.log("\u26A0\uFE0F No DATABASE_URL found and not in development mode");
       console.log("\u{1F4DD} Using SQLite fallback for compatibility");
-      const Database3 = await import("better-sqlite3");
+      const Database2 = await import("better-sqlite3");
       const { drizzle } = await import("drizzle-orm/better-sqlite3");
-      const sqlite = new Database3.default("local.db");
+      const sqlite = new Database2.default("local.db");
       db = drizzle(sqlite, { schema: schema_exports });
     }
   }
@@ -642,7 +642,7 @@ __export(storage_exports, {
   storage: () => storage
 });
 import { eq, and, desc, count, sql as sql2, gte, lte, or } from "drizzle-orm";
-import Database2 from "better-sqlite3";
+import Database from "better-sqlite3";
 var DrizzleSQLiteFallback, DatabaseStorage, storage;
 var init_storage = __esm({
   async "server/storage.ts"() {
@@ -656,7 +656,7 @@ var init_storage = __esm({
           throw new Error("SQLite fallback not allowed in production");
         }
         if (!this.sqliteDb) {
-          this.sqliteDb = new Database2("local.db");
+          this.sqliteDb = new Database("local.db");
         }
         return this.sqliteDb;
       }
@@ -2614,25 +2614,20 @@ async function register(userData) {
 }
 async function changePassword(userId, currentPassword, newPassword) {
   try {
-    const sqliteDb = new Database("local.db");
-    const user = sqliteDb.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+    const [user] = await db.select().from(users).where(eq2(users.id, userId)).limit(1);
     if (!user) {
-      sqliteDb.close();
       throw new Error("Usu\xE1rio n\xE3o encontrado");
     }
-    const userHash = user.password_hash || user.password || "";
-    const isValidPassword = await verifyPassword(currentPassword, userHash);
+    const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
     if (!isValidPassword) {
-      sqliteDb.close();
       throw new Error("Senha atual incorreta");
     }
     const newPasswordHash = await hashPassword(newPassword);
-    sqliteDb.prepare(`
-      UPDATE users 
-      SET password_hash = ?, password = ?, requires_password_change = 0 
-      WHERE id = ?
-    `).run(newPasswordHash, newPasswordHash, userId);
-    sqliteDb.close();
+    await db.update(users).set({
+      passwordHash: newPasswordHash,
+      requiresPasswordChange: false,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(users.id, userId));
     return { message: "Senha alterada com sucesso" };
   } catch (error) {
     throw error;
@@ -5941,7 +5936,9 @@ function calculateBalanceScore(schedules3) {
   const ministerCounts = {};
   schedules3.forEach((schedule) => {
     schedule.ministers.forEach((minister) => {
-      ministerCounts[minister.id] = (ministerCounts[minister.id] || 0) + 1;
+      if (minister.id !== null) {
+        ministerCounts[minister.id] = (ministerCounts[minister.id] || 0) + 1;
+      }
     });
   });
   const counts = Object.values(ministerCounts);
@@ -6096,27 +6093,46 @@ router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       date: z4.string(),
       time: z4.string(),
       ministerId: z4.string(),
+      position: z4.number().optional(),
+      // NOVO: aceita posição opcional
       type: z4.string().default("missa"),
       location: z4.string().optional(),
-      notes: z4.string().optional()
+      notes: z4.string().optional(),
+      skipDuplicateCheck: z4.boolean().optional()
+      // NOVO: flag para permitir substituição durante edição
     });
     const data = schema.parse(req.body);
+    logger.info(`[ADD_MINISTER] \u{1F4E5} Recebido: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}, position=${data.position}, skipDuplicateCheck=${data.skipDuplicateCheck}`);
     if (!db) {
-      return res.status(503).json({ error: "Database unavailable" });
+      return res.status(503).json({ message: "Database unavailable" });
     }
-    const [existing] = await db.select().from(schedules).where(and7(
-      eq9(schedules.date, data.date),
-      eq9(schedules.time, data.time),
-      eq9(schedules.ministerId, data.ministerId)
-    )).limit(1);
-    if (existing) {
-      return res.status(400).json({ error: "Ministro j\xE1 escalado neste hor\xE1rio" });
+    if (!data.skipDuplicateCheck) {
+      logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
+      const [existing] = await db.select().from(schedules).where(and7(
+        eq9(schedules.date, data.date),
+        eq9(schedules.time, data.time),
+        eq9(schedules.ministerId, data.ministerId)
+      )).limit(1);
+      if (existing) {
+        logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
+        return res.status(400).json({ message: "Ministro j\xE1 escalado neste hor\xE1rio" });
+      }
+      logger.info(`[ADD_MINISTER] \u2705 Nenhuma duplica\xE7\xE3o encontrada, prosseguindo...`);
+    } else {
+      logger.info(`[ADD_MINISTER] \u23E9 Pulando verifica\xE7\xE3o de duplica\xE7\xE3o (modo edi\xE7\xE3o)`);
     }
-    const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and7(
-      eq9(schedules.date, data.date),
-      eq9(schedules.time, data.time)
-    )).orderBy(desc4(schedules.position));
-    const newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
+    let newPosition;
+    if (data.position !== void 0) {
+      newPosition = data.position;
+      logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
+    } else {
+      const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and7(
+        eq9(schedules.date, data.date),
+        eq9(schedules.time, data.time)
+      )).orderBy(desc4(schedules.position));
+      newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
+      logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
+    }
     const [newSchedule] = await db.insert(schedules).values({
       date: data.date,
       time: data.time,
@@ -6127,10 +6143,12 @@ router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       notes: data.notes,
       status: "scheduled"
     }).returning();
+    logger.info(`[ADD_MINISTER] \u2705 Ministro adicionado com sucesso: id=${newSchedule.id}, position=${newSchedule.position}`);
     res.json(newSchedule);
   } catch (error) {
-    logger.error("Error adding minister to schedule:", error);
-    res.status(500).json({ error: "Failed to add minister to schedule" });
+    logger.error("[ADD_MINISTER] \u274C Erro ao adicionar ministro:", error);
+    logger.error("[ADD_MINISTER] \u274C Stack:", error.stack);
+    res.status(500).json({ message: error.message || "Erro ao adicionar ministro na escala" });
   }
 });
 router5.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
@@ -8014,6 +8032,21 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
 var app = express2();
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    uptime: process.uptime()
+  });
+});
+app.get("/", (_req, res, next) => {
+  if (res.headersSent) return;
+  const acceptHeader = _req.get("accept") || "";
+  if (acceptHeader.includes("application/json") && !acceptHeader.includes("text/html")) {
+    return res.status(200).json({ status: "ok" });
+  }
+  next();
+});
 app.use(express2.json());
 app.use(express2.urlencoded({ extended: false }));
 app.use(express2.static(path3.join(process.cwd(), "public")));
@@ -8031,13 +8064,6 @@ app.use((req, res, next) => {
   next();
 });
 (async () => {
-  app.get("/health", (_req, res) => {
-    res.status(200).json({
-      status: "ok",
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      uptime: process.uptime()
-    });
-  });
   const server = await registerRoutes(app);
   app.use((err, req, res, _next) => {
     const status = err.status || err.statusCode || 500;
