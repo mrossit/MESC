@@ -102,6 +102,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session routes (activity monitoring & auto-logout)
   app.use('/api/session', sessionRoutes);
 
+  // Substitution routes
+  app.use('/api/substitutions', substitutionsRoutes);
+
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
     try {
