@@ -32,6 +32,10 @@ export default function Login() {
     password: "",
   });
 
+  // Detecta se veio de timeout de inatividade
+  const searchParams = new URLSearchParams(window.location.search);
+  const inactivityReason = searchParams.get('reason') === 'inactivity';
+
   const queryClient = useQueryClient();
 
   const forgotPasswordMutation = useMutation({
@@ -141,6 +145,17 @@ export default function Login() {
           </p>
         </CardHeader>
         <CardContent>
+          {/* Alerta de timeout de inatividade */}
+          {inactivityReason && (
+            <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+              <Clock className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
+                <strong>Sessão Encerrada</strong><br />
+                Sua sessão foi encerrada após 10 minutos de inatividade. Por favor, faça login novamente.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-neutral-textDark dark:text-text-light font-semibold text-sm">

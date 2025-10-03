@@ -11,6 +11,8 @@ var __export = (target, all) => {
 // shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  activeSessions: () => activeSessions,
+  activeSessionsRelations: () => activeSessionsRelations,
   activityLogs: () => activityLogs,
   activityLogsRelations: () => activityLogsRelations,
   families: () => families,
@@ -76,7 +78,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activityLogs, familiesRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -355,6 +357,22 @@ var init_schema = __esm({
       adminNotes: text("admin_notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
+    activeSessions = pgTable("active_sessions", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      sessionToken: varchar("session_token", { length: 100 }).notNull().unique(),
+      createdAt: timestamp("created_at").defaultNow(),
+      lastActivityAt: timestamp("last_activity_at").defaultNow(),
+      expiresAt: timestamp("expires_at").notNull(),
+      ipAddress: varchar("ip_address", { length: 45 }),
+      userAgent: text("user_agent"),
+      isActive: boolean("is_active").default(true)
+    }, (table) => [
+      index("idx_active_sessions_user").on(table.userId),
+      index("idx_active_sessions_active").on(table.isActive),
+      index("idx_active_sessions_expires").on(table.expiresAt),
+      index("idx_active_sessions_activity").on(table.lastActivityAt)
+    ]);
     activityLogs = pgTable("activity_logs", {
       id: uuid("id").primaryKey().defaultRandom(),
       userId: varchar("user_id").notNull().references(() => users.id),
@@ -374,6 +392,12 @@ var init_schema = __esm({
     familiesRelations = relations(families, ({ many }) => ({
       members: many(users)
     }));
+    activeSessionsRelations = relations(activeSessions, ({ one }) => ({
+      user: one(users, {
+        fields: [activeSessions.userId],
+        references: [users.id]
+      })
+    }));
     activityLogsRelations = relations(activityLogs, ({ one }) => ({
       user: one(users, {
         fields: [activityLogs.userId],
@@ -391,6 +415,7 @@ var init_schema = __esm({
       substitutionRequests: many(substitutionRequests),
       notifications: many(notifications),
       formationProgress: many(formationProgress),
+      activeSessions: many(activeSessions),
       activityLogs: many(activityLogs),
       spouse: one(users, {
         fields: [users.spouseMinisterId],
@@ -1361,7 +1386,7 @@ __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
   generateAutomaticSchedule: () => generateAutomaticSchedule
 });
-import { eq as eq8, and as and6, or as or5, sql as sql3, ne as ne2 } from "drizzle-orm";
+import { eq as eq9, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
 import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday } from "date-fns";
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
@@ -1487,10 +1512,10 @@ var init_scheduleGenerator = __esm({
             canServeAsCouple: users.canServeAsCouple,
             spouseMinisterId: users.spouseMinisterId
           }).from(users).where(
-            and6(
+            and7(
               or5(
-                eq8(users.status, "active"),
-                sql3`${users.status} IS NULL`
+                eq9(users.status, "active"),
+                sql4`${users.status} IS NULL`
                 // Incluir usuários com status null
               ),
               ne2(users.role, "gestor")
@@ -1568,9 +1593,9 @@ var init_scheduleGenerator = __esm({
         }
         const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
-          and6(
-            eq8(questionnaires.month, month),
-            eq8(questionnaires.year, year)
+          and7(
+            eq9(questionnaires.month, month),
+            eq9(questionnaires.year, year)
           )
         ).limit(1);
         if (!targetQuestionnaire) {
@@ -1585,7 +1610,7 @@ var init_scheduleGenerator = __esm({
           }
           return;
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         responses.forEach((r, index2) => {
           let availableSundays = [];
@@ -1776,7 +1801,7 @@ var init_scheduleGenerator = __esm({
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq8(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq9(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -2656,12 +2681,148 @@ async function resetPassword(email) {
 }
 
 // server/authRoutes.ts
-import { Router } from "express";
+import { Router as Router2 } from "express";
 await init_db();
 init_schema();
 import { z } from "zod";
-import { eq as eq3 } from "drizzle-orm";
+import { eq as eq4 } from "drizzle-orm";
+
+// server/routes/session.ts
+await init_db();
+init_schema();
+import { Router } from "express";
+import { eq as eq3, and as and2, gt, sql as sql3 } from "drizzle-orm";
+import { nanoid } from "nanoid";
 var router = Router();
+var INACTIVITY_TIMEOUT_MINUTES = 10;
+var SESSION_EXPIRES_HOURS = 12;
+router.post("/verify", async (req, res) => {
+  const sessionToken = req.body.sessionToken || req.cookies?.session_token;
+  if (!sessionToken) {
+    return res.json({ expired: true, reason: "no_token" });
+  }
+  try {
+    const [session] = await db.select().from(activeSessions).where(
+      and2(
+        eq3(activeSessions.sessionToken, sessionToken),
+        eq3(activeSessions.isActive, true),
+        gt(activeSessions.expiresAt, /* @__PURE__ */ new Date())
+      )
+    ).limit(1);
+    if (!session) {
+      return res.json({ expired: true, reason: "session_not_found" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    const lastActivity = new Date(session.lastActivityAt);
+    const minutesInactive = Math.floor((now.getTime() - lastActivity.getTime()) / 6e4);
+    console.log(`[SESSION] User ${session.userId}: ${minutesInactive} min inactive`);
+    if (minutesInactive > INACTIVITY_TIMEOUT_MINUTES) {
+      await db.update(activeSessions).set({ isActive: false }).where(eq3(activeSessions.id, session.id));
+      console.log(`[SESSION] \u274C Expired - User ${session.userId} (${minutesInactive}min)`);
+      return res.json({
+        expired: true,
+        reason: "inactivity",
+        minutesInactive
+      });
+    }
+    return res.json({
+      expired: false,
+      minutesInactive,
+      minutesRemaining: INACTIVITY_TIMEOUT_MINUTES - minutesInactive
+    });
+  } catch (error) {
+    console.error("[SESSION] Error verifying:", error);
+    return res.status(500).json({
+      expired: true,
+      reason: "server_error"
+    });
+  }
+});
+router.post("/heartbeat", authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const sessionToken = req.cookies?.session_token || req.body.sessionToken;
+  if (!userId || !sessionToken) {
+    return res.status(401).json({ success: false, message: "N\xE3o autenticado" });
+  }
+  try {
+    const result = await db.update(activeSessions).set({ lastActivityAt: /* @__PURE__ */ new Date() }).where(
+      and2(
+        eq3(activeSessions.userId, userId),
+        eq3(activeSessions.sessionToken, sessionToken),
+        eq3(activeSessions.isActive, true)
+      )
+    ).returning();
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, message: "Sess\xE3o n\xE3o encontrada" });
+    }
+    console.log(`[SESSION] \u{1F493} Heartbeat - User ${userId}`);
+    res.json({ success: true, timestamp: /* @__PURE__ */ new Date() });
+  } catch (error) {
+    console.error("[SESSION] Error updating heartbeat:", error);
+    res.status(500).json({ success: false, message: "Erro ao atualizar sess\xE3o" });
+  }
+});
+async function createSession(userId, ipAddress, userAgent) {
+  const sessionToken = nanoid(64);
+  const expiresAt = /* @__PURE__ */ new Date();
+  expiresAt.setHours(expiresAt.getHours() + SESSION_EXPIRES_HOURS);
+  try {
+    await db.insert(activeSessions).values({
+      userId,
+      sessionToken,
+      expiresAt,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null
+    });
+    console.log(`[SESSION] \u2705 Created - User ${userId}`);
+    return sessionToken;
+  } catch (error) {
+    console.error("[SESSION] Error creating:", error);
+    throw new Error("Erro ao criar sess\xE3o");
+  }
+}
+router.post("/destroy", async (req, res) => {
+  const sessionToken = req.cookies?.session_token || req.body.sessionToken;
+  if (sessionToken) {
+    try {
+      await db.update(activeSessions).set({ isActive: false }).where(eq3(activeSessions.sessionToken, sessionToken));
+      console.log("[SESSION] \u{1F6AA} Destroyed - Token:", sessionToken.substring(0, 10) + "...");
+    } catch (error) {
+      console.error("[SESSION] Error destroying:", error);
+    }
+  }
+  res.clearCookie("session_token");
+  res.json({ success: true });
+});
+router.get("/cleanup", async (req, res) => {
+  try {
+    const inactiveResult = await db.update(activeSessions).set({ isActive: false }).where(
+      and2(
+        eq3(activeSessions.isActive, true),
+        sql3`EXTRACT(EPOCH FROM (NOW() - ${activeSessions.lastActivityAt})) / 60 > ${INACTIVITY_TIMEOUT_MINUTES}`
+      )
+    ).returning({ id: activeSessions.id });
+    const deleteResult = await db.delete(activeSessions).where(
+      and2(
+        eq3(activeSessions.isActive, false),
+        sql3`${activeSessions.createdAt} < NOW() - INTERVAL '30 days'`
+      )
+    ).returning({ id: activeSessions.id });
+    console.log(`[SESSION] \u{1F9F9} Cleanup: ${inactiveResult.length} expired, ${deleteResult.length} deleted`);
+    res.json({
+      success: true,
+      expired: inactiveResult.length,
+      deleted: deleteResult.length
+    });
+  } catch (error) {
+    console.error("[SESSION] Error in cleanup:", error);
+    res.status(500).json({ success: false, message: "Erro ao limpar sess\xF5es" });
+  }
+});
+var session_default = router;
+
+// server/authRoutes.ts
+var router2 = Router2();
 var loginSchema = z.object({
   email: z.string().email("Email inv\xE1lido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres")
@@ -2684,23 +2845,36 @@ var changePasswordSchema = z.object({
   currentPassword: z.string(),
   newPassword: z.string().min(8, "Nova senha deve ter pelo menos 8 caracteres")
 });
-router.post("/login", async (req, res) => {
+router2.post("/login", async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const result = await login(email, password);
     res.cookie("token", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== "development",
-      // Secure in all environments except development
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1e3,
-      // 7 dias
+      maxAge: 12 * 60 * 60 * 1e3,
+      // 12 horas
       path: "/"
-      // Explicitly set path for clarity
+    });
+    const sessionToken = await createSession(
+      result.user.id,
+      req.ip || req.socket.remoteAddress,
+      req.get("user-agent")
+    );
+    res.cookie("session_token", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== "development",
+      sameSite: "lax",
+      maxAge: 12 * 60 * 60 * 1e3,
+      // 12 horas
+      path: "/"
     });
     res.json({
       success: true,
       token: result.token,
+      sessionToken,
+      // Retorna para o frontend armazenar em localStorage
       user: result.user
     });
   } catch (error) {
@@ -2717,7 +2891,7 @@ router.post("/login", async (req, res) => {
     });
   }
 });
-router.post("/register", async (req, res) => {
+router2.post("/register", async (req, res) => {
   try {
     const userData = publicRegisterSchema.parse(req.body);
     const newUser = await register({
@@ -2744,7 +2918,7 @@ router.post("/register", async (req, res) => {
     });
   }
 });
-router.post("/admin-register", authenticateToken, requireRole(["reitor", "coordenador"]), async (req, res) => {
+router2.post("/admin-register", authenticateToken, requireRole(["reitor", "coordenador"]), async (req, res) => {
   try {
     const userData = registerSchema.parse(req.body);
     if ((userData.role === "reitor" || userData.role === "coordenador") && req.user?.role !== "reitor") {
@@ -2773,7 +2947,7 @@ router.post("/admin-register", authenticateToken, requireRole(["reitor", "coorde
     });
   }
 });
-router.get("/me", authenticateToken, async (req, res) => {
+router2.get("/me", authenticateToken, async (req, res) => {
   try {
     if (!db) {
       res.json({
@@ -2805,7 +2979,7 @@ router.get("/me", authenticateToken, async (req, res) => {
       lastName: users.lastName,
       phone: users.phone,
       photoUrl: users.photoUrl
-    }).from(users).where(eq3(users.id, userId)).limit(1);
+    }).from(users).where(eq4(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2828,7 +3002,7 @@ router.get("/me", authenticateToken, async (req, res) => {
     });
   }
 });
-router.get("/user", authenticateToken, async (req, res) => {
+router2.get("/user", authenticateToken, async (req, res) => {
   try {
     res.json(req.user);
   } catch (error) {
@@ -2838,8 +3012,24 @@ router.get("/user", authenticateToken, async (req, res) => {
     });
   }
 });
-router.post("/logout", (req, res) => {
+router2.post("/logout", async (req, res) => {
+  const sessionToken = req.cookies?.session_token;
+  if (sessionToken) {
+    try {
+      const { activeSessions: activeSessions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      await db.update(activeSessions2).set({ isActive: false }).where(eq4(activeSessions2.sessionToken, sessionToken));
+      console.log("[AUTH] Sess\xE3o marcada como inativa no logout");
+    } catch (error) {
+      console.error("[AUTH] Erro ao inativar sess\xE3o:", error);
+    }
+  }
   res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== "development",
+    sameSite: "lax",
+    path: "/"
+  });
+  res.clearCookie("session_token", {
     httpOnly: true,
     secure: process.env.NODE_ENV !== "development",
     sameSite: "lax",
@@ -2850,7 +3040,7 @@ router.post("/logout", (req, res) => {
     message: "Logout realizado com sucesso"
   });
 });
-router.post("/change-password", authenticateToken, async (req, res) => {
+router2.post("/change-password", authenticateToken, async (req, res) => {
   console.log("\u{1F50D} DEBUG: Rota /change-password foi chamada!");
   console.log("\u{1F50D} DEBUG: User autenticado:", req.user?.id);
   console.log("\u{1F50D} DEBUG: Dados recebidos no req.body:", req.body);
@@ -2891,10 +3081,10 @@ var adminResetSchema = z.object({
 var emailResetSchema = z.object({
   email: z.string().min(1, "Email \xE9 obrigat\xF3rio")
 });
-router.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId, newPassword } = adminResetSchema.parse(req.body);
-    const [user] = await db.select().from(users).where(eq3(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq4(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2913,7 +3103,7 @@ router.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq3(users.id, userId));
+    }).where(eq4(users.id, userId));
     console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usu\xE1rio ${user.name} (${user.email})`);
     return res.json({
       success: true,
@@ -2934,7 +3124,7 @@ router.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "
     });
   }
 });
-router.post("/reset-password", async (req, res) => {
+router2.post("/reset-password", async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -2963,22 +3153,22 @@ router.post("/reset-password", async (req, res) => {
     });
   }
 });
-router.get("/check", authenticateToken, (req, res) => {
+router2.get("/check", authenticateToken, (req, res) => {
   res.json({
     success: true,
     authenticated: true,
     user: req.user
   });
 });
-var authRoutes_default = router;
+var authRoutes_default = router2;
 
 // server/passwordResetRoutes.ts
 await init_db();
 init_schema();
-import { Router as Router2 } from "express";
-import { eq as eq4, and as and2, or as or2, desc as desc2 } from "drizzle-orm";
-var router2 = Router2();
-router2.post("/request-reset", async (req, res) => {
+import { Router as Router3 } from "express";
+import { eq as eq5, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
+var router3 = Router3();
+router3.post("/request-reset", async (req, res) => {
   try {
     const { email, reason } = req.body;
     if (!email) {
@@ -2987,7 +3177,7 @@ router2.post("/request-reset", async (req, res) => {
         message: "Email \xE9 obrigat\xF3rio"
       });
     }
-    const [user] = await db.select().from(users).where(eq4(users.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq5(users.email, email)).limit(1);
     if (!user) {
       return res.json({
         success: true,
@@ -2995,9 +3185,9 @@ router2.post("/request-reset", async (req, res) => {
       });
     }
     const [existingRequest] = await db.select().from(passwordResetRequests).where(
-      and2(
-        eq4(passwordResetRequests.userId, user.id),
-        eq4(passwordResetRequests.status, "pending")
+      and3(
+        eq5(passwordResetRequests.userId, user.id),
+        eq5(passwordResetRequests.status, "pending")
       )
     ).limit(1);
     if (existingRequest) {
@@ -3012,12 +3202,12 @@ router2.post("/request-reset", async (req, res) => {
       status: "pending"
     });
     const coordinators = await db.select().from(users).where(
-      and2(
-        eq4(users.status, "active"),
+      and3(
+        eq5(users.status, "active"),
         // Notifica tanto coordenadores quanto gestores
         or2(
-          eq4(users.role, "coordenador"),
-          eq4(users.role, "gestor")
+          eq5(users.role, "coordenador"),
+          eq5(users.role, "gestor")
         )
       )
     );
@@ -3043,7 +3233,7 @@ router2.post("/request-reset", async (req, res) => {
     });
   }
 });
-router2.get("/pending-requests", async (req, res) => {
+router3.get("/pending-requests", async (req, res) => {
   try {
     const requests = await db.select({
       id: passwordResetRequests.id,
@@ -3053,7 +3243,7 @@ router2.get("/pending-requests", async (req, res) => {
       requestedAt: passwordResetRequests.requestedAt,
       reason: passwordResetRequests.reason,
       status: passwordResetRequests.status
-    }).from(passwordResetRequests).leftJoin(users, eq4(passwordResetRequests.userId, users.id)).where(eq4(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
+    }).from(passwordResetRequests).leftJoin(users, eq5(passwordResetRequests.userId, users.id)).where(eq5(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
     res.json({ success: true, requests });
   } catch (error) {
     console.error("Erro ao buscar solicita\xE7\xF5es:", error);
@@ -3063,11 +3253,11 @@ router2.get("/pending-requests", async (req, res) => {
     });
   }
 });
-router2.post("/approve-reset/:requestId", async (req, res) => {
+router3.post("/approve-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq4(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq5(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -3080,13 +3270,13 @@ router2.post("/approve-reset/:requestId", async (req, res) => {
       passwordHash: hashedPassword,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq4(users.id, request.userId));
+    }).where(eq5(users.id, request.userId));
     await db.update(passwordResetRequests).set({
       status: "approved",
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes: adminNotes || `Senha tempor\xE1ria: ${tempPassword}`
-    }).where(eq4(passwordResetRequests.id, requestId));
+    }).where(eq5(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
@@ -3108,11 +3298,11 @@ router2.post("/approve-reset/:requestId", async (req, res) => {
     });
   }
 });
-router2.post("/reject-reset/:requestId", async (req, res) => {
+router3.post("/reject-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq4(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq5(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -3124,7 +3314,7 @@ router2.post("/reject-reset/:requestId", async (req, res) => {
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes
-    }).where(eq4(passwordResetRequests.id, requestId));
+    }).where(eq5(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Solicita\xE7\xE3o de Reset Negada",
@@ -3148,9 +3338,9 @@ router2.post("/reject-reset/:requestId", async (req, res) => {
 // server/routes/questionnaireAdmin.ts
 await init_db();
 init_schema();
-import { Router as Router3 } from "express";
+import { Router as Router4 } from "express";
 import { z as z2 } from "zod";
-import { eq as eq5, and as and3, or as or3, ne } from "drizzle-orm";
+import { eq as eq6, and as and4, or as or3, ne } from "drizzle-orm";
 
 // server/utils/questionnaireGenerator.ts
 init_logger();
@@ -3607,7 +3797,7 @@ function getSpecialEvents(month, year) {
 }
 
 // server/routes/questionnaireAdmin.ts
-var router3 = Router3();
+var router4 = Router4();
 function getMonthName(month) {
   const months = [
     "Janeiro",
@@ -3625,14 +3815,14 @@ function getMonthName(month) {
   ];
   return months[month - 1];
 }
-router3.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -3657,13 +3847,13 @@ router3.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to get current questionnaire" });
   }
 });
-router3.get("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.get("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -3687,7 +3877,7 @@ router3.get("/templates/:year/:month", authenticateToken, requireRole(["gestor",
     res.status(500).json({ error: "Failed to fetch template" });
   }
 });
-router3.post("/templates/generate", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.post("/templates/generate", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const schema = z2.object({
       month: z2.number().min(1).max(12),
@@ -3695,9 +3885,9 @@ router3.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
     });
     const { month, year } = schema.parse(req.body);
     const userId = req.user?.id || req.session?.userId;
-    const [existingTemplate] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [existingTemplate] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
       // Ignorar templates deletados
     ));
@@ -3745,7 +3935,7 @@ router3.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
     res.status(500).json({ error: "Failed to generate template" });
   }
 });
-router3.post("/templates", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const schema = z2.object({
       id: z2.string().optional(),
@@ -3773,15 +3963,15 @@ router3.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, data.month),
-      eq5(questionnaires.year, data.year)
+    const [existingTemplate] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, data.month),
+      eq6(questionnaires.year, data.year)
     ));
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions: data.questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq5(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq6(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -3808,7 +3998,7 @@ router3.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
     res.status(500).json({ error: "Failed to save template" });
   }
 });
-router3.post("/templates/:year/:month/questions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.post("/templates/:year/:month/questions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -3820,9 +4010,9 @@ router3.post("/templates/:year/:month/questions", authenticateToken, requireRole
       category: z2.enum(["custom"]).default("custom")
     });
     const questionData = schema.parse(req.body);
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -3838,7 +4028,7 @@ router3.post("/templates/:year/:month/questions", authenticateToken, requireRole
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, template.id)).returning();
+    }).where(eq6(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -3848,7 +4038,7 @@ router3.post("/templates/:year/:month/questions", authenticateToken, requireRole
     res.status(500).json({ error: "Failed to add question" });
   }
 });
-router3.put("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -3859,9 +4049,9 @@ router3.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
       required: z2.boolean()
     });
     const updates = schema.parse(req.body);
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -3881,7 +4071,7 @@ router3.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, template.id)).returning();
+    }).where(eq6(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -3891,14 +4081,14 @@ router3.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     res.status(500).json({ error: "Failed to update question" });
   }
 });
-router3.delete("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.delete("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     const questionId = req.params.questionId;
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -3913,7 +4103,7 @@ router3.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, template.id)).returning();
+    }).where(eq6(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -3923,7 +4113,7 @@ router3.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     res.status(500).json({ error: "Failed to delete question" });
   }
 });
-router3.post("/templates/:year/:month/send", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -3939,9 +4129,9 @@ router3.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       console.log("[SEND] Erro: Database indispon\xEDvel");
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -3972,15 +4162,15 @@ router3.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
     };
-    const [updated] = await db.update(questionnaires).set(updateData).where(eq5(questionnaires.id, template.id)).returning();
+    const [updated] = await db.update(questionnaires).set(updateData).where(eq6(questionnaires.id, template.id)).returning();
     const isResend = template.status === "sent" && resend;
     const allMinisters = await db.select({
       id: users.id,
       name: users.name,
       email: users.email
-    }).from(users).where(and3(
-      eq5(users.role, "ministro"),
-      eq5(users.status, "active")
+    }).from(users).where(and4(
+      eq6(users.role, "ministro"),
+      eq6(users.status, "active")
     ));
     const monthNames2 = [
       "Janeiro",
@@ -4020,20 +4210,20 @@ router3.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
     res.status(500).json({ error: "Failed to send questionnaire" });
   }
 });
-router3.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const templateId = req.params.id;
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq5(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, templateId)).returning();
+    }).where(eq6(questionnaires.id, templateId)).returning();
     res.json({
       message: "Question\xE1rio enviado com sucesso!",
       template: {
@@ -4046,13 +4236,13 @@ router3.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
     res.status(500).json({ error: "Failed to send questionnaire" });
   }
 });
-router3.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const templateId = req.params.id;
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq5(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -4063,7 +4253,7 @@ router3.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
       status: "closed",
       // closedAt: new Date(), // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, templateId)).returning();
+    }).where(eq6(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -4073,13 +4263,13 @@ router3.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
     res.status(500).json({ error: "Failed to close questionnaire" });
   }
 });
-router3.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const templateId = req.params.id;
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq5(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -4090,7 +4280,7 @@ router3.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
       status: "sent",
       // closedAt: null, // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(questionnaires.id, templateId)).returning();
+    }).where(eq6(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -4100,16 +4290,16 @@ router3.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
     res.status(500).json({ error: "Failed to reopen questionnaire" });
   }
 });
-router3.delete("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year),
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -4121,12 +4311,12 @@ router3.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq5(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
     if (responses.length > 0) {
       const [updated] = await db.update(questionnaires).set({
         status: "deleted",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq5(questionnaires.id, template.id)).returning();
+      }).where(eq6(questionnaires.id, template.id)).returning();
       res.json({
         message: "Template marcado como deletado. Respostas existentes foram preservadas.",
         template: {
@@ -4135,7 +4325,7 @@ router3.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
         }
       });
     } else {
-      await db.delete(questionnaires).where(eq5(questionnaires.id, template.id));
+      await db.delete(questionnaires).where(eq6(questionnaires.id, template.id));
       res.json({
         message: "Template deletado com sucesso!",
         deleted: true
@@ -4146,16 +4336,16 @@ router3.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
     res.status(500).json({ error: "Failed to delete template" });
   }
 });
-router3.get("/responses-status/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year)
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.json({
@@ -4173,18 +4363,18 @@ router3.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(and3(
+    }).from(users).where(and4(
       or3(
-        eq5(users.role, "ministro"),
-        eq5(users.role, "coordenador")
+        eq6(users.role, "ministro"),
+        eq6(users.role, "coordenador")
       ),
-      eq5(users.status, "active")
+      eq6(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq5(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
     const ministersWithResponses = allMinisters.map((minister) => {
       const response = responses.find((r) => r.userId === minister.id);
       if (response) {
@@ -4252,19 +4442,19 @@ router3.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
     res.status(500).json({ error: "Failed to fetch response status" });
   }
 });
-router3.get("/responses/:templateId/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { templateId, ministerId } = req.params;
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq5(questionnaires.id, templateId)).limit(1);
+    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId)).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const [response] = await db.select().from(questionnaireResponses).where(and3(
-      eq5(questionnaireResponses.questionnaireId, templateId),
-      eq5(questionnaireResponses.userId, ministerId)
+    const [response] = await db.select().from(questionnaireResponses).where(and4(
+      eq6(questionnaireResponses.questionnaireId, templateId),
+      eq6(questionnaireResponses.userId, ministerId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -4273,7 +4463,7 @@ router3.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq5(users.id, ministerId)).limit(1);
+    }).from(users).where(eq6(users.id, ministerId)).limit(1);
     res.json({
       user,
       response: {
@@ -4292,21 +4482,21 @@ router3.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
     res.status(500).json({ error: "Failed to fetch response details" });
   }
 });
-router3.get("/responses-summary/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(and3(
-      eq5(questionnaires.month, month),
-      eq5(questionnaires.year, year)
+    const [template] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq5(questionnaireResponses.questionnaireId, template.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
     const summary = {};
     const questions = template.questions;
     responses.forEach((response) => {
@@ -4356,19 +4546,19 @@ router3.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
     res.status(500).json({ error: "Failed to fetch response summary" });
   }
 });
-var questionnaireAdmin_default = router3;
+var questionnaireAdmin_default = router4;
 
 // server/routes/questionnaires.ts
 await init_db();
 init_schema();
-import { Router as Router4 } from "express";
+import { Router as Router5 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq7, and as and5, or as or4 } from "drizzle-orm";
+import { eq as eq8, and as and6, or as or4 } from "drizzle-orm";
 
 // server/utils/csvExporter.ts
 await init_db();
 init_schema();
-import { eq as eq6, and as and4 } from "drizzle-orm";
+import { eq as eq7, and as and5 } from "drizzle-orm";
 function convertResponsesToCSV(data) {
   if (data.length === 0) {
     return "Sem dados para exportar";
@@ -4480,14 +4670,14 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   if (!db) {
     throw new Error("Database not available");
   }
-  const [questionnaire] = await db.select().from(questionnaires).where(eq6(questionnaires.id, questionnaireId)).limit(1);
+  const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
   if (!questionnaire) {
     throw new Error("Questionnaire not found");
   }
   const responsesWithUsers = await db.select({
     response: questionnaireResponses,
     user: users
-  }).from(questionnaireResponses).innerJoin(users, eq6(questionnaireResponses.userId, users.id)).where(eq6(questionnaireResponses.questionnaireId, questionnaireId));
+  }).from(questionnaireResponses).innerJoin(users, eq7(questionnaireResponses.userId, users.id)).where(eq7(questionnaireResponses.questionnaireId, questionnaireId));
   const exportData = responsesWithUsers.map(({ response, user }) => {
     const formattedResponses = [];
     if (response.availableSundays && response.availableSundays.length > 0) {
@@ -4625,7 +4815,7 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   });
   const respondedUserIds = new Set(responsesWithUsers.map((r) => r.user.id));
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
-    const nonRespondents = await db.select().from(users).where(eq6(users.role, "ministro"));
+    const nonRespondents = await db.select().from(users).where(eq7(users.role, "ministro"));
     nonRespondents.filter((user) => !respondedUserIds.has(user.id)).forEach((user) => {
       exportData.push({
         ministerId: user.id,
@@ -4643,9 +4833,9 @@ async function getMonthlyResponsesForExport(month, year) {
   if (!db) {
     throw new Error("Database not available");
   }
-  const [questionnaire] = await db.select().from(questionnaires).where(and4(
-    eq6(questionnaires.month, month),
-    eq6(questionnaires.year, year)
+  const [questionnaire] = await db.select().from(questionnaires).where(and5(
+    eq7(questionnaires.month, month),
+    eq7(questionnaires.year, year)
   )).limit(1);
   if (!questionnaire) {
     throw new Error(`No questionnaire found for ${month}/${year}`);
@@ -4654,7 +4844,7 @@ async function getMonthlyResponsesForExport(month, year) {
 }
 
 // server/routes/questionnaires.ts
-var router4 = Router4();
+var router5 = Router5();
 var monthNames = [
   "Janeiro",
   "Fevereiro",
@@ -4772,7 +4962,7 @@ function extractQuestionnaireData(responses) {
   });
   return data;
 }
-router4.post("/templates", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router5.post("/templates", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const schema = z3.object({
       month: z3.number().min(1).max(12),
@@ -4783,16 +4973,16 @@ router4.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(and5(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+    const [existingTemplate] = await db.select().from(questionnaires).where(and6(
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     )).limit(1);
     const questions = generateQuestionnaireQuestions(month, year);
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq7(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq8(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -4809,9 +4999,9 @@ router4.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
         id: users.id,
         name: users.name,
         email: users.email
-      }).from(users).where(and5(
-        eq7(users.role, "ministro"),
-        eq7(users.status, "active")
+      }).from(users).where(and6(
+        eq8(users.role, "ministro"),
+        eq8(users.status, "active")
       ));
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -4833,7 +5023,7 @@ router4.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
     res.status(500).json({ error: "Failed to create/update questionnaire template" });
   }
 });
-router4.get("/templates/:year/:month", authenticateToken, async (req, res) => {
+router5.get("/templates/:year/:month", authenticateToken, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -4847,9 +5037,9 @@ router4.get("/templates/:year/:month", authenticateToken, async (req, res) => {
       });
     }
     try {
-      const [template] = await db.select().from(questionnaires).where(and5(
-        eq7(questionnaires.month, month),
-        eq7(questionnaires.year, year)
+      const [template] = await db.select().from(questionnaires).where(and6(
+        eq8(questionnaires.month, month),
+        eq8(questionnaires.year, year)
       )).limit(1);
       if (!template) {
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado para este per\xEDodo" });
@@ -4878,7 +5068,7 @@ router4.get("/templates/:year/:month", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch questionnaire template" });
   }
 });
-router4.post("/responses", authenticateToken, async (req, res) => {
+router5.post("/responses", authenticateToken, async (req, res) => {
   try {
     console.log("[RESPONSES] In\xEDcio do endpoint de submiss\xE3o");
     console.log("[RESPONSES] UserId:", req.user?.id);
@@ -4918,7 +5108,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service temporarily unavailable. Please try again later." });
     }
     if (data.questionnaireId) {
-      const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, data.questionnaireId)).limit(1);
+      const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, data.questionnaireId)).limit(1);
       if (template && template.status === "closed") {
         return res.status(400).json({ error: "Este question\xE1rio foi encerrado e n\xE3o aceita mais respostas" });
       }
@@ -4926,7 +5116,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Buscando usu\xE1rio para userId:", userId);
     let minister = null;
     try {
-      const [foundUser] = await db.select().from(users).where(eq7(users.id, userId)).limit(1);
+      const [foundUser] = await db.select().from(users).where(eq8(users.id, userId)).limit(1);
       console.log("[RESPONSES] Usu\xE1rio encontrado:", foundUser);
       if (foundUser && foundUser.role === "ministro") {
         minister = {
@@ -4956,9 +5146,9 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Template ID inicial:", templateId);
     if (!templateId) {
       console.log("[RESPONSES] Buscando template para m\xEAs:", data.month, "ano:", data.year);
-      const [template] = await db.select().from(questionnaires).where(and5(
-        eq7(questionnaires.month, data.month),
-        eq7(questionnaires.year, data.year)
+      const [template] = await db.select().from(questionnaires).where(and6(
+        eq8(questionnaires.month, data.month),
+        eq8(questionnaires.year, data.year)
       )).limit(1);
       if (template) {
         templateId = template.id;
@@ -4979,9 +5169,9 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     }
     console.log("[RESPONSES] Template ID final:", templateId);
     console.log("[RESPONSES] Verificando resposta existente para userId:", minister.id, "templateId:", templateId);
-    const [existingResponse] = await db.select().from(questionnaireResponses).where(and5(
-      eq7(questionnaireResponses.userId, minister.id),
-      eq7(questionnaireResponses.questionnaireId, templateId)
+    const [existingResponse] = await db.select().from(questionnaireResponses).where(and6(
+      eq8(questionnaireResponses.userId, minister.id),
+      eq8(questionnaireResponses.questionnaireId, templateId)
     )).limit(1);
     console.log("[RESPONSES] Resposta existente encontrada?", existingResponse ? "Sim" : "N\xE3o");
     console.log("[RESPONSES] Analisando respostas");
@@ -5003,7 +5193,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
           notes: extractedData.notes,
           submittedAt: /* @__PURE__ */ new Date(),
           sharedWithFamilyIds: data.sharedWithFamilyIds || []
-        }).where(eq7(questionnaireResponses.id, existingResponse.id)).returning();
+        }).where(eq8(questionnaireResponses.id, existingResponse.id)).returning();
         console.log("[RESPONSES] Resposta atualizada com sucesso");
         const responseData = {
           ...updated,
@@ -5046,31 +5236,31 @@ router4.post("/responses", authenticateToken, async (req, res) => {
       console.log("[RESPONSES] Processando compartilhamento familiar:", data.sharedWithFamilyIds);
       for (const familyUserId of data.sharedWithFamilyIds) {
         try {
-          const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and5(
-            eq7(users.id, familyUserId),
-            eq7(users.status, "active")
+          const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and6(
+            eq8(users.id, familyUserId),
+            eq8(users.status, "active")
           )).limit(1);
           if (!familyMember) {
             console.warn(`[RESPONSES] Usu\xE1rio n\xE3o encontrado ou inativo: ${familyUserId}`);
             continue;
           }
           const [familyRelation] = await db.select().from(familyRelationships).where(or4(
-            and5(
-              eq7(familyRelationships.userId, minister.id),
-              eq7(familyRelationships.relatedUserId, familyUserId)
+            and6(
+              eq8(familyRelationships.userId, minister.id),
+              eq8(familyRelationships.relatedUserId, familyUserId)
             ),
-            and5(
-              eq7(familyRelationships.userId, familyUserId),
-              eq7(familyRelationships.relatedUserId, minister.id)
+            and6(
+              eq8(familyRelationships.userId, familyUserId),
+              eq8(familyRelationships.relatedUserId, minister.id)
             )
           )).limit(1);
           if (!familyRelation) {
             console.warn(`[RESPONSES] Sem rela\xE7\xE3o familiar v\xE1lida entre ${minister.id} e ${familyUserId}`);
             continue;
           }
-          const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and5(
-            eq7(questionnaireResponses.userId, familyUserId),
-            eq7(questionnaireResponses.questionnaireId, templateId)
+          const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and6(
+            eq8(questionnaireResponses.userId, familyUserId),
+            eq8(questionnaireResponses.questionnaireId, templateId)
           )).limit(1);
           if (!existingFamilyResponse) {
             await db.insert(questionnaireResponses).values({
@@ -5086,7 +5276,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
             await db.update(questionnaireResponses).set({
               responses: JSON.stringify(data.responses),
               submittedAt: /* @__PURE__ */ new Date()
-            }).where(eq7(questionnaireResponses.id, existingFamilyResponse.id));
+            }).where(eq8(questionnaireResponses.id, existingFamilyResponse.id));
             console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
           } else {
             console.log(`[RESPONSES] ${familyMember.name} j\xE1 possui resposta pr\xF3pria, n\xE3o sobrescrevendo`);
@@ -5118,7 +5308,7 @@ router4.post("/responses", authenticateToken, async (req, res) => {
     }
   }
 });
-router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
+router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5127,7 +5317,7 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       return res.json(null);
     }
     try {
-      const [user] = await db.select().from(users).where(eq7(users.id, userId)).limit(1);
+      const [user] = await db.select().from(users).where(eq8(users.id, userId)).limit(1);
       const minister = user && (user.role === "ministro" || user.role === "coordenador" || user.role === "gestor") ? {
         id: user.id,
         userId: user.id
@@ -5145,7 +5335,7 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
         questionnaireId: questionnaireResponses.questionnaireId,
         month: questionnaires.month,
         year: questionnaires.year
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq7(questionnaireResponses.userId, minister.id));
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq8(questionnaireResponses.userId, minister.id));
       console.log("[GET /responses] Todas as respostas do usu\xE1rio:", allUserResponses);
       const [response] = await db.select({
         id: questionnaireResponses.id,
@@ -5159,10 +5349,10 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
           questions: questionnaires.questions,
           status: questionnaires.status
         }
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(and5(
-        eq7(questionnaireResponses.userId, minister.id),
-        eq7(questionnaires.month, month),
-        eq7(questionnaires.year, year)
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+        eq8(questionnaireResponses.userId, minister.id),
+        eq8(questionnaires.month, month),
+        eq8(questionnaires.year, year)
       )).limit(1);
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
@@ -5193,7 +5383,7 @@ router4.get("/responses/:year/:month", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch questionnaire response" });
   }
 });
-router4.get("/admin/responses-status/:year/:month", authenticateToken, async (req, res) => {
+router5.get("/admin/responses-status/:year/:month", authenticateToken, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5204,9 +5394,9 @@ router4.get("/admin/responses-status/:year/:month", authenticateToken, async (re
     if (!db) {
       return res.json([]);
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(and5(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+    const [questionnaire] = await db.select().from(questionnaires).where(and6(
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({
@@ -5225,15 +5415,15 @@ router4.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(and5(
-      eq7(users.role, "ministro"),
-      eq7(users.status, "active")
+    }).from(users).where(and6(
+      eq8(users.role, "ministro"),
+      eq8(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
     const responseMap = new Map(responses.map((r) => [r.userId, r]));
     const ministerResponses = ministers.map((minister) => {
       const response = responseMap.get(minister.id);
@@ -5268,7 +5458,7 @@ router4.get("/admin/responses-status/:year/:month", authenticateToken, async (re
     res.status(500).json({ error: "Failed to fetch response status" });
   }
 });
-router4.get("/admin/responses-summary/:year/:month", authenticateToken, async (req, res) => {
+router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5279,14 +5469,14 @@ router4.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
     if (!db) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(and5(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+    const [questionnaire] = await db.select().from(questionnaires).where(and6(
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
@@ -5311,7 +5501,7 @@ router4.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
     res.status(500).json({ error: "Failed to fetch response summary" });
   }
 });
-router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (req, res) => {
+router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (req, res) => {
   try {
     const { templateId, userId } = req.params;
     const userRole = req.user.role;
@@ -5321,7 +5511,7 @@ router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     if (!db) {
       return res.status(500).json({ error: "Database not available" });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
@@ -5329,13 +5519,13 @@ router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq7(users.id, userId)).limit(1);
+    }).from(users).where(eq8(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const [response] = await db.select().from(questionnaireResponses).where(and5(
-      eq7(questionnaireResponses.questionnaireId, templateId),
-      eq7(questionnaireResponses.userId, userId)
+    const [response] = await db.select().from(questionnaireResponses).where(and6(
+      eq8(questionnaireResponses.questionnaireId, templateId),
+      eq8(questionnaireResponses.userId, userId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -5360,7 +5550,7 @@ router4.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     res.status(500).json({ error: "Failed to fetch detailed response" });
   }
 });
-router4.get("/responses/all/:year/:month", authenticateToken, async (req, res) => {
+router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5387,9 +5577,9 @@ router4.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
         month: questionnaires.month,
         year: questionnaires.year
       }
-    }).from(questionnaireResponses).leftJoin(users, eq7(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq7(questionnaireResponses.questionnaireId, questionnaires.id)).where(and5(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+    }).from(questionnaireResponses).leftJoin(users, eq8(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     ));
     res.json(responses);
   } catch (error) {
@@ -5397,7 +5587,7 @@ router4.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
     res.status(500).json({ error: "Failed to fetch questionnaire responses" });
   }
 });
-router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const userId = req.user?.id;
     const templateId = req.params.id;
@@ -5407,7 +5597,7 @@ router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -5417,7 +5607,7 @@ router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     const [updated] = await db.update(questionnaires).set({
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, templateId)).returning();
+    }).where(eq8(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -5427,7 +5617,7 @@ router4.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     res.status(500).json({ error: "Failed to close questionnaire" });
   }
 });
-router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const userId = req.user?.id;
     const templateId = req.params.id;
@@ -5437,7 +5627,7 @@ router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -5447,7 +5637,7 @@ router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, templateId)).returning();
+    }).where(eq8(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -5457,7 +5647,7 @@ router4.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     res.status(500).json({ error: "Failed to reopen questionnaire" });
   }
 });
-router4.get("/family-sharing/:questionnaireId", authenticateToken, async (req, res) => {
+router5.get("/family-sharing/:questionnaireId", authenticateToken, async (req, res) => {
   try {
     const { questionnaireId } = req.params;
     const userId = req.user.id;
@@ -5469,13 +5659,13 @@ router4.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
     res.status(500).json({ error: "Failed to fetch family members" });
   }
 });
-router4.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { questionnaireId } = req.params;
     const { format: format4 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
     const csvContent = format4 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
-    const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -5485,7 +5675,7 @@ router4.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coo
     res.status(500).json({ error: "Failed to export questionnaire responses" });
   }
 });
-router4.get("/export/:year/:month/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5506,7 +5696,7 @@ router4.get("/export/:year/:month/csv", authenticateToken, requireRole(["coorden
     res.status(500).json({ error: message });
   }
 });
-router4.post("/admin/reprocess-responses", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({ error: "Database not available" });
@@ -5515,14 +5705,14 @@ router4.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     console.log(`[REPROCESS] \u{1F504} Iniciando reprocessamento...`);
     console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
     if (questionnaireId) {
-      const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
+      const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
       if (!questionnaire) {
         console.log(`[REPROCESS] \u274C Question\xE1rio ${questionnaireId} n\xE3o encontrado!`);
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado" });
       }
       console.log(`[REPROCESS] \u2705 Question\xE1rio encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
     }
-    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
+    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
     console.log(`[REPROCESS] \u{1F4DD} Encontradas ${allResponses.length} respostas para reprocessar...`);
     let updated = 0;
     let errors = 0;
@@ -5543,7 +5733,7 @@ router4.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
           specialEvents: extractedData.specialEvents,
           canSubstitute: extractedData.canSubstitute,
           notes: extractedData.notes
-        }).where(eq7(questionnaireResponses.id, response.id));
+        }).where(eq8(questionnaireResponses.id, response.id));
         updated++;
       } catch (error) {
         console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
@@ -5568,19 +5758,19 @@ router4.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     });
   }
 });
-var questionnaires_default = router4;
+var questionnaires_default = router5;
 
 // server/routes/scheduleGeneration.ts
-import { Router as Router5 } from "express";
+import { Router as Router6 } from "express";
 import { z as z4 } from "zod";
 init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and7, gte as gte3, lte as lte3, eq as eq9, sql as sql4, ne as ne3, desc as desc4 } from "drizzle-orm";
+import { and as and8, gte as gte3, lte as lte3, eq as eq10, sql as sql5, ne as ne3, desc as desc4 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
-var router5 = Router5();
+var router6 = Router6();
 var generateScheduleSchema = z4.object({
   year: z4.number().min(2024).max(2030),
   month: z4.number().min(1).max(12),
@@ -5601,12 +5791,12 @@ var saveSchedulesSchema = z4.object({
   })),
   replaceExisting: z4.boolean().default(false)
 });
-router5.post("/generate", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { year, month, saveToDatabase, replaceExisting } = generateScheduleSchema.parse(req.body);
     logger.info(`Iniciando gera\xE7\xE3o autom\xE1tica de escalas para ${month}/${year} por usu\xE1rio ${req.user?.id}`);
     if (!replaceExisting && db) {
-      const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(sql4`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`).limit(1);
+      const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(sql5`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`).limit(1);
       if (existingSchedules.length > 0) {
         return res.status(400).json({
           success: false,
@@ -5664,7 +5854,7 @@ router5.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     });
   }
 });
-router5.post("/save-generated", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { schedules: schedulesToSave, replaceExisting } = saveSchedulesSchema.parse(req.body);
     if (!db) {
@@ -5678,7 +5868,7 @@ router5.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
       const firstDate = sortedSchedules[0].date;
       const lastDate = sortedSchedules[sortedSchedules.length - 1].date;
       await db.delete(schedules).where(
-        and7(
+        and8(
           gte3(schedules.date, firstDate),
           lte3(schedules.date, lastDate)
         )
@@ -5733,7 +5923,7 @@ router5.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
     });
   }
 });
-router5.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5775,7 +5965,7 @@ router5.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "
     });
   }
 });
-router5.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5788,16 +5978,16 @@ router5.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       status: users.status,
       totalServices: users.totalServices
     }).from(users).where(
-      and7(
-        eq9(users.status, "active"),
+      and8(
+        eq10(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq9(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(
-      and7(
-        eq9(questionnaires.month, month),
-        eq9(questionnaires.year, year)
+    const massTimesData = await db.select().from(massTimesConfig).where(eq10(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+      and8(
+        eq10(questionnaires.month, month),
+        eq10(questionnaires.year, year)
       )
     );
     res.json({
@@ -5830,7 +6020,7 @@ router5.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
     });
   }
 });
-router5.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -5840,10 +6030,10 @@ router5.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(
-      and7(
-        sql4`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
-        sql4`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(
+      and8(
+        sql5`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
+        sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
       )
     );
     const metrics = {
@@ -5879,9 +6069,9 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
     if (!schedule.massTime.date) continue;
     if (replaceExisting) {
       await db.delete(schedules).where(
-        and7(
-          eq9(schedules.date, schedule.massTime.date),
-          eq9(schedules.time, schedule.massTime.time)
+        and8(
+          eq10(schedules.date, schedule.massTime.date),
+          eq10(schedules.time, schedule.massTime.time)
         )
       );
     }
@@ -6014,7 +6204,7 @@ function calculateCoverageByDay(schedules3) {
   });
   return coverage;
 }
-router5.get("/by-date/:date", authenticateToken, async (req, res) => {
+router6.get("/by-date/:date", authenticateToken, async (req, res) => {
   try {
     const { date: date2 } = req.params;
     const dateOnly = date2.split("T")[0];
@@ -6031,7 +6221,7 @@ router5.get("/by-date/:date", authenticateToken, async (req, res) => {
       status: schedules.status,
       notes: schedules.notes,
       ministerName: users.name
-    }).from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(eq9(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+    }).from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(eq10(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
     const formattedAssignments = assignments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -6058,7 +6248,7 @@ router5.get("/by-date/:date", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch schedule" });
   }
 });
-router5.get("/:date/:time", authenticateToken, async (req, res) => {
+router6.get("/:date/:time", authenticateToken, async (req, res) => {
   try {
     const { date: date2, time: time2 } = req.params;
     if (!db) {
@@ -6073,9 +6263,9 @@ router5.get("/:date/:time", authenticateToken, async (req, res) => {
       type: schedules.type,
       location: schedules.location,
       position: schedules.position
-    }).from(schedules).leftJoin(users, eq9(schedules.ministerId, users.id)).where(and7(
-      eq9(schedules.date, date2),
-      eq9(schedules.time, time2)
+    }).from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(and8(
+      eq10(schedules.date, date2),
+      eq10(schedules.time, time2)
     )).orderBy(schedules.position);
     res.json({
       date: date2,
@@ -6087,7 +6277,7 @@ router5.get("/:date/:time", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch schedule" });
   }
 });
-router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const schema = z4.object({
       date: z4.string(),
@@ -6108,10 +6298,10 @@ router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     }
     if (!data.skipDuplicateCheck) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
-      const [existing] = await db.select().from(schedules).where(and7(
-        eq9(schedules.date, data.date),
-        eq9(schedules.time, data.time),
-        eq9(schedules.ministerId, data.ministerId)
+      const [existing] = await db.select().from(schedules).where(and8(
+        eq10(schedules.date, data.date),
+        eq10(schedules.time, data.time),
+        eq10(schedules.ministerId, data.ministerId)
       )).limit(1);
       if (existing) {
         logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
@@ -6126,9 +6316,9 @@ router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       newPosition = data.position;
       logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
     } else {
-      const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and7(
-        eq9(schedules.date, data.date),
-        eq9(schedules.time, data.time)
+      const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and8(
+        eq10(schedules.date, data.date),
+        eq10(schedules.time, data.time)
       )).orderBy(desc4(schedules.position));
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
       logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
@@ -6151,20 +6341,20 @@ router5.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ message: error.message || "Erro ao adicionar ministro na escala" });
   }
 });
-router5.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { id } = req.params;
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(eq9(schedules.id, id));
+    await db.delete(schedules).where(eq10(schedules.id, id));
     res.json({ success: true, message: "Ministro removido da escala" });
   } catch (error) {
     logger.error("Error removing minister from schedule:", error);
     res.status(500).json({ error: "Failed to remove minister from schedule" });
   }
 });
-router5.patch("/batch-update", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const schema = z4.object({
       date: z4.string(),
@@ -6176,9 +6366,9 @@ router5.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(and7(
-      eq9(schedules.date, date2),
-      eq9(schedules.time, time2)
+    await db.delete(schedules).where(and8(
+      eq10(schedules.date, date2),
+      eq10(schedules.time, time2)
     ));
     if (ministers.length > 0) {
       const newSchedules = ministers.map((ministerId, index2) => ({
@@ -6199,16 +6389,16 @@ router5.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     res.status(500).json({ error: "Failed to update schedule" });
   }
 });
-var scheduleGeneration_default = router5;
+var scheduleGeneration_default = router6;
 
 // server/routes/upload.ts
 await init_db();
 init_schema();
-import { Router as Router6 } from "express";
+import { Router as Router7 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq10 } from "drizzle-orm";
-var router6 = Router6();
+import { eq as eq11 } from "drizzle-orm";
+var router7 = Router7();
 var upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -6247,7 +6437,7 @@ var handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-router6.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
+router7.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
@@ -6274,7 +6464,7 @@ router6.post("/profile-photo", authenticateToken, upload.single("photo"), handle
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq10(users.id, userId));
+    }).where(eq11(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -6296,7 +6486,7 @@ router6.post("/profile-photo", authenticateToken, upload.single("photo"), handle
     res.status(500).json({ error: "Erro interno ao processar a foto. Tente novamente." });
   }
 });
-router6.delete("/profile-photo", authenticateToken, async (req, res) => {
+router7.delete("/profile-photo", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     if (!db) {
@@ -6306,7 +6496,7 @@ router6.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq10(users.id, userId));
+    }).where(eq11(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -6316,16 +6506,16 @@ router6.delete("/profile-photo", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro interno ao remover a foto. Tente novamente." });
   }
 });
-var upload_default = router6;
+var upload_default = router7;
 
 // server/routes/notifications.ts
-import { Router as Router7 } from "express";
+import { Router as Router8 } from "express";
 import { z as z5 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq11, and as and8 } from "drizzle-orm";
-var router7 = Router7();
+import { eq as eq12, and as and9 } from "drizzle-orm";
+var router8 = Router8();
 var createNotificationSchema = z5.object({
   title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
   message: z5.string().min(1, "Mensagem \xE9 obrigat\xF3ria"),
@@ -6348,7 +6538,7 @@ function mapNotificationType(frontendType) {
       return "announcement";
   }
 }
-router7.get("/", authenticateToken, async (req, res) => {
+router8.get("/", authenticateToken, async (req, res) => {
   try {
     const notifications2 = await storage.getUserNotifications(req.user.id);
     res.json(notifications2);
@@ -6356,7 +6546,7 @@ router7.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
   }
 });
-router7.get("/unread-count", authenticateToken, async (req, res) => {
+router8.get("/unread-count", authenticateToken, async (req, res) => {
   try {
     const allNotifications = await storage.getUserNotifications(req.user.id);
     const count5 = allNotifications.filter((n) => !n.read).length;
@@ -6365,12 +6555,12 @@ router7.get("/unread-count", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao contar notifica\xE7\xF5es" });
   }
 });
-router7.patch("/:id/read", authenticateToken, async (req, res) => {
+router8.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await db.select().from(notifications).where(and8(
-      eq11(notifications.id, id),
-      eq11(notifications.userId, req.user.id)
+    const notification = await db.select().from(notifications).where(and9(
+      eq12(notifications.id, id),
+      eq12(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -6381,7 +6571,7 @@ router7.patch("/:id/read", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router7.patch("/read-all", authenticateToken, async (req, res) => {
+router8.patch("/read-all", authenticateToken, async (req, res) => {
   try {
     const userNotifications = await storage.getUserNotifications(req.user.id);
     const unreadNotifications = userNotifications.filter((n) => !n.read);
@@ -6391,13 +6581,13 @@ router7.patch("/read-all", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router7.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { massId, date: date2, time: time2, location, message, urgencyLevel } = req.body;
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq11(users.status, "active")
+      eq12(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -6430,7 +6620,7 @@ router7.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ges
     res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : "Unknown error" });
   }
 });
-router7.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     let recipientUserIds = [];
@@ -6439,18 +6629,18 @@ router7.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq11(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq12(users.status, "active"));
       } else {
-        recipients = await db.select({ id: users.id }).from(users).where(and8(
-          eq11(users.role, data.recipientRole),
-          eq11(users.status, "active")
+        recipients = await db.select({ id: users.id }).from(users).where(and9(
+          eq12(users.role, data.recipientRole),
+          eq12(users.status, "active")
         ));
       }
       recipientUserIds = recipients.map((r) => r.id);
     } else {
-      const recipients = await db.select({ id: users.id }).from(users).where(and8(
-        eq11(users.role, "ministro"),
-        eq11(users.status, "active")
+      const recipients = await db.select({ id: users.id }).from(users).where(and9(
+        eq12(users.role, "ministro"),
+        eq12(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
     }
@@ -6486,24 +6676,24 @@ router7.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     }
   }
 });
-router7.delete("/:id", authenticateToken, async (req, res) => {
+router8.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await storage.getUser(req.user.id);
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq11(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq12(notifications.id, id)).limit(1);
     } else {
-      notification = await db.select().from(notifications).where(and8(
-        eq11(notifications.id, id),
-        eq11(notifications.userId, req.user.id)
+      notification = await db.select().from(notifications).where(and9(
+        eq12(notifications.id, id),
+        eq12(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq11(notifications.id, id));
+    await db.delete(notifications).where(eq12(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -6514,13 +6704,13 @@ router7.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
-var notifications_default = router7;
+var notifications_default = router8;
 
 // server/routes/reports.ts
 await init_db();
 init_schema();
-import { Router as Router8 } from "express";
-import { eq as eq12, sql as sql5, and as and9, gte as gte4, lte as lte4, desc as desc6, asc, count as count3, avg } from "drizzle-orm";
+import { Router as Router9 } from "express";
+import { eq as eq13, sql as sql6, and as and10, gte as gte4, lte as lte4, desc as desc6, asc, count as count3, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
 await init_db();
@@ -6553,8 +6743,8 @@ function createActivityLogger(req) {
 }
 
 // server/routes/reports.ts
-var router8 = Router8();
-router8.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+var router9 = Router9();
+router9.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "availability" });
   try {
@@ -6563,7 +6753,7 @@ router8.get("/availability", authenticateToken, requireRole(["gestor", "coordena
       userId: questionnaireResponses.userId,
       userName: users.name,
       totalResponses: count3(questionnaireResponses.id),
-      availableDays: sql5`
+      availableDays: sql6`
           COALESCE(
             SUM(
               jsonb_array_length(
@@ -6572,12 +6762,12 @@ router8.get("/availability", authenticateToken, requireRole(["gestor", "coordena
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq12(users.id, questionnaireResponses.userId)).where(
-      and9(
-        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql5`true`,
-        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql5`true`
+    }).from(questionnaireResponses).leftJoin(users, eq13(users.id, questionnaireResponses.userId)).where(
+      and10(
+        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql6`true`,
+        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql6`true`
       )
-    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql5`available_days`)).limit(Number(limit));
+    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql6`available_days`)).limit(Number(limit));
     res.json({
       topAvailable: availabilityData,
       period: { startDate, endDate }
@@ -6587,7 +6777,7 @@ router8.get("/availability", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch availability metrics" });
   }
 });
-router8.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router9.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "substitutions" });
   try {
@@ -6596,35 +6786,35 @@ router8.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
       userId: substitutionRequests.requesterId,
       userName: users.name,
       totalRequests: count3(substitutionRequests.id),
-      approvedRequests: sql5`
+      approvedRequests: sql6`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved_requests"),
-      pendingRequests: sql5`
+      pendingRequests: sql6`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq12(users.id, substitutionRequests.requesterId)).where(
-      and9(
-        startDate ? gte4(substitutionRequests.createdAt, new Date(startDate)) : sql5`true`,
-        endDate ? lte4(substitutionRequests.createdAt, new Date(endDate)) : sql5`true`
+    }).from(substitutionRequests).leftJoin(users, eq13(users.id, substitutionRequests.requesterId)).where(
+      and10(
+        startDate ? gte4(substitutionRequests.createdAt, new Date(startDate)) : sql6`true`,
+        endDate ? lte4(substitutionRequests.createdAt, new Date(endDate)) : sql6`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc6(count3(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
       userId: schedules.ministerId,
       userName: users.name,
       totalAssignments: count3(schedules.id),
-      substitutionRequests: sql5`
+      substitutionRequests: sql6`
           (SELECT COUNT(*) FROM ${substitutionRequests}
            WHERE ${substitutionRequests.requesterId} = ${schedules.ministerId}
-           ${startDate ? sql5`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql5``}
-           ${endDate ? sql5`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql5``})
+           ${startDate ? sql6`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql6``}
+           ${endDate ? sql6`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql6``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq12(users.id, schedules.ministerId)).where(
-      and9(
-        schedules.status ? eq12(schedules.status, "published") : sql5`true`,
-        startDate ? gte4(schedules.createdAt, new Date(startDate)) : sql5`true`,
-        endDate ? lte4(schedules.createdAt, new Date(endDate)) : sql5`true`
+    }).from(schedules).leftJoin(users, eq13(users.id, schedules.ministerId)).where(
+      and10(
+        schedules.status ? eq13(schedules.status, "published") : sql6`true`,
+        startDate ? gte4(schedules.createdAt, new Date(startDate)) : sql6`true`,
+        endDate ? lte4(schedules.createdAt, new Date(endDate)) : sql6`true`
       )
-    ).groupBy(schedules.ministerId, users.name).having(sql5`COUNT(${schedules.id}) > 0`).orderBy(asc(sql5`substitution_requests`), desc6(count3(schedules.id))).limit(10);
+    ).groupBy(schedules.ministerId, users.name).having(sql6`COUNT(${schedules.id}) > 0`).orderBy(asc(sql6`substitution_requests`), desc6(count3(schedules.id))).limit(10);
     res.json({
       mostRequests,
       reliableServers,
@@ -6635,7 +6825,7 @@ router8.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch substitution metrics" });
   }
 });
-router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router9.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "engagement" });
   try {
@@ -6644,22 +6834,22 @@ router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
       userId: activityLogs.userId,
       userName: users.name,
       totalActions: count3(activityLogs.id),
-      lastActivity: sql5`MAX(${activityLogs.createdAt})`.as("last_activity"),
-      uniqueDays: sql5`
+      lastActivity: sql6`MAX(${activityLogs.createdAt})`.as("last_activity"),
+      uniqueDays: sql6`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq12(users.id, activityLogs.userId)).where(
-      and9(
-        startDate ? gte4(activityLogs.createdAt, new Date(startDate)) : sql5`true`,
-        endDate ? lte4(activityLogs.createdAt, new Date(endDate)) : sql5`true`
+    }).from(activityLogs).leftJoin(users, eq13(users.id, activityLogs.userId)).where(
+      and10(
+        startDate ? gte4(activityLogs.createdAt, new Date(startDate)) : sql6`true`,
+        endDate ? lte4(activityLogs.createdAt, new Date(endDate)) : sql6`true`
       )
     ).groupBy(activityLogs.userId, users.name).orderBy(desc6(count3(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
       totalMinisters: count3(users.id),
-      respondedMinisters: sql5`
+      respondedMinisters: sql6`
           COUNT(DISTINCT ${questionnaireResponses.userId})
         `.as("responded_ministers"),
-      responseRate: sql5`
+      responseRate: sql6`
           ROUND(
             COUNT(DISTINCT ${questionnaireResponses.userId})::numeric /
             NULLIF(COUNT(DISTINCT ${users.id}), 0) * 100,
@@ -6668,12 +6858,12 @@ router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
         `.as("response_rate")
     }).from(users).leftJoin(
       questionnaireResponses,
-      and9(
-        eq12(users.id, questionnaireResponses.userId),
-        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql5`true`,
-        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql5`true`
+      and10(
+        eq13(users.id, questionnaireResponses.userId),
+        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql6`true`,
+        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql6`true`
       )
-    ).where(eq12(users.status, "active"));
+    ).where(eq13(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -6684,7 +6874,7 @@ router8.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
     res.status(500).json({ error: "Failed to fetch engagement metrics" });
   }
 });
-router8.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router9.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "formation" });
   try {
@@ -6692,19 +6882,19 @@ router8.get("/formation", authenticateToken, requireRole(["gestor", "coordenador
     const topPerformers = await db.select({
       userId: formationProgress.userId,
       userName: users.name,
-      completedModules: sql5`
+      completedModules: sql6`
           COUNT(CASE WHEN ${formationProgress.status} = 'completed' THEN 1 END)
         `.as("completed_modules"),
-      inProgressModules: sql5`
+      inProgressModules: sql6`
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq12(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql5`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq13(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql6`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
-      totalModules: sql5`
+      totalModules: sql6`
           (SELECT COUNT(*) FROM formation_modules)
         `.as("total_modules"),
-      totalEnrolled: count3(sql5`DISTINCT ${formationProgress.userId}`),
+      totalEnrolled: count3(sql6`DISTINCT ${formationProgress.userId}`),
       avgCompletionRate: avg(formationProgress.progressPercentage)
     }).from(formationProgress);
     res.json({
@@ -6716,7 +6906,7 @@ router8.get("/formation", authenticateToken, requireRole(["gestor", "coordenador
     res.status(500).json({ error: "Failed to fetch formation metrics" });
   }
 });
-router8.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router9.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "families" });
   try {
@@ -6724,13 +6914,13 @@ router8.get("/families", authenticateToken, requireRole(["gestor", "coordenador"
       familyId: families.id,
       familyName: families.name,
       totalMembers: count3(users.id),
-      activeMembers: sql5`
+      activeMembers: sql6`
           COUNT(CASE WHEN ${users.status} = 'active' THEN 1 END)
         `.as("active_members"),
-      totalServices: sql5`
+      totalServices: sql6`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq12(users.familyId, families.id)).groupBy(families.id, families.name).having(sql5`COUNT(${users.id}) > 1`).orderBy(desc6(sql5`active_members`), desc6(sql5`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq13(users.familyId, families.id)).groupBy(families.id, families.name).having(sql6`COUNT(${users.id}) > 1`).orderBy(desc6(sql6`active_members`), desc6(sql6`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -6739,34 +6929,34 @@ router8.get("/families", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch family metrics" });
   }
 });
-router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router9.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "summary" });
   try {
     const now = /* @__PURE__ */ new Date();
     const startOfMonth2 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq12(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq13(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count3(),
-      approved: sql5`
+      approved: sql6`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved")
     }).from(substitutionRequests).where(
-      and9(
+      and10(
         gte4(substitutionRequests.createdAt, startOfMonth2),
         lte4(substitutionRequests.createdAt, endOfMonth2)
       )
     );
     const formationThisMonth = await db.select({ count: count3() }).from(formationProgress).where(
-      and9(
-        eq12(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte4(formationProgress.completedAt, startOfMonth2) : sql5`false`,
-        formationProgress.completedAt ? lte4(formationProgress.completedAt, endOfMonth2) : sql5`false`
+      and10(
+        eq13(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte4(formationProgress.completedAt, startOfMonth2) : sql6`false`,
+        formationProgress.completedAt ? lte4(formationProgress.completedAt, endOfMonth2) : sql6`false`
       )
     );
     const avgAvailability = await db.select({
-      avgDays: sql5`
+      avgDays: sql6`
           AVG(
             jsonb_array_length(
               COALESCE(${questionnaireResponses.responses}->>'availableDays', '[]')::jsonb
@@ -6774,7 +6964,7 @@ router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
           )
         `.as("avg_days")
     }).from(questionnaireResponses).where(
-      and9(
+      and10(
         gte4(questionnaireResponses.submittedAt, startOfMonth2),
         lte4(questionnaireResponses.submittedAt, endOfMonth2)
       )
@@ -6797,18 +6987,18 @@ router8.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch summary metrics" });
   }
 });
-var reports_default = router8;
+var reports_default = router9;
 
 // server/routes/ministers.ts
 await init_db();
 init_schema();
-import { Router as Router9 } from "express";
-import { eq as eq13, and as and10, sql as sql6 } from "drizzle-orm";
-var router9 = Router9();
-router9.get("/", authenticateToken, async (req, res) => {
+import { Router as Router10 } from "express";
+import { eq as eq14, and as and11, sql as sql7 } from "drizzle-orm";
+var router10 = Router10();
+router10.get("/", authenticateToken, async (req, res) => {
   try {
     const ministersList = await db.select().from(users).where(
-      sql6`${users.role} IN ('ministro', 'coordenador')`
+      sql7`${users.role} IN ('ministro', 'coordenador')`
     );
     res.json(ministersList);
   } catch (error) {
@@ -6816,11 +7006,11 @@ router9.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar ministros" });
   }
 });
-router9.get("/:id", authenticateToken, async (req, res) => {
+router10.get("/:id", authenticateToken, async (req, res) => {
   try {
-    const minister = await db.select().from(users).where(and10(
-      eq13(users.id, req.params.id),
-      eq13(users.role, "ministro")
+    const minister = await db.select().from(users).where(and11(
+      eq14(users.id, req.params.id),
+      eq14(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -6831,7 +7021,7 @@ router9.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar ministro" });
   }
 });
-router9.patch("/:id", authenticateToken, async (req, res) => {
+router10.patch("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.params.id;
     const currentUser = req.user;
@@ -6874,9 +7064,9 @@ router9.patch("/:id", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
-    const result = await db.update(users).set(updateData).where(and10(
-      eq13(users.id, userId),
-      eq13(users.role, "ministro")
+    const result = await db.update(users).set(updateData).where(and11(
+      eq14(users.id, userId),
+      eq14(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -6888,12 +7078,12 @@ router9.patch("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao atualizar ministro" });
   }
 });
-router9.get("/:id/stats", authenticateToken, async (req, res) => {
+router10.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
-    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and10(
-      eq13(users.id, ministerId),
-      eq13(users.role, "ministro")
+    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and11(
+      eq14(users.id, ministerId),
+      eq14(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -6910,14 +7100,14 @@ router9.get("/:id/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar estat\xEDsticas" });
   }
 });
-var ministers_default = router9;
+var ministers_default = router10;
 
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z6 } from "zod";
-import { eq as eq14, count as count4, or as or6 } from "drizzle-orm";
+import { eq as eq15, count as count4, or as or6 } from "drizzle-orm";
 function handleApiError(error, operation) {
   if (error instanceof z6.ZodError) {
     return {
@@ -6959,7 +7149,7 @@ function handleApiError(error, operation) {
 async function registerRoutes(app2) {
   app2.use(cookieParser());
   app2.use("/api/auth", authRoutes_default);
-  app2.use("/api/password-reset", router2);
+  app2.use("/api/password-reset", router3);
   app2.use("/api/questionnaires", questionnaires_default);
   app2.use("/api/questionnaires/admin", questionnaireAdmin_default);
   app2.use("/api/schedules", scheduleGeneration_default);
@@ -6967,6 +7157,7 @@ async function registerRoutes(app2) {
   app2.use("/api/notifications", notifications_default);
   app2.use("/api/reports", reports_default);
   app2.use("/api/ministers", ministers_default);
+  app2.use("/api/session", session_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -7102,8 +7293,8 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/users/active", authenticateToken, async (req, res) => {
     try {
-      const users2 = await storage.getAllUsers();
-      const activeUsers = users2.filter((u) => u.status === "active");
+      const users3 = await storage.getAllUsers();
+      const activeUsers = users3.filter((u) => u.status === "active");
       res.json(activeUsers);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usu\xE1rios ativos");
@@ -7112,8 +7303,8 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const users2 = await storage.getAllUsers();
-      const pendingUsers = users2.filter((u) => u.status === "pending");
+      const users3 = await storage.getAllUsers();
+      const pendingUsers = users3.filter((u) => u.status === "pending");
       res.json(pendingUsers);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usu\xE1rios pendentes");
@@ -7137,8 +7328,8 @@ async function registerRoutes(app2) {
         "Expires": "0",
         "Surrogate-Control": "no-store"
       });
-      const users2 = await storage.getAllUsers();
-      res.json(users2);
+      const users3 = await storage.getAllUsers();
+      res.json(users3);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar lista de usu\xE1rios");
       res.status(errorResponse.status).json(errorResponse);
@@ -7162,7 +7353,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq14(users.id, userId));
+      }).from(users).where(eq15(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -7361,25 +7552,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
         const [substitutionCheck] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-          eq14(substitutionRequests.requesterId, userId),
-          eq14(substitutionRequests.substituteId, userId)
+          eq15(substitutionRequests.requesterId, userId),
+          eq15(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -7416,12 +7607,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq14(substitutionRequests.requesterId, userId),
-            eq14(substitutionRequests.substituteId, userId)
+            eq15(substitutionRequests.requesterId, userId),
+            eq15(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -7450,12 +7641,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq14(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq14(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq14(substitutionRequests.requesterId, userId),
-            eq14(substitutionRequests.substituteId, userId)
+            eq15(substitutionRequests.requesterId, userId),
+            eq15(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -7926,7 +8117,7 @@ var vite_config_default = defineConfig({
 });
 
 // server/vite.ts
-import { nanoid } from "nanoid";
+import { nanoid as nanoid2 } from "nanoid";
 var viteLogger = createLogger();
 function log(message, source = "express") {
   const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
@@ -7972,7 +8163,7 @@ async function setupVite(app2, server) {
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
+        `src="/src/main.tsx?v=${nanoid2()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
