@@ -337,6 +337,24 @@ export const passwordResetRequests = pgTable('password_reset_requests', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Active sessions for activity tracking and auto-logout
+export const activeSessions = pgTable('active_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionToken: varchar('session_token', { length: 100 }).notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+  lastActivityAt: timestamp('last_activity_at').defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  isActive: boolean('is_active').default(true)
+}, (table) => [
+  index('idx_active_sessions_user').on(table.userId),
+  index('idx_active_sessions_active').on(table.isActive),
+  index('idx_active_sessions_expires').on(table.expiresAt),
+  index('idx_active_sessions_activity').on(table.lastActivityAt)
+]);
+
 // Activity logs for tracking user interactions and analytics
 export const activityLogs = pgTable('activity_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -358,6 +376,13 @@ export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)
 }));
 
+export const activeSessionsRelations = relations(activeSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [activeSessions.userId],
+    references: [users.id]
+  })
+}));
+
 export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   user: one(users, {
     fields: [activityLogs.userId],
@@ -376,6 +401,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   substitutionRequests: many(substitutionRequests),
   notifications: many(notifications),
   formationProgress: many(formationProgress),
+  activeSessions: many(activeSessions),
   activityLogs: many(activityLogs),
   spouse: one(users, {
     fields: [users.spouseMinisterId],
@@ -588,6 +614,8 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Family = typeof families.$inferSelect;
 export type FamilyRelationship = typeof familyRelationships.$inferSelect;
 export type InsertFamilyRelationship = typeof familyRelationships.$inferInsert;
+export type ActiveSession = typeof activeSessions.$inferSelect;
+export type InsertActiveSession = typeof activeSessions.$inferInsert;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type InsertQuestionnaire = z.infer<typeof insertQuestionnaireSchema>;
 export type QuestionnaireResponse = typeof questionnaireResponses.$inferSelect;

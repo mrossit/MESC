@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { createSession } from './routes/session';
 
 const router = Router();
 
@@ -41,21 +42,38 @@ const changePasswordSchema = z.object({
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
-    
+
     const result = await login(email, password);
-    
-    // Define cookie com o token
+
+    // Define cookie com o token JWT
     res.cookie('token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development', // Secure in all environments except development
+      secure: process.env.NODE_ENV !== 'development',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
-      path: '/' // Explicitly set path for clarity
+      maxAge: 12 * 60 * 60 * 1000, // 12 horas
+      path: '/'
     });
-    
+
+    // NOVO: Cria sessão de atividade (timeout de 10min)
+    const sessionToken = await createSession(
+      result.user.id,
+      req.ip || req.socket.remoteAddress,
+      req.get('user-agent')
+    );
+
+    // Define cookie da sessão
+    res.cookie('session_token', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'development',
+      sameSite: 'lax',
+      maxAge: 12 * 60 * 60 * 1000, // 12 horas
+      path: '/'
+    });
+
     res.json({
       success: true,
       token: result.token,
+      sessionToken, // Retorna para o frontend armazenar em localStorage
       user: result.user
     });
   } catch (error: any) {
@@ -66,7 +84,7 @@ router.post('/login', async (req, res) => {
         errors: error.errors
       });
     }
-    
+
     res.status(401).json({
       success: false,
       message: error.message || 'Erro ao fazer login'
@@ -221,14 +239,36 @@ router.get('/user', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Rota de logout
-router.post('/logout', (req, res) => {
-  // Clear cookie with same options as when it was set for proper clearing
+router.post('/logout', async (req, res) => {
+  // NOVO: Marca sessão como inativa
+  const sessionToken = req.cookies?.session_token;
+  if (sessionToken) {
+    try {
+      const { activeSessions } = await import('@shared/schema');
+      await db
+        .update(activeSessions)
+        .set({ isActive: false })
+        .where(eq(activeSessions.sessionToken, sessionToken));
+      console.log('[AUTH] Sessão marcada como inativa no logout');
+    } catch (error) {
+      console.error('[AUTH] Erro ao inativar sessão:', error);
+    }
+  }
+
+  // Clear cookies
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'development',
     sameSite: 'lax',
     path: '/'
   });
+  res.clearCookie('session_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'development',
+    sameSite: 'lax',
+    path: '/'
+  });
+
   res.json({
     success: true,
     message: 'Logout realizado com sucesso'

@@ -9,6 +9,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { checkCacheVersion } from "@/lib/cacheManager";
+import { useActivityMonitor } from "@/hooks/useActivityMonitor";
+import { SessionIndicator } from "@/components/SessionIndicator";
 
 // Pages
 import Login from "@/pages/login";
@@ -163,6 +165,9 @@ function Router() {
 }
 
 function App() {
+  // Monitor de atividade - logout automático após 10min de inatividade
+  useActivityMonitor();
+
   // Verificar versão do cache ao iniciar a aplicação
   useEffect(() => {
     checkCacheVersion();
@@ -172,6 +177,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="mesc-ui-theme">
         <TooltipProvider>
+          <SessionIndicator />
           <Toaster />
           <PWAUpdatePrompt />
           <PWAInstallPrompt />

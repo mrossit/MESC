@@ -90,12 +90,19 @@ export const authAPI = {
     try {
       const response = await apiRequest("POST", "/api/auth/login", credentials);
       const data = await response.json();
-      
-      // 🔑 IMPORTANTE: Salvar o token no localStorage para requisições futuras
+
+      // 🔑 IMPORTANTE: Salvar o token JWT no localStorage
       if (data.token) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('auth_token', data.token); // Compatibilidade com monitor
       }
-      
+
+      // 🔒 NOVO: Salvar session_token para controle de inatividade (10min)
+      if (data.sessionToken) {
+        localStorage.setItem('session_token', data.sessionToken);
+        console.log('[AUTH] Session token salvo - monitoramento de 10min ativado');
+      }
+
       return data;
     } catch (error: any) {
       // Extrair mensagem do JSON se possível
@@ -130,6 +137,13 @@ export const authAPI = {
   },
 
   async logout(): Promise<{ message: string }> {
+    // Limpa todos os tokens antes de fazer logout
+    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('session_token');
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+
     const response = await apiRequest("POST", "/api/auth/logout");
     return response.json();
   },
