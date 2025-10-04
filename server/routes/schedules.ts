@@ -14,8 +14,12 @@ const router = Router();
 // Get current month schedules for a minister
 router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    console.log('🔄 [API /minister/current-month] Requisição recebida');
+    console.log('🔄 [API /minister/current-month] User:', req.user);
+
     const userId = req.user?.id;
     if (!userId) {
+      console.log('❌ [API /minister/current-month] Usuário não autenticado');
       return res.status(401).json({ message: "Não autenticado" });
     }
 
@@ -26,7 +30,7 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
     const firstDayStr = firstDay.toISOString().split('T')[0];
     const lastDayStr = lastDay.toISOString().split('T')[0];
 
-    console.log(`🔍 Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
+    console.log(`🔍 [API /minister/current-month] Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
 
     // Buscar TODAS as escalas do usuário no mês atual
     const monthSchedules = await db
@@ -50,7 +54,14 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
       )
       .orderBy(schedules.date, schedules.time);
 
-    console.log(`✅ Encontradas ${monthSchedules.length} escalas no mês atual`);
+    console.log(`✅ [API /minister/current-month] Encontradas ${monthSchedules.length} escalas no mês atual`);
+
+    if (monthSchedules.length > 0) {
+      console.log('📋 [API /minister/current-month] Escalas encontradas:');
+      monthSchedules.forEach(s => {
+        console.log(`  - ${s.date} às ${s.time} - Posição ${s.position}`);
+      });
+    }
 
     const formattedAssignments = monthSchedules.map(s => ({
       id: s.id,
@@ -64,9 +75,12 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
       location: s.location
     }));
 
+    console.log('📤 [API /minister/current-month] Resposta formatada:');
+    console.log(JSON.stringify({ assignments: formattedAssignments }, null, 2));
+
     res.json({ assignments: formattedAssignments });
   } catch (error) {
-    console.error("Error getting current month schedules:", error);
+    console.error("[API /minister/current-month] Erro:", error);
     res.status(500).json({ message: "Erro ao buscar escalas do mês" });
   }
 });
