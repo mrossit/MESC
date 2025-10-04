@@ -57,7 +57,7 @@ html, body, #root {
   position: fixed !important;
   bottom: 0 !important;
   width: 100% !important;
-  background-color: var(--color-green-dark) !important;
+  background-color: #000000 !important;
   display: flex !important;
   justify-content: space-around !important;
   align-items: center !important;
@@ -166,13 +166,13 @@ button[variant="outline"],
 
 /* TopBar */
 .top-bar {
-  background-color: var(--color-beige-light) !important;
+  background-color: #000000 !important;
   border-bottom: 2px solid rgba(122, 28, 28, 0.2) !important;
   padding: 1rem;
 }
 
 .top-bar h2 {
-  color: var(--color-red-dark) !important;
+  color: #FFFFFF !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
