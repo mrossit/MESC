@@ -87,11 +87,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Questionnaire admin routes
   app.use('/api/questionnaires/admin', questionnaireAdminRoutes);
   
-  // Schedule routes (MUST come before scheduleGeneration to prioritize specific routes)
-  app.use('/api/schedules', schedulesRoutes);
-  
-  // Schedule generation routes
+  // Schedule generation routes (MUST come first - contains main schedule routes)
   app.use('/api/schedules', scheduleGenerationRoutes);
+  
+  // Schedule routes (minister-specific routes)
+  app.use('/api/schedules', schedulesRoutes);
   
   // Upload routes
   app.use('/api/upload', uploadRoutes);
