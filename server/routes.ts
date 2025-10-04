@@ -17,6 +17,7 @@ import ministersRoutes from "./routes/ministers";
 import sessionRoutes from "./routes/session";
 import substitutionsRoutes from "./routes/substitutions";
 import usersRoutes from "./routes/users";
+import versiculosRoutes from "./routes/versiculos";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -108,6 +109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Users routes (recent connections, etc)
   app.use('/api/users', usersRoutes);
+
+  // Biblical verses routes
+  app.use('/api/versiculos', versiculosRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
