@@ -1,4 +1,4 @@
-const VERSION = '6.0.0';
+const VERSION = '7.0.0';
 const BUILD_TIMESTAMP = Date.now(); // Usar timestamp atual para forçar atualização
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 const urlsToCache = [
