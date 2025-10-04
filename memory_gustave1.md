@@ -194,5 +194,23 @@
      - Minhas Estatísticas
   4. SEM dark mode, SEM temas, CORES FIXAS!
 
+### CORREÇÕES FINAIS - CORES E LAYOUT:
+- vangrey: AINDA 100% PRETO, menu inferior com opacidade, ícones desalinhados
+- Assistente: FORÇOU TUDO:
+  1. **Background forçado em html, body, #root** com !important
+  2. **BottomNav 100% SÓLIDO**:
+     - Removido TODA opacidade
+     - Background #000000 sólido JPG
+     - Sem backdrop-filter
+     - Sem transparência
+  3. **Ícones centralizados**:
+     - justify-content: center no container
+     - SVG centralizado com margin auto
+     - Texto centralizado
+  4. **Cores dos ícones**:
+     - Brancos (#FFFFFF) com opacity 0.7
+     - Ativos: amarelo (#FACC15) opacity 1
+     - Hover: branco opacity 1
+
 ---
 
