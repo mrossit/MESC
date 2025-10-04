@@ -58,28 +58,25 @@ export function TopBar() {
                         className={cn(
                           "h-14 w-14 ring-[3px] ring-offset-2 transition-all duration-300 group-hover:scale-110 group-hover:ring-offset-4",
                           user.isOnline
-                            ? "ring-[#2E7D32] shadow-lg shadow-[#2E7D32]/30"
-                            : "ring-[#7A1C1C] shadow-lg shadow-[#7A1C1C]/30"
+                            ? "ring-[#95CB89] shadow-lg shadow-[#95CB89]/30"
+                            : "ring-[#FACC15] shadow-lg shadow-[#FACC15]/30"
                         )}
                       >
                         <AvatarImage src={user.photoUrl || undefined} alt={user.name} />
-                        <AvatarFallback className="bg-gradient-to-br from-[#7A1C1C] to-[#7A1C1C]/80 text-white text-sm font-bold">
+                        <AvatarFallback className="bg-white text-black text-sm font-bold">
                           {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      {/* Indicador de status - maior e mais visível */}
+                      {/* Indicador de status - verde para online, amarelo para offline */}
                       <div
                         className={cn(
-                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-[3px] ring-[#F5E6CC] transition-all",
+                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-[3px] ring-black transition-all",
                           user.isOnline
-                            ? "bg-[#2E7D32] shadow-lg shadow-[#2E7D32]/50"
-                            : "bg-[#7A1C1C] shadow-lg shadow-[#7A1C1C]/50"
+                            ? "bg-[#95CB89] shadow-lg shadow-[#95CB89]/50"
+                            : "bg-[#FACC15] shadow-lg shadow-[#FACC15]/50"
                         )}
                       />
                     </div>
-                    <span className="text-xs font-medium text-[#1E1E1E] max-w-[70px] truncate">
-                      {user.name.split(' ')[0]}
-                    </span>
                   </div>
                 ))}
               </div>
