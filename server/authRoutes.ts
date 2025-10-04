@@ -59,13 +59,13 @@ router.post('/login', async (req, res) => {
     const result = await login(email, password);
 
     // Define cookie com o token JWT
-    // IMPORTANTE: secure deve ser true apenas em HTTPS, mas sameSite: 'none' requer secure: true
-    // Para PWAs, mantemos lax para compatibilidade mobile
+    // IMPORTANTE: Replit usa proxy reverso com HTTPS, então secure: false funciona em prod
+    // Para PWAs mobile, mantemos lax para máxima compatibilidade
     res.cookie('token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Mais explícito
+      secure: false, // False porque Replit gerencia HTTPS no proxy
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias para PWA mobile (pesquisa recomenda)
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias para PWA mobile
       path: '/'
     });
 
@@ -79,7 +79,7 @@ router.post('/login', async (req, res) => {
     // Define cookie da sessão
     res.cookie('session_token', sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // False porque Replit gerencia HTTPS no proxy
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
       path: '/'
@@ -273,13 +273,13 @@ router.post('/logout', async (req, res) => {
   // Clear cookies
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     sameSite: 'lax',
     path: '/'
   });
   res.clearCookie('session_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     sameSite: 'lax',
     path: '/'
   });
