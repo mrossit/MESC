@@ -19,6 +19,7 @@ import sessionRoutes from "./routes/session";
 import substitutionsRoutes from "./routes/substitutions";
 import usersRoutes from "./routes/users";
 import versiculosRoutes from "./routes/versiculos";
+import devToolsRoutes from "./routes/dev-tools";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -113,6 +114,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Biblical verses routes
   app.use('/api/versiculos', versiculosRoutes);
+
+  // Dev tools routes (TEMPORARY - remover em produção)
+  if (process.env.NODE_ENV !== 'production') {
+    app.use('/api/dev-tools', devToolsRoutes);
+  }
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

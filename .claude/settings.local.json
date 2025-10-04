@@ -87,7 +87,9 @@
       "Bash(for db in local.db eueuchurch.db eueuchurch_production.db questionnaire.db)",
       "Bash(do echo \"=== $db ===\")",
       "Bash(done)",
-      "Bash(NODE_ENV=development sqlite3 local.db \"SELECT name, email FROM users LIMIT 5;\")"
+      "Bash(NODE_ENV=development sqlite3 local.db \"SELECT name, email FROM users LIMIT 5;\")",
+      "Bash(node_modules/.bin/tsx:*)",
+      "Bash(openssl passwd:*)"
     ],
     "deny": [],
     "ask": []
