@@ -11,6 +11,66 @@ const logActivity = async (userId: string, action: string, description: string, 
 
 const router = Router();
 
+// Get current month schedules for a minister
+router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Não autenticado" });
+    }
+
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const firstDayStr = firstDay.toISOString().split('T')[0];
+    const lastDayStr = lastDay.toISOString().split('T')[0];
+
+    console.log(`🔍 Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
+
+    // Buscar TODAS as escalas do usuário no mês atual
+    const monthSchedules = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        type: schedules.type,
+        location: schedules.location,
+        position: schedules.position,
+        status: schedules.status
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.ministerId, userId),
+          sql`${schedules.date} >= ${firstDayStr}::date`,
+          sql`${schedules.date} <= ${lastDayStr}::date`,
+          eq(schedules.status, "scheduled")
+        )
+      )
+      .orderBy(schedules.date, schedules.time);
+
+    console.log(`✅ Encontradas ${monthSchedules.length} escalas no mês atual`);
+
+    const formattedAssignments = monthSchedules.map(s => ({
+      id: s.id,
+      date: s.date,
+      massTime: s.time,
+      position: s.position || 0,
+      confirmed: true,
+      scheduleId: s.id,
+      scheduleTitle: s.type,
+      scheduleStatus: s.status,
+      location: s.location
+    }));
+
+    res.json({ assignments: formattedAssignments });
+  } catch (error) {
+    console.error("Error getting current month schedules:", error);
+    res.status(500).json({ message: "Erro ao buscar escalas do mês" });
+  }
+});
+
 // Get upcoming schedules for a minister
 router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Response) => {
   try {

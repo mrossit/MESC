@@ -19,7 +19,7 @@
       })();
     </script>
     
-    <!-- Cache bust: v2025-08-31-01:38 -->
+    <!-- Cache bust: v2025-10-04-06:08 -->
     <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
     
     <!-- PWA Meta Tags -->
@@ -61,23 +61,32 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- PWA Update Prompt -->
+    <!-- PWA Update Prompt with Force Cache Clear -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(
-            (registration) => {
-              console.log('ServiceWorker registration successful:', registration.scope);
-              
-              // Only check for updates in production
-              if (location.hostname !== 'localhost' && !location.hostname.includes('replit.dev')) {
-                registration.update();
-              }
-            },
-            (err) => {
-              console.log('ServiceWorker registration failed:', err);
+        window.addEventListener('load', async () => {
+          try {
+            // Force clear all caches
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+            console.log('All caches cleared!');
+            
+            // Unregister all service workers
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(reg => reg.unregister()));
+            console.log('All service workers unregistered!');
+            
+            // Register new service worker
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('ServiceWorker registration successful:', registration.scope);
+            
+            // Only check for updates in production
+            if (location.hostname !== 'localhost' && !location.hostname.includes('replit.dev')) {
+              registration.update();
             }
-          );
+          } catch (err) {
+            console.log('ServiceWorker error:', err);
+          }
         });
       }
     </script>
