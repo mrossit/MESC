@@ -121,7 +121,7 @@ export function PWAUpdatePrompt() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50">
-      <div className="bg-white/80 dark:bg-gray-900/80  rounded-lg shadow-lg border border-neutral-accentWarm/30 dark:border-gray-700 p-4">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-lg shadow-lg border border-neutral-accentWarm/30 dark:border-gray-700 p-4">
         <div className="flex items-start gap-3">
           <RefreshCw className="h-5 w-5 text-neutral-accentWarm dark:text-amber-500 mt-0.5" />
           <div className="flex-1">

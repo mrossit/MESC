@@ -42,7 +42,6 @@ export const lessonContentTypeEnum = pgEnum('lesson_content_type', ['text', 'vid
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  pid: integer("pid").generatedAlwaysAsIdentity({ startWith: 1 }).unique().notNull(),
   email: varchar("email", { length: 255 }).unique().notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -380,14 +379,6 @@ export const activityLogs = pgTable('activity_logs', {
   index('idx_activity_logs_action').on(table.action),
   index('idx_activity_logs_created').on(table.createdAt)
 ]);
-
-// Biblical verses for minister inspiration
-export const versiculos = pgTable('versiculos', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  frase: text('frase').notNull(),
-  referencia: varchar('referencia', { length: 100 }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull()
-});
 
 // Relations
 export const familiesRelations = relations(families, ({ many }) => ({

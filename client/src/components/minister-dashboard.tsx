@@ -1,38 +1,27 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Calendar, Clock, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { MinisterTutorial, useShouldShowTutorial } from "@/components/minister-tutorial";
-import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
-
-interface Versiculo {
-  id: number;
-  frase: string;
-  referencia: string;
-}
+import { useLocation } from "wouter";
 
 interface ScheduleAssignment {
-  id: number;
+  id: string;
   date: string;
   massTime: string;
   position: number;
   confirmed: boolean;
-  scheduleId: number;
-  scheduleTitle?: string;
-  scheduleStatus?: string;
-  location?: string;
+  scheduleTitle: string;
 }
 
 export function MinisterDashboard() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const [versiculo, setVersiculo] = useState<Versiculo | null>(null);
-  const [loadingVersiculo, setLoadingVersiculo] = useState(true);
-  const [schedule, setSchedule] = useState<ScheduleAssignment[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(true);
-  const [ministerPid, setMinisterPid] = useState<number | null>(null);
-  const [ministerName, setMinisterName] = useState<string>('');
+  const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
 
@@ -42,64 +31,42 @@ export function MinisterDashboard() {
     }
   }, [shouldShowTutorial]);
 
-  const fetchVersiculo = async () => {
-    try {
-      console.log('📖 [MINISTER-DASHBOARD] Buscando versículo aleatório...');
-
-      const response = await fetch("/api/versiculos/random", {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ [MINISTER-DASHBOARD] Versículo recebido:', data);
-        setVersiculo(data);
-      } else {
-        console.error('❌ [MINISTER-DASHBOARD] Erro ao buscar versículo:', response.status);
-      }
-    } catch (error) {
-      console.error("❌ [MINISTER-DASHBOARD] Erro ao buscar versículo:", error);
-    } finally {
-      setLoadingVersiculo(false);
-    }
-  };
-
-  const fetchSchedule = async () => {
-    try {
-      console.log('🔄 [MINISTER-DASHBOARD] Buscando escala do mês...');
-      console.log('🔄 [MINISTER-DASHBOARD] URL: /api/schedules/minister/current-month');
-      
-      const response = await fetch("/api/schedules/minister/current-month", {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('🔄 [MINISTER-DASHBOARD] Response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ [MINISTER-DASHBOARD] Escala recebida:', data);
-        setSchedule(data.assignments || []);
-        setMinisterPid(data.pid || null);
-        setMinisterName(data.name || '');
-      } else {
-        console.error('❌ [MINISTER-DASHBOARD] Erro ao buscar escala:', response.status);
-      }
-    } catch (error) {
-      console.error("❌ [MINISTER-DASHBOARD] Erro ao buscar escala:", error);
-    } finally {
-      setLoadingSchedule(false);
-    }
-  };
-
-  // Buscar dados quando o componente é montado
   useEffect(() => {
-    console.log('🚀 [MINISTER-DASHBOARD] Componente montado');
-    fetchVersiculo();
-    fetchSchedule();
+    fetchUpcomingSchedules();
   }, []);
+
+  const fetchUpcomingSchedules = async () => {
+    try {
+      const response = await fetch("/api/schedules/minister/upcoming");
+      if (response.ok) {
+        const data = await response.json();
+        setUpcomingSchedules(data.assignments || []);
+      }
+    } catch (error) {
+      console.error("Error fetching upcoming schedules:", error);
+    } finally {
+      setLoadingSchedules(false);
+    }
+  };
+
+  const handleOpenTutorial = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const getMassTimeLabel = (time: string) => {
+    const times: Record<string, string> = {
+      "saturday_evening": "Sábado 19h",
+      "sunday_7am": "Domingo 7h",
+      "sunday_9am": "Domingo 9h",
+      "sunday_11am": "Domingo 11h",
+      "sunday_7pm": "Domingo 19h"
+    };
+    return times[time] || time;
+  };
+
+  const getPositionLabel = (position: number) => {
+    return LITURGICAL_POSITIONS[position] || `Posição ${position}`;
+  };
 
   return (
     <>
@@ -110,109 +77,241 @@ export function MinisterDashboard() {
       />
 
       <div className="space-y-4">
-      {/* Versículo Bíblico de Incentivo */}
-      <Card className="border-2 border-[var(--color-green-dark)]">
-        <CardHeader className="bg-gradient-to-r from-[var(--color-green-light)] to-[var(--color-green-dark)] text-white">
-          <CardTitle className="flex items-center gap-2 text-lg font-bold">
-            <BookOpen className="h-6 w-6" />
-            Ministro, Lembre-se:
+        {/* Cartão de Boas-vindas */}
+        <Card className="bg-gradient-to-r from-mesc-gold/10 to-mesc-beige/20 dark:from-gray-800 dark:to-gray-900 border-neutral-accentWarm/30 dark:border-gray-700">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-foreground">Bem-vindo ao MESC</h2>
+                <p className="text-muted-foreground mt-1">
+                  Sistema de Gestão do Ministério Extraordinário da Sagrada Comunhão
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenTutorial}
+                  className="hidden md:flex items-center gap-2"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  Tutorial
+                </Button>
+                <div className="hidden md:block">
+                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                    Versão Beta
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            {/* Botão do Tutorial para Mobile */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenTutorial}
+              className="md:hidden mt-4 w-full flex items-center justify-center gap-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Iniciar Tutorial
+            </Button>
+          </CardContent>
+        </Card>
+
+      {/* Próximas Escalas */}
+      <Card className="  border border-neutral-border/30 dark:border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Calendar className="h-5 w-5 text-neutral-accentWarm dark:text-amber-600" />
+            Minhas Próximas Escalas
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
-          {loadingVersiculo ? (
-            <div className="flex items-center justify-center py-8">
-              <BookOpen className="h-8 w-8 text-[var(--color-green-dark)] animate-pulse" />
-              <p className="ml-3 text-[var(--color-text-primary)]">Carregando...</p>
+        <CardContent>
+          {loadingSchedules ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
+              </div>
+              <p className="text-muted-foreground">Carregando escalas...</p>
             </div>
-          ) : versiculo ? (
-            <div className="bg-[var(--color-beige-light)] p-6 rounded-lg">
-              <p className="text-lg italic text-[var(--color-text-primary)] leading-relaxed mb-4">
-                "{versiculo.frase}"
-              </p>
-              <p className="text-right text-sm font-semibold text-[var(--color-green-dark)]">
-                {versiculo.referencia}
+          ) : upcomingSchedules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4">
+                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-2">Nenhuma escala próxima</p>
+              <p className="text-sm text-muted-foreground/70 max-w-sm">
+                Você não possui escalas programadas para os próximos dias
               </p>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <BookOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-[var(--color-text-secondary)]">Nenhum versículo disponível</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Minha Escala do Mês */}
-      <Card className="border-2 border-[var(--color-bronze)]">
-        <CardHeader className="bg-gradient-to-r from-[var(--color-bronze)] to-[var(--color-gold)] text-white">
-          <CardTitle className="flex items-center gap-2 text-lg font-bold">
-            <Calendar className="h-6 w-6" />
-            Minha Escala do Mês
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {loadingSchedule ? (
-            <div className="flex items-center justify-center py-8">
-              <Calendar className="h-8 w-8 text-[var(--color-bronze)] animate-pulse" />
-              <p className="ml-3 text-[var(--color-text-primary)]">Carregando...</p>
-            </div>
-          ) : schedule.length > 0 ? (
-            <div className="space-y-3">
-              {schedule
-                .sort((a, b) => {
-                  const dateA = new Date(a.date);
-                  const dateB = new Date(b.date);
-                  if (dateA.getTime() !== dateB.getTime()) {
-                    return dateA.getTime() - dateB.getTime();
-                  }
-                  return a.massTime.localeCompare(b.massTime);
-                })
-                .map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className="bg-[var(--color-beige-light)] p-4 rounded-lg border-l-4 border-[var(--color-bronze)]"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-[var(--color-bronze)]" />
-                          <span className="font-semibold text-[var(--color-text-primary)]">
-                            {format(new Date(assignment.date), "dd 'de' MMMM", { locale: ptBR })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-[var(--color-text-secondary)]">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {assignment.massTime}
-                          </div>
-                          {assignment.location && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {assignment.location}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-sm font-medium text-[var(--color-bronze)]">
-                        {LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`}
-                      </div>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {upcomingSchedules.slice(0, 5).map((schedule) => (
+                <div 
+                  key={schedule.id} 
+                  className="flex items-center justify-between p-3 bg-neutral-peachCream/10 dark:bg-gray-800 rounded-lg border border-neutral-border/20 dark:border-gray-700 hover:bg-neutral-peachCream/20 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-foreground">
+                        {format(new Date(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
+                      </p>
+                      <Badge variant="secondary" className="text-xs">
+                        {getPositionLabel(schedule.position)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{getMassTimeLabel(schedule.massTime)}</span>
                     </div>
                   </div>
-                ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-[var(--color-text-secondary)]">Nenhuma escala para este mês</p>
+                </div>
+              ))}
+              {upcomingSchedules.length > 5 && (
+                <div className="text-center pt-2">
+                  <Button 
+                    variant="link" 
+                    className="text-primary hover:text-primary/80"
+                    onClick={() => setLocation('/schedules')}
+                  >
+                    Ver todas ({upcomingSchedules.length} escalas)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* OCULTO - Minha Disponibilidade, Minha Formação, Família MESC, Minhas Estatísticas */}
-      {/* Removido a pedido do vangrey */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Disponibilidade */}
+        <Card className="  border border-neutral-border/30 dark:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <Clock className="h-5 w-5 text-neutral-accentNeutral" />
+              Minha Disponibilidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="w-14 h-14 bg-neutral-accentNeutral/10 rounded-full flex items-center justify-center mb-3">
+                <Clock className="h-7 w-7 text-neutral-accentNeutral/50" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
+              <p className="text-xs text-muted-foreground/70 max-w-xs">
+                Gerencie seus horários disponíveis para servir
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Avisos Importantes - REMOVIDO */}
+        {/* Formação */}
+        <Card className="  border border-neutral-border/30 dark:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <BookOpen className="h-5 w-5 text-blue-500" />
+              Minha Formação
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                <BookOpen className="h-7 w-7 text-blue-500/70" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
+              <p className="text-xs text-muted-foreground/70 max-w-xs">
+                Acompanhe seu progresso nos módulos de formação
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Notificações */}
+        <Card className="  border border-neutral-border/30 dark:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Bell className="h-4 w-4 text-orange-500" />
+              Notificações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
+                <Bell className="h-6 w-6 text-orange-500/70" />
+              </div>
+              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Família MESC */}
+        <Card className="  border border-neutral-border/30 dark:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Users className="h-4 w-4 text-purple-500" />
+              Família MESC
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-2">
+                <Users className="h-6 w-6 text-purple-500/70" />
+              </div>
+              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Estatísticas Pessoais */}
+        <Card className="  border border-neutral-border/30 dark:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              Minhas Estatísticas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                <TrendingUp className="h-6 w-6 text-green-500/70" />
+              </div>
+              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Avisos e Comunicados */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800/50">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+            Avisos Importantes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+              <div>
+                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Sistema em fase Beta</p>
+                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
+                  Estamos trabalhando para trazer novas funcionalidades em breve
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+              <div>
+                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Mantenha seus dados atualizados</p>
+                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
+                  Acesse seu perfil para atualizar suas informações pessoais
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       </div>
     </>
   );

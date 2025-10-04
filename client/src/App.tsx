@@ -16,7 +16,6 @@ import { SessionIndicator } from "@/components/SessionIndicator";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Dashboard from "@/pages/dashboard";
-import CoordinatorDashboard from "@/pages/CoordinatorDashboard";
 import Approvals from "@/pages/approvals";
 import ChangePassword from "@/pages/change-password";
 import ChangePasswordRequired from "@/pages/change-password-required";
@@ -55,53 +54,42 @@ function Router() {
           <Dashboard />
         </AuthGuard>
       </Route>
-
-      {/* Dashboard Coordenador - Apenas para Coordenadores e Gestores */}
-      <Route path="/coordinator-dashboard">
-        <AuthGuard allowedRoles={["coordenador", "gestor"]}>
-          <CoordinatorDashboard />
-        </AuthGuard>
-      </Route>
-
+      
       <Route path="/schedules/substitutions">
         <AuthGuard>
           <Substitutions />
         </AuthGuard>
       </Route>
       
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/schedules/auto-generation">
+      <Route path="/schedules/auto-generation">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <AutoScheduleGeneration />
         </AuthGuard>
-      </Route> */}
-
+      </Route>
+      
       <Route path="/schedules/:action?">
         <AuthGuard>
           <Schedules />
         </AuthGuard>
       </Route>
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/schedule-editor">
+      
+      <Route path="/schedule-editor">
         <AuthGuard>
           <ScheduleEditor />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/questionnaire">
+      </Route>
+      
+      <Route path="/questionnaire">
         <AuthGuard>
           <QuestionnaireUnified />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/questionnaire-responses">
+      </Route>
+      
+      <Route path="/questionnaire-responses">
         <AuthGuard allowedRoles={["coordenador", "gestor"]}>
           <QuestionnaireResponses />
         </AuthGuard>
-      </Route> */}
+      </Route>
       
       <Route path="/profile">
         <AuthGuard>
@@ -109,75 +97,66 @@ function Router() {
         </AuthGuard>
       </Route>
       
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/settings">
+      <Route path="/settings">
         <AuthGuard>
           <Settings />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/ministers">
+      </Route>
+      
+      <Route path="/ministers">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Ministers />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/ministros">
+      </Route>
+      
+      <Route path="/ministros">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Ministers />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/ministers-directory">
+      </Route>
+      
+      <Route path="/ministers-directory">
         <AuthGuard>
           <MinistersDirectory />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/formation/:track?/:module?/:lesson?">
+      </Route>
+      
+      <Route path="/formation/:track?/:module?/:lesson?">
         <AuthGuard>
           <Formation />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/communication">
+      </Route>
+      
+      <Route path="/communication">
         <AuthGuard>
           <Communication />
         </AuthGuard>
-      </Route> */}
+      </Route>
 
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/reports">
+      <Route path="/reports">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Reports />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/approvals">
+      </Route>
+      
+      <Route path="/approvals">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Approvals />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/user-management">
+      </Route>
+      
+      <Route path="/user-management">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <UserManagement />
         </AuthGuard>
-      </Route> */}
-
-      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
-      {/* <Route path="/qrcode">
+      </Route>
+      
+      
+      <Route path="/qrcode">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <QRCodeShare />
         </AuthGuard>
-      </Route> */}
+      </Route>
 
       {/* Fallback to 404 */}
       <Route component={NotFound} />
