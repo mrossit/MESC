@@ -143,7 +143,7 @@ export function MinisterDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Disponibilidade */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="  border border-neutral-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <Clock className="h-5 w-5 text-neutral-accentNeutral" />
@@ -164,7 +164,7 @@ export function MinisterDashboard() {
         </Card>
 
         {/* Formação */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="  border border-neutral-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <BookOpen className="h-5 w-5 text-blue-500" />
@@ -187,7 +187,7 @@ export function MinisterDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Notificações */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="  border border-neutral-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
               <Bell className="h-4 w-4 text-orange-500" />
@@ -205,7 +205,7 @@ export function MinisterDashboard() {
         </Card>
 
         {/* Família MESC */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="  border border-neutral-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
               <Users className="h-4 w-4 text-purple-500" />
@@ -223,7 +223,7 @@ export function MinisterDashboard() {
         </Card>
 
         {/* Estatísticas Pessoais */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="  border border-neutral-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
               <TrendingUp className="h-4 w-4 text-green-500" />
@@ -242,28 +242,28 @@ export function MinisterDashboard() {
       </div>
 
       {/* Avisos e Comunicados */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800/50">
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+          <CardTitle className="text-lg font-semibold text-blue-900">
             Avisos Importantes
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
               <div>
-                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Sistema em fase Beta</p>
-                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
+                <p className="text-sm text-blue-900 font-medium">Sistema em fase Beta</p>
+                <p className="text-xs text-blue-700/70">
                   Estamos trabalhando para trazer novas funcionalidades em breve
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
               <div>
-                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Mantenha seus dados atualizados</p>
-                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
+                <p className="text-sm text-blue-900 font-medium">Mantenha seus dados atualizados</p>
+                <p className="text-xs text-blue-700/70">
                   Acesse seu perfil para atualizar suas informações pessoais
                 </p>
               </div>

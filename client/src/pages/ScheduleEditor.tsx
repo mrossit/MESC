@@ -385,7 +385,7 @@ export default function ScheduleEditor() {
                                     variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
                                     className={cn(
                                       "cursor-pointer hover:bg-accent transition-all",
-                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200"
                                     )}
                                     onClick={() => {
                                       setEditingAssignment(a);
@@ -405,7 +405,7 @@ export default function ScheduleEditor() {
                                     variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
                                     className={cn(
                                       "cursor-pointer hover:bg-accent transition-all",
-                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200"
                                     )}
                                     onClick={() => {
                                       setEditingAssignment(a);
@@ -425,7 +425,7 @@ export default function ScheduleEditor() {
                                     variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
                                     className={cn(
                                       "cursor-pointer hover:bg-accent transition-all",
-                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200"
                                     )}
                                     onClick={() => {
                                       setEditingAssignment(a);
@@ -445,7 +445,7 @@ export default function ScheduleEditor() {
                                     variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
                                     className={cn(
                                       "cursor-pointer hover:bg-accent transition-all",
-                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200"
                                     )}
                                     onClick={() => {
                                       setEditingAssignment(a);
@@ -465,7 +465,7 @@ export default function ScheduleEditor() {
                                     variant={a.ministerName === 'VACANT' ? 'destructive' : 'outline'}
                                     className={cn(
                                       "cursor-pointer hover:bg-accent transition-all",
-                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300"
+                                      a.ministerName === 'VACANT' && "animate-pulse bg-red-100 text-red-800 hover:bg-red-200"
                                     )}
                                     onClick={() => {
                                       setEditingAssignment(a);
@@ -539,12 +539,12 @@ export default function ScheduleEditor() {
             {editingAssignment && (
               <div className="space-y-4">
                 {editingAssignment.ministerName === 'VACANT' && (
-                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-amber-900 dark:text-amber-100">Vaga Disponível</p>
-                        <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                        <p className="font-semibold text-amber-900">Vaga Disponível</p>
+                        <p className="text-sm text-amber-800 mt-1">
                           Selecione um ministro da lista completa. Use a busca para filtrar.
                         </p>
                       </div>

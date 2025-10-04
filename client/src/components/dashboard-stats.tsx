@@ -39,8 +39,8 @@ export function DashboardStatsCards() {
       icon: Users,
       change: "+3",
       changeText: "este mês",
-      iconBg: "bg-neutral-accentWarm/20 dark:bg-dark-gold/20",
-      iconColor: "text-neutral-accentWarm dark:text-text-gold"
+      iconBg: "bg-neutral-accentWarm/20",
+      iconColor: "text-neutral-accentWarm"
     },
     {
       title: "Taxa de Resposta",
@@ -48,8 +48,8 @@ export function DashboardStatsCards() {
       icon: Percent,
       change: "+4%",
       changeText: "vs meta 63%",
-      iconBg: "bg-neutral-peanut/20 dark:bg-dark-copper/20",
-      iconColor: "text-neutral-peanut dark:text-text-gold"
+      iconBg: "bg-neutral-peanut/20",
+      iconColor: "text-neutral-peanut"
     },
     {
       title: "Escalas Pendentes",
@@ -57,8 +57,8 @@ export function DashboardStatsCards() {
       icon: Calendar,
       change: "Domingo 19h",
       changeText: "próxima",
-      iconBg: "bg-neutral-badgeWarm dark:bg-dark-terracotta/20",
-      iconColor: "text-neutral-textMedium dark:text-text-gold"
+      iconBg: "bg-neutral-badgeWarm",
+      iconColor: "text-neutral-textMedium"
     },
     {
       title: "Aprovações",
@@ -66,8 +66,8 @@ export function DashboardStatsCards() {
       icon: UserCheck,
       change: "Novos cadastros",
       changeText: "aguardando",
-      iconBg: "bg-neutral-badgeNeutral dark:bg-dark-bronze/20",
-      iconColor: "text-neutral-neutral dark:text-text-gold"
+      iconBg: "bg-neutral-badgeNeutral",
+      iconColor: "text-neutral-neutral"
     },
   ];
 

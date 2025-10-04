@@ -59,7 +59,7 @@ export function ScheduleOverview() {
   };
 
   return (
-    <Card className="  border border-neutral-border/30 dark:border-border">
+    <Card className="  border border-neutral-border/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">

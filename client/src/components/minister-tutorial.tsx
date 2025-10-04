@@ -157,7 +157,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
       />
 
       {/* Card do Tutorial */}
-      <Card className={`relative w-full max-w-lg mx-4 shadow-2xl border-neutral-accentWarm/30 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 ${
+      <Card className={`relative w-full max-w-lg mx-4 shadow-2xl border-neutral-accentWarm/30 bg-white transition-all duration-200 ${
         isAnimating ? "scale-95 opacity-50" : "scale-100 opacity-100"
       }`}>
         <CardContent className="p-6">
@@ -195,13 +195,13 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
             <div className="flex justify-center mb-4">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
                 currentStep === tutorialSteps.length - 1 
-                  ? "bg-green-100 dark:bg-green-900/20" 
-                  : "bg-neutral-accentWarm/20 dark:bg-amber-900/20"
+                  ? "bg-green-100" 
+                  : "bg-neutral-accentWarm/20"
               }`}>
                 <StepIcon className={`h-8 w-8 ${
                   currentStep === tutorialSteps.length - 1 
-                    ? "text-green-600 dark:text-green-400" 
-                    : "text-neutral-accentWarm dark:text-amber-500"
+                    ? "text-green-600" 
+                    : "text-neutral-accentWarm"
                 }`} />
               </div>
             </div>
@@ -220,7 +220,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
             {step.target && currentStep !== tutorialSteps.length - 1 && (
               <div className="bg-muted/30 rounded-lg p-3 mb-6">
                 <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-neutral-accentWarm dark:text-amber-500 mt-0.5 flex-shrink-0" />
+                  <Info className="h-4 w-4 text-neutral-accentWarm mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-mesc-text/60 text-left">
                     Após o tutorial, você pode acessar esta funcionalidade através do menu lateral.
                   </p>
@@ -246,7 +246,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="flex-1 font-semibold shadow-md border-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="flex-1 font-semibold shadow-md border-2 bg-white hover:bg-gray-50"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Anterior
@@ -255,7 +255,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               {currentStep === tutorialSteps.length - 1 ? (
                 <Button
                   onClick={handleFinish}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-neutral-cream dark:text-text-light font-semibold shadow-lg border border-green-500"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-neutral-cream font-semibold shadow-lg border border-green-500"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   Concluir
@@ -263,7 +263,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               ) : (
                 <Button
                   onClick={handleNext}
-                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-neutral-textDark dark:text-text-light font-semibold shadow-lg border border-amber-500"
+                  className="flex-1 bg-neutral-accentWarm hover:bg-neutral-accentWarm/90 text-neutral-textDark font-semibold shadow-lg border border-amber-500"
                 >
                   Próximo
                   <ChevronRight className="h-4 w-4 ml-1" />

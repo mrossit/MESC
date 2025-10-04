@@ -345,7 +345,7 @@ export default function Formation() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Map className="h-5 w-5 text-neutral-accentWarm dark:text-text-gold" />
+                <Map className="h-5 w-5 text-neutral-accentWarm" />
                 Mapa do Santuário São Judas Tadeu
               </CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -395,7 +395,7 @@ export default function Formation() {
 
                 {/* Informações do Mapa */}
                 {showMapInfo && (
-                  <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
+                  <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
@@ -426,19 +426,19 @@ export default function Formation() {
                 )}
 
                 {/* Mapa SVG */}
-                <div className="border rounded-lg bg-white dark:bg-gray-900 p-4 overflow-auto">
+                <div className="border rounded-lg bg-white p-4 overflow-auto">
                   <div 
                     className="flex justify-center"
                     style={{ transform: `scale(${mapZoom})`, transformOrigin: 'center top' }}
                   >
                     <div 
-                      className="w-full max-w-2xl h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600"
+                      className="w-full max-w-2xl h-96 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300"
                       data-testid="placeholder-church-map"
                     >
                       <div className="text-center">
                         <Map className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-500 dark:text-gray-400 font-medium">Mapa do Santuário</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500">Em desenvolvimento</p>
+                        <p className="text-gray-500 font-medium">Mapa do Santuário</p>
+                        <p className="text-sm text-gray-400">Em desenvolvimento</p>
                       </div>
                     </div>
                   </div>
@@ -452,14 +452,14 @@ export default function Formation() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <FileText className="h-5 w-5 text-green-600" />
                   Documentos Litúrgicos
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-3">
-                    <FileText className="h-8 w-8 text-green-600/70 dark:text-green-400/70" />
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                    <FileText className="h-8 w-8 text-green-600/70" />
                   </div>
                   <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
                   <p className="text-xs text-muted-foreground/70 max-w-xs">
@@ -472,14 +472,14 @@ export default function Formation() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <PlayCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <PlayCircle className="h-5 w-5 text-blue-600" />
                   Vídeos Formativos
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                    <PlayCircle className="h-8 w-8 text-blue-600/70 dark:text-blue-400/70" />
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                    <PlayCircle className="h-8 w-8 text-blue-600/70" />
                   </div>
                   <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
                   <p className="text-xs text-muted-foreground/70 max-w-xs">
@@ -501,18 +501,18 @@ export default function Formation() {
     >
       <div className="space-y-6">
         {/* Banner de Status */}
-        <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
+        <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-neutral-badgeNeutral dark:bg-dark-5 rounded-full flex items-center justify-center">
-                  <Cross className="h-6 w-6 text-neutral-neutral dark:text-text-gold" />
+                <div className="w-12 h-12 bg-neutral-badgeNeutral rounded-full flex items-center justify-center">
+                  <Cross className="h-6 w-6 text-neutral-neutral" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-neutral-textDark dark:text-text-light">
+                  <h2 className="text-xl font-bold text-neutral-textDark">
                     Formação para Ministros Extraordinários
                   </h2>
-                  <p className="text-neutral-textMedium dark:text-text-light/70 text-sm mt-1">
+                  <p className="text-neutral-textMedium text-sm mt-1">
                     Capacitação completa para o serviço da Sagrada Comunhão
                   </p>
                 </div>
@@ -653,7 +653,7 @@ export default function Formation() {
               {/* Videoaulas */}
               <div className="border border-border rounded-lg p-4">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-3">
                     <PlayCircle className="h-6 w-6 text-red-500" />
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Videoaulas</h3>
@@ -664,7 +664,7 @@ export default function Formation() {
               {/* Material de Apoio */}
               <div className="border border-border rounded-lg p-4">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
                     <FileText className="h-6 w-6 text-green-500" />
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Material de Apoio</h3>
@@ -675,7 +675,7 @@ export default function Formation() {
               {/* Encontros Presenciais */}
               <div className="border border-border rounded-lg p-4">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
                     <Users className="h-6 w-6 text-blue-500" />
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Encontros</h3>
@@ -768,9 +768,9 @@ export default function Formation() {
         </div>
 
         {/* Informações Importantes */}
-        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
+        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+            <CardTitle className="text-lg font-semibold text-blue-900">
               Orientações Gerais
             </CardTitle>
           </CardHeader>
@@ -778,8 +778,8 @@ export default function Formation() {
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Requisitos Básicos</h4>
-                  <ul className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
+                  <h4 className="font-medium text-blue-800">Requisitos Básicos</h4>
+                  <ul className="text-sm space-y-1 text-blue-700">
                     <li>• Ser católico praticante</li>
                     <li>• Idade mínima de 16 anos</li>
                     <li>• Participar da Missa dominical</li>
@@ -787,8 +787,8 @@ export default function Formation() {
                   </ul>
                 </div>
                 <div className="space-y-3">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Compromissos</h4>
-                  <ul className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
+                  <h4 className="font-medium text-blue-800">Compromissos</h4>
+                  <ul className="text-sm space-y-1 text-blue-700">
                     <li>• Pontualidade nos horários</li>
                     <li>• Participação ativa na formação</li>
                     <li>• Discrição e reverência</li>
@@ -796,8 +796,8 @@ export default function Formation() {
                   </ul>
                 </div>
               </div>
-              <div className="pt-3 border-t border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+              <div className="pt-3 border-t border-blue-200">
+                <p className="text-sm text-blue-700">
                   <strong>Importante:</strong> A conclusão desta formação é obrigatória para todos os ministros extraordinários 
                   do Santuário São Judas Tadeu. O conteúdo está baseado nas diretrizes da CNBB e do Vaticano.
                 </p>

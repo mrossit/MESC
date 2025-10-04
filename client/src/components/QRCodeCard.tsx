@@ -18,7 +18,7 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
           width: 300,
           margin: 2,
           color: {
-            dark: '#8B4513', // Cor marrom/bronze do MESC
+            '#8B4513', // Cor marrom/bronze do MESC
             light: '#FFFFFF'
           }
         });

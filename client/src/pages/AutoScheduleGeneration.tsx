@@ -228,9 +228,9 @@ export default function AutoScheduleGeneration() {
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600 dark:text-green-400';
-    if (confidence >= 0.6) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
+    if (confidence >= 0.8) return 'text-green-600
+    if (confidence >= 0.6) return 'text-yellow-600
+    return 'text-red-600
   };
 
   const formatDayOfWeek = (dayOfWeek: number) => {

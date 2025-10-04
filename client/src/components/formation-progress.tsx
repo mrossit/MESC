@@ -32,9 +32,9 @@ export function FormationProgress() {
       progress: 65,
       completed: 99,
       total: 152,
-      iconBg: "bg-neutral-accentWarm/10 dark:bg-amber-900/20",
-      iconColor: "text-neutral-accentWarm dark:text-amber-500",
-      progressColor: "bg-neutral-accentWarm dark:bg-amber-700",
+      iconBg: "bg-neutral-accentWarm/10",
+      iconColor: "text-neutral-accentWarm",
+      progressColor: "bg-neutral-accentWarm",
     },
     {
       title: "Biblioteca",
@@ -49,7 +49,7 @@ export function FormationProgress() {
   ];
 
   return (
-    <Card className="  border border-neutral-border/30 dark:border-border">
+    <Card className="  border border-neutral-border/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">

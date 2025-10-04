@@ -485,8 +485,8 @@ export default function Substitutions() {
                           key={mass.id}
                           className={cn(
                             "border rounded-lg p-4",
-                            mass.urgencyLevel === "critical" && "border-red-500 bg-red-50 dark:bg-red-900/20",
-                            mass.urgencyLevel === "high" && "border-orange-500 bg-orange-50 dark:bg-orange-900/20",
+                            mass.urgencyLevel === "critical" && "border-red-500 bg-red-50",
+                            mass.urgencyLevel === "high" && "border-orange-500 bg-orange-50",
                             mass.isSpecial && "ring-2 ring-amber-400"
                           )}
                         >
@@ -567,9 +567,9 @@ export default function Substitutions() {
 
                             {/* Alert for critical situations */}
                             {mass.urgencyLevel === "critical" && (
-                              <div className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-                                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                                <p className="text-sm text-red-800 dark:text-red-200">
+                              <div className="flex items-center gap-2 p-2 bg-red-100 rounded-md">
+                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                <p className="text-sm text-red-800">
                                   <span className="font-semibold">URGENTE:</span> Esta missa é {daysUntil === 0 ? "hoje" : "em breve"} e 
                                   ainda faltam {mass.ministersShort} ministros!
                                 </p>
@@ -681,8 +681,8 @@ export default function Substitutions() {
                         key={item.request.id}
                         className={cn(
                           "border rounded-lg p-4",
-                          isMyRequest && "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-                          isForMe && !isMyRequest && "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                          isMyRequest && "bg-blue-50 border-blue-200",
+                          isForMe && !isMyRequest && "bg-amber-50 border-amber-200"
                         )}
                       >
                         {/* Header com nome e badges */}
@@ -897,7 +897,7 @@ export default function Substitutions() {
               </div>
 
               {!sendToApp && !sendToWhatsApp && (
-                <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-md">
+                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded-md">
                   <AlertCircle className="h-4 w-4 inline mr-1" />
                   Selecione pelo menos um canal de notificação
                 </div>
@@ -1025,14 +1025,14 @@ export default function Substitutions() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
+          <div className="rounded-lg bg-amber-50 p-3 space-y-2">
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-amber-900 dark:text-amber-100">
+                <p className="font-medium text-amber-900">
                   Atenção:
                 </p>
-                <ul className="mt-1 space-y-1 text-amber-800 dark:text-amber-200 text-xs">
+                <ul className="mt-1 space-y-1 text-amber-800 text-xs">
                   <li>• Esta ação não pode ser desfeita</li>
                   <li>• Você voltará a estar escalado para esta data</li>
                   <li>• Os ministros que já responderam serão notificados</li>

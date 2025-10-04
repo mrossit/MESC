@@ -80,7 +80,7 @@ export default function Register() {
 
   if (registerMutation.isSuccess) {
     return (
-      <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-liturgical border-border/30">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -286,8 +286,8 @@ export default function Register() {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
-                <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-amber-600" />
               </div>
             </div>
             <DialogTitle className="text-center">Email J\u00e1 Cadastrado</DialogTitle>
@@ -296,12 +296,12 @@ export default function Register() {
                 {duplicateEmailMessage}
               </p>
               
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-2 text-left">
+              <div className="bg-blue-50 rounded-lg p-4 space-y-2 text-left">
                 <div className="flex items-start gap-3">
-                  <MessageCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <MessageCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-blue-900 dark:text-blue-100">O que fazer:</p>
-                    <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
+                    <p className="font-medium text-blue-900">O que fazer:</p>
+                    <ul className="text-sm text-blue-800 mt-1 space-y-1">
                       <li>\u2022 Se voc\u00ea j\u00e1 \u00e9 cadastrado, fa\u00e7a login com sua senha</li>
                       <li>\u2022 Se esqueceu a senha, entre em contato com a coordena\u00e7\u00e3o</li>
                       <li>\u2022 Se \u00e9 seu primeiro cadastro, verifique se digitou o email corretamente</li>
