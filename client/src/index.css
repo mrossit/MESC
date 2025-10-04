@@ -770,3 +770,130 @@ input[type="date"]::-webkit-date-and-time-value {
     height: calc(var(--footer-height) + 8px + env(safe-area-inset-bottom));
   }
 }
+
+/* ============================================
+   HEADER ÚLTIMAS CONEXÕES
+   ============================================ */
+
+:root {
+  --header-bg: var(--color-beige-light);
+  --status-online: #4CAF50;
+  --status-away: #FFB300;
+  --status-offline: #9CA3AF;
+  --avatar-size: 32px;
+}
+
+.header-ultimas-conexoes {
+  position: fixed;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 1200;
+  background: transparent;
+  padding: 8px 12px;
+}
+
+.uc-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.uc-item:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.uc-item-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uc-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.uc-status.online {
+  background: var(--status-online);
+}
+
+.uc-status.offline {
+  background: var(--status-offline);
+}
+
+.uc-avatar {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.uc-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-green-gradient-start);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.uc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uc-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uc-time {
+  color: var(--text-medium);
+  font-size: 11px;
+}
+
+.uc-whatsapp {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #25D366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.uc-whatsapp:hover {
+  background: rgba(37, 211, 102, 0.1);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .header-ultimas-conexoes {
+    display: none;
+  }
+}

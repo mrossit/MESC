@@ -1,0 +1,95 @@
+### Prompt 1 — Adicionar o novo Menu Superior "ULTIMAS CONEXOES"
+
+CLAUDE, adicione ao projeto o novo componente do menu superior fixo chamado "ULTIMAS CONEXOES" seguindo exatamente as especificações abaixo. Entregue código pronto para integrar ao front-end e back-end, testes automatizados e instruções de deploy.
+
+1. Objetivo
+- Exibir no header fixo um painel compacto com as últimas conexões de usuários, destacando quem está online agora, com link rápido para WhatsApp e indicação de tempo desde a última atividade.
+- Usar exclusivamente user_id (PID) para todas as consultas e associações de dados; nunca usar senha como chave de busca.
+- Atualização em tempo real via WebSocket com fallback de polling a cada 15s.
+
+2. Estrutura de dados e endpoints
+- Banco (exemplos SQL):
+  - Tabela usuarios:
+    - user_id (PK, UUID or serial), nome, email, whatsapp (E.164), avatar_url, last_seen TIMESTAMP WITH TIME ZONE, status ENUM('online','away','offline'), ativo BOOLEAN.
+  - Tabela sessions (opcional):
+    - session_id, user_id, ip, started_at TIMESTAMP, last_activity_at TIMESTAMP.
+- API:
+  - GET /api/header/ultimas-conexoes?limit=8
+    - Retorna array ordenado por status (online primeiro), depois last_seen desc.
+    - Cada item: { user_id, nome, avatar_url, whatsapp, status, last_seen_iso, last_seen_human }.
+  - WS /sockets/ultimas-conexoes
+    - Server messages: { type: "update", payload: [ ...items ] } where items follow GET format.
+
+3. Regras de negócio e formatação
+- Considerar usuário **online** quando last_activity_at >= now() - INTERVAL '2 minutes' OR status = 'online'.
+- last_seen_human em pt-BR: "agora", "há 1 min", "há 5 min", "ontem 14:32", etc.
+- Filtrar por ativo = true; usuários inativos não aparecem.
+- Não expor números completos de WhatsApp em logs; quando necessário, mascarar visualmente (ex: +55 11 9****-1234).
+- Email no mini-card deve aparecer parcialmente mascarado (a***@dominio.com).
+
+4. Componente front-end (entregar em React/Vue/Svelte ou HTML+vanilla JS)
+- Posicionamento e classes:
+  - Container: .header-ultimas-conexoes { position: fixed; top: 0; right: 0; z-index: 1200; display:flex; gap:8px; align-items:center; background: transparent; }
+  - Item: .uc-item { display:flex; gap:8px; align-items:center; padding:6px 8px; border-radius:8px; background: rgba(0,0,0,0.03); }
+  - Status dot: .uc-status (10px circle; colors via CSS vars).
+  - Avatar: .uc-avatar (32px circular).
+  - Name: .uc-name (truncated to 12 chars; title attribute with full name).
+  - WhatsApp icon/link: .uc-whatsapp (opens wa.me/E.164 in new tab).
+- Mini-card on-click:
+  - On click avatar/name open mini-card with: nome completo, email mascarado, botão "Abrir WhatsApp" (wa.me/E.164), última função/escala (query SELECT funcao FROM escala WHERE user_id = :user_id ORDER BY data DESC LIMIT 1).
+- Accessibility:
+  - Keyboard navigable (tabindex), ARIA roles, aria-live="polite" for updates, tooltips accessible via aria-describedby.
+
+5. Estilo (to include in centralized style.css)
+- Add variables (if not existing):
+  --header-bg: var(--color-beige-light);
+  --status-online: #4CAF50;
+  --status-away: #FFB300;
+  --status-offline: #9CA3AF;
+  --avatar-size: 32px;
+  --text-primary: var(--color-text-primary);
+- Example classes (deliver as CSS snippet to paste into style.css):
+  .header-ultimas-conexoes { position: fixed; top: 0; right: 0; display:flex; gap:8px; align-items:center; z-index:1200; background: transparent; }
+  .uc-item { display:flex; gap:8px; align-items:center; padding:6px 8px; border-radius:8px; background: rgba(0,0,0,0.03); }
+  .uc-status { width:10px; height:10px; border-radius:50%; }
+  .uc-avatar { width:var(--avatar-size); height:var(--avatar-size); border-radius:50%; object-fit:cover; }
+  .uc-name { color: var(--text-primary); font-weight:600; font-size:13px; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+6. Atualização em tempo real e fallback
+- Implement WS server emitting user status updates { event: "status", user_id, status, last_seen_iso }.
+- Client behavior:
+  - Connect WS on app init; on message type "update" diff and update DOM with minimal re-render (animate opacity).
+  - If WS fails, start polling GET /api/header/ultimas-conexoes every 15s (configurable via POLLING_INTERVAL).
+- Security: authenticate WS with token (Bearer); reject anonymous connections.
+
+7. Tests to deliver
+- Unit:
+  - isOnline(last_activity_at) function with test cases (now, 1m, 3m, 1d).
+  - formatLastSeenHuman(date) pt-BR tests.
+- Integration:
+  - Test GET /api/header/ultimas-conexoes returns expected JSON given sample users (include test fixture with online/offline).
+- E2E (Playwright or Cypress):
+  1) Load app, mock WS that emits updates for 3 users; assert .uc-item count and status colors.
+  2) Click avatar -> mini-card opens with masked email and WhatsApp link.
+  3) Confirm wa.me link uses E.164 and opens target in new tab.
+- Performance: simulate 1000 users by load testing WS broadcast and ensure component updates are throttled.
+
+8. Security, privacy and logging
+- Logs should record user_id and timestamp for connect/disconnect; do NOT log Whatsapp numbers or full emails.
+- Admin endpoint (restricted) GET /admin/ultimas-conexoes/logs returning summary per user: { user_id, first_seen, last_seen, connections_count }.
+
+9. Delivery expectations
+- Provide:
+  - Front-end component code (React/Vue/Svelte or HTML+JS) with clear integration points and props.
+  - Back-end endpoints and SQL examples.
+  - CSS snippet to merge into centralized style.css.
+  - Unit/integration/E2E test scripts and commands to run them.
+  - README with required environment variables, WS auth method, POLLING_INTERVAL default, and deployment steps.
+  - Pull request with atomic commits and removals.log if any strings were hidden/removed during integration.
+
+10. Acceptance criteria
+- Component visible and fixed in header, respects z-index and does not obscure central system menu.
+- Displays online users first, correct humanized last_seen, WhatsApp links correct and masked in logs.
+- Real-time updates within 3s via WS or via polling fallback < 15s.
+- Accessible (keyboard, ARIA), privacy respected, and tests pass.
+

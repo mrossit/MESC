@@ -5,24 +5,20 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation, useRoute } from 'wouter';
+import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Home, Calendar, Users, UserCircle } from 'lucide-react';
+import { Home, Calendar, Users, LayoutGrid } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 
 interface UnreadCount {
   unread: number;
 }
 
-interface ProfileAlert {
-  hasAlert: boolean;
-}
-
 const ROUTES = [
-  { id: 'home', path: '/', label: 'HOME', icon: Home, ariaLabel: 'Ir para Home' },
+  { id: 'home', path: '/dashboard', label: 'HOME', icon: Home, ariaLabel: 'Ir para Home' },
   { id: 'escala', path: '/schedules', label: 'ESCALA', icon: Calendar, ariaLabel: 'Ir para Escalas' },
   { id: 'substituicoes', path: '/substitutions', label: 'SUBSTITUIÇÕES', icon: Users, ariaLabel: 'Ir para Substituições' },
-  { id: 'perfil', path: '/profile', label: 'PERFIL', icon: UserCircle, ariaLabel: 'Ir para Perfil' }
+  { id: 'menu', path: '/menu', label: 'MENU', icon: LayoutGrid, ariaLabel: 'Abrir Menu Principal' }
 ] as const;
 
 export function FixedFooter() {
@@ -42,20 +38,6 @@ export function FixedFooter() {
     },
     enabled: !!user?.id,
     refetchInterval: 15000 // 15s polling
-  });
-
-  // Query para alertas de perfil
-  const { data: profileAlert } = useQuery<ProfileAlert>({
-    queryKey: ['/api/user/profile-alert', user?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/user/${user?.id}/profile-alert`, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Erro ao buscar alertas de perfil');
-      return res.json();
-    },
-    enabled: !!user?.id,
-    refetchInterval: 30000 // 30s polling
   });
 
   // Persistir última rota visitada
@@ -112,12 +94,6 @@ export function FixedFooter() {
     logNavigation(route.id);
   }, [setLocation, logNavigation]);
 
-  // Handler de long-press (atalhos rápidos) - feature opcional
-  const handleLongPress = useCallback((route: typeof ROUTES[number]) => {
-    console.log(`[FixedFooter] Long press em ${route.id}`);
-    // TODO: Implementar menu contextual com atalhos
-  }, []);
-
   // Verificar se rota está ativa
   const isActive = useCallback((routePath: string) => {
     if (routePath === '/' && location === '/') return true;
@@ -147,7 +123,7 @@ export function FixedFooter() {
             const Icon = route.icon;
             const active = isActive(route.path);
             const showBadge = route.id === 'escala' && unreadData && unreadData.unread > 0;
-            const showDot = route.id === 'perfil' && profileAlert?.hasAlert;
+            const showDot = false; // Removido indicador de alerta
 
             return (
               <button
