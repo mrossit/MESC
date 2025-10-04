@@ -99,15 +99,15 @@ export function MinisterDashboard() {
       <div className="space-y-4">
         {/* Versículo Bíblico */}
         {versiculo && (
-          <Card style={{ backgroundColor: 'var(--color-beige-light)' }} className="border border-neutral-border/30">
+          <Card className="bg-white border-2 border-neutral-400 shadow-lg">
             <CardContent className="p-6">
-              <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+              <h3 className="text-lg font-bold mb-3 text-gray-800">
                 Ministro, lembre-se:
               </h3>
-              <p className="text-base italic mb-2" style={{ color: 'var(--color-text-primary)' }}>
+              <p className="text-base italic mb-2 text-gray-700">
                 "{versiculo.frase}"
               </p>
-              <p className="text-sm font-semibold text-right" style={{ color: 'var(--color-text-primary)' }}>
+              <p className="text-sm font-semibold text-right text-gray-800">
                 — {versiculo.referencia}
               </p>
             </CardContent>
@@ -115,26 +115,26 @@ export function MinisterDashboard() {
         )}
 
       {/* Minhas Escalas */}
-      <Card style={{ backgroundColor: 'var(--color-beige-light)' }} className="border border-neutral-border/30">
+      <Card className="bg-white border-2 border-neutral-400 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
             <Calendar className="h-5 w-5" />
             Minhas Escalas
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loadingSchedules ? (
-            <p style={{ color: 'var(--color-text-primary)' }}>Carregando...</p>
+            <p className="text-gray-700">Carregando...</p>
           ) : upcomingSchedules.length === 0 ? (
-            <p style={{ color: 'var(--color-text-primary)' }}>Você ainda não possui escalas cadastradas.</p>
+            <p className="text-gray-700">Você ainda não possui escalas cadastradas.</p>
           ) : (
             <div className="space-y-2">
-              <p style={{ color: 'var(--color-text-primary)' }} className="font-semibold mb-2">
+              <p className="font-semibold mb-2 text-gray-800">
                 Você está escalado(a) para:
               </p>
               {upcomingSchedules.slice(0, 5).map((schedule) => (
                 <div key={schedule.id} className="flex items-center gap-2">
-                  <p style={{ color: 'var(--color-text-primary)' }}>
+                  <p className="text-gray-700">
                     {getPositionLabel(schedule.position)} ({getMassTimeLabel(schedule.massTime)} - {format(new Date(schedule.date), "dd/MM", { locale: ptBR })})
                   </p>
                 </div>
