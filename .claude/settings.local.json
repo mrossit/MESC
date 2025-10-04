@@ -76,7 +76,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/migrate-substitution-schema.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/check-day5-schedules.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/create-schedule-05-10-19h.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/create-schedule-05-10-19h-correct.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/create-schedule-05-10-19h-correct.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/test-marcelo-schedules.ts)"
     ],
     "deny": [],
     "ask": []
