@@ -1183,22 +1183,6 @@ export default function Schedules() {
                     </div>
                   </div>
 
-                  {currentSchedule.status === "published" && (
-                    <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-2 border-blue-300 dark:border-blue-700 shadow-sm">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex-shrink-0">
-                          <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">💡 Dica</p>
-                          <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
-                            Clique em qualquer dia do calendário para ver os detalhes completos da escala e gerenciar suas escalações.
-                            Os dias com indicadores coloridos possuem informações importantes!
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   </CardContent>
                 </Card>
               )}
