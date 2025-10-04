@@ -225,7 +225,13 @@
   - Agora o deployment sempre roda com `NODE_ENV=production`
   - Isso garante que o JWT_SECRET funcione corretamente e autenticação opere em modo produção
 - **Arquivo modificado**: `/home/runner/workspace/.replit`
-- **AÇÃO NECESSÁRIA**: Fazer novo deploy do app para aplicar a correção
+
+### CORREÇÃO ADICIONAL - Build falhava no deployment:
+- **PROBLEMA**: Build falhava porque devDependencies (vite, esbuild) não eram instaladas no deployment
+- **SOLUÇÃO**: Modificado `.replit` linha 11:
+  - Build command agora: `npm ci --production=false && npm run build`
+  - Isso instala TODAS as dependências antes de compilar
+- **AÇÃO NECESSÁRIA**: Fazer novo deploy do app para aplicar ambas as correções
 
 ---
 
