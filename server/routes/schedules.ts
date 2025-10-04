@@ -31,6 +31,7 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
     const lastDayStr = lastDay.toISOString().split('T')[0];
 
     console.log(`🔍 [API /minister/current-month] Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
+    console.log(`🔍 [API /minister/current-month] Date types: firstDayStr=${typeof firstDayStr}, lastDayStr=${typeof lastDayStr}`);
 
     // Buscar TODAS as escalas do usuário no mês atual
     const monthSchedules = await db
