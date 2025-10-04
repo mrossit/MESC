@@ -26,7 +26,7 @@ export function TopBar() {
   });
 
   return (
-    <div className="w-full top-bar">
+    <div className="w-full top-bar" style={{ backgroundColor: '#000000' }}>
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
