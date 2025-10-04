@@ -9,6 +9,7 @@ import { passwordResetRoutes } from "./passwordResetRoutes";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
+import schedulesRoutes from "./routes/schedules";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
@@ -85,6 +86,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Questionnaire admin routes
   app.use('/api/questionnaires/admin', questionnaireAdminRoutes);
+  
+  // Schedule routes (MUST come before scheduleGeneration to prioritize specific routes)
+  app.use('/api/schedules', schedulesRoutes);
   
   // Schedule generation routes
   app.use('/api/schedules', scheduleGenerationRoutes);
