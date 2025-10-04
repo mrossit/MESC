@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { FloatingNotificationBell } from "@/components/floating-notification-bell";
 import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
+import { FixedFooter } from "@/components/FixedFooter";
 
 interface LayoutProps {
   children: ReactNode;
@@ -63,6 +64,9 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
       
       {/* Floating Notification Bell for Mobile */}
       <FloatingNotificationBell />
+
+      {/* Fixed Footer - Menu Inferior */}
+      <FixedFooter />
     </SidebarProvider>
   );
 }
