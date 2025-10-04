@@ -29,7 +29,7 @@ body.dark *,
 }
 
 :root {
-  /* PALETA ÚNICA - SEM TEMAS */
+  /* PALETA ÚNICA - SEM TEMAS - RGB FORMAT */
 
   /* Cores Principais - Vangrey */
   --color-red-dark: #7A1C1C;
@@ -42,34 +42,38 @@ body.dark *,
   --color-text-secondary: #6B6B6B;
   --color-bg-beige-alt: #F6EFE3;
 
-  /* Aplicação direta */
-  --background: #F6EFE3;
-  --foreground: #1E1E1E;
+  /* Aplicação direta - RGB format for Tailwind */
+  --background: 246 239 227;
+  --foreground: 30 30 30;
 
-  --card: #FFFFFF;
-  --card-foreground: #1E1E1E;
+  --card: 255 255 255;
+  --card-foreground: 30 30 30;
 
-  --popover: #FFFFFF;
-  --popover-foreground: #1E1E1E;
+  --popover: 255 255 255;
+  --popover-foreground: 30 30 30;
 
-  --primary: #2E7D32;
-  --primary-foreground: #FFFFFF;
+  --primary: 46 125 50;
+  --primary-foreground: 255 255 255;
 
-  --secondary: #FACC15;
-  --secondary-foreground: #000000;
+  --secondary: 250 204 21;
+  --secondary-foreground: 0 0 0;
 
-  --muted: #F5E6CC;
-  --muted-foreground: #6B6B6B;
+  --muted: 245 230 204;
+  --muted-foreground: 107 107 107;
 
-  --accent: #7A1C1C;
-  --accent-foreground: #FFFFFF;
+  --accent: 122 28 28;
+  --accent-foreground: 255 255 255;
 
-  --destructive: #DC2626;
-  --destructive-foreground: #FFFFFF;
+  --destructive: 220 38 38;
+  --destructive-foreground: 255 255 255;
 
-  --border: #F5E6CC;
-  --input: #FFFFFF;
-  --ring: #7A1C1C;
+  --border: 245 230 204;
+  --input: 255 255 255;
+  --ring: 122 28 28;
+
+  --sidebar-background: 246 239 227;
+  --sidebar-foreground: 30 30 30;
+  --sidebar-accent: 122 28 28;
 
   --radius: 0.375rem;
   --font-sans: 'Inter', -apple-system, sans-serif;
@@ -98,7 +102,7 @@ body.dark *,
   /* Tipografia elegante */
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
-    color: rgb(var(--foreground));
+    color: #1E1E1E;
   }
   
   /* Traços finos e alta definição */
@@ -106,17 +110,7 @@ body.dark *,
     border-width: 0.5px;
   }
   
-  /* Gradientes responsivos - SEM DARK MODE */
-.bg-gradient-responsive {
-  background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%) !important;
-}
-
-.pattern-bg-responsive {
-  background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0) !important;
-  background-size: 20px 20px !important;
-}
-
-/* Melhorias específicas para campos de data */
+  /* Melhorias específicas para campos de data */
   input[type="date"] {
     width: 100%;
     max-width: 100%;
@@ -143,81 +137,77 @@ body.dark *,
 }
 
 @layer components {
+  /* Gradientes responsivos */
+  .bg-gradient-responsive {
+    background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%) !important;
+  }
+
+  .pattern-bg-responsive {
+    background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0) !important;
+    background-size: 20px 20px !important;
+  }
+
   /* Cor personalizada para cards */
   .custom-card-bg {
-    background-color: rgb(var(--card)) !important;
+    background-color: var(--card) !important;
   }
   
   /* Botões com gradientes sutis */
   .btn-primary {
     background: linear-gradient(135deg, 
-      rgb(var(--primary)) 0%, 
-      rgb(var(--primary)) 50%, 
-      rgba(var(--primary), 0.9) 100%
+      var(--primary) 0%, 
+      var(--primary) 50%, 
+      var(--primary) 100%
     );
-    color: rgb(var(--primary-foreground));
+    color: var(--primary-foreground);
     @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
-    border: 0.5px solid rgba(var(--primary), 0.2);
   }
   
   .btn-secondary {
     background: linear-gradient(135deg, 
-      rgb(var(--secondary)) 0%, 
-      rgb(var(--secondary)) 50%, 
-      rgba(var(--secondary), 0.9) 100%
+      var(--secondary) 0%, 
+      var(--secondary) 50%, 
+      var(--secondary) 100%
     );
-    color: rgb(var(--secondary-foreground));
+    color: var(--secondary-foreground);
     @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
-    border: 0.5px solid rgba(var(--secondary), 0.2);
   }
   
   /* Cards com bordas finas */
   .card-liturgical {
-    background: rgb(var(--card));
-    color: rgb(var(--card-foreground));
-    border: 0.5px solid rgb(var(--border));
+    background: var(--card);
+    color: var(--card-foreground);
+    border: 0.5px solid var(--border);
     @apply shadow-sm hover:shadow-md transition-all duration-200 rounded-md;
   }
   
   /* Badges acetinados */
   .badge-pearl {
-    background: rgb(var(--badge-pearl));
-    color: rgb(var(--coffee));
     @apply font-medium text-xs px-2 py-1 rounded-full;
-    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
   }
   
   .badge-gold {
-    background: rgb(var(--badge-gold));
-    color: rgb(var(--coffee));
     @apply font-medium text-xs px-2 py-1 rounded-full;
-    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
   }
   
   .badge-copper {
-    background: rgb(var(--badge-copper));
-    color: rgb(var(--coffee));
     @apply font-medium text-xs px-2 py-1 rounded-full;
-    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
   }
   
   .badge-terracotta {
-    background: rgb(var(--badge-terracotta));
-    color: rgb(var(--coffee));
     @apply font-medium text-xs px-2 py-1 rounded-full;
-    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
   }
 }
 
 @layer utilities {
   /* Sidebar refinado - Sem bordas nas opções */
   [data-sidebar="sidebar"] {
-    background: rgb(var(--sidebar-background)) !important;
-    color: rgb(var(--sidebar-foreground)) !important;
+    background: var(--sidebar-background) !important;
+    color: var(--sidebar-foreground) !important;
   }
   
   [data-sidebar="sidebar"] * {
-    color: rgb(var(--sidebar-foreground)) !important;
+    color: var(--sidebar-foreground) !important;
   }
   
   [data-sidebar="sidebar"] [data-sidebar="menu-button"] {
@@ -227,20 +217,22 @@ body.dark *,
   }
   
   [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover {
-    background: rgba(var(--sidebar-accent), 0.15) !important;
+    background: var(--sidebar-accent) !important;
+    opacity: 0.15;
     border: none !important;
   }
   
   [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] {
-    background: rgba(var(--sidebar-accent), 0.2) !important;
+    background: var(--sidebar-accent) !important;
+    opacity: 0.2;
     font-weight: 500;
     border: none !important;
   }
   
   /* Mobile sidebar - Sem bordas */
   [data-sidebar="sidebar"][data-mobile="true"] {
-    background: rgb(var(--sidebar-background)) !important;
-    color: rgb(var(--sidebar-foreground)) !important;
+    background: var(--sidebar-background) !important;
+    color: var(--sidebar-foreground) !important;
     border: none !important;
   }
   
@@ -257,39 +249,39 @@ body.dark *,
   
   /* Sombras litúrgicas */
   .shadow-liturgical-sm {
-    box-shadow: 0 1px 2px 0 rgba(var(--foreground), 0.05);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
   
   .shadow-liturgical {
     box-shadow: 
-      0 1px 3px 0 rgba(var(--foreground), 0.1),
-      0 1px 2px -1px rgba(var(--foreground), 0.06);
+      0 1px 3px 0 rgba(0, 0, 0, 0.1),
+      0 1px 2px -1px rgba(0, 0, 0, 0.06);
   }
   
   .shadow-liturgical-md {
     box-shadow: 
-      0 4px 6px -1px rgba(var(--foreground), 0.1),
-      0 2px 4px -2px rgba(var(--foreground), 0.06);
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.06);
   }
   
   /* Gradientes litúrgicos */
   .gradient-liturgical {
     background: linear-gradient(135deg, 
-      rgb(var(--primary)) 0%, 
-      rgb(var(--secondary)) 100%
+      var(--primary) 0%, 
+      var(--secondary) 100%
     );
   }
   
   .gradient-pearl {
     background: linear-gradient(180deg, 
-      rgb(var(--badge-pearl)) 0%, 
-      rgb(var(--badge-light)) 100%
+      #F5E6CC 0%, 
+      #FAF8F4 100%
     );
   }
   
   /* Bordas finas de alta definição */
   .border-liturgical {
-    border: 0.5px solid rgb(var(--border));
+    border: 0.5px solid var(--border);
   }
   
   /* Texto com antialiasing refinado */
@@ -323,16 +315,16 @@ body.dark *,
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(var(--background));
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(var(--foreground), 0.2);
+  background: rgba(30, 30, 30, 0.2);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--foreground), 0.3);
+  background: rgba(30, 30, 30, 0.3);
 }
 
 /* Print styles */

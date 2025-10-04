@@ -157,7 +157,7 @@ export function NotificationBell({ compact = false, showLabel = false, className
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-96 p-0 bg-neutral-whiteBeige/95 backdrop-blur-md dark:bg-dark-7/95 dark:backdrop-blur-md" 
+        className="w-96 p-0 bg-neutral-whiteBeige/95  dark:bg-dark-7/95 dark:" 
         align="end"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
