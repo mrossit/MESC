@@ -125,7 +125,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .where(
         and(
           eq(schedules.ministerId, ministerId),
-          sql`${schedules.date} >= ${todayStr}::date`,
+          gte(schedules.date, todayStr),
           eq(schedules.status, "scheduled")
         )
       )
