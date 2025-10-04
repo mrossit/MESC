@@ -1734,38 +1734,77 @@ export default function Schedules() {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-96">
+                <div className="max-h-[500px] overflow-y-auto pr-2">
                   <div className="space-y-3">
-                    {timeFilteredAssignments.map((assignment, index) => (
-                      <div
-                        key={assignment.id}
-                        className="p-4 rounded-lg border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)] transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Badge className="bg-[var(--color-green-dark)] text-white">
-                                {LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`}
-                              </Badge>
-                              <p className="font-semibold text-[var(--color-text-primary)]">
-                                {assignment.ministerName || 'VAGA DISPONÍVEL'}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-sm text-[var(--color-text-secondary)]">
-                              <Clock className="h-3 w-3" />
-                              <span>{assignment.massTime?.substring(0, 5)}</span>
-                            </div>
-                          </div>
-                          {assignment.confirmed ? (
-                            <Check className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    {timeFilteredAssignments.map((assignment, index) => {
+                      // Verifica se é o usuário logado
+                      const isCurrentUser = assignment.ministerId === user?.id;
+                      // Verifica se é vaga disponível
+                      const isVacant = !assignment.ministerId || assignment.ministerName === 'VACANT' || assignment.ministerName === 'VAGA DISPONÍVEL';
+
+                      return (
+                        <div
+                          key={assignment.id}
+                          className={cn(
+                            "p-4 rounded-lg border transition-all relative",
+                            isCurrentUser
+                              ? "border-[3px] border-[var(--color-red-dark)] bg-[#FFF5F5] shadow-lg ring-2 ring-[var(--color-red-dark)]/30"
+                              : isVacant
+                                ? "border border-[var(--color-green-dark)]/30 bg-[#E8F5E9] hover:bg-[#C8E6C9]"
+                                : "border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)]"
                           )}
+                        >
+                          {/* Estrela para o usuário logado */}
+                          {isCurrentUser && (
+                            <div className="absolute -top-3 -right-3">
+                              <div className="relative">
+                                <div className="absolute inset-0 bg-yellow-400 rounded-full blur-md opacity-60 animate-pulse" />
+                                <Star className="h-7 w-7 text-yellow-500 fill-yellow-400 relative animate-pulse" />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn(
+                                  "font-semibold",
+                                  isCurrentUser
+                                    ? "bg-[var(--color-red-dark)] text-white"
+                                    : isVacant
+                                      ? "bg-[var(--color-green-dark)] text-white border-2 border-green-600"
+                                      : "bg-[var(--color-green-dark)] text-white"
+                                )}>
+                                  {LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`}
+                                </Badge>
+                                <p className={cn(
+                                  "font-semibold",
+                                  isCurrentUser
+                                    ? "text-[var(--color-red-dark)] text-lg"
+                                    : isVacant
+                                      ? "text-green-700 italic"
+                                      : "text-[var(--color-text-primary)]"
+                                )}>
+                                  {assignment.ministerName || 'VAGA DISPONÍVEL'}
+                                  {isCurrentUser && " (Você)"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-sm text-[var(--color-text-secondary)]">
+                                <Clock className="h-3 w-3" />
+                                <span>{assignment.massTime?.substring(0, 5)}</span>
+                              </div>
+                            </div>
+                            {assignment.confirmed ? (
+                              <Check className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <AlertCircle className="h-5 w-5 text-yellow-600" />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                </ScrollArea>
+                </div>
               )}
 
               <Button

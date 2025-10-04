@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle } from "lucide-react";
+import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MinisterTutorial, useShouldShowTutorial } from "@/components/minister-tutorial";
 import { format } from "date-fns";
@@ -95,45 +95,43 @@ export function MinisterDashboard() {
               <p className="text-[var(--color-text-primary)] font-medium mb-2">Você não possui missas escaladas no momento.</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {scheduledMasses.slice(0, 10).map((mass) => (
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+              {scheduledMasses.map((mass) => (
                 <div
                   key={mass.id}
                   className="p-4 rounded-lg border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)] transition-colors"
                 >
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-[var(--color-red-dark)]">
-                        {format(new Date(mass.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  {/* Layout VERTICAL com Data e Posição */}
+                  <div className="flex flex-col gap-3">
+                    {/* Data */}
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-[var(--color-red-dark)]" />
+                      <p className="font-bold text-[var(--color-red-dark)] text-lg">
+                        {format(new Date(mass.date), "dd/MM/yyyy", { locale: ptBR })}
                       </p>
-                      <Badge className="bg-[var(--color-green-dark)] text-white text-xs">
+                    </div>
+
+                    {/* Posição (função) */}
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-[var(--color-green-dark)] text-white font-semibold px-3 py-1">
                         {getPositionLabel(mass.position)}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-[var(--color-text-primary)]">
+
+                    {/* Horário e Local (info secundária) */}
+                    <div className="flex items-center gap-4 text-sm text-[var(--color-text-secondary)] pt-2 border-t border-[var(--color-beige-light)]">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        <span>{mass.time}</span>
+                        <span>{mass.time?.substring(0, 5)}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span>📍</span>
-                        <span>{mass.location}</span>
+                        <span className="text-xs">{mass.location}</span>
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
-              {scheduledMasses.length > 10 && (
-                <div className="text-center pt-2">
-                  <Button
-                    variant="link"
-                    className="text-[var(--color-green-dark)] hover:text-[var(--color-green-dark)]/80"
-                    onClick={() => setLocation('/schedules')}
-                  >
-                    Ver todas ({scheduledMasses.length} missas)
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </CardContent>
