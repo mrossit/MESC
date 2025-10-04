@@ -4,6 +4,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* FORÇAR CORES DESDE O INÍCIO - ANTES DE QUALQUER COMPONENTE */
+html,
+body,
+#root {
+  background-color: #F6EFE3 !important;
+  background: #F6EFE3 !important;
+  color: #1E1E1E !important;
+}
+
+/* BLOQUEAR DARK MODE COMPLETAMENTE */
+html.dark,
+body.dark,
+.dark {
+  background-color: #F6EFE3 !important;
+  background: #F6EFE3 !important;
+  color: #1E1E1E !important;
+}
+
+html.dark *,
+body.dark *,
+.dark * {
+  color: inherit !important;
+}
+
 :root {
   /* PALETA ÚNICA - SEM TEMAS */
 
@@ -59,8 +83,9 @@
   
   body {
     @apply font-sans antialiased;
-    background-color: rgb(var(--background));
-    color: rgb(var(--foreground));
+    background-color: #F6EFE3 !important;
+    background: #F6EFE3 !important;
+    color: #1E1E1E !important;
     font-weight: 400;
     letter-spacing: -0.01em;
     line-height: 1.6;
@@ -81,23 +106,14 @@
     border-width: 0.5px;
   }
   
-  /* Gradientes responsivos para dark mode */
+  /* Gradientes responsivos - SEM DARK MODE */
 .bg-gradient-responsive {
-  background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%);
-}
-
-.dark .bg-gradient-responsive {
-  background: linear-gradient(135deg, rgb(12, 8, 7) 0%, rgb(31, 20, 18) 100%);
+  background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%) !important;
 }
 
 .pattern-bg-responsive {
-  background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0);
-  background-size: 20px 20px;
-}
-
-.dark .pattern-bg-responsive {
-  background-image: radial-gradient(circle at 1px 1px, rgba(184, 134, 11, 0.1) 1px, transparent 0);
-  background-size: 20px 20px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0) !important;
+  background-size: 20px 20px !important;
 }
 
 /* Melhorias específicas para campos de data */

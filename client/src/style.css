@@ -137,13 +137,12 @@ div[class*="dark"] {
   color: var(--color-black) !important;
 }
 
-/* Header com Degradê Vertical */
+/* Header com Degradê Vertical - Verde */
 .header-gradient {
   background: linear-gradient(
     to bottom,
-    var(--color-gradient-header-start) 0%,
-    var(--color-gradient-header-mid) 50%,
-    var(--color-gradient-header-end) 100%
+    var(--color-gradient-green-start) 0%,
+    var(--color-gradient-green-end) 100%
   ) !important;
   border-bottom: 2px solid var(--color-beige-light) !important;
 }
@@ -230,13 +229,13 @@ nav[class*="bottom"] {
   stroke-width: 3 !important;
 }
 
-/* Texto dos ícones - BRANCO CAIXA ALTA NEGRITO */
+/* Texto dos ícones - BRANCO CAIXA BAIXA NEGRITO */
 .bottom-nav button span,
 .bottom-nav a span {
   color: var(--color-white) !important;
   font-size: 0.7rem !important;
   font-weight: 700 !important;
-  text-transform: uppercase !important;
+  text-transform: lowercase !important;
   letter-spacing: 0.05em !important;
   text-align: center !important;
   display: block !important;
