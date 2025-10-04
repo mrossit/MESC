@@ -39,11 +39,6 @@ export function MinisterDashboard() {
     }
   }, [shouldShowTutorial]);
 
-  useEffect(() => {
-    fetchScheduledMasses();
-    fetchVersiculo();
-  }, []);
-
   const fetchVersiculo = async () => {
     try {
       console.log('📖 [MINISTER-DASHBOARD] Buscando versículo aleatório...');
@@ -119,6 +114,13 @@ export function MinisterDashboard() {
       console.log('🏁 [MINISTER-DASHBOARD] Loading finalizado');
     }
   };
+
+  // Buscar dados quando o componente é montado
+  useEffect(() => {
+    console.log('🚀 [MINISTER-DASHBOARD] Componente montado - iniciando busca de dados');
+    fetchScheduledMasses();
+    fetchVersiculo();
+  }, []);
 
   const getPositionLabel = (position: number) => {
     return LITURGICAL_POSITIONS[position] || `Ministro ${position}`;
