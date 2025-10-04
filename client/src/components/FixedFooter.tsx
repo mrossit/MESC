@@ -17,7 +17,7 @@ interface UnreadCount {
 const ROUTES = [
   { id: 'home', path: '/dashboard', label: 'HOME', icon: Home, ariaLabel: 'Ir para Home' },
   { id: 'escala', path: '/schedules', label: 'ESCALA', icon: Calendar, ariaLabel: 'Ir para Escalas' },
-  { id: 'substituicoes', path: '/substitutions', label: 'SUBSTITUIÇÕES', icon: Users, ariaLabel: 'Ir para Substituições' },
+  { id: 'substituicoes', path: '/schedules/substitutions', label: 'SUBSTITUIÇÕES', icon: Users, ariaLabel: 'Ir para Substituições' },
   { id: 'menu', path: '/menu', label: 'MENU', icon: LayoutGrid, ariaLabel: 'Abrir Menu Principal' }
 ] as const;
 
