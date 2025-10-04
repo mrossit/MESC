@@ -121,7 +121,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-border/20 bg-card/95 backdrop-blur-sm">
+      <Card className="w-full max-w-md shadow-2xl border-2 border-neutral-400 bg-white">
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             <img 
