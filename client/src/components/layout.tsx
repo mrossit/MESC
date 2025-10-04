@@ -16,6 +16,7 @@ interface LayoutProps {
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const [location] = useLocation();
   const showHeaderConexoes = location === "/dashboard";
+  const isDashboard = location === "/dashboard";
 
   return (
     <div className="flex h-screen w-full flex-col bg-background">
@@ -41,17 +42,19 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
             )}
           </div>
 
-          {/* Actions section - responsive */}
-          <div className="flex items-center gap-2">
-            {/* Command Search - responsive */}
-            <CommandSearch />
+          {/* Actions section - responsive (oculto no Dashboard/HOME) */}
+          {!isDashboard && (
+            <div className="flex items-center gap-2">
+              {/* Command Search - responsive */}
+              <CommandSearch />
 
-            {/* Install Button */}
-            <InstallButton size="sm" className="hidden sm:inline-flex" />
+              {/* Install Button */}
+              <InstallButton size="sm" className="hidden sm:inline-flex" />
 
-            {/* Notifications */}
-            <NotificationBell compact className="h-9 w-9" />
-          </div>
+              {/* Notifications */}
+              <NotificationBell compact className="h-9 w-9" />
+            </div>
+          )}
         </div>
       </header>
 

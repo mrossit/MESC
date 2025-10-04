@@ -264,7 +264,7 @@ export function AppSidebar() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium leading-none">{user.name}</span>
+                        <span className="text-base font-semibold leading-none">{user.name}</span>
                         <span className="text-xs capitalize text-muted-foreground">{user.role === 'coordenador' ? 'Coordenador Sistema' : user.role}</span>
                       </div>
                     </Link>

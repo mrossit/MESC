@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
-import { eq, and, sql, gte, lte, count } from "drizzle-orm";
+import { eq, and, sql, gte, lte, count, isNotNull } from "drizzle-orm";
 
 // Stub implementations for missing functions
 const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
@@ -85,6 +85,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
     const targetDateStr = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
     
     // Buscar TODOS os ministros escalados naquela data (não apenas 1!)
+    // Filtrar apenas assignments com ministros (minister_id NOT NULL)
     const allAssignments = await db
       .select({
         id: schedules.id,
@@ -102,7 +103,8 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       .where(
         and(
           eq(schedules.date, targetDateStr),
-          eq(schedules.status, "scheduled")
+          eq(schedules.status, "scheduled"),
+          isNotNull(schedules.ministerId) // Apenas assignments com ministros
         )
       )
       .orderBy(schedules.time, schedules.position);

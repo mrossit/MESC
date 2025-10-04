@@ -871,11 +871,12 @@ export default function Schedules() {
                       )}
                       onClick={() => {
                         setSelectedDate(day);
-                        
-                        // Se a escala está publicada, abre modal de visualização
+
+                        // Se a escala está publicada, navega para página de detalhes
                         if (currentSchedule?.status === "published") {
-                          fetchScheduleForDate(day);
-                        } 
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          window.location.href = `/schedules/day/${dateStr}`;
+                        }
                         // Se é coordenador e escala está em rascunho, abre modal de edição
                         else if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
                           setIsAssignmentDialogOpen(true);
@@ -887,14 +888,14 @@ export default function Schedules() {
                           <div className="relative">
                             {!substitutionStatus && (
                               <>
-                                <div className="absolute inset-0 bg-amber-400 rounded-full blur-lg opacity-60 animate-pulse" />
-                                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600 fill-amber-400 animate-pulse relative" />
+                                <div className="absolute inset-0 bg-yellow-400 rounded-full blur-lg opacity-60 animate-pulse" />
+                                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600 fill-yellow-400 animate-pulse relative" />
                               </>
                             )}
                             {substitutionStatus === 'pending' && (
                               <>
-                                <div className="absolute inset-0 bg-red-400 rounded-full blur-lg opacity-60 animate-pulse" />
-                                <UserX className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 fill-red-400 animate-pulse relative" />
+                                <div className="absolute inset-0 bg-gray-400 rounded-full blur-lg opacity-60 animate-pulse" />
+                                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600 fill-gray-400 animate-pulse relative" />
                               </>
                             )}
                             {substitutionStatus === 'approved' && (
@@ -931,11 +932,11 @@ export default function Schedules() {
                             {isUserScheduled ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 {substitutionStatus === 'pending' ? (
-                                  <UserX className="h-4 w-4 text-red-600 fill-red-400" />
+                                  <Star className="h-4 w-4 text-gray-600 fill-gray-400 animate-pulse" />
                                 ) : substitutionStatus === 'approved' ? (
                                   <Check className="h-4 w-4 text-green-600 fill-green-400" />
                                 ) : (
-                                  <Star className="h-4 w-4 text-amber-600 fill-amber-500 animate-pulse" />
+                                  <Star className="h-4 w-4 text-yellow-600 fill-yellow-500 animate-pulse" />
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
@@ -979,8 +980,8 @@ export default function Schedules() {
                               <div className="space-y-0.5">
                                 {substitutionStatus === 'pending' ? (
                                   <div className="flex items-center gap-1">
-                                    <UserX className="h-4 w-4 text-red-600 fill-red-400 flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-red-700 truncate">Aguardando</span>
+                                    <Star className="h-4 w-4 text-gray-600 fill-gray-400 animate-pulse flex-shrink-0" />
+                                    <span className="text-[10px] font-bold text-gray-700 truncate">Aguardando</span>
                                   </div>
                                 ) : substitutionStatus === 'approved' ? (
                                   <div className="flex items-center gap-1">
@@ -989,8 +990,8 @@ export default function Schedules() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-amber-600 fill-amber-500 animate-pulse flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-amber-700 truncate">Escalado</span>
+                                    <Star className="h-4 w-4 text-yellow-600 fill-yellow-500 animate-pulse flex-shrink-0" />
+                                    <span className="text-[10px] font-bold text-yellow-700 truncate">Escalado</span>
                                   </div>
                                 )}
                               </div>
@@ -1055,153 +1056,6 @@ export default function Schedules() {
                 })}
               </div>
               
-              {/* Legenda dos indicadores visuais - Sempre visível quando há escala */}
-              {currentSchedule && (
-                <Card className="mt-6 border-2 border-primary/20 shadow-lg">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <AlertCircle className="h-5 w-5 text-primary" />
-                      </div>
-                      <span>Legenda do Calendário</span>
-                    </CardTitle>
-                    <CardDescription>
-                      Entenda os indicadores visuais da escala de ministros
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {currentSchedule.status === "published" && (
-                      <>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-yellow-100 border-2 border-amber-500 rounded-xl flex items-center justify-center ring-2 ring-amber-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <Star className="h-5 w-5 text-amber-600 fill-amber-500 animate-pulse" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-amber-800 leading-tight">Você está escalado</p>
-                            <p className="text-xs text-amber-700/70 mt-1">Dia com sua participação confirmada</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-red-200 border-2 border-red-500 rounded-xl flex items-center justify-center ring-2 ring-red-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <UserX className="h-5 w-5 text-red-600 fill-red-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-red-800 leading-tight">Substituição solicitada</p>
-                            <p className="text-xs text-red-700/70 mt-1">Aguardando confirmação de substituto</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 border-2 border-green-500 rounded-xl flex items-center justify-center ring-2 ring-green-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <UserCheck className="h-5 w-5 text-green-600 fill-green-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-green-800 leading-tight">Substituto confirmado</p>
-                            <p className="text-xs text-green-700/70 mt-1">Substituição já foi aprovada</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 border-2 border-blue-500 rounded-xl flex items-center justify-center ring-2 ring-blue-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <Users className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-blue-800 leading-tight">Ministros escalados</p>
-                            <p className="text-xs text-blue-700/70 mt-1">Quantidade de ministros confirmados</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 border-2 border-orange-500 rounded-xl flex items-center justify-center ring-2 ring-orange-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <AlertCircle className="h-5 w-5 text-orange-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-orange-800 leading-tight">Vagas disponíveis</p>
-                            <p className="text-xs text-orange-700/70 mt-1">Posições ainda não preenchidas</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
-                            <CalendarIcon className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-primary leading-tight">Dia atual</p>
-                            <p className="text-xs text-primary/70 mt-1">Data de hoje no calendário</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-400 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-accent/50 border-2 border-slate-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 group-hover:ring-4 ring-slate-400/30 transition-all">
-                            <span className="text-base font-bold text-slate-700">D</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-slate-800 leading-tight">Dia selecionado</p>
-                            <p className="text-xs text-slate-700/70 mt-1">Dia que você clicou para ver</p>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    {currentSchedule.status === "draft" && isCoordinator && (
-                      <>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 border-2 border-purple-500 rounded-xl flex items-center justify-center ring-2 ring-purple-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <Clock className="h-5 w-5 text-purple-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-purple-800 leading-tight">Horários de missa</p>
-                            <p className="text-xs text-purple-700/70 mt-1">Dias com celebrações agendadas</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
-                            <CalendarIcon className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-primary leading-tight">Dia atual</p>
-                            <p className="text-xs text-primary/70 mt-1">Data de hoje no calendário</p>
-                          </div>
-                        </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-400 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-accent/50 border-2 border-slate-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 group-hover:ring-4 ring-slate-400/30 transition-all">
-                            <span className="text-base font-bold text-slate-700">D</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-slate-800 leading-tight">Dia selecionado</p>
-                            <p className="text-xs text-slate-700/70 mt-1">Dia que você clicou para ver</p>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Seção de informações sobre posições litúrgicas */}
-                  <div className="mt-6 pt-4 border-t-2 border-primary/20">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <h4 className="font-bold text-base text-slate-800">Posições Litúrgicas</h4>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => (
-                        <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-xs font-bold text-primary">{key}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-slate-800 leading-tight">{value}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {key === '1' && 'Ministro que lidera a distribuição da Eucaristia'}
-                              {key === '2' && 'Ministro auxiliar na distribuição'}
-                              {key === '3' && 'Ministro que auxilia na celebração'}
-                              {key === '4' && 'Ministro de apoio adicional'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  </CardContent>
-                </Card>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1332,7 +1186,7 @@ export default function Schedules() {
           setSelectedMassTimeView(null);
         }
       }}>
-        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
+        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6 bg-[rgb(var(--background))]">
           <DialogHeader className="space-y-1 sm:space-y-2">
             <DialogTitle className="text-base sm:text-lg leading-tight">
               {showMassTimeSelection
@@ -1382,8 +1236,9 @@ export default function Schedules() {
                         className={cn(
                           "w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-lg",
                           userAssignment
-                            ? "border-red-500 bg-red-50 hover:bg-red-100"
-                            : "border-border bg-card hover:bg-accent"
+                            ? "border-yellow-500 bg-yellow-50 hover:bg-yellow-100"
+                            : "border-border hover:bg-accent",
+                          "bg-[rgb(var(--card))]"
                         )}
                       >
                         <div className="flex items-center justify-between">
@@ -1396,8 +1251,8 @@ export default function Schedules() {
                           </div>
                           {userAssignment && (
                             <div className="flex items-center gap-2">
-                              <Star className="h-5 w-5 text-red-500 fill-red-500" />
-                              <span className="text-sm font-medium text-red-700">Você está escalado</span>
+                              <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-medium text-yellow-700">Você está escalado</span>
                             </div>
                           )}
                         </div>
@@ -1493,15 +1348,15 @@ export default function Schedules() {
                                 key={assignment.id}
                                 className={cn(
                                   "flex flex-col p-2 sm:p-3 rounded-lg border bg-card relative",
-                                  isCurrentUser && "bg-red-50 border-red-500 border-2"
+                                  isCurrentUser && "bg-yellow-50 border-yellow-500 border-2"
                                 )}
                               >
                                 {/* Estrela quando usuário está escalado */}
                                 {isCurrentUser && (
                                   <div className="absolute -top-2 -right-2 z-10">
                                     <div className="relative">
-                                      <div className="absolute inset-0 bg-red-400 rounded-full blur-md opacity-60" />
-                                      <Star className="h-6 w-6 text-red-600 fill-red-500 relative" />
+                                      <div className="absolute inset-0 bg-yellow-400 rounded-full blur-md opacity-60" />
+                                      <Star className="h-6 w-6 text-yellow-600 fill-yellow-500 relative" />
                                     </div>
                                   </div>
                                 )}
@@ -1512,15 +1367,15 @@ export default function Schedules() {
                                       <span className="sm:hidden">{assignment.position}</span>
                                     </Badge>
                                     <div className="min-w-0 flex-1">
-                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-red-900 font-bold text-base")}>
+                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-yellow-900 font-bold text-base")}>
                                         {assignment.ministerName || "Ministro"}
                                       </p>
-                                      <p className={cn("text-[10px] sm:text-xs truncate mt-0.5", isCurrentUser ? "text-red-700 font-semibold" : "text-muted-foreground sm:hidden")}>
+                                      <p className={cn("text-[10px] sm:text-xs truncate mt-0.5", isCurrentUser ? "text-yellow-700 font-semibold" : "text-muted-foreground sm:hidden")}>
                                         {LITURGICAL_POSITIONS[assignment.position]}
                                       </p>
                                       {isCurrentUser && (
-                                        <p className="text-[10px] sm:text-xs text-red-700 font-semibold mt-0.5 flex items-center gap-1">
-                                          <Star className="h-3 w-3 fill-red-500" />
+                                        <p className="text-[10px] sm:text-xs text-yellow-700 font-semibold mt-0.5 flex items-center gap-1">
+                                          <Star className="h-3 w-3 fill-yellow-500" />
                                           Você está escalado nesta posição
                                         </p>
                                       )}

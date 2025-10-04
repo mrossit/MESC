@@ -15,7 +15,7 @@ import {
 } from '../components/ui/select';
 import {
   Search, Users, Phone, Mail, Calendar, Heart,
-  Church, User, Filter, Grid, List, Info, ArrowUpDown
+  Church, User, Filter, Grid, List, Info, ArrowUpDown, MessageCircle
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -34,6 +34,7 @@ type Minister = {
   name: string;
   email: string;
   phone?: string;
+  whatsapp?: string;
   profilePhoto?: string;
   photoUrl?: string;
   role: string;
@@ -367,6 +368,18 @@ export default function MinistersDirectory() {
                           {getRoleLabel(minister.role)}
                         </Badge>
                         <div className="mt-3 space-y-1 w-full">
+                          {minister.whatsapp && (
+                            <a
+                              href={`https://api.whatsapp.com/send/?phone=${minister.whatsapp}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center justify-center gap-2 text-xs sm:text-sm text-green-600 hover:text-green-700"
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                              <span>WhatsApp</span>
+                            </a>
+                          )}
                           {minister.phone && (
                             <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-gray-600">
                               <Phone className="h-3 w-3" />
@@ -421,6 +434,18 @@ export default function MinistersDirectory() {
                             </Badge>
                           </div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
+                            {minister.whatsapp && (
+                              <a
+                                href={`https://api.whatsapp.com/send/?phone=${minister.whatsapp}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs sm:text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
+                              >
+                                <MessageCircle className="h-3 w-3" />
+                                WhatsApp
+                              </a>
+                            )}
                             {minister.phone && (
                               <span className="text-xs sm:text-sm text-gray-600 flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
@@ -536,6 +561,16 @@ export default function MinistersDirectory() {
 
               {/* Ações */}
               <div className="flex gap-2 pt-4">
+                {selectedMinister.whatsapp && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-green-50 hover:bg-green-100 border-green-200"
+                    onClick={() => window.open(`https://api.whatsapp.com/send/?phone=${selectedMinister.whatsapp}`, '_blank', 'noopener,noreferrer')}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2 text-green-600" />
+                    <span className="text-green-600">WhatsApp</span>
+                  </Button>
+                )}
                 {selectedMinister.phone && (
                   <Button
                     variant="outline"

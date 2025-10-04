@@ -464,14 +464,16 @@ export default function Profile() {
             )}
             
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${profile?.role === 'gestor' || profile?.role === 'coordenador' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="personal" className="text-xs sm:text-sm px-1 sm:px-3">
                   <span className="hidden sm:inline">Dados Pessoais</span>
                   <span className="sm:hidden">Dados</span>
                 </TabsTrigger>
-                <TabsTrigger value="sacraments" className="text-xs sm:text-sm px-1 sm:px-3">
-                  Sacramentos
-                </TabsTrigger>
+                {(profile?.role === 'gestor' || profile?.role === 'coordenador') && (
+                  <TabsTrigger value="sacraments" className="text-xs sm:text-sm px-1 sm:px-3">
+                    Sacramentos
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="family" className="text-xs sm:text-sm px-1 sm:px-3">
                   Família
                 </TabsTrigger>
@@ -552,39 +554,21 @@ export default function Profile() {
                       maxLength={15}
                     />
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="maritalStatus">Estado Civil</Label>
-                    <Select
-                      value={profile?.maritalStatus || ''}
-                      onValueChange={(value) => setProfile(prev => prev ? { ...prev, maritalStatus: value } : null)}
-                      disabled={!isEditing}
-                    >
-                      <SelectTrigger id="maritalStatus">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {maritalStatusOptions.map(option => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <Label htmlFor="ministryStart">Início no Ministério</Label>
-                    <Input
-                      id="ministryStart"
-                      type="date"
-                      value={dateToInputValue(profile?.ministryStartDate)}
-                      onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
-                      disabled={!isEditing}
-                      className="w-full max-w-full min-w-0 overflow-hidden"
-                      data-testid="input-ministry-start"
-                    />
-                  </div>
+
+                  {(profile?.role === 'gestor' || profile?.role === 'coordenador') && (
+                    <div className="min-w-0">
+                      <Label htmlFor="ministryStart">Início no Ministério</Label>
+                      <Input
+                        id="ministryStart"
+                        type="date"
+                        value={dateToInputValue(profile?.ministryStartDate)}
+                        onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
+                        disabled={!isEditing}
+                        className="w-full max-w-full min-w-0 overflow-hidden"
+                        data-testid="input-ministry-start"
+                      />
+                    </div>
+                  )}
                   
                   {profile?.maritalStatus === 'married' && (
                     <div className="min-w-0">
@@ -603,142 +587,48 @@ export default function Profile() {
                 </div>
               </TabsContent>
               
-              <TabsContent value="sacraments" className="space-y-4">
-                <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
-                  <Card className="border min-w-0">
-                    <CardContent className="p-3 sm:p-4 md:pt-6">
-                      <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                        <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                        <h4 className="font-semibold text-sm sm:text-base">Batismo</h4>
-                      </div>
-                      <div className="min-w-0 space-y-3">
-                      {isEditing ? (
-                        <>
-                          <div>
-                            <label className="text-xs text-gray-500">Data:</label>
-                            <Input
-                              type="date"
-                              value={dateToInputValue(profile?.baptismDate)}
-                              onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
-                              className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
-                              data-testid="input-baptism-date"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500">Paróquia:</label>
-                            <Input
-                              type="text"
-                              value={profile?.baptismParish || ''}
-                              onChange={(e) => setProfile(prev => prev ? { ...prev, baptismParish: e.target.value } : null)}
-                              className="text-sm w-full mt-1"
-                              placeholder="Nome da paróquia"
-                              data-testid="input-baptism-parish"
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            {formatDate(profile?.baptismDate)}
-                          </p>
-                          {profile?.baptismParish && (
-                            <p className="text-xs sm:text-sm text-gray-500">
-                              {profile.baptismParish}
-                            </p>
-                          )}
-                        </>
-                      )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="border min-w-0">
-                    <CardContent className="p-3 sm:p-4 md:pt-6">
-                      <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                        <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                        <h4 className="font-semibold text-sm sm:text-base">Crisma</h4>
-                      </div>
-                      <div className="min-w-0 space-y-3">
-                      {isEditing ? (
-                        <>
-                          <div>
-                            <label className="text-xs text-gray-500">Data:</label>
-                            <Input
-                              type="date"
-                              value={dateToInputValue(profile?.confirmationDate)}
-                              onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
-                              className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
-                              data-testid="input-confirmation-date"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500">Paróquia:</label>
-                            <Input
-                              type="text"
-                              value={profile?.confirmationParish || ''}
-                              onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationParish: e.target.value } : null)}
-                              className="text-sm w-full mt-1"
-                              placeholder="Nome da paróquia"
-                              data-testid="input-confirmation-parish"
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            {formatDate(profile?.confirmationDate)}
-                          </p>
-                          {profile?.confirmationParish && (
-                            <p className="text-xs sm:text-sm text-gray-500">
-                              {profile.confirmationParish}
-                            </p>
-                          )}
-                        </>
-                      )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  {profile?.maritalStatus === 'married' && (
+{(profile?.role === 'gestor' || profile?.role === 'coordenador') && (
+                <TabsContent value="sacraments" className="space-y-4">
+                  <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
                     <Card className="border min-w-0">
                       <CardContent className="p-3 sm:p-4 md:pt-6">
                         <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                          <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
-                          <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
+                          <Droplets className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                          <h4 className="font-semibold text-sm sm:text-base">Batismo</h4>
                         </div>
-                        <div className="min-w-0 space-y-3 overflow-hidden">
+                        <div className="min-w-0 space-y-3">
                         {isEditing ? (
                           <>
                             <div>
                               <label className="text-xs text-gray-500">Data:</label>
                               <Input
                                 type="date"
-                                value={dateToInputValue(profile?.marriageDate)}
-                                onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
+                                value={dateToInputValue(profile?.baptismDate)}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, baptismDate: e.target.value } : null)}
                                 className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
-                                data-testid="input-marriage-date"
+                                data-testid="input-baptism-date"
                               />
                             </div>
                             <div>
                               <label className="text-xs text-gray-500">Paróquia:</label>
                               <Input
                                 type="text"
-                                value={profile?.marriageParish || ''}
-                                onChange={(e) => setProfile(prev => prev ? { ...prev, marriageParish: e.target.value } : null)}
+                                value={profile?.baptismParish || ''}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, baptismParish: e.target.value } : null)}
                                 className="text-sm w-full mt-1"
                                 placeholder="Nome da paróquia"
-                                data-testid="input-marriage-parish"
+                                data-testid="input-baptism-parish"
                               />
                             </div>
                           </>
                         ) : (
                           <>
                             <p className="text-xs sm:text-sm text-gray-600">
-                              {formatDate(profile?.marriageDate)}
+                              {formatDate(profile?.baptismDate)}
                             </p>
-                            {profile?.marriageParish && (
+                            {profile?.baptismParish && (
                               <p className="text-xs sm:text-sm text-gray-500">
-                                {profile.marriageParish}
+                                {profile.baptismParish}
                               </p>
                             )}
                           </>
@@ -746,43 +636,139 @@ export default function Profile() {
                         </div>
                       </CardContent>
                     </Card>
-                  )}
-                  
-                  <Card className="border min-w-0">
-                    <CardContent className="p-3 sm:p-4 md:pt-6">
-                      <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                        <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                        <h4 className="font-semibold text-sm sm:text-base">Ministério</h4>
-                      </div>
-                      <div className="min-w-0 overflow-hidden">
-                      {isEditing ? (
-                        <div>
-                          <label className="text-xs text-gray-500">Data de início:</label>
-                          <Input
-                            type="date"
-                            value={dateToInputValue(profile?.ministryStartDate)}
-                            onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
-                            className="text-sm mt-1 w-full max-w-full min-w-0 overflow-hidden"
-                            data-testid="input-ministry-date"
-                          />
+
+                    <Card className="border min-w-0">
+                      <CardContent className="p-3 sm:p-4 md:pt-6">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                          <Cross className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                          <h4 className="font-semibold text-sm sm:text-base">Crisma</h4>
                         </div>
-                      ) : (
-                        <p className="text-xs sm:text-sm text-gray-600">
-                          Servindo desde {formatDate(profile?.ministryStartDate)}
-                        </p>
-                      )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
+                        <div className="min-w-0 space-y-3">
+                        {isEditing ? (
+                          <>
+                            <div>
+                              <label className="text-xs text-gray-500">Data:</label>
+                              <Input
+                                type="date"
+                                value={dateToInputValue(profile?.confirmationDate)}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationDate: e.target.value } : null)}
+                                className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
+                                data-testid="input-confirmation-date"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500">Paróquia:</label>
+                              <Input
+                                type="text"
+                                value={profile?.confirmationParish || ''}
+                                onChange={(e) => setProfile(prev => prev ? { ...prev, confirmationParish: e.target.value } : null)}
+                                className="text-sm w-full mt-1"
+                                placeholder="Nome da paróquia"
+                                data-testid="input-confirmation-parish"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs sm:text-sm text-gray-600">
+                              {formatDate(profile?.confirmationDate)}
+                            </p>
+                            {profile?.confirmationParish && (
+                              <p className="text-xs sm:text-sm text-gray-500">
+                                {profile.confirmationParish}
+                              </p>
+                            )}
+                          </>
+                        )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {profile?.maritalStatus === 'married' && (
+                      <Card className="border min-w-0">
+                        <CardContent className="p-3 sm:p-4 md:pt-6">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                            <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+                            <h4 className="font-semibold text-sm sm:text-base">Matrimônio</h4>
+                          </div>
+                          <div className="min-w-0 space-y-3 overflow-hidden">
+                          {isEditing ? (
+                            <>
+                              <div>
+                                <label className="text-xs text-gray-500">Data:</label>
+                                <Input
+                                  type="date"
+                                  value={dateToInputValue(profile?.marriageDate)}
+                                  onChange={(e) => setProfile(prev => prev ? { ...prev, marriageDate: e.target.value } : null)}
+                                  className="text-sm w-full max-w-full min-w-0 mt-1 overflow-hidden"
+                                  data-testid="input-marriage-date"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500">Paróquia:</label>
+                                <Input
+                                  type="text"
+                                  value={profile?.marriageParish || ''}
+                                  onChange={(e) => setProfile(prev => prev ? { ...prev, marriageParish: e.target.value } : null)}
+                                  className="text-sm w-full mt-1"
+                                  placeholder="Nome da paróquia"
+                                  data-testid="input-marriage-parish"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs sm:text-sm text-gray-600">
+                                {formatDate(profile?.marriageDate)}
+                              </p>
+                              {profile?.marriageParish && (
+                                <p className="text-xs sm:text-sm text-gray-500">
+                                  {profile.marriageParish}
+                                </p>
+                              )}
+                            </>
+                          )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    <Card className="border min-w-0">
+                      <CardContent className="p-3 sm:p-4 md:pt-6">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                          <Church className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                          <h4 className="font-semibold text-sm sm:text-base">Ministério</h4>
+                        </div>
+                        <div className="min-w-0 overflow-hidden">
+                        {isEditing ? (
+                          <div>
+                            <label className="text-xs text-gray-500">Data de início:</label>
+                            <Input
+                              type="date"
+                              value={dateToInputValue(profile?.ministryStartDate)}
+                              onChange={(e) => setProfile(prev => prev ? { ...prev, ministryStartDate: e.target.value } : null)}
+                              className="text-sm mt-1 w-full max-w-full min-w-0 overflow-hidden"
+                              data-testid="input-ministry-date"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            Servindo desde {formatDate(profile?.ministryStartDate)}
+                          </p>
+                        )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+              )}
               
               <TabsContent value="family" className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Familiares no Ministério</h3>
                   <Dialog open={showAddFamily} onOpenChange={setShowAddFamily}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="text-xs sm:text-sm">
+                      <Button size="sm" className="text-xs sm:text-sm" disabled={!isEditing}>
                         <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                         <span className="hidden sm:inline">Adicionar Familiar</span>
                         <span className="sm:hidden">Add Familiar</span>
@@ -876,6 +862,7 @@ export default function Profile() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRemoveFamilyMember(member.id)}
+                              disabled={!isEditing}
                             >
                               <X className="h-4 w-4" />
                             </Button>
