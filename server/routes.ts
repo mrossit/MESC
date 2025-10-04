@@ -72,32 +72,6 @@ function handleApiError(error: any, operation: string) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // DIAGNÓSTICO TEMPORÁRIO - Endpoint para verificar estado do banco
-  app.get('/api/diagnostico', async (req, res) => {
-    try {
-      const [userCount] = await db.select({ count: count() }).from(users);
-      const [sampleUser] = await db.select({ email: users.email, pid: users.pid }).from(users).limit(1);
-      
-      res.json({
-        success: true,
-        environment: process.env.NODE_ENV || 'unknown',
-        database: {
-          totalUsers: userCount.count,
-          sampleUser: sampleUser || null,
-          databaseUrl: process.env.DATABASE_URL ? 'configurado' : 'não configurado'
-        },
-        timestamp: new Date().toISOString(),
-        codeVersion: '2025-10-04-v2' // Para confirmar que o código foi atualizado
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        environment: process.env.NODE_ENV || 'unknown'
-      });
-    }
-  });
-
   // Cookie parser middleware
   app.use(cookieParser());
   
@@ -308,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/users/pending', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.get('/api/users/pending', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       const pendingUsers = users.filter(u => u.status === 'pending');
@@ -331,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User/Minister routes
-  app.get('/api/users', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.get('/api/users', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       // Prevent caching of sensitive user data
       res.set({
@@ -349,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.get('/api/users/:id', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
       if (!user) {
@@ -398,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users', authenticateToken, requireRole(['gestor']), async (req, res) => {
+  app.post('/api/users', authenticateToken, requireRole('gestor'), async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       
@@ -417,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.put('/api/users/:id', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const userData = insertUserSchema.partial().parse(req.body);
       
@@ -432,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/status', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
     try {
       const statusUpdateSchema = z.object({
         status: z.enum(['active', 'inactive', 'pending'], {
@@ -479,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/role', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
     try {
       const roleUpdateSchema = z.object({
         role: z.enum(['gestor', 'coordenador', 'ministro'], {
@@ -542,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/block', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
     try {
       // Impedir auto-bloqueio
       if (req.user?.id === req.params.id) {
@@ -575,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check if user has been used in the system (before deletion)
-  app.get('/api/users/:id/check-usage', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.get('/api/users/:id/check-usage', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
     try {
       const userId = req.params.id;
       
@@ -600,7 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Health check / diagnostic endpoint - útil para debugar problemas de produção
-  app.get('/api/diagnostic/:userId', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
+  app.get('/api/diagnostic/:userId', authenticateToken, requireRole('gestor'), async (req: AuthRequest, res) => {
     try {
       const userId = req.params.userId;
       
@@ -687,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.delete('/api/users/:id', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
     try {
       const userId = req.params.id;
       const currentUser = req.user;
@@ -1245,7 +1219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes for managing formation content (restricted to coordinators and managers)
-  app.post('/api/formation/tracks', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/tracks', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const trackData = insertFormationTrackSchema.parse(req.body);
       const track = await storage.createFormationTrack(trackData);
@@ -1256,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/formation/lessons', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/lessons', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const lessonData = insertFormationLessonSchema.parse(req.body);
       const lesson = await storage.createFormationLesson(lessonData);
@@ -1267,7 +1241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/formation/lessons/:id/sections', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/lessons/:id/sections', authenticateToken, requireRole('gestor', 'coordenador'), async (req, res) => {
     try {
       const sectionData = insertFormationLessonSectionSchema.parse({
         ...req.body,
