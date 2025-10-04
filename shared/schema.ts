@@ -380,6 +380,14 @@ export const activityLogs = pgTable('activity_logs', {
   index('idx_activity_logs_created').on(table.createdAt)
 ]);
 
+// Biblical verses for minister inspiration
+export const versiculos = pgTable('versiculos', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  frase: text('frase').notNull(),
+  referencia: varchar('referencia', { length: 100 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // Relations
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)
