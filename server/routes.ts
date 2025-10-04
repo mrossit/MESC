@@ -72,6 +72,32 @@ function handleApiError(error: any, operation: string) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // DIAGNÓSTICO TEMPORÁRIO - Endpoint para verificar estado do banco
+  app.get('/api/diagnostico', async (req, res) => {
+    try {
+      const [userCount] = await db.select({ count: count() }).from(users);
+      const [sampleUser] = await db.select({ email: users.email, pid: users.pid }).from(users).limit(1);
+      
+      res.json({
+        success: true,
+        environment: process.env.NODE_ENV || 'unknown',
+        database: {
+          totalUsers: userCount.count,
+          sampleUser: sampleUser || null,
+          databaseUrl: process.env.DATABASE_URL ? 'configurado' : 'não configurado'
+        },
+        timestamp: new Date().toISOString(),
+        codeVersion: '2025-10-04-v2' // Para confirmar que o código foi atualizado
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        environment: process.env.NODE_ENV || 'unknown'
+      });
+    }
+  });
+
   // Cookie parser middleware
   app.use(cookieParser());
   
