@@ -179,17 +179,17 @@ export default function Communication() {
   };
 
   const getNotificationBg = (type: string, read: boolean) => {
-    if (read) return "bg-gray-50 dark:bg-gray-900/50";
+    if (read) return "bg-gray-50";
     
     switch (type) {
       case "success":
-        return "bg-green-50 dark:bg-green-900/20";
+        return "bg-green-50";
       case "warning":
-        return "bg-yellow-50 dark:bg-yellow-900/20";
+        return "bg-yellow-50";
       case "error":
-        return "bg-red-50 dark:bg-red-900/20";
+        return "bg-red-50";
       default:
-        return "bg-blue-50 dark:bg-blue-900/20";
+        return "bg-blue-50";
     }
   };
 

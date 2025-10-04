@@ -30,12 +30,12 @@ const getActivityIconStyle = (action: string) => {
   switch (action) {
     case "schedule_published":
     case "schedule_created":
-      return { bg: "bg-neutral-accentWarm/10 dark:bg-amber-900/20", color: "text-neutral-accentWarm dark:text-amber-500" };
+      return { bg: "bg-neutral-accentWarm/10", color: "text-neutral-accentWarm" };
     case "user_created":
     case "formation_completed":
-      return { bg: "bg-green-100 dark:bg-green-900/20", color: "text-green-500 dark:text-green-400" };
+      return { bg: "bg-green-100", color: "text-green-500" };
     case "substitution_requested":
-      return { bg: "bg-orange-100 dark:bg-orange-900/20", color: "text-orange-500 dark:text-orange-400" };
+      return { bg: "bg-orange-100", color: "text-orange-500" };
     default:
       return { bg: "bg-blue-100", color: "text-blue-500" };
   }
@@ -98,7 +98,7 @@ export function RecentActivity() {
 
   if (isLoading) {
     return (
-      <Card className="  border border-neutral-border/30 dark:border-border">
+      <Card className="  border border-neutral-border/30">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground">
             Atividades Recentes
@@ -122,7 +122,7 @@ export function RecentActivity() {
   }
 
   return (
-    <Card className="  border border-neutral-border/30 dark:border-border">
+    <Card className="  border border-neutral-border/30">
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">
           Atividades Recentes

@@ -9,20 +9,20 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-neutral-border bg-neutral-badgeWarm text-neutral-textDark hover:shadow-sm dark:bg-dark-gold dark:text-dark-10 dark:border-dark-5",
+          "border-neutral-border bg-neutral-badgeWarm text-neutral-textDark hover:shadow-sm",
         secondary:
-          "border-neutral-border bg-neutral-badgeNeutral text-neutral-textDark hover:shadow-sm dark:bg-dark-copper dark:text-text-light dark:border-dark-5",
+          "border-neutral-border bg-neutral-badgeNeutral text-neutral-textDark hover:shadow-sm",
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-neutral-border text-foreground hover:bg-neutral-whiteBeige dark:border-dark-4 dark:text-text-light dark:hover:bg-dark-5",
+        outline: "border-neutral-border text-foreground hover:bg-neutral-whiteBeige",
         pearl:
-          "border-neutral-border bg-neutral-badgeLight text-neutral-textDark hover:shadow-sm dark:bg-dark-3 dark:text-text-gold dark:border-dark-5",
+          "border-neutral-border bg-neutral-badgeLight text-neutral-textDark hover:shadow-sm",
         gold:
-          "border-neutral-border bg-neutral-badgeWarm text-neutral-textDark hover:shadow-sm dark:bg-dark-gold dark:text-dark-10 dark:border-dark-5",
+          "border-neutral-border bg-neutral-badgeWarm text-neutral-textDark hover:shadow-sm",
         copper:
-          "border-neutral-border bg-neutral-badgeSoft text-neutral-textMedium hover:shadow-sm dark:bg-dark-copper dark:text-text-light dark:border-dark-5",
+          "border-neutral-border bg-neutral-badgeSoft text-neutral-textMedium hover:shadow-sm",
         terracotta:
-          "border-neutral-border bg-neutral-accentWarm text-neutral-cream hover:shadow-sm dark:bg-dark-terracotta dark:text-text-light dark:border-dark-5",
+          "border-neutral-border bg-neutral-accentWarm text-neutral-cream hover:shadow-sm",
       },
     },
     defaultVariants: {

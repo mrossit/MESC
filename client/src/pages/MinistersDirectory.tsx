@@ -206,7 +206,7 @@ export default function MinistersDirectory() {
         title="Diretório de Ministros"
         subtitle="Conheça os membros do ministério e seus contatos"
       >
-        <Card className="border-2 border-neutral-border dark:border-dark-4">
+        <Card className="border-2 border-neutral-border">
           <CardContent className="py-12 text-center">
             <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Erro ao carregar ministros</p>
@@ -338,7 +338,7 @@ export default function MinistersDirectory() {
 
         {/* Lista de Ministros */}
         {filteredMinisters.length === 0 ? (
-          <Card className="border-2 border-neutral-border dark:border-dark-4">
+          <Card className="border-2 border-neutral-border">
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">Nenhum ministro encontrado</p>

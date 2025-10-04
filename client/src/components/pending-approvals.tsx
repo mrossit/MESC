@@ -55,7 +55,7 @@ export function PendingApprovals() {
 
   if (isLoading) {
     return (
-      <Card className="  border border-neutral-border/30 dark:border-border">
+      <Card className="  border border-neutral-border/30">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground">
             Aprovações Pendentes
@@ -83,7 +83,7 @@ export function PendingApprovals() {
   }
 
   return (
-    <Card className="  border border-neutral-border/30 dark:border-border">
+    <Card className="  border border-neutral-border/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">
@@ -91,7 +91,7 @@ export function PendingApprovals() {
           </CardTitle>
           {pendingUsers.length > 0 && (
             <Badge 
-              className="bg-neutral-accentWarm/20 text-foreground dark:bg-amber-900/20 dark:text-amber-200"
+              className="bg-neutral-accentWarm/20 text-foreground"
               data-testid="badge-pending-count"
             >
               {pendingUsers.length} novos
@@ -118,7 +118,7 @@ export function PendingApprovals() {
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="bg-neutral-accentWarm/20 dark:bg-dark-5 text-neutral-accentWarm dark:text-text-light">
+                      <AvatarFallback className="bg-neutral-accentWarm/20 text-neutral-accentWarm">
                         <User className="h-5 w-5" />
                       </AvatarFallback>
                     </Avatar>

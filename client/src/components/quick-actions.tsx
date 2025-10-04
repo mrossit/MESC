@@ -8,30 +8,30 @@ export function QuickActions() {
       title: "Nova Escala",
       description: "Criar escala mensal",
       icon: Plus,
-      iconBg: "bg-red-100 dark:bg-red-900/20",
-      iconColor: "text-red-600 dark:text-red-400",
+      iconBg: "bg-red-100",
+      iconColor: "text-red-600",
       onClick: () => console.log("Nova escala"),
     },
     {
       title: "Enviar Questionário",
       description: "Disponibilidade mensal",
       icon: Send,
-      iconBg: "bg-amber-100 dark:bg-amber-900/20",
-      iconColor: "text-amber-600 dark:text-amber-500",
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-600",
       onClick: () => console.log("Enviar questionário"),
     },
     {
       title: "Exportar Relatório",
       description: "Excel/PDF",
       icon: Download,
-      iconBg: "bg-blue-100 dark:bg-blue-900/20",
-      iconColor: "text-blue-500 dark:text-blue-400",
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-500",
       onClick: () => console.log("Exportar relatório"),
     },
   ];
 
   return (
-    <Card className="  border border-neutral-border/30 dark:border-border">
+    <Card className="  border border-neutral-border/30">
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">
           Ações Rápidas
