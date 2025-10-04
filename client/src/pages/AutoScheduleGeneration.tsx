@@ -583,7 +583,7 @@ export default function AutoScheduleGeneration() {
               // Após salvar, atualizar apenas a escala específica editada
               if (generatedData && editingSchedule) {
                 try {
-                  const response = await apiRequest('GET', `/api/schedules/${editingSchedule.date}/${editingSchedule.time}`);
+                  const response = await apiRequest('GET', `/api/schedules/by-datetime/${editingSchedule.date}/${editingSchedule.time}`);
                   const updatedSchedule = await response.json();
                   
                   // Atualizar os dados exibidos com a escala editada

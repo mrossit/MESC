@@ -629,9 +629,9 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
 
 /**
  * Buscar ministros escalados para uma data/hora específica
- * GET /api/schedules/:date/:time
+ * GET /api/schedules/by-datetime/:date/:time
  */
-router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/by-datetime/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { date, time } = req.params;
     

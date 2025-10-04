@@ -42,6 +42,7 @@ export const lessonContentTypeEnum = pgEnum('lesson_content_type', ['text', 'vid
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pid: integer("pid").generatedAlwaysAsIdentity({ startWith: 1 }).unique().notNull(),
   email: varchar("email", { length: 255 }).unique().notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),

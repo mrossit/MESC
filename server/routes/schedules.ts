@@ -48,8 +48,8 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
       .where(
         and(
           eq(schedules.ministerId, userId),
-          gte(schedules.date, firstDayStr),
-          lte(schedules.date, lastDayStr),
+          sql`${schedules.date} >= ${firstDayStr}::date`,
+          sql`${schedules.date} <= ${lastDayStr}::date`,
           eq(schedules.status, "scheduled")
         )
       )
@@ -80,9 +80,11 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
     console.log(JSON.stringify({ assignments: formattedAssignments }, null, 2));
 
     res.json({ assignments: formattedAssignments });
-  } catch (error) {
-    console.error("[API /minister/current-month] Erro:", error);
-    res.status(500).json({ message: "Erro ao buscar escalas do mês" });
+  } catch (error: any) {
+    console.error("[API /minister/current-month] Erro completo:", error);
+    console.error("[API /minister/current-month] Stack:", error?.stack);
+    console.error("[API /minister/current-month] Message:", error?.message);
+    res.status(500).json({ message: "Erro ao buscar escalas do mês", error: error?.message });
   }
 });
 
