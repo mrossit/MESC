@@ -163,7 +163,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={credentials.email}
                 onChange={(e) => handleInputChange("email", e.target.value.toLowerCase().trim())}
-                className="bg-background border-border focus:border-primary focus:ring-primary transition-all duration-200"
+                className="bg-white text-black border-border focus:border-primary focus:ring-primary transition-all duration-200"
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -184,7 +184,7 @@ export default function Login() {
                   placeholder="Sua senha"
                   value={credentials.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
+                  className="bg-white text-black border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
                   required
                   data-testid="input-password"
                 />

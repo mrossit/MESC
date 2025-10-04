@@ -21,6 +21,7 @@ import ChangePasswordRequired from "@/pages/change-password-required";
 import Ministers from "@/pages/Ministers";
 import MinistersDirectory from "@/pages/MinistersDirectory";
 import Schedules from "@/pages/Schedules";
+import ScheduleDay from "@/pages/ScheduleDay";
 import ScheduleEditor from "@/pages/ScheduleEditor";
 import QuestionnaireUnified from "@/pages/QuestionnaireUnified";
 import QuestionnaireResponses from "@/pages/QuestionnaireResponses";
@@ -66,7 +67,13 @@ function Router() {
           <AutoScheduleGeneration />
         </AuthGuard>
       </Route>
-      
+
+      <Route path="/schedules/day/:date">
+        <AuthGuard>
+          <ScheduleDay />
+        </AuthGuard>
+      </Route>
+
       <Route path="/schedules/:action?">
         <AuthGuard>
           <Schedules />

@@ -454,9 +454,61 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Garantir background sólido em todos os modais */
+  /* ============================================
+     FORÇAR BACKGROUND SÓLIDO EM TODOS OS MODAIS
+     ============================================ */
+
+  /* Remover blur e forçar opacidade 100% */
   [role="dialog"],
-  [role="alertdialog"] {
+  [role="alertdialog"],
+  [data-radix-dialog-content],
+  [data-radix-alert-dialog-content],
+  [data-radix-popper-content-wrapper],
+  [data-radix-select-content],
+  [data-radix-dropdown-menu-content] {
+    background: rgb(var(--background)) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Overlay sem transparência excessiva */
+  [data-radix-dialog-overlay],
+  [data-radix-alert-dialog-overlay] {
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Background sólido em popover, select, dropdown */
+  [data-radix-select-viewport],
+  [data-radix-dropdown-menu-viewport],
+  [data-radix-popover-content] {
+    background: rgb(var(--popover)) !important;
+  }
+
+  /* Cards e botões dentro de dialogs - SEM ANIMAÇÕES */
+  [role="dialog"] [class*="space-y"],
+  [role="dialog"] div[class*="py-"],
+  [role="dialog"] button[class*="border"] {
+    background-color: rgb(var(--card)) !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Exceção para botões com cores específicas */
+  [role="dialog"] button[class*="bg-red"] {
+    background-color: rgb(254 226 226) !important;
+  }
+
+  [role="dialog"] button[class*="bg-green"],
+  [role="dialog"] button[class*="bg-blue"],
+  [role="dialog"] button[class*="bg-amber"],
+  [role="dialog"] [class*="bg-gradient"] {
+    background: inherit !important;
+  }
+
+  /* Sheet e outros componentes overlay */
+  [data-radix-sheet-content] {
     background: rgb(var(--background)) !important;
   }
 }
@@ -785,47 +837,86 @@ input[type="date"]::-webkit-date-and-time-value {
   --avatar-size: 48px;
 }
 
-.header-ultimas-conexoes {
+.header-ultimas-conexoes-wrapper {
   position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: #000000;
+  height: 120px;
+  z-index: 1300;
+  padding: 16px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.header-ultimas-conexoes {
   display: flex;
   gap: 12px;
   align-items: center;
-  z-index: 1300;
-  background: transparent;
-  padding: 0;
+  justify-content: center;
 }
 
 .uc-item-circular {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   cursor: pointer;
   transition: transform 0.2s ease;
 }
 
 .uc-item-circular:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
-.uc-avatar-wrapper {
-  width: var(--avatar-size);
-  height: var(--avatar-size);
+.uc-ring {
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
-  padding: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  background: linear-gradient(45deg, #FFDC80 0%, #FF7A5A 35%, #C838D8 70%, #4C9CF9 100%);
+  padding: 2px;
 }
 
-.uc-avatar-wrapper.online {
-  border: 3px solid var(--status-online);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2), 0 4px 12px rgba(34, 197, 94, 0.3);
+.uc-avatar-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
 
-.uc-avatar-wrapper.offline {
-  border: 3px solid var(--status-offline);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2), 0 4px 12px rgba(239, 68, 68, 0.3);
+.uc-avatar-wrapper.online::after,
+.uc-avatar-wrapper.offline::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  border: 2px solid #FFFFFF;
+}
+
+.uc-avatar-wrapper.online::after {
+  background: #4CAF50;
+}
+
+.uc-avatar-wrapper.offline::after {
+  background: #FFB300;
 }
 
 .uc-avatar-img {
@@ -842,35 +933,97 @@ input[type="date"]::-webkit-date-and-time-value {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-green-gradient-start), var(--color-green-gradient-end));
+  background: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 36px;
+}
+
+.uc-whatsapp-link {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  background: #25D366;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.uc-whatsapp-link:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 8px rgba(37, 211, 102, 0.4);
+}
+
+.uc-whatsapp-icon {
   color: white;
-  font-weight: 700;
-  font-size: 20px;
+  width: 12px;
+  height: 12px;
 }
 
 /* Responsividade */
 @media (max-width: 768px) {
-  :root {
-    --avatar-size: 40px;
+  .header-ultimas-conexoes-wrapper {
+    height: 100px;
+    padding: 12px 8px;
   }
 
-  .header-ultimas-conexoes {
-    top: 12px;
-    gap: 8px;
+  .uc-item-circular {
+    width: 80px;
+    height: 80px;
+  }
+
+  .uc-ring {
+    width: 80px;
+    height: 80px;
+  }
+
+  .uc-avatar-wrapper {
+    width: 68px;
+    height: 68px;
   }
 
   .uc-avatar-placeholder {
-    font-size: 16px;
+    font-size: 28px;
+  }
+
+  .uc-avatar-wrapper.online::after,
+  .uc-avatar-wrapper.offline::after {
+    width: 12px;
+    height: 12px;
+    right: 6px;
+    bottom: 6px;
   }
 }
 
 @media (max-width: 480px) {
-  :root {
-    --avatar-size: 36px;
+  .header-ultimas-conexoes-wrapper {
+    height: 90px;
+    padding: 10px 6px;
   }
 
-  .header-ultimas-conexoes {
-    top: 10px;
-    gap: 6px;
+  .uc-item-circular {
+    width: 72px;
+    height: 72px;
+  }
+
+  .uc-ring {
+    width: 72px;
+    height: 72px;
+  }
+
+  .uc-avatar-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+
+  .uc-avatar-placeholder {
+    font-size: 24px;
   }
 }
