@@ -184,8 +184,12 @@ export default function Login() {
                   type={showPassword ? "text" : "password"}
                   placeholder="Sua senha"
                   value={credentials.password}
-                  onChange={(e) => handleInputChange("password", e.target.value)}
+                  onChange={(e) => handleInputChange("password", e.target.value.trim())}
                   className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
+                  autoComplete="current-password"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                   required
                   data-testid="input-password"
                 />
