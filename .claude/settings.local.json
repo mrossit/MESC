@@ -82,7 +82,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/test-current-month-api.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/setup-versiculos.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/debug-home-api.ts)",
-      "Bash(NODE_ENV=production psql $DATABASE_URL -c \"\\d users\")"
+      "Bash(NODE_ENV=production psql $DATABASE_URL -c \"\\d users\")",
+      "Bash(env)"
     ],
     "deny": [],
     "ask": []
