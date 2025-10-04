@@ -23,7 +23,7 @@ export default function QRCodeShare() {
           width: 400,
           margin: 2,
           color: {
-            '#000000',
+            dark: '#000000',
             light: '#FFFFFF'
           }
         });
