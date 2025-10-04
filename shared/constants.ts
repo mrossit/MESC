@@ -13,21 +13,13 @@ export const LITURGICAL_POSITIONS: Record<number, string> = {
   11: "Purificar/Expor 3",
   12: "Purificar/Expor 4",
   13: "Mezanino 1",
-  14: "Mezanino 2",
-  15: "Mezanino 3",
-  16: "Corredor Ambão",
-  17: "Corredor Capela",
-  18: "Corredor Cadeiras",
-  19: "Nave central Pe Pio",
-  20: "Nave central lado músicos 1",
-  21: "Nave central lado músicos 2",
-  22: "Nave central Ambão",
-  23: "Nave central Capela",
-  24: "Átrio Externo 1",
-  25: "Átrio Externo 2",
-  26: "Átrio Externo 3",
-  27: "Átrio Externo 4",
-  28: "Átrio Externo 5"
+  14: "####",
+  15: "####",
+  16: "####",
+  17: "####",
+  18: "####",
+  19: "####",
+  20: "####"
 };
 
 // Mass times by day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
