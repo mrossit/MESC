@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { ReactNode } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 import { FloatingNotificationBell } from "@/components/floating-notification-bell";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
 
@@ -17,11 +16,11 @@ interface LayoutProps {
 export function Layout({ children, title, subtitle }: LayoutProps) {
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-background dark:bg-dark-8">
+      <div className="flex h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset>
           {/* Header */}
-          <header className="sticky top-0 border-b border-border bg-background dark:bg-dark-7 dark:border-dark-4">
+          <header className="sticky top-0 border-b border-border bg-background">
             <div className="flex h-14 items-center gap-4 px-4 sm:h-16 sm:px-6">
               <SidebarTrigger className="-ml-1" />
               
@@ -51,15 +50,12 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
 
                 {/* Notifications */}
                 <NotificationBell compact className="h-9 w-9" />
-
-                {/* Dark Mode Toggle */}
-                <ThemeToggle />
               </div>
             </div>
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background dark:bg-dark-8">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background">
             {children}
           </main>
         </SidebarInset>
