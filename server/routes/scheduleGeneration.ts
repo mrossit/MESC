@@ -12,6 +12,88 @@ import { format } from 'date-fns';
 
 const router = Router();
 
+// Get current month schedules for a minister
+router.get("/minister/current-month", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    console.log('🔄 [API /minister/current-month] Requisição recebida');
+    console.log('🔄 [API /minister/current-month] User:', req.user);
+
+    const userId = req.user?.id;
+    if (!userId) {
+      console.log('❌ [API /minister/current-month] Usuário não autenticado');
+      return res.status(401).json({ message: "Não autenticado" });
+    }
+
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const firstDayStr = firstDay.toISOString().split('T')[0];
+    const lastDayStr = lastDay.toISOString().split('T')[0];
+
+    console.log(`🔍 [API /minister/current-month] Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
+
+    // Buscar PID do usuário
+    const [userData] = await db
+      .select({ pid: users.pid, name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!userData) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    console.log(`👤 [API /minister/current-month] Usuário ${userData.name} - PID: ${userData.pid}`);
+
+    // Buscar TODAS as escalas do usuário no mês atual
+    const monthSchedules = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        type: schedules.type,
+        location: schedules.location,
+        position: schedules.position,
+        status: schedules.status
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.ministerId, userId),
+          sql`${schedules.date} >= ${firstDayStr}::date`,
+          sql`${schedules.date} <= ${lastDayStr}::date`,
+          eq(schedules.status, "scheduled")
+        )
+      )
+      .orderBy(schedules.date, schedules.time);
+
+    console.log(`✅ [API /minister/current-month] Encontradas ${monthSchedules.length} escalas no mês atual`);
+
+    const formattedAssignments = monthSchedules.map(s => ({
+      id: s.id,
+      date: s.date,
+      massTime: s.time,
+      position: s.position || 0,
+      confirmed: true,
+      scheduleId: s.id,
+      scheduleTitle: s.type,
+      scheduleStatus: s.status,
+      location: s.location
+    }));
+
+    res.json({ 
+      pid: userData.pid,
+      name: userData.name,
+      assignments: formattedAssignments 
+    });
+  } catch (error: any) {
+    console.error("[API /minister/current-month] Erro completo:", error);
+    console.error("[API /minister/current-month] Stack:", error?.stack);
+    res.status(500).json({ message: "Erro ao buscar escalas do mês", error: error?.message });
+  }
+});
+
 // Schema para validação de entrada
 const generateScheduleSchema = z.object({
   year: z.number().min(2024).max(2030),
