@@ -537,9 +537,9 @@ input[type="date"]::-webkit-date-and-time-value {
 
 :root {
   --footer-height: 64px;
-  --footer-bg: var(--color-beige-light);
-  --footer-border-top: rgba(0, 0, 0, 0.06);
-  --footer-item-color: var(--color-text-primary);
+  --footer-bg: #000000;
+  --footer-border-top: rgba(255, 255, 255, 0.1);
+  --footer-item-color: #ffffff;
   --footer-item-active: linear-gradient(90deg, var(--color-green-gradient-start), var(--color-green-gradient-end));
   --footer-icon-size: 22px;
   --footer-safe-area: env(safe-area-inset-bottom, 8px);
@@ -594,12 +594,12 @@ input[type="date"]::-webkit-date-and-time-value {
 }
 
 .nav-item:hover {
-  background: rgba(var(--neutral), 0.08);
+  background: rgba(255, 255, 255, 0.15);
   transform: translateY(-2px);
 }
 
 .nav-item:focus {
-  outline: 2px solid rgba(0, 0, 0, 0.08);
+  outline: 2px solid rgba(255, 255, 255, 0.3);
   outline-offset: 3px;
 }
 
