@@ -1,5 +1,5 @@
-const VERSION = '5.3.0';
-const BUILD_TIMESTAMP = '__BUILD_TIMESTAMP__'; // Será substituído durante o build
+const VERSION = '5.4.0';
+const BUILD_TIMESTAMP = Date.now(); // Usar timestamp atual para forçar atualização
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 const urlsToCache = [
   '/',
