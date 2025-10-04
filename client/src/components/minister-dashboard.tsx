@@ -37,9 +37,9 @@ export function MinisterDashboard() {
 
   const fetchScheduledMasses = async () => {
     try {
-      console.log('🔄 Chamando API /api/schedules/minister/upcoming...');
+      console.log('🔄 Buscando missas do mês atual via /api/schedules/minister/current-month...');
 
-      const response = await fetch("/api/schedules/minister/upcoming", {
+      const response = await fetch("/api/schedules/minister/current-month", {
         credentials: 'include'
       });
 
@@ -48,53 +48,25 @@ export function MinisterDashboard() {
       if (response.ok) {
         const data = await response.json();
 
-        console.log('📅 Dados recebidos da API:', data);
-        console.log('📊 Total de assignments:', data.assignments?.length || 0);
+        console.log('✅ Dados recebidos:', data);
+        console.log(`📊 Total de missas no mês: ${data.assignments?.length || 0}`);
 
-        // Filtrar apenas missas do MÊS ATUAL
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
+        const masses = data.assignments?.map((a: any) => ({
+          id: a.id,
+          date: a.date,
+          time: a.massTime,
+          location: a.location || "Santuário São Judas Tadeu",
+          position: a.position,
+          type: a.scheduleTitle || "Missa"
+        })) || [];
 
-        console.log(`🔍 Mês atual: ${currentMonth} (${currentMonth + 1}), Ano: ${currentYear}`);
-
-        const masses = data.assignments
-          ?.filter((a: any) => {
-            // Criar data corretamente sem problema de timezone
-            const dateParts = a.date.split('-');
-            const year = parseInt(dateParts[0]);
-            const month = parseInt(dateParts[1]);
-            const day = parseInt(dateParts[2]);
-            const massDate = new Date(year, month - 1, day); // month - 1 porque JS começa em 0
-
-            const isMatch = massDate.getMonth() === currentMonth && massDate.getFullYear() === currentYear;
-
-            console.log(`   📅 Missa: ${a.date}`);
-            console.log(`      → Parseado: ano=${year}, mês=${month}, dia=${day}`);
-            console.log(`      → Data criada: ${massDate.toISOString()}`);
-            console.log(`      → Mês da missa: ${massDate.getMonth()} (esperado: ${currentMonth})`);
-            console.log(`      → Ano da missa: ${massDate.getFullYear()} (esperado: ${currentYear})`);
-            console.log(`      → MATCH: ${isMatch ? '✅ SIM' : '❌ NÃO'}\n`);
-
-            return isMatch;
-          })
-          .map((a: any) => ({
-            id: a.id,
-            date: a.date,
-            time: a.massTime,
-            location: a.location || "Santuário São Judas Tadeu",
-            position: a.position,
-            type: a.scheduleTitle || "Missa"
-          })) || [];
-
-        console.log(`✅ Missas filtradas para o mês atual: ${masses.length}`);
         console.log('📋 Missas finais:', masses);
         setScheduledMasses(masses);
       } else {
         console.error('❌ Erro na API:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error("❌ Error fetching scheduled masses:", error);
+      console.error("❌ Erro ao buscar missas:", error);
     } finally {
       setLoadingMasses(false);
     }
