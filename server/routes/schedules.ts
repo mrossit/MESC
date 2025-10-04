@@ -34,6 +34,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
     const ministerId = minister[0].id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
     
     // Note: scheduleAssignments table doesn't exist in schema - using schedules table instead
     const upcomingAssignments = await db
@@ -50,7 +51,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .where(
         and(
           eq(schedules.ministerId, ministerId),
-          gte(schedules.date, today.toISOString().split('T')[0]),
+          sql`${schedules.date} >= ${todayStr}::date`,
           eq(schedules.status, "scheduled")
         )
       )
