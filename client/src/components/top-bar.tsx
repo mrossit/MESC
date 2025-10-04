@@ -49,7 +49,7 @@ export function TopBar() {
               <div className="flex gap-4">
                 {recentUsers.map((user, index) => {
                   const whatsappLink = user.phone 
-                    ? `https://api.whatsapp.com/send/?phone=5515${user.phone.replace(/\D/g, '')}`
+                    ? `https://api.whatsapp.com/send/?phone=55${user.phone.replace(/\D/g, '')}`
                     : '#';
                   
                   return (
