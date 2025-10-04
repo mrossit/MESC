@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout } from '../components/layout';
+import { LayoutClean } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -410,16 +410,16 @@ export default function Profile() {
   
   if (userLoading || familyLoading) {
     return (
-      <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
+      <LayoutClean title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
         <div className="flex items-center justify-center h-96">
           <div className="text-center">Carregando perfil...</div>
         </div>
-      </Layout>
+      </LayoutClean>
     );
   }
   
   return (
-    <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
+    <LayoutClean title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
       <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6 overflow-x-hidden pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
         <Card className="border-opacity-30">
           <CardHeader>
@@ -899,6 +899,6 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </LayoutClean>
   );
 }
