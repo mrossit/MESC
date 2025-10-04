@@ -175,5 +175,24 @@
   - Removido TODOS blur e transparências com !important
   - Importado no main.tsx
 
+### CORREÇÃO DEFINITIVA:
+- vangrey: APP AINDA PRETO - Problema com temas claro/escuro
+- vangrey: Pediu para REMOVER temas e OCULTAR opções
+- Assistente: Implementado:
+  1. **REMOVIDO tema dark do index.css** - deletado TODA a seção .dark
+  2. **Aplicado paleta única**:
+     - Background: #F6EFE3 (bege alternativo)
+     - Cards: #FFFFFF (branco)
+     - Primary: #2E7D32 (verde)
+     - Secondary: #FACC15 (amarelo)
+     - Accent: #7A1C1C (vermelho escuro)
+     - Borders: #F5E6CC (bege claro)
+  3. **OCULTADO do minister-dashboard.tsx**:
+     - Minha Disponibilidade
+     - Minha Formação
+     - Família MESC
+     - Minhas Estatísticas
+  4. SEM dark mode, SEM temas, CORES FIXAS!
+
 ---
 
