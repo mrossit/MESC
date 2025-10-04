@@ -35,6 +35,7 @@ import UserManagement from "@/pages/UserManagement";
 import QRCodeShare from "@/pages/QRCodeShare";
 import NotFound from "@/pages/not-found";
 import Reports from "@/pages/Reports";
+import Menu from "@/pages/Menu";
 
 function Router() {
   return (
@@ -154,6 +155,12 @@ function Router() {
       <Route path="/qrcode">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <QRCodeShare />
+        </AuthGuard>
+      </Route>
+
+      <Route path="/menu">
+        <AuthGuard>
+          <Menu />
         </AuthGuard>
       </Route>
 

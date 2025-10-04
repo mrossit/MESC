@@ -128,6 +128,26 @@ export const families = pgTable('families', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// User Sessions table - Para rastreamento de "Últimas Conexões"
+export const onlineStatusEnum = pgEnum('online_status', ['online', 'away', 'offline']);
+
+export const userSessions = pgTable('user_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  sessionId: varchar('session_id', { length: 255 }),
+  ipAddress: varchar('ip_address', { length: 50 }),
+  userAgent: text('user_agent'),
+  status: onlineStatusEnum('status').notNull().default('online'),
+  startedAt: timestamp('started_at').defaultNow(),
+  lastActivityAt: timestamp('last_activity_at').defaultNow(),
+  endedAt: timestamp('ended_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_user_sessions_user_id').on(table.userId),
+  index('idx_user_sessions_last_activity').on(table.lastActivityAt),
+]);
+
 // Family relationships table
 export const familyRelationships = pgTable('family_relationships', {
   id: uuid('id').primaryKey().defaultRandom(),
