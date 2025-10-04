@@ -18,10 +18,17 @@ interface ScheduleAssignment {
   scheduleTitle: string;
 }
 
+interface Versiculo {
+  id: number;
+  frase: string;
+  referencia: string;
+}
+
 export function MinisterDashboard() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
+  const [versiculo, setVersiculo] = useState<Versiculo | null>(null);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
 
@@ -33,6 +40,7 @@ export function MinisterDashboard() {
 
   useEffect(() => {
     fetchUpcomingSchedules();
+    fetchVersiculo();
   }, []);
 
   const fetchUpcomingSchedules = async () => {
@@ -46,6 +54,18 @@ export function MinisterDashboard() {
       console.error("Error fetching upcoming schedules:", error);
     } finally {
       setLoadingSchedules(false);
+    }
+  };
+
+  const fetchVersiculo = async () => {
+    try {
+      const response = await fetch("/api/versiculos/random");
+      if (response.ok) {
+        const data = await response.json();
+        setVersiculo(data);
+      }
+    } catch (error) {
+      console.error("Error fetching versiculo:", error);
     }
   };
 
@@ -77,106 +97,45 @@ export function MinisterDashboard() {
       />
 
       <div className="space-y-4">
-        {/* Cartão de Boas-vindas */}
-        <Card className="bg-gradient-to-r from-mesc-gold/10 to-mesc-beige/20 dark:from-gray-800 dark:to-gray-900 border-neutral-accentWarm/30 dark:border-gray-700">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-foreground">Bem-vindo ao MESC</h2>
-                <p className="text-muted-foreground mt-1">
-                  Sistema de Gestão do Ministério Extraordinário da Sagrada Comunhão
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenTutorial}
-                  className="hidden md:flex items-center gap-2"
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  Tutorial
-                </Button>
-                <div className="hidden md:block">
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Versão Beta
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            {/* Botão do Tutorial para Mobile */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenTutorial}
-              className="md:hidden mt-4 w-full flex items-center justify-center gap-2"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Iniciar Tutorial
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Versículo Bíblico */}
+        {versiculo && (
+          <Card style={{ backgroundColor: 'var(--color-beige-light)' }} className="border border-neutral-border/30">
+            <CardContent className="p-6">
+              <p className="text-base italic mb-2" style={{ color: 'var(--color-text-primary)' }}>
+                "{versiculo.frase}"
+              </p>
+              <p className="text-sm font-semibold text-right" style={{ color: 'var(--color-text-primary)' }}>
+                — {versiculo.referencia}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Próximas Escalas */}
-      <Card className="  border border-neutral-border/30 dark:border-border">
+      {/* Minhas Escalas */}
+      <Card style={{ backgroundColor: 'var(--color-beige-light)' }} className="border border-neutral-border/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Calendar className="h-5 w-5 text-neutral-accentWarm dark:text-amber-600" />
-            Minhas Próximas Escalas
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <Calendar className="h-5 w-5" />
+            Minhas Escalas
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loadingSchedules ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
-              </div>
-              <p className="text-muted-foreground">Carregando escalas...</p>
-            </div>
+            <p style={{ color: 'var(--color-text-primary)' }}>Carregando...</p>
           ) : upcomingSchedules.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4">
-                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
-              </div>
-              <p className="text-muted-foreground font-medium mb-2">Nenhuma escala próxima</p>
-              <p className="text-sm text-muted-foreground/70 max-w-sm">
-                Você não possui escalas programadas para os próximos dias
-              </p>
-            </div>
+            <p style={{ color: 'var(--color-text-primary)' }}>Você ainda não possui escalas cadastradas.</p>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              <p style={{ color: 'var(--color-text-primary)' }} className="font-semibold mb-2">
+                Você está escalado(a) para:
+              </p>
               {upcomingSchedules.slice(0, 5).map((schedule) => (
-                <div 
-                  key={schedule.id} 
-                  className="flex items-center justify-between p-3 bg-neutral-peachCream/10 dark:bg-gray-800 rounded-lg border border-neutral-border/20 dark:border-gray-700 hover:bg-neutral-peachCream/20 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-foreground">
-                        {format(new Date(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
-                      </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {getPositionLabel(schedule.position)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>{getMassTimeLabel(schedule.massTime)}</span>
-                    </div>
-                  </div>
+                <div key={schedule.id} className="flex items-center gap-2">
+                  <p style={{ color: 'var(--color-text-primary)' }}>
+                    {getPositionLabel(schedule.position)} ({getMassTimeLabel(schedule.massTime)} - {format(new Date(schedule.date), "dd/MM", { locale: ptBR })})
+                  </p>
                 </div>
               ))}
-              {upcomingSchedules.length > 5 && (
-                <div className="text-center pt-2">
-                  <Button 
-                    variant="link" 
-                    className="text-primary hover:text-primary/80"
-                    onClick={() => setLocation('/schedules')}
-                  >
-                    Ver todas ({upcomingSchedules.length} escalas)
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </CardContent>

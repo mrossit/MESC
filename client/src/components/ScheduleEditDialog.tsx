@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-react';
+import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { getMassTimesForDate } from '@shared/constants';
 
 interface Minister {
   id: string | null; // null = VACANTE
@@ -17,25 +18,31 @@ interface ScheduleEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   date: string;
-  time: string;
+  time?: string; // Tornado opcional - pode ser selecionado no diálogo
   initialMinisters: Minister[];
   onSave: () => void;
 }
 
-export function ScheduleEditDialog({ 
-  open, 
-  onOpenChange, 
-  date, 
-  time, 
+export function ScheduleEditDialog({
+  open,
+  onOpenChange,
+  date,
+  time: initialTime,
   initialMinisters,
-  onSave 
+  onSave
 }: ScheduleEditDialogProps) {
   const [ministers, setMinisters] = useState<Minister[]>(initialMinisters);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [selectedMinisterId, setSelectedMinisterId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  const [selectedTime, setSelectedTime] = useState<string | null>(initialTime || null);
+  const [showTimeSelection, setShowTimeSelection] = useState(false);
   const { toast } = useToast();
+
+  // Obter horários disponíveis para a data selecionada
+  const availableTimes = date ? getMassTimesForDate(new Date(date)) : [];
+  const hasMultipleTimes = availableTimes.length > 1;
 
   // Buscar lista de todos os ministros disponíveis
   const { data: allMinisters, isLoading: loadingMinisters, error: ministersError } = useQuery({
@@ -62,6 +69,20 @@ export function ScheduleEditDialog({
   useEffect(() => {
     setMinisters(initialMinisters);
   }, [initialMinisters, open]);
+
+  // Controlar exibição da seleção de horário
+  useEffect(() => {
+    if (open) {
+      // Se não tem horário definido e há múltiplos horários, mostrar seleção
+      if (!initialTime && hasMultipleTimes) {
+        setShowTimeSelection(true);
+        setSelectedTime(null);
+      } else {
+        setShowTimeSelection(false);
+        setSelectedTime(initialTime || availableTimes[0] || null);
+      }
+    }
+  }, [open, initialTime, hasMultipleTimes, availableTimes]);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -131,16 +152,25 @@ export function ScheduleEditDialog({
     : [];
 
   const handleSave = async () => {
+    if (!selectedTime) {
+      toast({
+        title: "Selecione o horário",
+        description: "Por favor, selecione o horário da missa antes de salvar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setSaving(true);
 
       const ministerIds = ministers.map(m => m.id);
-      console.log('[ScheduleEditDialog] Salvando escala:', { date, time, ministerIds, ministers });
+      console.log('[ScheduleEditDialog] Salvando escala:', { date, time: selectedTime, ministerIds, ministers });
 
       // Atualizar escala usando o endpoint batch-update
       await apiRequest('PATCH', '/api/schedules/batch-update', {
         date,
-        time,
+        time: selectedTime,
         ministers: ministerIds
       });
 
@@ -167,12 +197,70 @@ export function ScheduleEditDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Editar Escala</DialogTitle>
-          <DialogDescription>
-            {date} às {time} - Use os botões ↑↓ para reordenar os ministros
-          </DialogDescription>
-        </DialogHeader>
+        {showTimeSelection ? (
+          // Tela de seleção de horário (quando há múltiplas missas no dia)
+          <>
+            <DialogHeader>
+              <DialogTitle>Selecione o Horário da Missa</DialogTitle>
+              <DialogDescription>
+                {date} - Este dia possui {availableTimes.length} missas. Selecione qual você deseja editar.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Escolha o horário da missa que deseja ajustar a escala:
+              </p>
+              <div className="grid gap-3">
+                {availableTimes.map((time) => (
+                  <Button
+                    key={time}
+                    variant={selectedTime === time ? "default" : "outline"}
+                    className="h-16 justify-start text-left"
+                    onClick={() => {
+                      setSelectedTime(time);
+                      setShowTimeSelection(false);
+                    }}
+                  >
+                    <Clock className="h-5 w-5 mr-3" />
+                    <div>
+                      <div className="font-semibold text-lg">
+                        Missa das {time.substring(0, 5)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Clique para editar esta escala
+                      </div>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          // Tela de edição de ministros (após selecionar o horário)
+          <>
+            <DialogHeader>
+              <DialogTitle>Editar Escala</DialogTitle>
+              <DialogDescription>
+                {date} às {selectedTime?.substring(0, 5)} - Use os botões ↑↓ para reordenar os ministros
+                {hasMultipleTimes && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2 h-6 text-xs"
+                    onClick={() => setShowTimeSelection(true)}
+                  >
+                    Trocar horário
+                  </Button>
+                )}
+              </DialogDescription>
+            </DialogHeader>
 
         <div className="space-y-4">
           {/* Lista de ministros com drag and drop */}
@@ -348,6 +436,8 @@ export function ScheduleEditDialog({
             )}
           </Button>
         </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
