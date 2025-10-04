@@ -5,26 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes" />
     <title>MESC - Sistema de Gestão de Ministros da Sagrada Comunhão</title>
     
-    <!-- Theme detection and initialization -->
-    <script>
-      // Detect and apply theme before React loads to prevent flash
-      (function() {
-        const theme = localStorage.getItem('mesc-ui-theme') || 'system';
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const shouldUseDark = theme === 'dark' || (theme === 'system' && prefersDark);
-        
-        if (shouldUseDark) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
-    
     <!-- Cache bust: v2025-08-31-01:38 -->
     <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#5C4033">
-    <meta name="color-scheme" content="light dark">
     <link rel="manifest" href="/manifest.json">
     
     <!-- iOS PWA Meta Tags -->
