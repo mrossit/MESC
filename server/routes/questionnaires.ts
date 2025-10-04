@@ -1397,4 +1397,24 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
   }
 });
 
+// Endpoint para verificar meses com questionários preenchidos
+router.get('/user-filled-months', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id!;
+
+    const filledMonths = await db.select({
+      month: questionnaires.month,
+      year: questionnaires.year
+    })
+    .from(questionnaireResponses)
+    .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+    .where(eq(questionnaireResponses.userId, userId));
+
+    res.json(filledMonths);
+  } catch (error: any) {
+    console.error('[GET /user-filled-months] Erro:', error);
+    res.status(500).json({ message: 'Erro ao buscar questionários preenchidos' });
+  }
+});
+
 export default router;

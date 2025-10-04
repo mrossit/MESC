@@ -124,6 +124,8 @@ export default function Schedules() {
   const [isViewScheduleDialogOpen, setIsViewScheduleDialogOpen] = useState(false);
   const [selectedDateAssignments, setSelectedDateAssignments] = useState<ScheduleAssignment[]>([]);
   const [loadingDateAssignments, setLoadingDateAssignments] = useState(false);
+  const [showMassTimeSelection, setShowMassTimeSelection] = useState(true);
+  const [selectedMassTimeView, setSelectedMassTimeView] = useState<string | null>(null);
   const [isSubstitutionDialogOpen, setIsSubstitutionDialogOpen] = useState(false);
   const [selectedAssignmentForSubstitution, setSelectedAssignmentForSubstitution] = useState<ScheduleAssignment | null>(null);
   const [substitutionReason, setSubstitutionReason] = useState("");
@@ -131,6 +133,7 @@ export default function Schedules() {
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [filledQuestionnaires, setFilledQuestionnaires] = useState<{month: number, year: number}[]>([]);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -142,7 +145,22 @@ export default function Schedules() {
   useEffect(() => {
     fetchSchedules();
     fetchMinisters();
+    fetchFilledQuestionnaires();
   }, [currentMonth]);
+
+  const fetchFilledQuestionnaires = async () => {
+    try {
+      const response = await fetch("/api/questionnaires/user-filled-months", {
+        credentials: "include"
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFilledQuestionnaires(data);
+      }
+    } catch (error) {
+      console.error("Error fetching filled questionnaires:", error);
+    }
+  };
 
   const fetchSchedules = async () => {
     try {
@@ -194,6 +212,8 @@ export default function Schedules() {
   const fetchScheduleForDate = async (date: Date) => {
     setLoadingDateAssignments(true);
     setSelectedDateAssignments([]); // Reset assignments before loading
+    setShowMassTimeSelection(true); // Mostrar seleção de horário primeiro
+    setSelectedMassTimeView(null); // Reset horário selecionado
     setIsViewScheduleDialogOpen(true); // Open dialog immediately
 
     try {
@@ -551,36 +571,42 @@ export default function Schedules() {
     return isCurrentlyAssigned || hasSubstitutionRequest;
   };
 
+  const hasFilledQuestionnaireForMonth = (date: Date) => {
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    return filledQuestionnaires.some(q => q.month === month && q.year === year);
+  };
+
   const getUserSubstitutionStatus = (date: Date) => {
     if (!user?.id) return null;
-    
+
     const dayAssignments = getAssignmentsForDate(date);
     const currentMinister = ministers.find(m => m.id === user.id);
     if (!currentMinister) return null;
-    
+
     // Check if user has a substitution request for this date
     // We need to check by requestingMinisterId, not by current assignment
     // because when approved, the assignment is transferred to the substitute
     const dayAssignmentIds = dayAssignments.map(a => a.id);
-    const userSubstitutionRequest = substitutions.find(s => 
-      dayAssignmentIds.includes(s.assignmentId) && 
+    const userSubstitutionRequest = substitutions.find(s =>
+      dayAssignmentIds.includes(s.assignmentId) &&
       s.requestingMinisterId === currentMinister.id
     );
-    
-    
+
+
     if (!userSubstitutionRequest) {
       // Also check if user is currently assigned (no substitution requested)
       const userAssignment = dayAssignments.find(a => a.ministerId === currentMinister.id);
       return userAssignment ? null : null;
     }
-    
+
     // Return status: 'pending' for red, 'approved' or 'auto_approved' for green
     if (userSubstitutionRequest.status === 'pending') {
       return 'pending';
     } else if (userSubstitutionRequest.status === 'approved' || userSubstitutionRequest.status === 'auto_approved') {
       return 'approved';
     }
-    
+
     return null;
   };
 
@@ -819,7 +845,8 @@ export default function Schedules() {
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const substitutionStatus = getUserSubstitutionStatus(day);
                   const availableMassTimes = getMassTimesForDate(day);
-                  
+                  const hasQuestionnaire = hasFilledQuestionnaireForMonth(day);
+
                   return (
                     <div
                       key={index}
@@ -877,6 +904,16 @@ export default function Schedules() {
                                 <Check className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 fill-green-400 animate-pulse relative" />
                               </>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Badge para indicar questionário preenchido */}
+                      {hasQuestionnaire && currentSchedule?.status === "published" && isSameMonth(day, currentMonth) && (
+                        <div className="absolute -top-1 -left-1 sm:-top-2 sm:-left-2 z-10">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-blue-400 rounded-full blur-lg opacity-60 animate-pulse" />
+                            <Star className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 fill-blue-400 animate-pulse relative" />
                           </div>
                         </div>
                       )}
@@ -1289,25 +1326,37 @@ export default function Schedules() {
       </Tabs>
 
       {/* Dialog para visualizar escala publicada */}
-      <Dialog open={isViewScheduleDialogOpen} onOpenChange={setIsViewScheduleDialogOpen}>
+      <Dialog open={isViewScheduleDialogOpen} onOpenChange={(open) => {
+        setIsViewScheduleDialogOpen(open);
+        if (!open) {
+          setShowMassTimeSelection(true);
+          setSelectedMassTimeView(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
           <DialogHeader className="space-y-1 sm:space-y-2">
             <DialogTitle className="text-base sm:text-lg leading-tight">
-              Escala do dia {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              {showMassTimeSelection
+                ? `Horários de Missa - ${selectedDate && format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}`
+                : `Escala do dia ${selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`
+              }
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Confira os ministros escalados para as celebrações deste dia
+              {showMassTimeSelection
+                ? "Selecione o horário da missa para visualizar a escala"
+                : `Confira os ministros escalados para a missa das ${selectedMassTimeView}`
+              }
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
-            <div className="space-y-4 pr-2 sm:pr-4">
+          {showMassTimeSelection ? (
+            <div className="space-y-3">
               {loadingDateAssignments ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando horários...</p>
                 </div>
-              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
+              ) : (
                 <>
                   {Object.entries(
                     selectedDateAssignments.reduce((acc, assignment) => {
@@ -1318,17 +1367,96 @@ export default function Schedules() {
                       acc[massTime].push(assignment);
                       return acc;
                     }, {} as Record<string, ScheduleAssignment[]>)
-                  )
-                    .sort(([a], [b]) => {
-                      // Ordenar por horário correto (converter para minutos)
-                      const timeToMinutes = (time: string) => {
-                        if (time === 'Sem horário') return 9999;
-                        const [hours, minutes] = time.split(':').map(Number);
-                        return hours * 60 + minutes;
-                      };
-                      return timeToMinutes(a) - timeToMinutes(b);
-                    })
-                    .map(([massTime, assignments]) => (
+                  ).map(([time, assignments]) => {
+                    const userAssignment = assignments.find(a => {
+                      const currentMinister = ministers.find(m => m.id === user?.id);
+                      return currentMinister && a.ministerId === currentMinister.id;
+                    });
+
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => {
+                          setSelectedMassTimeView(time);
+                          setShowMassTimeSelection(false);
+                        }}
+                        className={cn(
+                          "w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-lg",
+                          userAssignment
+                            ? "border-red-500 bg-red-50 hover:bg-red-100"
+                            : "border-border bg-card hover:bg-accent"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Clock className="h-5 w-5 text-primary" />
+                            <div>
+                              <p className="font-semibold text-base">Missa das {time}</p>
+                              <p className="text-sm text-muted-foreground">{assignments.length} ministros escalados</p>
+                            </div>
+                          </div>
+                          {userAssignment && (
+                            <div className="flex items-center gap-2">
+                              <Star className="h-5 w-5 text-red-500 fill-red-500" />
+                              <span className="text-sm font-medium text-red-700">Você está escalado</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
+              <div className="space-y-4 pr-2 sm:pr-4">
+                {selectedMassTimeView && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowMassTimeSelection(true)}
+                      className="mb-4"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-2" />
+                      Voltar para horários
+                    </Button>
+                  </>
+                )}
+                {loadingDateAssignments ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
+                </div>
+              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
+                <>
+                  {(() => {
+                    // Filtrar apenas pelo horário selecionado
+                    const filteredAssignments = selectedMassTimeView
+                      ? selectedDateAssignments.filter(a => a.massTime === selectedMassTimeView)
+                      : selectedDateAssignments;
+
+                    const groupedByTime = filteredAssignments.reduce((acc, assignment) => {
+                      const massTime = assignment.massTime || 'Sem horário';
+                      if (!acc[massTime]) {
+                        acc[massTime] = [];
+                      }
+                      acc[massTime].push(assignment);
+                      return acc;
+                    }, {} as Record<string, ScheduleAssignment[]>);
+
+                    return Object.entries(groupedByTime)
+                      .sort(([a], [b]) => {
+                        // Ordenar por horário correto (converter para minutos)
+                        const timeToMinutes = (time: string) => {
+                          if (time === 'Sem horário') return 9999;
+                          const [hours, minutes] = time.split(':').map(Number);
+                          return hours * 60 + minutes;
+                        };
+                        return timeToMinutes(a) - timeToMinutes(b);
+                      })
+                      .map(([massTime, assignments]) => (
                     <div key={massTime} className="space-y-2 sm:space-y-3">
                       <div className="flex items-center justify-between gap-2 pb-2 border-b">
                         <div className="flex items-center gap-2">
@@ -1365,25 +1493,35 @@ export default function Schedules() {
                               <div
                                 key={assignment.id}
                                 className={cn(
-                                  "flex flex-col p-2 sm:p-3 rounded-lg border bg-card",
-                                  isCurrentUser && "bg-amber-50 border-amber-300"
+                                  "flex flex-col p-2 sm:p-3 rounded-lg border bg-card relative",
+                                  isCurrentUser && "bg-red-50 border-red-500 border-2"
                                 )}
                               >
+                                {/* Estrela quando usuário está escalado */}
+                                {isCurrentUser && (
+                                  <div className="absolute -top-2 -right-2 z-10">
+                                    <div className="relative">
+                                      <div className="absolute inset-0 bg-red-400 rounded-full blur-md opacity-60" />
+                                      <Star className="h-6 w-6 text-red-600 fill-red-500 relative" />
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                                   <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                    <Badge variant={isCurrentUser ? "default" : "secondary"} className="flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1">
+                                    <Badge variant={isCurrentUser ? "destructive" : "secondary"} className="flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1">
                                       <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
                                       <span className="sm:hidden">{assignment.position}</span>
                                     </Badge>
                                     <div className="min-w-0 flex-1">
-                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-amber-900")}>
+                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-red-900 font-bold text-base")}>
                                         {assignment.ministerName || "Ministro"}
                                       </p>
-                                      <p className="text-[10px] sm:hidden text-muted-foreground truncate mt-0.5">
+                                      <p className={cn("text-[10px] sm:text-xs truncate mt-0.5", isCurrentUser ? "text-red-700 font-semibold" : "text-muted-foreground sm:hidden")}>
                                         {LITURGICAL_POSITIONS[assignment.position]}
                                       </p>
                                       {isCurrentUser && (
-                                        <p className="text-[10px] sm:text-xs text-amber-700 mt-0.5">
+                                        <p className="text-[10px] sm:text-xs text-red-700 font-semibold mt-0.5 flex items-center gap-1">
+                                          <Star className="h-3 w-3 fill-red-500" />
                                           Você está escalado nesta posição
                                         </p>
                                       )}
@@ -1487,7 +1625,8 @@ export default function Schedules() {
                           })}
                       </div>
                     </div>
-                  ))}
+                      ));
+                  })()}
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -1497,9 +1636,10 @@ export default function Schedules() {
               )}
             </div>
           </ScrollArea>
+          )}
 
           <DialogFooter className="mt-3 sm:mt-4 flex-col sm:flex-row gap-2">
-            {selectedDateAssignments && selectedDateAssignments.length > 0 && selectedDate && (
+            {!showMassTimeSelection && selectedDateAssignments && selectedDateAssignments.length > 0 && selectedDate && (
               <ScheduleExport
                 date={selectedDate}
                 assignments={selectedDateAssignments}

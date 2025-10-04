@@ -13,10 +13,10 @@ export default function Substitutions() {
           <CardContent className="flex flex-col items-center justify-center p-12 text-center space-y-6">
             <MessageSquare className="h-20 w-20 text-primary" />
             <h2 className="text-2xl sm:text-3xl font-bold">
-              PARA SUBSTITUIÇÕES, POR GENTILEZA INFORMAR NO GRUPO DO WHATSAPP!
+              CASO NECESSITE DE SUBSTITUIÇÃO, INFORME O GRUPO DOS MINISTROS VIA WHATSAPP!
             </h2>
             <p className="text-muted-foreground text-lg">
-              Para solicitar ou oferecer substituições, utilize o grupo oficial do WhatsApp da comunidade.
+              Para solicitar ou oferecer substituições, utilize o grupo oficial dos ministros no WhatsApp.
             </p>
           </CardContent>
         </Card>
