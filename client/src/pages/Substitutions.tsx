@@ -1,4 +1,4 @@
-import { LayoutClean } from "@/components/layout";
+import { LayoutClean } from "@/components/layout-clean";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
