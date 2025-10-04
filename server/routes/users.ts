@@ -10,6 +10,7 @@ interface RecentUser {
   id: string;
   name: string;
   photoUrl?: string;
+  phone?: string;
   isOnline: boolean;
   lastSeen: Date;
 }
@@ -42,6 +43,7 @@ router.get('/recent-connections', authenticateToken, async (req: AuthRequest, re
         id: users.id,
         name: users.name,
         photoUrl: users.photoUrl,
+        phone: users.phone,
       })
       .from(users)
       .where(inArray(users.id, uniqueUserIds));
@@ -66,6 +68,7 @@ router.get('/recent-connections', authenticateToken, async (req: AuthRequest, re
           id: user.id,
           name: user.name,
           photoUrl: user.photoUrl ? `/api/users/${user.id}/photo` : undefined,
+          phone: user.phone || undefined,
           isOnline,
           lastSeen: session.lastActivity,
         };
