@@ -41,31 +41,16 @@ const changePasswordSchema = z.object({
 // Rota de login
 router.post('/login', async (req, res) => {
   try {
-    // CRITICAL: Trim email e password para evitar problemas de mobile (espaços, auto-complete)
-    const rawData = {
-      email: typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : req.body.email,
-      password: typeof req.body.password === 'string' ? req.body.password.trim() : req.body.password
-    };
-    
-    console.log('[LOGIN] Tentativa de login:', {
-      email: rawData.email,
-      passwordLength: rawData.password?.length,
-      userAgent: req.get('user-agent'),
-      ip: req.ip
-    });
-    
-    const { email, password } = loginSchema.parse(rawData);
+    const { email, password } = loginSchema.parse(req.body);
 
     const result = await login(email, password);
 
     // Define cookie com o token JWT
-    // IMPORTANTE: Replit usa proxy reverso com HTTPS, então secure: false funciona em prod
-    // Para PWAs mobile, mantemos lax para máxima compatibilidade
     res.cookie('token', result.token, {
       httpOnly: true,
-      secure: false, // False porque Replit gerencia HTTPS no proxy
+      secure: process.env.NODE_ENV !== 'development',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias para PWA mobile
+      maxAge: 12 * 60 * 60 * 1000, // 12 horas
       path: '/'
     });
 
@@ -79,9 +64,9 @@ router.post('/login', async (req, res) => {
     // Define cookie da sessão
     res.cookie('session_token', sessionToken, {
       httpOnly: true,
-      secure: false, // False porque Replit gerencia HTTPS no proxy
+      secure: process.env.NODE_ENV !== 'development',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
+      maxAge: 12 * 60 * 60 * 1000, // 12 horas
       path: '/'
     });
 
@@ -92,12 +77,6 @@ router.post('/login', async (req, res) => {
       user: result.user
     });
   } catch (error: any) {
-    console.error('[LOGIN ERROR]', {
-      message: error.message,
-      stack: error.stack?.split('\n')[0],
-      email: req.body?.email
-    });
-
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -147,7 +126,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Rota de registro administrativo (apenas coordenadores e reitor)
-router.post('/admin-register', authenticateToken, requireRole('reitor', 'coordenador'), async (req: AuthRequest, res) => {
+router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
     const userData = registerSchema.parse(req.body);
     
@@ -279,13 +258,13 @@ router.post('/logout', async (req, res) => {
   // Clear cookies
   res.clearCookie('token', {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV !== 'development',
     sameSite: 'lax',
     path: '/'
   });
   res.clearCookie('session_token', {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV !== 'development',
     sameSite: 'lax',
     path: '/'
   });
@@ -312,11 +291,11 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
       });
     }
     
-    await changePassword(req.user.id, currentPassword, newPassword);
+    const result = await changePassword(req.user.id, currentPassword, newPassword);
     
     res.json({
       success: true,
-      message: 'Senha alterada com sucesso'
+      message: result.message
     });
   } catch (error: any) {
     console.log('❌ DEBUG: Erro na rota /change-password:', error);
@@ -348,7 +327,7 @@ const emailResetSchema = z.object({
 });
 
 // Rota para reset administrativo (SOMENTE coordenadores/gestores autenticados)
-router.post('/admin-reset-password', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
+router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
     // Validar dados com schema
     const { userId, newPassword } = adminResetSchema.parse(req.body);
@@ -412,12 +391,42 @@ router.post('/admin-reset-password', authenticateToken, requireRole('gestor', 'c
   }
 });
 
-// Rota para resetar senha por email (SEM autenticação - usa sistema de password-reset)
+// Rota para resetar senha por email (SEM autenticação - para usuários esqueceram senha)
 router.post('/reset-password', async (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Use /api/password-reset/request-reset para solicitar reset de senha'
-  });
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email é obrigatório'
+      });
+    }
+    
+    // Validação básica mais flexível
+    if (typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Por favor, forneça um endereço de email válido'
+      });
+    }
+    
+    // Normalizar o email
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const result = await resetPassword(normalizedEmail);
+    
+    return res.json({
+      success: true,
+      ...result
+    });
+  } catch (error: any) {
+    console.error('Erro ao resetar senha por email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao processar solicitação de reset de senha'
+    });
+  }
 });
 
 // Rota para verificar se está autenticado

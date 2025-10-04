@@ -1,4 +1,4 @@
-import { LayoutClean } from "@/components/layout-clean";
+import { Layout } from "@/components/layout";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -438,19 +438,10 @@ export default function Substitutions() {
   };
 
   return (
-    <LayoutClean
+    <Layout 
       title="Substituições"
       subtitle={isCoordinator ? "Gerencie pendências e substituições" : "Gerencie solicitações de substituição"}
     >
-      {/* Alerta WhatsApp */}
-      <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-500 rounded-lg p-4">
-        <p className="font-bold text-red-700 dark:text-red-300 text-sm sm:text-base text-center">
-          PARA SUBSTITUIÇÕES, COMUNIQUE IMEDIATAMENTE NO GRUPO DO WHATSAPP!
-        </p>
-      </div>
-
-      {/* Conteúdo removido - apenas alerta exibido */}
-      {false && (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className={cn("grid w-full", isCoordinator ? "grid-cols-2" : "grid-cols-1")}>
           {isCoordinator && (
@@ -657,7 +648,15 @@ export default function Substitutions() {
 
         <TabsContent value="substitutions" className="space-y-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader>
+              <CardTitle>Solicitações de Substituição</CardTitle>
+              <CardDescription>
+                {isCoordinator 
+                  ? "Todas as solicitações de substituição do ministério"
+                  : "Suas solicitações e pedidos que você pode atender"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               {loadingRequests ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -665,6 +664,7 @@ export default function Substitutions() {
               ) : substitutionRequests.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhuma solicitação de substituição no momento</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -795,11 +795,7 @@ export default function Substitutions() {
           </Card>
         </TabsContent>
       </Tabs>
-      )}
 
-      {/* Dialogs removidos - funcionalidade desativada */}
-      {false && (
-      <>
       {/* Dialog for sending notifications */}
       <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1078,8 +1074,6 @@ export default function Substitutions() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </>
-      )}
-    </LayoutClean>
+    </Layout>
   );
 }

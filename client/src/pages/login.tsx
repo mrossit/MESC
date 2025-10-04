@@ -85,7 +85,10 @@ export default function Login() {
         });
         navigate("/change-password");
       } else {
-        // Removida mensagem de boas-vindas
+        toast({
+          title: "Login realizado com sucesso",
+          description: `Bem-vindo(a), ${data.user.name}!`,
+        });
         navigate("/dashboard");
       }
     },
@@ -122,7 +125,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-border/20 bg-[#F5E6CC] ">
+      <Card className="w-full max-w-md shadow-xl border-border/20 bg-card/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             <img 
@@ -184,12 +187,8 @@ export default function Login() {
                   type={showPassword ? "text" : "password"}
                   placeholder="Sua senha"
                   value={credentials.password}
-                  onChange={(e) => handleInputChange("password", e.target.value.trim())}
+                  onChange={(e) => handleInputChange("password", e.target.value)}
                   className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
-                  autoComplete="current-password"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck="false"
                   required
                   data-testid="input-password"
                 />

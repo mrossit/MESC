@@ -46,46 +46,6 @@ export const MASS_TIMES_BY_DAY: string[][] = [
 export const ALL_MASS_TIMES: string[] = ["06:30:00", "08:00:00", "10:00:00", "16:00:00", "19:00:00", "19:30:00"];
 
 /**
- * PADRÃO SISTÊMICO DE FORMATO DE HORÁRIO
- *
- * Todos os horários no sistema DEVEM usar o formato HH:MM:SS (com segundos)
- * Exemplos: "08:00:00", "10:00:00", "19:00:00", "19:30:00"
- *
- * NUNCA use "08:00" ou "10:00" sem os segundos, pois isso causa incompatibilidade
- * com os dados armazenados no banco de dados PostgreSQL (tipo TIME).
- *
- * Para exibição ao usuário, use: time.substring(0, 5) → "08:00"
- * Para comparação/filtros: mantenha o formato completo "08:00:00"
- *
- * IMPORTANTE: Os horários são DINÂMICOS por dia!
- * - Domingos: 08:00:00, 10:00:00, 19:00:00
- * - Quinta-feira (1ª): 06:30:00, 19:30:00 (Cura e Libertação)
- * - Dias de semana: geralmente 06:30:00
- * - Outubro (dias 19-27): 06:30:00, 19:00:00 (Novena)
- *
- * SEMPRE busque os horários do banco de dados para cada dia específico,
- * NUNCA assuma horários fixos!
- */
-export const TIME_FORMAT_STANDARD = "HH:MM:SS";
-export const TIME_FORMAT_DISPLAY = "HH:MM";
-
-/**
- * Função helper para formatar horário para exibição
- * Converte "08:00:00" → "08:00"
- */
-export function formatTimeForDisplay(time: string): string {
-  return time.substring(0, 5);
-}
-
-/**
- * Função helper para garantir formato completo de horário
- * Converte "08:00" → "08:00:00"
- */
-export function ensureFullTimeFormat(time: string): string {
-  return time.length === 5 ? `${time}:00` : time;
-}
-
-/**
  * Get mass times for a specific date, considering special rules:
  * - First Thursday: Adds 19:30 mass (Cura e Libertação) - all months
  * - First Friday: Adds 19:00 mass (Sagrado Coração de Jesus) - all months

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { schedules, substitutionRequests, users, questionnaireResponses, questionnaires } from "@shared/schema";
+import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 
@@ -10,100 +10,6 @@ const logActivity = async (userId: string, action: string, description: string, 
 };
 
 const router = Router();
-
-// Get current month schedules for a minister
-router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    console.log('🔄 [API /minister/current-month] Requisição recebida');
-    console.log('🔄 [API /minister/current-month] User:', req.user);
-
-    const userId = req.user?.id;
-    if (!userId) {
-      console.log('❌ [API /minister/current-month] Usuário não autenticado');
-      return res.status(401).json({ message: "Não autenticado" });
-    }
-
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const firstDayStr = firstDay.toISOString().split('T')[0];
-    const lastDayStr = lastDay.toISOString().split('T')[0];
-
-    console.log(`🔍 [API /minister/current-month] Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
-    console.log(`🔍 [API /minister/current-month] Date types: firstDayStr=${typeof firstDayStr}, lastDayStr=${typeof lastDayStr}`);
-
-    // Buscar PID do usuário
-    const [userData] = await db
-      .select({ pid: users.pid, name: users.name })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-
-    if (!userData) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
-    }
-
-    console.log(`👤 [API /minister/current-month] Usuário ${userData.name} - PID: ${userData.pid}`);
-
-    // Buscar TODAS as escalas do usuário no mês atual
-    const monthSchedules = await db
-      .select({
-        id: schedules.id,
-        date: schedules.date,
-        time: schedules.time,
-        type: schedules.type,
-        location: schedules.location,
-        position: schedules.position,
-        status: schedules.status
-      })
-      .from(schedules)
-      .where(
-        and(
-          eq(schedules.ministerId, userId),
-          sql`${schedules.date} >= ${firstDayStr}::date`,
-          sql`${schedules.date} <= ${lastDayStr}::date`,
-          eq(schedules.status, "scheduled")
-        )
-      )
-      .orderBy(schedules.date, schedules.time);
-
-    console.log(`✅ [API /minister/current-month] Encontradas ${monthSchedules.length} escalas no mês atual`);
-
-    if (monthSchedules.length > 0) {
-      console.log('📋 [API /minister/current-month] Escalas encontradas:');
-      monthSchedules.forEach(s => {
-        console.log(`  - ${s.date} às ${s.time} - Posição ${s.position}`);
-      });
-    }
-
-    const formattedAssignments = monthSchedules.map(s => ({
-      id: s.id,
-      date: s.date,
-      massTime: s.time,
-      position: s.position || 0,
-      confirmed: true,
-      scheduleId: s.id,
-      scheduleTitle: s.type,
-      scheduleStatus: s.status,
-      location: s.location
-    }));
-
-    console.log('📤 [API /minister/current-month] Resposta formatada:');
-    console.log(JSON.stringify({ pid: userData.pid, name: userData.name, assignments: formattedAssignments }, null, 2));
-
-    res.json({ 
-      pid: userData.pid,
-      name: userData.name,
-      assignments: formattedAssignments 
-    });
-  } catch (error: any) {
-    console.error("[API /minister/current-month] Erro completo:", error);
-    console.error("[API /minister/current-month] Stack:", error?.stack);
-    console.error("[API /minister/current-month] Message:", error?.message);
-    res.status(500).json({ message: "Erro ao buscar escalas do mês", error: error?.message });
-  }
-});
 
 // Get upcoming schedules for a minister
 router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -128,7 +34,6 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
     const ministerId = minister[0].id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
     
     // Note: scheduleAssignments table doesn't exist in schema - using schedules table instead
     const upcomingAssignments = await db
@@ -145,7 +50,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .where(
         and(
           eq(schedules.ministerId, ministerId),
-          gte(schedules.date, todayStr),
+          gte(schedules.date, today.toISOString().split('T')[0]),
           eq(schedules.status, "scheduled")
         )
       )
@@ -632,91 +537,6 @@ router.post("/:scheduleId/generate", requireAuth, requireRole(['coordenador', 'g
   } catch (error) {
     console.error("Error generating intelligent schedule:", error);
     res.status(500).json({ message: "Erro ao gerar escala inteligente" });
-  }
-});
-
-// Get available ministers from questionnaire responses for a specific date and time
-router.get("/available-ministers/:date/:time", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { date, time } = req.params;
-
-    // Parse date to get month and year
-    const targetDate = new Date(date);
-    const month = targetDate.getMonth() + 1; // JavaScript months are 0-indexed
-    const year = targetDate.getFullYear();
-    const dayOfMonth = targetDate.getDate();
-
-    console.log(`🔍 Buscando ministros disponíveis para ${date} às ${time}h`);
-    console.log(`📅 Mês: ${month}, Ano: ${year}, Dia: ${dayOfMonth}`);
-
-    // Find questionnaire for this month/year
-    const activeQuestionnaires = await db
-      .select()
-      .from(questionnaires)
-      .where(
-        and(
-          eq(questionnaires.month, month),
-          eq(questionnaires.year, year),
-          eq(questionnaires.status, 'published')
-        )
-      )
-      .limit(1);
-
-    if (activeQuestionnaires.length === 0) {
-      console.log('❌ Nenhum questionário encontrado para este mês/ano');
-      return res.json({ ministers: [] });
-    }
-
-    const questionnaireId = activeQuestionnaires[0].id;
-    console.log(`📋 Questionário encontrado: ${questionnaireId}`);
-
-    // Get all responses for this questionnaire
-    const responses = await db
-      .select({
-        id: questionnaireResponses.id,
-        userId: questionnaireResponses.userId,
-        userName: users.name,
-        userPhoto: users.profilePhoto,
-        responses: questionnaireResponses.responses,
-        availableSundays: questionnaireResponses.availableSundays,
-        preferredMassTimes: questionnaireResponses.preferredMassTimes
-      })
-      .from(questionnaireResponses)
-      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
-      .where(eq(questionnaireResponses.questionnaireId, questionnaireId));
-
-    console.log(`📝 Total de respostas: ${responses.length}`);
-
-    // Filter ministers available for this specific day and time
-    const availableMinister = responses.filter(response => {
-      const availableSundays = response.availableSundays as string[] || [];
-      const preferredTimes = response.preferredMassTimes as string[] || [];
-
-      // Check if day is in available sundays (format: "1", "2", "8", etc.)
-      const isDayAvailable = availableSundays.includes(String(dayOfMonth));
-
-      // Check if time matches (format: "08:00", "10:00", "19:00")
-      const isTimeAvailable = preferredTimes.includes(time);
-
-      console.log(`👤 ${response.userName}: Dia ${dayOfMonth} disponível? ${isDayAvailable}, Horário ${time} disponível? ${isTimeAvailable}`);
-
-      return isDayAvailable && isTimeAvailable;
-    });
-
-    console.log(`✅ Ministros disponíveis encontrados: ${availableMinister.length}`);
-
-    const ministers = availableMinister.map(m => ({
-      id: m.userId,
-      name: m.userName,
-      photo: m.userPhoto,
-      availableSundays: m.availableSundays,
-      preferredTimes: m.preferredMassTimes
-    }));
-
-    res.json({ ministers });
-  } catch (error) {
-    console.error("Error getting available ministers:", error);
-    res.status(500).json({ message: "Erro ao buscar ministros disponíveis" });
   }
 });
 

@@ -1,4 +1,4 @@
-import { LayoutClean } from "@/components/layout-clean";
+import { Layout } from "@/components/layout";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -134,12 +134,6 @@ export default function Schedules() {
   const [availableSubstitutes, setAvailableSubstitutes] = useState<any[]>([]);
   const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
   const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
-  // Estados para seleção de horário por dia (sistemático)
-  const [isTimeSelectionDialogOpen, setIsTimeSelectionDialogOpen] = useState(false);
-  const [selectedTimeForDay, setSelectedTimeForDay] = useState<string>("");
-  const [timeFilteredAssignments, setTimeFilteredAssignments] = useState<ScheduleAssignment[]>([]);
-  const [loadingTimeAssignments, setLoadingTimeAssignments] = useState(false);
-  const [availableTimesForDay, setAvailableTimesForDay] = useState<string[]>([]);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -684,13 +678,14 @@ export default function Schedules() {
 
   if (loading) {
     return (
-      <LayoutClean
+      <Layout
         title="Escalas Litúrgicas"
+        subtitle="Gerenciar escalas de ministros para as celebrações"
       >
         <div className="flex items-center justify-center h-64">
           <div className="text-lg text-muted-foreground">Carregando escalas...</div>
         </div>
-      </LayoutClean>
+      </Layout>
     );
   }
 
@@ -700,8 +695,9 @@ export default function Schedules() {
   );
 
   return (
-    <LayoutClean 
+    <Layout 
       title="Escalas Litúrgicas"
+      subtitle="Gerenciar escalas de ministros para as celebrações"
     >
       <div className="space-y-4 sm:space-y-6">
         {isCoordinator && !currentSchedule && (
@@ -912,7 +908,7 @@ export default function Schedules() {
                       className={cn(
                         "min-h-[60px] p-1 border rounded transition-all relative sm:min-h-24 sm:rounded-lg sm:p-2",
                         isToday && !isUserScheduled && "border-primary border-2",
-                        isSelected && !isUserScheduled && "bg-gradient-to-br from-[#95CB89] to-[#499058] text-white font-bold shadow-lg",
+                        isSelected && !isUserScheduled && "bg-accent",
                         // Destaque especial quando usuário está escalado - cores baseadas no status de substituição
                         isUserScheduled && currentSchedule?.status === "published" && !substitutionStatus && "bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 border-2 border-amber-500 shadow-lg ring-2 ring-amber-400 ring-offset-1",
                         // Vermelho quando tem substituição pendente
@@ -929,33 +925,15 @@ export default function Schedules() {
                         // Tornar clicável para coordenador em rascunho
                         isCoordinator && currentSchedule?.status === "draft" && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-accent"
                       )}
-                      onClick={async () => {
+                      onClick={() => {
                         setSelectedDate(day);
-
-                        // NOVO PADRÃO SISTÊMICO: Buscar horários disponíveis para este dia
-                        if (currentSchedule?.status === "published" && isSameMonth(day, currentMonth)) {
-                          // Buscar os horários que existem para este dia específico
-                          const dateStr = format(day, 'yyyy-MM-dd');
-                          try {
-                            const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
-                              credentials: "include"
-                            });
-
-                            if (response.ok) {
-                              const data = await response.json();
-                              // Extrair horários únicos das escalas deste dia
-                              const uniqueTimes = [...new Set(data.assignments?.map((a: any) => a.massTime) || [])];
-                              setAvailableTimesForDay(uniqueTimes.sort());
-                              setIsTimeSelectionDialogOpen(true);
-                            }
-                          } catch (error) {
-                            console.error("Erro ao buscar horários:", error);
-                          }
-                          return;
-                        }
-
+                        
+                        // Se a escala está publicada, abre modal de visualização
+                        if (currentSchedule?.status === "published") {
+                          fetchScheduleForDate(day);
+                        } 
                         // Se é coordenador e escala está em rascunho, abre modal de edição
-                        if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
+                        else if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
                           setIsAssignmentDialogOpen(true);
                         }
                       }}>
@@ -1122,8 +1100,170 @@ export default function Schedules() {
                   );
                 })}
               </div>
+              
+              {/* Legenda dos indicadores visuais - Sempre visível quando há escala */}
+              {currentSchedule && (
+                <Card className="mt-6 border-2 border-primary/20 shadow-lg">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <AlertCircle className="h-5 w-5 text-primary" />
+                      </div>
+                      <span>Legenda do Calendário</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Entenda os indicadores visuais da escala de ministros
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {currentSchedule.status === "published" && (
+                      <>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 border-2 border-amber-300 dark:border-amber-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/50 dark:to-yellow-900/50 border-2 border-amber-500 rounded-xl flex items-center justify-center ring-2 ring-amber-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <Star className="h-5 w-5 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-amber-800 dark:text-amber-300 leading-tight">Você está escalado</p>
+                            <p className="text-xs text-amber-700/70 dark:text-amber-400/70 mt-1">Dia com sua participação confirmada</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/40 dark:to-red-900/40 border-2 border-red-300 dark:border-red-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/50 dark:to-red-800/50 border-2 border-red-500 rounded-xl flex items-center justify-center ring-2 ring-red-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <UserX className="h-5 w-5 text-red-600 dark:text-red-400 fill-red-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-red-800 dark:text-red-300 leading-tight">Substituição solicitada</p>
+                            <p className="text-xs text-red-700/70 dark:text-red-400/70 mt-1">Aguardando confirmação de substituto</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/40 dark:to-green-900/40 border-2 border-green-300 dark:border-green-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/50 dark:to-green-800/50 border-2 border-green-500 rounded-xl flex items-center justify-center ring-2 ring-green-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400 fill-green-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-green-800 dark:text-green-300 leading-tight">Substituto confirmado</p>
+                            <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-1">Substituição já foi aprovada</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/40 border-2 border-blue-300 dark:border-blue-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 border-2 border-blue-500 rounded-xl flex items-center justify-center ring-2 ring-blue-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-blue-800 dark:text-blue-300 leading-tight">Ministros escalados</p>
+                            <p className="text-xs text-blue-700/70 dark:text-blue-400/70 mt-1">Quantidade de ministros confirmados</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/40 dark:to-orange-900/40 border-2 border-orange-300 dark:border-orange-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/50 dark:to-orange-800/50 border-2 border-orange-500 rounded-xl flex items-center justify-center ring-2 ring-orange-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-orange-800 dark:text-orange-300 leading-tight">Vagas disponíveis</p>
+                            <p className="text-xs text-orange-700/70 dark:text-orange-400/70 mt-1">Posições ainda não preenchidas</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
+                            <CalendarIcon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-primary leading-tight">Dia atual</p>
+                            <p className="text-xs text-primary/70 mt-1">Data de hoje no calendário</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-2 border-slate-400 dark:border-slate-600 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-accent/50 border-2 border-slate-500 dark:border-slate-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 group-hover:ring-4 ring-slate-400/30 transition-all">
+                            <span className="text-base font-bold text-slate-700 dark:text-slate-200">D</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">Dia selecionado</p>
+                            <p className="text-xs text-slate-700/70 dark:text-slate-400/70 mt-1">Dia que você clicou para ver</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {currentSchedule.status === "draft" && isCoordinator && (
+                      <>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/40 dark:to-purple-900/40 border-2 border-purple-300 dark:border-purple-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/50 dark:to-purple-800/50 border-2 border-purple-500 rounded-xl flex items-center justify-center ring-2 ring-purple-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
+                            <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-purple-800 dark:text-purple-300 leading-tight">Horários de missa</p>
+                            <p className="text-xs text-purple-700/70 dark:text-purple-400/70 mt-1">Dias com celebrações agendadas</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
+                            <CalendarIcon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-primary leading-tight">Dia atual</p>
+                            <p className="text-xs text-primary/70 mt-1">Data de hoje no calendário</p>
+                          </div>
+                        </div>
+                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-2 border-slate-400 dark:border-slate-600 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+                          <div className="w-12 h-12 bg-accent/50 border-2 border-slate-500 dark:border-slate-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 group-hover:ring-4 ring-slate-400/30 transition-all">
+                            <span className="text-base font-bold text-slate-700 dark:text-slate-200">D</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">Dia selecionado</p>
+                            <p className="text-xs text-slate-700/70 dark:text-slate-400/70 mt-1">Dia que você clicou para ver</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
 
-              {/* Legenda removida a pedido do usuário */}
+                  {/* Seção de informações sobre posições litúrgicas */}
+                  <div className="mt-6 pt-4 border-t-2 border-primary/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <h4 className="font-bold text-base text-slate-800 dark:text-slate-200">Posições Litúrgicas</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => (
+                        <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs font-bold text-primary">{key}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 leading-tight">{value}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {key === '1' && 'Ministro que lidera a distribuição da Eucaristia'}
+                              {key === '2' && 'Ministro auxiliar na distribuição'}
+                              {key === '3' && 'Ministro que auxilia na celebração'}
+                              {key === '4' && 'Ministro de apoio adicional'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {currentSchedule.status === "published" && (
+                    <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-2 border-blue-300 dark:border-blue-700 shadow-sm">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex-shrink-0">
+                          <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">💡 Dica</p>
+                          <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+                            Clique em qualquer dia do calendário para ver os detalhes completos da escala e gerenciar suas escalações.
+                            Os dias com indicadores coloridos possuem informações importantes!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  </CardContent>
+                </Card>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1474,226 +1614,6 @@ export default function Schedules() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog SISTÊMICO para seleção de horário (qualquer dia do mês) */}
-      <Dialog open={isTimeSelectionDialogOpen} onOpenChange={(open) => {
-        setIsTimeSelectionDialogOpen(open);
-        if (!open) {
-          setSelectedTimeForDay("");
-          setTimeFilteredAssignments([]);
-          setAvailableTimesForDay([]);
-        }
-      }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--color-red-dark)]">
-              {selectedTimeForDay
-                ? `Escala - Dia ${selectedDate && format(selectedDate, 'd')} - ${selectedTimeForDay.substring(0, 5)}h`
-                : `Selecione o Horário - Dia ${selectedDate && format(selectedDate, 'd')}`}
-            </DialogTitle>
-            <DialogDescription className="text-[var(--color-text-primary)]">
-              {selectedTimeForDay ? 'Ministros escalados para este horário' : 'Escolha um horário para visualizar a escala'}
-            </DialogDescription>
-          </DialogHeader>
-
-          {!selectedTimeForDay ? (
-            // Lista de horários DINÂMICA - baseada nos horários cadastrados para este dia
-            <div className="space-y-3 py-4">
-              {availableTimesForDay.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-[var(--color-text-primary)]">Nenhum horário encontrado para este dia</p>
-                </div>
-              ) : (
-                availableTimesForDay.map((time) => (
-                <Button
-                  key={time}
-                  variant="outline"
-                  className="w-full h-16 text-lg font-semibold border-[var(--color-beige-light)] hover:bg-[var(--color-beige-light)] transition-all"
-                  onClick={async () => {
-                    setSelectedTimeForDay(time);
-                    setLoadingTimeAssignments(true);
-                    try {
-                      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-                      const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
-                        credentials: "include"
-                      });
-
-                      if (response.ok) {
-                        const data = await response.json();
-                        console.log(`📅 Escalas do dia ${format(selectedDate, 'd')}:`, data);
-
-                        // Filtrar APENAS o horário selecionado (formato padrão: HH:MM:SS)
-                        const filteredAssignments = data.assignments?.filter(
-                          (a: ScheduleAssignment) => a.massTime === time
-                        ) || [];
-
-                        console.log(`⏰ Horário ${time} - Total: ${filteredAssignments.length} ministros`);
-
-                        setTimeFilteredAssignments(filteredAssignments);
-
-                        if (filteredAssignments.length === 0) {
-                          toast({
-                            title: "Aviso",
-                            description: `Nenhum ministro escalado para ${time.substring(0, 5)}h`,
-                          });
-                        }
-                      } else {
-                        setTimeFilteredAssignments([]);
-                        toast({
-                          title: "Erro",
-                          description: "Erro ao buscar escalas",
-                          variant: "destructive"
-                        });
-                      }
-                    } catch (error) {
-                      console.error("Erro ao buscar escalas:", error);
-                      setTimeFilteredAssignments([]);
-                    } finally {
-                      setLoadingTimeAssignments(false);
-                    }
-                  }}
-                >
-                  <Clock className="h-6 w-6 mr-3" />
-                  {time.substring(0, 5)}h
-                </Button>
-                ))
-              )}
-            </div>
-          ) : (
-            // Exibir escala do horário selecionado
-            <div className="space-y-4 py-4">
-              {loadingTimeAssignments ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-[var(--color-green-dark)]" />
-                </div>
-              ) : timeFilteredAssignments.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-[var(--color-text-primary)]">
-                    Nenhum ministro escalado para este horário
-                  </p>
-                </div>
-              ) : (
-                <div className="max-h-[500px] overflow-y-auto pr-2">
-                  <div className="space-y-3">
-                    {timeFilteredAssignments.map((assignment, index) => {
-                      // Verifica se é o usuário logado
-                      const isCurrentUser = assignment.ministerId === user?.id;
-                      // Verifica se é vaga disponível
-                      const isVacant = !assignment.ministerId || assignment.ministerName === 'VACANT' || assignment.ministerName === 'VAGA DISPONÍVEL';
-
-                      return (
-                        <div
-                          key={assignment.id}
-                          className={cn(
-                            "p-4 rounded-lg border transition-all relative",
-                            isCurrentUser
-                              ? "border-[3px] border-[var(--color-red-dark)] bg-[#FFF5F5] shadow-lg ring-2 ring-[var(--color-red-dark)]/30"
-                              : isVacant
-                                ? "border border-[var(--color-green-dark)]/30 bg-[#E8F5E9] hover:bg-[#C8E6C9]"
-                                : "border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)]"
-                          )}
-                        >
-                          {/* Estrela para o usuário logado */}
-                          {isCurrentUser && (
-                            <div className="absolute -top-3 -right-3">
-                              <div className="relative">
-                                <div className="absolute inset-0 bg-yellow-400 rounded-full blur-md opacity-60 animate-pulse" />
-                                <Star className="h-7 w-7 text-yellow-500 fill-yellow-400 relative animate-pulse" />
-                              </div>
-                            </div>
-                          )}
-
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Badge className={cn(
-                                    "font-semibold",
-                                    isCurrentUser
-                                      ? "bg-[var(--color-red-dark)] text-white"
-                                      : isVacant
-                                        ? "bg-[var(--color-green-dark)] text-white border-2 border-green-600"
-                                        : "bg-[var(--color-green-dark)] text-white"
-                                  )}>
-                                    {LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`}
-                                  </Badge>
-                                  <p className={cn(
-                                    "font-semibold",
-                                    isCurrentUser
-                                      ? "text-[var(--color-red-dark)] text-lg"
-                                      : isVacant
-                                        ? "text-green-700 italic"
-                                        : "text-[var(--color-text-primary)]"
-                                  )}>
-                                    {assignment.ministerName || 'VAGA DISPONÍVEL'}
-                                    {isCurrentUser && " (Você)"}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1 text-sm text-[var(--color-text-secondary)]">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{assignment.massTime?.substring(0, 5)}</span>
-                                </div>
-                              </div>
-                              {assignment.confirmed ? (
-                                <Check className="h-5 w-5 text-green-600" />
-                              ) : (
-                                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                              )}
-                            </div>
-
-                            {/* Botão WhatsApp para vagas disponíveis */}
-                            {isVacant && (
-                              <div className="mt-3 flex justify-center">
-                                <a
-                                  href={`https://api.whatsapp.com/send/?phone=5515991343638&text=Olá! Sou ${user?.name || 'um ministro'} e gostaria de me candidatar como substituto para a vaga de ${LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`} no dia ${selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: ptBR }) : ''} às ${assignment.massTime?.substring(0, 5)}h.&type=phone_number&app_absent=0`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20BA5A] text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
-                                >
-                                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                                  </svg>
-                                  Candidatar-se via WhatsApp
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setSelectedTimeForDay("");
-                  setTimeFilteredAssignments([]);
-                }}
-              >
-                Voltar aos horários
-              </Button>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsTimeSelectionDialogOpen(false);
-                setSelectedTimeForDay("");
-                setTimeFilteredAssignments([]);
-                setAvailableTimesForDay([]);
-              }}
-              className="w-full sm:w-auto"
-            >
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Dialog para escalar ministro */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={(open) => {
         setIsAssignmentDialogOpen(open);
@@ -1881,7 +1801,7 @@ export default function Schedules() {
 
       {/* Dialog para solicitar substituição */}
       <Dialog open={isSubstitutionDialogOpen} onOpenChange={setIsSubstitutionDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
+        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Solicitar Substituição</DialogTitle>
             <DialogDescription>
@@ -1899,66 +1819,33 @@ export default function Schedules() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Motivo - OPCIONAL */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Motivo da substituição <span className="text-muted-foreground text-xs">(opcional)</span>
+                Motivo da substituição <span className="text-red-500">*</span>
               </label>
               <Textarea
-                placeholder="Se desejar, explique o motivo da sua ausência..."
+                placeholder="Por favor, explique o motivo da sua ausência..."
                 value={substitutionReason}
                 onChange={(e) => setSubstitutionReason(e.target.value)}
-                rows={3}
+                rows={4}
                 className="resize-none"
               />
-            </div>
-
-            {/* Substitutos Sugeridos */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Indicar substituto específico <span className="text-muted-foreground text-xs">(opcional)</span>
-              </label>
-              {loadingSubstitutes ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : availableSubstitutes.length > 0 ? (
-                <Select value={selectedSubstituteId} onValueChange={setSelectedSubstituteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um ministro (ou deixe em branco)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Não indicar ninguém</SelectItem>
-                    {availableSubstitutes.map((minister) => (
-                      <SelectItem key={minister.id} value={minister.id}>
-                        {minister.name} {minister.servicesThisMonth > 0 && `(${minister.servicesThisMonth} missas este mês)`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-sm text-muted-foreground py-2">
-                  Nenhum substituto disponível encontrado para este horário
-                </p>
-              )}
               <p className="text-xs text-muted-foreground">
-                Ministros não escalados no mesmo horário, ordenados por menor atividade no mês
+                Seja específico sobre o motivo para ajudar na aprovação da sua solicitação.
               </p>
             </div>
 
-            {/* Informações importantes */}
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 space-y-2">
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">
-                    Como funciona:
+                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                    Importante:
                   </p>
-                  <ul className="mt-1 space-y-1 text-blue-800 dark:text-blue-200 text-xs">
-                    <li>• <strong>≥ 12h antes:</strong> Auto-aprovada (máx 2/mês)</li>
-                    <li>• <strong>{'<'} 12h antes:</strong> Requer aprovação do coordenador</li>
-                    <li>• Se não indicar substituto, outros ministros serão notificados</li>
-                    <li>• Você será notificado quando alguém aceitar</li>
+                  <ul className="mt-1 space-y-1 text-amber-800 dark:text-amber-200 text-xs">
+                    <li>• Sua solicitação será enviada aos coordenadores para aprovação</li>
+                    <li>• Outros ministros serão notificados sobre a necessidade de substituição</li>
+                    <li>• Você será notificado quando alguém aceitar substituí-lo</li>
                   </ul>
                 </div>
               </div>
@@ -1966,22 +1853,20 @@ export default function Schedules() {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => {
                 setIsSubstitutionDialogOpen(false);
                 setSubstitutionReason("");
-                setSelectedSubstituteId("");
                 setSelectedAssignmentForSubstitution(null);
-                setAvailableSubstitutes([]);
               }}
               disabled={submittingSubstitution}
             >
               Cancelar
             </Button>
-            <Button
+            <Button 
               onClick={handleRequestSubstitution}
-              disabled={submittingSubstitution}
+              disabled={submittingSubstitution || !substitutionReason.trim()}
             >
               {submittingSubstitution ? (
                 <>
@@ -1999,6 +1884,6 @@ export default function Schedules() {
         </DialogContent>
       </Dialog>
       </div>
-    </LayoutClean>
+    </Layout>
   );
 }
