@@ -162,12 +162,18 @@
 ### Ajustes Finais - BottomNav:
 - vangrey: Solicitou ocultar menus (Em Desenvolvimento, Família MESC, Minhas Estatísticas, Minha Formação)
 - vangrey: Pediu BottomNav #000000 sólido, sem blur e transparência
-- Assistente: Implementado:
-  - BottomNav agora é PRETO SÓLIDO (#000000)
-  - Removido todas as sombras, blur e transparências
-  - Fallback do avatar agora é amarelo (#FACC15) com texto preto
-  - Ring offset atualizado para preto
-  - Menu totalmente opaco e sólido
+- vangrey: RECLAMOU QUE AS CORES NÃO FORAM APLICADAS - app ainda 100% preto
+- Assistente: CRIOU style.css para aplicar cores com !important:
+  - Arquivo: /client/src/style.css
+  - TopBar: fundo bege claro, título vermelho escuro, avatares verde/vermelho
+  - BottomNav: fundo preto sólido, ícones brancos, ativo amarelo
+  - Layout: fundo bege alternativo
+  - Cards: brancos com borda bege
+  - Botões principais: verde
+  - Botões secundários: amarelo
+  - Headers: vermelho escuro
+  - Removido TODOS blur e transparências com !important
+  - Importado no main.tsx
 
 ---
 

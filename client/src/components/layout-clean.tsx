@@ -21,7 +21,7 @@ export function LayoutClean({ children, title }: LayoutCleanProps) {
   const isAuthenticated = !!authData?.user;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#F6EFE3]">
+    <div className="flex flex-col h-screen w-full layout-clean">
       {/* TopBar - Apenas se autenticado */}
       {isAuthenticated && <TopBar />}
 

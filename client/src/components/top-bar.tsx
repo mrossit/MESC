@@ -26,11 +26,11 @@ export function TopBar() {
   });
 
   return (
-    <div className="w-full bg-[#F5E6CC] border-b-2 border-[#7A1C1C]/20">
+    <div className="w-full top-bar">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h2 className="text-sm font-semibold text-[#7A1C1C] uppercase tracking-wider">
+            <h2 className="text-sm font-semibold title">
               Últimas Conexões
             </h2>
 

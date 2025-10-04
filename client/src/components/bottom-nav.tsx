@@ -44,7 +44,7 @@ export function BottomNav() {
   if (!user) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-black border-t-2 border-black">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bottom-nav">
       <div className="container mx-auto px-2">
         <div className="flex items-center justify-around h-16 sm:h-18">
           {navItems.map((item) => (
@@ -53,9 +53,7 @@ export function BottomNav() {
               onClick={() => handleNavigation(item.href)}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[70px] sm:min-w-[80px]",
-                item.active
-                  ? "text-[#FACC15]"
-                  : "text-white/70 hover:text-white"
+                item.active && "active"
               )}
             >
               <item.icon
@@ -73,9 +71,7 @@ export function BottomNav() {
             onClick={() => handleNavigation("/profile")}
             className={cn(
               "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[70px] sm:min-w-[80px]",
-              location === "/profile"
-                ? "text-[#FACC15]"
-                : "text-white/70 hover:text-white"
+              location === "/profile" && "active"
             )}
           >
             <div className="relative">
@@ -88,7 +84,7 @@ export function BottomNav() {
                 )}
               >
                 <AvatarImage src={user.photoUrl || undefined} alt={user.name} />
-                <AvatarFallback className="bg-[#FACC15] text-black text-[10px] font-bold">
+                <AvatarFallback className="avatar-fallback text-[10px] font-bold">
                   {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
