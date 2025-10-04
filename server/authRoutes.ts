@@ -92,6 +92,12 @@ router.post('/login', async (req, res) => {
       user: result.user
     });
   } catch (error: any) {
+    console.error('[LOGIN ERROR]', {
+      message: error.message,
+      stack: error.stack?.split('\n')[0],
+      email: req.body?.email
+    });
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
