@@ -25,19 +25,19 @@ export default function Dashboard() {
   const getTitle = () => {
     if (user?.role === "coordenador") return "Dashboard Coordenador";
     if (user?.role === "gestor") return "Dashboard Gestor";
-    return "Dashboard Ministro";
+    return undefined; // Remove título para ministro
   };
 
   const getSubtitle = () => {
-    return isCoordinator 
-      ? "Gestão completa do ministério" 
-      : "Acompanhe suas atividades";
+    return isCoordinator
+      ? "Gestão completa do ministério"
+      : undefined; // Remove subtítulo para ministro
   };
 
   // Se for ministro, mostra o dashboard simplificado
   if (user?.role === "ministro") {
     return (
-      <Layout title={getTitle()} subtitle={getSubtitle()}>
+      <Layout>
         <MinisterDashboard />
       </Layout>
     );

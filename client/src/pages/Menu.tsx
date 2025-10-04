@@ -74,12 +74,6 @@ export default function Menu() {
 
   const menuItems: MenuItem[] = [
     {
-      title: "Dashboard",
-      href: "/dashboard",
-      icon: BarChart3,
-      roles: ["gestor", "coordenador", "ministro"]
-    },
-    {
       title: "Questionário",
       href: "/questionnaire",
       icon: FileText,
@@ -102,12 +96,6 @@ export default function Menu() {
       href: "/schedules/auto-generation",
       icon: Calendar,
       roles: ["gestor", "coordenador"]
-    },
-    {
-      title: "Formação",
-      href: "/formation",
-      icon: GraduationCap,
-      roles: ["gestor", "coordenador", "ministro"]
     },
     {
       title: "Gerenciar Usuários",

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useLocation } from "wouter";
 import { NotificationBell } from "@/components/notification-bell";
 import { FloatingNotificationBell } from "@/components/floating-notification-bell";
 import { InstallButton } from "@/components/install-button";
@@ -13,13 +14,16 @@ interface LayoutProps {
 }
 
 export function Layout({ children, title, subtitle }: LayoutProps) {
+  const [location] = useLocation();
+  const showHeaderConexoes = location === "/dashboard";
+
   return (
     <div className="flex h-screen w-full flex-col bg-background">
-      {/* Últimas Conexões - Header Superior */}
-      <HeaderUltimasConexoes />
-      
-      {/* Header */}
-      <header className="sticky top-0 border-b border-border bg-background z-50">
+      {/* Últimas Conexões - Header Superior Fixo (apenas em HOME/Dashboard) */}
+      {showHeaderConexoes && <HeaderUltimasConexoes />}
+
+      {/* Header - com padding-top condicional para compensar o header de conexões */}
+      <header className={`sticky top-0 border-b border-border bg-background z-50 ${showHeaderConexoes ? 'pt-16 sm:pt-20' : ''}`}>
         <div className="flex h-14 items-center gap-4 px-4 sm:h-16 sm:px-6">
           {/* Title section - responsive */}
           <div className="flex-1 min-w-0">
@@ -36,12 +40,12 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               </div>
             )}
           </div>
-          
+
           {/* Actions section - responsive */}
           <div className="flex items-center gap-2">
             {/* Command Search - responsive */}
             <CommandSearch />
-            
+
             {/* Install Button */}
             <InstallButton size="sm" className="hidden sm:inline-flex" />
 
@@ -55,7 +59,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
       <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background">
         {children}
       </main>
-      
+
       {/* Floating Notification Bell for Mobile */}
       <FloatingNotificationBell />
 
