@@ -153,19 +153,9 @@ export function MinisterDashboard() {
       {/* Minha Escala do Mês */}
       <Card className="border-2 border-[var(--color-bronze)]">
         <CardHeader className="bg-gradient-to-r from-[var(--color-bronze)] to-[var(--color-gold)] text-white">
-          <CardTitle className="flex items-center justify-between text-lg font-bold">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-6 w-6" />
-              Minha Escala do Mês
-            </div>
-            {ministerPid && (
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-sm font-normal opacity-90" data-testid="text-minister-name">{ministerName}</span>
-                <span className="text-xs font-mono bg-white/20 px-3 py-1 rounded-full" data-testid="text-minister-pid">
-                  PID: {ministerPid}
-                </span>
-              </div>
-            )}
+          <CardTitle className="flex items-center gap-2 text-lg font-bold">
+            <Calendar className="h-6 w-6" />
+            Minha Escala do Mês
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
