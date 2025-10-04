@@ -130,7 +130,6 @@ export default function Schedules() {
   const [selectedAssignmentForSubstitution, setSelectedAssignmentForSubstitution] = useState<ScheduleAssignment | null>(null);
   const [substitutionReason, setSubstitutionReason] = useState("");
   const [submittingSubstitution, setSubmittingSubstitution] = useState(false);
-  const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [filledQuestionnaires, setFilledQuestionnaires] = useState<{month: number, year: number}[]>([]);
@@ -1663,7 +1662,6 @@ export default function Schedules() {
           fetchMinisters();
         } else {
           // Limpar estados ao fechar
-          setMinisterSearch('');
           setFilterByPreferredPosition(false);
           setEditingAssignmentId(null);
           
@@ -1727,26 +1725,6 @@ export default function Schedules() {
                 </Badge>
               </div>
 
-              {/* Barra de pesquisa */}
-              <div className="relative">
-                <Input
-                  placeholder="Buscar ministro pelo nome..."
-                  value={ministerSearch}
-                  onChange={(e) => setMinisterSearch(e.target.value)}
-                  className="pr-10"
-                />
-                {ministerSearch && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                    onClick={() => setMinisterSearch('')}
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
               {/* Filtros */}
               <div className="flex items-center gap-2">
                 <Button
@@ -1765,7 +1743,6 @@ export default function Schedules() {
                 value={selectedMinisterId}
                 onValueChange={(value) => {
                   setSelectedMinisterId(value);
-                  setMinisterSearch('');
                 }}
               >
                 <SelectTrigger>
@@ -1779,13 +1756,6 @@ export default function Schedules() {
                   ) : (() => {
                     // Filtrar ministros
                     let filteredMinisters = ministers;
-
-                    // Filtro por busca
-                    if (ministerSearch.trim()) {
-                      filteredMinisters = filteredMinisters.filter(m =>
-                        m.name.toLowerCase().includes(ministerSearch.toLowerCase())
-                      );
-                    }
 
                     // Filtro por posição preferida
                     if (filterByPreferredPosition && selectedPosition) {
