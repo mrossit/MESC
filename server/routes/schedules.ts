@@ -47,8 +47,8 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
       .where(
         and(
           eq(schedules.ministerId, userId),
-          sql`${schedules.date} >= ${firstDayStr}::date`,
-          sql`${schedules.date} <= ${lastDayStr}::date`,
+          gte(schedules.date, firstDayStr),
+          lte(schedules.date, lastDayStr),
           eq(schedules.status, "scheduled")
         )
       )

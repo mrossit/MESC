@@ -18,10 +18,18 @@ interface ScheduledMass {
   type: string;
 }
 
+interface Versiculo {
+  id: number;
+  frase: string;
+  referencia: string;
+}
+
 export function MinisterDashboard() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [scheduledMasses, setScheduledMasses] = useState<ScheduledMass[]>([]);
   const [loadingMasses, setLoadingMasses] = useState(true);
+  const [versiculo, setVersiculo] = useState<Versiculo | null>(null);
+  const [loadingVersiculo, setLoadingVersiculo] = useState(true);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
 
@@ -33,7 +41,30 @@ export function MinisterDashboard() {
 
   useEffect(() => {
     fetchScheduledMasses();
+    fetchVersiculo();
   }, []);
+
+  const fetchVersiculo = async () => {
+    try {
+      console.log('📖 [MINISTER-DASHBOARD] Buscando versículo aleatório...');
+
+      const response = await fetch("/api/versiculos/random", {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ [MINISTER-DASHBOARD] Versículo recebido:', data);
+        setVersiculo(data);
+      } else {
+        console.error('❌ [MINISTER-DASHBOARD] Erro ao buscar versículo:', response.status);
+      }
+    } catch (error) {
+      console.error("❌ [MINISTER-DASHBOARD] Erro ao buscar versículo:", error);
+    } finally {
+      setLoadingVersiculo(false);
+    }
+  };
 
   const fetchScheduledMasses = async () => {
     try {
@@ -164,6 +195,38 @@ export function MinisterDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Versículo Bíblico de Incentivo */}
+      <Card className="border-2 border-[var(--color-green-dark)]">
+        <CardHeader className="bg-gradient-to-r from-[var(--color-green-light)] to-[var(--color-green-dark)] text-white">
+          <CardTitle className="flex items-center gap-2 text-lg font-bold">
+            <BookOpen className="h-6 w-6" />
+            Ministro, Lembre-se:
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {loadingVersiculo ? (
+            <div className="flex items-center justify-center py-8">
+              <BookOpen className="h-8 w-8 text-[var(--color-green-dark)] animate-pulse" />
+              <p className="ml-3 text-[var(--color-text-primary)]">Carregando...</p>
+            </div>
+          ) : versiculo ? (
+            <div className="bg-[var(--color-beige-light)] p-6 rounded-lg">
+              <p className="text-lg italic text-[var(--color-text-primary)] leading-relaxed mb-4">
+                "{versiculo.frase}"
+              </p>
+              <p className="text-right text-sm font-semibold text-[var(--color-green-dark)]">
+                {versiculo.referencia}
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BookOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-[var(--color-text-secondary)]">Nenhum versículo disponível</p>
             </div>
           )}
         </CardContent>
