@@ -115,5 +115,49 @@
 - Ring effects nos avatares
 - Container mx-auto para centralização
 
+### Correção de Bug:
+- vangrey: Tela de login aparecendo preta
+- Problema: LayoutClean estava renderizando TopBar e BottomNav mesmo sem usuário logado
+- Solução: Adicionado verificação de autenticação no LayoutClean
+  - TopBar e BottomNav só aparecem se usuário autenticado
+  - Padding bottom condicional no main
+
+### Feedback sobre Visual:
+- vangrey: Reclamou do blur (design ruim/imbecil)
+- vangrey: Quer dar vida ao sistema com cores bacanas
+- vangrey: Forneceu paleta de cores profissional:
+  - **Principais**: Vermelho escuro (#7A1C1C), Verde (#2E7D32), Amarelo (#FACC15), Bege claro (#F5E6CC)
+  - **Apoio**: Texto preto suave (#1E1E1E), Cinza médio (#6B6B6B), Bege alternativo (#F6EFE3)
+
+### Redesign com Nova Paleta - IMPLEMENTADO:
+
+**1. TopBar** (/client/src/components/top-bar.tsx):
+- Fundo: Bege claro (#F5E6CC)
+- Título: Vermelho escuro (#7A1C1C)
+- Avatares com contorno VERDE (#2E7D32) quando online, VERMELHO (#7A1C1C) quando offline
+- Indicador de status com sombra colorida
+- Fallback do avatar: gradiente vermelho escuro
+- Texto dos nomes: Preto suave (#1E1E1E)
+- Loading state: Bege alternativo (#F6EFE3)
+
+**2. BottomNav** (/client/src/components/bottom-nav.tsx):
+- Fundo: Vermelho escuro (#7A1C1C) - DESTAQUE FORTE
+- Ícones inativos: Branco com 70% opacidade
+- Ícone ativo: Amarelo vibrante (#FACC15)
+- Avatar do perfil: ring amarelo quando ativo
+- Fallback avatar: Bege claro (#F5E6CC) com texto vermelho escuro
+
+**3. LayoutClean** (/client/src/components/layout-clean.tsx):
+- Fundo principal: Bege alternativo (#F6EFE3)
+- Header: Fundo branco com borda bege clara
+- Título: Vermelho escuro (#7A1C1C) bold
+
+**4. Estilo Geral Aplicado**:
+- Visual clean com contraste vermelho/bege
+- Verde e amarelo usados pontualmente
+- Sem excessos de saturação
+- Hierarquia visual clara com cores de destaque
+- Sofisticação através do contraste
+
 ---
 
