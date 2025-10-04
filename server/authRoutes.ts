@@ -141,7 +141,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Rota de registro administrativo (apenas coordenadores e reitor)
-router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coordenador']), async (req: AuthRequest, res) => {
+router.post('/admin-register', authenticateToken, requireRole('reitor', 'coordenador'), async (req: AuthRequest, res) => {
   try {
     const userData = registerSchema.parse(req.body);
     
@@ -306,11 +306,11 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
       });
     }
     
-    const result = await changePassword(req.user.id, currentPassword, newPassword);
+    await changePassword(req.user.id, currentPassword, newPassword);
     
     res.json({
       success: true,
-      message: result.message
+      message: 'Senha alterada com sucesso'
     });
   } catch (error: any) {
     console.log('❌ DEBUG: Erro na rota /change-password:', error);
@@ -342,7 +342,7 @@ const emailResetSchema = z.object({
 });
 
 // Rota para reset administrativo (SOMENTE coordenadores/gestores autenticados)
-router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+router.post('/admin-reset-password', authenticateToken, requireRole('gestor', 'coordenador'), async (req: AuthRequest, res) => {
   try {
     // Validar dados com schema
     const { userId, newPassword } = adminResetSchema.parse(req.body);
@@ -406,42 +406,12 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
   }
 });
 
-// Rota para resetar senha por email (SEM autenticação - para usuários esqueceram senha)
+// Rota para resetar senha por email (SEM autenticação - usa sistema de password-reset)
 router.post('/reset-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email é obrigatório'
-      });
-    }
-    
-    // Validação básica mais flexível
-    if (typeof email !== 'string' || !email.includes('@')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor, forneça um endereço de email válido'
-      });
-    }
-    
-    // Normalizar o email
-    const normalizedEmail = email.trim().toLowerCase();
-    
-    const result = await resetPassword(normalizedEmail);
-    
-    return res.json({
-      success: true,
-      ...result
-    });
-  } catch (error: any) {
-    console.error('Erro ao resetar senha por email:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao processar solicitação de reset de senha'
-    });
-  }
+  res.status(404).json({
+    success: false,
+    message: 'Use /api/password-reset/request-reset para solicitar reset de senha'
+  });
 });
 
 // Rota para verificar se está autenticado

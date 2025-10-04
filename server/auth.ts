@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // JWT secret - deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -128,90 +128,88 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   });
 }
 
-// Middleware para verificar roles - verifica role atual no banco
-export function requireRole(roles: string[]) {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Middleware para verificar role
+export function requireRole(...allowedRoles: string[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Não autenticado' });
     }
 
-    // Buscar role atual no banco para evitar bypass com tokens antigos
-    const [currentUser] = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, req.user.id))
-      .limit(1);
-
-    if (!currentUser || !roles.includes(currentUser.role)) {
-      return res.status(403).json({ message: 'Permissão insuficiente para esta ação' });
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        message: 'Sem permissão para acessar este recurso',
+        requiredRoles: allowedRoles,
+        userRole: req.user.role
+      });
     }
 
     next();
   };
 }
 
-// Login
-export async function login(email: string, password: string) {
+// ============= FUNÇÃO DE LOGIN REESCRITA - MAIS SIMPLES E DIRETA =============
+export async function login(emailInput: string, passwordInput: string) {
   try {
-    // CRITICAL: Normalizar email para evitar problemas de case e espaços
-    const normalizedEmail = email.trim().toLowerCase();
+    console.log('[AUTH] Login attempt for:', emailInput);
+
+    // Normaliza email: remove espaços e converte para minúsculas
+    const normalizedEmail = emailInput.trim().toLowerCase();
     
-    console.log('[AUTH] Login attempt for:', normalizedEmail);
-    
-    // Busca usuário por email
+    // Busca usuário no banco de dados usando LOWER() para case-insensitive
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, normalizedEmail))
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
       .limit(1);
 
     if (!user) {
-      throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
+      console.log('[AUTH] User not found:', normalizedEmail);
+      throw new Error('Email ou senha incorretos');
     }
 
-    // Verifica o status do usuário
+    console.log('[AUTH] User found:', user.email, 'Status:', user.status, 'PID:', user.pid);
+
+    // Verifica se a conta está pendente
     if (user.status === 'pending') {
-      throw new Error('Sua conta ainda não foi aprovada. Aguarde a aprovação do coordenador.');
+      console.log('[AUTH] User account pending approval');
+      throw new Error('Account pending approval');
     }
+
+    // Verifica se a conta está ativa
+    if (user.status !== 'active') {
+      console.log('[AUTH] User account not active:', user.status);
+      throw new Error('Conta inativa. Entre em contato com a coordenação.');
+    }
+
+    // Verifica a senha (remove trim da senha para respeitar espaços)
+    const isPasswordValid = await bcrypt.compare(passwordInput, user.password);
     
-    if (user.status === 'inactive') {
-      throw new Error('Usuário inativo. Entre em contato com a coordenação.');
-    }
+    console.log('[AUTH] Password verification result:', isPasswordValid);
 
-    // Verifica a senha
-    const passwordHash = user.passwordHash || '';
-    const isValidPassword = await verifyPassword(password, passwordHash);
-
-    if (!isValidPassword) {
-      throw new Error('Usuário ou senha errados, revise os dados e tente novamente.');
+    if (!isPasswordValid) {
+      console.log('[AUTH] Invalid password for user:', normalizedEmail);
+      throw new Error('Email ou senha incorretos');
     }
 
     // Gera token JWT
     const token = generateToken(user);
 
-    // Atualiza último login
-    try {
-      await db
-        .update(users)
-        .set({ lastLogin: new Date() })
-        .where(eq(users.id, user.id));
-    } catch (updateError) {
-      // Silent fail - não bloquear login por erro de update
-    }
+    console.log('[AUTH] Login successful for:', user.email);
 
-    // Remove informações sensíveis
-    const { passwordHash: _, ...userWithoutPassword } = user;
-
+    // Retorna dados do usuário (sem senha)
+    const { password, ...userWithoutPassword } = user;
+    
     return {
       token,
       user: userWithoutPassword
     };
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[AUTH] Login error:', error.message);
     throw error;
   }
 }
 
-// Registro de novo usuário
+// Função de registro
 export async function register(userData: {
   email: string;
   password: string;
@@ -219,51 +217,49 @@ export async function register(userData: {
   phone?: string;
   role?: string;
   status?: string;
-  observations?: string;
 }) {
   try {
     // Verifica se o email já existe
     const [existingUser] = await db
       .select()
       .from(users)
-      .where(eq(users.email, userData.email))
+      .where(eq(users.email, userData.email.toLowerCase()))
       .limit(1);
 
     if (existingUser) {
-      throw new Error('Este email já está cadastrado');
+      throw new Error('Email já cadastrado');
     }
 
     // Hash da senha
-    const passwordHash = await hashPassword(userData.password);
+    const hashedPassword = await hashPassword(userData.password);
 
-    // Cria o usuário
+    // Cria novo usuário
     const [newUser] = await db
       .insert(users)
       .values({
-        email: userData.email,
-        passwordHash,
+        email: userData.email.toLowerCase(),
+        password: hashedPassword,
         name: userData.name,
         phone: userData.phone || null,
-        role: userData.role as any || 'ministro',
-        status: userData.status as any || 'pending',
-        observations: userData.observations || null,
+        role: (userData.role as any) || 'ministro',
+        status: (userData.status as any) || 'pending',
         requiresPasswordChange: false
       })
       .returning();
 
-    // Remove informações sensíveis
-    const { passwordHash: _, ...userWithoutPassword } = newUser;
-
+    // Retorna usuário sem senha
+    const { password, ...userWithoutPassword } = newUser;
     return userWithoutPassword;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[AUTH] Registration error:', error);
     throw error;
   }
 }
 
-// Trocar senha
+// Função para trocar senha
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   try {
-    // Busca usuário usando Drizzle ORM com PostgreSQL
+    // Busca usuário
     const [user] = await db
       .select()
       .from(users)
@@ -275,68 +271,46 @@ export async function changePassword(userId: string, currentPassword: string, ne
     }
 
     // Verifica senha atual
-    const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
-
-    if (!isValidPassword) {
+    const isPasswordValid = await verifyPassword(currentPassword, user.password);
+    if (!isPasswordValid) {
       throw new Error('Senha atual incorreta');
     }
 
     // Hash da nova senha
-    const newPasswordHash = await hashPassword(newPassword);
+    const hashedPassword = await hashPassword(newPassword);
 
-    // Atualiza a senha e remove flag de troca obrigatória
+    // Atualiza senha
     await db
       .update(users)
-      .set({
-        passwordHash: newPasswordHash,
-        requiresPasswordChange: false,
-        updatedAt: new Date()
+      .set({ 
+        password: hashedPassword,
+        requiresPasswordChange: false 
       })
       .where(eq(users.id, userId));
 
-    return { message: 'Senha alterada com sucesso' };
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
+    console.error('[AUTH] Change password error:', error);
     throw error;
   }
 }
 
-// Resetar senha (gera uma senha temporária)
-export async function resetPassword(email: string) {
+// Função para resetar senha (admin)
+export async function resetPassword(userId: string, newPassword: string) {
   try {
-    // Busca usuário
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const hashedPassword = await hashPassword(newPassword);
 
-    if (!user) {
-      // Por segurança, não revelamos se o email existe ou não
-      return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
-    }
-
-    // Gera senha temporária
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
-    const passwordHash = await hashPassword(tempPassword);
-
-    // Atualiza a senha e marca que precisa trocar
     await db
       .update(users)
-      .set({
-        passwordHash,
-        requiresPasswordChange: true,
-        updatedAt: new Date()
+      .set({ 
+        password: hashedPassword,
+        requiresPasswordChange: true 
       })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, userId));
 
-    // TODO: Enviar email com a senha temporária
-    // Log temporário apenas para desenvolvimento (não retornar ao cliente)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEV] Senha temporária gerada para ${email}: ${tempPassword}`);
-    }
-
-    return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
+    console.error('[AUTH] Reset password error:', error);
     throw error;
   }
 }
