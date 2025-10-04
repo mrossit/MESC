@@ -73,7 +73,8 @@
       "Bash(NODE_ENV=production npx tsx scripts/debug-schedule-edit.ts)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(NODE_ENV=production npx tsx scripts/migrate-substitution-schema.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/migrate-substitution-schema.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-day5-schedules.ts)"
     ],
     "deny": [],
     "ask": []

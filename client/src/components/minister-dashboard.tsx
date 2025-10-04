@@ -9,19 +9,19 @@ import { ptBR } from "date-fns/locale";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
 import { useLocation } from "wouter";
 
-interface ScheduleAssignment {
+interface ScheduledMass {
   id: string;
   date: string;
-  massTime: string;
+  time: string;
+  location: string;
   position: number;
-  confirmed: boolean;
-  scheduleTitle: string;
+  type: string;
 }
 
 export function MinisterDashboard() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(true);
+  const [scheduledMasses, setScheduledMasses] = useState<ScheduledMass[]>([]);
+  const [loadingMasses, setLoadingMasses] = useState(true);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
 
@@ -32,40 +32,34 @@ export function MinisterDashboard() {
   }, [shouldShowTutorial]);
 
   useEffect(() => {
-    fetchUpcomingSchedules();
+    fetchScheduledMasses();
   }, []);
 
-  const fetchUpcomingSchedules = async () => {
+  const fetchScheduledMasses = async () => {
     try {
       const response = await fetch("/api/schedules/minister/upcoming");
       if (response.ok) {
         const data = await response.json();
-        setUpcomingSchedules(data.assignments || []);
+        // Filtra apenas escalas preenchidas (com ministerId)
+        const masses = data.assignments?.map((a: any) => ({
+          id: a.id,
+          date: a.date,
+          time: a.massTime,
+          location: a.location || "Santuário São Judas Tadeu",
+          position: a.position,
+          type: a.scheduleTitle || "Missa"
+        })) || [];
+        setScheduledMasses(masses);
       }
     } catch (error) {
-      console.error("Error fetching upcoming schedules:", error);
+      console.error("Error fetching scheduled masses:", error);
     } finally {
-      setLoadingSchedules(false);
+      setLoadingMasses(false);
     }
   };
 
-  const handleOpenTutorial = () => {
-    setIsTutorialOpen(true);
-  };
-
-  const getMassTimeLabel = (time: string) => {
-    const times: Record<string, string> = {
-      "saturday_evening": "Sábado 19h",
-      "sunday_7am": "Domingo 7h",
-      "sunday_9am": "Domingo 9h",
-      "sunday_11am": "Domingo 11h",
-      "sunday_7pm": "Domingo 19h"
-    };
-    return times[time] || time;
-  };
-
   const getPositionLabel = (position: number) => {
-    return LITURGICAL_POSITIONS[position] || `Posição ${position}`;
+    return LITURGICAL_POSITIONS[position] || `Ministro ${position}`;
   };
 
   return (
@@ -77,99 +71,66 @@ export function MinisterDashboard() {
       />
 
       <div className="space-y-4">
-        {/* Cartão de Boas-vindas */}
-        <Card className="bg-gradient-to-r from-mesc-gold/10 to-mesc-beige/20 dark:from-gray-800 dark:to-gray-900 border-neutral-accentWarm/30 dark:border-gray-700">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-foreground">Bem-vindo ao MESC</h2>
-                <p className="text-muted-foreground mt-1">
-                  Sistema de Gestão do Ministério Extraordinário da Sagrada Comunhão
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenTutorial}
-                  className="hidden md:flex items-center gap-2"
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  Tutorial
-                </Button>
-                {/* Badge Beta removido - oculto para todos os usuários */}
-              </div>
-            </div>
-            {/* Botão do Tutorial para Mobile */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenTutorial}
-              className="md:hidden mt-4 w-full flex items-center justify-center gap-2"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Iniciar Tutorial
-            </Button>
-          </CardContent>
-        </Card>
-
-      {/* Próximas Escalas */}
-      <Card className="  border border-neutral-border/30 dark:border-border">
+      {/* Minhas Missas Escaladas */}
+      <Card className="border border-neutral-border/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Calendar className="h-5 w-5 text-neutral-accentWarm dark:text-amber-600" />
-            Minhas Próximas Escalas
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Calendar className="h-5 w-5" />
+            Minhas Missas Escaladas
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingSchedules ? (
+          {loadingMasses ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 animate-pulse bg-[var(--color-beige-light)]">
+                <Calendar className="h-8 w-8 text-[var(--color-green-dark)]" />
               </div>
-              <p className="text-muted-foreground">Carregando escalas...</p>
+              <p className="text-[var(--color-text-primary)]">Carregando missas...</p>
             </div>
-          ) : upcomingSchedules.length === 0 ? (
+          ) : scheduledMasses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4">
-                <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-[var(--color-beige-light)]">
+                <Calendar className="h-8 w-8 text-[var(--color-green-dark)]" />
               </div>
-              <p className="text-muted-foreground font-medium mb-2">Nenhuma escala próxima</p>
-              <p className="text-sm text-muted-foreground/70 max-w-sm">
-                Você não possui escalas programadas para os próximos dias
-              </p>
+              <p className="text-[var(--color-text-primary)] font-medium mb-2">Você não possui missas escaladas no momento.</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {upcomingSchedules.slice(0, 5).map((schedule) => (
-                <div 
-                  key={schedule.id} 
-                  className="flex items-center justify-between p-3 bg-neutral-peachCream/10 dark:bg-gray-800 rounded-lg border border-neutral-border/20 dark:border-gray-700 hover:bg-neutral-peachCream/20 dark:hover:bg-gray-700 transition-colors"
+              {scheduledMasses.slice(0, 10).map((mass) => (
+                <div
+                  key={mass.id}
+                  className="p-4 rounded-lg border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)] transition-colors"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-foreground">
-                        {format(new Date(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-[var(--color-red-dark)]">
+                        {format(new Date(mass.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {getPositionLabel(schedule.position)}
+                      <Badge className="bg-[var(--color-green-dark)] text-white text-xs">
+                        {getPositionLabel(mass.position)}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>{getMassTimeLabel(schedule.massTime)}</span>
+                    <div className="flex items-center gap-4 text-sm text-[var(--color-text-primary)]">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{mass.time}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>📍</span>
+                        <span>{mass.location}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
-              {upcomingSchedules.length > 5 && (
+              {scheduledMasses.length > 10 && (
                 <div className="text-center pt-2">
-                  <Button 
-                    variant="link" 
-                    className="text-primary hover:text-primary/80"
+                  <Button
+                    variant="link"
+                    className="text-[var(--color-green-dark)] hover:text-[var(--color-green-dark)]/80"
                     onClick={() => setLocation('/schedules')}
                   >
-                    Ver todas ({upcomingSchedules.length} escalas)
+                    Ver todas ({scheduledMasses.length} missas)
                   </Button>
                 </div>
               )}
@@ -181,28 +142,7 @@ export function MinisterDashboard() {
       {/* OCULTO - Minha Disponibilidade, Minha Formação, Família MESC, Minhas Estatísticas */}
       {/* Removido a pedido do vangrey */}
 
-      {/* Avisos e Comunicados */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800/50">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-            Avisos Importantes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {/* Aviso de Beta removido - oculto para todos os usuários */}
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-              <div>
-                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Mantenha seus dados atualizados</p>
-                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
-                  Acesse seu perfil para atualizar suas informações pessoais
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Avisos Importantes - REMOVIDO */}
       </div>
     </>
   );

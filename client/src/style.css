@@ -118,7 +118,7 @@ html, body, #root {
 .btn-primary,
 button[variant="default"] {
   background-color: var(--color-green-dark) !important;
-  color: var(--color-bg-beige-alt) !important;
+  color: #FFFFFF !important;
   border: none !important;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -131,6 +131,37 @@ button[variant="secondary"] {
   border: none !important;
   padding: 0.5rem 1rem;
   border-radius: 6px;
+}
+
+/* Botões outline */
+button[variant="outline"],
+.btn-outline {
+  background-color: #FFFFFF !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-beige-light) !important;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+/* Botões com fundos específicos */
+.bg-neutral-neutral,
+.dark\:bg-dark-gold {
+  background-color: var(--color-green-dark) !important;
+  color: #FFFFFF !important;
+}
+
+.bg-neutral-neutral:hover,
+.dark\:bg-dark-gold:hover,
+.hover\:bg-neutral-neutral\/90,
+.dark\:hover\:bg-dark-gold\/90 {
+  background-color: #3a7549 !important;
+  color: #FFFFFF !important;
+}
+
+/* Textos em botões */
+.text-neutral-cream,
+.dark\:text-dark-10 {
+  color: #FFFFFF !important;
 }
 
 /* TopBar */
@@ -155,8 +186,17 @@ button[variant="secondary"] {
 /* Forçar remoção de dark mode */
 html.dark,
 body.dark,
-.dark {
+.dark,
+[data-theme="dark"],
+.theme-dark {
   background-color: var(--color-bg-beige-alt) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Círculos de ícones em dialogs */
+.w-16.h-16,
+[class*="rounded-full"] {
+  background-color: var(--color-beige-light) !important;
   color: var(--color-text-primary) !important;
 }
 
@@ -212,12 +252,26 @@ p, span, div {
 [class*="bg-blue"],
 [class*="bg-indigo"],
 [class*="bg-slate"],
+[class*="bg-zinc"],
+[class*="bg-neutral"],
+[class*="bg-stone"],
+[class*="bg-dark"],
 .bg-gray-800,
 .bg-gray-900,
 .bg-blue-900,
-.bg-slate-900 {
+.bg-slate-900,
+.bg-zinc-900,
+.bg-neutral-900,
+.bg-stone-900,
+.dark\:bg-dark-8,
+.dark\:bg-dark-10,
+.dark\:bg-dark-3,
+.bg-muted,
+.bg-card,
+.bg-popover,
+.bg-background {
   background-color: var(--color-bg-beige-alt) !important;
-  color: var(--color-black) !important;
+  color: var(--color-text-primary) !important;
 }
 
 /* Caixas de destaque - verde claro */
@@ -269,9 +323,223 @@ button[data-selected="true"] {
   background-color: var(--color-beige-light) !important;
   opacity: 1 !important;
   border: 2px solid var(--color-green-dark) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Dialogs e Modais */
+[role="dialog"],
+.dialog,
+[class*="dialog"],
+[class*="modal"],
+.sm\:max-w-\[500px\],
+.sm\:max-w-\[425px\] {
+  background-color: #FFFFFF !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Fundos de alerta específicos */
+.bg-amber-100,
+.bg-amber-50,
+.bg-blue-50,
+.dark\:bg-amber-900\/20,
+.dark\:bg-blue-900\/20,
+.bg-muted\/50 {
+  background-color: var(--color-beige-light) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Textos de alerta */
+.text-amber-600,
+.text-amber-800,
+.text-amber-400,
+.text-blue-600,
+.text-blue-800,
+.text-blue-900,
+.text-blue-100,
+.text-blue-200,
+.dark\:text-amber-400,
+.dark\:text-amber-200,
+.dark\:text-blue-400,
+.dark\:text-blue-100,
+.dark\:text-blue-200,
+.text-muted-foreground,
+.text-foreground {
+  color: var(--color-text-primary) !important;
 }
 
 /* Garantir opacidade 1 em tudo */
 [class*="opacity"] {
   opacity: 1 !important;
+}
+
+/* Seção de Boas-Vindas */
+.welcome-section,
+[class*="welcome"],
+.tutorial-section,
+[data-welcome="true"] {
+  background-color: var(--color-bg-beige-alt) !important;
+  border: 2px solid var(--color-beige-light) !important;
+  padding: 2rem !important;
+  border-radius: 8px !important;
+  color: var(--color-text-primary) !important;
+}
+
+.welcome-section h1,
+.welcome-section h2,
+.welcome-section h3,
+[class*="welcome"] h1,
+[class*="welcome"] h2,
+[class*="welcome"] h3 {
+  color: var(--color-text-primary) !important;
+}
+
+.welcome-section p,
+.welcome-section span,
+[class*="welcome"] p,
+[class*="welcome"] span {
+  color: var(--color-text-primary) !important;
+}
+
+/* Botão Iniciar Tutorial */
+.tutorial-button,
+button[data-tutorial="true"],
+.welcome-section button,
+[class*="welcome"] button {
+  background-color: var(--color-yellow-vibrant) !important;
+  color: var(--color-black) !important;
+  border: none !important;
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.tutorial-button:hover,
+button[data-tutorial="true"]:hover,
+.welcome-section button:hover,
+[class*="welcome"] button:hover {
+  background-color: #E6B800 !important;
+}
+
+/* ===== TELA DE LOGIN ===== */
+
+/* Container principal do login */
+.min-h-screen {
+  background-color: #FFFFFF !important;
+}
+
+/* Card do login */
+.max-w-md {
+  background-color: #FFFFFF !important;
+}
+
+/* Bordas de alertas */
+.border-orange-500,
+.border-primary {
+  border-color: var(--color-green-dark) !important;
+}
+
+/* Fundos de alertas alaranjados */
+.bg-orange-50,
+.dark\:bg-orange-950\/20 {
+  background-color: var(--color-beige-light) !important;
+}
+
+/* Texto de alertas alaranjados */
+.text-orange-600,
+.text-orange-800,
+.dark\:text-orange-200 {
+  color: var(--color-text-primary) !important;
+}
+
+/* Ícones em alertas */
+.text-primary {
+  color: var(--color-green-dark) !important;
+}
+
+/* Campos de entrada (input de e-mail e senha) */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+.login-input,
+form input {
+  background-color: #FFFFFF !important;
+  border: 1px solid var(--color-beige-light) !important;
+  border-radius: 6px !important;
+  color: #000000 !important;
+  padding: 0.75rem !important;
+}
+
+/* Placeholder dos inputs */
+input::placeholder,
+input::-webkit-input-placeholder,
+input::-moz-placeholder {
+  color: #000000 !important;
+  opacity: 0.6 !important;
+}
+
+/* Labels (E-mail, Senha, etc) */
+label,
+form label {
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+/* Textos gerais no login */
+.text-neutral-textDark,
+.text-neutral-textMedium,
+.dark\:text-text-light,
+.dark\:text-gray-400 {
+  color: #000000 !important;
+}
+
+/* Título MESC */
+.text-3xl {
+  color: #000000 !important;
+}
+
+/* Links no login */
+.text-neutral-accentWarm,
+.dark\:text-dark-gold,
+.hover\:text-neutral-accentWarm\/80,
+.dark\:hover\:text-dark-gold\/80 {
+  color: var(--color-green-dark) !important;
+}
+
+.text-neutral-accentWarm:hover,
+.dark\:text-dark-gold:hover {
+  color: #3a7549 !important;
+}
+
+/* Background de inputs com focus */
+.bg-background,
+.focus\:border-primary,
+.focus\:ring-primary {
+  background-color: #FFFFFF !important;
+  border-color: var(--color-green-dark) !important;
+}
+
+/* Botão ghost (mostrar senha) */
+button[variant="ghost"],
+.hover\:bg-transparent:hover {
+  background-color: transparent !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Botão principal de login */
+button[type="submit"],
+.login-button,
+form button[type="submit"] {
+  background-color: var(--color-green-dark) !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+button[type="submit"]:hover,
+.login-button:hover,
+form button[type="submit"]:hover {
+  background-color: #3a7549 !important;
 }

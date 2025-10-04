@@ -66,6 +66,8 @@ export default function Dashboard() {
 
         {/* Recent Activity - OCULTO */}
         {/* <RecentActivity /> */}
+
+        {/* Bem-vindo ao MESC e Avisos Importantes - REMOVIDOS */}
       </div>
     </LayoutClean>
   );
