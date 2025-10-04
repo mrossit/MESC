@@ -579,64 +579,66 @@ export default function Profile() {
               <TabsContent value="family" className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Familiares no Ministério</h3>
-                  <Dialog open={showAddFamily} onOpenChange={setShowAddFamily}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="text-xs sm:text-sm">
-                        <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">Adicionar Familiar</span>
-                        <span className="sm:hidden">Add Familiar</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Adicionar Familiar</DialogTitle>
-                        <DialogDescription>
-                          Selecione um membro da família que também serve no ministério
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Pessoa</Label>
-                          <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione uma pessoa..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableUsers.map((user: any) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label>Tipo de Relacionamento</Label>
-                          <Select value={selectedRelationship} onValueChange={setSelectedRelationship}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o parentesco..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {relationshipTypes.map(type => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAddFamily(false)}>
-                          Cancelar
+                  {isEditing && (
+                    <Dialog open={showAddFamily} onOpenChange={setShowAddFamily}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="text-xs sm:text-sm">
+                          <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">Adicionar Familiar</span>
+                          <span className="sm:hidden">Add Familiar</span>
                         </Button>
-                        <Button onClick={handleAddFamilyMember} disabled={loading}>
-                          {loading ? 'Adicionando...' : 'Adicionar'}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Adicionar Familiar</DialogTitle>
+                          <DialogDescription>
+                            Selecione um membro da família que também serve no ministério
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label>Pessoa</Label>
+                            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma pessoa..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableUsers.map((user: any) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <Label>Tipo de Relacionamento</Label>
+                            <Select value={selectedRelationship} onValueChange={setSelectedRelationship}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o parentesco..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {relationshipTypes.map(type => (
+                                  <SelectItem key={type.value} value={type.value}>
+                                    {type.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowAddFamily(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={handleAddFamilyMember} disabled={loading}>
+                            {loading ? 'Adicionando...' : 'Adicionar'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
                 
                 {familyMembers.length === 0 ? (
@@ -671,13 +673,15 @@ export default function Profile() {
                                 </p>
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveFamilyMember(member.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                            {isEditing && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveFamilyMember(member.id)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
