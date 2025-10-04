@@ -639,6 +639,9 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(503).json({ error: 'Database unavailable' });
     }
 
+    // Normalize date format to YYYY-MM-DD
+    const dateStr = date.includes('T') ? date.split('T')[0] : date;
+
     const scheduledMinisters = await db
       .select({
         id: schedules.id,
@@ -653,13 +656,13 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(and(
-        eq(schedules.date, date),
+        sql`${schedules.date} = ${dateStr}::date`,
         eq(schedules.time, time)
       ))
       .orderBy(schedules.position);
 
     res.json({
-      date,
+      date: dateStr,
       time,
       ministers: scheduledMinisters
     });
