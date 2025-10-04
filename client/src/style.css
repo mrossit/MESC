@@ -18,14 +18,27 @@
   /* Status */
   --color-status-online: #2E7D32;
   --color-status-offline: #7A1C1C;
+
+  /* Cores do Degradê Verde (BottomNav) */
+  --color-gradient-green-start: #95CB89;
+  --color-gradient-green-end: #499058;
+
+  /* Cores do Degradê Header */
+  --color-gradient-header-start: #7A1C1C;
+  --color-gradient-header-mid: #FACC15;
+  --color-gradient-header-end: #F6EFE3;
+
+  /* Cores Fixas */
+  --color-white: #FFFFFF;
+  --color-black: #000000;
 }
 
 /* FORÇAR BACKGROUND EM TUDO */
 html,
 body,
 #root {
-  background-color: #F6EFE3 !important;
-  background: #F6EFE3 !important;
+  background-color: var(--color-bg-beige-alt) !important;
+  background: var(--color-bg-beige-alt) !important;
 }
 
 /* ========================================
@@ -79,25 +92,25 @@ body,
 /* CENTRO - Conteúdo Principal */
 body,
 .main-content {
-  background-color: #F6EFE3 !important;
-  background: #F6EFE3 !important;
+  background-color: var(--color-bg-beige-alt) !important;
+  background: var(--color-bg-beige-alt) !important;
 }
 
 .layout-clean {
-  background-color: #F6EFE3 !important;
-  background: #F6EFE3 !important;
+  background-color: var(--color-bg-beige-alt) !important;
+  background: var(--color-bg-beige-alt) !important;
 }
 
 div[class*="bg-"],
 div[class*="dark"] {
-  background-color: #F6EFE3 !important;
-  background: #F6EFE3 !important;
+  background-color: var(--color-bg-beige-alt) !important;
+  background: var(--color-bg-beige-alt) !important;
 }
 
 /* Cards */
 .card,
 [class*="card"] {
-  background-color: white !important;
+  background-color: var(--color-white) !important;
   border: 1px solid var(--color-beige-light) !important;
 }
 
@@ -108,23 +121,46 @@ div[class*="dark"] {
   color: var(--color-red-dark) !important;
 }
 
-/* Header */
-header {
-  background-color: white !important;
+/* Cards com degradê */
+.card.bg-gradient-to-r,
+[class*="bg-gradient"] {
+  background: linear-gradient(
+    to bottom,
+    var(--color-gradient-header-start) 0%,
+    var(--color-gradient-header-mid) 50%,
+    var(--color-gradient-header-end) 100%
+  ) !important;
+}
+
+.card.bg-gradient-to-r *,
+[class*="bg-gradient"] * {
+  color: var(--color-black) !important;
+}
+
+/* Header com Degradê Vertical */
+.header-gradient {
+  background: linear-gradient(
+    to bottom,
+    var(--color-gradient-header-start) 0%,
+    var(--color-gradient-header-mid) 50%,
+    var(--color-gradient-header-end) 100%
+  ) !important;
   border-bottom: 2px solid var(--color-beige-light) !important;
 }
 
-header h1 {
-  color: var(--color-red-dark) !important;
+.header-gradient h1 {
+  color: var(--color-white) !important;
   font-weight: bold !important;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* RODAPÉ FIXO - Menu Inferior - SÓLIDO JPG */
+/* RODAPÉ FIXO - Menu Inferior - MODERNO E CLEAN */
 .bottom-nav,
 nav[class*="bottom"] {
-  background-color: #000000 !important;
-  background: #000000 !important;
-  border-top: 2px solid #000000 !important;
+  background-color: var(--color-black) !important;
+  background: var(--color-black) !important;
+  border: none !important;
+  border-top: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   opacity: 1 !important;
@@ -135,73 +171,100 @@ nav[class*="bottom"] {
   opacity: 1 !important;
 }
 
-/* Container do BottomNav - CENTRALIZAR */
+/* Container do BottomNav - ESPAÇAMENTO MODERNO */
 .bottom-nav > div {
   display: flex !important;
-  justify-content: center !important;
+  justify-content: space-evenly !important;
   align-items: center !important;
+  gap: 1rem !important;
+  padding: 0.5rem 1rem !important;
 }
 
 .bottom-nav .flex {
-  justify-content: center !important;
+  justify-content: space-evenly !important;
   align-items: center !important;
+  gap: 1rem !important;
 }
 
-/* Ícones do BottomNav - GRADIENTE VERDE */
+/* Botões do BottomNav - CLEAN E MODERNO */
 .bottom-nav button,
 .bottom-nav a {
   opacity: 1 !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.3s ease !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  background: linear-gradient(to bottom, #95CB89, #499058) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-}
-
-.bottom-nav button:hover,
-.bottom-nav a:hover {
-  background: linear-gradient(to bottom, #95CB89, #499058) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-  opacity: 1 !important;
-}
-
-.bottom-nav button.active,
-.bottom-nav a.active,
-.bottom-nav [data-active="true"] {
-  color: #FACC15 !important;
+  gap: 0.25rem !important;
+  padding: 0.5rem 1rem !important;
   background: none !important;
-  -webkit-text-fill-color: #FACC15 !important;
-  opacity: 1 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  min-width: 70px !important;
 }
 
+/* Ícones do BottomNav - BRANCO PURO E NEGRITO */
 .bottom-nav button svg,
 .bottom-nav a svg {
+  color: var(--color-white) !important;
+  stroke: var(--color-white) !important;
+  stroke-width: 2.5 !important;
+  width: 24px !important;
+  height: 24px !important;
   margin: 0 auto !important;
+  filter: none !important;
 }
 
-.bottom-nav .icon-active {
-  color: #FACC15 !important;
+.bottom-nav button:hover svg,
+.bottom-nav a:hover svg {
+  color: var(--color-white) !important;
+  stroke: var(--color-white) !important;
+  transform: scale(1.1) !important;
 }
 
-/* Avatar no BottomNav */
-.bottom-nav .avatar-fallback {
-  background-color: #FACC15 !important;
-  color: #000000 !important;
-  font-weight: bold !important;
-  opacity: 1 !important;
+.bottom-nav button.active svg,
+.bottom-nav a.active svg,
+.bottom-nav [data-active="true"] svg {
+  color: var(--color-yellow-vibrant) !important;
+  stroke: var(--color-yellow-vibrant) !important;
+  stroke-width: 3 !important;
 }
 
-/* Texto dos ícones - centralizado */
-.bottom-nav span {
-  display: block !important;
+/* Texto dos ícones - BRANCO CAIXA ALTA NEGRITO */
+.bottom-nav button span,
+.bottom-nav a span {
+  color: var(--color-white) !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
   text-align: center !important;
+  display: block !important;
   width: 100% !important;
+  margin-top: 0.25rem !important;
+}
+
+.bottom-nav button.active span,
+.bottom-nav a.active span,
+.bottom-nav [data-active="true"] span {
+  color: var(--color-yellow-vibrant) !important;
+}
+
+/* Avatar no BottomNav - SEM BORDAS ANTIQUADAS */
+.bottom-nav .avatar-fallback {
+  background-color: var(--color-yellow-vibrant) !important;
+  color: var(--color-black) !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.bottom-nav [class*="ring"],
+.bottom-nav [class*="border"] {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* BOTÕES */
@@ -210,7 +273,7 @@ nav[class*="bottom"] {
 button[variant="default"],
 .button-primary {
   background-color: var(--color-green-medium) !important;
-  color: white !important;
+  color: var(--color-white) !important;
   border: none !important;
 }
 
@@ -225,7 +288,7 @@ button[variant="default"]:hover,
 button[variant="secondary"],
 .button-secondary {
   background-color: var(--color-yellow-vibrant) !important;
-  color: #000000 !important;
+  color: var(--color-black) !important;
   border: none !important;
 }
 
@@ -249,6 +312,34 @@ p, span, div {
   color: var(--color-text-secondary) !important;
 }
 
+/* Corrigir textos amarelos - forçar preto */
+.text-yellow-600,
+.text-yellow-700,
+.text-yellow-800,
+[class*="text-yellow"],
+[class*="text-amber"] {
+  color: var(--color-black) !important;
+}
+
+/* Fundos azulados/cinzas - forçar texto preto */
+.bg-blue-50,
+.bg-indigo-50,
+.bg-gray-100,
+[class*="bg-blue"],
+[class*="bg-indigo"],
+[class*="bg-gray"] {
+  color: var(--color-black) !important;
+}
+
+.bg-blue-50 *,
+.bg-indigo-50 *,
+.bg-gray-100 *,
+[class*="bg-blue"] *,
+[class*="bg-indigo"] *,
+[class*="bg-gray"] * {
+  color: var(--color-black) !important;
+}
+
 /* REMOVE TRANSPARÊNCIAS E BLUR */
 * {
   backdrop-filter: none !important;
@@ -270,7 +361,7 @@ p, span, div {
 }
 
 [class*="bg-card"] {
-  background-color: white !important;
+  background-color: var(--color-white) !important;
 }
 
 [class*="text-foreground"] {
@@ -279,6 +370,22 @@ p, span, div {
 
 [class*="border-border"] {
   border-color: var(--color-beige-light) !important;
+}
+
+/* Substituir fundos brancos por degradê onde apropriado */
+header.bg-white,
+.card.bg-white:first-child {
+  background: linear-gradient(
+    to bottom,
+    var(--color-gradient-header-start) 0%,
+    var(--color-gradient-header-mid) 50%,
+    var(--color-gradient-header-end) 100%
+  ) !important;
+}
+
+header.bg-white *,
+.card.bg-white:first-child * {
+  color: var(--color-black) !important;
 }
 
 /* Links */

@@ -27,9 +27,9 @@ export function LayoutClean({ children, title }: LayoutCleanProps) {
 
       {/* Header simplificado - apenas título */}
       {title && (
-        <header className="sticky top-0 bg-white border-b-2 border-[#F5E6CC] z-40">
+        <header className="sticky top-0 z-40 header-gradient">
           <div className="container mx-auto px-6 py-4">
-            <h1 className="text-2xl font-bold tracking-tight text-[#7A1C1C]">
+            <h1 className="text-2xl font-bold tracking-tight text-white">
               {title}
             </h1>
           </div>
