@@ -83,7 +83,11 @@
       "Bash(NODE_ENV=production npx tsx scripts/setup-versiculos.ts)",
       "Bash(NODE_ENV=production npx tsx scripts/debug-home-api.ts)",
       "Bash(NODE_ENV=production psql $DATABASE_URL -c \"\\d users\")",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(for db in local.db eueuchurch.db eueuchurch_production.db questionnaire.db)",
+      "Bash(do echo \"=== $db ===\")",
+      "Bash(done)",
+      "Bash(NODE_ENV=development sqlite3 local.db \"SELECT name, email FROM users LIMIT 5;\")"
     ],
     "deny": [],
     "ask": []
