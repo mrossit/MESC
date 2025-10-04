@@ -182,8 +182,8 @@ export async function login(emailInput: string, passwordInput: string) {
     }
 
     // Verifica a senha (remove trim da senha para respeitar espaços)
-    const isPasswordValid = await bcrypt.compare(passwordInput, user.password);
-    
+    const isPasswordValid = await bcrypt.compare(passwordInput, user.passwordHash);
+
     console.log('[AUTH] Password verification result:', isPasswordValid);
 
     if (!isPasswordValid) {
@@ -197,7 +197,7 @@ export async function login(emailInput: string, passwordInput: string) {
     console.log('[AUTH] Login successful for:', user.email);
 
     // Retorna dados do usuário (sem senha)
-    const { password, ...userWithoutPassword } = user;
+    const { passwordHash, ...userWithoutPassword } = user;
     
     return {
       token,
@@ -238,7 +238,7 @@ export async function register(userData: {
       .insert(users)
       .values({
         email: userData.email.toLowerCase(),
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         name: userData.name,
         phone: userData.phone || null,
         role: (userData.role as any) || 'ministro',
@@ -248,7 +248,7 @@ export async function register(userData: {
       .returning();
 
     // Retorna usuário sem senha
-    const { password, ...userWithoutPassword } = newUser;
+    const { passwordHash, ...userWithoutPassword } = newUser;
     return userWithoutPassword;
   } catch (error: any) {
     console.error('[AUTH] Registration error:', error);
@@ -271,7 +271,7 @@ export async function changePassword(userId: string, currentPassword: string, ne
     }
 
     // Verifica senha atual
-    const isPasswordValid = await verifyPassword(currentPassword, user.password);
+    const isPasswordValid = await verifyPassword(currentPassword, user.passwordHash);
     if (!isPasswordValid) {
       throw new Error('Senha atual incorreta');
     }
@@ -282,9 +282,9 @@ export async function changePassword(userId: string, currentPassword: string, ne
     // Atualiza senha
     await db
       .update(users)
-      .set({ 
-        password: hashedPassword,
-        requiresPasswordChange: false 
+      .set({
+        passwordHash: hashedPassword,
+        requiresPasswordChange: false
       })
       .where(eq(users.id, userId));
 
@@ -302,9 +302,9 @@ export async function resetPassword(userId: string, newPassword: string) {
 
     await db
       .update(users)
-      .set({ 
-        password: hashedPassword,
-        requiresPasswordChange: true 
+      .set({
+        passwordHash: hashedPassword,
+        requiresPasswordChange: true
       })
       .where(eq(users.id, userId));
 
