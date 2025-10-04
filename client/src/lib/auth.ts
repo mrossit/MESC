@@ -88,7 +88,19 @@ export function safeGetUserProperty<K extends keyof AuthUser>(
 export const authAPI = {
   async login(credentials: LoginCredentials): Promise<{ user: AuthUser }> {
     try {
-      const response = await apiRequest("POST", "/api/auth/login", credentials);
+      // CRITICAL: Normalizar dados antes de enviar (proteção extra mobile)
+      const cleanCredentials = {
+        email: credentials.email.trim().toLowerCase(),
+        password: credentials.password.trim()
+      };
+      
+      console.log('[FRONTEND LOGIN] Enviando login:', {
+        email: cleanCredentials.email,
+        passwordLength: cleanCredentials.password.length,
+        isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      });
+      
+      const response = await apiRequest("POST", "/api/auth/login", cleanCredentials);
       const data = await response.json();
 
       // 🔑 IMPORTANTE: Salvar o token JWT no localStorage

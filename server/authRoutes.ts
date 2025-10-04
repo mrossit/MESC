@@ -41,16 +41,31 @@ const changePasswordSchema = z.object({
 // Rota de login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    // CRITICAL: Trim email e password para evitar problemas de mobile (espaços, auto-complete)
+    const rawData = {
+      email: typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : req.body.email,
+      password: typeof req.body.password === 'string' ? req.body.password.trim() : req.body.password
+    };
+    
+    console.log('[LOGIN] Tentativa de login:', {
+      email: rawData.email,
+      passwordLength: rawData.password?.length,
+      userAgent: req.get('user-agent'),
+      ip: req.ip
+    });
+    
+    const { email, password } = loginSchema.parse(rawData);
 
     const result = await login(email, password);
 
     // Define cookie com o token JWT
+    // IMPORTANTE: secure deve ser true apenas em HTTPS, mas sameSite: 'none' requer secure: true
+    // Para PWAs, mantemos lax para compatibilidade mobile
     res.cookie('token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
+      secure: process.env.NODE_ENV === 'production', // Mais explícito
       sameSite: 'lax',
-      maxAge: 12 * 60 * 60 * 1000, // 12 horas
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias para PWA mobile (pesquisa recomenda)
       path: '/'
     });
 
@@ -64,9 +79,9 @@ router.post('/login', async (req, res) => {
     // Define cookie da sessão
     res.cookie('session_token', sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 12 * 60 * 60 * 1000, // 12 horas
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
       path: '/'
     });
 
@@ -258,13 +273,13 @@ router.post('/logout', async (req, res) => {
   // Clear cookies
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development',
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/'
   });
   res.clearCookie('session_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development',
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/'
   });

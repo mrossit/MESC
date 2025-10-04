@@ -153,11 +153,16 @@ export function requireRole(roles: string[]) {
 // Login
 export async function login(email: string, password: string) {
   try {
+    // CRITICAL: Normalizar email para evitar problemas de case e espaços
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    console.log('[AUTH] Login attempt for:', normalizedEmail);
+    
     // Busca usuário por email
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (!user) {
