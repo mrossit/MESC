@@ -225,6 +225,137 @@
 }
 
 @layer utilities {
+  /* Classe global de ocultação definitiva */
+  .oculto-global {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Estilos do componente Últimas Conexões */
+  .header-ultimas-conexoes {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 1200;
+    background: transparent;
+    padding: 0;
+  }
+
+  .uc-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--color-beige-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .uc-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: rgba(246, 239, 227, 0.95);
+  }
+
+  .uc-item:focus {
+    outline: 2px solid var(--color-green-gradient-start);
+    outline-offset: 2px;
+  }
+
+  .uc-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+  }
+
+  .uc-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+
+  .uc-name {
+    color: var(--color-text-primary);
+    font-weight: 600;
+    font-size: 13px;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .uc-whatsapp {
+    color: #25D366;
+    margin-left: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .uc-whatsapp:hover {
+    transform: scale(1.2);
+  }
+
+  .uc-whatsapp:focus {
+    outline: 2px solid #25D366;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Screen reader only (acessibilidade) */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Responsividade mobile */
+  @media (max-width: 768px) {
+    .header-ultimas-conexoes {
+      top: 8px;
+      right: 8px;
+      gap: 4px;
+      flex-wrap: wrap;
+      max-width: calc(100vw - 16px);
+    }
+
+    .uc-item {
+      padding: 4px 6px;
+      gap: 6px;
+    }
+
+    .uc-name {
+      max-width: 80px;
+      font-size: 12px;
+    }
+
+    .uc-avatar {
+      width: 28px;
+      height: 28px;
+    }
+  }
+
   /* Estilo do dia selecionado no calendário - Degradê Verde */
   .rdp-day_selected,
   [aria-selected="true"] {
@@ -395,7 +526,247 @@ input[type="date"] {
   min-width: 0; 
 }
 
-input[type="date"]::-webkit-datetime-edit, 
-input[type="date"]::-webkit-date-and-time-value { 
-  min-width: 0 !important; 
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0 !important;
+}
+
+/* ============================================
+   FIXED FOOTER - Menu Inferior Sobreposto
+   ============================================ */
+
+:root {
+  --footer-height: 64px;
+  --footer-bg: var(--color-beige-light);
+  --footer-border-top: rgba(0, 0, 0, 0.06);
+  --footer-item-color: var(--color-text-primary);
+  --footer-item-active: linear-gradient(90deg, var(--color-green-gradient-start), var(--color-green-gradient-end));
+  --footer-icon-size: 22px;
+  --footer-safe-area: env(safe-area-inset-bottom, 8px);
+}
+
+/* Container principal do footer */
+.fixed-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--footer-height);
+  background: var(--footer-bg);
+  border-top: 1px solid var(--footer-border-top);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1400;
+  padding: var(--footer-safe-area) 12px 8px;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Navegação interna */
+.footer-nav {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 880px;
+  justify-content: space-around;
+  align-items: center;
+}
+
+/* Item de navegação */
+.nav-item {
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--footer-item-color);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+  position: relative;
+  min-width: 64px;
+}
+
+.nav-item:hover {
+  background: rgba(var(--neutral), 0.08);
+  transform: translateY(-2px);
+}
+
+.nav-item:focus {
+  outline: 2px solid rgba(0, 0, 0, 0.08);
+  outline-offset: 3px;
+}
+
+.nav-item:active {
+  transform: translateY(0);
+}
+
+/* Item ativo */
+.nav-item.active {
+  background: var(--footer-item-active);
+  color: #ffffff;
+  font-weight: 700;
+  transform: translateY(-4px);
+  box-shadow: 0 6px 18px rgba(73, 144, 88, 0.18);
+}
+
+.nav-item.active:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(73, 144, 88, 0.24);
+}
+
+/* Wrapper do ícone (para badges e dots) */
+.nav-item-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ícone */
+.nav-item-icon {
+  width: var(--footer-icon-size);
+  height: var(--footer-icon-size);
+  stroke-width: 2;
+}
+
+/* Label */
+.nav-item-label {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Badge numérico (escalas não lidas) */
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #DC2626;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  animation: badge-pop 0.3s ease-out;
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Dot de notificação (perfil) */
+.nav-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #DC2626;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--footer-bg);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.4);
+  }
+}
+
+/* Espaçador para compensar altura do footer */
+.footer-spacer {
+  height: calc(var(--footer-height) + var(--footer-safe-area));
+  flex-shrink: 0;
+}
+
+/* Estado desabilitado (offline) */
+.nav-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Responsividade Desktop */
+@media (min-width: 1024px) {
+  :root {
+    --footer-height: 56px;
+  }
+
+  .nav-item {
+    min-width: 80px;
+    padding: 8px 12px;
+  }
+
+  /* Opcional: Labels apenas no hover em desktop */
+  .nav-item-label {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-item:hover .nav-item-label,
+  .nav-item.active .nav-item-label {
+    opacity: 1;
+  }
+}
+
+/* Mobile small screens */
+@media (max-width: 360px) {
+  .nav-item {
+    min-width: 56px;
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  .nav-item-label {
+    font-size: 10px;
+  }
+
+  :root {
+    --footer-icon-size: 20px;
+  }
+}
+
+/* Suporte para modais full-screen */
+.fixed-footer[data-modal-open="true"] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Safe area adjustments para iOS */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .fixed-footer {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .footer-spacer {
+    height: calc(var(--footer-height) + 8px + env(safe-area-inset-bottom));
+  }
 }

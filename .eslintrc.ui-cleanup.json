@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value=/💡|Dica:|Clique em qualquer|Lorem ipsum|Preview mode|This is a preview/i]",
+        "message": "❌ Evite adicionar dicas/banners desnecessários. Use tooltips contextuais quando necessário."
+      },
+      {
+        "selector": "JSXAttribute[name.name='className'][value.value=/tip|hint|help|banner-tip|tutorial|onboarding/i]",
+        "message": "❌ Classes de dicas/banners não são permitidas. Use componentes de ajuda contextuais."
+      }
+    ]
+  }
+}

@@ -105,6 +105,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Versiculos routes
   app.use('/api/versiculos', (await import('./routes/versiculos')).default);
 
+  // Ultimas Conexoes routes
+  app.use('/api/header', (await import('./routes/ultimas-conexoes')).default);
+  app.use('/admin/ultimas-conexoes', (await import('./routes/ultimas-conexoes')).default);
+
+  // Fixed Footer routes
+  app.use('/api/escala', (await import('./routes/footer')).default);
+  app.use('/api/user', (await import('./routes/footer')).default);
+  app.use('/api/navigation', (await import('./routes/footer')).default);
+
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
     try {

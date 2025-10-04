@@ -797,26 +797,6 @@ export default function Schedules() {
               </div>
             </CardHeader>
             <CardContent className="p-2 sm:p-6">
-              {/* Banner informativo quando escala está publicada */}
-              {currentSchedule?.status === "published" && (
-                <div className="mb-3 p-3 sm:mb-4 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 rounded-lg shadow-sm">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <div className="mt-0.5 flex-shrink-0">
-                      <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-blue-900 sm:text-sm">
-                        <span className="hidden sm:inline">Escala Publicada - Interaja com o calendário!</span>
-                        <span className="sm:hidden">Escala Publicada</span>
-                      </p>
-                      <p className="text-[10px] text-blue-700 mt-0.5 sm:text-xs sm:mt-1">
-                        <span className="hidden sm:inline">Clique em qualquer dia para ver detalhes. Dias em dourado indicam que você está escalado.</span>
-                        <span className="sm:hidden">Toque nos dias para ver detalhes</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
               
               <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                 {/* Header dos dias */}

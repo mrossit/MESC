@@ -1,0 +1,75 @@
+### Prompt para CLAUDE — Verificação completa: menu superior, menu inferior, tela de login e execução do sistema
+
+CLAUDE, execute uma verificação completa do sistema publicada e reporte resultados e correções necessárias. Siga estritamente os passos abaixo, aplique testes automatizados e manuais, e gere um PR com correções se encontrar problemas.
+
+1. Objetivo geral  
+- Confirmar que o **menu superior (Últimas Conexões)** foi criado conforme especificação e está FIXO no topo.  
+- Confirmar que o **menu do sistema** (área central) permanece corretamente posicionado e acessível, sem ser sobreposto pelo header ou footer.  
+- Confirmar que o **menu inferior fixo** (HOME | ESCALA | SUBSTITUIÇÕES | PERFIL) foi criado conforme especificação e está sobreposto ao conteúdo sem impedir interações críticas.  
+- Verificar a **tela de login** (funcionalidade, mensagens e segurança) e **rodar o sistema** em ambiente de produção testável.
+
+2. Checklist técnico (verificar e reportar)
+- Menu superior (ULTIMAS CONEXOES)
+  - Está presente com classe .header-ultimas-conexoes ou equivalente.
+  - Posicionamento: position: fixed; top: 0; right: 0; z-index >= 1200.
+  - Exibe até N itens (default limit=8), ícones de status, avatar e link WhatsApp funcional (wa.me/E.164).
+  - Atualização em tempo real via WS ou polling (confirme presença de conexão WS / fallback polling a cada 15s).
+  - Regras de exibição: exibir apenas users com ativo=true e cálculo de online: last_activity_at >= now - 2min.
+  - Mini-card ao clicar em avatar/nome mostra nome completo, email mascarado e última função/escala.
+- Menu do sistema (área central)
+  - Conteúdo central permanece visível e clicável entre header e footer.
+  - Não há sobreposição que bloqueie botões ou inputs centrais; testes de clique em áreas críticas.
+  - Layout responsivo: desktop/mobile verificados (resolução mobile e desktop).
+- Menu inferior fixo
+  - Está presente com classe .fixed-footer ou equivalente.
+  - Posicionamento: position: fixed; bottom: 0; z-index >= 1400; padding safe-area-inset-bottom aplicado.
+  - Botões HOME, ESCALA, SUBSTITUIÇÕES, PERFIL existem, com data-route e behavior SPA.
+  - Estado ativo persistente via URL/hash/localStorage last_route_user_{PID}.
+  - Badges: ESCALA mostra unread count via /api/escala/unread-count?user_id=PID; PERFIL mostra ponto de notificação quando aplicável.
+  - Testar interações: tap, long-press (se implementado), hover/keyboard focus.
+- Tela de login
+  - Formulário: campos email, senha, lembrar-me, link esqueci senha e botão Entrar presentes.  
+  - Mensagens: exibir apenas feedbacks essenciais (ex: "Usuário ou senha errados"); garantir remoção de banners de debug/preview.  
+  - Autenticação: POST /api/auth/login aceita email+senha e retorna cookie de sessão ou JWT; cookie set deve respeitar Secure/SameSite/Domain.  
+  - Verificar que user_id (PID) é retornado/associado e salvo na sessão/token.
+  - Testar 3 cenários: login válido, login inválido (credenciais erradas), usuário inativo/desativado.
+- Execução do sistema
+  - Rodar build de produção a partir do commit publicado; confirmar que o mesmo commit testado em Preview foi implantado.
+  - Levantar servidor e confirmar acesso HTTPS se necessário.
+  - Validar que a sequência login → HOME → ESCALA funciona sem erros JS/HTTP.
+  - Capturar logs de servidor e front-end ao executar tentativa de login e navegação (incluir timestamps).
+
+3. Testes automatizados e manuais a executar
+- Automatizados (rodar e anexar resultados)
+  - Unit: funções de cálculo online/offline e formatter last_seen_human.  
+  - Integration: GET /api/header/ultimas-conexoes?limit=8 retorna JSON correto; GET /api/escala/unread-count?user_id retorna inteiro.  
+  - E2E Playwright/Cypress (scripts executáveis):
+    1. Abrir rota /login, preencher credenciais de teste válidas, submeter, afirmar redirecionamento para /home e presença do footer/header.  
+    2. Simular WS update de 3 usuários e afirmar atualização do header com statuses corretos.  
+    3. Validar que ao clicar ESCALA o badge decrementa conforme leitura (mock).
+    4. Verificar que documento.body.textContent NÃO contém strings de dicas removidas (ex: "Clique em qualquer dia do calendário...").
+- Manuais (passos e verificações a realizar)
+  - Testar responsividade mobile (emulador iPhone/Android) e desktop.
+  - Testar acessibilidade básica: navegação por teclado para header items e footer nav-items; aria-current atualizado.
+  - Verificar comportamento com usuários inativos e mascaramento de WhatsApp/email.
+
+4. Falhas e correções automáticas solicitadas ao detectar problemas
+- Se header ausente: criar stub front-end que consome GET /api/header/ultimas-conexoes e renderiza com classes esperadas; abrir PR com implementação mínima e testes.
+- Se WS não disponível: habilitar polling fallback a 15s e documentar variáveis (POLLING_INTERVAL).
+- Se footer sobrepõe inputs críticos: ajustar CSS (reduce bottom padding do conteúdo via .content { padding-bottom: calc(var(--footer-height) + 12px); }).
+- Se login falha por erro de variáveis/env: validar JWT_SECRET, DB connection e migrations; reportar variáveis faltantes e sugerir comando de migração (ex: prisma migrate deploy).
+- Se mensagens de dica/removal aparecerem: rodar o script de ocultação .oculto-global e garantir removals.log contém entradas; remover via PR.
+
+5. Entregáveis e relatório final
+- Relatório curto com:
+  - Status (OK / Problema) para: header, menu central, footer, login, execução do sistema.
+  - Logs e outputs do cURL/cypress/playwright executados.
+  - Lista de correções aplicadas automaticamente (se houver) e PRs gerados.
+  - Comandos recomendados para rollback caso necessário.
+- Pull request(s) com commits atômicos contendo correções, testes e build/removals.log quando aplicável.
+- Instruções claras de como executar localmente os testes E2E e validar manualmente os pontos críticos.
+
+6. Permissões e segurança
+- Execute testes apenas em ambiente autorizado; não exponha números de WhatsApp em logs públicos; use user_id nas logs em vez de e-mails/números quando possível.
+
+Execute tudo e entregue o pacote de validação e correções prontas em um PR. Reporte aqui o resumo dos resultados e anexe logs, outputs dos testes e links dos PRs.
