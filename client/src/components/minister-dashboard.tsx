@@ -37,19 +37,29 @@ export function MinisterDashboard() {
 
   const fetchScheduledMasses = async () => {
     try {
-      console.log('🔄 Buscando missas do mês atual via /api/schedules/minister/current-month...');
+      console.log('🔄 [MINISTER-DASHBOARD] Buscando missas do mês atual...');
+      console.log('🔄 [MINISTER-DASHBOARD] URL: /api/schedules/minister/current-month');
 
       const response = await fetch("/api/schedules/minister/current-month", {
         credentials: 'include'
       });
 
-      console.log('📡 Response status:', response.status);
+      console.log('📡 [MINISTER-DASHBOARD] Response status:', response.status);
+      console.log('📡 [MINISTER-DASHBOARD] Response ok:', response.ok);
 
       if (response.ok) {
         const data = await response.json();
 
-        console.log('✅ Dados recebidos:', data);
-        console.log(`📊 Total de missas no mês: ${data.assignments?.length || 0}`);
+        console.log('✅ [MINISTER-DASHBOARD] Dados RAW recebidos da API:');
+        console.log(JSON.stringify(data, null, 2));
+        console.log(`📊 [MINISTER-DASHBOARD] Total de assignments: ${data.assignments?.length || 0}`);
+
+        if (data.assignments && data.assignments.length > 0) {
+          console.log('📋 [MINISTER-DASHBOARD] Detalhes de cada assignment:');
+          data.assignments.forEach((a: any, index: number) => {
+            console.log(`  [${index}] ID: ${a.id}, Date: ${a.date}, Time: ${a.massTime}, Position: ${a.position}`);
+          });
+        }
 
         const masses = data.assignments?.map((a: any) => ({
           id: a.id,
@@ -60,15 +70,22 @@ export function MinisterDashboard() {
           type: a.scheduleTitle || "Missa"
         })) || [];
 
-        console.log('📋 Missas finais:', masses);
+        console.log('📋 [MINISTER-DASHBOARD] Missas APÓS transformação:');
+        console.log(JSON.stringify(masses, null, 2));
+        console.log(`📊 [MINISTER-DASHBOARD] Total de missas após transformação: ${masses.length}`);
+
         setScheduledMasses(masses);
+        console.log('✅ [MINISTER-DASHBOARD] Estado scheduledMasses atualizado!');
       } else {
-        console.error('❌ Erro na API:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ [MINISTER-DASHBOARD] Erro na API:', response.status, response.statusText);
+        console.error('❌ [MINISTER-DASHBOARD] Resposta:', errorText);
       }
     } catch (error) {
-      console.error("❌ Erro ao buscar missas:", error);
+      console.error("❌ [MINISTER-DASHBOARD] Erro ao buscar missas:", error);
     } finally {
       setLoadingMasses(false);
+      console.log('🏁 [MINISTER-DASHBOARD] Loading finalizado');
     }
   };
 

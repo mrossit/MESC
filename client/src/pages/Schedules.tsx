@@ -1187,7 +1187,7 @@ export default function Schedules() {
                           </div>
                         </div>
                         <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
+                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
                             <CalendarIcon className="h-5 w-5 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1218,7 +1218,7 @@ export default function Schedules() {
                           </div>
                         </div>
                         <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
+                          <div className="w-12 h-12 border-2 border-primary rounded-xl flex items-center justify-center bg-white shadow-md flex-shrink-0 group-hover:ring-4 ring-primary/30 transition-all">
                             <CalendarIcon className="h-5 w-5 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
