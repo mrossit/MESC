@@ -259,7 +259,7 @@ export function ScheduleEditDialog({
                 disabled={loadingMinisters}
               />
 
-              <div className="relative rounded-md border backdrop-blur-xl bg-background/80 shadow-lg h-48 overflow-y-auto">
+              <div className="relative rounded-md border -xl bg-[#F6EFE3] shadow-lg h-48 overflow-y-auto">
                 <div className="p-2">
                   {loadingMinisters ? (
                     <p className="text-sm text-muted-foreground text-center py-4">

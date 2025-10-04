@@ -97,11 +97,7 @@ export function MinisterDashboard() {
                   <HelpCircle className="h-4 w-4" />
                   Tutorial
                 </Button>
-                <div className="hidden md:block">
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Versão Beta
-                  </Badge>
-                </div>
+                {/* Badge Beta removido - oculto para todos os usuários */}
               </div>
             </div>
             {/* Botão do Tutorial para Mobile */}
@@ -194,15 +190,7 @@ export function MinisterDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-              <div>
-                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">Sistema em fase Beta</p>
-                <p className="text-xs text-blue-700/70 dark:text-blue-200/70">
-                  Estamos trabalhando para trazer novas funcionalidades em breve
-                </p>
-              </div>
-            </div>
+            {/* Aviso de Beta removido - oculto para todos os usuários */}
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
               <div>
