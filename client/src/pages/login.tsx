@@ -85,10 +85,7 @@ export default function Login() {
         });
         navigate("/change-password");
       } else {
-        toast({
-          title: "Login realizado com sucesso",
-          description: `Bem-vindo(a), ${data.user.name}!`,
-        });
+        // Removida mensagem de boas-vindas
         navigate("/dashboard");
       }
     },
