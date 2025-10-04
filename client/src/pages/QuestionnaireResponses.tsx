@@ -691,8 +691,8 @@ export default function QuestionnaireResponses() {
                                         className={cn(
                                           "cursor-pointer transition-all hover:scale-105",
                                           minister.availability === 'Disponível' 
-                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 
-                                            : 'bg-red-100 text-red-800 hover:bg-red-200
+                                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                            : 'bg-red-100 text-red-800 hover:bg-red-200'
                                         )}
                                         onClick={() => minister.responded && fetchDetailedResponse(minister)}
                                       >
