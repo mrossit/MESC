@@ -63,6 +63,9 @@ export function generateToken(user: any): string {
 
 // Middleware para verificar JWT
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  console.log('[AUTH] authenticateToken called for:', req.method, req.path);
+  console.log('[AUTH] Cookies:', req.cookies);
+  
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   const secret: string = JWT_SECRET;
@@ -96,22 +99,29 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   if (!token) {
     // Verifica se há token no cookie também
     const cookieToken = req.cookies?.token;
+    console.log('[AUTH] No bearer token, checking cookie. Cookie token exists:', !!cookieToken);
+    
     if (!cookieToken) {
+      console.log('[AUTH] No cookie token found. Returning 401');
       return res.status(401).json({ message: 'Token de autenticação não fornecido' });
     }
     
     // Usa o token do cookie
     jwt.verify(cookieToken, secret, async (err: any, user: any) => {
       if (err) {
+        console.log('[AUTH] Cookie token verification failed:', err.message);
         return res.status(403).json({ message: 'Token inválido ou expirado' });
       }
+      console.log('[AUTH] Cookie token verified successfully');
       await verifyAndCheckStatus(user);
     });
     return;
   }
 
+  console.log('[AUTH] Using bearer token from header');
   jwt.verify(token, secret, async (err: any, user: any) => {
     if (err) {
+      console.log('[AUTH] Bearer token verification failed:', err.message);
       return res.status(403).json({ message: 'Token inválido ou expirado' });
     }
     await verifyAndCheckStatus(user);
