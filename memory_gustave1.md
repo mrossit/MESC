@@ -214,3 +214,18 @@
 
 ---
 
+### CORREÇÃO CRÍTICA - Login não funcionava em produção:
+- vangrey: App 100% OK no preview, mas nenhum usuário consegue logar no modo oficial
+- **PROBLEMA IDENTIFICADO**:
+  - Variável `NODE_ENV` NÃO estava definida no ambiente de produção do Replit
+  - Arquivo `.replit` não definia `NODE_ENV=production`
+  - Sistema ficava em modo indefinido, sem ser development nem production
+- **SOLUÇÃO APLICADA**:
+  - Adicionado `NODE_ENV = "production"` na seção `[env]` do `.replit` (linha 16)
+  - Agora o deployment sempre roda com `NODE_ENV=production`
+  - Isso garante que o JWT_SECRET funcione corretamente e autenticação opere em modo produção
+- **Arquivo modificado**: `/home/runner/workspace/.replit`
+- **AÇÃO NECESSÁRIA**: Fazer novo deploy do app para aplicar a correção
+
+---
+
