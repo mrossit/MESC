@@ -33,6 +33,19 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
     console.log(`🔍 [API /minister/current-month] Buscando escalas do usuário ${userId} entre ${firstDayStr} e ${lastDayStr}`);
     console.log(`🔍 [API /minister/current-month] Date types: firstDayStr=${typeof firstDayStr}, lastDayStr=${typeof lastDayStr}`);
 
+    // Buscar PID do usuário
+    const [userData] = await db
+      .select({ pid: users.pid, name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!userData) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    console.log(`👤 [API /minister/current-month] Usuário ${userData.name} - PID: ${userData.pid}`);
+
     // Buscar TODAS as escalas do usuário no mês atual
     const monthSchedules = await db
       .select({
@@ -77,9 +90,13 @@ router.get("/minister/current-month", requireAuth, async (req: AuthRequest, res:
     }));
 
     console.log('📤 [API /minister/current-month] Resposta formatada:');
-    console.log(JSON.stringify({ assignments: formattedAssignments }, null, 2));
+    console.log(JSON.stringify({ pid: userData.pid, name: userData.name, assignments: formattedAssignments }, null, 2));
 
-    res.json({ assignments: formattedAssignments });
+    res.json({ 
+      pid: userData.pid,
+      name: userData.name,
+      assignments: formattedAssignments 
+    });
   } catch (error: any) {
     console.error("[API /minister/current-month] Erro completo:", error);
     console.error("[API /minister/current-month] Stack:", error?.stack);
