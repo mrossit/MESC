@@ -269,3 +269,68 @@
 
 ---
 
+### DIAGNÓSTICO COMPLETO DE AUTENTICAÇÃO (2025-10-04):
+- **Solicitação**: Investigar e corrigir problema de autenticação em produção seguindo protocolo completo
+- **Executor**: Claude (agente moderado)
+
+#### 1. Variáveis de Ambiente Verificadas:
+- NODE_ENV: NÃO DEFINIDO (problema)
+- JWT_SECRET: DEFINIDO (63 chars)
+- DATABASE_URL: PostgreSQL Neon (correto)
+- PORT: 5000
+
+#### 2. Banco de Dados Validado:
+- ✅ Conexão: PostgreSQL 16.9 funcionando
+- ✅ Schema: Tabela users com password_hash (correto)
+- ✅ Dados: 121 usuários, 98 escalas, 2 questionários
+- ✅ Coordenadores: rossit@icloud.com, machadopri@hotmail.com
+
+#### 3. Hash/Validação de Senha:
+- ✅ Algoritmo: bcrypt 2b, 10 rounds
+- ✅ Biblioteca: bcrypt@6.0.0
+- ✅ Hashes válidos no banco
+
+#### 4. Problemas Identificados e Corrigidos:
+**A. Campo de senha incorreto (`server/auth.ts`):**
+- Linha 185: `user.password` → `user.passwordHash`
+- Linha 200: `const { password,` → `const { passwordHash,`
+- Linha 241: `password:` → `passwordHash:`
+- Linha 251: `const { password,` → `const { passwordHash,`
+- Linha 274: `user.password` → `user.passwordHash`
+- Linha 286: `password:` → `passwordHash:`
+- Linha 306: `password:` → `passwordHash:`
+
+**B. NODE_ENV não definido (`.replit`):**
+- Adicionado: `NODE_ENV = "production"` (linha 16)
+
+**C. Build sem devDependencies (`.replit`):**
+- build: `["sh", "-c", "npm ci --production=false && npm run build"]` (linha 11)
+
+**D. Logs aprimorados (`server/authRoutes.ts`):**
+- Adicionado console.error detalhado no catch de login (linhas 95-99)
+
+#### 5. Arquivos Criados:
+- `/scripts/test-password-validation.ts` - Testa algoritmo bcrypt
+- `/scripts/test-login-api.ts` - Testa endpoint de login
+- `/scripts/reset-test-user-password.ts` - Reset de senha para testes
+- `/server/routes/dev-tools.ts` - Rotas temporárias de dev (apenas NODE_ENV != production)
+- `/DIAGNOSTICO_AUTH.md` - Documento completo do diagnóstico
+
+#### 6. Configurações Validadas:
+- **Cookies**: httpOnly, secure=false (Replit proxy), sameSite='lax', 30 dias
+- **CORS**: Não necessário (mesmo domínio)
+- **JWT**: Secret correto, expiração adequada
+
+#### 7. Próximos Passos:
+1. Fazer novo **DEPLOYMENT** no Replit
+2. Testar login em produção com credenciais conhecidas
+3. Monitorar logs do servidor
+4. Criar usuários de teste com senhas conhecidas
+
+#### 8. Nota Importante:
+- **SQLite (local.db)**: 2 usuários (dev only)
+- **PostgreSQL (Neon)**: 121 usuários (PRODUCTION)
+- Ambos os ambientes agora apontam para o mesmo banco PostgreSQL quando DATABASE_URL está definido
+
+---
+
