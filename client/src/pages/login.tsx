@@ -35,6 +35,14 @@ export default function Login() {
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
   const inactivityReason = searchParams.get('reason') === 'inactivity';
+  const forceLogout = searchParams.get('logout') === 'true';
+
+  // Limpar cache se forceLogout=true
+  if (forceLogout) {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/login');
+  }
 
   const queryClient = useQueryClient();
 
