@@ -26,22 +26,22 @@ export function TopBar() {
   });
 
   return (
-    <div className="w-full bg-gradient-to-r from-background to-muted/20 dark:from-dark-7 dark:to-dark-6 border-b-2 border-primary/10 dark:border-dark-gold/20">
+    <div className="w-full bg-[#F5E6CC] border-b-2 border-[#7A1C1C]/20">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h2 className="text-sm font-semibold text-foreground/70 dark:text-dark-cream/70 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-[#7A1C1C] uppercase tracking-wider">
               Últimas Conexões
             </h2>
 
             {isLoading ? (
               <div className="flex gap-3">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-14 w-14 rounded-full bg-muted/50 animate-pulse" />
+                  <div key={i} className="h-14 w-14 rounded-full bg-[#F6EFE3] animate-pulse" />
                 ))}
               </div>
             ) : !recentUsers || recentUsers.length === 0 ? (
-              <span className="text-sm text-muted-foreground italic">
+              <span className="text-sm text-[#6B6B6B] italic">
                 Aguardando conexões...
               </span>
             ) : (
@@ -58,26 +58,26 @@ export function TopBar() {
                         className={cn(
                           "h-14 w-14 ring-[3px] ring-offset-2 transition-all duration-300 group-hover:scale-110 group-hover:ring-offset-4",
                           user.isOnline
-                            ? "ring-green-500 dark:ring-green-400 shadow-lg shadow-green-500/30"
-                            : "ring-red-500 dark:ring-red-400 shadow-lg shadow-red-500/30"
+                            ? "ring-[#2E7D32] shadow-lg shadow-[#2E7D32]/30"
+                            : "ring-[#7A1C1C] shadow-lg shadow-[#7A1C1C]/30"
                         )}
                       >
                         <AvatarImage src={user.photoUrl || undefined} alt={user.name} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-sm font-bold">
+                        <AvatarFallback className="bg-gradient-to-br from-[#7A1C1C] to-[#7A1C1C]/80 text-white text-sm font-bold">
                           {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       {/* Indicador de status - maior e mais visível */}
                       <div
                         className={cn(
-                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-[3px] ring-background dark:ring-dark-7 transition-all",
+                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-[3px] ring-[#F5E6CC] transition-all",
                           user.isOnline
-                            ? "bg-green-500 shadow-lg shadow-green-500/50"
-                            : "bg-red-500 shadow-lg shadow-red-500/50"
+                            ? "bg-[#2E7D32] shadow-lg shadow-[#2E7D32]/50"
+                            : "bg-[#7A1C1C] shadow-lg shadow-[#7A1C1C]/50"
                         )}
                       />
                     </div>
-                    <span className="text-xs font-medium text-foreground/80 dark:text-dark-cream/80 max-w-[70px] truncate">
+                    <span className="text-xs font-medium text-[#1E1E1E] max-w-[70px] truncate">
                       {user.name.split(' ')[0]}
                     </span>
                   </div>

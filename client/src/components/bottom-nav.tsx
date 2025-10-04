@@ -44,7 +44,7 @@ export function BottomNav() {
   if (!user) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background dark:bg-dark-7 border-t border-border dark:border-dark-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#7A1C1C] border-t-2 border-[#7A1C1C] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
       <div className="container mx-auto px-2">
         <div className="flex items-center justify-around h-16 sm:h-18">
           {navItems.map((item) => (
@@ -54,8 +54,8 @@ export function BottomNav() {
               className={cn(
                 "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[70px] sm:min-w-[80px]",
                 item.active
-                  ? "text-primary dark:text-dark-gold"
-                  : "text-muted-foreground hover:text-foreground dark:hover:text-dark-cream"
+                  ? "text-[#FACC15]"
+                  : "text-white/70 hover:text-white"
               )}
             >
               <item.icon
@@ -74,21 +74,21 @@ export function BottomNav() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[70px] sm:min-w-[80px]",
               location === "/profile"
-                ? "text-primary dark:text-dark-gold"
-                : "text-muted-foreground hover:text-foreground dark:hover:text-dark-cream"
+                ? "text-[#FACC15]"
+                : "text-white/70 hover:text-white"
             )}
           >
             <div className="relative">
               <Avatar
                 className={cn(
-                  "h-6 w-6 sm:h-7 sm:w-7 ring-2 ring-offset-1 transition-all",
+                  "h-6 w-6 sm:h-7 sm:w-7 ring-2 ring-offset-1 transition-all ring-offset-[#7A1C1C]",
                   location === "/profile"
-                    ? "ring-primary dark:ring-dark-gold"
+                    ? "ring-[#FACC15]"
                     : "ring-transparent"
                 )}
               >
                 <AvatarImage src={user.photoUrl || undefined} alt={user.name} />
-                <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-[10px]">
+                <AvatarFallback className="bg-[#F5E6CC] text-[#7A1C1C] text-[10px] font-bold">
                   {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
