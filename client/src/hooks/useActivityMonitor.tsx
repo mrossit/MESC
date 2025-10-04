@@ -29,38 +29,51 @@ export function useActivityMonitor() {
   const handleInactivity = useCallback(async () => {
     console.log('[ACTIVITY] 🔒 10 minutos de inatividade - encerrando sessão');
 
-    // Limpa tokens e dados sensíveis
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('user');
+    // 1. Limpa dados da aplicação (localStorage e sessionStorage)
+    localStorage.clear();
     sessionStorage.clear();
 
-    // Mantém preferências do usuário (theme, etc)
-    // localStorage.getItem('theme') permanece intacto
+    // 2. Desregistra Service Workers (PWA cache)
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log('[ACTIVITY] 🧹 Service Worker desregistrado');
+        }
+      } catch (error) {
+        console.error('[ACTIVITY] Erro ao desregistrar Service Worker:', error);
+      }
+    }
 
-    // Notifica backend
+    // 3. Notifica backend com header Clear-Site-Data
     try {
-      await fetch('/api/session/destroy', {
+      await fetch('/api/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+      console.log('[ACTIVITY] 🗑️ Logout no backend concluído');
     } catch (error) {
       console.error('[ACTIVITY] Erro ao destruir sessão:', error);
     }
 
-    // Mostra toast
+    // 4. Mostra toast
     toast({
       title: '🔒 Sessão Encerrada',
       description: 'Sua sessão foi encerrada após 10 minutos de inatividade.',
       variant: 'destructive'
     });
 
-    // Redireciona para login após 2 segundos
+    // 5. Redireciona com cache busting (força ignorar cache)
+    const timestamp = Date.now();
     setTimeout(() => {
-      setLocation('/login?reason=inactivity');
+      window.location.href = `/login?reason=inactivity&_=${timestamp}`;
     }, 2000);
 
-  }, [setLocation, toast]);
+  }, [toast]);
 
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now();

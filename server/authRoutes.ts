@@ -269,6 +269,10 @@ router.post('/logout', async (req, res) => {
     path: '/'
   });
 
+  // Header Clear-Site-Data para forçar limpeza de cache no navegador
+  // Suportado por Chrome, Edge, Opera (60%+ dos navegadores)
+  res.set('Clear-Site-Data', '"cache", "cookies", "storage"');
+
   res.json({
     success: true,
     message: 'Logout realizado com sucesso'
