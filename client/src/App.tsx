@@ -16,6 +16,7 @@ import { SessionIndicator } from "@/components/SessionIndicator";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Dashboard from "@/pages/dashboard";
+import CoordinatorDashboard from "@/pages/CoordinatorDashboard";
 import Approvals from "@/pages/approvals";
 import ChangePassword from "@/pages/change-password";
 import ChangePasswordRequired from "@/pages/change-password-required";
@@ -54,7 +55,14 @@ function Router() {
           <Dashboard />
         </AuthGuard>
       </Route>
-      
+
+      {/* Dashboard Coordenador - Apenas para Coordenadores e Gestores */}
+      <Route path="/coordinator-dashboard">
+        <AuthGuard allowedRoles={["coordenador", "gestor"]}>
+          <CoordinatorDashboard />
+        </AuthGuard>
+      </Route>
+
       <Route path="/schedules/substitutions">
         <AuthGuard>
           <Substitutions />

@@ -284,13 +284,16 @@ p, span, div {
   color: var(--color-black) !important;
 }
 
-/* Calendário - dia selecionado */
+/* Calendário - dia selecionado - mesmo estilo de "Você está Escalado" */
 [class*="calendar"] [data-selected],
 [class*="calendar"] .selected,
 button[data-selected="true"] {
-  background-color: var(--color-green-very-light) !important;
-  color: var(--color-black) !important;
-  border: 2px solid var(--color-green-dark) !important;
+  background: linear-gradient(to bottom right, var(--color-green-gradient-start), var(--color-green-gradient-end)) !important;
+  background: linear-gradient(to bottom right, #95CB89, #499058) !important;
+  color: #FFFFFF !important;
+  font-weight: bold !important;
+  border: none !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
 }
 
 /* REMOVER TODO BLUR E TRANSPARÊNCIA - GLOBAL */

@@ -1,7 +1,7 @@
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
-import { Home, Star, ArrowUpDown, User } from "lucide-react";
+import { Home, Star, ArrowUpDown, User, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -15,6 +15,7 @@ export function BottomNav() {
   });
 
   const user = authData?.user;
+  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
   const navItems = [
     {
@@ -65,6 +66,25 @@ export function BottomNav() {
               <span className="text-xs font-medium">{item.label}</span>
             </button>
           ))}
+
+          {/* ADM - Somente para Coordenadores e Gestores */}
+          {isCoordinator && (
+            <button
+              onClick={() => handleNavigation("/coordinator-dashboard")}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[70px] sm:min-w-[80px]",
+                location === "/coordinator-dashboard" && "active"
+              )}
+            >
+              <Shield
+                className={cn(
+                  "h-5 w-5 sm:h-6 sm:w-6",
+                  location === "/coordinator-dashboard" && "stroke-[2.5]"
+                )}
+              />
+              <span className="text-xs font-medium">ADM</span>
+            </button>
+          )}
 
           {/* Perfil do usuário */}
           <button
