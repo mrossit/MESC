@@ -159,5 +159,15 @@
 - Hierarquia visual clara com cores de destaque
 - Sofisticação através do contraste
 
+### Ajustes Finais - BottomNav:
+- vangrey: Solicitou ocultar menus (Em Desenvolvimento, Família MESC, Minhas Estatísticas, Minha Formação)
+- vangrey: Pediu BottomNav #000000 sólido, sem blur e transparência
+- Assistente: Implementado:
+  - BottomNav agora é PRETO SÓLIDO (#000000)
+  - Removido todas as sombras, blur e transparências
+  - Fallback do avatar agora é amarelo (#FACC15) com texto preto
+  - Ring offset atualizado para preto
+  - Menu totalmente opaco e sólido
+
 ---
 
