@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { schedules, substitutionRequests, users } from "@shared/schema";
+import { schedules, substitutionRequests, users, questionnaireResponses, questionnaires } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 
@@ -538,6 +538,91 @@ router.post("/:scheduleId/generate", requireAuth, requireRole(['coordenador', 'g
   } catch (error) {
     console.error("Error generating intelligent schedule:", error);
     res.status(500).json({ message: "Erro ao gerar escala inteligente" });
+  }
+});
+
+// Get available ministers from questionnaire responses for a specific date and time
+router.get("/available-ministers/:date/:time", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, time } = req.params;
+
+    // Parse date to get month and year
+    const targetDate = new Date(date);
+    const month = targetDate.getMonth() + 1; // JavaScript months are 0-indexed
+    const year = targetDate.getFullYear();
+    const dayOfMonth = targetDate.getDate();
+
+    console.log(`🔍 Buscando ministros disponíveis para ${date} às ${time}h`);
+    console.log(`📅 Mês: ${month}, Ano: ${year}, Dia: ${dayOfMonth}`);
+
+    // Find questionnaire for this month/year
+    const activeQuestionnaires = await db
+      .select()
+      .from(questionnaires)
+      .where(
+        and(
+          eq(questionnaires.month, month),
+          eq(questionnaires.year, year),
+          eq(questionnaires.status, 'published')
+        )
+      )
+      .limit(1);
+
+    if (activeQuestionnaires.length === 0) {
+      console.log('❌ Nenhum questionário encontrado para este mês/ano');
+      return res.json({ ministers: [] });
+    }
+
+    const questionnaireId = activeQuestionnaires[0].id;
+    console.log(`📋 Questionário encontrado: ${questionnaireId}`);
+
+    // Get all responses for this questionnaire
+    const responses = await db
+      .select({
+        id: questionnaireResponses.id,
+        userId: questionnaireResponses.userId,
+        userName: users.name,
+        userPhoto: users.profilePhoto,
+        responses: questionnaireResponses.responses,
+        availableSundays: questionnaireResponses.availableSundays,
+        preferredMassTimes: questionnaireResponses.preferredMassTimes
+      })
+      .from(questionnaireResponses)
+      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+      .where(eq(questionnaireResponses.questionnaireId, questionnaireId));
+
+    console.log(`📝 Total de respostas: ${responses.length}`);
+
+    // Filter ministers available for this specific day and time
+    const availableMinister = responses.filter(response => {
+      const availableSundays = response.availableSundays as string[] || [];
+      const preferredTimes = response.preferredMassTimes as string[] || [];
+
+      // Check if day is in available sundays (format: "1", "2", "8", etc.)
+      const isDayAvailable = availableSundays.includes(String(dayOfMonth));
+
+      // Check if time matches (format: "08:00", "10:00", "19:00")
+      const isTimeAvailable = preferredTimes.includes(time);
+
+      console.log(`👤 ${response.userName}: Dia ${dayOfMonth} disponível? ${isDayAvailable}, Horário ${time} disponível? ${isTimeAvailable}`);
+
+      return isDayAvailable && isTimeAvailable;
+    });
+
+    console.log(`✅ Ministros disponíveis encontrados: ${availableMinister.length}`);
+
+    const ministers = availableMinister.map(m => ({
+      id: m.userId,
+      name: m.userName,
+      photo: m.userPhoto,
+      availableSundays: m.availableSundays,
+      preferredTimes: m.preferredMassTimes
+    }));
+
+    res.json({ ministers });
+  } catch (error) {
+    console.error("Error getting available ministers:", error);
+    res.status(500).json({ message: "Erro ao buscar ministros disponíveis" });
   }
 });
 

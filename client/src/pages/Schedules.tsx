@@ -134,6 +134,12 @@ export default function Schedules() {
   const [availableSubstitutes, setAvailableSubstitutes] = useState<any[]>([]);
   const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
   const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
+  // Estados para seleção de horário por dia (sistemático)
+  const [isTimeSelectionDialogOpen, setIsTimeSelectionDialogOpen] = useState(false);
+  const [selectedTimeForDay, setSelectedTimeForDay] = useState<string>("");
+  const [timeFilteredAssignments, setTimeFilteredAssignments] = useState<ScheduleAssignment[]>([]);
+  const [loadingTimeAssignments, setLoadingTimeAssignments] = useState(false);
+  const [availableTimesForDay, setAvailableTimesForDay] = useState<string[]>([]);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -923,15 +929,33 @@ export default function Schedules() {
                         // Tornar clicável para coordenador em rascunho
                         isCoordinator && currentSchedule?.status === "draft" && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-accent"
                       )}
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedDate(day);
-                        
-                        // Se a escala está publicada, abre modal de visualização
-                        if (currentSchedule?.status === "published") {
-                          fetchScheduleForDate(day);
-                        } 
+
+                        // NOVO PADRÃO SISTÊMICO: Buscar horários disponíveis para este dia
+                        if (currentSchedule?.status === "published" && isSameMonth(day, currentMonth)) {
+                          // Buscar os horários que existem para este dia específico
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          try {
+                            const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
+                              credentials: "include"
+                            });
+
+                            if (response.ok) {
+                              const data = await response.json();
+                              // Extrair horários únicos das escalas deste dia
+                              const uniqueTimes = [...new Set(data.assignments?.map((a: any) => a.massTime) || [])];
+                              setAvailableTimesForDay(uniqueTimes.sort());
+                              setIsTimeSelectionDialogOpen(true);
+                            }
+                          } catch (error) {
+                            console.error("Erro ao buscar horários:", error);
+                          }
+                          return;
+                        }
+
                         // Se é coordenador e escala está em rascunho, abre modal de edição
-                        else if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
+                        if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
                           setIsAssignmentDialogOpen(true);
                         }
                       }}>
@@ -1605,6 +1629,168 @@ export default function Schedules() {
               variant="outline"
               onClick={() => setIsViewScheduleDialogOpen(false)}
               className="w-full sm:w-auto text-sm"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog SISTÊMICO para seleção de horário (qualquer dia do mês) */}
+      <Dialog open={isTimeSelectionDialogOpen} onOpenChange={(open) => {
+        setIsTimeSelectionDialogOpen(open);
+        if (!open) {
+          setSelectedTimeForDay("");
+          setTimeFilteredAssignments([]);
+          setAvailableTimesForDay([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--color-red-dark)]">
+              {selectedTimeForDay
+                ? `Escala - Dia ${selectedDate && format(selectedDate, 'd')} - ${selectedTimeForDay.substring(0, 5)}h`
+                : `Selecione o Horário - Dia ${selectedDate && format(selectedDate, 'd')}`}
+            </DialogTitle>
+            <DialogDescription className="text-[var(--color-text-primary)]">
+              {selectedTimeForDay ? 'Ministros escalados para este horário' : 'Escolha um horário para visualizar a escala'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!selectedTimeForDay ? (
+            // Lista de horários DINÂMICA - baseada nos horários cadastrados para este dia
+            <div className="space-y-3 py-4">
+              {availableTimesForDay.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-[var(--color-text-primary)]">Nenhum horário encontrado para este dia</p>
+                </div>
+              ) : (
+                availableTimesForDay.map((time) => (
+                <Button
+                  key={time}
+                  variant="outline"
+                  className="w-full h-16 text-lg font-semibold border-[var(--color-beige-light)] hover:bg-[var(--color-beige-light)] transition-all"
+                  onClick={async () => {
+                    setSelectedTimeForDay(time);
+                    setLoadingTimeAssignments(true);
+                    try {
+                      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                      const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
+                        credentials: "include"
+                      });
+
+                      if (response.ok) {
+                        const data = await response.json();
+                        console.log(`📅 Escalas do dia ${format(selectedDate, 'd')}:`, data);
+
+                        // Filtrar APENAS o horário selecionado (formato padrão: HH:MM:SS)
+                        const filteredAssignments = data.assignments?.filter(
+                          (a: ScheduleAssignment) => a.massTime === time
+                        ) || [];
+
+                        console.log(`⏰ Horário ${time} - Total: ${filteredAssignments.length} ministros`);
+
+                        setTimeFilteredAssignments(filteredAssignments);
+
+                        if (filteredAssignments.length === 0) {
+                          toast({
+                            title: "Aviso",
+                            description: `Nenhum ministro escalado para ${time.substring(0, 5)}h`,
+                          });
+                        }
+                      } else {
+                        setTimeFilteredAssignments([]);
+                        toast({
+                          title: "Erro",
+                          description: "Erro ao buscar escalas",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error) {
+                      console.error("Erro ao buscar escalas:", error);
+                      setTimeFilteredAssignments([]);
+                    } finally {
+                      setLoadingTimeAssignments(false);
+                    }
+                  }}
+                >
+                  <Clock className="h-6 w-6 mr-3" />
+                  {time.substring(0, 5)}h
+                </Button>
+                ))
+              )}
+            </div>
+          ) : (
+            // Exibir escala do horário selecionado
+            <div className="space-y-4 py-4">
+              {loadingTimeAssignments ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--color-green-dark)]" />
+                </div>
+              ) : timeFilteredAssignments.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-[var(--color-text-primary)]">
+                    Nenhum ministro escalado para este horário
+                  </p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-96">
+                  <div className="space-y-3">
+                    {timeFilteredAssignments.map((assignment, index) => (
+                      <div
+                        key={assignment.id}
+                        className="p-4 rounded-lg border border-[var(--color-beige-light)] bg-white hover:bg-[var(--color-beige-light)] transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-[var(--color-green-dark)] text-white">
+                                {LITURGICAL_POSITIONS[assignment.position] || `Posição ${assignment.position}`}
+                              </Badge>
+                              <p className="font-semibold text-[var(--color-text-primary)]">
+                                {assignment.ministerName || 'VAGA DISPONÍVEL'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-[var(--color-text-secondary)]">
+                              <Clock className="h-3 w-3" />
+                              <span>{assignment.massTime?.substring(0, 5)}</span>
+                            </div>
+                          </div>
+                          {assignment.confirmed ? (
+                            <Check className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSelectedTimeForDay("");
+                  setTimeFilteredAssignments([]);
+                }}
+              >
+                Voltar aos horários
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsTimeSelectionDialogOpen(false);
+                setSelectedTimeForDay("");
+                setTimeFilteredAssignments([]);
+                setAvailableTimesForDay([]);
+              }}
+              className="w-full sm:w-auto"
             >
               Fechar
             </Button>
