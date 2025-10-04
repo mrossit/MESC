@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { LayoutClean } from "@/components/layout";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -438,7 +438,7 @@ export default function Substitutions() {
   };
 
   return (
-    <Layout 
+    <LayoutClean 
       title="Substituições"
       subtitle={isCoordinator ? "Gerencie pendências e substituições" : "Gerencie solicitações de substituição"}
     >
@@ -1074,6 +1074,6 @@ export default function Substitutions() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Layout>
+    </LayoutClean>
   );
 }

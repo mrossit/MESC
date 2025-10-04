@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { LayoutClean } from "@/components/layout-clean";
 import { DashboardStatsCards } from "@/components/dashboard-stats";
 import { QuickActions } from "@/components/quick-actions";
 import { ScheduleOverview } from "@/components/schedule-overview";
@@ -37,23 +37,23 @@ export default function Dashboard() {
   // Se for ministro, mostra o dashboard simplificado
   if (user?.role === "ministro") {
     return (
-      <Layout title={getTitle()} subtitle={getSubtitle()}>
+      <LayoutClean title="Início">
         <MinisterDashboard />
-      </Layout>
+      </LayoutClean>
     );
   }
 
   // Dashboard para coordenadores e gestores
   return (
-    <Layout title={getTitle()} subtitle={getSubtitle()}>
-      <div className="space-y-4">
+    <LayoutClean title="Início">
+      <div className="space-y-6">
         {/* Statistics Cards */}
         <DashboardStatsCards />
 
         {/* Quick Actions - Only for coordinators */}
         {isCoordinator && <QuickActions />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Schedule Overview */}
           <ScheduleOverview />
 
@@ -61,12 +61,12 @@ export default function Dashboard() {
           {isCoordinator && <PendingApprovals />}
         </div>
 
-        {/* Formation Progress */}
-        <FormationProgress />
+        {/* Formation Progress - OCULTO */}
+        {/* <FormationProgress /> */}
 
-        {/* Recent Activity */}
-        <RecentActivity />
+        {/* Recent Activity - OCULTO */}
+        {/* <RecentActivity /> */}
       </div>
-    </Layout>
+    </LayoutClean>
   );
 }

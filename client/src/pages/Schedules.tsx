@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { LayoutClean } from "@/components/layout-clean";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -678,14 +678,13 @@ export default function Schedules() {
 
   if (loading) {
     return (
-      <Layout
+      <LayoutClean
         title="Escalas Litúrgicas"
-        subtitle="Gerenciar escalas de ministros para as celebrações"
       >
         <div className="flex items-center justify-center h-64">
           <div className="text-lg text-muted-foreground">Carregando escalas...</div>
         </div>
-      </Layout>
+      </LayoutClean>
     );
   }
 
@@ -695,9 +694,8 @@ export default function Schedules() {
   );
 
   return (
-    <Layout 
+    <LayoutClean 
       title="Escalas Litúrgicas"
-      subtitle="Gerenciar escalas de ministros para as celebrações"
     >
       <div className="space-y-4 sm:space-y-6">
         {isCoordinator && !currentSchedule && (
@@ -1801,7 +1799,7 @@ export default function Schedules() {
 
       {/* Dialog para solicitar substituição */}
       <Dialog open={isSubstitutionDialogOpen} onOpenChange={setIsSubstitutionDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
+        <DialogContent className="sm:max-w-[600px] max-w-[calc(100vw-2rem)] mx-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Solicitar Substituição</DialogTitle>
             <DialogDescription>
@@ -1819,33 +1817,66 @@ export default function Schedules() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Motivo - OPCIONAL */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Motivo da substituição <span className="text-red-500">*</span>
+                Motivo da substituição <span className="text-muted-foreground text-xs">(opcional)</span>
               </label>
               <Textarea
-                placeholder="Por favor, explique o motivo da sua ausência..."
+                placeholder="Se desejar, explique o motivo da sua ausência..."
                 value={substitutionReason}
                 onChange={(e) => setSubstitutionReason(e.target.value)}
-                rows={4}
+                rows={3}
                 className="resize-none"
               />
+            </div>
+
+            {/* Substitutos Sugeridos */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Indicar substituto específico <span className="text-muted-foreground text-xs">(opcional)</span>
+              </label>
+              {loadingSubstitutes ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : availableSubstitutes.length > 0 ? (
+                <Select value={selectedSubstituteId} onValueChange={setSelectedSubstituteId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um ministro (ou deixe em branco)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Não indicar ninguém</SelectItem>
+                    {availableSubstitutes.map((minister) => (
+                      <SelectItem key={minister.id} value={minister.id}>
+                        {minister.name} {minister.servicesThisMonth > 0 && `(${minister.servicesThisMonth} missas este mês)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">
+                  Nenhum substituto disponível encontrado para este horário
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
-                Seja específico sobre o motivo para ajudar na aprovação da sua solicitação.
+                Ministros não escalados no mesmo horário, ordenados por menor atividade no mês
               </p>
             </div>
 
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
+            {/* Informações importantes */}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 space-y-2">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-900 dark:text-amber-100">
-                    Importante:
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Como funciona:
                   </p>
-                  <ul className="mt-1 space-y-1 text-amber-800 dark:text-amber-200 text-xs">
-                    <li>• Sua solicitação será enviada aos coordenadores para aprovação</li>
-                    <li>• Outros ministros serão notificados sobre a necessidade de substituição</li>
-                    <li>• Você será notificado quando alguém aceitar substituí-lo</li>
+                  <ul className="mt-1 space-y-1 text-blue-800 dark:text-blue-200 text-xs">
+                    <li>• <strong>≥ 12h antes:</strong> Auto-aprovada (máx 2/mês)</li>
+                    <li>• <strong>{'<'} 12h antes:</strong> Requer aprovação do coordenador</li>
+                    <li>• Se não indicar substituto, outros ministros serão notificados</li>
+                    <li>• Você será notificado quando alguém aceitar</li>
                   </ul>
                 </div>
               </div>
@@ -1853,20 +1884,22 @@ export default function Schedules() {
           </div>
 
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setIsSubstitutionDialogOpen(false);
                 setSubstitutionReason("");
+                setSelectedSubstituteId("");
                 setSelectedAssignmentForSubstitution(null);
+                setAvailableSubstitutes([]);
               }}
               disabled={submittingSubstitution}
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleRequestSubstitution}
-              disabled={submittingSubstitution || !substitutionReason.trim()}
+              disabled={submittingSubstitution}
             >
               {submittingSubstitution ? (
                 <>
@@ -1884,6 +1917,6 @@ export default function Schedules() {
         </DialogContent>
       </Dialog>
       </div>
-    </Layout>
+    </LayoutClean>
   );
 }

@@ -61,35 +61,39 @@ function Router() {
         </AuthGuard>
       </Route>
       
-      <Route path="/schedules/auto-generation">
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/schedules/auto-generation">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <AutoScheduleGeneration />
         </AuthGuard>
-      </Route>
-      
+      </Route> */}
+
       <Route path="/schedules/:action?">
         <AuthGuard>
           <Schedules />
         </AuthGuard>
       </Route>
-      
-      <Route path="/schedule-editor">
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/schedule-editor">
         <AuthGuard>
           <ScheduleEditor />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/questionnaire">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/questionnaire">
         <AuthGuard>
           <QuestionnaireUnified />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/questionnaire-responses">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/questionnaire-responses">
         <AuthGuard allowedRoles={["coordenador", "gestor"]}>
           <QuestionnaireResponses />
         </AuthGuard>
-      </Route>
+      </Route> */}
       
       <Route path="/profile">
         <AuthGuard>
@@ -97,66 +101,75 @@ function Router() {
         </AuthGuard>
       </Route>
       
-      <Route path="/settings">
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/settings">
         <AuthGuard>
           <Settings />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/ministers">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/ministers">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Ministers />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/ministros">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/ministros">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Ministers />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/ministers-directory">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/ministers-directory">
         <AuthGuard>
           <MinistersDirectory />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/formation/:track?/:module?/:lesson?">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/formation/:track?/:module?/:lesson?">
         <AuthGuard>
           <Formation />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/communication">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/communication">
         <AuthGuard>
           <Communication />
         </AuthGuard>
-      </Route>
+      </Route> */}
 
-      <Route path="/reports">
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/reports">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Reports />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/approvals">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/approvals">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <Approvals />
         </AuthGuard>
-      </Route>
-      
-      <Route path="/user-management">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/user-management">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <UserManagement />
         </AuthGuard>
-      </Route>
-      
-      
-      <Route path="/qrcode">
+      </Route> */}
+
+      {/* OCULTO TEMPORARIAMENTE - Não prioritário */}
+      {/* <Route path="/qrcode">
         <AuthGuard allowedRoles={["gestor", "coordenador"]}>
           <QRCodeShare />
         </AuthGuard>
-      </Route>
+      </Route> */}
 
       {/* Fallback to 404 */}
       <Route component={NotFound} />
