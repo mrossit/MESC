@@ -251,5 +251,21 @@
   - Linha 306: `password:` → `passwordHash:`
 - **RESULTADO**: Login funcionará corretamente após restart do servidor
 
+### Investigação - "Banco de dados dropado":
+- vangrey: Relatou que banco de produção estava zerado
+- **INVESTIGAÇÃO REALIZADA**:
+  - Verificado todas as tabelas: ✅ 20 tabelas intactas
+  - Contagem de dados:
+    - 121 usuários cadastrados
+    - 98 escalas criadas
+    - 2 questionários ativos
+    - Escalas de outubro/2025 presentes (01 a 05/10)
+  - Coordenadores existentes: Marco Rossit, Priscila Machado
+- **CONCLUSÃO**:
+  - Banco de dados NÃO foi dropado
+  - Todos os dados estão preservados
+  - O problema era apenas o bug de autenticação (password vs passwordHash)
+  - Erro de login fazia parecer que banco estava vazio, mas eram apenas credenciais não funcionando
+
 ---
 
