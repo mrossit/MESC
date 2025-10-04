@@ -5,6 +5,7 @@ import { MinisterTutorial, useShouldShowTutorial } from "@/components/minister-t
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { LITURGICAL_POSITIONS } from "@shared/constants";
 
 interface Versiculo {
   id: number;
@@ -23,15 +24,6 @@ interface ScheduleAssignment {
   scheduleStatus?: string;
   location?: string;
 }
-
-const LITURGICAL_POSITIONS: Record<number, string> = {
-  1: "Círio",
-  2: "Turíbulo",
-  3: "Naveta",
-  4: "Acolhedor(a)",
-  5: "Acolhedor(a) 2",
-  6: "Galhetas"
-};
 
 export function MinisterDashboard() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
