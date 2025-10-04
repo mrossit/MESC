@@ -233,5 +233,23 @@
   - Isso instala TODAS as dependências antes de compilar
 - **AÇÃO NECESSÁRIA**: Fazer novo deploy do app para aplicar ambas as correções
 
+### CORREÇÃO CRÍTICA 2 - Erro de login após deployment:
+- vangrey: "ERRO DE LOGIN - revise os dados e tente novamente"
+- **PROBLEMA IDENTIFICADO**:
+  - Schema do banco usa `passwordHash` mas código de auth usava `user.password`
+  - Incompatibilidade entre nome de campo no schema e no código
+  - Banco PostgreSQL: coluna `password_hash`
+  - Schema Drizzle: `passwordHash`
+  - Código auth: tentava acessar `user.password` (ERRADO!)
+- **SOLUÇÃO APLICADA** em `/home/runner/workspace/server/auth.ts`:
+  - Linha 185: `user.password` → `user.passwordHash`
+  - Linha 200: `const { password, ...` → `const { passwordHash, ...`
+  - Linha 241: `password: hashedPassword` → `passwordHash: hashedPassword`
+  - Linha 251: `const { password, ...` → `const { passwordHash, ...`
+  - Linha 274: `user.password` → `user.passwordHash`
+  - Linha 286: `password:` → `passwordHash:`
+  - Linha 306: `password:` → `passwordHash:`
+- **RESULTADO**: Login funcionará corretamente após restart do servidor
+
 ---
 
