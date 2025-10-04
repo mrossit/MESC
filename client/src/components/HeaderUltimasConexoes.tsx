@@ -96,14 +96,20 @@ export function HeaderUltimasConexoes() {
   // Usar dados do WebSocket se conectado, senão usar polling
   const displayData = (wsConnected ? connections : (queryData || [])).slice(0, 3);
 
-  // Não renderizar se não houver dados
-  if (!user || displayData.length === 0) {
+  // Não renderizar se usuário não estiver logado
+  if (!user) {
     return null;
   }
 
   return (
     <div className="header-ultimas-conexoes">
-      {displayData.map((conn) => (
+      {displayData.length === 0 ? (
+        // Placeholder quando não há dados
+        <div className="text-xs text-muted-foreground italic">
+          Nenhuma conexão recente
+        </div>
+      ) : (
+        displayData.map((conn) => (
         <div
           key={conn.user_id}
           className="uc-item-circular"
@@ -123,7 +129,8 @@ export function HeaderUltimasConexoes() {
             )}
           </div>
         </div>
-      ))}
+        ))
+      )}
     </div>
   );
 }

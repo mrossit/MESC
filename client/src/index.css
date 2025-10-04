@@ -446,12 +446,18 @@
   .border-liturgical {
     border: 0.5px solid rgb(var(--border));
   }
-  
+
   /* Texto com antialiasing refinado */
   .text-liturgical {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Garantir background sólido em todos os modais */
+  [role="dialog"],
+  [role="alertdialog"] {
+    background: rgb(var(--background)) !important;
   }
 }
 
