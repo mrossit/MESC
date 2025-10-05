@@ -10,7 +10,7 @@ const router = Router();
 
 router.get("/api/header/ultimas-conexoes", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 8;
+    const limit = parseInt(req.query.limit as string) || 20;
     
     // Considerar online se last_activity_at >= now() - 2 minutos
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);

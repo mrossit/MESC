@@ -75,7 +75,8 @@
       "Bash(find:*)",
       "Bash(npx vitest run:*)",
       "Bash(npm test:*)",
-      "Bash(NODE_ENV=production npx tsx scripts/check-schedule-assignments.ts)"
+      "Bash(NODE_ENV=production npx tsx scripts/check-schedule-assignments.ts)",
+      "Bash(NODE_ENV=production npx tsx scripts/check-users-online-status.ts)"
     ],
     "deny": [],
     "ask": []

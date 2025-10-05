@@ -24,7 +24,7 @@ export function HeaderUltimasConexoes() {
   const { data: queryData } = useQuery<UltimaConexao[]>({
     queryKey: ['/api/header/ultimas-conexoes'],
     queryFn: async () => {
-      const res = await fetch('/api/header/ultimas-conexoes?limit=3', {
+      const res = await fetch('/api/header/ultimas-conexoes?limit=20', {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Erro ao buscar últimas conexões');
@@ -94,7 +94,7 @@ export function HeaderUltimasConexoes() {
   }, [user]);
 
   // Usar dados do WebSocket se conectado, senão usar polling
-  const displayData = (wsConnected ? connections : (queryData || [])).slice(0, 3);
+  const displayData = (wsConnected ? connections : (queryData || [])).slice(0, 20);
 
   // Não renderizar se usuário não estiver logado
   if (!user) {
@@ -119,7 +119,7 @@ export function HeaderUltimasConexoes() {
           tabIndex={0}
           aria-label={`${conn.nome}, ${conn.status === 'online' ? 'online' : 'offline'} ${conn.last_seen_human}`}
         >
-          <div className="uc-ring">
+          <div className={`uc-ring ${conn.status}`}>
             <div className={`uc-avatar-wrapper ${conn.status}`}>
               {conn.avatar_url ? (
                 <img

@@ -65,7 +65,7 @@ function checkRateLimit(userId: string): boolean {
 /**
  * Busca status atual dos usuários online
  */
-async function getOnlineUsers(limit = 8) {
+async function getOnlineUsers(limit = 20) {
   const result = await db.execute(sql`
     SELECT
       user_id,
