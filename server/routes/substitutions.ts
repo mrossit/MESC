@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db";
 import { substitutionRequests, schedules, users } from "@shared/schema";
 import { eq, and, sql, gte, desc, count } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth";
+import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 
 const router = Router();
 
@@ -54,7 +54,7 @@ async function countMonthlySubstitutions(requesterId: string): Promise<number> {
 }
 
 // POST /api/substitutions - Criar solicitação de substituição
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user!.id;
@@ -202,7 +202,7 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 // GET /api/substitutions - Listar solicitações
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const userRole = req.user!.role;
@@ -261,7 +261,7 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // GET /api/substitutions/available/:scheduleId - Listar substitutos disponíveis
-router.get("/available/:scheduleId", requireAuth, async (req, res) => {
+router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { scheduleId } = req.params;
 
@@ -329,7 +329,7 @@ router.get("/available/:scheduleId", requireAuth, async (req, res) => {
 });
 
 // POST /api/substitutions/:id/respond - Aceitar/Rejeitar solicitação
-router.post("/:id/respond", requireAuth, async (req, res) => {
+router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { response, responseMessage } = req.body; // response: "accepted" | "rejected"
@@ -418,7 +418,7 @@ router.post("/:id/respond", requireAuth, async (req, res) => {
 });
 
 // DELETE /api/substitutions/:id - Cancelar solicitação
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
