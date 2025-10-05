@@ -30,14 +30,14 @@ const getActivityIconStyle = (action: string) => {
   switch (action) {
     case "schedule_published":
     case "schedule_created":
-      return { bg: "bg-neutral-accentWarm/10 dark:bg-amber-900/20", color: "text-neutral-accentWarm dark:text-amber-500" };
+      return { bg: "bg-sage/20 dark:bg-sage/30", color: "text-sage-dark dark:text-sage-light" };
     case "user_created":
     case "formation_completed":
-      return { bg: "bg-green-100 dark:bg-green-900/20", color: "text-green-500 dark:text-green-400" };
+      return { bg: "bg-sage-light/25 dark:bg-sage-dark/25", color: "text-sage dark:text-sage-light" };
     case "substitution_requested":
-      return { bg: "bg-orange-100 dark:bg-orange-900/20", color: "text-orange-500 dark:text-orange-400" };
+      return { bg: "bg-burgundy/15 dark:bg-burgundy/25", color: "text-burgundy dark:text-burgundy-soft" };
     default:
-      return { bg: "bg-blue-100", color: "text-blue-500" };
+      return { bg: "bg-cream-light/35 dark:bg-cream-light/20", color: "text-sage dark:text-cream-light" };
   }
 };
 

@@ -90,8 +90,8 @@ export function PendingApprovals() {
             Aprovações Pendentes
           </CardTitle>
           {pendingUsers.length > 0 && (
-            <Badge 
-              className="bg-neutral-accentWarm/20 text-foreground dark:bg-amber-900/20 dark:text-amber-200"
+            <Badge
+              className="bg-burgundy/20 text-burgundy dark:bg-burgundy/30 dark:text-burgundy-soft"
               data-testid="badge-pending-count"
             >
               {pendingUsers.length} novos
@@ -118,7 +118,7 @@ export function PendingApprovals() {
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="bg-neutral-accentWarm/20 dark:bg-dark-5 text-neutral-accentWarm dark:text-text-light">
+                      <AvatarFallback className="bg-sage/20 dark:bg-sage/30 text-sage-dark dark:text-sage-light">
                         <User className="h-5 w-5" />
                       </AvatarFallback>
                     </Avatar>
@@ -143,7 +143,7 @@ export function PendingApprovals() {
                   <div className="flex gap-2 flex-shrink-0 self-start">
                     <Button
                       size="sm"
-                      className="bg-green-100 text-green-800 hover:bg-green-200 border-0 text-xs px-3"
+                      className="bg-sage/25 text-sage-dark hover:bg-sage/35 dark:bg-sage/30 dark:text-sage-light dark:hover:bg-sage/40 border-0 text-xs px-3"
                       onClick={() => handleApproval(user.id, "active")}
                       disabled={updateUserStatusMutation.isPending}
                       data-testid={`button-approve-${user.id}`}
@@ -154,7 +154,7 @@ export function PendingApprovals() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="bg-red-100 text-red-800 hover:bg-red-200 border-0 text-xs px-3"
+                      className="bg-burgundy/20 text-burgundy hover:bg-burgundy/30 dark:bg-burgundy/25 dark:text-burgundy-soft dark:hover:bg-burgundy/35 border-0 text-xs px-3"
                       onClick={() => handleApproval(user.id, "inactive")}
                       disabled={updateUserStatusMutation.isPending}
                       data-testid={`button-reject-${user.id}`}

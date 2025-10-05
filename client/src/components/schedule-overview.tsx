@@ -42,20 +42,20 @@ export function ScheduleOverview() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "complete":
-        return <Badge className="bg-green-100 text-green-800">Completa</Badge>;
+        return <Badge className="bg-sage/20 text-sage-dark dark:bg-sage/30 dark:text-sage-light">Completa</Badge>;
       case "incomplete":
-        return <Badge className="bg-orange-100 text-orange-800">Incompleta</Badge>;
+        return <Badge className="bg-cream-light/40 text-sage dark:bg-cream-light/25 dark:text-cream-light">Incompleta</Badge>;
       case "urgent":
-        return <Badge className="bg-red-100 text-red-800">Urgente</Badge>;
+        return <Badge className="bg-burgundy/20 text-burgundy dark:bg-burgundy/30 dark:text-burgundy-soft">Urgente</Badge>;
       default:
         return null;
     }
   };
 
   const getMassStatus = (ministers: number, total: number) => {
-    if (ministers === total) return "bg-neutral-accentWarm";
-    if (ministers >= total * 0.7) return "bg-orange-400";
-    return "bg-red-400";
+    if (ministers === total) return "bg-sage dark:bg-sage-light";
+    if (ministers >= total * 0.7) return "bg-cream-light/60 dark:bg-cream-light/40";
+    return "bg-burgundy dark:bg-burgundy-soft";
   };
 
   return (

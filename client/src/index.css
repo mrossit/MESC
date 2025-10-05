@@ -435,6 +435,52 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
+
+  /* Novas classes utilitárias com a paleta */
+  .bg-sage {
+    background-color: rgb(var(--sage));
+  }
+
+  .bg-sage-light {
+    background-color: rgb(var(--sage-light));
+  }
+
+  .bg-cream-light {
+    background-color: rgb(var(--cream-light));
+  }
+
+  .bg-burgundy {
+    background-color: rgb(var(--burgundy));
+  }
+
+  .text-sage {
+    color: rgb(var(--sage));
+  }
+
+  .text-burgundy {
+    color: rgb(var(--burgundy));
+  }
+
+  .border-sage {
+    border-color: rgb(var(--sage));
+  }
+
+  .border-burgundy {
+    border-color: rgb(var(--burgundy));
+  }
+
+  /* Hover states */
+  .hover\:bg-sage:hover {
+    background-color: rgb(var(--sage));
+  }
+
+  .hover\:bg-sage-light:hover {
+    background-color: rgb(var(--sage-light));
+  }
+
+  .hover\:bg-burgundy:hover {
+    background-color: rgb(var(--burgundy));
+  }
 }
 
 /* Animações suaves */
