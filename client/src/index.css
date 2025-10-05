@@ -35,6 +35,14 @@
   --badge-gold: 212, 175, 55;             /* #D4AF37 - Badge dourado */
   --badge-copper: 184, 115, 51;           /* #B87333 - Badge cobre */
   --badge-terracotta: 204, 119, 102;      /* #CC7766 - Badge terracota */
+
+  /* Novas cores da paleta - Light Mode */
+  --sage: 162, 179, 139;                  /* #A2B38B - Verde oliva/sálvia */
+  --sage-light: 184, 198, 165;            /* #B8C6A5 - Sálvia claro */
+  --sage-dark: 138, 156, 118;             /* #8A9C76 - Sálvia escuro */
+  --cream-light: 228, 233, 190;           /* #E4E9BE - Bege claro amarelado */
+  --burgundy: 110, 19, 12;                /* #6E130C - Vermelho escuro */
+  --burgundy-soft: 160, 88, 80;           /* #A05850 - Burgundy suave */
   
   /* Cores Complementares */
   --coffee: 101, 67, 33;                  /* #654321 - Cor café para textos */
@@ -117,6 +125,14 @@
   --badge-gold: 120, 95, 30;              /* Dourado escuro */
   --badge-copper: 100, 65, 25;            /* Cobre escuro */
   --badge-terracotta: 110, 70, 55;        /* Terracota escura */
+
+  /* Novas cores da paleta - Dark Mode */
+  --sage: 138, 156, 118;                  /* #8A9C76 - Verde oliva mais escuro */
+  --sage-light: 162, 179, 139;            /* #A2B38B - Sálvia */
+  --sage-dark: 115, 130, 98;              /* Tom ainda mais escuro */
+  --cream-light: 180, 185, 150;           /* Tom mais escuro do bege */
+  --burgundy: 139, 69, 19;                /* #8B4513 - Burgundy mais claro para dark */
+  --burgundy-soft: 180, 110, 100;         /* Burgundy suave para dark */
   
   /* Cores Complementares Dark */
   --coffee: 200, 170, 140;                /* Café claro para contraste */
@@ -305,6 +321,28 @@
     color: rgb(var(--coffee));
     @apply font-medium text-xs px-2 py-1 rounded-full;
     border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+
+  /* Novas badges com as cores da paleta */
+  .badge-sage {
+    background: rgb(var(--sage));
+    color: white;
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--sage-dark), 0.3);
+  }
+
+  .badge-cream {
+    background: rgb(var(--cream-light));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--sage), 0.2);
+  }
+
+  .badge-burgundy {
+    background: rgb(var(--burgundy));
+    color: white;
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--burgundy-soft), 0.3);
   }
 }
 
