@@ -121,9 +121,9 @@ export function PWAUpdatePrompt() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50">
-      <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-lg border border-neutral-accentWarm/30 p-4">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-lg shadow-lg border border-neutral-accentWarm/30 dark:border-gray-700 p-4">
         <div className="flex items-start gap-3">
-          <RefreshCw className="h-5 w-5 text-neutral-accentWarm mt-0.5" />
+          <RefreshCw className="h-5 w-5 text-neutral-accentWarm dark:text-amber-500 mt-0.5" />
           <div className="flex-1">
             <h3 className="font-semibold text-sm mb-1">
               {forceUpdateAvailable ? 'Atualização instalada' : 'Nova versão disponível'}
@@ -138,7 +138,7 @@ export function PWAUpdatePrompt() {
               <Button 
                 size="sm" 
                 onClick={forceUpdateAvailable ? handleForceUpdate : handleUpdate}
-                className="bg-neutral-accentWarm hover:bg-neutral-accentWarm/90"
+                className="bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600"
               >
                 {forceUpdateAvailable ? 'Recarregar' : 'Atualizar agora'}
               </Button>

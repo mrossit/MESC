@@ -5,82 +5,76 @@
 @tailwind utilities;
 
 :root {
-  /* CORES PRINCIPAIS - VERDE E BEGE */
-  --color-green-sage: #CACDA5;
-  --color-green-moss: #99A285;
-  --color-green-forest: #A0B179;
-  --color-green-gradient-start: #CACDA5;
-  --color-green-gradient-end: #99A285;
-  --color-beige-light: #F6EFE3;
-  --color-text-primary: #333333;
-
-  /* Cores Base */
-  --peanut: 201, 194, 178;
-  --chalk-beige: 235, 230, 218;
-  --white-beige: 248, 245, 238;
-  --cream: 252, 248, 237;
-  --neutral: 158, 151, 138;
-  --peach-cream: 243, 235, 220;
-  --card-bg: #F6EFE3;
-
+  /* PALETA NEUTRA - LIGHT MODE */
+  
+  /* Cores Base - Tons Neutros */
+  --peanut: 201, 194, 178;                /* #C9C2B2 - Peanut - Base neutra */
+  --chalk-beige: 235, 230, 218;           /* #EBE6DA - Chalk Beige - Fundo principal */
+  --white-beige: 248, 245, 238;           /* #F8F5EE - White Beige - Fundo claro */
+  --cream: 252, 248, 237;                 /* #FCF8ED - Cream - Fundo mais claro */
+  --neutral: 158, 151, 138;               /* #9E978A - Neutral - Elementos secundários */
+  --peach-cream: 243, 235, 220;           /* #F3EBDC - Peach Cream - Cards */
+  --card-bg: #E4E5DD;                     /* #E4E5DD - Card Background - Nova cor */
+  
   /* Cores de Texto */
-  --text-dark: 51, 51, 51;
-  --text-medium: 102, 97, 88;
-  --text-light: 140, 135, 125;
-
+  --text-dark: 51, 48, 43;                /* #33302B - Texto escuro */
+  --text-medium: 102, 97, 88;             /* #666158 - Texto médio */
+  --text-light: 140, 135, 125;            /* #8C877D - Texto claro */
+  
   /* Cores de Destaque */
-  --accent-warm: 186, 175, 156;
-  --accent-soft: 211, 203, 189;
-  --accent-neutral: 175, 168, 155;
-
-  /* Badges */
-  --badge-light: 245, 241, 235;
-  --badge-warm: 228, 220, 207;
-  --badge-neutral: 218, 211, 200;
-  --badge-soft: 238, 233, 225;
-  --badge-pearl: 250, 248, 243;
-  --badge-gold: 212, 175, 55;
-  --badge-copper: 184, 115, 51;
-  --badge-terracotta: 204, 119, 102;
-
+  --accent-warm: 186, 175, 156;           /* #BAAF9C - Acento quente */
+  --accent-soft: 211, 203, 189;           /* #D3CBBD - Acento suave */
+  --accent-neutral: 175, 168, 155;        /* #AFA89B - Acento neutro */
+  
+  /* Badges - Tons Suaves */
+  --badge-light: 245, 241, 235;           /* #F5F1EB - Badge claro */
+  --badge-warm: 228, 220, 207;            /* #E4DCCF - Badge quente */
+  --badge-neutral: 218, 211, 200;         /* #DAD3C8 - Badge neutro */
+  --badge-soft: 238, 233, 225;            /* #EEE9E1 - Badge suave */
+  --badge-pearl: 250, 248, 243;           /* #FAF8F3 - Badge pérola */
+  --badge-gold: 212, 175, 55;             /* #D4AF37 - Badge dourado */
+  --badge-copper: 184, 115, 51;           /* #B87333 - Badge cobre */
+  --badge-terracotta: 204, 119, 102;      /* #CC7766 - Badge terracota */
+  
   /* Cores Complementares */
-  --coffee: 101, 67, 33;
-  --aged-bronze: 107, 86, 55;
-
-  /* Sistema */
-  --background: var(--chalk-beige);
-  --foreground: var(--text-dark);
-
-  --card: var(--card-bg);
+  --coffee: 101, 67, 33;                  /* #654321 - Cor café para textos */
+  --aged-bronze: 107, 86, 55;             /* #6B5637 - Bronze envelhecido */
+  
+  /* Sistema Light Mode - Paleta Neutra */
+  --background: var(--chalk-beige);       /* Chalk Beige - Fundo principal */
+  --foreground: var(--text-dark);         /* Texto escuro */
+  
+  --card: var(--card-bg);                 /* Card Background - Nova cor #E4E5DD */
   --card-foreground: var(--text-dark);
-
+  
   --popover: var(--white-beige);
   --popover-foreground: var(--text-dark);
-
-  --primary: var(--neutral);
+  
+  --primary: var(--neutral);              /* Neutral - Botões primários */
   --primary-foreground: var(--cream);
-
-  --secondary: var(--peanut);
+  
+  --secondary: var(--peanut);             /* Peanut - Botões secundários */
   --secondary-foreground: var(--white-beige);
-
+  
   --muted: var(--peach-cream);
-  --muted-foreground: 85, 80, 71;
-
+  --muted-foreground: 85, 80, 71;         /* Texto muted mais escuro para melhor contraste */
+  
   --accent: var(--accent-warm);
   --accent-foreground: var(--text-dark);
-
-  --destructive: 185, 28, 28;
+  
+  --destructive: 185, 28, 28;             /* #B91C1C - Vermelho erro */
   --destructive-foreground: 255, 255, 255;
-
-  --border: 220, 214, 203;
+  
+  --border: 220, 214, 203;                /* #DCD6CB - Borda suave */
   --input: var(--white-beige);
-  --ring: var(--text-dark);
-
-  --switch-checked: 21, 128, 61;
-  --switch-unchecked: 107, 114, 128;
-  --switch-thumb: 0, 0, 0;
-
-  /* Sidebar */
+  --ring: var(--text-dark);               /* Texto escuro para melhor contraste do focus ring */
+  
+  /* Switch specific colors for better contrast - Light Mode */
+  --switch-checked: 21, 128, 61;           /* #15803D - Verde mais escuro (green-700) */
+  --switch-unchecked: 107, 114, 128;       /* #6B7280 - Cinza mais escuro (gray-500) */
+  --switch-thumb: 0, 0, 0;                 /* #000000 - Polegar preto para light mode */
+  
+  /* Sidebar Light - Tons Neutros */
   --sidebar-background: var(--chalk-beige);
   --sidebar-foreground: var(--text-dark);
   --sidebar-primary: var(--neutral);
@@ -89,12 +83,89 @@
   --sidebar-accent-foreground: var(--text-dark);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--peanut);
-
+  
   --radius: 0.375rem;
   --font-sans: 'Inter', -apple-system, sans-serif;
   --font-display: 'Playfair Display', serif;
 }
 
+.dark {
+  /* PALETA DARK BROWN REFINADA - DARK MODE */
+  
+  /* Dark Brown Shades - Base */
+  --dark-1: 56, 35, 32;                   /* #382320 - Mais claro */
+  --dark-2: 50, 31, 28;                   /* #321F1C */
+  --dark-3: 43, 27, 25;                   /* #2B1B19 */
+  --dark-4: 37, 23, 21;                   /* #251715 */
+  --dark-5: 31, 20, 18;                   /* #1F1412 - Meio */
+  --dark-6: 25, 16, 14;                   /* #19100E */
+  --dark-7: 19, 12, 11;                   /* #130C0B */
+  --dark-8: 12, 8, 7;                     /* #0C0807 */
+  --dark-9: 6, 4, 3;                      /* #060403 */
+  --dark-10: 0, 0, 0;                     /* #000000 - Mais escuro */
+  
+  /* Cores de Destaque Dark */
+  --dark-gold: 184, 134, 11;              /* #B8860B - Dourado escuro */
+  --dark-terracotta: 139, 69, 19;         /* #8B4513 - Terracota escuro */
+  --dark-copper: 139, 90, 43;             /* #8B5A2B - Cobre escuro */
+  --dark-bronze: 139, 105, 20;            /* #8B6914 - Bronze escuro */
+  --text-light: 255, 248, 240;            /* #FFF8F0 - Texto claro */
+  --text-gold: 255, 215, 0;               /* #FFD700 - Dourado para texto */
+  
+  /* Badges Dark Mode */
+  --badge-pearl: 60, 50, 45;              /* Pérola escura */
+  --badge-gold: 120, 95, 30;              /* Dourado escuro */
+  --badge-copper: 100, 65, 25;            /* Cobre escuro */
+  --badge-terracotta: 110, 70, 55;        /* Terracota escura */
+  
+  /* Cores Complementares Dark */
+  --coffee: 200, 170, 140;                /* Café claro para contraste */
+  --aged-bronze: 160, 130, 100;           /* Bronze claro para contraste */
+  
+  /* Sistema Dark Mode - Alto Contraste */
+  --background: var(--dark-8);            /* #0C0807 - Fundo principal */
+  --foreground: var(--text-light);        /* Texto claro para contraste */
+  
+  --card: var(--dark-7);                  /* #130C0B - Cards */
+  --card-foreground: var(--text-light);
+  
+  --popover: var(--dark-6);               /* #19100E - Popovers */
+  --popover-foreground: var(--text-light);
+  
+  --primary: var(--dark-gold);
+  --primary-foreground: var(--dark-10);
+  
+  --secondary: var(--dark-terracotta);
+  --secondary-foreground: var(--text-light);
+  
+  --muted: var(--dark-5);                 /* #1F1412 - Elementos muted */
+  --muted-foreground: 220, 200, 180;      /* Texto muted com mais contraste */
+  
+  --accent: var(--dark-copper);
+  --accent-foreground: var(--text-light);
+  
+  --destructive: 220, 38, 38;             /* #DC2626 - Vermelho erro */
+  --destructive-foreground: var(--text-light);
+  
+  --border: var(--dark-4);                /* #251715 - Bordas sutis */
+  --input: var(--dark-6);                 /* #19100E - Inputs */
+  --ring: var(--text-gold);               /* Dourado para focus */
+  
+  /* Switch specific colors for better contrast - Dark Mode */
+  --switch-checked: 21, 128, 61;          /* #15803D - Verde mais escuro */
+  --switch-unchecked: 156, 163, 175;      /* #9CA3AF - Cinza mais claro para dark mode */
+  --switch-thumb: 0, 0, 0;                /* #000000 - Polegar preto para dark mode também */
+  
+  /* Sidebar Dark - Contraste otimizado */
+  --sidebar-background: var(--dark-8);    /* #0C0807 - Mesmo fundo das páginas */
+  --sidebar-foreground: var(--text-light);
+  --sidebar-primary: var(--dark-gold);
+  --sidebar-primary-foreground: var(--dark-10);
+  --sidebar-accent: var(--dark-3);        /* #2B1B19 - Hover items */
+  --sidebar-accent-foreground: var(--text-gold);
+  --sidebar-border: var(--dark-5);        /* #1F1412 - Borda sutil */
+  --sidebar-ring: var(--dark-gold);
+}
 
 @layer base {
   * {
@@ -125,12 +196,22 @@
     border-width: 0.5px;
   }
   
-  .bg-gradient-responsive {
+  /* Gradientes responsivos para dark mode */
+.bg-gradient-responsive {
   background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%);
+}
+
+.dark .bg-gradient-responsive {
+  background: linear-gradient(135deg, rgb(12, 8, 7) 0%, rgb(31, 20, 18) 100%);
 }
 
 .pattern-bg-responsive {
   background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.dark .pattern-bg-responsive {
+  background-image: radial-gradient(circle at 1px 1px, rgba(184, 134, 11, 0.1) 1px, transparent 0);
   background-size: 20px 20px;
 }
 
@@ -228,146 +309,6 @@
 }
 
 @layer utilities {
-  /* Classe global de ocultação definitiva */
-  .oculto-global {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    pointer-events: none !important;
-  }
-
-  /* Estilos do componente Últimas Conexões */
-  .header-ultimas-conexoes {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    z-index: 1200;
-    background: transparent;
-    padding: 0;
-  }
-
-  .uc-item {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding: 6px 10px;
-    border-radius: 8px;
-    background: var(--color-beige-light);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-  }
-
-  .uc-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    background: rgba(246, 239, 227, 0.95);
-  }
-
-  .uc-item:focus {
-    outline: 2px solid var(--color-green-gradient-start);
-    outline-offset: 2px;
-  }
-
-  .uc-status {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
-  }
-
-  .uc-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-  }
-
-  .uc-name {
-    color: var(--color-text-primary);
-    font-weight: 600;
-    font-size: 13px;
-    max-width: 110px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .uc-whatsapp {
-    color: #25D366;
-    margin-left: 4px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: transform 0.2s ease;
-  }
-
-  .uc-whatsapp:hover {
-    transform: scale(1.2);
-  }
-
-  .uc-whatsapp:focus {
-    outline: 2px solid #25D366;
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-
-  /* Screen reader only (acessibilidade) */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border-width: 0;
-  }
-
-  /* Responsividade mobile */
-  @media (max-width: 768px) {
-    .header-ultimas-conexoes {
-      top: 8px;
-      right: 8px;
-      gap: 4px;
-      flex-wrap: wrap;
-      max-width: calc(100vw - 16px);
-    }
-
-    .uc-item {
-      padding: 4px 6px;
-      gap: 6px;
-    }
-
-    .uc-name {
-      max-width: 80px;
-      font-size: 12px;
-    }
-
-    .uc-avatar {
-      width: 28px;
-      height: 28px;
-    }
-  }
-
-  /* Estilo do dia selecionado no calendário - Degradê Verde */
-  .rdp-day_selected,
-  [aria-selected="true"] {
-    background: linear-gradient(135deg, var(--color-green-gradient-start), var(--color-green-gradient-end)) !important;
-    color: #FFFFFF !important;
-    font-weight: bold !important;
-    border: none !important;
-  }
-
   /* Sidebar refinado - Sem bordas nas opções */
   [data-sidebar="sidebar"] {
     background: rgb(var(--sidebar-background)) !important;
@@ -449,70 +390,12 @@
   .border-liturgical {
     border: 0.5px solid rgb(var(--border));
   }
-
+  
   /* Texto com antialiasing refinado */
   .text-liturgical {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-  }
-
-  /* ============================================
-     FORÇAR BACKGROUND SÓLIDO EM TODOS OS MODAIS
-     ============================================ */
-
-  /* Remover blur e forçar opacidade 100% */
-  [role="dialog"],
-  [role="alertdialog"],
-  [data-radix-dialog-content],
-  [data-radix-alert-dialog-content],
-  [data-radix-popper-content-wrapper],
-  [data-radix-select-content],
-  [data-radix-dropdown-menu-content] {
-    background: rgb(var(--background)) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-
-  /* Overlay sem transparência excessiva */
-  [data-radix-dialog-overlay],
-  [data-radix-alert-dialog-overlay] {
-    background: rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-
-  /* Background sólido em popover, select, dropdown */
-  [data-radix-select-viewport],
-  [data-radix-dropdown-menu-viewport],
-  [data-radix-popover-content] {
-    background: rgb(var(--popover)) !important;
-  }
-
-  /* Cards e botões dentro de dialogs - SEM ANIMAÇÕES */
-  [role="dialog"] [class*="space-y"],
-  [role="dialog"] div[class*="py-"],
-  [role="dialog"] button[class*="border"] {
-    background-color: rgb(var(--card)) !important;
-    animation: none !important;
-    transition: none !important;
-  }
-
-  /* Exceção para botões com cores específicas */
-  [role="dialog"] button[class*="bg-red"] {
-    background-color: rgb(254 226 226) !important;
-  }
-
-  [role="dialog"] button[class*="bg-green"],
-  [role="dialog"] button[class*="bg-blue"],
-  [role="dialog"] button[class*="bg-amber"],
-  [role="dialog"] [class*="bg-gradient"] {
-    background: inherit !important;
-  }
-
-  /* Sheet e outros componentes overlay */
-  [data-radix-sheet-content] {
-    background: rgb(var(--background)) !important;
   }
 }
 
@@ -587,483 +470,7 @@ input[type="date"] {
   min-width: 0; 
 }
 
-input[type="date"]::-webkit-datetime-edit,
-input[type="date"]::-webkit-date-and-time-value {
-  min-width: 0 !important;
-}
-
-/* ============================================
-   FIXED FOOTER - Menu Inferior Sobreposto
-   ============================================ */
-
-:root {
-  --footer-height: 64px;
-  --footer-bg: #000000;
-  --footer-border-top: rgba(255, 255, 255, 0.1);
-  --footer-item-color: #ffffff;
-  --footer-item-active: linear-gradient(90deg, var(--color-green-gradient-start), var(--color-green-gradient-end));
-  --footer-icon-size: 22px;
-  --footer-safe-area: env(safe-area-inset-bottom, 8px);
-}
-
-/* Container principal do footer */
-.fixed-footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--footer-height);
-  background: var(--footer-bg);
-  border-top: 1px solid var(--footer-border-top);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1400;
-  padding: var(--footer-safe-area) 12px 8px;
-  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
-}
-
-/* Navegação interna */
-.footer-nav {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  max-width: 880px;
-  justify-content: space-around;
-  align-items: center;
-}
-
-/* Item de navegação */
-.nav-item {
-  background: transparent;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  color: var(--footer-item-color);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 6px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
-  position: relative;
-  min-width: 64px;
-}
-
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-.nav-item:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.3);
-  outline-offset: 3px;
-}
-
-.nav-item:active {
-  transform: translateY(0);
-}
-
-/* Item ativo */
-.nav-item.active {
-  background: var(--footer-item-active);
-  color: #ffffff;
-  font-weight: 700;
-  transform: translateY(-4px);
-  box-shadow: 0 6px 18px rgba(73, 144, 88, 0.18);
-}
-
-.nav-item.active:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(73, 144, 88, 0.24);
-}
-
-/* Wrapper do ícone (para badges e dots) */
-.nav-item-icon-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Ícone */
-.nav-item-icon {
-  width: var(--footer-icon-size);
-  height: var(--footer-icon-size);
-  stroke-width: 2;
-}
-
-/* Label */
-.nav-item-label {
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-/* Badge numérico (escalas não lidas) */
-.nav-badge {
-  position: absolute;
-  top: -6px;
-  right: -8px;
-  background: #DC2626;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 700;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
-  animation: badge-pop 0.3s ease-out;
-}
-
-@keyframes badge-pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Dot de notificação (perfil) */
-.nav-dot {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #DC2626;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--footer-bg);
-  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
-  animation: dot-pulse 2s ease-in-out infinite;
-}
-
-@keyframes dot-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.4);
-  }
-}
-
-/* Espaçador para compensar altura do footer */
-.footer-spacer {
-  height: calc(var(--footer-height) + var(--footer-safe-area));
-  flex-shrink: 0;
-}
-
-/* Estado desabilitado (offline) */
-.nav-item:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-/* Responsividade Desktop */
-@media (min-width: 1024px) {
-  :root {
-    --footer-height: 56px;
-  }
-
-  .nav-item {
-    min-width: 80px;
-    padding: 8px 12px;
-  }
-
-  /* Opcional: Labels apenas no hover em desktop */
-  .nav-item-label {
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  .nav-item:hover .nav-item-label,
-  .nav-item.active .nav-item-label {
-    opacity: 1;
-  }
-}
-
-/* Mobile small screens */
-@media (max-width: 360px) {
-  .nav-item {
-    min-width: 56px;
-    padding: 4px 6px;
-    font-size: 10px;
-  }
-
-  .nav-item-label {
-    font-size: 10px;
-  }
-
-  :root {
-    --footer-icon-size: 20px;
-  }
-}
-
-/* Suporte para modais full-screen */
-.fixed-footer[data-modal-open="true"] {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-/* Safe area adjustments para iOS */
-@supports (padding: env(safe-area-inset-bottom)) {
-  .fixed-footer {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
-  }
-
-  .footer-spacer {
-    height: calc(var(--footer-height) + 8px + env(safe-area-inset-bottom));
-  }
-}
-
-/* ============================================
-   HEADER ÚLTIMAS CONEXÕES - Layout Circular
-   ============================================ */
-
-:root {
-  --status-online: #22C55E;
-  --status-offline: #EF4444;
-  --avatar-size: 48px;
-}
-
-.header-ultimas-conexoes-wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  background: linear-gradient(135deg, var(--color-green-gradient-start), var(--color-green-gradient-end));
-  height: 120px;
-  z-index: 1300;
-  padding: 16px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.header-ultimas-conexoes {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  width: 100%;
-  padding: 0 16px;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Estilo da scrollbar */
-.header-ultimas-conexoes::-webkit-scrollbar {
-  height: 6px;
-}
-
-.header-ultimas-conexoes::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-.header-ultimas-conexoes::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-.header-ultimas-conexoes::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.uc-item-circular {
-  width: 96px;
-  height: 96px;
-  min-width: 96px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.uc-item-circular:hover {
-  transform: scale(1.05);
-}
-
-.uc-ring {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px;
-}
-
-.uc-ring.online {
-  background: #3E4095;
-}
-
-.uc-ring.offline {
-  background: #EF4444;
-}
-
-.uc-avatar-wrapper {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-}
-
-.uc-avatar-wrapper.online::after,
-.uc-avatar-wrapper.offline::after {
-  content: '';
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  border: 2px solid #FFFFFF;
-}
-
-.uc-avatar-wrapper.online::after {
-  background: #4CAF50;
-}
-
-.uc-avatar-wrapper.offline::after {
-  background: #FFB300;
-}
-
-.uc-avatar-img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.uc-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #FFFFFF;
-  color: #333333;
-  font-weight: 600;
-  font-size: 36px;
-}
-
-.uc-whatsapp-link {
-  position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 20px;
-  height: 20px;
-  background: #25D366;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.uc-whatsapp-link:hover {
-  transform: scale(1.15);
-  box-shadow: 0 4px 8px rgba(37, 211, 102, 0.4);
-}
-
-.uc-whatsapp-icon {
-  color: white;
-  width: 12px;
-  height: 12px;
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-  .header-ultimas-conexoes-wrapper {
-    height: 100px;
-    padding: 12px 8px;
-  }
-
-  .uc-item-circular {
-    width: 80px;
-    height: 80px;
-    min-width: 80px;
-  }
-
-  .uc-ring {
-    width: 80px;
-    height: 80px;
-  }
-
-  .uc-avatar-wrapper {
-    width: 68px;
-    height: 68px;
-  }
-
-  .uc-avatar-placeholder {
-    font-size: 28px;
-  }
-
-  .uc-avatar-wrapper.online::after,
-  .uc-avatar-wrapper.offline::after {
-    width: 14px;
-    height: 14px;
-    right: 5px;
-    bottom: 5px;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-ultimas-conexoes-wrapper {
-    height: 90px;
-    padding: 10px 6px;
-  }
-
-  .uc-item-circular {
-    width: 72px;
-    height: 72px;
-    min-width: 72px;
-  }
-
-  .uc-ring {
-    width: 72px;
-    height: 72px;
-  }
-
-  .uc-avatar-wrapper {
-    width: 60px;
-    height: 60px;
-  }
-
-  .uc-avatar-placeholder {
-    font-size: 24px;
-  }
+input[type="date"]::-webkit-datetime-edit, 
+input[type="date"]::-webkit-date-and-time-value { 
+  min-width: 0 !important; 
 }

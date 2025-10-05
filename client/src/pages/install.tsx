@@ -139,11 +139,11 @@ export default function InstallPage() {
 
   if (isInstalled) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-950 flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <CardTitle className="text-xl">App Já Instalado!</CardTitle>
           </CardHeader>
@@ -166,7 +166,7 @@ export default function InstallPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-950 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -183,7 +183,7 @@ export default function InstallPage() {
             </div>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-[#5C4033]">
+            <h1 className="text-3xl font-bold text-[#5C4033] dark:text-[#F3E9D2]">
               Instalar MESC
             </h1>
             <p className="text-muted-foreground">
@@ -202,7 +202,7 @@ export default function InstallPage() {
           ].map((feature, idx) => (
             <Card key={idx}>
               <CardContent className="p-4 text-center">
-                <feature.icon className="h-8 w-8 mx-auto mb-2 text-[#5C4033]" />
+                <feature.icon className="h-8 w-8 mx-auto mb-2 text-[#5C4033] dark:text-[#F3E9D2]" />
                 <h3 className="font-semibold">{feature.title}</h3>
                 <p className="text-xs text-muted-foreground">{feature.desc}</p>
               </CardContent>
@@ -223,10 +223,10 @@ export default function InstallPage() {
             <CardContent className="space-y-4">
               {isInstallable ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-green-800 font-medium">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <span className="text-green-800 dark:text-green-200 font-medium">
                         Pronto para instalar!
                       </span>
                     </div>
@@ -238,8 +238,8 @@ export default function InstallPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="text-amber-800 text-sm">
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <p className="text-amber-800 dark:text-amber-200 text-sm">
                       Instalação automática não disponível neste navegador. 
                       Use as instruções manuais ao lado.
                     </p>
@@ -284,8 +284,8 @@ export default function InstallPage() {
                 ))}
               </div>
               
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-blue-800 text-sm">
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-blue-800 dark:text-blue-200 text-sm">
                   <strong>Dica:</strong> Após instalar, o MESC ficará disponível na sua tela inicial 
                   como um aplicativo normal, funcionando mesmo sem internet!
                 </p>

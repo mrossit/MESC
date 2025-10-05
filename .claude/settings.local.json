@@ -72,11 +72,7 @@
       "Bash(awk:*)",
       "Bash(NODE_ENV=production npx tsx scripts/debug-schedule-edit.ts)",
       "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(npx vitest run:*)",
-      "Bash(npm test:*)",
-      "Bash(NODE_ENV=production npx tsx scripts/check-schedule-assignments.ts)",
-      "Bash(NODE_ENV=production npx tsx scripts/check-users-online-status.ts)"
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

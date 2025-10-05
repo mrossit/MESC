@@ -55,22 +55,22 @@ export function PendingApprovals() {
 
   if (isLoading) {
     return (
-      <Card className="border-2 border-[#CACDA5]/40">
-        <CardHeader className="bg-gradient-to-r from-[#CACDA5]/10 to-[#99A285]/10">
+      <Card className="  border border-neutral-border/30 dark:border-border">
+        <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground">
             Aprovações Pendentes
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent>
           <div className="space-y-4">
             {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="border-2 border-[#CACDA5]/40 rounded-lg p-4 animate-pulse">
+              <div key={i} className="border border-neutral-border rounded-lg p-4 animate-pulse">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#CACDA5]/30 rounded-full" />
+                    <div className="w-10 h-10 bg-neutral-peachCream/50 rounded-full" />
                     <div className="space-y-2">
-                      <div className="h-4 w-24 bg-[#CACDA5]/30 rounded" />
-                      <div className="h-3 w-32 bg-[#CACDA5]/30 rounded" />
+                      <div className="h-4 w-24 bg-neutral-peachCream/50 rounded" />
+                      <div className="h-3 w-32 bg-neutral-peachCream/50 rounded" />
                     </div>
                   </div>
                 </div>
@@ -83,15 +83,15 @@ export function PendingApprovals() {
   }
 
   return (
-    <Card className="border-2 hover:border-[#A0B179] transition-all duration-200">
-      <CardHeader className="bg-gradient-to-r from-[#CACDA5]/10 to-[#99A285]/10">
+    <Card className="  border border-neutral-border/30 dark:border-border">
+      <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">
             Aprovações Pendentes
           </CardTitle>
           {pendingUsers.length > 0 && (
-            <Badge
-              className="bg-[#A0B179]/20 text-[#A0B179] border border-[#A0B179]/30"
+            <Badge 
+              className="bg-neutral-accentWarm/20 text-foreground dark:bg-amber-900/20 dark:text-amber-200"
               data-testid="badge-pending-count"
             >
               {pendingUsers.length} novos
@@ -99,9 +99,9 @@ export function PendingApprovals() {
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent>
         {pendingUsers.length === 0 ? (
-          <div
+          <div 
             className="text-center py-8 text-muted-foreground"
             data-testid="text-no-pending-approvals"
           >
@@ -110,21 +110,21 @@ export function PendingApprovals() {
         ) : (
           <div className="space-y-4">
             {pendingUsers.map((user) => (
-              <div
-                key={user.id}
-                className="border-2 border-[#CACDA5]/40 rounded-lg p-4 hover:border-[#A0B179] transition-all"
+              <div 
+                key={user.id} 
+                className="border border-neutral-border rounded-lg p-4"
                 data-testid={`card-pending-user-${user.id}`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-[#CACDA5]">
-                      <AvatarFallback className="bg-[#CACDA5]/20 text-[#99A285]">
-                        <User className="h-6 w-6" />
+                    <Avatar className="w-10 h-10 flex-shrink-0">
+                      <AvatarFallback className="bg-neutral-accentWarm/20 dark:bg-dark-5 text-neutral-accentWarm dark:text-text-light">
+                        <User className="h-5 w-5" />
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p
-                        className="font-semibold text-foreground truncate"
+                      <p 
+                        className="font-medium text-foreground truncate"
                         data-testid={`text-user-name-${user.id}`}
                       >
                         {user.name}
@@ -132,7 +132,7 @@ export function PendingApprovals() {
                       <p className="text-sm text-muted-foreground">
                         Solicitou cadastro
                       </p>
-                      <p
+                      <p 
                         className="text-xs text-muted-foreground truncate"
                         data-testid={`text-user-email-${user.id}`}
                       >
@@ -143,7 +143,7 @@ export function PendingApprovals() {
                   <div className="flex gap-2 flex-shrink-0 self-start">
                     <Button
                       size="sm"
-                      className="bg-[#A0B179]/20 text-[#A0B179] hover:bg-[#A0B179] hover:text-white border-2 border-[#A0B179] text-xs px-3"
+                      className="bg-green-100 text-green-800 hover:bg-green-200 border-0 text-xs px-3"
                       onClick={() => handleApproval(user.id, "active")}
                       disabled={updateUserStatusMutation.isPending}
                       data-testid={`button-approve-${user.id}`}
@@ -154,7 +154,7 @@ export function PendingApprovals() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="bg-red-100 text-red-800 hover:bg-red-600 hover:text-white border-2 border-red-200 hover:border-red-600 text-xs px-3"
+                      className="bg-red-100 text-red-800 hover:bg-red-200 border-0 text-xs px-3"
                       onClick={() => handleApproval(user.id, "inactive")}
                       disabled={updateUserStatusMutation.isPending}
                       data-testid={`button-reject-${user.id}`}

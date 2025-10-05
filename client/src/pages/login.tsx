@@ -35,14 +35,6 @@ export default function Login() {
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
   const inactivityReason = searchParams.get('reason') === 'inactivity';
-  const forceLogout = searchParams.get('logout') === 'true';
-
-  // Limpar cache se forceLogout=true
-  if (forceLogout) {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.history.replaceState({}, '', '/login');
-  }
 
   const queryClient = useQueryClient();
 
@@ -93,6 +85,10 @@ export default function Login() {
         });
         navigate("/change-password");
       } else {
+        toast({
+          title: "Login realizado com sucesso",
+          description: `Bem-vindo(a), ${data.user.name}!`,
+        });
         navigate("/dashboard");
       }
     },
@@ -128,8 +124,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-2xl border-2 border-neutral-400 bg-white">
+    <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl border-border/20 bg-card/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             <img 
@@ -138,22 +134,22 @@ export default function Login() {
               className="h-72 w-full max-w-xs object-contain"
             />
           </div>
-          <CardTitle className="text-3xl font-bold text-neutral-textDark mb-2">
+          <CardTitle className="text-3xl font-bold text-neutral-textDark dark:text-text-light mb-2">
             MESC
           </CardTitle>
-          <p className="text-neutral-textMedium text-sm mb-1">
+          <p className="text-neutral-textMedium dark:text-gray-400 text-sm mb-1">
             Sistema de Gestão
           </p>
-          <p className="text-neutral-textMedium text-xs">
+          <p className="text-neutral-textMedium dark:text-gray-400 text-xs">
             Ministério Extraordinário da Sagrada Comunhão
           </p>
         </CardHeader>
         <CardContent>
           {/* Alerta de timeout de inatividade */}
           {inactivityReason && (
-            <Alert className="mb-4 border-orange-500 bg-orange-50">
+            <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
               <Clock className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
                 <strong>Sessão Encerrada</strong><br />
                 Sua sessão foi encerrada após 10 minutos de inatividade. Por favor, faça login novamente.
               </AlertDescription>
@@ -162,7 +158,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-neutral-textDark font-semibold text-sm">
+              <Label htmlFor="email" className="text-neutral-textDark dark:text-text-light font-semibold text-sm">
                 Email
               </Label>
               <Input
@@ -171,7 +167,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={credentials.email}
                 onChange={(e) => handleInputChange("email", e.target.value.toLowerCase().trim())}
-                className="bg-white text-black border-border focus:border-primary focus:ring-primary transition-all duration-200"
+                className="bg-background border-border focus:border-primary focus:ring-primary transition-all duration-200"
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -182,7 +178,7 @@ export default function Login() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-neutral-textDark font-semibold text-sm">
+              <Label htmlFor="password" className="text-neutral-textDark dark:text-text-light font-semibold text-sm">
                 Senha
               </Label>
               <div className="relative">
@@ -192,7 +188,7 @@ export default function Login() {
                   placeholder="Sua senha"
                   value={credentials.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className="bg-white text-black border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
+                  className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
                   required
                   data-testid="input-password"
                 />
@@ -222,7 +218,7 @@ export default function Login() {
                 />
                 <Label 
                   htmlFor="remember" 
-                  className="text-sm text-neutral-textMedium cursor-pointer"
+                  className="text-sm text-neutral-textMedium dark:text-gray-400 cursor-pointer"
                 >
                   Lembrar-me
                 </Label>
@@ -230,7 +226,7 @@ export default function Login() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 p-0"
+                className="text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80 p-0"
                 onClick={() => setShowForgotPassword(true)}
               >
                 Esqueci minha senha
@@ -239,7 +235,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full bg-neutral-neutral hover:bg-neutral-neutral/90 text-neutral-cream font-semibold shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className="w-full bg-neutral-neutral hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:hover:bg-dark-gold/90 text-neutral-cream dark:text-dark-10 font-semibold shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
               disabled={loginMutation.isPending}
               data-testid="button-login"
             >
@@ -249,10 +245,10 @@ export default function Login() {
 
           <div className="mt-6 space-y-4">
             <div className="text-center">
-              <p className="text-sm text-neutral-textMedium">
+              <p className="text-sm text-neutral-textMedium dark:text-gray-400">
                 Não tem uma conta?{" "}
                 <Link href="/register">
-                  <span className="text-neutral-accentWarm hover:text-neutral-accentWarm/80 font-medium cursor-pointer">
+                  <span className="text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80 font-medium cursor-pointer">
                     Cadastre-se aqui
                   </span>
                 </Link>
@@ -267,8 +263,8 @@ export default function Login() {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-                <Clock className="h-8 w-8 text-amber-600" />
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
+                <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
             <DialogTitle className="text-center">Cadastro Aguardando Aprovação</DialogTitle>
@@ -290,12 +286,12 @@ export default function Login() {
                   </div>
                 </div>
               </div>
-              <div className="bg-blue-50 rounded-lg p-4 space-y-2 text-left">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-2 text-left">
                 <div className="flex items-start gap-3">
-                  <MessageCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <MessageCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-blue-900">Contato da Coordenação:</p>
-                    <p className="text-sm text-blue-800 mt-1">
+                    <p className="font-medium text-blue-900 dark:text-blue-100">Contato da Coordenação:</p>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
                       Procure a coordenação após a missa ou entre em contato 
                       pelo WhatsApp do ministério.
                     </p>
@@ -324,20 +320,20 @@ export default function Login() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-neutral-accentWarm/10 rounded-full flex items-center justify-center">
-                <Mail className="h-8 w-8 text-neutral-accentWarm" />
+              <div className="w-16 h-16 bg-neutral-accentWarm/10 dark:bg-dark-gold/20 rounded-full flex items-center justify-center">
+                <Mail className="h-8 w-8 text-neutral-accentWarm dark:text-dark-gold" />
               </div>
             </div>
-            <DialogTitle className="text-center text-neutral-textDark">
+            <DialogTitle className="text-center text-neutral-textDark dark:text-text-light">
               Recuperar Senha
             </DialogTitle>
-            <DialogDescription className="text-center text-neutral-textMedium">
+            <DialogDescription className="text-center text-neutral-textMedium dark:text-gray-400">
               Digite seu email cadastrado e os coordenadores serão notificados para auxiliar com uma nova senha.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="forgot-email" className="text-neutral-textDark">
+              <Label htmlFor="forgot-email" className="text-neutral-textDark dark:text-text-light">
                 Email cadastrado
               </Label>
               <Input
@@ -350,8 +346,8 @@ export default function Login() {
                 className="bg-background border-border"
               />
             </div>
-            <div className="bg-neutral-badgeWarm/20 rounded-lg p-3">
-              <p className="text-xs text-neutral-textMedium">
+            <div className="bg-neutral-badgeWarm/20 dark:bg-dark-3 rounded-lg p-3">
+              <p className="text-xs text-neutral-textMedium dark:text-gray-400">
                 <strong>Importante:</strong> Após enviar o email, o coordenador gerará uma senha provisória 
                 que será enviada para você. No primeiro acesso, você deverá alterar essa senha.
               </p>
@@ -371,7 +367,7 @@ export default function Login() {
               <Button
                 type="submit"
                 disabled={forgotPasswordMutation.isPending}
-                className="w-full sm:w-auto bg-neutral-neutral hover:bg-neutral-neutral/90 text-neutral-cream"
+                className="w-full sm:w-auto bg-neutral-neutral hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:hover:bg-dark-gold/90 text-neutral-cream dark:text-dark-10"
               >
                 {forgotPasswordMutation.isPending ? "Enviando..." : "Enviar Email"}
               </Button>

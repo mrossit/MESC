@@ -956,7 +956,7 @@ export default function QuestionnaireUnified() {
             {/* Opções condicionais - aparecem condicionalmente baseado no tipo de pergunta */}
             {showOptions && question.metadata?.conditionalOptions && (
               <div className="ml-6 p-3 border-l-2 border-blue-200 bg-[#DOD9B3] rounded-r-md">
-                <p className="text-sm font-medium mb-2 text-blue-700">
+                <p className="text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">
                   {question.id === 'daily_mass_availability' 
                     ? 'Selecione os dias que você pode servir:' 
                     : question.id === 'other_times_available'

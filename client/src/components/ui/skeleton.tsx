@@ -6,9 +6,9 @@ const skeletonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-muted/50",
-        shimmer: "bg-gradient-to-r from-muted/50 via-muted/30 to-muted/50 bg-[length:200%_100%] animate-shimmer",
-        subtle: "bg-muted/30",
+        default: "bg-muted/50 dark:bg-muted/20",
+        shimmer: "bg-gradient-to-r from-muted/50 via-muted/30 to-muted/50 dark:from-muted/20 dark:via-muted/10 dark:to-muted/20 bg-[length:200%_100%] animate-shimmer",
+        subtle: "bg-muted/30 dark:bg-muted/10",
       },
     },
     defaultVariants: {

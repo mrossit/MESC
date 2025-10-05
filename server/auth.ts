@@ -2,8 +2,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { users, userSessions } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 // JWT secret - deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -83,38 +83,6 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
       if (!currentUser || currentUser.status !== 'active') {
         console.log('[AUTH] User blocked - Status:', currentUser?.status);
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
-      }
-
-      // Atualizar atividade da sessão
-      try {
-        const now = new Date();
-        const [existingSession] = await db
-          .select()
-          .from(userSessions)
-          .where(eq(userSessions.userId, user.id))
-          .limit(1);
-
-        if (existingSession) {
-          await db
-            .update(userSessions)
-            .set({
-              lastActivityAt: now,
-              status: 'online'
-            })
-            .where(eq(userSessions.userId, user.id));
-        } else {
-          // Criar sessão se não existir
-          await db
-            .insert(userSessions)
-            .values({
-              userId: user.id,
-              lastActivityAt: now,
-              status: 'online'
-            });
-        }
-      } catch (sessionError) {
-        console.error('[AUTH] Erro ao atualizar sessão:', sessionError);
-        // Não bloquear a requisição por erro de sessão
       }
 
       req.user = user;
@@ -206,45 +174,13 @@ export async function login(email: string, password: string) {
     // Gera token JWT
     const token = generateToken(user);
 
-    // Atualiza último login e cria sessão
+    // Atualiza último login
     try {
-      const now = new Date();
-
-      // Atualiza último login
       await db
         .update(users)
-        .set({ lastLogin: now })
+        .set({ lastLogin: new Date() })
         .where(eq(users.id, user.id));
-
-      // Cria ou atualiza sessão do usuário
-      // Primeiro tenta encontrar sessão existente
-      const [existingSession] = await db
-        .select()
-        .from(userSessions)
-        .where(eq(userSessions.userId, user.id))
-        .limit(1);
-
-      if (existingSession) {
-        // Atualiza sessão existente
-        await db
-          .update(userSessions)
-          .set({
-            lastActivityAt: now,
-            status: 'online'
-          })
-          .where(eq(userSessions.userId, user.id));
-      } else {
-        // Cria nova sessão
-        await db
-          .insert(userSessions)
-          .values({
-            userId: user.id,
-            lastActivityAt: now,
-            status: 'online'
-          });
-      }
     } catch (updateError) {
-      console.error('[AUTH] Erro ao atualizar sessão:', updateError);
       // Silent fail - não bloquear login por erro de update
     }
 

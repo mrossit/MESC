@@ -300,7 +300,7 @@ export default function QRCodeShare() {
           <CardContent className="pt-6">
             <div className="text-center">
               {/* QR Code Container */}
-              <div className="inline-block p-4 bg-white rounded-lg shadow-lg mb-6">
+              <div className="inline-block p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg mb-6">
                 {qrCodeDataURL ? (
                   <img 
                     src={qrCodeDataURL} 
@@ -308,17 +308,17 @@ export default function QRCodeShare() {
                     className="w-64 h-64 sm:w-80 sm:h-80 mx-auto"
                   />
                 ) : (
-                  <div className="w-64 h-64 sm:w-80 sm:h-80 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500">Gerando QR Code...</span>
+                  <div className="w-64 h-64 sm:w-80 sm:h-80 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-500 dark:text-gray-400">Gerando QR Code...</span>
                   </div>
                 )}
               </div>
 
               {/* URL Display */}
               <div className="mb-6 px-2 sm:px-0">
-                <p className="text-sm text-gray-600 mb-2">URL do Sistema:</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">URL do Sistema:</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-                  <code className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg text-xs sm:text-sm font-mono break-all max-w-full">
+                  <code className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-3 py-2 rounded-lg text-xs sm:text-sm font-mono break-all max-w-full">
                     {url}
                   </code>
                   <Button
