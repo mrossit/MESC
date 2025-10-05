@@ -44,6 +44,24 @@ export default {
                                 DEFAULT: '#F5E6D3',
                                 warm: '#EDD9C4'
                         },
+                        // Novas cores - Paleta adicional para maior visibilidade
+                        sage: {
+                                DEFAULT: '#A2B38B',        // Verde oliva/sálvia
+                                light: '#B8C6A5',          // Variação mais clara
+                                dark: '#8A9C76',           // Variação mais escura
+                                muted: '#94A580'           // Tom desbotado
+                        },
+                        cream: {
+                                light: '#E4E9BE',          // Bege claro amarelado
+                                vanilla: '#F0F4D3',        // Mais claro ainda
+                                warm: '#D8DDA8'            // Mais quente
+                        },
+                        burgundy: {
+                                DEFAULT: '#6E130C',        // Vermelho escuro
+                                rich: '#8B1810',           // Variação mais rica
+                                deep: '#5A0F09',           // Mais profundo
+                                soft: '#A05850'            // Tom suave
+                        },
                         gold: {
                                 DEFAULT: '#D4AF37',
                                 soft: '#E6D7B8',
