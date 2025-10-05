@@ -102,16 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session routes (activity monitoring & auto-logout)
   app.use('/api/session', sessionRoutes);
 
-  // Versiculos routes
-  app.use('/api/versiculos', (await import('./routes/versiculos')).default);
-
-  // Ultimas Conexoes routes (Header)
-  app.use((await import('./routes/header')).default);
-
-  // Fixed Footer routes
-  app.use('/api/escala', (await import('./routes/footer')).default);
-  app.use('/api/user', (await import('./routes/footer')).default);
-  app.use('/api/navigation', (await import('./routes/footer')).default);
+  // Substitution routes
+  app.use('/api/substitutions', substitutionsRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

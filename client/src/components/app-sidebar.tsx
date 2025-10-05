@@ -259,12 +259,12 @@ export function AppSidebar() {
                     >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.photoUrl || undefined} />
-                        <AvatarFallback className="bg-neutral-neutral text-neutral-cream text-xs">
+                        <AvatarFallback className="bg-neutral-neutral text-neutral-cream dark:bg-dark-gold dark:text-dark-10 text-xs">
                           {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-base font-semibold leading-none">{user.name}</span>
+                        <span className="text-sm font-medium leading-none">{user.name}</span>
                         <span className="text-xs capitalize text-muted-foreground">{user.role === 'coordenador' ? 'Coordenador Sistema' : user.role}</span>
                       </div>
                     </Link>
@@ -295,7 +295,7 @@ export function AppSidebar() {
                             <item.icon />
                             <span>{item.title}</span>
                             {item.badge && (
-                              <SidebarMenuBadge className="bg-neutral-badgeWarm text-neutral-textDark font-medium">{item.badge}</SidebarMenuBadge>
+                              <SidebarMenuBadge className="bg-neutral-badgeWarm text-neutral-textDark dark:bg-dark-gold dark:text-dark-10 font-medium">{item.badge}</SidebarMenuBadge>
                             )}
                             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                           </SidebarMenuButton>
@@ -320,7 +320,7 @@ export function AppSidebar() {
                                     >
                                       <span>{subItem.title}</span>
                                       {subItem.badge && (
-                                        <SidebarMenuBadge className="bg-neutral-accentWarm text-neutral-cream font-medium">{subItem.badge}</SidebarMenuBadge>
+                                        <SidebarMenuBadge className="bg-neutral-accentWarm text-neutral-cream dark:bg-dark-terracotta dark:text-text-light font-medium">{subItem.badge}</SidebarMenuBadge>
                                       )}
                                     </Link>
                                   </SidebarMenuSubButton>

@@ -29,51 +29,38 @@ export function useActivityMonitor() {
   const handleInactivity = useCallback(async () => {
     console.log('[ACTIVITY] 🔒 10 minutos de inatividade - encerrando sessão');
 
-    // 1. Limpa dados da aplicação (localStorage e sessionStorage)
-    localStorage.clear();
+    // Limpa tokens e dados sensíveis
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('session_token');
+    localStorage.removeItem('user');
     sessionStorage.clear();
 
-    // 2. Desregistra Service Workers (PWA cache)
-    if ('serviceWorker' in navigator) {
-      try {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-          console.log('[ACTIVITY] 🧹 Service Worker desregistrado');
-        }
-      } catch (error) {
-        console.error('[ACTIVITY] Erro ao desregistrar Service Worker:', error);
-      }
-    }
+    // Mantém preferências do usuário (theme, etc)
+    // localStorage.getItem('theme') permanece intacto
 
-    // 3. Notifica backend com header Clear-Site-Data
+    // Notifica backend
     try {
-      await fetch('/api/logout', {
+      await fetch('/api/session/destroy', {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        credentials: 'include'
       });
-      console.log('[ACTIVITY] 🗑️ Logout no backend concluído');
     } catch (error) {
       console.error('[ACTIVITY] Erro ao destruir sessão:', error);
     }
 
-    // 4. Mostra toast
+    // Mostra toast
     toast({
       title: '🔒 Sessão Encerrada',
       description: 'Sua sessão foi encerrada após 10 minutos de inatividade.',
       variant: 'destructive'
     });
 
-    // 5. Redireciona com cache busting (força ignorar cache)
-    const timestamp = Date.now();
+    // Redireciona para login após 2 segundos
     setTimeout(() => {
-      window.location.href = `/login?reason=inactivity&_=${timestamp}`;
+      setLocation('/login?reason=inactivity');
     }, 2000);
 
-  }, [toast]);
+  }, [setLocation, toast]);
 
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now();

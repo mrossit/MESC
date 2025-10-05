@@ -55,7 +55,7 @@ export function FloatingNotificationBell({ className }: FloatingNotificationBell
     >
       <Button
         size="lg"
-        className="relative h-14 w-14 rounded-full bg-neutral-accentWarm hover:bg-neutral-accentWarm/90 shadow-lg hover:shadow-xl transition-all"
+        className="relative h-14 w-14 rounded-full bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 shadow-lg hover:shadow-xl transition-all"
         onClick={() => navigate("/communication")}
       >
         <Bell className="h-6 w-6 text-white" />
@@ -71,7 +71,7 @@ export function FloatingNotificationBell({ className }: FloatingNotificationBell
       
       {/* Ripple effect for attention */}
       <div className="absolute inset-0 -z-10">
-        <div className="h-14 w-14 rounded-full bg-neutral-accentWarm/30 animate-ping" />
+        <div className="h-14 w-14 rounded-full bg-neutral-accentWarm/30 dark:bg-amber-700/20 animate-ping" />
       </div>
     </div>
   );

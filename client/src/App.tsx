@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CachedAuthGuard as AuthGuard } from "@/components/cached-auth-guard";
+import { ThemeProvider } from "@/components/theme-provider";
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { checkCacheVersion } from "@/lib/cacheManager";
@@ -21,7 +22,6 @@ import ChangePasswordRequired from "@/pages/change-password-required";
 import Ministers from "@/pages/Ministers";
 import MinistersDirectory from "@/pages/MinistersDirectory";
 import Schedules from "@/pages/Schedules";
-import ScheduleDay from "@/pages/ScheduleDay";
 import ScheduleEditor from "@/pages/ScheduleEditor";
 import QuestionnaireUnified from "@/pages/QuestionnaireUnified";
 import QuestionnaireResponses from "@/pages/QuestionnaireResponses";
@@ -36,7 +36,6 @@ import UserManagement from "@/pages/UserManagement";
 import QRCodeShare from "@/pages/QRCodeShare";
 import NotFound from "@/pages/not-found";
 import Reports from "@/pages/Reports";
-import Menu from "@/pages/Menu";
 
 function Router() {
   return (
@@ -67,13 +66,7 @@ function Router() {
           <AutoScheduleGeneration />
         </AuthGuard>
       </Route>
-
-      <Route path="/schedules/day/:date">
-        <AuthGuard>
-          <ScheduleDay />
-        </AuthGuard>
-      </Route>
-
+      
       <Route path="/schedules/:action?">
         <AuthGuard>
           <Schedules />
@@ -165,12 +158,6 @@ function Router() {
         </AuthGuard>
       </Route>
 
-      <Route path="/menu">
-        <AuthGuard>
-          <Menu />
-        </AuthGuard>
-      </Route>
-
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
@@ -188,13 +175,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SessionIndicator />
-        <Toaster />
-        <PWAUpdatePrompt />
-        <PWAInstallPrompt />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="system" storageKey="mesc-ui-theme">
+        <TooltipProvider>
+          <SessionIndicator />
+          <Toaster />
+          <PWAUpdatePrompt />
+          <PWAInstallPrompt />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

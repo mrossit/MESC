@@ -448,9 +448,9 @@ export default function QuestionnaireResponses() {
 
         {/* Informative State */}
         {!loading && status && !status.templateExists && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-900">
+          <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-900 dark:text-blue-100">
               <div className="space-y-2">
                 <p className="font-medium">
                   Ainda não há questionário criado para {monthNames[selectedMonth - 1]} de {selectedYear}.
@@ -480,11 +480,11 @@ export default function QuestionnaireResponses() {
                   setFilterTab('all');
                 }}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-blue-50 to-blue-100/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
                   <CardTitle className="text-sm font-medium">
                     Total de Ministros
                   </CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
+                  <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </CardHeader>
                 <CardContent className="pt-4">
                   <div className="text-2xl font-bold">{status.totalMinisters}</div>
@@ -501,14 +501,14 @@ export default function QuestionnaireResponses() {
                   setFilterTab('responded');
                 }}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-green-50 to-green-100/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50">
                   <CardTitle className="text-sm font-medium">
                     Responderam
                   </CardTitle>
-                  <UserCheck className="h-4 w-4 text-green-600" />
+                  <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                     {status.respondedCount}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -524,14 +524,14 @@ export default function QuestionnaireResponses() {
                   setFilterTab('pending');
                 }}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-orange-50 to-orange-100/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950 dark:to-orange-900/50">
                   <CardTitle className="text-sm font-medium">
                     Pendentes
                   </CardTitle>
-                  <UserX className="h-4 w-4 text-orange-600" />
+                  <UserX className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-orange-600">
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                     {status.pendingCount}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -547,11 +547,11 @@ export default function QuestionnaireResponses() {
                   setFilterTab('all');
                 }}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-purple-50 to-purple-100/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950 dark:to-purple-900/50">
                   <CardTitle className="text-sm font-medium">
                     Taxa de Resposta
                   </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </CardHeader>
                 <CardContent className="pt-4">
                   <div className="text-2xl font-bold">{status.responseRate.replace('%%', '%')}</div>
@@ -691,8 +691,8 @@ export default function QuestionnaireResponses() {
                                         className={cn(
                                           "cursor-pointer transition-all hover:scale-105",
                                           minister.availability === 'Disponível' 
-                                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                            : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100' 
+                                            : 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-100'
                                         )}
                                         onClick={() => minister.responded && fetchDetailedResponse(minister)}
                                       >
