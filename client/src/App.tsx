@@ -11,6 +11,8 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { checkCacheVersion } from "@/lib/cacheManager";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
 import { SessionIndicator } from "@/components/SessionIndicator";
+// import { VersionChecker } from "@/components/VersionChecker";
+// import { initVersionControl } from "@/lib/version";
 
 // Pages
 import Login from "@/pages/login";
@@ -171,6 +173,11 @@ function App() {
   // Verificar versão do cache ao iniciar a aplicação
   useEffect(() => {
     checkCacheVersion();
+
+    // Inicializar controle de versão (comentado temporariamente para debug)
+    // initVersionControl().catch(error => {
+    //   console.error('Erro ao inicializar controle de versão:', error);
+    // });
   }, []);
 
   return (
@@ -181,6 +188,7 @@ function App() {
           <Toaster />
           <PWAUpdatePrompt />
           <PWAInstallPrompt />
+          {/* <VersionChecker /> */}
           <Router />
         </TooltipProvider>
       </ThemeProvider>

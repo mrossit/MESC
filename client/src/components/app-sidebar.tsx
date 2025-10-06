@@ -18,7 +18,8 @@ import {
   User,
   HelpCircle,
   QrCode,
-  ChartBar
+  ChartBar,
+  Move
 } from "lucide-react";
 import {
   Sidebar,

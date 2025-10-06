@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { apiRateLimiter } from "./middleware/rateLimiter";
 import path from "path";
 
 // Global error handlers to prevent server crashes
@@ -17,6 +19,9 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
+
+// Trust proxy for Replit deployment (needed for rate limiter and CORS)
+app.set('trust proxy', true);
 
 // CRITICAL: Health check endpoints MUST be registered FIRST
 // before any middleware that might delay the response
@@ -43,6 +48,37 @@ app.get('/', (_req: Request, res: Response, next) => {
   
   next();
 });
+
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5000', 'http://localhost:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir requests sem origin (mobile apps, Postman, etc)
+    if (!origin) return callback(null, true);
+
+    // Permitir qualquer domínio Replit
+    if (origin && origin.includes('.replit.dev')) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Origem não permitida: ${origin}`);
+      callback(null, true); // Temporariamente permitindo todas as origens para debug
+    }
+  },
+  credentials: true, // Permitir cookies e headers de auth
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset']
+}));
+
+// Rate limiting global para todas as rotas da API
+app.use('/api', apiRateLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -117,7 +153,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(process.env.PORT || '5005', 10);
   
   server.on('error', (error: any) => {
     console.error('Server error:', error);

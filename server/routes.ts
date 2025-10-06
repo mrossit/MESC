@@ -6,6 +6,8 @@ import { storage } from "./storage";
 import { authenticateToken, requireRole, AuthRequest } from "./auth";
 import authRoutes from "./authRoutes";
 import { passwordResetRoutes } from "./passwordResetRoutes";
+import { csrfTokenGenerator, csrfProtection, getCsrfToken } from "./middleware/csrf";
+import { authRateLimiter, passwordResetRateLimiter } from "./middleware/rateLimiter";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
@@ -16,6 +18,8 @@ import reportsRoutes from "./routes/reports";
 import ministersRoutes from "./routes/ministers";
 import sessionRoutes from "./routes/session";
 import substitutionsRoutes from "./routes/substitutions";
+import massPendenciesRoutes from "./routes/mass-pendencies";
+import formationAdminRoutes from "./routes/formationAdmin";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -71,39 +75,60 @@ function handleApiError(error: any, operation: string) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Cookie parser middleware
   app.use(cookieParser());
-  
-  // Auth routes (nosso sistema próprio)
-  app.use('/api/auth', authRoutes);
-  
-  // Password reset routes
-  app.use('/api/password-reset', passwordResetRoutes);
+
+  // CSRF token generator - gera token para todas as rotas
+  app.use(csrfTokenGenerator);
+
+  // Endpoint para obter token CSRF
+  app.get('/api/csrf-token', getCsrfToken);
+
+  // Auth routes com rate limiting específico
+  app.use('/api/auth', authRateLimiter, authRoutes);
+
+  // Password reset routes com rate limiting muito restritivo
+  app.use('/api/password-reset', passwordResetRateLimiter, passwordResetRoutes);
   
   // Questionnaire routes (IMPORTANTE: registrar as rotas regulares ANTES das admin)
-  app.use('/api/questionnaires', questionnaireRoutes);
-  
-  // Questionnaire admin routes
-  app.use('/api/questionnaires/admin', questionnaireAdminRoutes);
-  
-  // Schedule generation routes
-  app.use('/api/schedules', scheduleGenerationRoutes);
-  
-  // Upload routes
-  app.use('/api/upload', uploadRoutes);
-  
-  // Notification routes
-  app.use('/api/notifications', notificationsRoutes);
+  app.use('/api/questionnaires', csrfProtection, questionnaireRoutes);
 
-  // Reports routes
+  // Questionnaire admin routes - com proteção CSRF
+  app.use('/api/questionnaires/admin', csrfProtection, questionnaireAdminRoutes);
+
+  // Schedule generation routes - com proteção CSRF
+  app.use('/api/schedules', csrfProtection, scheduleGenerationRoutes);
+
+  // Upload routes - com proteção CSRF
+  app.use('/api/upload', csrfProtection, uploadRoutes);
+
+  // Notification routes - com proteção CSRF
+  app.use('/api/notifications', csrfProtection, notificationsRoutes);
+
+  // Reports routes (apenas leitura, não precisa CSRF)
   app.use('/api/reports', reportsRoutes);
 
-  // Ministers routes
-  app.use('/api/ministers', ministersRoutes);
+  // Ministers routes - com proteção CSRF
+  app.use('/api/ministers', csrfProtection, ministersRoutes);
 
   // Session routes (activity monitoring & auto-logout)
   app.use('/api/session', sessionRoutes);
 
-  // Substitution routes
-  app.use('/api/substitutions', substitutionsRoutes);
+  // Substitution routes - com proteção CSRF
+  app.use('/api/substitutions', csrfProtection, substitutionsRoutes);
+
+  // Mass pendencies routes (apenas leitura, não precisa CSRF)
+  app.use('/api/mass-pendencies', massPendenciesRoutes);
+
+  // Formation admin routes - com proteção CSRF
+  app.use('/api/formation/admin', csrfProtection, formationAdminRoutes);
+
+  // Version endpoint (public - sem auth)
+  app.get('/api/version', (req, res) => {
+    res.json({
+      version: '1.0.0', // Atualizar manualmente a cada deploy
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
@@ -141,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/profile', authenticateToken, async (req: AuthRequest, res) => {
+  app.put('/api/profile', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -179,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Family routes
   // POST /api/profile/family - Add family member
-  app.post('/api/profile/family', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/profile/family', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.user!.id;
       const { relatedUserId, relationshipType } = req.body;
@@ -251,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/profile/family/:id - Remove family member
-  app.delete('/api/profile/family/:id', authenticateToken, async (req: AuthRequest, res) => {
+  app.delete('/api/profile/family/:id', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       await storage.removeFamilyMember(id);
@@ -363,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users', authenticateToken, requireRole(['gestor']), async (req, res) => {
+  app.post('/api/users', authenticateToken, requireRole(['gestor']), csrfProtection, async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       
@@ -382,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.put('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req, res) => {
     try {
       const userData = insertUserSchema.partial().parse(req.body);
       
@@ -397,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req: AuthRequest, res) => {
     try {
       const statusUpdateSchema = z.object({
         status: z.enum(['active', 'inactive', 'pending'], {
@@ -444,7 +469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req: AuthRequest, res) => {
     try {
       const roleUpdateSchema = z.object({
         role: z.enum(['gestor', 'coordenador', 'ministro'], {
@@ -507,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.patch('/api/users/:id/block', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req: AuthRequest, res) => {
     try {
       // Impedir auto-bloqueio
       if (req.user?.id === req.params.id) {
@@ -652,7 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  app.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.params.id;
       const currentUser = req.user;
@@ -848,7 +873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/questionnaires', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/questionnaires', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const questionnaireData = insertQuestionnaireSchema.parse(req.body);
       const questionnaire = await storage.createQuestionnaire({
@@ -875,7 +900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/questionnaires/:id/responses', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/questionnaires/:id/responses', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const responseData = {
         questionnaireId: req.params.id,
@@ -916,7 +941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/schedules', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/schedules', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const scheduleData = {
         ...req.body,
@@ -966,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/mass-times', authenticateToken, async (req, res) => {
+  app.post('/api/mass-times', authenticateToken, csrfProtection, async (req, res) => {
     try {
       const massTimeData = insertMassTimeSchema.parse(req.body);
       const massTime = await storage.createMassTime(massTimeData);
@@ -980,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/mass-times/:id', authenticateToken, async (req, res) => {
+  app.put('/api/mass-times/:id', authenticateToken, csrfProtection, async (req, res) => {
     try {
       const massTimeData = insertMassTimeSchema.partial().parse(req.body);
       const massTime = await storage.updateMassTime(req.params.id, massTimeData);
@@ -994,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/mass-times/:id', authenticateToken, async (req, res) => {
+  app.delete('/api/mass-times/:id', authenticateToken, csrfProtection, async (req, res) => {
     try {
       await storage.deleteMassTime(req.params.id);
       res.status(204).send();
@@ -1155,7 +1180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/formation/progress', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/formation/progress', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -1176,7 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark lesson section as completed
-  app.post('/api/formation/lessons/:lessonId/sections/:sectionId/complete', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/formation/lessons/:lessonId/sections/:sectionId/complete', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -1193,7 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark entire lesson as completed
-  app.post('/api/formation/lessons/:lessonId/complete', authenticateToken, async (req: AuthRequest, res) => {
+  app.post('/api/formation/lessons/:lessonId/complete', authenticateToken, csrfProtection, async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -1210,7 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes for managing formation content (restricted to coordinators and managers)
-  app.post('/api/formation/tracks', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/tracks', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req, res) => {
     try {
       const trackData = insertFormationTrackSchema.parse(req.body);
       const track = await storage.createFormationTrack(trackData);
@@ -1221,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/formation/lessons', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/lessons', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req, res) => {
     try {
       const lessonData = insertFormationLessonSchema.parse(req.body);
       const lesson = await storage.createFormationLesson(lessonData);
@@ -1232,7 +1257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/formation/lessons/:id/sections', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
+  app.post('/api/formation/lessons/:id/sections', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req, res) => {
     try {
       const sectionData = insertFormationLessonSectionSchema.parse({
         ...req.body,

@@ -13,6 +13,8 @@ const CACHE_VERSION_KEY = 'app-cache-version';
  * Verifica se a versão do cache mudou e limpa tudo se necessário
  */
 export function checkCacheVersion(): void {
+  if (typeof window === 'undefined') return;
+
   const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
 
   if (storedVersion !== CACHE_VERSION) {
@@ -26,6 +28,8 @@ export function checkCacheVersion(): void {
  * Limpa TODO o cache do React Query e dados relacionados
  */
 export function clearAllCache(): void {
+  if (typeof window === 'undefined') return;
+
   console.log('[CacheManager] Limpando todo o cache...');
 
   // Limpa cache do React Query
@@ -90,6 +94,8 @@ export function forceRefreshAuth(): Promise<void> {
  * Limpa cache ao fazer logout
  */
 export function clearCacheOnLogout(): void {
+  if (typeof window === 'undefined') return;
+
   console.log('[CacheManager] Limpando cache no logout...');
   clearAllCache();
   localStorage.removeItem('token');

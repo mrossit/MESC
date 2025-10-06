@@ -1,17 +1,17 @@
 import { Router } from "express";
 import { db } from "../db";
-import { substitutionRequests, schedules, users } from "@shared/schema";
-import { eq, and, sql, gte, desc, count } from "drizzle-orm";
+import { substitutionRequests, schedules, users, questionnaireResponses, questionnaires } from "@shared/schema";
+import { eq, and, sql, gte, desc, count, notInArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 
 const router = Router();
 
 // Calcular urgência baseada no tempo até a missa
-function calculateUrgency(massDate: Date, massTime: string): "low" | "medium" | "high" | "critical" {
+function calculateUrgency(massDateStr: string, massTime: string): "low" | "medium" | "high" | "critical" {
   const now = new Date();
+  const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  const massDateTime = new Date(massDate);
-  massDateTime.setHours(hours, minutes, 0, 0);
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -22,11 +22,11 @@ function calculateUrgency(massDate: Date, massTime: string): "low" | "medium" | 
 }
 
 // Verificar se solicitação deve ser auto-aprovada (> 12h antes)
-function shouldAutoApprove(massDate: Date, massTime: string): boolean {
+function shouldAutoApprove(massDateStr: string, massTime: string): boolean {
   const now = new Date();
+  const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  const massDateTime = new Date(massDate);
-  massDateTime.setHours(hours, minutes, 0, 0);
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -51,6 +51,136 @@ async function countMonthlySubstitutions(requesterId: string): Promise<number> {
     );
 
   return result[0]?.count || 0;
+}
+
+// Buscar suplente disponível automaticamente
+async function findAvailableSubstitute(massDate: string, massTime: string): Promise<string | null> {
+  try {
+    // 1. Buscar o questionário ativo do mês/ano da missa
+    const [year, month] = massDate.split('-').map(Number);
+
+    const [activeQuestionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(
+        and(
+          eq(questionnaires.year, year),
+          eq(questionnaires.month, month),
+          eq(questionnaires.status, 'published')
+        )
+      )
+      .limit(1);
+
+    if (!activeQuestionnaire) {
+      console.log('Nenhum questionário ativo encontrado para', year, month);
+      return null;
+    }
+
+    // 2. Buscar ministros já escalados para aquela data/hora
+    const scheduledMinisters = await db
+      .select({ ministerId: schedules.ministerId })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.date, massDate),
+          eq(schedules.time, massTime),
+          eq(schedules.status, 'scheduled')
+        )
+      );
+
+    const scheduledMinisterIds = scheduledMinisters
+      .map((s: any) => s.ministerId)
+      .filter((id: any) => id !== null) as string[];
+
+    // 3. Buscar respostas de ministros que indicaram disponibilidade
+    // Converter data para formato do domingo (YYYY-MM-DD)
+    const responsesQuery = scheduledMinisterIds.length > 0
+      ? db
+          .select({
+            userId: questionnaireResponses.userId,
+            availableSundays: questionnaireResponses.availableSundays,
+            preferredMassTimes: questionnaireResponses.preferredMassTimes,
+            canSubstitute: questionnaireResponses.canSubstitute,
+            userName: users.name,
+            lastService: users.lastService
+          })
+          .from(questionnaireResponses)
+          .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+          .where(
+            and(
+              eq(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
+              eq(users.status, 'active'),
+              eq(users.role, 'ministro'),
+              notInArray(questionnaireResponses.userId, scheduledMinisterIds)
+            )
+          )
+      : db
+          .select({
+            userId: questionnaireResponses.userId,
+            availableSundays: questionnaireResponses.availableSundays,
+            preferredMassTimes: questionnaireResponses.preferredMassTimes,
+            canSubstitute: questionnaireResponses.canSubstitute,
+            userName: users.name,
+            lastService: users.lastService
+          })
+          .from(questionnaireResponses)
+          .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+          .where(
+            and(
+              eq(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
+              eq(users.status, 'active'),
+              eq(users.role, 'ministro')
+            )
+          );
+
+    const availableResponses = await responsesQuery;
+
+    // 4. Filtrar ministros que indicaram disponibilidade para aquela data
+    const eligibleMinisters = availableResponses.filter((response: any) => {
+      // Verificar se o ministro marcou disponibilidade para aquele domingo
+      const availableSundays = response.availableSundays as string[] || [];
+      const isDateAvailable = availableSundays.includes(massDate);
+
+      // Verificar se pode substituir
+      const canSubstitute = response.canSubstitute ?? false;
+
+      return isDateAvailable && canSubstitute;
+    });
+
+    if (eligibleMinisters.length === 0) {
+      console.log('Nenhum suplente elegível encontrado para', massDate, massTime);
+      return null;
+    }
+
+    // 5. Priorizar por:
+    // - Menos serviços recentes (lastService mais antigo ou null)
+    // - Que preferiu este horário
+    eligibleMinisters.sort((a: any, b: any) => {
+      // Primeiro, verificar se preferiu o horário
+      const aPreferredTimes = (a.preferredMassTimes as string[]) || [];
+      const bPreferredTimes = (b.preferredMassTimes as string[]) || [];
+      const aPreferred = aPreferredTimes.includes(massTime);
+      const bPreferred = bPreferredTimes.includes(massTime);
+
+      if (aPreferred && !bPreferred) return -1;
+      if (!aPreferred && bPreferred) return 1;
+
+      // Depois, ordenar por lastService (mais antigo primeiro)
+      const aLastService = a.lastService ? new Date(a.lastService).getTime() : 0;
+      const bLastService = b.lastService ? new Date(b.lastService).getTime() : 0;
+
+      return aLastService - bLastService;
+    });
+
+    const selectedSubstitute = eligibleMinisters[0];
+    console.log(`✅ Suplente automático encontrado: ${selectedSubstitute.userName} (${selectedSubstitute.userId})`);
+
+    return selectedSubstitute.userId;
+
+  } catch (error) {
+    console.error('Erro ao buscar suplente disponível:', error);
+    return null;
+  }
 }
 
 // POST /api/substitutions - Criar solicitação de substituição
@@ -81,13 +211,18 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Verificar se a data já passou
-    const massDate = new Date(schedule.date);
+    // Verificar se a data/hora da missa já passou
+    // Usar UTC para evitar problemas de timezone
+    const [year, month, day] = schedule.date.split('-').map(Number);
+    const [hours, minutes] = schedule.time.split(':').map(Number);
+    const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
     const now = new Date();
-    if (massDate < now) {
+
+    if (massDateTime < now) {
       return res.status(400).json({
         success: false,
-        message: "Não é possível solicitar substituição para data passada"
+        message: "Não é possível solicitar substituição para missa que já passou"
       });
     }
 
@@ -119,10 +254,27 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Calcular urgência
-    const urgency = calculateUrgency(massDate, schedule.massTime);
+    const urgency = calculateUrgency(schedule.date, schedule.time);
 
     // Verificar contador mensal de substituições
     const monthlyCount = await countMonthlySubstitutions(requesterId);
+
+    // 🆕 AUTO-ESCALAÇÃO: Se não foi especificado um substituto, buscar automaticamente
+    let finalSubstituteId = substituteId;
+    let autoAssigned = false;
+
+    if (!finalSubstituteId) {
+      console.log(`🔍 Buscando suplente automático para ${schedule.date} às ${schedule.time}...`);
+      const autoSubstituteId = await findAvailableSubstitute(schedule.date, schedule.time);
+
+      if (autoSubstituteId) {
+        finalSubstituteId = autoSubstituteId;
+        autoAssigned = true;
+        console.log(`✅ Suplente automático atribuído: ${autoSubstituteId}`);
+      } else {
+        console.log(`⚠️  Nenhum suplente disponível encontrado automaticamente`);
+      }
+    }
 
     // Determinar status inicial
     let status: "pending" | "auto_approved" = "pending";
@@ -133,7 +285,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     const userRole = req.user!.role;
     const isCoordinator = userRole === 'coordenador' || userRole === 'gestor';
 
-    if (shouldAutoApprove(massDate, schedule.massTime) && (monthlyCount < 2 || isCoordinator)) {
+    if (shouldAutoApprove(schedule.date, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
       status = "auto_approved";
     }
 
@@ -143,7 +295,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       .values({
         scheduleId,
         requesterId,
-        substituteId: substituteId || null,
+        substituteId: finalSubstituteId || null,
         reason: reason || null,
         status,
         urgency,
@@ -153,19 +305,19 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       .returning();
 
     // Se auto-aprovado, atualizar a escala imediatamente
-    if (status === "auto_approved" && substituteId) {
+    if (status === "auto_approved" && finalSubstituteId) {
       await db
         .update(schedules)
         .set({
-          ministerId: substituteId,
+          ministerId: finalSubstituteId,
           substituteId: requesterId,
           updatedAt: new Date()
         })
         .where(eq(schedules.id, scheduleId));
     }
 
-    // Buscar dados completos para retorno
-    const [requestWithDetails] = await db
+    // Buscar dados completos para retorno (incluindo dados do suplente se houver)
+    const requestQuery = db
       .select({
         request: substitutionRequests,
         assignment: schedules,
@@ -182,14 +334,61 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       .where(eq(substitutionRequests.id, newRequest.id))
       .limit(1);
 
+    const [requestWithDetails] = await requestQuery;
+
+    // Buscar dados do suplente, se houver
+    let substituteUser = null;
+    if (finalSubstituteId) {
+      const [substitute] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          phone: users.phone,
+          whatsapp: users.whatsapp
+        })
+        .from(users)
+        .where(eq(users.id, finalSubstituteId))
+        .limit(1);
+
+      substituteUser = substitute || null;
+    }
+
+    // Mapear 'time' para 'massTime' para compatibilidade com o frontend
+    const responseData = {
+      ...requestWithDetails,
+      assignment: {
+        ...requestWithDetails.assignment,
+        massTime: requestWithDetails.assignment.time
+      },
+      substituteUser
+    };
+
+    // Mensagem personalizada baseada na auto-escalação
+    let message = "";
+    if (autoAssigned && finalSubstituteId) {
+      message = `Solicitação criada! Foi encontrado automaticamente um suplente disponível: ${substituteUser?.name}. ` +
+                `${status === "auto_approved" ? "A substituição foi auto-aprovada." : "Aguardando confirmação do suplente."}`;
+    } else if (status === "auto_approved") {
+      message = "Solicitação criada e auto-aprovada com sucesso";
+    } else {
+      message = finalSubstituteId
+        ? "Solicitação criada com sucesso. Aguardando aprovação do suplente."
+        : "Solicitação criada. Nenhum suplente disponível foi encontrado automaticamente. Aguardando coordenador.";
+    }
+
     res.json({
       success: true,
-      message: status === "auto_approved"
-        ? "Solicitação criada e auto-aprovada com sucesso"
-        : "Solicitação criada com sucesso. Aguardando aprovação do coordenador.",
-      data: requestWithDetails,
+      message,
+      data: responseData,
       monthlyCount: monthlyCount + 1,
-      isAutoApproved: status === "auto_approved"
+      isAutoApproved: status === "auto_approved",
+      autoAssigned,
+      substituteInfo: substituteUser ? {
+        name: substituteUser.name,
+        phone: substituteUser.phone,
+        whatsapp: substituteUser.whatsapp
+      } : null
     });
 
   } catch (error) {
@@ -249,7 +448,16 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
         .orderBy(desc(substitutionRequests.createdAt));
     }
 
-    res.json(requests);
+    // Mapear 'time' para 'massTime' para compatibilidade com o frontend
+    const mappedRequests = requests.map((req: any) => ({
+      ...req,
+      assignment: {
+        ...req.assignment,
+        massTime: req.assignment.time
+      }
+    }));
+
+    res.json(mappedRequests);
 
   } catch (error) {
     console.error("Erro ao listar solicitações:", error);
@@ -307,7 +515,7 @@ router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) 
             SELECT 1 FROM ${schedules} s
             WHERE s.minister_id = ${users.id}
             AND s.date = ${schedule.date}
-            AND s.mass_time = ${schedule.massTime}
+            AND s.time = ${schedule.time}
           )`
         )
       )

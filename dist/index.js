@@ -57,6 +57,7 @@ __export(schema_exports, {
   substitutionRequests: () => substitutionRequests,
   substitutionRequestsRelations: () => substitutionRequestsRelations,
   substitutionStatusEnum: () => substitutionStatusEnum,
+  urgencyLevelEnum: () => urgencyLevelEnum,
   userRoleEnum: () => userRoleEnum,
   userStatusEnum: () => userStatusEnum,
   users: () => users,
@@ -78,7 +79,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -95,7 +96,8 @@ var init_schema = __esm({
     userStatusEnum = pgEnum("user_status", ["active", "inactive", "pending"]);
     scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published", "completed"]);
     scheduleTypeEnum = pgEnum("schedule_type", ["missa", "celebracao", "evento"]);
-    substitutionStatusEnum = pgEnum("substitution_status", ["pending", "approved", "rejected", "cancelled"]);
+    substitutionStatusEnum = pgEnum("substitution_status", ["pending", "approved", "rejected", "cancelled", "auto_approved"]);
+    urgencyLevelEnum = pgEnum("urgency_level", ["low", "medium", "high", "critical"]);
     notificationTypeEnum = pgEnum("notification_type", ["schedule", "substitution", "formation", "announcement", "reminder"]);
     formationCategoryEnum = pgEnum("formation_category", ["liturgia", "espiritualidade", "pratica"]);
     formationStatusEnum = pgEnum("formation_status", ["not_started", "in_progress", "completed"]);
@@ -231,15 +233,25 @@ var init_schema = __esm({
     });
     substitutionRequests = pgTable("substitution_requests", {
       id: uuid("id").primaryKey().defaultRandom(),
-      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id),
-      requesterId: varchar("requester_id").notNull().references(() => users.id),
-      substituteId: varchar("substitute_id").references(() => users.id),
+      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
+      requesterId: varchar("requester_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      substituteId: varchar("substitute_id").references(() => users.id, { onDelete: "set null" }),
       reason: text("reason"),
+      // Opcional - ministro pode ou não informar motivo
       status: substitutionStatusEnum("status").notNull().default("pending"),
+      urgency: urgencyLevelEnum("urgency").notNull().default("medium"),
       approvedBy: varchar("approved_by").references(() => users.id),
       approvedAt: timestamp("approved_at"),
-      createdAt: timestamp("created_at").defaultNow()
-    });
+      responseMessage: text("response_message"),
+      // Mensagem do substituto ao aceitar/rejeitar
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_substitution_requester").on(table.requesterId),
+      index("idx_substitution_substitute").on(table.substituteId),
+      index("idx_substitution_status").on(table.status),
+      index("idx_substitution_schedule").on(table.scheduleId)
+    ]);
     notifications = pgTable("notifications", {
       id: uuid("id").primaryKey().defaultRandom(),
       userId: varchar("user_id").notNull().references(() => users.id),
@@ -2389,9 +2401,9 @@ var init_scheduleGenerator = __esm({
       /**
        * Seleciona ministros de backup
        */
-      selectBackupMinisters(available, selected, count5) {
+      selectBackupMinisters(available, selected, count6) {
         const selectedIds = new Set(selected.map((m) => m.id).filter((id) => id !== null));
-        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count5);
+        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count6);
         return backup;
       }
       /**
@@ -2485,12 +2497,13 @@ var init_scheduleGenerator = __esm({
 
 // server/index.ts
 import express2 from "express";
+import cors from "cors";
 
 // server/routes.ts
 await init_storage();
 import { createServer } from "http";
 import cookieParser from "cookie-parser";
-import crypto from "crypto";
+import crypto2 from "crypto";
 
 // server/auth.ts
 await init_db();
@@ -3331,6 +3344,120 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Erro ao processar rejei\xE7\xE3o"
+    });
+  }
+});
+
+// server/middleware/csrf.ts
+import crypto from "crypto";
+function generateCsrfToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+function csrfTokenGenerator(req, res, next) {
+  if (req.session) {
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = generateCsrfToken();
+    }
+  }
+  next();
+}
+function csrfProtection(req, res, next) {
+  const safeMethods = ["GET", "HEAD", "OPTIONS"];
+  if (safeMethods.includes(req.method)) {
+    return next();
+  }
+  const token = req.headers["x-csrf-token"] || req.body._csrf;
+  if (!req.session || !req.session.csrfToken) {
+    res.status(403).json({
+      error: "CSRF token inv\xE1lido",
+      message: "Sess\xE3o expirada ou inv\xE1lida. Fa\xE7a login novamente."
+    });
+    return;
+  }
+  if (!token || token !== req.session.csrfToken) {
+    res.status(403).json({
+      error: "CSRF token inv\xE1lido",
+      message: "Token de seguran\xE7a inv\xE1lido. A requisi\xE7\xE3o foi bloqueada por seguran\xE7a."
+    });
+    return;
+  }
+  next();
+}
+function getCsrfToken(req, res) {
+  if (!req.session) {
+    res.status(500).json({
+      error: "Sess\xE3o n\xE3o dispon\xEDvel"
+    });
+    return;
+  }
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = generateCsrfToken();
+  }
+  res.json({
+    csrfToken: req.session.csrfToken
+  });
+}
+
+// server/middleware/rateLimiter.ts
+import rateLimit from "express-rate-limit";
+var authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1e3,
+  // 15 minutos
+  max: 5,
+  // Máximo 5 tentativas por IP
+  message: {
+    error: "Muitas tentativas de autentica\xE7\xE3o. Tente novamente em 15 minutos."
+  },
+  standardHeaders: true,
+  // Retorna info de rate limit nos headers `RateLimit-*`
+  legacyHeaders: false,
+  // Desabilita headers `X-RateLimit-*`
+  skipSuccessfulRequests: false,
+  // Contar mesmo se request for bem-sucedido
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Muitas tentativas de autentica\xE7\xE3o",
+      message: "Voc\xEA excedeu o limite de tentativas. Por favor, aguarde 15 minutos e tente novamente.",
+      retryAfter: "15 minutes"
+    });
+  }
+});
+var apiRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1e3,
+  // 1 minuto
+  max: 100,
+  // Máximo 100 requests por minuto por IP
+  message: {
+    error: "Muitas requisi\xE7\xF5es. Tente novamente em breve."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Rate limit excedido",
+      message: "Voc\xEA excedeu o limite de requisi\xE7\xF5es por minuto. Por favor, aguarde um momento.",
+      retryAfter: "1 minute"
+    });
+  }
+});
+var passwordResetRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1e3,
+  // 1 hora
+  max: 3,
+  // Máximo 3 tentativas por hora por IP
+  message: {
+    error: "Muitas tentativas de recupera\xE7\xE3o de senha."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  // Não contar se request falhar
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Limite de recupera\xE7\xE3o de senha excedido",
+      message: "Voc\xEA excedeu o limite de tentativas de recupera\xE7\xE3o de senha. Aguarde 1 hora.",
+      retryAfter: "1 hour"
     });
   }
 });
@@ -6549,8 +6676,8 @@ router8.get("/", authenticateToken, async (req, res) => {
 router8.get("/unread-count", authenticateToken, async (req, res) => {
   try {
     const allNotifications = await storage.getUserNotifications(req.user.id);
-    const count5 = allNotifications.filter((n) => !n.read).length;
-    res.json({ count: count5 });
+    const count6 = allNotifications.filter((n) => !n.read).length;
+    res.json({ count: count6 });
   } catch (error) {
     res.status(500).json({ error: "Erro ao contar notifica\xE7\xF5es" });
   }
@@ -7102,12 +7229,1061 @@ router10.get("/:id/stats", authenticateToken, async (req, res) => {
 });
 var ministers_default = router10;
 
+// server/routes/substitutions.ts
+await init_db();
+init_schema();
+import { Router as Router11 } from "express";
+import { eq as eq15, and as and12, sql as sql8, gte as gte5, desc as desc7, count as count4, notInArray } from "drizzle-orm";
+var router11 = Router11();
+function calculateUrgency(massDate, massTime) {
+  const now = /* @__PURE__ */ new Date();
+  const [hours, minutes] = massTime.split(":").map(Number);
+  const massDateTime = new Date(massDate);
+  massDateTime.setHours(hours, minutes, 0, 0);
+  const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
+  if (hoursUntilMass < 12) return "critical";
+  if (hoursUntilMass < 24) return "high";
+  if (hoursUntilMass < 72) return "medium";
+  return "low";
+}
+function shouldAutoApprove(massDate, massTime) {
+  const now = /* @__PURE__ */ new Date();
+  const [hours, minutes] = massTime.split(":").map(Number);
+  const massDateTime = new Date(massDate);
+  massDateTime.setHours(hours, minutes, 0, 0);
+  const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
+  return hoursUntilMass >= 12;
+}
+async function countMonthlySubstitutions(requesterId) {
+  const now = /* @__PURE__ */ new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDayOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const result = await db.select({ count: count4() }).from(substitutionRequests).where(
+    and12(
+      eq15(substitutionRequests.requesterId, requesterId),
+      gte5(substitutionRequests.createdAt, firstDayOfMonth),
+      sql8`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
+    )
+  );
+  return result[0]?.count || 0;
+}
+async function findAvailableSubstitute(massDate, massTime) {
+  try {
+    const [year, month] = massDate.split("-").map(Number);
+    const [activeQuestionnaire] = await db.select().from(questionnaires).where(
+      and12(
+        eq15(questionnaires.year, year),
+        eq15(questionnaires.month, month),
+        eq15(questionnaires.status, "published")
+      )
+    ).limit(1);
+    if (!activeQuestionnaire) {
+      console.log("Nenhum question\xE1rio ativo encontrado para", year, month);
+      return null;
+    }
+    const scheduledMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
+      and12(
+        eq15(schedules.date, massDate),
+        eq15(schedules.time, massTime),
+        eq15(schedules.status, "scheduled")
+      )
+    );
+    const scheduledMinisterIds = scheduledMinisters.map((s) => s.ministerId).filter((id) => id !== null);
+    const responsesQuery = scheduledMinisterIds.length > 0 ? db.select({
+      userId: questionnaireResponses.userId,
+      availableSundays: questionnaireResponses.availableSundays,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      userName: users.name,
+      lastService: users.lastService
+    }).from(questionnaireResponses).innerJoin(users, eq15(questionnaireResponses.userId, users.id)).where(
+      and12(
+        eq15(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
+        eq15(users.status, "active"),
+        eq15(users.role, "ministro"),
+        notInArray(questionnaireResponses.userId, scheduledMinisterIds)
+      )
+    ) : db.select({
+      userId: questionnaireResponses.userId,
+      availableSundays: questionnaireResponses.availableSundays,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      userName: users.name,
+      lastService: users.lastService
+    }).from(questionnaireResponses).innerJoin(users, eq15(questionnaireResponses.userId, users.id)).where(
+      and12(
+        eq15(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
+        eq15(users.status, "active"),
+        eq15(users.role, "ministro")
+      )
+    );
+    const availableResponses = await responsesQuery;
+    const eligibleMinisters = availableResponses.filter((response) => {
+      const availableSundays = response.availableSundays || [];
+      const isDateAvailable = availableSundays.includes(massDate);
+      const canSubstitute = response.canSubstitute ?? false;
+      return isDateAvailable && canSubstitute;
+    });
+    if (eligibleMinisters.length === 0) {
+      console.log("Nenhum suplente eleg\xEDvel encontrado para", massDate, massTime);
+      return null;
+    }
+    eligibleMinisters.sort((a, b) => {
+      const aPreferredTimes = a.preferredMassTimes || [];
+      const bPreferredTimes = b.preferredMassTimes || [];
+      const aPreferred = aPreferredTimes.includes(massTime);
+      const bPreferred = bPreferredTimes.includes(massTime);
+      if (aPreferred && !bPreferred) return -1;
+      if (!aPreferred && bPreferred) return 1;
+      const aLastService = a.lastService ? new Date(a.lastService).getTime() : 0;
+      const bLastService = b.lastService ? new Date(b.lastService).getTime() : 0;
+      return aLastService - bLastService;
+    });
+    const selectedSubstitute = eligibleMinisters[0];
+    console.log(`\u2705 Suplente autom\xE1tico encontrado: ${selectedSubstitute.userName} (${selectedSubstitute.userId})`);
+    return selectedSubstitute.userId;
+  } catch (error) {
+    console.error("Erro ao buscar suplente dispon\xEDvel:", error);
+    return null;
+  }
+}
+router11.post("/", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId, substituteId, reason } = req.body;
+    const requesterId = req.user.id;
+    if (!scheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "ID da escala \xE9 obrigat\xF3rio"
+      });
+    }
+    const [schedule] = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Escala n\xE3o encontrada"
+      });
+    }
+    const massDate = new Date(schedule.date);
+    const [hours, minutes] = schedule.time.split(":").map(Number);
+    const massDateTime = new Date(massDate);
+    massDateTime.setHours(hours, minutes, 0, 0);
+    const now = /* @__PURE__ */ new Date();
+    if (massDateTime < now) {
+      return res.status(400).json({
+        success: false,
+        message: "N\xE3o \xE9 poss\xEDvel solicitar substitui\xE7\xE3o para missa que j\xE1 passou"
+      });
+    }
+    if (schedule.ministerId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: "Voc\xEA n\xE3o est\xE1 escalado para esta data"
+      });
+    }
+    const [existingRequest] = await db.select().from(substitutionRequests).where(
+      and12(
+        eq15(substitutionRequests.scheduleId, scheduleId),
+        eq15(substitutionRequests.status, "pending")
+      )
+    ).limit(1);
+    if (existingRequest) {
+      return res.status(400).json({
+        success: false,
+        message: "J\xE1 existe uma solicita\xE7\xE3o pendente para esta escala"
+      });
+    }
+    const urgency = calculateUrgency(massDate, schedule.time);
+    const monthlyCount = await countMonthlySubstitutions(requesterId);
+    let finalSubstituteId = substituteId;
+    let autoAssigned = false;
+    if (!finalSubstituteId) {
+      console.log(`\u{1F50D} Buscando suplente autom\xE1tico para ${schedule.date} \xE0s ${schedule.time}...`);
+      const autoSubstituteId = await findAvailableSubstitute(schedule.date, schedule.time);
+      if (autoSubstituteId) {
+        finalSubstituteId = autoSubstituteId;
+        autoAssigned = true;
+        console.log(`\u2705 Suplente autom\xE1tico atribu\xEDdo: ${autoSubstituteId}`);
+      } else {
+        console.log(`\u26A0\uFE0F  Nenhum suplente dispon\xEDvel encontrado automaticamente`);
+      }
+    }
+    let status = "pending";
+    const userRole = req.user.role;
+    const isCoordinator = userRole === "coordenador" || userRole === "gestor";
+    if (shouldAutoApprove(massDate, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
+      status = "auto_approved";
+    }
+    const [newRequest] = await db.insert(substitutionRequests).values({
+      scheduleId,
+      requesterId,
+      substituteId: finalSubstituteId || null,
+      reason: reason || null,
+      status,
+      urgency,
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).returning();
+    if (status === "auto_approved" && finalSubstituteId) {
+      await db.update(schedules).set({
+        ministerId: finalSubstituteId,
+        substituteId: requesterId,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq15(schedules.id, scheduleId));
+    }
+    const requestQuery = db.select({
+      request: substitutionRequests,
+      assignment: schedules,
+      requestingUser: {
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        profilePhoto: users.photoUrl
+      }
+    }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).where(eq15(substitutionRequests.id, newRequest.id)).limit(1);
+    const [requestWithDetails] = await requestQuery;
+    let substituteUser = null;
+    if (finalSubstituteId) {
+      const [substitute] = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        whatsapp: users.whatsapp
+      }).from(users).where(eq15(users.id, finalSubstituteId)).limit(1);
+      substituteUser = substitute || null;
+    }
+    const responseData = {
+      ...requestWithDetails,
+      assignment: {
+        ...requestWithDetails.assignment,
+        massTime: requestWithDetails.assignment.time
+      },
+      substituteUser
+    };
+    let message = "";
+    if (autoAssigned && finalSubstituteId) {
+      message = `Solicita\xE7\xE3o criada! Foi encontrado automaticamente um suplente dispon\xEDvel: ${substituteUser?.name}. ${status === "auto_approved" ? "A substitui\xE7\xE3o foi auto-aprovada." : "Aguardando confirma\xE7\xE3o do suplente."}`;
+    } else if (status === "auto_approved") {
+      message = "Solicita\xE7\xE3o criada e auto-aprovada com sucesso";
+    } else {
+      message = finalSubstituteId ? "Solicita\xE7\xE3o criada com sucesso. Aguardando aprova\xE7\xE3o do suplente." : "Solicita\xE7\xE3o criada. Nenhum suplente dispon\xEDvel foi encontrado automaticamente. Aguardando coordenador.";
+    }
+    res.json({
+      success: true,
+      message,
+      data: responseData,
+      monthlyCount: monthlyCount + 1,
+      isAutoApproved: status === "auto_approved",
+      autoAssigned,
+      substituteInfo: substituteUser ? {
+        name: substituteUser.name,
+        phone: substituteUser.phone,
+        whatsapp: substituteUser.whatsapp
+      } : null
+    });
+  } catch (error) {
+    console.error("Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o"
+    });
+  }
+});
+router11.get("/", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const isCoordinator = userRole === "coordenador" || userRole === "gestor";
+    let requests;
+    if (isCoordinator) {
+      requests = await db.select({
+        request: substitutionRequests,
+        assignment: schedules,
+        requestingUser: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          profilePhoto: users.photoUrl
+        }
+      }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
+    } else {
+      requests = await db.select({
+        request: substitutionRequests,
+        assignment: schedules,
+        requestingUser: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          profilePhoto: users.photoUrl
+        }
+      }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).where(
+        sql8`${substitutionRequests.requesterId} = ${userId} OR ${substitutionRequests.substituteId} = ${userId}`
+      ).orderBy(desc7(substitutionRequests.createdAt));
+    }
+    const mappedRequests = requests.map((req2) => ({
+      ...req2,
+      assignment: {
+        ...req2.assignment,
+        massTime: req2.assignment.time
+      }
+    }));
+    res.json(mappedRequests);
+  } catch (error) {
+    console.error("Erro ao listar solicita\xE7\xF5es:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao listar solicita\xE7\xF5es"
+    });
+  }
+});
+router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const [schedule] = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Escala n\xE3o encontrada"
+      });
+    }
+    const availableSubstitutes = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      photoUrl: users.photoUrl,
+      // Contar quantas vezes serviu no mês
+      servicesThisMonth: sql8`
+          (SELECT COUNT(*)
+           FROM ${schedules} s
+           WHERE s.minister_id = ${users.id}
+           AND EXTRACT(MONTH FROM s.date) = EXTRACT(MONTH FROM ${sql8`CURRENT_DATE`})
+           AND EXTRACT(YEAR FROM s.date) = EXTRACT(YEAR FROM ${sql8`CURRENT_DATE`})
+          )`
+    }).from(users).where(
+      and12(
+        eq15(users.status, "active"),
+        eq15(users.role, "ministro"),
+        // Não está escalado no mesmo horário
+        sql8`NOT EXISTS (
+            SELECT 1 FROM ${schedules} s
+            WHERE s.minister_id = ${users.id}
+            AND s.date = ${schedule.date}
+            AND s.time = ${schedule.time}
+          )`
+      )
+    ).orderBy(sql8`services_this_month ASC`).limit(20);
+    res.json({
+      success: true,
+      data: availableSubstitutes
+    });
+  } catch (error) {
+    console.error("Erro ao buscar substitutos dispon\xEDveis:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar substitutos dispon\xEDveis"
+    });
+  }
+});
+router11.post("/:id/respond", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { response, responseMessage } = req.body;
+    const userId = req.user.id;
+    if (!response || !["accepted", "rejected"].includes(response)) {
+      return res.status(400).json({
+        success: false,
+        message: "Resposta inv\xE1lida. Use 'accepted' ou 'rejected'"
+      });
+    }
+    const [request] = await db.select().from(substitutionRequests).where(eq15(substitutionRequests.id, id)).limit(1);
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Solicita\xE7\xE3o n\xE3o encontrada"
+      });
+    }
+    const isSubstitute = request.substituteId === userId;
+    const isCoordinator = req.user.role === "coordenador" || req.user.role === "gestor";
+    if (!isSubstitute && !isCoordinator) {
+      return res.status(403).json({
+        success: false,
+        message: "Voc\xEA n\xE3o tem permiss\xE3o para responder esta solicita\xE7\xE3o"
+      });
+    }
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Esta solicita\xE7\xE3o j\xE1 foi respondida"
+      });
+    }
+    const newStatus = response === "accepted" ? "approved" : "rejected";
+    await db.update(substitutionRequests).set({
+      status: newStatus,
+      approvedBy: userId,
+      approvedAt: /* @__PURE__ */ new Date(),
+      responseMessage: responseMessage || null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq15(substitutionRequests.id, id));
+    if (newStatus === "approved" && request.substituteId) {
+      await db.update(schedules).set({
+        ministerId: request.substituteId,
+        substituteId: request.requesterId,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq15(schedules.id, request.scheduleId));
+    }
+    res.json({
+      success: true,
+      message: response === "accepted" ? "Substitui\xE7\xE3o aceita com sucesso" : "Substitui\xE7\xE3o rejeitada"
+    });
+  } catch (error) {
+    console.error("Erro ao responder solicita\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao responder solicita\xE7\xE3o"
+    });
+  }
+});
+router11.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const [request] = await db.select().from(substitutionRequests).where(eq15(substitutionRequests.id, id)).limit(1);
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Solicita\xE7\xE3o n\xE3o encontrada"
+      });
+    }
+    const isRequester = request.requesterId === userId;
+    const isCoordinator = req.user.role === "coordenador" || req.user.role === "gestor";
+    if (!isRequester && !isCoordinator) {
+      return res.status(403).json({
+        success: false,
+        message: "Voc\xEA n\xE3o tem permiss\xE3o para cancelar esta solicita\xE7\xE3o"
+      });
+    }
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Apenas solicita\xE7\xF5es pendentes podem ser canceladas"
+      });
+    }
+    await db.update(substitutionRequests).set({
+      status: "cancelled",
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq15(substitutionRequests.id, id));
+    res.json({
+      success: true,
+      message: "Solicita\xE7\xE3o cancelada com sucesso"
+    });
+  } catch (error) {
+    console.error("Erro ao cancelar solicita\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao cancelar solicita\xE7\xE3o"
+    });
+  }
+});
+var substitutions_default = router11;
+
+// server/routes/mass-pendencies.ts
+await init_db();
+init_schema();
+import { Router as Router12 } from "express";
+import { eq as eq16, and as and13, gte as gte6, lte as lte5, sql as sql9 } from "drizzle-orm";
+var router12 = Router12();
+var MINIMUM_MINISTERS = {
+  "08:00:00": 15,
+  // Missa das 8h - 15 ministros
+  "10:00:00": 20,
+  // Missa das 10h - 20 ministros
+  "19:00:00": 20,
+  // Missa das 19h - 20 ministros
+  "19:30:00": 15
+  // São Judas - 15 ministros (domingo 28)
+};
+router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth2 = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth2 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startDateStr = startOfMonth2.toISOString().split("T")[0];
+    const endDateStr = endOfMonth2.toISOString().split("T")[0];
+    const monthSchedules = await db.select({
+      date: schedules.date,
+      time: schedules.time,
+      location: schedules.location,
+      ministerId: schedules.ministerId,
+      ministerName: users.name,
+      position: schedules.position,
+      status: schedules.status,
+      id: schedules.id
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
+      and13(
+        gte6(schedules.date, startDateStr),
+        lte5(schedules.date, endDateStr),
+        eq16(schedules.status, "scheduled")
+      )
+    ).orderBy(schedules.date, schedules.time);
+    const scheduleIds = monthSchedules.map((s) => s.id);
+    const activeSubstitutions = scheduleIds.length > 0 ? await db.select({
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      substituteId: substitutionRequests.substituteId,
+      status: substitutionRequests.status
+    }).from(substitutionRequests).where(
+      and13(
+        sql9`${substitutionRequests.scheduleId} IN (${sql9.join(
+          scheduleIds.map((id) => sql9`${id}`),
+          sql9`, `
+        )})`,
+        sql9`${substitutionRequests.status} IN ('pending', 'approved')`
+      )
+    ) : [];
+    const substitutionsMap = /* @__PURE__ */ new Map();
+    activeSubstitutions.forEach((sub) => {
+      substitutionsMap.set(sub.scheduleId, sub);
+    });
+    const massesByDateTime = /* @__PURE__ */ new Map();
+    monthSchedules.forEach((schedule) => {
+      const key = `${schedule.date}-${schedule.time}`;
+      if (!massesByDateTime.has(key)) {
+        massesByDateTime.set(key, []);
+      }
+      massesByDateTime.get(key).push(schedule);
+    });
+    const allMinisters = await db.select({
+      id: users.id,
+      name: users.name,
+      lastService: users.lastService
+    }).from(users).where(
+      and13(
+        eq16(users.status, "active"),
+        eq16(users.role, "ministro")
+      )
+    );
+    const pendencies = [];
+    for (const [dateTimeKey, scheduleGroup] of massesByDateTime.entries()) {
+      if (scheduleGroup.length === 0) continue;
+      const firstSchedule = scheduleGroup[0];
+      const massDate = firstSchedule.date;
+      const massTime = firstSchedule.time;
+      const location = firstSchedule.location || "Matriz";
+      const dayOfMonth = new Date(massDate).getDate();
+      const isSaoJudas = dayOfMonth === 28 && massTime === "19:30:00";
+      const minimumRequired = MINIMUM_MINISTERS[massTime] || 15;
+      let currentConfirmed = 0;
+      const confirmedMinisters = [];
+      scheduleGroup.forEach((schedule) => {
+        const substitution = substitutionsMap.get(schedule.id);
+        if (substitution?.status === "approved" && substitution.substituteId) {
+          currentConfirmed++;
+          confirmedMinisters.push({
+            id: substitution.substituteId,
+            name: "Substituto",
+            // Poderia fazer join para pegar o nome real
+            position: schedule.position || 0
+          });
+        } else if (!substitution && schedule.ministerId && schedule.ministerName) {
+          currentConfirmed++;
+          confirmedMinisters.push({
+            id: schedule.ministerId,
+            name: schedule.ministerName,
+            position: schedule.position || 0
+          });
+        }
+      });
+      const ministersShort = Math.max(0, minimumRequired - currentConfirmed);
+      if (ministersShort > 0) {
+        const daysUntilMass = Math.floor(
+          (new Date(massDate).getTime() - today.getTime()) / (1e3 * 60 * 60 * 24)
+        );
+        let urgencyLevel = "low";
+        if (daysUntilMass <= 1 && ministersShort >= 5) urgencyLevel = "critical";
+        else if (daysUntilMass <= 3 && ministersShort >= 3) urgencyLevel = "high";
+        else if (daysUntilMass <= 7 && ministersShort >= 2) urgencyLevel = "medium";
+        const scheduledMinisterIds = new Set(
+          scheduleGroup.filter((s) => s.ministerId).map((s) => s.ministerId)
+        );
+        const availableMinisters = allMinisters.filter((m) => !scheduledMinisterIds.has(m.id)).slice(0, 10).map((m) => ({
+          id: m.id,
+          name: m.name,
+          lastServed: m.lastService ? new Date(m.lastService).toISOString().split("T")[0] : void 0
+        }));
+        pendencies.push({
+          id: dateTimeKey,
+          date: massDate,
+          massTime,
+          location: isSaoJudas ? "S\xE3o Judas" : location,
+          isSpecial: isSaoJudas,
+          specialName: isSaoJudas ? "Missa de S\xE3o Judas Tadeu" : void 0,
+          minimumRequired,
+          currentConfirmed,
+          ministersShort,
+          confirmedMinisters,
+          availableMinisters,
+          urgencyLevel
+        });
+      }
+    }
+    pendencies.sort((a, b) => {
+      const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      if (urgencyOrder[a.urgencyLevel] !== urgencyOrder[b.urgencyLevel]) {
+        return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
+      }
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+    res.json(pendencies);
+  } catch (error) {
+    console.error("Error fetching mass pendencies:", error);
+    res.status(500).json({ message: "Erro ao buscar pend\xEAncias" });
+  }
+});
+var mass_pendencies_default = router12;
+
+// server/routes/formationAdmin.ts
+await init_db();
+init_schema();
+import { Router as Router13 } from "express";
+import { eq as eq17, asc as asc2 } from "drizzle-orm";
+var router13 = Router13();
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
+    return res.status(403).json({
+      error: "Acesso negado",
+      message: "Apenas gestores e coordenadores podem acessar esta funcionalidade"
+    });
+  }
+  next();
+}
+router13.use(authenticateToken, requireAdmin);
+router13.get("/tracks", async (req, res) => {
+  try {
+    const tracks = await db.select().from(formationTracks).orderBy(asc2(formationTracks.orderIndex));
+    res.json({ tracks });
+  } catch (error) {
+    console.error("Error fetching formation tracks:", error);
+    res.status(500).json({
+      error: "Erro ao buscar trilhas de forma\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.get("/tracks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const track = await db.select().from(formationTracks).where(eq17(formationTracks.id, id)).limit(1);
+    if (track.length === 0) {
+      return res.status(404).json({
+        error: "Trilha n\xE3o encontrada",
+        message: `Trilha com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({ track: track[0] });
+  } catch (error) {
+    console.error("Error fetching formation track:", error);
+    res.status(500).json({
+      error: "Erro ao buscar trilha de forma\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.post("/tracks", async (req, res) => {
+  try {
+    const trackData = req.body;
+    const newTrack = await db.insert(formationTracks).values(trackData).returning();
+    res.status(201).json({
+      message: "Trilha criada com sucesso",
+      track: newTrack[0]
+    });
+  } catch (error) {
+    console.error("Error creating formation track:", error);
+    res.status(500).json({
+      error: "Erro ao criar trilha de forma\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.patch("/tracks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationTracks.id, id)).returning();
+    if (updated.length === 0) {
+      return res.status(404).json({
+        error: "Trilha n\xE3o encontrada",
+        message: `Trilha com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Trilha atualizada com sucesso",
+      track: updated[0]
+    });
+  } catch (error) {
+    console.error("Error updating formation track:", error);
+    res.status(500).json({
+      error: "Erro ao atualizar trilha de forma\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.delete("/tracks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const modules = await db.select().from(formationModules).where(eq17(formationModules.trackId, id));
+    if (modules.length > 0) {
+      return res.status(400).json({
+        error: "N\xE3o \xE9 poss\xEDvel deletar",
+        message: "Esta trilha possui m\xF3dulos. Delete os m\xF3dulos primeiro ou desative a trilha."
+      });
+    }
+    const deleted = await db.delete(formationTracks).where(eq17(formationTracks.id, id)).returning();
+    if (deleted.length === 0) {
+      return res.status(404).json({
+        error: "Trilha n\xE3o encontrada",
+        message: `Trilha com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Trilha deletada com sucesso",
+      track: deleted[0]
+    });
+  } catch (error) {
+    console.error("Error deleting formation track:", error);
+    res.status(500).json({
+      error: "Erro ao deletar trilha de forma\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.get("/tracks/:trackId/modules", async (req, res) => {
+  try {
+    const { trackId } = req.params;
+    const modules = await db.select().from(formationModules).where(eq17(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
+    res.json({ modules });
+  } catch (error) {
+    console.error("Error fetching formation modules:", error);
+    res.status(500).json({
+      error: "Erro ao buscar m\xF3dulos",
+      message: error.message
+    });
+  }
+});
+router13.get("/modules/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const module = await db.select().from(formationModules).where(eq17(formationModules.id, id)).limit(1);
+    if (module.length === 0) {
+      return res.status(404).json({
+        error: "M\xF3dulo n\xE3o encontrado",
+        message: `M\xF3dulo com ID ${id} n\xE3o encontrado`
+      });
+    }
+    res.json({ module: module[0] });
+  } catch (error) {
+    console.error("Error fetching formation module:", error);
+    res.status(500).json({
+      error: "Erro ao buscar m\xF3dulo",
+      message: error.message
+    });
+  }
+});
+router13.post("/modules", async (req, res) => {
+  try {
+    const moduleData = req.body;
+    const newModule = await db.insert(formationModules).values(moduleData).returning();
+    res.status(201).json({
+      message: "M\xF3dulo criado com sucesso",
+      module: newModule[0]
+    });
+  } catch (error) {
+    console.error("Error creating formation module:", error);
+    res.status(500).json({
+      error: "Erro ao criar m\xF3dulo",
+      message: error.message
+    });
+  }
+});
+router13.patch("/modules/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await db.update(formationModules).set(updates).where(eq17(formationModules.id, id)).returning();
+    if (updated.length === 0) {
+      return res.status(404).json({
+        error: "M\xF3dulo n\xE3o encontrado",
+        message: `M\xF3dulo com ID ${id} n\xE3o encontrado`
+      });
+    }
+    res.json({
+      message: "M\xF3dulo atualizado com sucesso",
+      module: updated[0]
+    });
+  } catch (error) {
+    console.error("Error updating formation module:", error);
+    res.status(500).json({
+      error: "Erro ao atualizar m\xF3dulo",
+      message: error.message
+    });
+  }
+});
+router13.delete("/modules/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lessons = await db.select().from(formationLessons).where(eq17(formationLessons.moduleId, id));
+    if (lessons.length > 0) {
+      return res.status(400).json({
+        error: "N\xE3o \xE9 poss\xEDvel deletar",
+        message: "Este m\xF3dulo possui li\xE7\xF5es. Delete as li\xE7\xF5es primeiro."
+      });
+    }
+    const deleted = await db.delete(formationModules).where(eq17(formationModules.id, id)).returning();
+    if (deleted.length === 0) {
+      return res.status(404).json({
+        error: "M\xF3dulo n\xE3o encontrado",
+        message: `M\xF3dulo com ID ${id} n\xE3o encontrado`
+      });
+    }
+    res.json({
+      message: "M\xF3dulo deletado com sucesso",
+      module: deleted[0]
+    });
+  } catch (error) {
+    console.error("Error deleting formation module:", error);
+    res.status(500).json({
+      error: "Erro ao deletar m\xF3dulo",
+      message: error.message
+    });
+  }
+});
+router13.get("/modules/:moduleId/lessons", async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const lessons = await db.select().from(formationLessons).where(eq17(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
+    res.json({ lessons });
+  } catch (error) {
+    console.error("Error fetching formation lessons:", error);
+    res.status(500).json({
+      error: "Erro ao buscar li\xE7\xF5es",
+      message: error.message
+    });
+  }
+});
+router13.get("/lessons/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lesson = await db.select().from(formationLessons).where(eq17(formationLessons.id, id)).limit(1);
+    if (lesson.length === 0) {
+      return res.status(404).json({
+        error: "Li\xE7\xE3o n\xE3o encontrada",
+        message: `Li\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({ lesson: lesson[0] });
+  } catch (error) {
+    console.error("Error fetching formation lesson:", error);
+    res.status(500).json({
+      error: "Erro ao buscar li\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.post("/lessons", async (req, res) => {
+  try {
+    const lessonData = req.body;
+    const newLesson = await db.insert(formationLessons).values(lessonData).returning();
+    res.status(201).json({
+      message: "Li\xE7\xE3o criada com sucesso",
+      lesson: newLesson[0]
+    });
+  } catch (error) {
+    console.error("Error creating formation lesson:", error);
+    res.status(500).json({
+      error: "Erro ao criar li\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.patch("/lessons/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationLessons.id, id)).returning();
+    if (updated.length === 0) {
+      return res.status(404).json({
+        error: "Li\xE7\xE3o n\xE3o encontrada",
+        message: `Li\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Li\xE7\xE3o atualizada com sucesso",
+      lesson: updated[0]
+    });
+  } catch (error) {
+    console.error("Error updating formation lesson:", error);
+    res.status(500).json({
+      error: "Erro ao atualizar li\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.delete("/lessons/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sections = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.lessonId, id));
+    if (sections.length > 0) {
+      return res.status(400).json({
+        error: "N\xE3o \xE9 poss\xEDvel deletar",
+        message: "Esta li\xE7\xE3o possui se\xE7\xF5es. Delete as se\xE7\xF5es primeiro."
+      });
+    }
+    const deleted = await db.delete(formationLessons).where(eq17(formationLessons.id, id)).returning();
+    if (deleted.length === 0) {
+      return res.status(404).json({
+        error: "Li\xE7\xE3o n\xE3o encontrada",
+        message: `Li\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Li\xE7\xE3o deletada com sucesso",
+      lesson: deleted[0]
+    });
+  } catch (error) {
+    console.error("Error deleting formation lesson:", error);
+    res.status(500).json({
+      error: "Erro ao deletar li\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.get("/lessons/:lessonId/sections", async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const sections = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
+    res.json({ sections });
+  } catch (error) {
+    console.error("Error fetching lesson sections:", error);
+    res.status(500).json({
+      error: "Erro ao buscar se\xE7\xF5es",
+      message: error.message
+    });
+  }
+});
+router13.get("/sections/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const section = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.id, id)).limit(1);
+    if (section.length === 0) {
+      return res.status(404).json({
+        error: "Se\xE7\xE3o n\xE3o encontrada",
+        message: `Se\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({ section: section[0] });
+  } catch (error) {
+    console.error("Error fetching lesson section:", error);
+    res.status(500).json({
+      error: "Erro ao buscar se\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.post("/sections", async (req, res) => {
+  try {
+    const sectionData = req.body;
+    const newSection = await db.insert(formationLessonSections).values(sectionData).returning();
+    res.status(201).json({
+      message: "Se\xE7\xE3o criada com sucesso",
+      section: newSection[0]
+    });
+  } catch (error) {
+    console.error("Error creating lesson section:", error);
+    res.status(500).json({
+      error: "Erro ao criar se\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.patch("/sections/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationLessonSections.id, id)).returning();
+    if (updated.length === 0) {
+      return res.status(404).json({
+        error: "Se\xE7\xE3o n\xE3o encontrada",
+        message: `Se\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Se\xE7\xE3o atualizada com sucesso",
+      section: updated[0]
+    });
+  } catch (error) {
+    console.error("Error updating lesson section:", error);
+    res.status(500).json({
+      error: "Erro ao atualizar se\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.delete("/sections/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await db.delete(formationLessonSections).where(eq17(formationLessonSections.id, id)).returning();
+    if (deleted.length === 0) {
+      return res.status(404).json({
+        error: "Se\xE7\xE3o n\xE3o encontrada",
+        message: `Se\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    res.json({
+      message: "Se\xE7\xE3o deletada com sucesso",
+      section: deleted[0]
+    });
+  } catch (error) {
+    console.error("Error deleting lesson section:", error);
+    res.status(500).json({
+      error: "Erro ao deletar se\xE7\xE3o",
+      message: error.message
+    });
+  }
+});
+router13.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const { sectionIds } = req.body;
+    if (!Array.isArray(sectionIds)) {
+      return res.status(400).json({
+        error: "Dados inv\xE1lidos",
+        message: "sectionIds deve ser um array"
+      });
+    }
+    const updates = sectionIds.map(
+      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq17(formationLessonSections.id, id))
+    );
+    await Promise.all(updates);
+    res.json({
+      message: "Ordem das se\xE7\xF5es atualizada com sucesso"
+    });
+  } catch (error) {
+    console.error("Error reordering sections:", error);
+    res.status(500).json({
+      error: "Erro ao reordenar se\xE7\xF5es",
+      message: error.message
+    });
+  }
+});
+var formationAdmin_default = router13;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z6 } from "zod";
-import { eq as eq15, count as count4, or as or6 } from "drizzle-orm";
+import { eq as eq18, count as count5, or as or6 } from "drizzle-orm";
 function handleApiError(error, operation) {
   if (error instanceof z6.ZodError) {
     return {
@@ -7148,16 +8324,29 @@ function handleApiError(error, operation) {
 }
 async function registerRoutes(app2) {
   app2.use(cookieParser());
-  app2.use("/api/auth", authRoutes_default);
-  app2.use("/api/password-reset", router3);
-  app2.use("/api/questionnaires", questionnaires_default);
-  app2.use("/api/questionnaires/admin", questionnaireAdmin_default);
-  app2.use("/api/schedules", scheduleGeneration_default);
-  app2.use("/api/upload", upload_default);
-  app2.use("/api/notifications", notifications_default);
+  app2.use(csrfTokenGenerator);
+  app2.get("/api/csrf-token", getCsrfToken);
+  app2.use("/api/auth", authRateLimiter, authRoutes_default);
+  app2.use("/api/password-reset", passwordResetRateLimiter, router3);
+  app2.use("/api/questionnaires", csrfProtection, questionnaires_default);
+  app2.use("/api/questionnaires/admin", csrfProtection, questionnaireAdmin_default);
+  app2.use("/api/schedules", csrfProtection, scheduleGeneration_default);
+  app2.use("/api/upload", csrfProtection, upload_default);
+  app2.use("/api/notifications", csrfProtection, notifications_default);
   app2.use("/api/reports", reports_default);
-  app2.use("/api/ministers", ministers_default);
+  app2.use("/api/ministers", csrfProtection, ministers_default);
   app2.use("/api/session", session_default);
+  app2.use("/api/substitutions", csrfProtection, substitutions_default);
+  app2.use("/api/mass-pendencies", mass_pendencies_default);
+  app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
+  app2.get("/api/version", (req, res) => {
+    res.json({
+      version: "1.0.0",
+      // Atualizar manualmente a cada deploy
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -7190,7 +8379,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.put("/api/profile", authenticateToken, async (req, res) => {
+  app2.put("/api/profile", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -7220,7 +8409,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/profile/family", authenticateToken, async (req, res) => {
+  app2.post("/api/profile/family", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const userId = req.user.id;
       const { relatedUserId, relationshipType } = req.body;
@@ -7281,7 +8470,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.delete("/api/profile/family/:id", authenticateToken, async (req, res) => {
+  app2.delete("/api/profile/family/:id", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.removeFamilyMember(id);
@@ -7353,12 +8542,12 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq15(users.id, userId));
+      }).from(users).where(eq18(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
       const imageBuffer = Buffer.from(user.imageData, "base64");
-      const imageHash = crypto.createHash("md5").update(user.imageData).digest("hex");
+      const imageHash = crypto2.createHash("md5").update(user.imageData).digest("hex");
       res.set({
         "Content-Type": user.imageContentType || "image/jpeg",
         "Content-Length": imageBuffer.length.toString(),
@@ -7375,7 +8564,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to load photo" });
     }
   });
-  app2.post("/api/users", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+  app2.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProtection, async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const safeUserData = {
@@ -7392,7 +8581,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const userData = insertUserSchema.partial().parse(req.body);
       const { role, status, ...safeUserData } = userData;
@@ -7403,7 +8592,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const statusUpdateSchema = z6.object({
         status: z6.enum(["active", "inactive", "pending"], {
@@ -7440,7 +8629,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const roleUpdateSchema = z6.object({
         role: z6.enum(["gestor", "coordenador", "ministro"], {
@@ -7484,7 +8673,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       if (req.user?.id === req.params.id) {
         return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear sua pr\xF3pria conta" });
@@ -7552,25 +8741,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
-        const [substitutionCheck] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-          eq15(substitutionRequests.requesterId, userId),
-          eq15(substitutionRequests.substituteId, userId)
+        const [substitutionCheck] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
+          eq18(substitutionRequests.requesterId, userId),
+          eq18(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -7588,7 +8777,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: `Diagnostic failed: ${error}` });
     }
   });
-  app2.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const userId = req.params.id;
       const currentUser = req.user;
@@ -7607,12 +8796,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq15(substitutionRequests.requesterId, userId),
-            eq15(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
+            eq18(substitutionRequests.requesterId, userId),
+            eq18(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -7641,12 +8830,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count4() }).from(questionnaireResponses).where(eq15(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count4() }).from(schedules).where(eq15(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count4() }).from(substitutionRequests).where(or6(
-            eq15(substitutionRequests.requesterId, userId),
-            eq15(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
+            eq18(substitutionRequests.requesterId, userId),
+            eq18(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -7723,7 +8912,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch questionnaires" });
     }
   });
-  app2.post("/api/questionnaires", authenticateToken, async (req, res) => {
+  app2.post("/api/questionnaires", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const questionnaireData = insertQuestionnaireSchema.parse(req.body);
       const questionnaire = await storage.createQuestionnaire({
@@ -7748,7 +8937,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch questionnaire responses" });
     }
   });
-  app2.post("/api/questionnaires/:id/responses", authenticateToken, async (req, res) => {
+  app2.post("/api/questionnaires/:id/responses", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const responseData = {
         questionnaireId: req.params.id,
@@ -7783,7 +8972,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch schedules" });
     }
   });
-  app2.post("/api/schedules", authenticateToken, async (req, res) => {
+  app2.post("/api/schedules", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const scheduleData = {
         ...req.body,
@@ -7814,7 +9003,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch mass times" });
     }
   });
-  app2.post("/api/mass-times", authenticateToken, async (req, res) => {
+  app2.post("/api/mass-times", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const massTimeData = insertMassTimeSchema.parse(req.body);
       const massTime = await storage.createMassTime(massTimeData);
@@ -7827,7 +9016,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to create mass time" });
     }
   });
-  app2.put("/api/mass-times/:id", authenticateToken, async (req, res) => {
+  app2.put("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const massTimeData = insertMassTimeSchema.partial().parse(req.body);
       const massTime = await storage.updateMassTime(req.params.id, massTimeData);
@@ -7840,7 +9029,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to update mass time" });
     }
   });
-  app2.delete("/api/mass-times/:id", authenticateToken, async (req, res) => {
+  app2.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
     try {
       await storage.deleteMassTime(req.params.id);
       res.status(204).send();
@@ -7974,7 +9163,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/progress", authenticateToken, async (req, res) => {
+  app2.post("/api/formation/progress", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -7991,7 +9180,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, async (req, res) => {
+  app2.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -8005,7 +9194,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/lessons/:lessonId/complete", authenticateToken, async (req, res) => {
+  app2.post("/api/formation/lessons/:lessonId/complete", authenticateToken, csrfProtection, async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -8019,7 +9208,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const trackData = insertFormationTrackSchema.parse(req.body);
       const track = await storage.createFormationTrack(trackData);
@@ -8029,7 +9218,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const lessonData = insertFormationLessonSchema.parse(req.body);
       const lesson = await storage.createFormationLesson(lessonData);
@@ -8039,7 +9228,7 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  app2.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
       const sectionData = insertFormationLessonSectionSchema.parse({
         ...req.body,
@@ -8238,6 +9427,23 @@ app.get("/", (_req, res, next) => {
   }
   next();
 });
+var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5000", "http://localhost:3000"];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  // Permitir cookies e headers de auth
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+  exposedHeaders: ["RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"]
+}));
+app.use("/api", apiRateLimiter);
 app.use(express2.json());
 app.use(express2.urlencoded({ extended: false }));
 app.use(express2.static(path3.join(process.cwd(), "public")));
