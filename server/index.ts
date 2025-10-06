@@ -1,8 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
+import { pool } from "./db";
 import path from "path";
 
 // Global error handlers to prevent server crashes
@@ -76,6 +79,27 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset']
 }));
+
+// Configuração do Express Session com PostgreSQL
+const PgSession = connectPgSimple(session);
+app.use(session({
+  store: new PgSession({
+    pool: pool,
+    tableName: 'session'
+  }),
+  secret: process.env.SESSION_SECRET || 'sjt-mesc-session-secret-2025-dev',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 12 * 60 * 60 * 1000, // 12 horas
+    path: '/'
+  },
+  name: 'mesc.sid'
+}));
+console.log('✅ Express Session configurado com PostgreSQL');
 
 // Rate limiting global para todas as rotas da API
 app.use('/api', apiRateLimiter);
