@@ -404,8 +404,27 @@ export default function ScheduleEditorDnD() {
   }
 
   const handleBackToSelector = () => {
+    setSelectedDate(null);
+    setSelectedTime(null);
     setLocation('/schedule-editor-dnd');
   };
+
+  const handleSelectMassTime = (date: Date, time: string) => {
+    setSelectedDate(date);
+    setSelectedTime(time);
+    // Atualizar URL
+    const dateStr = format(date, 'yyyy-MM-dd');
+    setLocation(`/schedule-editor-dnd?date=${dateStr}&time=${time}`);
+  };
+
+  // Agrupar slots por data para a visão de seleção
+  const slotsByDate = slots.reduce((acc, slot) => {
+    if (!acc[slot.date]) {
+      acc[slot.date] = [];
+    }
+    acc[slot.date].push(slot);
+    return acc;
+  }, {} as Record<string, MassTimeSlot[]>);
 
   return (
     <Layout
@@ -523,32 +542,108 @@ export default function ScheduleEditorDnD() {
       </Card>
 
       {/* Dica de uso */}
-      <Card className="mb-6 bg-primary/5 border-primary/20">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <p className="font-medium text-sm">Como usar o editor drag & drop:</p>
-              <ul className="text-sm text-muted-foreground mt-1 space-y-1">
-                <li>• Arraste ministros para reordenar dentro do mesmo horário</li>
-                <li>• Arraste entre colunas para mover ministros entre horários diferentes</li>
-                <li>• Clique no ✕ para remover um ministro da escala</li>
-                <li>• Use "Adicionar ministro" para incluir novos ministros</li>
-              </ul>
+      {!selectedDate && !selectedTime && (
+        <Card className="mb-6 bg-primary/5 border-primary/20">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <p className="font-medium text-sm">Selecione uma data para editar:</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Clique em uma das datas abaixo para editar os ministros daquele horário de missa.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Editor drag & drop */}
-      {slots.length > 0 ? (
+      {selectedDate && selectedTime && (
+        <Card className="mb-6 bg-primary/5 border-primary/20">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <p className="font-medium text-sm">Como usar o editor drag & drop:</p>
+                <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                  <li>• Arraste ministros para reordenar dentro do mesmo horário</li>
+                  <li>• Arraste entre colunas para mover ministros entre horários diferentes</li>
+                  <li>• Clique no ✕ para remover um ministro da escala</li>
+                  <li>• Use "Adicionar ministro" para incluir novos ministros</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Seletor de Data/Horário - Visão Geral */}
+      {!selectedDate && !selectedTime && slots.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Object.entries(slotsByDate)
+            .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+            .map(([dateStr, dateSlots]) => {
+              const date = new Date(dateStr);
+              const hasMultipleMasses = dateSlots.length > 1;
+
+              return (
+                <Card key={dateStr} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {format(date, "EEEE", { locale: ptBR })}
+                    </CardTitle>
+                    <CardDescription className="text-lg font-semibold">
+                      {format(date, "d 'de' MMMM", { locale: ptBR })}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {dateSlots.map((slot) => {
+                      const assignmentCount = slot.assignments.length;
+                      const maxMinisters = slot.maxMinisters || 15;
+                      const isFull = assignmentCount >= maxMinisters;
+                      const isEmpty = assignmentCount === 0;
+
+                      return (
+                        <Button
+                          key={slot.time}
+                          variant="outline"
+                          className="w-full justify-between h-auto py-3"
+                          onClick={() => handleSelectMassTime(date, slot.time)}
+                        >
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="font-medium">{slot.time.substring(0, 5)}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {assignmentCount} / {maxMinisters} ministros
+                            </span>
+                          </div>
+                          <Badge
+                            variant={isEmpty ? "destructive" : isFull ? "default" : "secondary"}
+                          >
+                            {isEmpty ? "Vazia" : isFull ? "Completa" : "Parcial"}
+                          </Badge>
+                        </Button>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+        </div>
+      )}
+
+      {/* Editor drag & drop - Quando data/horário selecionado */}
+      {selectedDate && selectedTime && slots.length > 0 && (
         <DraggableScheduleEditor
           slots={slots}
           onAssignmentsChange={handleAssignmentsChange}
           onRemoveAssignment={handleRemoveAssignment}
           onAddMinister={handleAddMinister}
         />
-      ) : (
+      )}
+
+      {/* Mensagem quando não há slots */}
+      {!selectedDate && !selectedTime && slots.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
