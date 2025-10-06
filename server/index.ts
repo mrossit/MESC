@@ -52,7 +52,7 @@ app.get('/', (_req: Request, res: Response, next) => {
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5000', 'http://localhost:3000'];
+  : ['http://localhost:5000', 'http://localhost:3000', 'http://127.0.0.1:5000'];
 
 app.use(cors({
   origin: (origin, callback) => {
