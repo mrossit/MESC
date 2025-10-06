@@ -19,6 +19,7 @@ const QuestionnaireResponses = lazy(() => import('@/pages/QuestionnaireResponses
 const ScheduleVisualization = lazy(() => import('@/pages/ScheduleVisualization'));
 const AutoScheduleGeneration = lazy(() => import('@/pages/AutoScheduleGeneration'));
 const ScheduleEditorDnD = lazy(() => import('@/pages/ScheduleEditorDnD'));
+const MassTimeSelector = lazy(() => import('@/pages/MassTimeSelector'));
 const QRCodeShare = lazy(() => import('@/pages/QRCodeShare'));
 const Communication = lazy(() => import('@/pages/communication'));
 const Install = lazy(() => import('@/pages/install'));
@@ -192,6 +193,14 @@ export const routes: RouteConfig[] = [
     title: 'Editor de Escalas (Drag & Drop)',
     showInMenu: true,
     icon: 'Move'
+  },
+  {
+    path: '/mass-time-selector',
+    component: MassTimeSelector,
+    requiresAuth: true,
+    allowedRoles: ['gestor', 'coordenador'],
+    title: 'Seleção de Horário de Missa',
+    showInMenu: false
   },
   {
     path: '/schedule-generation',

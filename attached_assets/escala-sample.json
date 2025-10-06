@@ -1,0 +1,273 @@
+[
+  {
+    "linha": 1,
+    "celulas": [
+      "SANTUÁRIO SÃO JUDAS TADEU - Outubro/2025"
+    ]
+  },
+  {
+    "linha": 2,
+    "celulas": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15"
+    ]
+  },
+  {
+    "linha": 3,
+    "celulas": [
+      "Data",
+      "Dia",
+      "Hora",
+      "Auxiliares",
+      "Recolher",
+      "Velas",
+      "Adoração",
+      "      Purificar/Expor",
+      "Recolher / Mezanino / Web "
+    ]
+  },
+  {
+    "linha": 4,
+    "celulas": [
+      "1",
+      "Quarta - Feira ",
+      "6h30",
+      "Penha ",
+      "Dirce ",
+      "Joana ",
+      "Hudson ",
+      "Adil "
+    ]
+  },
+  {
+    "linha": 5,
+    "celulas": [
+      "2",
+      "Quinta - Feira ",
+      "6h30",
+      "Glória ",
+      "Rosana P ",
+      "Marcelo ",
+      "Raimundo ",
+      "Raquel "
+    ]
+  },
+  {
+    "linha": 6,
+    "celulas": [
+      "2",
+      "Quinta - Feira Missa por cura e libertação ",
+      "19h30",
+      "Janaina A",
+      "Patricia A",
+      "Hellen",
+      "Valentina",
+      "Preta",
+      "Anderson Roberto",
+      "Mauro",
+      "Sérgio",
+      "SM",
+      "Sophia",
+      "Maria Salles",
+      "Ana Miaço",
+      "João A",
+      "Fernando H"
+    ]
+  },
+  {
+    "linha": 7,
+    "celulas": [
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28"
+    ]
+  },
+  {
+    "linha": 8,
+    "celulas": [
+      "SM"
+    ]
+  },
+  {
+    "linha": 9,
+    "celulas": [
+      "3",
+      "Sexta - Feira  Missa ao Sagrado coração de Jesus ",
+      "6h30",
+      "Marcelo",
+      "Elaine Acquati",
+      "Glória",
+      "Dani Tatá",
+      "Irene ",
+      "Daguimar",
+      "Bel"
+    ]
+  },
+  {
+    "linha": 10,
+    "celulas": [
+      "4",
+      "Sábado - Missa ao Imaculado coração de Maria ",
+      "6h30",
+      "Gi Nunes",
+      "Fabiane Scarpin",
+      "Marcelo ",
+      "Ru Morelli",
+      "Rogério Scarpin",
+      "Shirleine",
+      "Augusto",
+      "Fernando Miaço",
+      "Dani Tata"
+    ]
+  },
+  {
+    "linha": 11,
+    "celulas": [
+      "4",
+      "Sábado - Missa das preciosas do Pai",
+      "16h",
+      "Patricia S.",
+      "Raquel",
+      "Maiara Araújo",
+      "Jeniffer",
+      "Valentina",
+      "Bruna Rubio",
+      "Maria Salles",
+      "Dani Tata",
+      "Ana Paula Soares",
+      "Bia Bisan",
+      "Shirleine",
+      "Victória",
+      "Ru Morelli",
+      "Ro",
+      "Lais Lia"
+    ]
+  },
+  {
+    "linha": 12,
+    "celulas": [
+      "16",
+      "17",
+      "18",
+      "19",
+      "20"
+    ]
+  },
+  {
+    "linha": 13,
+    "celulas": [
+      "Marcelo Tadeu",
+      "Glória",
+      "Luciana de Deus",
+      "Luis Gustavo",
+      "Mauro S."
+    ]
+  },
+  {
+    "linha": 14,
+    "celulas": [
+      "5",
+      "Domingo ",
+      "8h",
+      "Roseli",
+      "Roberta",
+      "Cleide M.",
+      "Meire",
+      "Francisco",
+      "Alexandre Luis Lucio",
+      "Jaildo",
+      "Gi Nunes",
+      "Angela Prado",
+      "Elaine Acquati",
+      "André Amorim"
+    ]
+  },
+  {
+    "linha": 15,
+    "celulas": [
+      "10h",
+      "Sophia",
+      "Ana P Soares",
+      "Shirleine",
+      "Luana Rodrigues",
+      "Milene",
+      "Toledo",
+      "Ro ",
+      "Fabi",
+      "Patricia S",
+      "Bia Bisan",
+      "Valentina",
+      "Raquel",
+      "Mauro S",
+      "Fernando Miaço",
+      "Paulo"
+    ]
+  },
+  {
+    "linha": 16,
+    "celulas": [
+      "16",
+      "17",
+      "18",
+      "19",
+      "20"
+    ]
+  },
+  {
+    "linha": 17,
+    "celulas": [
+      "Glauco",
+      "Priscila",
+      "Marco",
+      "Gislaine"
+    ]
+  },
+  {
+    "linha": 18,
+    "celulas": [
+      "19h",
+      "Isabelle C.",
+      "Bruna Rubio",
+      "Luciana Soares",
+      "Marcelo T. Sanches",
+      "Sérgio",
+      "Pamella",
+      "Ana Jardim",
+      "Jaci",
+      "Sandro Soares"
+    ]
+  },
+  {
+    "linha": 19,
+    "celulas": [
+      "16",
+      "17",
+      "18",
+      "19",
+      "20"
+    ]
+  }
+]

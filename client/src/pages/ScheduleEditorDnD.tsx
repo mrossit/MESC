@@ -33,12 +33,14 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
+import { useLocation, useRoute } from 'wouter';
 import {
   DraggableScheduleEditor,
   ScheduleAssignment,
   Minister,
   MassTimeSlot,
 } from '../components/DraggableScheduleEditor';
+import { SelectiveScheduleExport } from '../components/SelectiveScheduleExport';
 import { getMassTimesForDate } from '@shared/constants';
 
 interface Schedule {
@@ -50,11 +52,23 @@ interface Schedule {
 }
 
 export default function ScheduleEditorDnD() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [, setLocation] = useLocation();
+
+  // Obter parâmetros da URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const dateParam = urlParams.get('date');
+  const timeParam = urlParams.get('time');
+
+  const [currentMonth, setCurrentMonth] = useState(
+    dateParam ? new Date(dateParam) : new Date()
+  );
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [allMinisters, setAllMinisters] = useState<Minister[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    dateParam ? new Date(dateParam) : null
+  );
+  const [selectedTime, setSelectedTime] = useState<string | null>(timeParam);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -154,6 +168,28 @@ export default function ScheduleEditorDnD() {
 
   // Gerar slots para o editor drag & drop
   const generateSlots = (): MassTimeSlot[] => {
+    // Se temos data e horário específicos, filtrar apenas esse slot
+    if (selectedDate && selectedTime) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const massTimesForDay = getMassTimesForDate(selectedDate);
+      const massTime = massTimesForDay.find(mt => mt.time === selectedTime);
+
+      if (massTime) {
+        const slotAssignments = assignments.filter(
+          (a) => a.date === dateStr && a.massTime === selectedTime
+        );
+
+        return [{
+          time: massTime.time,
+          date: dateStr,
+          assignments: slotAssignments,
+          maxMinisters: massTime.minMinisters || 15,
+        }];
+      }
+      return [];
+    }
+
+    // Caso contrário, mostrar todos os domingos do mês
     const sundays = getSundaysInMonth();
     const slots: MassTimeSlot[] = [];
 
@@ -367,42 +403,99 @@ export default function ScheduleEditorDnD() {
     );
   }
 
+  const handleBackToSelector = () => {
+    setLocation('/schedule-editor-dnd');
+  };
+
   return (
     <Layout
       title="Editor de Escalas (Drag & Drop)"
-      subtitle="Arraste ministros para reorganizar as escalas"
+      subtitle={
+        selectedDate && selectedTime
+          ? `Editando: ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })} às ${selectedTime.substring(0, 5)}`
+          : 'Arraste ministros para reorganizar as escalas'
+      }
     >
+      {/* Botão Voltar quando em modo de edição específica */}
+      {selectedDate && selectedTime && (
+        <Button
+          onClick={handleBackToSelector}
+          variant="ghost"
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar para Visão Geral
+        </Button>
+      )}
+
       {/* Header com navegação */}
       <Card className="mb-6">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon" onClick={() => navigateMonth('prev')}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <CardTitle>{format(currentMonth, 'MMMM yyyy', { locale: ptBR })}</CardTitle>
-                <CardDescription className="flex items-center gap-2 mt-1">
-                  <Badge
-                    variant={schedule.status === 'published' ? 'default' : 'secondary'}
-                    className="capitalize"
-                  >
-                    {schedule.status === 'published' ? 'Publicada' : 'Rascunho'}
-                  </Badge>
-                  {hasUnsavedChanges && (
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      Alterações não salvas
+              {!selectedDate && !selectedTime && (
+                <>
+                  <Button variant="outline" size="icon" onClick={() => navigateMonth('prev')}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <CardTitle>{format(currentMonth, 'MMMM yyyy', { locale: ptBR })}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 mt-1">
+                      <Badge
+                        variant={schedule.status === 'published' ? 'default' : 'secondary'}
+                        className="capitalize"
+                      >
+                        {schedule.status === 'published' ? 'Publicada' : 'Rascunho'}
+                      </Badge>
+                      {hasUnsavedChanges && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Alterações não salvas
+                        </Badge>
+                      )}
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={() => navigateMonth('next')}>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              {selectedDate && selectedTime && (
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    {format(selectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-1">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {selectedTime.substring(0, 5)}
                     </Badge>
-                  )}
-                </CardDescription>
-              </div>
-              <Button variant="outline" size="icon" onClick={() => navigateMonth('next')}>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+                    <Badge
+                      variant={schedule.status === 'published' ? 'default' : 'secondary'}
+                      className="capitalize"
+                    >
+                      {schedule.status === 'published' ? 'Publicada' : 'Rascunho'}
+                    </Badge>
+                    {hasUnsavedChanges && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Alterações não salvas
+                      </Badge>
+                    )}
+                  </CardDescription>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
+              {schedule && !selectedDate && !selectedTime && (
+                <SelectiveScheduleExport
+                  scheduleId={schedule.id}
+                  month={currentMonth.getMonth() + 1}
+                  year={currentMonth.getFullYear()}
+                  assignments={assignments}
+                />
+              )}
               <Button variant="outline" onClick={fetchScheduleData} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Recarregar
