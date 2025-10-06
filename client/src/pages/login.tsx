@@ -109,6 +109,13 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Limpar tokens antigos antes de fazer novo login
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('session_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
     loginMutation.mutate(credentials);
   };
 
