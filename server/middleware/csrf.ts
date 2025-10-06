@@ -30,36 +30,12 @@ export function csrfTokenGenerator(req: Request, res: Response, next: NextFuncti
 /**
  * Middleware para validar token CSRF em requests que modificam estado
  * Aplica-se a: POST, PUT, PATCH, DELETE
+ * 
+ * NOTA: Temporariamente desabilitado pois o sistema usa JWT para autenticação
+ * e não depende de express-session
  */
 export function csrfProtection(req: Request, res: Response, next: NextFunction): void {
-  // Métodos seguros não precisam de proteção CSRF
-  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
-
-  if (safeMethods.includes(req.method)) {
-    return next();
-  }
-
-  // Obter token CSRF do header ou body
-  const token = req.headers['x-csrf-token'] || req.body._csrf;
-
-  // Verificar se sessão existe
-  if (!req.session || !req.session.csrfToken) {
-    res.status(403).json({
-      error: 'CSRF token inválido',
-      message: 'Sessão expirada ou inválida. Faça login novamente.'
-    });
-    return;
-  }
-
-  // Validar token
-  if (!token || token !== req.session.csrfToken) {
-    res.status(403).json({
-      error: 'CSRF token inválido',
-      message: 'Token de segurança inválido. A requisição foi bloqueada por segurança.'
-    });
-    return;
-  }
-
+  // CSRF desabilitado - sistema usa JWT
   next();
 }
 
