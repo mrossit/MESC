@@ -55,6 +55,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
+import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
 
 // Helper function to capitalize first letter of a string
 const capitalizeFirst = (str: string) => {
@@ -134,6 +135,12 @@ export default function Schedules() {
   const [availableSubstitutes, setAvailableSubstitutes] = useState<any[]>([]);
   const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
   const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
+
+  // Estados para o ScheduleEditDialog
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editDialogDate, setEditDialogDate] = useState<string>("");
+  const [editDialogTime, setEditDialogTime] = useState<string>("");
+  const [editDialogMinisters, setEditDialogMinisters] = useState<{ id: string | null; name: string }[]>([]);
 
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
@@ -1436,19 +1443,42 @@ export default function Schedules() {
                           </h3>
                         </div>
                         {isCoordinator && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedMassTime(massTime);
-                              setIsAssignmentDialogOpen(true);
-                              setIsViewScheduleDialogOpen(false);
-                            }}
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Adicionar
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                // Preparar dados para edição
+                                const ministersForEdit = assignments.map(a => ({
+                                  id: a.ministerId,
+                                  name: a.ministerName || 'VACANTE'
+                                }));
+
+                                setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
+                                setEditDialogTime(massTime);
+                                setEditDialogMinisters(ministersForEdit);
+                                setIsEditDialogOpen(true);
+                                setIsViewScheduleDialogOpen(false);
+                              }}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedMassTime(massTime);
+                                setIsAssignmentDialogOpen(true);
+                                setIsViewScheduleDialogOpen(false);
+                              }}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Adicionar
+                            </Button>
+                          </div>
                         )}
                       </div>
 
@@ -1883,6 +1913,24 @@ export default function Schedules() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de edição de escala com drag and drop */}
+      <ScheduleEditDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        date={editDialogDate}
+        time={editDialogTime}
+        initialMinisters={editDialogMinisters}
+        onSave={async () => {
+          // Recarregar dados após salvar
+          await fetchSchedules();
+          if (selectedDate) {
+            await fetchScheduleForDate(selectedDate);
+          }
+          setIsEditDialogOpen(false);
+          setIsViewScheduleDialogOpen(true);
+        }}
+      />
       </div>
     </Layout>
   );
