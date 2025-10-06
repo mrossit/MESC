@@ -1,0 +1,560 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* PALETA NEUTRA - LIGHT MODE */
+  
+  /* Cores Base - Tons Neutros */
+  --peanut: 201, 194, 178;                /* #C9C2B2 - Peanut - Base neutra */
+  --chalk-beige: 235, 230, 218;           /* #EBE6DA - Chalk Beige - Fundo principal */
+  --white-beige: 248, 245, 238;           /* #F8F5EE - White Beige - Fundo claro */
+  --cream: 252, 248, 237;                 /* #FCF8ED - Cream - Fundo mais claro */
+  --neutral: 158, 151, 138;               /* #9E978A - Neutral - Elementos secundários */
+  --peach-cream: 243, 235, 220;           /* #F3EBDC - Peach Cream - Cards */
+  --card-bg: #E4E5DD;                     /* #E4E5DD - Card Background - Nova cor */
+  
+  /* Cores de Texto */
+  --text-dark: 51, 48, 43;                /* #33302B - Texto escuro */
+  --text-medium: 102, 97, 88;             /* #666158 - Texto médio */
+  --text-light: 140, 135, 125;            /* #8C877D - Texto claro */
+  
+  /* Cores de Destaque */
+  --accent-warm: 186, 175, 156;           /* #BAAF9C - Acento quente */
+  --accent-soft: 211, 203, 189;           /* #D3CBBD - Acento suave */
+  --accent-neutral: 175, 168, 155;        /* #AFA89B - Acento neutro */
+  
+  /* Badges - Tons Suaves */
+  --badge-light: 245, 241, 235;           /* #F5F1EB - Badge claro */
+  --badge-warm: 228, 220, 207;            /* #E4DCCF - Badge quente */
+  --badge-neutral: 218, 211, 200;         /* #DAD3C8 - Badge neutro */
+  --badge-soft: 238, 233, 225;            /* #EEE9E1 - Badge suave */
+  --badge-pearl: 250, 248, 243;           /* #FAF8F3 - Badge pérola */
+  --badge-gold: 212, 175, 55;             /* #D4AF37 - Badge dourado */
+  --badge-copper: 184, 115, 51;           /* #B87333 - Badge cobre */
+  --badge-terracotta: 204, 119, 102;      /* #CC7766 - Badge terracota */
+
+  /* Novas cores da paleta - Light Mode */
+  --sage: 162, 179, 139;                  /* #A2B38B - Verde oliva/sálvia */
+  --sage-light: 184, 198, 165;            /* #B8C6A5 - Sálvia claro */
+  --sage-dark: 138, 156, 118;             /* #8A9C76 - Sálvia escuro */
+  --cream-light: 228, 233, 190;           /* #E4E9BE - Bege claro amarelado */
+  --burgundy: 110, 19, 12;                /* #6E130C - Vermelho escuro */
+  --burgundy-soft: 160, 88, 80;           /* #A05850 - Burgundy suave */
+  
+  /* Cores Complementares */
+  --coffee: 101, 67, 33;                  /* #654321 - Cor café para textos */
+  --aged-bronze: 107, 86, 55;             /* #6B5637 - Bronze envelhecido */
+  
+  /* Sistema Light Mode - Paleta Neutra */
+  --background: var(--chalk-beige);       /* Chalk Beige - Fundo principal */
+  --foreground: var(--text-dark);         /* Texto escuro */
+  
+  --card: var(--card-bg);                 /* Card Background - Nova cor #E4E5DD */
+  --card-foreground: var(--text-dark);
+  
+  --popover: var(--white-beige);
+  --popover-foreground: var(--text-dark);
+  
+  --primary: var(--neutral);              /* Neutral - Botões primários */
+  --primary-foreground: var(--cream);
+  
+  --secondary: var(--peanut);             /* Peanut - Botões secundários */
+  --secondary-foreground: var(--white-beige);
+  
+  --muted: var(--peach-cream);
+  --muted-foreground: 85, 80, 71;         /* Texto muted mais escuro para melhor contraste */
+  
+  --accent: var(--accent-warm);
+  --accent-foreground: var(--text-dark);
+  
+  --destructive: 185, 28, 28;             /* #B91C1C - Vermelho erro */
+  --destructive-foreground: 255, 255, 255;
+  
+  --border: 220, 214, 203;                /* #DCD6CB - Borda suave */
+  --input: var(--white-beige);
+  --ring: var(--text-dark);               /* Texto escuro para melhor contraste do focus ring */
+  
+  /* Switch specific colors for better contrast - Light Mode */
+  --switch-checked: 21, 128, 61;           /* #15803D - Verde mais escuro (green-700) */
+  --switch-unchecked: 107, 114, 128;       /* #6B7280 - Cinza mais escuro (gray-500) */
+  --switch-thumb: 0, 0, 0;                 /* #000000 - Polegar preto para light mode */
+  
+  /* Sidebar Light - Tons Neutros */
+  --sidebar-background: var(--chalk-beige);
+  --sidebar-foreground: var(--text-dark);
+  --sidebar-primary: var(--neutral);
+  --sidebar-primary-foreground: var(--cream);
+  --sidebar-accent: var(--peanut);
+  --sidebar-accent-foreground: var(--text-dark);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--peanut);
+  
+  --radius: 0.375rem;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-display: 'Playfair Display', serif;
+}
+
+.dark {
+  /* PALETA DARK BROWN REFINADA - DARK MODE */
+  
+  /* Dark Brown Shades - Base */
+  --dark-1: 56, 35, 32;                   /* #382320 - Mais claro */
+  --dark-2: 50, 31, 28;                   /* #321F1C */
+  --dark-3: 43, 27, 25;                   /* #2B1B19 */
+  --dark-4: 37, 23, 21;                   /* #251715 */
+  --dark-5: 31, 20, 18;                   /* #1F1412 - Meio */
+  --dark-6: 25, 16, 14;                   /* #19100E */
+  --dark-7: 19, 12, 11;                   /* #130C0B */
+  --dark-8: 12, 8, 7;                     /* #0C0807 */
+  --dark-9: 6, 4, 3;                      /* #060403 */
+  --dark-10: 0, 0, 0;                     /* #000000 - Mais escuro */
+  
+  /* Cores de Destaque Dark */
+  --dark-gold: 184, 134, 11;              /* #B8860B - Dourado escuro */
+  --dark-terracotta: 139, 69, 19;         /* #8B4513 - Terracota escuro */
+  --dark-copper: 139, 90, 43;             /* #8B5A2B - Cobre escuro */
+  --dark-bronze: 139, 105, 20;            /* #8B6914 - Bronze escuro */
+  --text-light: 255, 248, 240;            /* #FFF8F0 - Texto claro */
+  --text-gold: 255, 215, 0;               /* #FFD700 - Dourado para texto */
+  
+  /* Badges Dark Mode */
+  --badge-pearl: 60, 50, 45;              /* Pérola escura */
+  --badge-gold: 120, 95, 30;              /* Dourado escuro */
+  --badge-copper: 100, 65, 25;            /* Cobre escuro */
+  --badge-terracotta: 110, 70, 55;        /* Terracota escura */
+
+  /* Novas cores da paleta - Dark Mode */
+  --sage: 138, 156, 118;                  /* #8A9C76 - Verde oliva mais escuro */
+  --sage-light: 162, 179, 139;            /* #A2B38B - Sálvia */
+  --sage-dark: 115, 130, 98;              /* Tom ainda mais escuro */
+  --cream-light: 180, 185, 150;           /* Tom mais escuro do bege */
+  --burgundy: 139, 69, 19;                /* #8B4513 - Burgundy mais claro para dark */
+  --burgundy-soft: 180, 110, 100;         /* Burgundy suave para dark */
+  
+  /* Cores Complementares Dark */
+  --coffee: 200, 170, 140;                /* Café claro para contraste */
+  --aged-bronze: 160, 130, 100;           /* Bronze claro para contraste */
+  
+  /* Sistema Dark Mode - Alto Contraste */
+  --background: var(--dark-8);            /* #0C0807 - Fundo principal */
+  --foreground: var(--text-light);        /* Texto claro para contraste */
+  
+  --card: var(--dark-7);                  /* #130C0B - Cards */
+  --card-foreground: var(--text-light);
+  
+  --popover: var(--dark-6);               /* #19100E - Popovers */
+  --popover-foreground: var(--text-light);
+  
+  --primary: var(--dark-gold);
+  --primary-foreground: var(--dark-10);
+  
+  --secondary: var(--dark-terracotta);
+  --secondary-foreground: var(--text-light);
+  
+  --muted: var(--dark-5);                 /* #1F1412 - Elementos muted */
+  --muted-foreground: 220, 200, 180;      /* Texto muted com mais contraste */
+  
+  --accent: var(--dark-copper);
+  --accent-foreground: var(--text-light);
+  
+  --destructive: 220, 38, 38;             /* #DC2626 - Vermelho erro */
+  --destructive-foreground: var(--text-light);
+  
+  --border: var(--dark-4);                /* #251715 - Bordas sutis */
+  --input: var(--dark-6);                 /* #19100E - Inputs */
+  --ring: var(--text-gold);               /* Dourado para focus */
+  
+  /* Switch specific colors for better contrast - Dark Mode */
+  --switch-checked: 21, 128, 61;          /* #15803D - Verde mais escuro */
+  --switch-unchecked: 156, 163, 175;      /* #9CA3AF - Cinza mais claro para dark mode */
+  --switch-thumb: 0, 0, 0;                /* #000000 - Polegar preto para dark mode também */
+  
+  /* Sidebar Dark - Contraste otimizado */
+  --sidebar-background: var(--dark-8);    /* #0C0807 - Mesmo fundo das páginas */
+  --sidebar-foreground: var(--text-light);
+  --sidebar-primary: var(--dark-gold);
+  --sidebar-primary-foreground: var(--dark-10);
+  --sidebar-accent: var(--dark-3);        /* #2B1B19 - Hover items */
+  --sidebar-accent-foreground: var(--text-gold);
+  --sidebar-border: var(--dark-5);        /* #1F1412 - Borda sutil */
+  --sidebar-ring: var(--dark-gold);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply font-sans antialiased;
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+    /* Renderização de alta definição */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Tipografia elegante */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    color: rgb(var(--foreground));
+  }
+  
+  /* Traços finos e alta definição */
+  button, input, select, textarea {
+    border-width: 0.5px;
+  }
+  
+  /* Gradientes responsivos para dark mode */
+.bg-gradient-responsive {
+  background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%);
+}
+
+.dark .bg-gradient-responsive {
+  background: linear-gradient(135deg, rgb(12, 8, 7) 0%, rgb(31, 20, 18) 100%);
+}
+
+.pattern-bg-responsive {
+  background-image: radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.dark .pattern-bg-responsive {
+  background-image: radial-gradient(circle at 1px 1px, rgba(184, 134, 11, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+/* Melhorias específicas para campos de data */
+  input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Melhorar responsividade em dispositivos móveis */
+  @media (max-width: 640px) {
+    /* Específico para formulários do profile */
+    .profile-form.grid {
+      gap: 0.75rem;
+    }
+    
+    .profile-form.grid > * {
+      min-width: 0 !important;
+    }
+  }
+  
+  /* Focus states refinados */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* Cor personalizada para cards */
+  .custom-card-bg {
+    background-color: rgb(var(--card)) !important;
+  }
+  
+  /* Botões com gradientes sutis */
+  .btn-primary {
+    background: linear-gradient(135deg, 
+      rgb(var(--primary)) 0%, 
+      rgb(var(--primary)) 50%, 
+      rgba(var(--primary), 0.9) 100%
+    );
+    color: rgb(var(--primary-foreground));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
+    border: 0.5px solid rgba(var(--primary), 0.2);
+  }
+  
+  .btn-secondary {
+    background: linear-gradient(135deg, 
+      rgb(var(--secondary)) 0%, 
+      rgb(var(--secondary)) 50%, 
+      rgba(var(--secondary), 0.9) 100%
+    );
+    color: rgb(var(--secondary-foreground));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md;
+    border: 0.5px solid rgba(var(--secondary), 0.2);
+  }
+  
+  /* Cards com bordas finas */
+  .card-liturgical {
+    background: rgb(var(--card));
+    color: rgb(var(--card-foreground));
+    border: 0.5px solid rgb(var(--border));
+    @apply shadow-sm hover:shadow-md transition-all duration-200 rounded-md;
+  }
+  
+  /* Badges acetinados */
+  .badge-pearl {
+    background: rgb(var(--badge-pearl));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-gold {
+    background: rgb(var(--badge-gold));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-copper {
+    background: rgb(var(--badge-copper));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+  
+  .badge-terracotta {
+    background: rgb(var(--badge-terracotta));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--aged-bronze), 0.1);
+  }
+
+  /* Novas badges com as cores da paleta */
+  .badge-sage {
+    background: rgb(var(--sage));
+    color: white;
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--sage-dark), 0.3);
+  }
+
+  .badge-cream {
+    background: rgb(var(--cream-light));
+    color: rgb(var(--coffee));
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--sage), 0.2);
+  }
+
+  .badge-burgundy {
+    background: rgb(var(--burgundy));
+    color: white;
+    @apply font-medium text-xs px-2 py-1 rounded-full;
+    border: 0.5px solid rgba(var(--burgundy-soft), 0.3);
+  }
+}
+
+@layer utilities {
+  /* Sidebar refinado - Sem bordas nas opções */
+  [data-sidebar="sidebar"] {
+    background: rgb(var(--sidebar-background)) !important;
+    color: rgb(var(--sidebar-foreground)) !important;
+  }
+  
+  [data-sidebar="sidebar"] * {
+    color: rgb(var(--sidebar-foreground)) !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"] {
+    @apply transition-all duration-200 rounded-md border-0;
+    border: none !important;
+    outline: none !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover {
+    background: rgba(var(--sidebar-accent), 0.15) !important;
+    border: none !important;
+  }
+  
+  [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] {
+    background: rgba(var(--sidebar-accent), 0.2) !important;
+    font-weight: 500;
+    border: none !important;
+  }
+  
+  /* Mobile sidebar - Sem bordas */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    background: rgb(var(--sidebar-background)) !important;
+    color: rgb(var(--sidebar-foreground)) !important;
+    border: none !important;
+  }
+  
+  /* Remover todas as bordas dos itens do menu */
+  [data-sidebar="menu-sub"] {
+    border-left: none !important;
+  }
+  
+  [data-sidebar="menu-item"],
+  [data-sidebar="menu-sub-item"],
+  [data-sidebar="menu-sub-button"] {
+    border: none !important;
+  }
+  
+  /* Sombras litúrgicas */
+  .shadow-liturgical-sm {
+    box-shadow: 0 1px 2px 0 rgba(var(--foreground), 0.05);
+  }
+  
+  .shadow-liturgical {
+    box-shadow: 
+      0 1px 3px 0 rgba(var(--foreground), 0.1),
+      0 1px 2px -1px rgba(var(--foreground), 0.06);
+  }
+  
+  .shadow-liturgical-md {
+    box-shadow: 
+      0 4px 6px -1px rgba(var(--foreground), 0.1),
+      0 2px 4px -2px rgba(var(--foreground), 0.06);
+  }
+  
+  /* Gradientes litúrgicos */
+  .gradient-liturgical {
+    background: linear-gradient(135deg, 
+      rgb(var(--primary)) 0%, 
+      rgb(var(--secondary)) 100%
+    );
+  }
+  
+  .gradient-pearl {
+    background: linear-gradient(180deg, 
+      rgb(var(--badge-pearl)) 0%, 
+      rgb(var(--badge-light)) 100%
+    );
+  }
+  
+  /* Bordas finas de alta definição */
+  .border-liturgical {
+    border: 0.5px solid rgb(var(--border));
+  }
+  
+  /* Texto com antialiasing refinado */
+  .text-liturgical {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Novas classes utilitárias com a paleta */
+  .bg-sage {
+    background-color: rgb(var(--sage));
+  }
+
+  .bg-sage-light {
+    background-color: rgb(var(--sage-light));
+  }
+
+  .bg-cream-light {
+    background-color: rgb(var(--cream-light));
+  }
+
+  .bg-burgundy {
+    background-color: rgb(var(--burgundy));
+  }
+
+  .text-sage {
+    color: rgb(var(--sage));
+  }
+
+  .text-burgundy {
+    color: rgb(var(--burgundy));
+  }
+
+  .border-sage {
+    border-color: rgb(var(--sage));
+  }
+
+  .border-burgundy {
+    border-color: rgb(var(--burgundy));
+  }
+
+  /* Hover states */
+  .hover\:bg-sage:hover {
+    background-color: rgb(var(--sage));
+  }
+
+  .hover\:bg-sage-light:hover {
+    background-color: rgb(var(--sage-light));
+  }
+
+  .hover\:bg-burgundy:hover {
+    background-color: rgb(var(--burgundy));
+  }
+}
+
+/* Animações suaves */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar customizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--foreground), 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--foreground), 0.3);
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+/* Mobile-specific fixes for date inputs */
+@media (max-width: 768px) {
+  input[type="date"] {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  
+  .profile-form .min-w-0 {
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+  
+  .profile-form input {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* iOS Safari date input shrink fix */
+input[type="date"] { 
+  width: 100%; 
+  max-width: 100%; 
+  min-width: 0; 
+}
+
+input[type="date"]::-webkit-datetime-edit, 
+input[type="date"]::-webkit-date-and-time-value { 
+  min-width: 0 !important; 
+}

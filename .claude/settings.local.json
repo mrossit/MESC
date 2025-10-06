@@ -4,7 +4,9 @@
       "Bash(sqlite3:*)",
       "Bash(export NODE_ENV=production)",
       "Bash(npx tsx:*)",
-      "Bash(echo $PORT)"
+      "Bash(echo $PORT)",
+      "Bash(xargs:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
