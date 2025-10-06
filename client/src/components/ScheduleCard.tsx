@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Clock, User, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { LITURGICAL_POSITIONS } from '@shared/constants';
 
 interface Minister {
   id: string;
@@ -21,24 +22,6 @@ interface ScheduleCardProps {
   isCoordinator?: boolean;
   onAssignMinister?: (date: Date, massTime: string) => void;
 }
-
-const LITURGICAL_POSITIONS = {
-  1: 'Auxiliar 1',
-  2: 'Auxiliar 2', 
-  3: 'Recolher 1',
-  4: 'Recolher 2',
-  5: 'Velas 1',
-  6: 'Velas 2',
-  7: 'Adoração 1',
-  8: 'Adoração 2',
-  9: 'Adoração 3',
-  10: 'Purificar/Expor 1',
-  11: 'Purificar/Expor 2',
-  12: 'Recolher Mezanino 1',
-  13: 'Recolher Mezanino 2',
-  14: 'Web/Transmissão 1',
-  15: 'Web/Transmissão 2'
-};
 
 export function ScheduleCard({ date, massTime, ministers, isCoordinator, onAssignMinister }: ScheduleCardProps) {
   const getInitials = (name: string) => {
