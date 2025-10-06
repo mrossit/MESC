@@ -6,7 +6,8 @@
       "Bash(npx tsx:*)",
       "Bash(echo $PORT)",
       "Bash(xargs:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//home/runner/gluestack-mcp/**)"
     ],
     "deny": [],
     "ask": []
