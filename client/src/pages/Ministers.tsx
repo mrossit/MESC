@@ -52,6 +52,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { LITURGICAL_POSITIONS } from "@shared/constants";
 
 interface Minister {
   id: string;
@@ -80,30 +81,6 @@ interface Minister {
   observations?: string;
   active?: boolean;
 }
-
-// Mapa das 20 posições litúrgicas
-const LITURGICAL_POSITIONS = {
-  1: "Auxiliar 1 - Coordenação",
-  2: "Auxiliar 2 - Coordenação",
-  3: "Recolher Santíssimo 1",
-  4: "Recolher Santíssimo 2",
-  5: "Velas 1",
-  6: "Velas 2",
-  7: "Procissão com vela 1",
-  8: "Procissão com vela 2",
-  9: "Purificação/Exposição 1",
-  10: "Purificação/Exposição 2",
-  11: "Purificação/Exposição 3",
-  12: "Purificação/Exposição 4",
-  13: "Mezanino 1",
-  14: "Mezanino 2",
-  15: "Mezanino 3",
-  16: "Lateral Nave 1",
-  17: "Lateral Nave 2",
-  18: "Lateral Nave 3",
-  19: "Lateral Nave 4",
-  20: "Lateral Nave 5"
-};
 
 const MASS_TIMES = ["7h", "9h", "11h", "12h", "17h", "19h"];
 
