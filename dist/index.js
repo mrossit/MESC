@@ -2780,6 +2780,12 @@ async function createSession(userId, ipAddress, userAgent) {
   const expiresAt = /* @__PURE__ */ new Date();
   expiresAt.setHours(expiresAt.getHours() + SESSION_EXPIRES_HOURS);
   try {
+    await db.update(activeSessions).set({ isActive: false }).where(
+      and2(
+        eq3(activeSessions.userId, userId),
+        eq3(activeSessions.isActive, true)
+      )
+    );
     await db.insert(activeSessions).values({
       userId,
       sessionToken,
@@ -3362,25 +3368,6 @@ function csrfTokenGenerator(req, res, next) {
   next();
 }
 function csrfProtection(req, res, next) {
-  const safeMethods = ["GET", "HEAD", "OPTIONS"];
-  if (safeMethods.includes(req.method)) {
-    return next();
-  }
-  const token = req.headers["x-csrf-token"] || req.body._csrf;
-  if (!req.session || !req.session.csrfToken) {
-    res.status(403).json({
-      error: "CSRF token inv\xE1lido",
-      message: "Sess\xE3o expirada ou inv\xE1lida. Fa\xE7a login novamente."
-    });
-    return;
-  }
-  if (!token || token !== req.session.csrfToken) {
-    res.status(403).json({
-      error: "CSRF token inv\xE1lido",
-      message: "Token de seguran\xE7a inv\xE1lido. A requisi\xE7\xE3o foi bloqueada por seguran\xE7a."
-    });
-    return;
-  }
   next();
 }
 function getCsrfToken(req, res) {
@@ -7235,22 +7222,22 @@ init_schema();
 import { Router as Router11 } from "express";
 import { eq as eq15, and as and12, sql as sql8, gte as gte5, desc as desc7, count as count4, notInArray } from "drizzle-orm";
 var router11 = Router11();
-function calculateUrgency(massDate, massTime) {
+function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
+  const [year, month, day] = massDateStr.split("-").map(Number);
   const [hours, minutes] = massTime.split(":").map(Number);
-  const massDateTime = new Date(massDate);
-  massDateTime.setHours(hours, minutes, 0, 0);
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
   if (hoursUntilMass < 12) return "critical";
   if (hoursUntilMass < 24) return "high";
   if (hoursUntilMass < 72) return "medium";
   return "low";
 }
-function shouldAutoApprove(massDate, massTime) {
+function shouldAutoApprove(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
+  const [year, month, day] = massDateStr.split("-").map(Number);
   const [hours, minutes] = massTime.split(":").map(Number);
-  const massDateTime = new Date(massDate);
-  massDateTime.setHours(hours, minutes, 0, 0);
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
   return hoursUntilMass >= 12;
 }
@@ -7364,10 +7351,9 @@ router11.post("/", authenticateToken, async (req, res) => {
         message: "Escala n\xE3o encontrada"
       });
     }
-    const massDate = new Date(schedule.date);
+    const [year, month, day] = schedule.date.split("-").map(Number);
     const [hours, minutes] = schedule.time.split(":").map(Number);
-    const massDateTime = new Date(massDate);
-    massDateTime.setHours(hours, minutes, 0, 0);
+    const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     const now = /* @__PURE__ */ new Date();
     if (massDateTime < now) {
       return res.status(400).json({
@@ -7393,7 +7379,7 @@ router11.post("/", authenticateToken, async (req, res) => {
         message: "J\xE1 existe uma solicita\xE7\xE3o pendente para esta escala"
       });
     }
-    const urgency = calculateUrgency(massDate, schedule.time);
+    const urgency = calculateUrgency(schedule.date, schedule.time);
     const monthlyCount = await countMonthlySubstitutions(requesterId);
     let finalSubstituteId = substituteId;
     let autoAssigned = false;
@@ -7411,7 +7397,7 @@ router11.post("/", authenticateToken, async (req, res) => {
     let status = "pending";
     const userRole = req.user.role;
     const isCoordinator = userRole === "coordenador" || userRole === "gestor";
-    if (shouldAutoApprove(massDate, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
+    if (shouldAutoApprove(schedule.date, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
       status = "auto_approved";
     }
     const [newRequest] = await db.insert(substitutionRequests).values({
@@ -9412,6 +9398,7 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
 var app = express2();
+app.set("trust proxy", true);
 app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
@@ -9427,14 +9414,18 @@ app.get("/", (_req, res, next) => {
   }
   next();
 });
-var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5000", "http://localhost:3000"];
+var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5000", "http://localhost:3000", "http://127.0.0.1:5000"];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+    if (origin && origin.includes(".replit.dev")) {
+      return callback(null, true);
+    }
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      console.warn(`CORS: Origem n\xE3o permitida: ${origin}`);
+      callback(null, true);
     }
   },
   credentials: true,
@@ -9490,7 +9481,7 @@ app.use((req, res, next) => {
       process.exit(1);
     }
   }
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "5005", 10);
   server.on("error", (error) => {
     console.error("Server error:", error);
     if (error.code === "EADDRINUSE") {

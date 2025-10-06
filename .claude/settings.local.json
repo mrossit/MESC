@@ -7,7 +7,11 @@
       "Bash(echo $PORT)",
       "Bash(xargs:*)",
       "Bash(find:*)",
-      "Read(//home/runner/gluestack-mcp/**)"
+      "Read(//home/runner/gluestack-mcp/**)",
+      "Bash(npm run build:*)",
+      "Read(//home/runner/**)",
+      "Bash(npm install:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
