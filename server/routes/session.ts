@@ -122,6 +122,18 @@ export async function createSession(userId: string, ipAddress?: string, userAgen
   expiresAt.setHours(expiresAt.getHours() + SESSION_EXPIRES_HOURS);
 
   try {
+    // IMPORTANTE: Desativar todas as sessões antigas deste usuário
+    await db
+      .update(activeSessions)
+      .set({ isActive: false })
+      .where(
+        and(
+          eq(activeSessions.userId, userId),
+          eq(activeSessions.isActive, true)
+        )
+      );
+
+    // Criar nova sessão
     await db.insert(activeSessions).values({
       userId,
       sessionToken,
