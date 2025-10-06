@@ -58,7 +58,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .limit(10);
     
     // Transform to match expected format
-    const formattedAssignments = upcomingAssignments.map(assignment => ({
+    const formattedAssignments = upcomingAssignments.map((assignment: any) => ({
       id: assignment.id,
       date: assignment.date,
       massTime: assignment.time,
@@ -159,8 +159,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         );
 
       // Note: scheduleAssignments table doesn't exist - returning schedule data directly
-      const assignmentsList = schedulesList.length > 0 
-        ? schedulesList.map(schedule => ({
+      const assignmentsList = schedulesList.length > 0
+        ? schedulesList.map((schedule: any) => ({
             id: schedule.id,
             scheduleId: schedule.id,
             ministerId: schedule.ministerId,
@@ -187,7 +187,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             .where(
               and(
                 sql`${substitutionRequests.scheduleId} IN (${sql.join(
-                  schedulesList.map(s => sql`${s.id}`),
+                  schedulesList.map((s: any) => sql`${s.id}`),
                   sql`, `
                 )})`,
                 sql`${substitutionRequests.status} IN ('pending', 'approved')`

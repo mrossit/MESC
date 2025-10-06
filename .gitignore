@@ -3,3 +3,11 @@ node_modules
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Backups (nunca versionar backups de banco!)
+backups/
+*.sql
+*.sql.gz
+backup-*.json
+
+# BMAD (local only)

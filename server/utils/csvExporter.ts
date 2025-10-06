@@ -305,7 +305,7 @@ export async function getQuestionnaireResponsesForExport(
 
           formattedResponses.push({
             questionId,
-            questionText: questionTextMap[questionId] || questionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            questionText: questionTextMap[questionId] || questionId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
             questionType,
             answer
           });
@@ -366,7 +366,7 @@ export async function getQuestionnaireResponsesForExport(
   });
 
   // Also include ministers who haven't responded yet
-  const respondedUserIds = new Set(responsesWithUsers.map(r => r.user.id));
+  const respondedUserIds = new Set(responsesWithUsers.map((r: any) => r.user.id));
 
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
     const nonRespondents = await db
@@ -375,8 +375,8 @@ export async function getQuestionnaireResponsesForExport(
       .where(eq(users.role, 'ministro'));
 
     nonRespondents
-      .filter(user => !respondedUserIds.has(user.id))
-      .forEach(user => {
+      .filter((user: any) => !respondedUserIds.has(user.id))
+      .forEach((user: any) => {
         exportData.push({
           ministerId: user.id,
           ministerName: user.name,

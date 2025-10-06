@@ -13,10 +13,12 @@ const MinistersDirectory = lazy(() => import('@/pages/MinistersDirectory'));
 const Approvals = lazy(() => import('@/pages/approvals'));
 const ScheduleCalendar = lazy(() => import('@/pages/ScheduleCalendar'));
 const Formation = lazy(() => import('@/pages/formation'));
+const FormationAdmin = lazy(() => import('@/pages/FormationAdmin'));
 const QuestionnaireUnified = lazy(() => import('@/pages/QuestionnaireUnified'));
 const QuestionnaireResponses = lazy(() => import('@/pages/QuestionnaireResponses'));
 const ScheduleVisualization = lazy(() => import('@/pages/ScheduleVisualization'));
 const AutoScheduleGeneration = lazy(() => import('@/pages/AutoScheduleGeneration'));
+const ScheduleEditorDnD = lazy(() => import('@/pages/ScheduleEditorDnD'));
 const QRCodeShare = lazy(() => import('@/pages/QRCodeShare'));
 const Communication = lazy(() => import('@/pages/communication'));
 const Install = lazy(() => import('@/pages/install'));
@@ -129,6 +131,15 @@ export const routes: RouteConfig[] = [
     icon: 'GraduationCap'
   },
   {
+    path: '/formation-admin',
+    component: FormationAdmin,
+    requiresAuth: true,
+    allowedRoles: ['gestor', 'coordenador'],
+    title: 'Admin Formação',
+    showInMenu: true,
+    icon: 'Settings'
+  },
+  {
     path: '/questionnaire',
     component: QuestionnaireUnified,
     requiresAuth: true,
@@ -172,6 +183,15 @@ export const routes: RouteConfig[] = [
     title: 'Visualizar Escalas',
     showInMenu: true,
     icon: 'Eye'
+  },
+  {
+    path: '/schedule-editor-dnd',
+    component: ScheduleEditorDnD,
+    requiresAuth: true,
+    allowedRoles: ['gestor', 'coordenador'],
+    title: 'Editor de Escalas (Drag & Drop)',
+    showInMenu: true,
+    icon: 'Move'
   },
   {
     path: '/schedule-generation',

@@ -37,9 +37,9 @@ import {
   Smartphone,
   XCircle
 } from "lucide-react";
-import { format, addDays, isSunday } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
 
 // Definir mínimos de ministros por horário de missa
@@ -141,6 +141,20 @@ export default function Substitutions() {
     enabled: !!user,
   });
 
+  // Fetch mass pendencies (real data from backend)
+  const { data: massPendencies = [], isLoading: loadingPendencies } = useQuery<MassPendency[]>({
+    queryKey: ["/api/mass-pendencies"],
+    queryFn: async () => {
+      const response = await fetch("/api/mass-pendencies", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch mass pendencies");
+      return response.json();
+    },
+    enabled: isCoordinator,
+    refetchInterval: 60000, // Refetch every minute
+  });
+
   // Fetch substitution requests
   const { data: substitutionRequests = [], isLoading: loadingRequests } = useQuery({
     queryKey: ["/api/substitutions"],
@@ -154,86 +168,6 @@ export default function Substitutions() {
     },
     enabled: !!user,
   });
-
-  // Generate mock data for mass pendencies
-  const generateMassPendencies = (): MassPendency[] => {
-    const pendencies: MassPendency[] = [];
-    const today = new Date();
-    
-    // Check next 2 weeks of Sunday masses
-    for (let i = 0; i < 14; i++) {
-      const checkDate = addDays(today, i);
-      
-      if (isSunday(checkDate)) {
-        const dateStr = format(checkDate, "yyyy-MM-dd");
-        const dayOfMonth = checkDate.getDate();
-        
-        // Check if it's São Judas Sunday (28th)
-        const isSaoJudas = dayOfMonth === 28;
-        
-        // Sunday masses
-        const sundayMasses = [
-          { time: "08:00", location: "Matriz", min: 15 },
-          { time: "10:00", location: "Matriz", min: 20 },
-          { time: "19:00", location: "Matriz", min: 20 },
-        ];
-        
-        // Add São Judas mass if it's the 28th
-        if (isSaoJudas) {
-          sundayMasses.push({ time: "19:30", location: "São Judas", min: 15 });
-        }
-        
-        sundayMasses.forEach(mass => {
-          // Simulate current confirmed ministers (random for demo)
-          const currentConfirmed = Math.floor(Math.random() * (mass.min + 5));
-          const ministersShort = Math.max(0, mass.min - currentConfirmed);
-          
-          if (ministersShort > 0) {
-            // Calculate urgency based on days until mass and shortage
-            const daysUntil = i;
-            let urgencyLevel: "low" | "medium" | "high" | "critical" = "low";
-            
-            if (daysUntil <= 1 && ministersShort >= 5) urgencyLevel = "critical";
-            else if (daysUntil <= 3 && ministersShort >= 3) urgencyLevel = "high";
-            else if (daysUntil <= 7 && ministersShort >= 2) urgencyLevel = "medium";
-            
-            pendencies.push({
-              id: `${dateStr}-${mass.time}`,
-              date: dateStr,
-              massTime: mass.time,
-              location: mass.location,
-              isSpecial: mass.location === "São Judas",
-              specialName: mass.location === "São Judas" ? "Missa de São Judas Tadeu" : undefined,
-              minimumRequired: mass.min,
-              currentConfirmed,
-              ministersShort,
-              confirmedMinisters: Array.from({ length: currentConfirmed }, (_, idx) => ({
-                id: `m${idx}`,
-                name: `Ministro ${idx + 1}`,
-                position: (idx % 4) + 1
-              })),
-              availableMinisters: [
-                { id: "av1", name: "João Silva", lastServed: "2024-03-10" },
-                { id: "av2", name: "Maria Santos", lastServed: "2024-03-03" },
-                { id: "av3", name: "Pedro Costa", lastServed: "2024-02-25" },
-                { id: "av4", name: "Ana Lima", lastServed: "2024-03-17" },
-              ],
-              urgencyLevel
-            });
-          }
-        });
-      }
-    }
-    
-    // Sort by date and urgency
-    return pendencies.sort((a, b) => {
-      if (a.urgencyLevel === "critical" && b.urgencyLevel !== "critical") return -1;
-      if (b.urgencyLevel === "critical" && a.urgencyLevel !== "critical") return 1;
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
-  };
-
-  const massPendencies = isCoordinator ? generateMassPendencies() : [];
 
   // Respond to substitution request mutation
   const respondToSubstitutionMutation = useMutation({
@@ -469,7 +403,11 @@ export default function Substitutions() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {massPendencies.length === 0 ? (
+                {loadingPendencies ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : massPendencies.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Check className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p>Todas as missas têm ministros suficientes</p>
@@ -669,8 +607,9 @@ export default function Substitutions() {
               ) : (
                 <div className="space-y-4">
                   {substitutionRequests.map((item: SubstitutionRequest) => {
-                    const assignmentDate = item.assignment?.date 
-                      ? new Date(item.assignment.date)
+                    // Parse date correctly to avoid timezone issues
+                    const assignmentDate = item.assignment?.date
+                      ? parseScheduleDate(item.assignment.date)
                       : new Date();
                     const isDirected = item.request.substituteMinisterId !== null;
                     const isForMe = isDirected && allMinisters.find((m: any) => m.id === item.request.substituteMinisterId)?.userId === user?.id;

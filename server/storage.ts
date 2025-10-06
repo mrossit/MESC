@@ -445,7 +445,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schedules.time, schedules.position);
 
     // Mapear para o formato esperado pelo frontend
-    return assignments.map(a => ({
+    return assignments.map((a: any) => ({
       id: a.id,
       date: a.date,
       massTime: this.formatMassTime(a.time),
@@ -491,7 +491,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schedules.date, schedules.time, schedules.position);
 
     // Mapear para o formato esperado pelo frontend
-    return rawAssignments.map(a => ({
+    return rawAssignments.map((a: any) => ({
       id: a.id,
       scheduleId,
       ministerId: a.ministerId,

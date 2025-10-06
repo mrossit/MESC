@@ -1,0 +1,1325 @@
+═══════════════════════════════════════════════════════════════════════════════
+EXPORTAÇÃO COMPLETA DE USUÁRIOS - BANCO DE PRODUÇÃO
+Data: 2025-10-06T02:38:30.856Z
+Total: 120 usuários
+═══════════════════════════════════════════════════════════════════════════════
+
+USUÁRIO #1
+Nome:          Marcelo M e Silva
+Email:         mmesilva1971@hotmail.com
+Telefone:      15996961617
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$CWteH0nl734CJo7BciaoaeNkLK7bfiZTpUKCbNiJJezzpBA4c/jjW
+Último Login:  Mon Sep 29 2025 14:53:40 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #2
+Nome:          Emanuelle Batista Sousa de Andrade 
+Email:         emanuelebadol@gmail.com
+Telefone:      15998509244
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$K6c/X1yvASFbnFF0ZvJumOD6HFj40pCT5doPwBQpx6Welmx9PEGIS
+Último Login:  Tue Sep 23 2025 22:13:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #3
+Nome:          João Reinaldo Anhaia
+Email:         janhaia@terra.com.br
+Telefone:      15991627520
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$ZTqf0WwXJHLY8900nFb5v.5uuBkkVmbKx7.uJH/ui7qryRPBgV86i
+Último Login:  Wed Sep 24 2025 09:00:13 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #4
+Nome:          Milene Toledo 
+Email:         milenetoledo11@gmail.com
+Telefone:      15998516162
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$sBTvW52bimYrtyxxnSH/PeKmnM2bouWI5koCiQ85siEZEukqJlof.
+Último Login:  Sat Sep 20 2025 19:44:41 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #5
+Nome:          EVANIL MARIA BERGAMO ANTUNES
+Email:         evanilbergamo@yahoo.com.br
+Telefone:      15991154024
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$MblysG0EfQO/yDzv/sX8lOmC5jvyfxTq7Y54CvQAP07J0XjST6efK
+Último Login:  Tue Sep 23 2025 21:52:36 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #6
+Nome:          Fabiana das Graças Campos Soares 
+Email:         fabicampos9090@gmail.com
+Telefone:      15997181149
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$/2qWHxiN.UC6yQX2j1t3KuoTh9DuRm6.NFAvVwN1zk8QwiFpMcf26
+Último Login:  Sun Sep 28 2025 15:12:09 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #7
+Nome:          Alexandre Henrique de Carvalho 
+Email:         engcarvalho@outlook.com
+Telefone:      (15) 99707-7273
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$kWSRkde1EcMF6c.lVIUmv.ExMwZ6ICXZM8LVPft.Fuuo8nZBYRXIS
+Último Login:  Mon Sep 22 2025 10:14:23 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #8
+Nome:          Jaci da Mota Jardim 
+Email:         jacimotaj@gmail.com
+Telefone:      15997107632
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$YfCt4a0Rh.6z2jtyZcach.lkWGxQi5G1iKOx5u1q.gDzLiOKLtwAi
+Último Login:  Wed Sep 24 2025 01:23:06 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #9
+Nome:          Rogério Fernando da Silva
+Email:         rogeriofs73@hotmail.com
+Telefone:      15996389643
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$04veJUcQUrqhy7u0nDNrU..uEeiTTDOoDlLjxvIaHpPqyILZVIzsy
+Último Login:  Wed Sep 24 2025 00:12:52 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #10
+Nome:          Mayra Pereira Garcia
+Email:         mayrabatista.pereira@gmail.com
+Telefone:      15988041491
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$zmMIVJC97EF7O5VNrYzyOenYc75OjC8taYWUy0FzfxqiY0gAK0eEi
+Último Login:  Fri Sep 26 2025 20:07:18 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #11
+Nome:          Irene aparecida dos santos
+Email:         irenesantos1473@gmail.com
+Telefone:      15996112649
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$vl9QYz7.wMCOERbMD1yVQOf6nzelHoH4NGofN9PGAuIgVkY8nwDxq
+Último Login:  Nunca
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #12
+Nome:          Eliane Machado Acquati Amorim
+Email:         eliane.acquati@adv.oabsp.org.br
+Telefone:      15996831507
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$HcUhS9cUT403aghGeH.vi.gqd3JakEm2mg5DiEPsuo9mADsLK9Nqy
+Último Login:  Tue Sep 30 2025 19:17:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #13
+Nome:          Sandro Elias Soares
+Email:         soareseliassandro@gmail.com
+Telefone:      15991030345
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$ds/JQlMi/Coo.y3F2YnhNuAZbzF5U3/M0HtysysGk/FCOMUN9BlZC
+Último Login:  Fri Sep 19 2025 20:16:36 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #14
+Nome:          Lais Lia Alves Adabro 
+Email:         laisliaalves27@gmail.com
+Telefone:      15991421382
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$5nncPyA6qVMI4wMAeZHiieniLNLX61EzQDKJqxshll2saEJ6PjmVG
+Último Login:  Mon Sep 29 2025 00:57:36 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #15
+Nome:          FERNANDO GALIANO MIACO
+Email:         fernando.miaco@yahoo.com.br
+Telefone:      15981411737
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$cSX17UujAnNLW28Qaa9ATuzUnZViLX1e8WJh8rWtVX40zY8g08Ime
+Último Login:  Mon Sep 29 2025 17:14:19 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #16
+Nome:          Rosana Vieira Soares
+Email:         rosanaso@gmail.com
+Telefone:      15997045971
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$SsMkExVNlUbQpu0.uN0iceGoMylSozwlkBMeUHosBEnokluuDXNqa
+Último Login:  Thu Sep 25 2025 14:21:00 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #17
+Nome:          Graziele Batista de Andrade 
+Email:         lele_gra@hotmail.com
+Telefone:      15996777765
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$X4PJ6B53KTg.sauiaxtop.ioAEyLhrw5Rko8Dn/x7HHNLp/pJjczO
+Último Login:  Tue Sep 30 2025 20:14:49 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #18
+Nome:          Beatriz Bisan 
+Email:         bisanverdura@gmail.com
+Telefone:      15991797827
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$c.KtzAQttJYScGqd5J.5nuZfc2dfYjhFslmBfsCRBgk0Q.Hrw2E62
+Último Login:  Sun Sep 28 2025 14:48:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #19
+Nome:          Meire Terezinha da Veiga 
+Email:         nina_meiretv1@hotmail.com
+Telefone:      15992624370
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$tFhipdsGhZguKT7D7XlYX./AzSqbeObOJ2I25xoWaKMnI1SW3IKrS
+Último Login:  Tue Sep 23 2025 22:00:00 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #20
+Nome:          Amanda Bergamo Antunes
+Email:         amandaantunes94@yahoo.com.br
+Telefone:      15991361177
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$8O0Q406S7YZzM2z8i3SqnOXEq0/N5mPxFkhozyitJfBpYr4QwGTsa
+Último Login:  Sun Sep 21 2025 14:37:01 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #21
+Nome:          Márcio Glauco de Campos Vieira
+Email:         mateglauco@gmail.com
+Telefone:      15991143740
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$vCyWCyz5RkJLPYIw7I4xpeO7fw2TolLpC/POJDloYyAnTAFQb8g86
+Último Login:  Mon Sep 29 2025 12:28:31 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #22
+Nome:          CARLOS AUGUSTO DE OLIVEIRA SANTOS
+Email:         augustominustah@gmail.com
+Telefone:      15997588359
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$IUDBqjiKBbNThYE958EWsuth/q3/xwmSGWGaIvg3sxZ2Bze0kUofK
+Último Login:  Sat Sep 27 2025 01:30:35 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #23
+Nome:          Rosana Lé Machado Piazentin 
+Email:         rosana.piazentin@gmail.com
+Telefone:      15991159969
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$0d8qp.KFhyU7f.tkURII0ugAvUi3B1JFDsYmVl95XWbOgzVWUZSJe
+Último Login:  Mon Sep 29 2025 18:58:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #24
+Nome:          Valentina Maria de Macedo Nunes 
+Email:         valentinaevaldir@yahoo.com.br
+Telefone:      15997061740
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$XLjH91KCed3ZQ7CSTcjGNOTU/wOSJqgLcI.cjLvz2S7yRPEtwFD92
+Último Login:  Tue Sep 30 2025 12:41:01 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #25
+Nome:          Gabriel henrique Silva martinez
+Email:         gabrielmhs433@gmail.com
+Telefone:      Não informado
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$qyXNoRJkGjRTta0TQzI3yuv1nWORBTVWl0femHbzIIwwA1KdvA1WW
+Último Login:  Fri Sep 26 2025 13:01:12 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #26
+Nome:          Luana Rodrigues Vieira
+Email:         luana.vieirar97@hotmail.com
+Telefone:      14981354384
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$S75Zbg0/VlY/EtQ/w8frweFu1EFASlrfprbhrvrzEL0Dwj4kE2ADG
+Último Login:  Tue Sep 23 2025 20:45:51 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #27
+Nome:          Luciana Aparecida Vieira de Deus santos 
+Email:         luciannavieiradedeus@gmail.com
+Telefone:      15991531528
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$By4s5HdwjcPV/gt6UJ1WEuAg4yoD1N205LH7tH1SdraovFzLCxOqu
+Último Login:  Tue Sep 30 2025 11:20:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #28
+Nome:          Pamella Rodrigues Soares 
+Email:         ropamella3@gmail.com
+Telefone:      15997391324
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$ass8OROd36m47H3oev3bAuZf3PI2IbTC1zhlZf8zwVu7xcW1aFU4K
+Último Login:  Tue Sep 23 2025 20:50:55 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #29
+Nome:          Daniela Pereira 
+Email:         danielapereira201077@gmail.com
+Telefone:      15997769550
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$9hbtWK1cnb43aME0HiYuc.dLqU/7hBfMqT/8CGLmgal6B9OwIXAiW
+Último Login:  Mon Sep 29 2025 17:58:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #30
+Nome:          Carlos eduardo antunes
+Email:         carlosantunes2013@yahoo.com.br
+Telefone:      15991337777
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$J7couDOpbzXS.Xb8pmdqDONNP.U31ud.nMoCTgkbEc/LHqq0oTFEy
+Último Login:  Tue Sep 23 2025 20:46:58 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #31
+Nome:          Sophia Oliveira
+Email:         sophia.olivers2004@gmail.com
+Telefone:      15997901910
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$kCf49v1zGFb1Pow9X4LXvOtgsnSlHIRAgctO81MvTbsL9nQiKPwna
+Último Login:  Mon Sep 29 2025 13:57:00 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #32
+Nome:          Julio Cesar de Carvalho 
+Email:         juliocarvalho_hot@yahoo.com.br
+Telefone:      15996245562
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$/Q4TvtOueW1DzqV.gqT.I.k7NXZHvQ/cP04d5ZmBeCyB.WduSOj2i
+Último Login:  Wed Sep 24 2025 12:55:09 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #33
+Nome:          Juliana El Hadi
+Email:         juelhadi@hotmail.com
+Telefone:      15981565100
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$/0T9iEfglXWQRhRy/O0J4O4VTHhwQL6GSbqSZj6.ttNJ/zu1PpvRa
+Último Login:  Tue Sep 23 2025 21:33:40 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #34
+Nome:          Rosana Ros Carvalho Silva
+Email:         rosanars2211@gmail.com
+Telefone:      15981621421
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$TK9JH0vK0uThYM1RpqEgEOD80nxVhUY26uNJ2Ta3vWWzp7tB49yZG
+Último Login:  Wed Sep 24 2025 00:16:26 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #35
+Nome:          Mauro César 
+Email:         mauro.s.maria@gmail.com
+Telefone:      15997076943
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$PQgq3ARFlYcpdQWYYF0ko.26qwsllU54diSAeZpIFREJBBfvR9q0K
+Último Login:  Sat Sep 20 2025 21:39:28 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #36
+Nome:          Ageu J R Neves
+Email:         ageu.neves76@gmail.com
+Telefone:      15996177773
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$rd3nkKzu7DQvdtplCOJWHupULM6oNPlSiCi7hkd2KJpZlcNqMy3Cu
+Último Login:  Tue Sep 23 2025 22:51:29 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #37
+Nome:          Juliana Albuquerque Abelaneda Martins 
+Email:         julianaabelaneda@hotmail.com
+Telefone:      15991373701
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$Rrb6jXbc0bmS.7ao.Gusw.0e193u33Sqryu2k5dUVe7KmC7JqEzn.
+Último Login:  Wed Sep 24 2025 01:34:37 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #38
+Nome:          ALEXANDRE DE ASSIS
+Email:         alexandreassis.aa@gmail.com
+Telefone:      15974025600
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$fP2CvHseyyMs9DRNgqfcue/rirF.s8PxgNbIdecbBGcr4BnAKhgSK
+Último Login:  Tue Sep 23 2025 21:19:01 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #39
+Nome:          Sérgio Manoel dos Santos 
+Email:         sergiiomanoelsantos@gmail.com
+Telefone:      15991279038
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$ayvwsMhTGcIxPJXlxmm6zONpbAu3cJwDzYaklpuCkVisafJ333rEy
+Último Login:  Wed Sep 24 2025 13:20:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #40
+Nome:          marcelo tadeu sanches
+Email:         marcelotadeu@live.com
+Telefone:      15996435230
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$BZ0N4dLovX8sWXzqOIBetOjzXEW24pCxRJcJNrPUB7UA.GNBea6lG
+Último Login:  Mon Oct 06 2025 02:29:53 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #41
+Nome:          Adrielle Toledo Anhaia 
+Email:         drianhaia@hotmail.com
+Telefone:      15998208661
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$3e4nCepjGuhXyg1B36pCQ.DnaYXpP1vWjaAP.q0kAp3XrU2rDkAlC
+Último Login:  Wed Sep 24 2025 09:34:51 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #42
+Nome:          Júlia Francisco Vaz
+Email:         juuliafvaz@gmail.com
+Telefone:      11976045957
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$8vDdtP2a.8ICrXUyXX7BRuyHH6yEIkJVKzkmcYse8MzHqXqcWf9yK
+Último Login:  Sun Sep 21 2025 03:27:46 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #43
+Nome:          Valdenice Lopes dos Santos
+Email:         valdenicelopessantos41@gmail.com
+Telefone:      15996918011
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$JIt5x2w2/tGmktzqO3Lhv.fEq4.DYm7Xn48gluOfXUt/unZ3jtWWm
+Último Login:  Tue Sep 30 2025 14:14:47 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #44
+Nome:          Jeniffer Regina Da Silva Martinez
+Email:         jrsmartinez01@gmail.com
+Telefone:      15988071467
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$5tlsw3EKpn7tb78.ASZphOIQLpbgURncMxo49ATBifBVT1MGy1UKC
+Último Login:  Thu Sep 18 2025 16:35:41 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #45
+Nome:          Sonia Regina da Silva Martinez 
+Email:         sonia.sm36@gmail.com
+Telefone:      15988212822
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$RKijy7nvy35hkXeToDEU0uNkGIJjgPb/bEjMSDhp5CFdPfSzEuzHm
+Último Login:  Sun Sep 21 2025 19:22:29 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #46
+Nome:          Marivaldo Roberto Soares
+Email:         mariva.soares@hotmail.com
+Telefone:      (15) 99627-7557
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$eyDIvpTlhQR4dmGFXoELFu9LGj3l0whIa/CVVJugJAed4m2VlGKmi
+Último Login:  Nunca
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #47
+Nome:          Raquel Ciolete de Jesus 
+Email:         raquel.ciolete@gmail.com
+Telefone:      15974025436
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$o6c7eZKo45wFtRWWfTVQGeDQSKiA/GgeKpbtnehsxsnzK1ztnDCXa
+Último Login:  Tue Sep 30 2025 15:41:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #48
+Nome:          Victoria Albuquerque Ronzani 
+Email:         victoria.ronzani@hotmail.con
+Telefone:      15998365269
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$b5TGU1Ib55Jx69cpiAuiDOsk1JSwukcoRaDeVsJK19ezxKySI/406
+Último Login:  Mon Sep 29 2025 11:17:46 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #49
+Nome:          Rafael Corrêa
+Email:         rafaelccdivino@gmail.com
+Telefone:      15997851710
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$siaDBRO7rXKufBtsjbIZY.60UXbsMfPWp/nyAtytEbCSbunlZj9jm
+Último Login:  Sun Sep 21 2025 19:24:04 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #50
+Nome:          Rogério Sousa Luiz
+Email:         rs_luis@yahoo.com.br
+Telefone:      15997440445
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$.ufib1CAASNOmV1vVB5GgOS8cOwO20quPtqMjofFIePTV9yJPAPuO
+Último Login:  Tue Sep 23 2025 21:37:42 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #51
+Nome:          TAIS CRISTINI DA SILVA MIRANDA
+Email:         taiscristinidasilvamirandahot@gmail.com
+Telefone:      15991641162
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$VZ26QP4ub.Tye.Zw3HcMqeH8hZJDutxfjdl2xsd/VIhUI3bWQn0/i
+Último Login:  Sat Sep 27 2025 18:06:58 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #52
+Nome:          Isabelle Cobianchi Pereira Ferreira
+Email:         isabellecpf@gmail.com
+Telefone:      Não informado
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$2fraeYe1UfVW02Nik7lEM.CPNE7kvXPi6zQ7H0ZCk/pdeB144C6vu
+Último Login:  Sat Sep 20 2025 01:19:33 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #53
+Nome:          Bruno Peccini
+Email:         brunopeccini@hotmail.com
+Telefone:      15981119502
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$PHbkZiP1.XACHj0GmHGJq.yBMXYInYn6ybmbrN24Sqsxs/TSh/YRi
+Último Login:  Tue Sep 23 2025 11:36:52 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #54
+Nome:          MARIA ISABEL PICINI DE MOURA NEVES
+Email:         belmoura20@gmail.com
+Telefone:      15997350559
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$BPbgMDI7nJB38/Apm2Q4mutlrKdGyNgWG80CGWw7uqddNdl3wcZ8u
+Último Login:  Tue Sep 23 2025 20:49:58 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #55
+Nome:          Jaildo Benedito
+Email:         jaildo.benedito@uol.com.br
+Telefone:      15997971444
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$1Stvzz7fsWuhmhMYUIzwIeAeZvbpZCWpQEHIv7gKyrVTyJxiiwV32
+Último Login:  Wed Sep 24 2025 13:57:57 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #56
+Nome:          Anderson Roberto Silva Santos 
+Email:         andermavival3239@gmail.com
+Telefone:      15997066664
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$hCyB3Ejjn.Ch8zI68NnaZ.tJs.3PtZaPDT4WhEhauBpTEBoiFgoZ.
+Último Login:  Sun Sep 28 2025 12:26:39 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #57
+Nome:          Catia Regina Lima Creado
+Email:         catiacreado74@gmail.com
+Telefone:      15997260239
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$oDyI1scSIRYMxai/WVXSE.rpwYduZLB1vg.KFWoxVJeM/zGtVQ57a
+Último Login:  Wed Sep 24 2025 00:34:47 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #58
+Nome:          Luciano Antonio Vieira Bueno 
+Email:         lucianourcioli70@gmail.com
+Telefone:      15996643141
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$zMpGi0dlI8rGuNZI8OPlAunjbRqbv15/Tq6uKyMYKfQloV7HFypW2
+Último Login:  Mon Sep 29 2025 22:05:36 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #59
+Nome:          Ruth Elias de Almeida Morelli
+Email:         ruthalmeidamorelli@gmail.com
+Telefone:      15981508714
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$CUm6474bL9NVzJ28jDqUTOfycrNdX5j/z/wlk2OaOkKnxiJMBbvl.
+Último Login:  Sun Sep 28 2025 15:35:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #60
+Nome:          Marcos Soares de Oliveira 
+Email:         ms652848@gmail.com
+Telefone:      (15) 98147-6170
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$.W/2uRnQdvPARyDoWJIdiO0tv2nO.3S84ajMNG1NMuCZ34JS5cbk6
+Último Login:  Fri Sep 26 2025 23:14:04 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #61
+Nome:          Amanda Germano de Aguiar
+Email:         amanda.germano09@gmail.com
+Telefone:      15998296524
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$KdVAu7ZjoLJAjotNYQuvV.jtbNQHF0EJYFBUgCfUhYej9ktfdtolO
+Último Login:  Fri Sep 19 2025 12:18:24 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #62
+Nome:          Maria Clara de Oliveira Salles
+Email:         mariaclarasalles0411@gmail.com
+Telefone:      15998041109
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$1LzZZQiHwDkGkdXcBT5l0ez56VE9arTheKA7z8Mn8ZWhOId0tbV.a
+Último Login:  Tue Sep 23 2025 20:55:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #63
+Nome:          Patrícia Oliveira Alves da Silva 
+Email:         patricia.olivers@gmail.com
+Telefone:      15997196961
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$QNTwkypLF4DG0K6Gs5EAZ.yFFBKug9Uo8WP3TMhj9P06JHY7Kf8YG
+Último Login:  Fri Sep 19 2025 15:11:33 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #64
+Nome:          Andréa Aparecida Colabuani dos Santos Oliveira 
+Email:         acolabuanioliveira@gmail.com
+Telefone:      15991914919
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$2EQlkKE0PoUR8LTGLllYWOn9AIC9XKRN9RVq/ISn0Pk2M4VSWgThm
+Último Login:  Tue Sep 23 2025 20:55:25 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #65
+Nome:          Rogério Alves Silva
+Email:         alves.rsilva7@gmail.com
+Telefone:      15997577687
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$8agEHHF9jsYi5Jo5IJRNn.nd70wmJJt7ehNKNpZOWNkknavoFJqyq
+Último Login:  Mon Sep 22 2025 01:39:33 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #66
+Nome:          Katia Massae Kataoka Corrêa
+Email:         katiamassae@hotmail.com
+Telefone:      15997851790
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$J17pA0/dHjogK2gqE84Kyu/oHeiPj1V9eZ9IKBqXeEB/dGRZV4oDO
+Último Login:  Tue Sep 23 2025 22:31:47 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #67
+Nome:          Sílvio  Lindo Benedito 
+Email:         inaraguilherme@hotmail.com
+Telefone:      15997463588
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$mnugUd2LhsBuzQIGjB7Pne.9OduuC.y43DdfizJosbT1F1YyMd7qS
+Último Login:  Fri Sep 26 2025 15:04:14 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #68
+Nome:          Adil Munir Nege
+Email:         adilnege@gmail.com
+Telefone:      15981197316
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$uX0I6VKNipgJpvGvaAZDtuprGy4ug/4kfwS3ObiVqdCpKjU0jvkQ2
+Último Login:  Wed Sep 24 2025 00:06:56 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #69
+Nome:          Maiara Araujo Sousa 
+Email:         ma.araujos@outlook.com
+Telefone:      11971126995
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$tpKFnpObQvot6ROLPsaM2u0DJgjXfUxwtNWW1sd7Qo4GaeRbmxkDi
+Último Login:  Wed Sep 24 2025 18:02:08 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #70
+Nome:          Hellen Ariane Ismirim de Sousa Dias
+Email:         hellen.ismirim@gmail.com
+Telefone:      15998490077
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$TXJcmw8HDgXYxP5v81xjpe1QCh.CPSxGwLSUYPCKR3gqUL94X9Yne
+Último Login:  Tue Sep 30 2025 17:14:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #71
+Nome:          Giovanna Isabelle Nunes de Barros
+Email:         giovannaisabelle3@gmail.com
+Telefone:      15996414111
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$Cl6VKCrnHkvBWJBg1yqcferdwhKbmhhHF1MzDl0gCNzSauwXWticm
+Último Login:  Tue Sep 23 2025 20:52:20 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #72
+Nome:          Angela Maria Gomes do Prado 
+Email:         agprado73@hotmail.com
+Telefone:      15991454846
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$Ejkwlpbxan4CzlFC2OTfiOPNsCNoN0BKHex9pVmxmDG7yDhrSidze
+Último Login:  Tue Sep 23 2025 20:55:37 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #73
+Nome:          Maria Vitoria Toledo
+Email:         maria.toledo@colegioose.com.br
+Telefone:      15997528098
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$jU5LvjSeOt5DnqWLwjTwieD7Hon.sMxXitCC6GS47/ASoYJnaViei
+Último Login:  Thu Sep 25 2025 01:35:48 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #74
+Nome:          Beatriz aparecida nunes
+Email:         beatriz.nunes495278@gmail.com
+Telefone:      15996414126
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$VVgIkpG0xaNxHrB5yWRYKuwkfKLtYVf0HQPRtwYq633ce0Z6leqtm
+Último Login:  Tue Sep 23 2025 15:13:50 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #75
+Nome:          Maria Eduarda Libano Pinto
+Email:         eduardamarialibano@gmail.com
+Telefone:      15991870700
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$D9C2MYl8rssqYTgqNEXOuuO5TEHTYvFCW5B3PrR4shHfKUfS2w6Mq
+Último Login:  Tue Sep 23 2025 20:44:04 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #76
+Nome:          Janaina Leonel Toledo Anhaia 
+Email:         jananhaia@gmail.com
+Telefone:      15997822752
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$gqoGQ5iS1mbORcqnO/A1LuuDWs2nxJK1eccNoYpLS3U2tqNSvOeeW
+Último Login:  Wed Sep 24 2025 16:54:05 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #77
+Nome:          Lais Soares Pompeu 
+Email:         soaresoliveira.lais@gmail.com
+Telefone:      15997176566
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$2PyxLFDyWt987j4Xn.P9K.NwObig6YKfMq0kW0d.1zS3n9/2W/gVG
+Último Login:  Thu Sep 18 2025 10:55:08 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #78
+Nome:          Rosicleide Aparecida Martins Lucio
+Email:         cleide_lucio@yahoo.com.br
+Telefone:      15997569990
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$SWBvaSKgdgkaZnWcucKcjOg9/k5odsK9GhqHJtWmMuHg57VaqK8ge
+Último Login:  Tue Sep 23 2025 21:48:21 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #79
+Nome:          ELIZABETH SOARES MORAES RAMOS
+Email:         elizabethsmramos@hotmail.com
+Telefone:      15981030209
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$oCltMVkWbxbXZ68uL3T6EeMMSg.wEsD/LhseKWaUBymIqCDtkigAq
+Último Login:  Sun Sep 28 2025 13:56:25 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #80
+Nome:          Caio Vinícius Leite Martins 
+Email:         kaio.vinicius.martins@hotmail.com
+Telefone:      11971348910
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$r2ZDn6J7C03kNo7poydD/uygWte8qxmmHI3L7CRed499/uLeTP81S
+Último Login:  Wed Sep 24 2025 14:15:51 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #81
+Nome:          Sérgio Manoel dos Santos 
+Email:         sergiiomanoelsantos@gmail.comcom
+Telefone:      15991279038
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        inactive
+Hash Bcrypt:   $2b$10$maxNJP2T4/8yRz5DJARRf.cK0Zxk3ZEIWDta6rAWTc7oINRcFMnvC
+Último Login:  Nunca
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #82
+Nome:          Danielson Candido de Assis 
+Email:         caempreiteiracivil@gmail.com
+Telefone:      15997165972
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$m5PPGitxc0kpDT6ZRYWcUO4AyY89n1HXT4/.womMifePstHDJxOS2
+Último Login:  Thu Sep 18 2025 13:00:08 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #83
+Nome:          JOSELANE DE FARIA PEREIRA
+Email:         joselane.faria@hotmail.com
+Telefone:      15981002659
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$j.AfZRSUpRPlUFf9JpazgOPFWIGmc9aB3zVWodKYebpWnyek7rHNC
+Último Login:  Tue Sep 30 2025 09:40:57 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #84
+Nome:          Ana Miaço
+Email:         almeida.miaco@yahoo.com.br
+Telefone:      15981411747
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$mkbOpljZRFkInJqul..WUOU/T/hcm.rvEeGHDdHbkbSLr3/UIo0ES
+Último Login:  Tue Sep 30 2025 13:24:49 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #85
+Nome:          Andre de Amorim
+Email:         andre_amorim3@hotmail.com
+Telefone:      15996831510
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$GBsWEfSMuwqgQOyucscsXeKJZSjlNeCWTIYrmhaLm7uhxNJe0Y6Hm
+Último Login:  Sun Sep 28 2025 09:58:11 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #86
+Nome:          Ana Jardim 
+Email:         jardim.claudia@hotmail.com
+Telefone:      Não informado
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$HBRORH1RDjF36MoKQnCthOR9Rvy/1CH1qWAbqPVz.fJfzj10Zyidm
+Último Login:  Wed Sep 24 2025 01:24:10 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #87
+Nome:          Aidê Maizumi Kanekio Benedito
+Email:         inaraguilherme@gmail.com
+Telefone:      15997296226
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$cY6GlsfnWStQuE1XgYX0je4nAqXIyfEcsacPocrb1tnKLyuU841ny
+Último Login:  Mon Sep 29 2025 20:01:18 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #88
+Nome:          Vagner de oliveira
+Email:         vagneroliveira197121@gmail.com
+Telefone:      15992740327
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$yHCHDxN.L655C1wKKMouYuPeflrNcaZPU9SOQJ7Prpb7Ahx2JoiDu
+Último Login:  Fri Sep 26 2025 19:41:21 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #89
+Nome:          Luis Gustavo Peres Adabro 
+Email:         peresadabro@gmail.com
+Telefone:      (15) 98133-6910
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$bsiXra4fxtPwp6/eqv.g3evlyHemuL.haLrkwJSgqk/Ro3oYsv2nS
+Último Login:  Sat Sep 20 2025 20:21:57 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #90
+Nome:          Mario Henrique Martinez
+Email:         marioh.mart@gmail.com
+Telefone:      15988215204
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$3/lOAYlKxkITxRr17wAxpeuiweR7GPH0y3ouIHWP5WPqBS.moXv2O
+Último Login:  Sun Sep 21 2025 19:21:48 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #91
+Nome:          Roseli Aparecida de Pontes Furquim 
+Email:         roselipontesfurquim@gmail.com
+Telefone:      15997971241
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$VUAPPp7lrJbl0YiCoxTkse8uGYnXCGDk5scPSHF7hH81pTfeIf8w2
+Último Login:  Tue Sep 23 2025 17:09:10 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #92
+Nome:          PAULO SERGIO DE OLIVEIRA SOUZA
+Email:         paulo.souza.casa67@gmail.com
+Telefone:      15991744369
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$TW8hsvlegl/EDMo5oqZC4uukZqgdNPtT0Rcp8oQIHeKeOJ1gbQhAC
+Último Login:  Mon Sep 29 2025 15:22:29 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #93
+Nome:          Roberta da Silva Andrade de Lacerda 
+Email:         roberta.dellavitta@gmail.com
+Telefone:      15996006034
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$.l3fvqBM3qT9BZRUSOjs1OTop3UJXUC7Sdp08mrTevrHbc3IILDlW
+Último Login:  Tue Sep 30 2025 00:04:55 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #94
+Nome:          Priscila Machado
+Email:         machadopri@hotmail.com
+Telefone:      15981111122
+WhatsApp:      Não informado
+Papel:         coordenador
+Status:        active
+Hash Bcrypt:   $2b$10$ICkfgnBYUOnCF28kRV5QEOTW9uPm.bA/hMgVw8PxQFMybrDR8CmiW
+Último Login:  Sat Sep 20 2025 21:59:27 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #95
+Nome:          Francisco eronilson de Lacerda 
+Email:         franciscoroberta10@gmail.com
+Telefone:      15996617814
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$qhEJ794QEloO.d3VQ7.jXOqPK.I0uJesqBAVLuvIK98ZElCzOMGoy
+Último Login:  Mon Sep 29 2025 21:39:03 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #96
+Nome:          Lavinia Roberta Faria Pereira 
+Email:         laviniafaria128@gmail.com
+Telefone:      Não informado
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$XVW3aukrJ3XZYtESJnfEROS/15i0ipgHHs5mEPp553lOdEgkEnX2y
+Último Login:  Wed Sep 24 2025 01:23:32 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #97
+Nome:          Gislaine Karin Dell Amo
+Email:         gidellamo.gda@gmail.com
+Telefone:      15991334432
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$aFlX7K3K5jQyaTqORBY3JuElj.ZbSVi5BSKVqaHxdGnD73j.RkIne
+Último Login:  Tue Sep 30 2025 00:39:29 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #98
+Nome:          Vitória Caroline Lima Creado
+Email:         vcreado45@gmail.com
+Telefone:      15991429788
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$O8JoICD6N2j6O4VYWD3M9eTcfISSTx4mng2ClJ6zTRtRhMf.wbMyu
+Último Login:  Wed Sep 24 2025 00:33:00 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #99
+Nome:          Lucas Moreira de Carvalho 
+Email:         lucasmoredec@gmail.com
+Telefone:      15991512030
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$55kMmekgRjuEoxGg2wQDeuhTUnItfzUTHGAPRmr5cIsb5ODuE.O/a
+Último Login:  Wed Sep 24 2025 09:38:02 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #100
+Nome:          Gloria Maria Santos 
+Email:         santosgloriamaria215@gmail.com
+Telefone:      15981717025
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$IB7rXP9a9PBWBSzZn5BoduhhE.RU3MCOUWLR/C4QtJMyBWoD9keoq
+Último Login:  Sun Sep 28 2025 02:00:28 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #101
+Nome:          Márcio José de Toledo 
+Email:         toledotomate@gmail.com
+Telefone:      15997559450
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$vv7myEDblPyt08Vq7eMV..YcErC6LNneUXYzvMUUbt5ajwfkJ4JyK
+Último Login:  Mon Sep 29 2025 02:44:48 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #102
+Nome:          Ivan dos Reis Creado 
+Email:         ivanzinho_reis@hotmail.com
+Telefone:      15997027877
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$4lgaLXAjoeyPOcBQQ1mya.qywphx1510gUIqashYzOkKq3sOp91u.
+Último Login:  Wed Sep 24 2025 01:51:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #103
+Nome:          Larissa Ros Carvalho Silva 
+Email:         larissaroscarvallho@gmail.com
+Telefone:      15996614607
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$drpvgHrNlhkoLcn1sC9fv.WyMJnPqAd.SPSFAjP/oq329LC/z2M4G
+Último Login:  Thu Sep 25 2025 22:27:29 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #104
+Nome:          Pedro Diniz 
+Email:         peuzbd@gmail.com
+Telefone:      15997916020
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$jqLv1OHPSeCUePIziaSEnebhijv5crMxQcmNVZgANYKFelM3F06zm
+Último Login:  Tue Sep 23 2025 23:05:02 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #105
+Nome:          Josiane Maria Batista Soares 
+Email:         josiane_mbsoares@hotmail.com
+Telefone:      15996153011
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$Sk0qxLBXp.pbTOMuFKJ6KuXl3SqT3n5AjUzhAWbxpo/1RIZuWjq/y
+Último Login:  Nunca
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #106
+Nome:          LUCIANA CAMPOS SILVA SOARES
+Email:         lu.campos.soares@hotmail.com
+Telefone:      15991187999
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$rkiZ3PaKi6X1DG/Sb3OYBeQpDmMn.X23H1fanESfjm/Io9ziGtwEW
+Último Login:  Wed Sep 24 2025 01:39:23 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #107
+Nome:          Luana Ros Carvalho Silva
+Email:         luanaros.carvalho@gmail.com
+Telefone:      15997321421
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$JiaJeAT4GpcpHvRfOI/osOXrhe4ofG63oTacAUf2cLqJDLfF.nt5C
+Último Login:  Tue Sep 23 2025 23:00:49 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #108
+Nome:          Alexandre Luiz Lucio
+Email:         al.lucio@yahoo.com.br
+Telefone:      15974038538
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$PP0fPe4KkujGnq3mZy9a5.kTe/6gFYNCxJmt4lrR1QeHyn2V1Pfj.
+Último Login:  Tue Sep 23 2025 23:10:24 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #109
+Nome:          Antônia Dirce Lins Nege 
+Email:         dirce.sjt@gmail.com
+Telefone:      15997781007
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$RUrrkkvhKEIC50A0ehvhDO1I71wUL2LSnLZ9CxWaLTAgPPpW.egGm
+Último Login:  Sat Sep 20 2025 19:59:05 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #110
+Nome:          Rogerio Scarpin 
+Email:         rogerioscarpin@hotmail.com
+Telefone:      Não informado
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$S5GjpU3mDX79SOra3Hr.r.0DZZ8xEMj0o8Rp3vzg3afbCYOJhAdei
+Último Login:  Thu Sep 25 2025 11:22:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #111
+Nome:          Isabela Colabuani Davanço 
+Email:         icolabuani@gmail.com
+Telefone:      15991821638
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$fToAxeTspiQFzapyxDwIaODT7EKz8EsCgAOV3wGYmMw1x3vK8WNS2
+Último Login:  Tue Sep 23 2025 20:46:32 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #112
+Nome:          Maria da Penha Leonardo Antunes
+Email:         mariapenha.antunes1@gmail.com
+Telefone:      15996571188
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$4607IwPpv8ObiHPuSO5n3OOR9Krh6Lgq1XOqNcNfcTBHFz30DGjYC
+Último Login:  Nunca
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #113
+Nome:          ELISABETE MEDEIROS
+Email:         elisabetemedeiros28@hotmail.com
+Telefone:      15998179596
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$hNFP5bgM2Qk2.9U2u1t5AOl24rdJvtUMPWdMmFJNdgGNph8z/OTjS
+Último Login:  Thu Sep 18 2025 12:50:53 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #114
+Nome:          Fernando Henrique de Oliveira Ferreira 
+Email:         fernandohof2014@gmail.com
+Telefone:      15998325822
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$lsdBf.C9g1jcWUuD2O/vo.pQYHmf07oKEFlLMl0MIT.CYc43pOQzG
+Último Login:  Wed Sep 24 2025 14:36:19 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #115
+Nome:          Fabiane Polo da Silva Scarpin 
+Email:         fabianescarpin@gmail.com
+Telefone:      15981812333
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$PkNcNoUK5aTw.GjxQQM5XOHspQmFXhOhCfwJ1UdKh75Afea7C.tRy
+Último Login:  Mon Sep 29 2025 10:17:27 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #116
+Nome:          Daguimar Gimenes
+Email:         daguimargimenes@gmail.com
+Telefone:      15996562238
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$IhfoyRAQmRh/AGZua4zVWOcGnQ9nKZ2etoLlmTwBjmMy6euheaauO
+Último Login:  Mon Sep 29 2025 20:14:48 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #117
+Nome:          Ana Laura Anhaia do Carmo 
+Email:         analauraanhaia23@gmail.com
+Telefone:      15997229074
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$.eFwtzbT8Mo81gVXG5iG3.mx4/nYXFyVto8M.9bVs6rj6WryHfEV6
+Último Login:  Mon Sep 29 2025 00:13:15 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #118
+Nome:          Ana Claudia da Silva Jacó 
+Email:         acsjaco@gmail.com
+Telefone:      15997637885
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$CNkXRffWndmqY/d46Ovi1eejTMAeEcGKAuIzAVMNKLFXkJvIrcT2e
+Último Login:  Tue Sep 30 2025 17:51:36 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #119
+Nome:          Bruna Michele Rubio Mariano Sanches
+Email:         bruna_rubio@hotmail.com
+Telefone:      15996505695
+WhatsApp:      Não informado
+Papel:         ministro
+Status:        active
+Hash Bcrypt:   $2b$10$FFXpzMr/EVaECccqv6zH9.vq2OFjmyUrNH82/N8O9NomEoRsZvQO.
+Último Login:  Mon Oct 06 2025 00:54:47 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
+
+USUÁRIO #120
+Nome:          Marco Rossit
+Email:         rossit@icloud.com
+Telefone:      15991343638
+WhatsApp:      Não informado
+Papel:         coordenador
+Status:        active
+Hash Bcrypt:   $2b$10$Z3GNd4I.nuVkqdQWWsDVJOp8qbt1A6XJzyQIx35/NzzMgeEjzN2Lu
+Último Login:  Mon Oct 06 2025 01:05:35 GMT+0000 (Coordinated Universal Time)
+─────────────────────────────────────────────────────────────────────────────
