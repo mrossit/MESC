@@ -344,7 +344,7 @@ export default function Schedules() {
       const requestData = {
         date: dateStr,
         time: selectedMassTime,
-        ministerId: selectedMinisterId,
+        ministerId: selectedMinisterId === 'VACANT' ? null : selectedMinisterId,
         position: selectedPosition,
         type: 'missa',
         skipDuplicateCheck: !!editingAssignmentId // NOVO: permitir edição sem verificação de duplicação
@@ -856,7 +856,10 @@ export default function Schedules() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      setSelectedDate(new Date());
+                      // Usar data selecionada se existir, senão usar data atual
+                      if (!selectedDate) {
+                        setSelectedDate(new Date());
+                      }
                       setIsAssignmentDialogOpen(true);
                     }}
                     className="text-xs w-full sm:w-auto sm:text-sm"
@@ -1627,11 +1630,25 @@ export default function Schedules() {
           <DialogHeader>
             <DialogTitle>Escalar Ministro</DialogTitle>
             <DialogDescription>
-              Selecione o ministro, horário e posição para {selectedDate && format(selectedDate, "dd/MM/yyyy")}
+              Selecione a data, ministro, horário e posição
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Data</label>
+              <Input
+                type="date"
+                value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedDate(new Date(e.target.value + 'T12:00:00'));
+                  }
+                }}
+                className="w-full [color-scheme:light] dark:[color-scheme:dark]"
+              />
+            </div>
+
             <div>
               <label className="text-sm font-medium">Horário da Missa</label>
               <Select value={selectedMassTime} onValueChange={setSelectedMassTime}>
@@ -1721,6 +1738,16 @@ export default function Schedules() {
                   <SelectValue placeholder={ministers.length === 0 ? "Carregando ministros..." : "Selecione o ministro"} />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
+                  {/* Opção VACANTE sempre no topo */}
+                  <SelectItem value="VACANT">
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="font-medium italic text-muted-foreground">VACANTE</span>
+                      <Badge variant="outline" className="text-xs">
+                        Vaga sem ministro
+                      </Badge>
+                    </div>
+                  </SelectItem>
+
                   {ministers.length === 0 ? (
                     <div className="p-4 text-center text-sm text-muted-foreground">
                       Carregando...
@@ -1729,7 +1756,7 @@ export default function Schedules() {
                     // Filtrar ministros
                     let filteredMinisters = ministers;
 
-                    // Filtro por busca
+                    // Filtro por busca (não aplicar para VACANTE que já está no topo)
                     if (ministerSearch.trim()) {
                       filteredMinisters = filteredMinisters.filter(m =>
                         m.name.toLowerCase().includes(ministerSearch.toLowerCase())

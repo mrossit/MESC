@@ -678,7 +678,7 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
     const schema = z.object({
       date: z.string(),
       time: z.string(),
-      ministerId: z.string(),
+      ministerId: z.string().nullable(), // Permite null para posições VACANTE
       position: z.number().optional(), // NOVO: aceita posição opcional
       type: z.string().default('missa'),
       location: z.string().optional(),
