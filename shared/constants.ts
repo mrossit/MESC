@@ -43,7 +43,7 @@ export const MASS_TIMES_BY_DAY: string[][] = [
 ];
 
 // All unique mass times
-export const ALL_MASS_TIMES: string[] = ["06:30:00", "08:00:00", "10:00:00", "16:00:00", "19:00:00", "19:30:00"];
+export const ALL_MASS_TIMES: string[] = ["05:00:00", "06:30:00", "07:00:00", "08:00:00", "10:00:00", "19:30:00"];
 
 /**
  * Get mass times for a specific date, considering special rules:
