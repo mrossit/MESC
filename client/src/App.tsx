@@ -10,6 +10,7 @@ import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { checkCacheVersion } from "@/lib/cacheManager";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { SessionIndicator } from "@/components/SessionIndicator";
 // import { VersionChecker } from "@/components/VersionChecker";
 // import { initVersionControl } from "@/lib/version";
@@ -169,6 +170,9 @@ function Router() {
 function App() {
   // Monitor de atividade - logout automático após 10min de inatividade
   useActivityMonitor();
+
+  // Verifica periodicamente se há nova versão e atualiza automaticamente
+  useVersionCheck();
 
   // Verificar versão do cache ao iniciar a aplicação
   useEffect(() => {
