@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown } from 'lucide-reac
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { formatMinisterName } from '@/lib/utils';
 
 interface Minister {
   id: string | null; // null = VACANTE
@@ -36,6 +37,9 @@ export function ScheduleEditDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // Ref para o container de ministros para scroll automático
+  const ministersListRef = useRef<HTMLDivElement>(null);
 
   // Buscar lista de todos os ministros disponíveis
   const { data: allMinisters, isLoading: loadingMinisters, error: ministersError } = useQuery({
@@ -101,9 +105,18 @@ export function ScheduleEditDialog({
     setMinisters(newMinisters);
   };
 
+  // Função para fazer scroll até o final da lista
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      if (ministersListRef.current) {
+        ministersListRef.current.scrollTop = ministersListRef.current.scrollHeight;
+      }
+    }, 100);
+  };
+
   const handleAddMinister = () => {
     if (!selectedMinisterId || !allMinisters) return;
-    
+
     const ministersList = Array.isArray(allMinisters) ? allMinisters : [];
     const minister = ministersList.find((m: any) => m.id === selectedMinisterId);
     if (!minister) return;
@@ -121,6 +134,7 @@ export function ScheduleEditDialog({
     setMinisters([...ministers, { id: minister.id, name: minister.name }]);
     setSelectedMinisterId('');
     setSearchQuery('');
+    scrollToBottom();
   };
 
   // Filtrar ministros baseado na busca
@@ -178,7 +192,7 @@ export function ScheduleEditDialog({
           {/* Lista de ministros com drag and drop */}
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Ministros Escalados ({ministers.length})</h4>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div ref={ministersListRef} className="space-y-2 max-h-96 overflow-y-auto scroll-smooth">
               {ministers.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhum ministro escalado. Adicione ministros abaixo.
@@ -206,7 +220,7 @@ export function ScheduleEditDialog({
                       {minister.id === null ? (
                         <span className="font-medium text-muted-foreground italic">VACANTE</span>
                       ) : (
-                        <span className="font-medium">{minister.name}</span>
+                        <span className="font-medium">{formatMinisterName(minister.name)}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -292,11 +306,7 @@ export function ScheduleEditDialog({
                           setMinisters([...ministers, { id: minister.id, name: minister.name }]);
                           setSearchQuery('');
                           setSelectedMinisterId('');
-                          
-                          toast({
-                            title: "Ministro adicionado",
-                            description: `${minister.name} foi adicionado à escala.`
-                          });
+                          scrollToBottom();
                         }}
                         className={`
                           w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
@@ -304,7 +314,7 @@ export function ScheduleEditDialog({
                         `}
                         data-testid={`option-minister-${minister.id}`}
                       >
-                        {minister.name}
+                        {formatMinisterName(minister.name)}
                       </button>
                     ))
                   )}
@@ -314,10 +324,7 @@ export function ScheduleEditDialog({
               <Button
                 onClick={() => {
                   setMinisters([...ministers, { id: null, name: 'VACANTE' }]);
-                  toast({
-                    title: "Vaga adicionada",
-                    description: "Posição VACANTE adicionada à escala."
-                  });
+                  scrollToBottom();
                 }}
                 variant="outline"
                 data-testid="button-add-vacant"

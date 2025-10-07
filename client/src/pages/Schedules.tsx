@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { 
+import {
   Calendar as CalendarIcon,
   Plus,
   Edit,
@@ -52,7 +52,7 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatMinisterName } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
@@ -142,6 +142,9 @@ export default function Schedules() {
   const [editDialogTime, setEditDialogTime] = useState<string>("");
   const [editDialogMinisters, setEditDialogMinisters] = useState<{ id: string | null; name: string }[]>([]);
 
+  // Estado para seleção de horário antes de editar
+  const [isTimeSelectionDialogOpen, setIsTimeSelectionDialogOpen] = useState(false);
+
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
   // Invalidar cache ao entrar na página de escalas
@@ -204,7 +207,7 @@ export default function Schedules() {
   const fetchScheduleForDate = async (date: Date) => {
     setLoadingDateAssignments(true);
     setSelectedDateAssignments([]); // Reset assignments before loading
-    setIsViewScheduleDialogOpen(true); // Open dialog immediately
+    setIsTimeSelectionDialogOpen(true); // Open selection dialog immediately
 
     try {
       // Format date as YYYY-MM-DD to avoid timezone issues
@@ -231,7 +234,7 @@ export default function Schedules() {
           description: errorData.message || "Erro ao buscar escala",
           variant: "destructive"
         });
-        setIsViewScheduleDialogOpen(false); // Close on error
+        setIsTimeSelectionDialogOpen(false); // Close on error
       }
     } catch (error) {
       console.error("Error fetching schedule for date:", error);
@@ -240,7 +243,7 @@ export default function Schedules() {
         description: "Erro ao buscar escala para a data",
         variant: "destructive"
       });
-      setIsViewScheduleDialogOpen(false); // Close on error
+      setIsTimeSelectionDialogOpen(false); // Close on error
     } finally {
       setLoadingDateAssignments(false);
     }
@@ -915,20 +918,20 @@ export default function Schedules() {
                       className={cn(
                         "min-h-[60px] p-1 border rounded transition-all relative sm:min-h-24 sm:rounded-lg sm:p-2",
                         isToday && !isUserScheduled && "border-primary border-2",
-                        isSelected && !isUserScheduled && "bg-accent",
+                        isSelected && !isUserScheduled && "bg-slate-100 dark:bg-slate-800 border-2 border-slate-400 dark:border-slate-600",
                         // Destaque especial quando usuário está escalado - cores baseadas no status de substituição
-                        isUserScheduled && currentSchedule?.status === "published" && !substitutionStatus && "bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 border-2 border-amber-500 shadow-lg ring-2 ring-amber-400 ring-offset-1",
-                        // Vermelho quando tem substituição pendente
-                        isUserScheduled && substitutionStatus === 'pending' && "bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 border-2 border-red-500 shadow-lg ring-2 ring-red-400 ring-offset-1",
-                        // Verde quando substituição foi aprovada
-                        isUserScheduled && substitutionStatus === 'approved' && "bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 border-2 border-green-500 shadow-lg ring-2 ring-green-400 ring-offset-1",
+                        isUserScheduled && currentSchedule?.status === "published" && !substitutionStatus && "bg-white dark:bg-slate-900 border-2 border-[#959D90] shadow-lg ring-2 ring-[#959D90] ring-offset-1",
+                        // Vinho quando tem substituição pendente
+                        isUserScheduled && substitutionStatus === 'pending' && "bg-white dark:bg-slate-900 border-2 border-[#610C27] shadow-lg ring-2 ring-[#610C27] ring-offset-1",
+                        // Amarelo dourado quando substituição foi aprovada
+                        isUserScheduled && substitutionStatus === 'approved' && "bg-white dark:bg-slate-900 border-2 border-[#FDCF76] shadow-lg ring-2 ring-[#FDCF76] ring-offset-1",
                         !isSameMonth(day, currentMonth) && "opacity-50",
                         // Tornar clicável quando há escala publicada
                         currentSchedule?.status === "published" && isSameMonth(day, currentMonth) && !isUserScheduled && "cursor-pointer hover:bg-accent hover:shadow-lg hover:scale-105",
                         // Hover especial baseado no status
-                        isUserScheduled && !substitutionStatus && currentSchedule?.status === "published" && isSameMonth(day, currentMonth) && "cursor-pointer hover:from-amber-200 hover:to-yellow-200 hover:dark:from-amber-800/40 hover:dark:to-yellow-800/40 hover:scale-110 hover:shadow-xl hover:ring-4",
-                        isUserScheduled && substitutionStatus === 'pending' && isSameMonth(day, currentMonth) && "cursor-pointer hover:from-red-200 hover:to-red-300 hover:dark:from-red-800/40 hover:dark:to-red-700/40 hover:scale-110 hover:shadow-xl hover:ring-4",
-                        isUserScheduled && substitutionStatus === 'approved' && isSameMonth(day, currentMonth) && "cursor-pointer hover:from-green-200 hover:to-green-300 hover:dark:from-green-800/40 hover:dark:to-green-700/40 hover:scale-110 hover:shadow-xl hover:ring-4",
+                        isUserScheduled && !substitutionStatus && currentSchedule?.status === "published" && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-[#959D90]/10 hover:dark:bg-[#959D90]/20 hover:scale-110 hover:shadow-xl hover:ring-4",
+                        isUserScheduled && substitutionStatus === 'pending' && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-[#610C27]/10 hover:dark:bg-[#610C27]/20 hover:scale-110 hover:shadow-xl hover:ring-4",
+                        isUserScheduled && substitutionStatus === 'approved' && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-[#FDCF76]/20 hover:dark:bg-[#FDCF76]/30 hover:scale-110 hover:shadow-xl hover:ring-4",
                         // Tornar clicável para coordenador em rascunho
                         isCoordinator && currentSchedule?.status === "draft" && isSameMonth(day, currentMonth) && "cursor-pointer hover:bg-accent"
                       )}
@@ -950,20 +953,20 @@ export default function Schedules() {
                           <div className="relative">
                             {!substitutionStatus && (
                               <>
-                                <div className="absolute inset-0 bg-amber-400 rounded-full blur-lg opacity-60 animate-pulse" />
-                                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600 fill-amber-400 animate-pulse relative" />
+                                <div className="absolute inset-0 rounded-full blur-lg opacity-60 animate-pulse" style={{ backgroundColor: '#959D90' }} />
+                                <Star className="h-5 w-5 sm:h-6 sm:w-6 animate-pulse relative" style={{ color: '#959D90', fill: '#959D90' }} />
                               </>
                             )}
                             {substitutionStatus === 'pending' && (
                               <>
-                                <div className="absolute inset-0 bg-red-400 rounded-full blur-lg opacity-60 animate-pulse" />
-                                <UserX className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 fill-red-400 animate-pulse relative" />
+                                <div className="absolute inset-0 rounded-full blur-lg opacity-60 animate-pulse" style={{ backgroundColor: '#610C27' }} />
+                                <UserX className="h-5 w-5 sm:h-6 sm:w-6 animate-pulse relative" style={{ color: '#610C27', fill: '#610C27' }} />
                               </>
                             )}
                             {substitutionStatus === 'approved' && (
                               <>
-                                <div className="absolute inset-0 bg-green-400 rounded-full blur-lg opacity-60 animate-pulse" />
-                                <Check className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 fill-green-400 animate-pulse relative" />
+                                <div className="absolute inset-0 rounded-full blur-lg opacity-60 animate-pulse" style={{ backgroundColor: '#FDCF76' }} />
+                                <Check className="h-5 w-5 sm:h-6 sm:w-6 animate-pulse relative" style={{ color: '#FDCF76', fill: '#FDCF76' }} />
                               </>
                             )}
                           </div>
@@ -972,8 +975,19 @@ export default function Schedules() {
                       <div className="font-semibold text-xs mb-0.5 sm:text-sm sm:mb-1 flex items-center justify-between">
                         <span className={cn(
                           "transition-all",
-                          isUserScheduled && currentSchedule?.status === "published" && "text-amber-700 dark:text-amber-300 font-bold text-lg"
-                        )}>
+                          isUserScheduled && currentSchedule?.status === "published" && !substitutionStatus && "font-bold text-lg",
+                          isUserScheduled && substitutionStatus === 'pending' && "font-bold text-lg",
+                          isUserScheduled && substitutionStatus === 'approved' && "font-bold text-lg"
+                        )}
+                        style={
+                          isUserScheduled && currentSchedule?.status === "published"
+                            ? substitutionStatus === 'pending'
+                              ? { color: '#610C27' }
+                              : substitutionStatus === 'approved'
+                              ? { color: '#FDCF76' }
+                              : { color: '#959D90' }
+                            : {}
+                        }>
                           {format(day, "d")}
                         </span>
                       </div>
@@ -984,11 +998,11 @@ export default function Schedules() {
                             {isUserScheduled ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 {substitutionStatus === 'pending' ? (
-                                  <UserX className="h-4 w-4 text-red-600 dark:text-red-400 fill-red-400" />
+                                  <UserX className="h-4 w-4" style={{ color: '#610C27', fill: '#610C27' }} />
                                 ) : substitutionStatus === 'approved' ? (
-                                  <Check className="h-4 w-4 text-green-600 dark:text-green-400 fill-green-400" />
+                                  <Check className="h-4 w-4" style={{ color: '#FDCF76', fill: '#FDCF76' }} />
                                 ) : (
-                                  <Star className="h-4 w-4 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse" />
+                                  <Star className="h-4 w-4 animate-pulse" style={{ color: '#959D90', fill: '#959D90' }} />
                                 )}
                               </div>
                             ) : dayAssignments.length > 0 ? (
@@ -1008,8 +1022,8 @@ export default function Schedules() {
                                     </div>
                                     {toConfirm > 0 && (
                                       <div className="flex items-center gap-0.5">
-                                        <AlertCircle className="h-3 w-3 text-orange-500" />
-                                        <span className="text-[9px] font-medium text-orange-600 dark:text-orange-400">{toConfirm}</span>
+                                        <AlertCircle className="h-3 w-3" style={{ color: '#D2691E' }} />
+                                        <span className="text-[9px] font-medium" style={{ color: '#D2691E' }}>{toConfirm}</span>
                                       </div>
                                     )}
                                   </div>
@@ -1017,7 +1031,7 @@ export default function Schedules() {
                               })()
                             ) : availableMassTimes.length > 0 ? (
                               <div className="flex items-center justify-center">
-                                <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
+                                <AlertCircle className="h-3.5 w-3.5" style={{ color: '#D2691E' }} />
                               </div>
                             ) : null}
                           </>
@@ -1032,18 +1046,18 @@ export default function Schedules() {
                               <div className="space-y-0.5">
                                 {substitutionStatus === 'pending' ? (
                                   <div className="flex items-center gap-1">
-                                    <UserX className="h-4 w-4 text-red-600 dark:text-red-400 fill-red-400 flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-red-700 dark:text-red-300 truncate">Aguardando</span>
+                                    <UserX className="h-4 w-4 flex-shrink-0" style={{ color: '#610C27', fill: '#610C27' }} />
+                                    <span className="text-[10px] font-bold truncate" style={{ color: '#610C27' }}>Aguardando</span>
                                   </div>
                                 ) : substitutionStatus === 'approved' ? (
                                   <div className="flex items-center gap-1">
-                                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 fill-green-400 flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-green-700 dark:text-green-300 truncate">Substituído</span>
+                                    <Check className="h-4 w-4 flex-shrink-0" style={{ color: '#FDCF76', fill: '#FDCF76' }} />
+                                    <span className="text-[10px] font-bold truncate" style={{ color: '#FDCF76' }}>Substituído</span>
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 truncate">Escalado</span>
+                                    <Star className="h-4 w-4 animate-pulse flex-shrink-0" style={{ color: '#959D90', fill: '#959D90' }} />
+                                    <span className="text-[10px] font-bold truncate" style={{ color: '#959D90' }}>Escalado</span>
                                   </div>
                                 )}
                               </div>
@@ -1063,7 +1077,7 @@ export default function Schedules() {
                                       <span className="text-[10px] font-medium truncate">{totalAssigned} escalados</span>
                                     </div>
                                     {toConfirm > 0 && (
-                                      <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                      <div className="flex items-center gap-1" style={{ color: '#D2691E' }}>
                                         <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                                         <span className="text-[10px] font-medium truncate">{toConfirm} à confirmar</span>
                                       </div>
@@ -1072,7 +1086,7 @@ export default function Schedules() {
                                 );
                               })()
                             ) : availableMassTimes.length > 0 ? (
-                              <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                              <div className="flex items-center gap-1" style={{ color: '#D2691E' }}>
                                 <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="text-[10px] font-medium truncate">{availableMassTimes.length * 20} vagas</span>
                               </div>
@@ -1126,49 +1140,49 @@ export default function Schedules() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {currentSchedule.status === "published" && (
                       <>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 border-2 border-amber-300 dark:border-amber-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/50 dark:to-yellow-900/50 border-2 border-amber-500 rounded-xl flex items-center justify-center ring-2 ring-amber-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <Star className="h-5 w-5 text-amber-600 dark:text-amber-400 fill-amber-500 animate-pulse" />
+                        <div className="group flex items-center gap-3 p-3 rounded-xl border-2 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white dark:bg-slate-900" style={{ borderColor: '#959D90' }}>
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-all border-2" style={{ backgroundColor: '#959D90', borderColor: '#959D90' }}>
+                            <Star className="h-5 w-5 text-white animate-pulse" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-amber-800 dark:text-amber-300 leading-tight">Você está escalado</p>
-                            <p className="text-xs text-amber-700/70 dark:text-amber-400/70 mt-1">Dia com sua participação confirmada</p>
+                            <p className="font-bold text-sm leading-tight" style={{ color: '#959D90' }}>Você está escalado</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Dia com sua participação confirmada</p>
                           </div>
                         </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/40 dark:to-red-900/40 border-2 border-red-300 dark:border-red-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/50 dark:to-red-800/50 border-2 border-red-500 rounded-xl flex items-center justify-center ring-2 ring-red-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <UserX className="h-5 w-5 text-red-600 dark:text-red-400 fill-red-400" />
+                        <div className="group flex items-center gap-3 p-3 rounded-xl border-2 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white dark:bg-slate-900" style={{ borderColor: '#610C27' }}>
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-all border-2" style={{ backgroundColor: '#610C27', borderColor: '#610C27' }}>
+                            <UserX className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-red-800 dark:text-red-300 leading-tight">Substituição solicitada</p>
-                            <p className="text-xs text-red-700/70 dark:text-red-400/70 mt-1">Aguardando confirmação de substituto</p>
+                            <p className="font-bold text-sm leading-tight" style={{ color: '#610C27' }}>Substituição solicitada</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Aguardando confirmação de substituto</p>
                           </div>
                         </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/40 dark:to-green-900/40 border-2 border-green-300 dark:border-green-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/50 dark:to-green-800/50 border-2 border-green-500 rounded-xl flex items-center justify-center ring-2 ring-green-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400 fill-green-400" />
+                        <div className="group flex items-center gap-3 p-3 rounded-xl border-2 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white dark:bg-slate-900" style={{ borderColor: '#FDCF76' }}>
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-all border-2" style={{ backgroundColor: '#FDCF76', borderColor: '#FDCF76' }}>
+                            <UserCheck className="h-5 w-5 text-slate-800" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-green-800 dark:text-green-300 leading-tight">Substituto confirmado</p>
-                            <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-1">Substituição já foi aprovada</p>
+                            <p className="font-bold text-sm leading-tight" style={{ color: '#FDCF76' }}>Substituto confirmado</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Substituição já foi aprovada</p>
                           </div>
                         </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/40 border-2 border-blue-300 dark:border-blue-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 border-2 border-blue-500 rounded-xl flex items-center justify-center ring-2 ring-blue-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <div className="group flex items-center gap-3 p-3 rounded-xl border-2 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white dark:bg-slate-900" style={{ borderColor: '#91AEC4' }}>
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-all border-2" style={{ backgroundColor: '#91AEC4', borderColor: '#91AEC4' }}>
+                            <Users className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-blue-800 dark:text-blue-300 leading-tight">Ministros escalados</p>
-                            <p className="text-xs text-blue-700/70 dark:text-blue-400/70 mt-1">Quantidade de ministros confirmados</p>
+                            <p className="font-bold text-sm leading-tight" style={{ color: '#91AEC4' }}>Ministros escalados</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Quantidade de ministros confirmados</p>
                           </div>
                         </div>
-                        <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/40 dark:to-orange-900/40 border-2 border-orange-300 dark:border-orange-700 hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                          <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/50 dark:to-orange-800/50 border-2 border-orange-500 rounded-xl flex items-center justify-center ring-2 ring-orange-400/50 shadow-md flex-shrink-0 group-hover:ring-4 transition-all">
-                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                        <div className="group flex items-center gap-3 p-3 rounded-xl border-2 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white dark:bg-slate-900" style={{ borderColor: '#D2691E' }}>
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-all border-2" style={{ backgroundColor: '#D2691E', borderColor: '#D2691E' }}>
+                            <AlertCircle className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-orange-800 dark:text-orange-300 leading-tight">Vagas disponíveis</p>
-                            <p className="text-xs text-orange-700/70 dark:text-orange-400/70 mt-1">Posições ainda não preenchidas</p>
+                            <p className="font-bold text-sm leading-tight" style={{ color: '#D2691E' }}>Vagas disponíveis</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Posições ainda não preenchidas</p>
                           </div>
                         </div>
                         <div className="group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30 border-2 border-primary hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
@@ -1300,17 +1314,17 @@ export default function Schedules() {
                   if (dayAssignments.length === 0 && !isCoordinator) return null;
                   
                   return (
-                    <div 
-                      key={day.toISOString()} 
+                    <div
+                      key={day.toISOString()}
                       className={cn(
                         "border rounded-lg p-3 sm:p-4",
-                        isUserScheduled && currentSchedule?.status === "published" && "border-2 border-amber-400 bg-gradient-to-r from-amber-100 to-yellow-100 shadow-lg dark:from-amber-900/40 dark:to-yellow-800/40 dark:border-amber-500"
+                        isUserScheduled && currentSchedule?.status === "published" && "border-2 bg-white dark:bg-slate-900 shadow-lg border-[#959D90]"
                       )}
                     >
                       <h3 className="font-semibold text-sm sm:text-lg mb-2 sm:mb-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                         <span className="break-words">{format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
                         {isUserScheduled && currentSchedule?.status === "published" && (
-                          <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                          <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs text-white" style={{ backgroundColor: '#959D90' }}>
                             Você está escalado
                           </Badge>
                         )}
@@ -1350,12 +1364,13 @@ export default function Schedules() {
                                     const isCurrentUser = currentMinister && assignment.ministerId === currentMinister.id;
                                     
                                     return (
-                                      <div 
-                                        key={assignment.id} 
+                                      <div
+                                        key={assignment.id}
                                         className={cn(
                                           "flex items-center gap-1 sm:gap-2 text-xs sm:text-sm p-1.5 sm:p-2 rounded",
-                                          isCurrentUser && "bg-amber-100 border border-amber-300 dark:bg-amber-900/30 dark:border-amber-700"
+                                          isCurrentUser && "bg-white dark:bg-slate-900 border-2"
                                         )}
+                                        style={isCurrentUser ? { borderColor: '#959D90' } : {}}
                                       >
                                         <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2 py-0 sm:py-0.5 flex-shrink-0">
                                           <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position] || 'Posição'}</span>
@@ -1398,92 +1413,19 @@ export default function Schedules() {
         <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
           <DialogHeader className="space-y-1 sm:space-y-2">
             <DialogTitle className="text-base sm:text-lg leading-tight">
-              Escala do dia {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              Missa das {selectedMassTime && formatMassTime(selectedMassTime)}
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Confira os ministros escalados para as celebrações deste dia
+              {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
-            <div className="space-y-4 pr-2 sm:pr-4">
-              {loadingDateAssignments ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
-                </div>
-              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
+            <div className="space-y-3 pr-2 sm:pr-4">
+              {selectedDateAssignments && selectedDateAssignments.length > 0 ? (
                 <>
-                  {Object.entries(
-                    selectedDateAssignments.reduce((acc, assignment) => {
-                      const massTime = assignment.massTime || 'Sem horário';
-                      if (!acc[massTime]) {
-                        acc[massTime] = [];
-                      }
-                      acc[massTime].push(assignment);
-                      return acc;
-                    }, {} as Record<string, ScheduleAssignment[]>)
-                  )
-                    .sort(([a], [b]) => {
-                      // Ordenar por horário correto (converter para minutos)
-                      const timeToMinutes = (time: string) => {
-                        if (time === 'Sem horário') return 9999;
-                        const [hours, minutes] = time.split(':').map(Number);
-                        return hours * 60 + minutes;
-                      };
-                      return timeToMinutes(a) - timeToMinutes(b);
-                    })
-                    .map(([massTime, assignments]) => (
-                    <div key={massTime} className="space-y-2 sm:space-y-3">
-                      <div className="flex items-center justify-between gap-2 pb-2 border-b">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                          <h3 className="font-semibold text-sm sm:text-lg">
-                            Missa das {formatMassTime(massTime)}
-                          </h3>
-                        </div>
-                        {isCoordinator && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                // Preparar dados para edição
-                                const ministersForEdit = assignments.map(a => ({
-                                  id: a.ministerId,
-                                  name: a.ministerName || 'VACANTE'
-                                }));
-
-                                setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
-                                setEditDialogTime(massTime);
-                                setEditDialogMinisters(ministersForEdit);
-                                setIsEditDialogOpen(true);
-                                setIsViewScheduleDialogOpen(false);
-                              }}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedMassTime(massTime);
-                                setIsAssignmentDialogOpen(true);
-                                setIsViewScheduleDialogOpen(false);
-                              }}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Adicionar
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid gap-2 pl-0 sm:pl-7">
-                        {assignments
+                  <div className="grid gap-2">
+                    {selectedDateAssignments
                           .sort((a, b) => a.position - b.position)
                           .map((assignment) => {
                             const currentMinister = ministers.find(m => m.id === user?.id);
@@ -1494,24 +1436,35 @@ export default function Schedules() {
                                 key={assignment.id}
                                 className={cn(
                                   "flex flex-col p-2 sm:p-3 rounded-lg border bg-card",
-                                  isCurrentUser && "bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700"
+                                  isCurrentUser && "bg-white dark:bg-slate-900 border-2"
                                 )}
+                                style={isCurrentUser ? { borderColor: '#959D90' } : {}}
                               >
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                                   <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                    <Badge variant={isCurrentUser ? "default" : "secondary"} className="flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1">
+                                    <Badge
+                                      variant={isCurrentUser ? "default" : "secondary"}
+                                      className={cn(
+                                        "flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1",
+                                        isCurrentUser && "text-white"
+                                      )}
+                                      style={isCurrentUser ? { backgroundColor: '#959D90' } : {}}
+                                    >
                                       <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
                                       <span className="sm:hidden">{assignment.position}</span>
                                     </Badge>
                                     <div className="min-w-0 flex-1">
-                                      <p className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "text-amber-900 dark:text-amber-100")}>
-                                        {assignment.ministerName || "Ministro"}
+                                      <p
+                                        className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "font-bold")}
+                                        style={isCurrentUser ? { color: '#959D90' } : {}}
+                                      >
+                                        {formatMinisterName(assignment.ministerName) || "Ministro"}
                                       </p>
                                       <p className="text-[10px] sm:hidden text-muted-foreground truncate mt-0.5">
                                         {LITURGICAL_POSITIONS[assignment.position]}
                                       </p>
                                       {isCurrentUser && (
-                                        <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                                        <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#959D90' }}>
                                           Você está escalado nesta posição
                                         </p>
                                       )}
@@ -1613,9 +1566,7 @@ export default function Schedules() {
                               </div>
                             );
                           })}
-                      </div>
-                    </div>
-                  ))}
+                  </div>
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -1633,6 +1584,16 @@ export default function Schedules() {
                 assignments={selectedDateAssignments}
               />
             )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsViewScheduleDialogOpen(false);
+                setIsTimeSelectionDialogOpen(true);
+              }}
+              className="w-full sm:w-auto text-sm"
+            >
+              Voltar
+            </Button>
             <Button
               variant="outline"
               onClick={() => setIsViewScheduleDialogOpen(false)}
@@ -1914,6 +1875,226 @@ export default function Schedules() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog principal - Seleção de horário com ações */}
+      <Dialog open={isTimeSelectionDialogOpen} onOpenChange={setIsTimeSelectionDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
+          <DialogHeader className="space-y-1 sm:space-y-2 pr-8">
+            <DialogTitle className="text-base sm:text-lg leading-tight">
+              Escala do dia {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              {isCoordinator ? 'Visualize ou edite os ministros escalados para cada horário' : 'Confira os ministros escalados para as celebrações deste dia'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Legenda de cores */}
+          <div className="flex flex-wrap gap-3 px-3 sm:px-0 py-2 border-b">
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#959D90' }}></div>
+              <span className="text-muted-foreground">Escalado</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#610C27' }}></div>
+              <span className="text-muted-foreground">Subst. Pendente</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FDCF76' }}></div>
+              <span className="text-muted-foreground">Subst. Aprovada</span>
+            </div>
+          </div>
+
+          <ScrollArea className="max-h-[60vh] sm:max-h-[55vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
+            <div className="space-y-3 py-2 pr-2 sm:pr-4">
+              {loadingDateAssignments ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
+                </div>
+              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
+                Object.entries(
+                  selectedDateAssignments.reduce((acc, assignment) => {
+                    const massTime = assignment.massTime || 'Sem horário';
+                    if (!acc[massTime]) {
+                      acc[massTime] = [];
+                    }
+                    acc[massTime].push(assignment);
+                    return acc;
+                  }, {} as Record<string, ScheduleAssignment[]>)
+                )
+                .sort(([a], [b]) => {
+                  const timeToMinutes = (time: string) => {
+                    if (time === 'Sem horário') return 9999;
+                    const [hours, minutes] = time.split(':').map(Number);
+                    return hours * 60 + minutes;
+                  };
+                  return timeToMinutes(a) - timeToMinutes(b);
+                })
+                .map(([massTime, assignments]) => {
+                  const confirmedCount = assignments.filter(a => a.ministerName && a.ministerName !== 'VACANTE').length;
+                  const totalCount = assignments.length;
+
+                  // Verificar se o usuário atual está escalado neste horário
+                  const currentMinister = ministers.find(m => m.id === user?.id);
+                  const userAssignment = currentMinister
+                    ? assignments.find(a => a.ministerId === currentMinister.id)
+                    : null;
+
+                  // Verificar status de substituição do usuário neste horário
+                  let userSubstitutionStatus = null;
+                  if (currentMinister && userAssignment) {
+                    const substitutionRequest = substitutions.find(s =>
+                      s.assignmentId === userAssignment.id &&
+                      s.requestingMinisterId === currentMinister.id
+                    );
+                    if (substitutionRequest) {
+                      userSubstitutionStatus = substitutionRequest.status;
+                    }
+                  }
+
+                  // Definir estilo do card baseado no status do usuário
+                  let cardBorderClass = "border";
+                  let statusBadge = null;
+
+                  let cardBorderStyle = {};
+
+                  if (userAssignment) {
+                    if (userSubstitutionStatus === 'pending') {
+                      cardBorderClass = "border-2 bg-white dark:bg-slate-900";
+                      cardBorderStyle = { borderColor: '#610C27' };
+                      statusBadge = (
+                        <Badge className="text-white text-xs" style={{ backgroundColor: '#610C27' }}>
+                          Substituição Pendente
+                        </Badge>
+                      );
+                    } else if (userSubstitutionStatus === 'approved' || userSubstitutionStatus === 'auto_approved') {
+                      cardBorderClass = "border-2 bg-white dark:bg-slate-900";
+                      cardBorderStyle = { borderColor: '#FDCF76' };
+                      statusBadge = (
+                        <Badge className="text-slate-800 text-xs" style={{ backgroundColor: '#FDCF76' }}>
+                          Substituição Aprovada
+                        </Badge>
+                      );
+                    } else {
+                      // Escalado mas sem substituição
+                      cardBorderClass = "border-2 bg-white dark:bg-slate-900";
+                      cardBorderStyle = { borderColor: '#959D90' };
+                      statusBadge = (
+                        <Badge className="text-white text-xs" style={{ backgroundColor: '#959D90' }}>
+                          Você está escalado
+                        </Badge>
+                      );
+                    }
+                  }
+
+                  return (
+                    <div key={massTime} className={`p-4 rounded-lg ${cardBorderClass} space-y-3`} style={cardBorderStyle}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-sm sm:text-base">Missa das {formatMassTime(massTime)}</p>
+                              {statusBadge}
+                            </div>
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                              {confirmedCount} de {totalCount} ministros escalados
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedMassTime(massTime);
+                              setSelectedDateAssignments(assignments);
+                              setIsTimeSelectionDialogOpen(false);
+                              setIsViewScheduleDialogOpen(true);
+                            }}
+                            className="h-8 px-2 sm:px-3 text-xs"
+                          >
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Ver</span>
+                          </Button>
+                          {isCoordinator && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => {
+                                // Preparar dados para edição
+                                const ministersForEdit = assignments
+                                  .sort((a, b) => a.position - b.position)
+                                  .map(a => ({
+                                    id: a.ministerId,
+                                    name: formatMinisterName(a.ministerName) || 'VACANTE'
+                                  }));
+
+                                setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
+                                setEditDialogTime(massTime);
+                                setEditDialogMinisters(ministersForEdit);
+                                setIsTimeSelectionDialogOpen(false);
+                                setIsEditDialogOpen(true);
+                              }}
+                              className="h-8 px-2 sm:px-3 text-xs"
+                            >
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Editar</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Preview dos ministros */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
+                        {assignments
+                          .sort((a, b) => a.position - b.position)
+                          .slice(0, 4)
+                          .map((assignment, idx) => {
+                            const isUserAssignment = currentMinister && assignment.ministerId === currentMinister.id;
+                            return (
+                              <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm">
+                                <Badge
+                                  variant={isUserAssignment ? "default" : "outline"}
+                                  className="text-[10px] sm:text-xs px-1.5 py-0.5"
+                                  style={isUserAssignment ? { backgroundColor: '#959D90' } : {}}
+                                >
+                                  {assignment.position}
+                                </Badge>
+                                <span
+                                  className={cn(
+                                    "truncate",
+                                    isUserAssignment ? "font-semibold" : "text-muted-foreground"
+                                  )}
+                                  style={isUserAssignment ? { color: '#959D90' } : {}}
+                                >
+                                  {formatMinisterName(assignment.ministerName) || 'VACANTE'}
+                                  {isUserAssignment && " (Você)"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        {assignments.length > 4 && (
+                          <div className="text-xs text-muted-foreground italic">
+                            +{assignments.length - 4} ministros...
+                            {userAssignment && !assignments.slice(0, 4).some(a => a.ministerId === currentMinister?.id) && (
+                              <span className="font-semibold" style={{ color: '#959D90' }}> (incluindo você)</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Nenhuma escala encontrada para esta data.</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog de edição de escala com drag and drop */}
       <ScheduleEditDialog
         open={isEditDialogOpen}
@@ -1928,7 +2109,8 @@ export default function Schedules() {
             await fetchScheduleForDate(selectedDate);
           }
           setIsEditDialogOpen(false);
-          setIsViewScheduleDialogOpen(true);
+          // Voltar para a tela de seleção de horários
+          setIsTimeSelectionDialogOpen(true);
         }}
       />
       </div>

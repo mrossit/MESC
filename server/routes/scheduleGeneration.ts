@@ -5,7 +5,7 @@ import type { AuthRequest } from '../auth';
 import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator';
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
-import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses } from '@shared/schema';
+import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses, substitutionRequests } from '@shared/schema';
 import { and, gte, lte, eq, sql, ne, desc } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
@@ -795,6 +795,8 @@ router.delete('/:id', authenticateToken, requireRole(['gestor', 'coordenador']),
  */
 router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
+    console.log('[batch-update] Request body:', req.body);
+
     const schema = z.object({
       date: z.string(),
       time: z.string(),
@@ -803,36 +805,92 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
 
     const { date, time, ministers } = schema.parse(req.body);
 
+    console.log('[batch-update] Parsed data:', { date, time, ministers });
+
     if (!db) {
       return res.status(503).json({ error: 'Database unavailable' });
     }
 
-    // Remover todos os ministros atuais
-    await db
-      .delete(schedules)
+    // Buscar escalas existentes para esta data/hora
+    console.log('[batch-update] Fetching existing schedules for:', { date, time });
+    const existingSchedules = await db
+      .select()
+      .from(schedules)
       .where(and(
         eq(schedules.date, date),
         eq(schedules.time, time)
       ));
 
-    // Adicionar novos ministros com posição para manter a ordem
-    if (ministers.length > 0) {
-      const newSchedules = ministers.map((ministerId, index) => ({
-        date,
-        time,
-        ministerId: ministerId, // Pode ser null para VACANTE
-        position: index + 1, // Posição começa em 1
-        type: 'missa',
-        status: 'scheduled'
-      }));
+    console.log('[batch-update] Found existing schedules:', existingSchedules.length);
 
-      await db.insert(schedules).values(newSchedules);
+    // Estratégia: atualizar existentes e adicionar/remover conforme necessário
+    // Isso evita deletar registros que podem ter foreign keys
+
+    // 1. Atualizar ou criar registros para os ministros na nova lista
+    for (let i = 0; i < ministers.length; i++) {
+      const ministerId = ministers[i];
+      const position = i + 1;
+
+      if (existingSchedules[i]) {
+        // Atualizar registro existente
+        console.log('[batch-update] Updating schedule:', existingSchedules[i].id);
+        await db
+          .update(schedules)
+          .set({
+            ministerId: ministerId,
+            position: position
+          })
+          .where(eq(schedules.id, existingSchedules[i].id));
+      } else {
+        // Criar novo registro
+        console.log('[batch-update] Creating new schedule at position:', position);
+        await db.insert(schedules).values({
+          date,
+          time,
+          ministerId: ministerId,
+          position: position,
+          type: 'missa',
+          status: 'scheduled'
+        });
+      }
     }
 
+    // 2. Remover registros excedentes (se a nova lista for menor)
+    if (existingSchedules.length > ministers.length) {
+      const schedulesToDelete = existingSchedules.slice(ministers.length);
+      console.log('[batch-update] Removing excess schedules:', schedulesToDelete.length);
+
+      for (const schedule of schedulesToDelete) {
+        // Verificar se há substituições vinculadas antes de deletar
+        const hasSubstitutions = await db
+          .select()
+          .from(substitutionRequests)
+          .where(eq(substitutionRequests.scheduleId, schedule.id))
+          .limit(1);
+
+        if (hasSubstitutions.length > 0) {
+          // Se houver substituições, apenas marcar o ministerId como null ao invés de deletar
+          console.log('[batch-update] Schedule has substitutions, setting ministerId to null:', schedule.id);
+          await db
+            .update(schedules)
+            .set({ ministerId: null })
+            .where(eq(schedules.id, schedule.id));
+        } else {
+          // Se não houver substituições, pode deletar
+          console.log('[batch-update] Deleting schedule:', schedule.id);
+          await db
+            .delete(schedules)
+            .where(eq(schedules.id, schedule.id));
+        }
+      }
+    }
+
+    console.log('[batch-update] Success! Updated schedule');
     res.json({ success: true, message: 'Escala atualizada com sucesso' });
   } catch (error: any) {
+    console.error('[batch-update] Error:', error);
     logger.error('Error batch updating schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule' });
+    res.status(500).json({ error: 'Failed to update schedule', details: error.message });
   }
 });
 
