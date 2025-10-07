@@ -209,7 +209,7 @@ const Sidebar = React.forwardRef<
                 ...props.style
               } as React.CSSProperties
             }
-            side={side}
+            side="right"
           >
             <SheetHeader className="sr-only">
               <SheetTitle>Sidebar</SheetTitle>
