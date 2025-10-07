@@ -27,6 +27,37 @@ Session management uses HTTP-only cookies for security.
 ## PWA Implementation
 Configured as a Progressive Web App with service worker for offline functionality, manifest.json for installation, and update prompts for new versions. Includes responsive design optimized for mobile usage by ministers.
 
+## Cache Management & Auto-Update System
+Implemented automatic cache invalidation and version control to ensure users always see the latest changes without manual intervention:
+
+### Service Worker (v5.4.0+)
+- **Network-First Strategy for Critical APIs**: Schedule and minister data always fetched fresh from server (never cached)
+- **Cache-First for Static Assets**: Images, fonts, and icons cached for offline access
+- **Automatic Cache Cleanup**: Old cache versions deleted automatically on activation
+- Location: `client/public/sw.js`
+
+### Version Detection
+- **Endpoint**: `/api/version` returns current system version (5.4.0) and build timestamp
+- **Auto-Check Hook**: `useVersionCheck` hook checks version every 2 minutes in production
+- **Automatic Update**: When new version detected:
+  1. Clears all browser caches (Cache API and Service Worker)
+  2. Unregisters old service workers
+  3. Forces page reload with cache bust
+- No manual cache clearing needed by users
+
+### Update Flow
+1. Developer increments VERSION in `server/routes/version.ts`
+2. Deploy triggers new build with timestamp
+3. Clients detect version change within 2 minutes
+4. Automatic cache clear and reload happens seamlessly
+5. User sees latest changes immediately
+
+### Key Files
+- Service Worker: `client/public/sw.js`
+- Version Check Hook: `client/src/hooks/useVersionCheck.tsx`
+- Version Endpoint: `server/routes/version.ts`
+- PWA Update Prompt: `client/src/components/pwa-update-prompt.tsx`
+
 ## Scheduling System
 Intelligent schedule generation using AI-assisted questionnaire analysis. Supports liturgical positions mapping, mass time management by day of week, and automated minister assignment based on availability and experience.
 
