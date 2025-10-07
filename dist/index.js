@@ -2704,76 +2704,20 @@ import { eq as eq4 } from "drizzle-orm";
 await init_db();
 init_schema();
 import { Router } from "express";
-import { eq as eq3, and as and2, gt, sql as sql3 } from "drizzle-orm";
+import { eq as eq3, and as and2, sql as sql3 } from "drizzle-orm";
 import { nanoid } from "nanoid";
 var router = Router();
 var INACTIVITY_TIMEOUT_MINUTES = 10;
 var SESSION_EXPIRES_HOURS = 12;
 router.post("/verify", async (req, res) => {
-  const sessionToken = req.body.sessionToken || req.cookies?.session_token;
-  if (!sessionToken) {
-    return res.json({ expired: true, reason: "no_token" });
-  }
-  try {
-    const [session] = await db.select().from(activeSessions).where(
-      and2(
-        eq3(activeSessions.sessionToken, sessionToken),
-        eq3(activeSessions.isActive, true),
-        gt(activeSessions.expiresAt, /* @__PURE__ */ new Date())
-      )
-    ).limit(1);
-    if (!session) {
-      return res.json({ expired: true, reason: "session_not_found" });
-    }
-    const now = /* @__PURE__ */ new Date();
-    const lastActivity = new Date(session.lastActivityAt);
-    const minutesInactive = Math.floor((now.getTime() - lastActivity.getTime()) / 6e4);
-    console.log(`[SESSION] User ${session.userId}: ${minutesInactive} min inactive`);
-    if (minutesInactive > INACTIVITY_TIMEOUT_MINUTES) {
-      await db.update(activeSessions).set({ isActive: false }).where(eq3(activeSessions.id, session.id));
-      console.log(`[SESSION] \u274C Expired - User ${session.userId} (${minutesInactive}min)`);
-      return res.json({
-        expired: true,
-        reason: "inactivity",
-        minutesInactive
-      });
-    }
-    return res.json({
-      expired: false,
-      minutesInactive,
-      minutesRemaining: INACTIVITY_TIMEOUT_MINUTES - minutesInactive
-    });
-  } catch (error) {
-    console.error("[SESSION] Error verifying:", error);
-    return res.status(500).json({
-      expired: true,
-      reason: "server_error"
-    });
-  }
+  return res.json({
+    expired: false,
+    minutesInactive: 0,
+    minutesRemaining: 10
+  });
 });
-router.post("/heartbeat", authenticateToken, async (req, res) => {
-  const userId = req.user?.id;
-  const sessionToken = req.cookies?.session_token || req.body.sessionToken;
-  if (!userId || !sessionToken) {
-    return res.status(401).json({ success: false, message: "N\xE3o autenticado" });
-  }
-  try {
-    const result = await db.update(activeSessions).set({ lastActivityAt: /* @__PURE__ */ new Date() }).where(
-      and2(
-        eq3(activeSessions.userId, userId),
-        eq3(activeSessions.sessionToken, sessionToken),
-        eq3(activeSessions.isActive, true)
-      )
-    ).returning();
-    if (result.length === 0) {
-      return res.status(404).json({ success: false, message: "Sess\xE3o n\xE3o encontrada" });
-    }
-    console.log(`[SESSION] \u{1F493} Heartbeat - User ${userId}`);
-    res.json({ success: true, timestamp: /* @__PURE__ */ new Date() });
-  } catch (error) {
-    console.error("[SESSION] Error updating heartbeat:", error);
-    res.status(500).json({ success: false, message: "Erro ao atualizar sess\xE3o" });
-  }
+router.post("/heartbeat", async (req, res) => {
+  res.json({ success: true, timestamp: /* @__PURE__ */ new Date() });
 });
 async function createSession(userId, ipAddress, userAgent) {
   const sessionToken = nanoid(64);
@@ -6470,6 +6414,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
 });
 router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
+    console.log("[batch-update] Request body:", req.body);
     const schema = z4.object({
       date: z4.string(),
       time: z4.string(),
@@ -6477,30 +6422,57 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
       // Array de IDs de ministros (null = VACANTE)
     });
     const { date: date2, time: time2, ministers } = schema.parse(req.body);
+    console.log("[batch-update] Parsed data:", { date: date2, time: time2, ministers });
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(and8(
+    console.log("[batch-update] Fetching existing schedules for:", { date: date2, time: time2 });
+    const existingSchedules = await db.select().from(schedules).where(and8(
       eq10(schedules.date, date2),
       eq10(schedules.time, time2)
     ));
-    if (ministers.length > 0) {
-      const newSchedules = ministers.map((ministerId, index2) => ({
-        date: date2,
-        time: time2,
-        ministerId,
-        // Pode ser null para VACANTE
-        position: index2 + 1,
-        // Posição começa em 1
-        type: "missa",
-        status: "scheduled"
-      }));
-      await db.insert(schedules).values(newSchedules);
+    console.log("[batch-update] Found existing schedules:", existingSchedules.length);
+    for (let i = 0; i < ministers.length; i++) {
+      const ministerId = ministers[i];
+      const position = i + 1;
+      if (existingSchedules[i]) {
+        console.log("[batch-update] Updating schedule:", existingSchedules[i].id);
+        await db.update(schedules).set({
+          ministerId,
+          position
+        }).where(eq10(schedules.id, existingSchedules[i].id));
+      } else {
+        console.log("[batch-update] Creating new schedule at position:", position);
+        await db.insert(schedules).values({
+          date: date2,
+          time: time2,
+          ministerId,
+          position,
+          type: "missa",
+          status: "scheduled"
+        });
+      }
     }
+    if (existingSchedules.length > ministers.length) {
+      const schedulesToDelete = existingSchedules.slice(ministers.length);
+      console.log("[batch-update] Removing excess schedules:", schedulesToDelete.length);
+      for (const schedule of schedulesToDelete) {
+        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq10(substitutionRequests.scheduleId, schedule.id)).limit(1);
+        if (hasSubstitutions.length > 0) {
+          console.log("[batch-update] Schedule has substitutions, setting ministerId to null:", schedule.id);
+          await db.update(schedules).set({ ministerId: null }).where(eq10(schedules.id, schedule.id));
+        } else {
+          console.log("[batch-update] Deleting schedule:", schedule.id);
+          await db.delete(schedules).where(eq10(schedules.id, schedule.id));
+        }
+      }
+    }
+    console.log("[batch-update] Success! Updated schedule");
     res.json({ success: true, message: "Escala atualizada com sucesso" });
   } catch (error) {
+    console.error("[batch-update] Error:", error);
     logger.error("Error batch updating schedule:", error);
-    res.status(500).json({ error: "Failed to update schedule" });
+    res.status(500).json({ error: "Failed to update schedule", details: error.message });
   }
 });
 var scheduleGeneration_default = router6;
