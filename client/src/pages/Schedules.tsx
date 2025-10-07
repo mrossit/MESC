@@ -1639,7 +1639,7 @@ export default function Schedules() {
                   <SelectValue placeholder="Selecione o horário" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedDate && getMassTimesForDate(selectedDate).map((time) => {
+                  {ALL_MASS_TIMES.map((time) => {
                     // Formatar horário para exibição (remover segundos)
                     const displayTime = time.substring(0, 5);
                     return (
