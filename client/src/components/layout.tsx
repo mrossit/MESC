@@ -7,6 +7,12 @@ import { FloatingNotificationBell } from "@/components/floating-notification-bel
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useQuery } from "@tanstack/react-query";
+import { authAPI } from "@/lib/auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Link } from "wouter";
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,16 +21,40 @@ interface LayoutProps {
 }
 
 export function Layout({ children, title, subtitle }: LayoutProps) {
+  const isMobile = useIsMobile();
+
+  const { data: authData } = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: () => authAPI.getMe(),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+
+  const user = authData?.user;
+
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background dark:bg-dark-8">
         <AppSidebar />
         <SidebarInset>
           {/* Header */}
-          <header className="sticky top-0 border-b border-border bg-background dark:bg-dark-7 dark:border-dark-4">
-            <div className="flex h-14 items-center gap-4 px-4 sm:h-16 sm:px-6">
-              <SidebarTrigger className="-ml-1" />
-              
+          <header className="sticky top-0 z-40 border-b border-border bg-background dark:bg-dark-7 dark:border-dark-4">
+            <div className="flex h-14 items-center gap-3 px-4 sm:h-16 sm:px-6">
+              {/* Mobile: Avatar on left */}
+              {isMobile && user && (
+                <Link href="/profile">
+                  <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-primary/10 hover:ring-primary/30 transition-all">
+                    <AvatarImage src={user.photoUrl || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary dark:bg-dark-gold/20 dark:text-dark-gold text-xs font-semibold">
+                      {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
+              )}
+
+              {/* Desktop: Sidebar Trigger on left */}
+              {!isMobile && <SidebarTrigger className="-ml-1" />}
+
               {/* Title section - responsive */}
               <div className="flex-1 min-w-0">
                 {title && (
@@ -40,33 +70,39 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                   </div>
                 )}
               </div>
-              
+
               {/* Actions section - responsive */}
               <div className="flex items-center gap-2">
-                {/* Command Search - responsive */}
-                <CommandSearch />
-                
-                {/* Install Button */}
+                {/* Command Search - desktop only */}
+                {!isMobile && <CommandSearch />}
+
+                {/* Install Button - desktop only */}
                 <InstallButton size="sm" className="hidden sm:inline-flex" />
 
-                {/* Notifications */}
-                <NotificationBell compact className="h-9 w-9" />
+                {/* Notifications - desktop only */}
+                {!isMobile && <NotificationBell compact className="h-9 w-9" />}
 
-                {/* Dark Mode Toggle */}
-                <ThemeToggle />
+                {/* Dark Mode Toggle - desktop only */}
+                {!isMobile && <ThemeToggle />}
+
+                {/* Mobile: Hamburger menu on right */}
+                {isMobile && <SidebarTrigger className="ml-auto" />}
               </div>
             </div>
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background dark:bg-dark-8">
+          <main className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-background dark:bg-dark-8 ${isMobile ? 'pb-20' : ''}`}>
             {children}
           </main>
         </SidebarInset>
       </div>
-      
-      {/* Floating Notification Bell for Mobile */}
-      <FloatingNotificationBell />
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && <MobileBottomNav />}
+
+      {/* Floating Notification Bell for Mobile - removed since we have bottom nav */}
+      {!isMobile && <FloatingNotificationBell />}
     </SidebarProvider>
   );
 }

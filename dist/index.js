@@ -8237,6 +8237,20 @@ router13.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
 });
 var formationAdmin_default = router13;
 
+// server/routes/version.ts
+import { Router as Router14 } from "express";
+var router14 = Router14();
+var SYSTEM_VERSION = "5.4.0";
+var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
+router14.get("/", (req, res) => {
+  res.json({
+    version: SYSTEM_VERSION,
+    buildTime: BUILD_TIME,
+    timestamp: Date.now()
+  });
+});
+var version_default = router14;
+
 // server/routes.ts
 init_schema();
 init_logger();
@@ -8298,14 +8312,7 @@ async function registerRoutes(app2) {
   app2.use("/api/substitutions", csrfProtection, substitutions_default);
   app2.use("/api/mass-pendencies", mass_pendencies_default);
   app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
-  app2.get("/api/version", (req, res) => {
-    res.json({
-      version: "1.0.0",
-      // Atualizar manualmente a cada deploy
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      environment: process.env.NODE_ENV || "development"
-    });
-  });
+  app2.use("/api/version", version_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
