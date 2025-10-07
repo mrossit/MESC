@@ -20,7 +20,7 @@ const navItems: NavItem[] = [
     icon: Calendar,
   },
   {
-    title: "Substituições",
+    title: "Substituir",
     href: "/schedules/substitutions",
     icon: Users,
   },
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
     icon: GraduationCap,
   },
   {
-    title: "Configurações",
+    title: "Ajustes",
     href: "/settings",
     icon: Settings,
   },
@@ -40,7 +40,7 @@ export function MobileBottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-md dark:bg-dark-7/95 dark:border-dark-4 md:hidden shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-md dark:bg-dark-7/95 dark:border-dark-4 md:hidden shadow-lg safe-area-bottom">
       <div className="flex h-16 items-stretch">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -51,15 +51,15 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
+                "flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors px-1",
+                "hover:bg-accent hover:text-accent-foreground min-w-0",
                 isActive
                   ? "text-primary dark:text-dark-gold font-medium"
                   : "text-muted-foreground"
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "text-primary dark:text-dark-gold")} />
-              <span className="text-[10px] leading-none">{item.title}</span>
+              <Icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-primary dark:text-dark-gold")} />
+              <span className="text-[9px] leading-tight truncate w-full text-center px-0.5">{item.title}</span>
             </Link>
           );
         })}
