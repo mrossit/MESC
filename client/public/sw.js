@@ -1,17 +1,15 @@
-const VERSION = '5.3.0';
-const BUILD_TIMESTAMP = '__BUILD_TIMESTAMP__'; // Será substituído durante o build
-const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
+const VERSION = '5.4.0'; // Incrementar quando houver mudanças importantes
+const CACHE_NAME = `mesc-v${VERSION}`;
+
+// Lista de URLs para pré-cachear (apenas essenciais)
 const urlsToCache = [
-  '/',
-  '/index.html',
   '/manifest.json',
-  '/images/icon-16.png',
-  '/images/icon-32.png',
-  '/images/icon-180.png',
-  '/images/icon-192.png',
-  '/images/icon-512.png',
-  '/images/icon.icns'
+  '/sjtlogo.png'
 ];
+
+// Configuração de auto-update
+const CHECK_UPDATE_INTERVAL = 30000; // 30 segundos
+const FORCE_UPDATE_ROUTES = ['/api/schedules', '/api/ministers']; // APIs críticas sempre frescas
 
 // Install service worker and cache resources
 self.addEventListener('install', (event) => {
@@ -32,11 +30,16 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Network-only for sensitive API endpoints (no caching to prevent stale data)
-  if (url.pathname === '/api/users' || url.pathname === '/api/auth/me' || url.pathname === '/api/auth/user') {
+  // Network-only for critical API endpoints (NEVER cache - always fresh data)
+  const isCriticalAPI = FORCE_UPDATE_ROUTES.some(route => url.pathname.includes(route)) ||
+                        url.pathname === '/api/users' || 
+                        url.pathname === '/api/auth/me' || 
+                        url.pathname === '/api/auth/user';
+  
+  if (isCriticalAPI) {
     event.respondWith(
       fetch(request).catch(() => {
-        // For these critical endpoints, if network fails, return a proper error
+        // For critical endpoints, if network fails, return proper error (no stale cache)
         return new Response(JSON.stringify({ error: 'Network unavailable' }), {
           status: 503,
           headers: { 'Content-Type': 'application/json' }
@@ -46,13 +49,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for other API calls (with caching for GET only)
+  // Network-first for other API calls (cache only as fallback)
   if (url.pathname.startsWith('/api')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Only cache GET requests (Cache API doesn't support POST/PUT/DELETE)
-          if (request.method === 'GET') {
+          // Cache GET requests only as offline fallback
+          if (request.method === 'GET' && response.status === 200) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
@@ -61,8 +64,17 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // If network fails, try cache (only works for GET requests)
-          return caches.match(request);
+          // If network fails, try cache (works for GET only)
+          return caches.match(request).then(cachedResponse => {
+            if (cachedResponse) {
+              console.log('[SW] Serving stale data (offline):', url.pathname);
+              return cachedResponse;
+            }
+            return new Response(JSON.stringify({ error: 'Network unavailable' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
         })
     );
     return;

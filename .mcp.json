@@ -6,6 +6,12 @@
         "shadcn@latest",
         "mcp"
       ]
+    },
+    "gluestack": {
+      "command": "node",
+      "args": [
+        "/home/runner/workspace/gluestack-mcp/index.js"
+      ]
     }
   }
 }
