@@ -6340,7 +6340,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     const schema = z4.object({
       date: z4.string(),
       time: z4.string(),
-      ministerId: z4.string(),
+      ministerId: z4.string().nullable(),
+      // Permite null para posições VACANTE
       position: z4.number().optional(),
       // NOVO: aceita posição opcional
       type: z4.string().default("missa"),
