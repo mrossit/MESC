@@ -60,7 +60,7 @@ interface Minister {
   name: string;
   email: string;
   phone?: string;
-  status: string;
+  status: 'active' | 'inactive' | 'pending';
   role: string;
   birthDate?: string;
   address?: string;
@@ -80,7 +80,6 @@ interface Minister {
   totalServices?: number;
   formationCompleted?: string[];
   observations?: string;
-  active?: boolean;
   scheduleDisplayName?: string;
 }
 
@@ -398,10 +397,15 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                     </div>
                   </TableCell>
                   <TableCell>
-                    {minister.active ? (
+                    {minister.status === 'active' ? (
                       <Badge variant="default" className="gap-1">
                         <UserCheck className="h-3 w-3" />
                         Ativo
+                      </Badge>
+                    ) : minister.status === 'pending' ? (
+                      <Badge variant="outline" className="gap-1">
+                        <Clock className="h-3 w-3" />
+                        Pendente
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="gap-1">
@@ -451,7 +455,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="sticky top-0 z-10 bg-background border-b px-6 py-4">
             <DialogTitle>
               {isEditMode ? "Editar Ministro" : "Detalhes do Ministro"}
@@ -461,20 +465,21 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
             </DialogDescription>
           </DialogHeader>
 
-          {selectedMinister && (
-            <div className="space-y-6 overflow-y-auto flex-1 px-6 py-4">
-              {/* Informações Básicas */}
+          <div className="space-y-6 overflow-y-auto flex-1 px-6 py-4">
+            {selectedMinister && (
+              <>
+                {/* Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Informações Pessoais</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 md:col-span-1">
                     <Label>Nome</Label>
                     <Input
                       value={selectedMinister.name}
                       disabled
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2 md:col-span-1">
                     <Label>Nome na Escala (opcional)</Label>
                     {isEditMode ? (
                       <Input
@@ -492,21 +497,21 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                       />
                     )}
                   </div>
-                  <div>
+                  <div className="sm:col-span-2 md:col-span-1">
                     <Label>Email</Label>
                     <Input
                       value={selectedMinister.email}
                       disabled
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2 md:col-span-1">
                     <Label>Telefone</Label>
                     <Input
-                      value={selectedMinister.phone || ""} 
-                      disabled 
+                      value={selectedMinister.phone || ""}
+                      disabled
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2 md:col-span-1">
                     <Label>Data de Nascimento</Label>
                     {isEditMode ? (
                       <Popover>
@@ -522,7 +527,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                             {birthDate ? format(birthDate, "dd/MM/yyyy") : "Selecione uma data"}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={birthDate}
@@ -533,9 +538,9 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <Input 
-                        value={birthDate ? format(birthDate, "dd/MM/yyyy") : "-"} 
-                        disabled 
+                      <Input
+                        value={birthDate ? format(birthDate, "dd/MM/yyyy") : "-"}
+                        disabled
                       />
                     )}
                   </div>
@@ -545,29 +550,32 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
               {/* Endereço */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Endereço</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
                     <Label>Endereço</Label>
-                    <Input 
-                      value={formData.address || ""} 
+                    <Input
+                      value={formData.address || ""}
                       onChange={(e) => setFormData({...formData, address: e.target.value})}
                       disabled={!isEditMode}
+                      placeholder="Rua, número, complemento"
                     />
                   </div>
                   <div>
                     <Label>Cidade</Label>
-                    <Input 
-                      value={formData.city || ""} 
+                    <Input
+                      value={formData.city || ""}
                       onChange={(e) => setFormData({...formData, city: e.target.value})}
                       disabled={!isEditMode}
+                      placeholder="Nome da cidade"
                     />
                   </div>
                   <div>
                     <Label>CEP</Label>
-                    <Input 
-                      value={formData.zipCode || ""} 
+                    <Input
+                      value={formData.zipCode || ""}
                       onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
                       disabled={!isEditMode}
+                      placeholder="00000-000"
                     />
                   </div>
                 </div>
@@ -576,21 +584,23 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
               {/* Contato de Emergência */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Contato de Emergência</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Nome do Contato</Label>
-                    <Input 
-                      value={formData.emergencyContact || ""} 
+                    <Input
+                      value={formData.emergencyContact || ""}
                       onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
                       disabled={!isEditMode}
+                      placeholder="Nome completo"
                     />
                   </div>
                   <div>
                     <Label>Telefone de Emergência</Label>
-                    <Input 
-                      value={formData.emergencyPhone || ""} 
+                    <Input
+                      value={formData.emergencyPhone || ""}
                       onChange={(e) => setFormData({...formData, emergencyPhone: e.target.value})}
                       disabled={!isEditMode}
+                      placeholder="(00) 00000-0000"
                     />
                   </div>
                 </div>
@@ -599,12 +609,12 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
               {/* Informações Ministeriais */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Informações Ministeriais</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Posição Litúrgica Preferida</Label>
                     {isEditMode ? (
-                      <Select 
-                        value={formData.preferredPosition?.toString() || ""} 
+                      <Select
+                        value={formData.preferredPosition?.toString() || ""}
                         onValueChange={(value) => setFormData({...formData, preferredPosition: parseInt(value)})}
                       >
                         <SelectTrigger>
@@ -619,17 +629,17 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input 
-                        value={formData.preferredPosition ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS] : "-"} 
-                        disabled 
+                      <Input
+                        value={formData.preferredPosition ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS] : "-"}
+                        disabled
                       />
                     )}
                   </div>
                   <div>
                     <Label>Nível de Experiência</Label>
                     {isEditMode ? (
-                      <Select 
-                        value={formData.experience || "iniciante"} 
+                      <Select
+                        value={formData.experience || "iniciante"}
                         onValueChange={(value) => setFormData({...formData, experience: value})}
                       >
                         <SelectTrigger>
@@ -642,9 +652,9 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input 
-                        value={getExperienceLabel(formData.experience)} 
-                        disabled 
+                      <Input
+                        value={getExperienceLabel(formData.experience)}
+                        disabled
                       />
                     )}
                   </div>
@@ -653,7 +663,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                 <div>
                   <Label>Horários de Missa Preferidos</Label>
                   {isEditMode ? (
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                       {MASS_TIMES.map((time) => (
                         <div key={time} className="flex items-center space-x-2">
                           <Checkbox 
@@ -692,7 +702,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                 <div>
                   <Label>Habilidades Especiais</Label>
                   {isEditMode ? (
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                       {SPECIAL_SKILLS.map((skill) => (
                         <div key={skill} className="flex items-center space-x-2">
                           <Checkbox 
@@ -729,9 +739,9 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         checked={formData.availableForSpecialEvents || false}
                         onCheckedChange={(checked) => setFormData({...formData, availableForSpecialEvents: checked as boolean})}
                         disabled={!isEditMode}
@@ -739,7 +749,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                       <Label>Disponível para eventos especiais</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         checked={formData.canServeAsCouple || false}
                         onCheckedChange={(checked) => setFormData({...formData, canServeAsCouple: checked as boolean})}
                         disabled={!isEditMode}
@@ -750,14 +760,20 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                   
                   {isCoordinator && (
                     <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
-                      <Checkbox 
-                        checked={formData.active !== false}
-                        onCheckedChange={(checked) => setFormData({...formData, active: checked as boolean})}
+                      <Checkbox
+                        checked={formData.status === 'active'}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          status: checked ? 'active' : 'inactive'
+                        })}
                         disabled={!isEditMode}
                       />
                       <Label className="font-medium">Ministro Ativo</Label>
-                      {!formData.active && (
+                      {formData.status === 'inactive' && (
                         <Badge variant="destructive" className="ml-2">Inativo</Badge>
+                      )}
+                      {formData.status === 'pending' && (
+                        <Badge variant="outline" className="ml-2">Pendente</Badge>
                       )}
                     </div>
                   )}
@@ -777,7 +793,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
               {/* Estatísticas */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Estatísticas</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-2xl font-bold">{formData.totalServices || 0}</div>
@@ -805,26 +821,29 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                   </Card>
                 </div>
               </div>
-            </div>
-          )}
-
-          <DialogFooter className="sticky bottom-0 z-10 bg-background border-t px-6 py-4 mt-auto">
-            {isEditMode && (
-              <>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave}>
-                  Salvar Alterações
-                </Button>
               </>
             )}
-            {!isEditMode && isCoordinator && (
-              <Button onClick={() => setIsEditMode(true)}>
-                Editar
-              </Button>
-            )}
-          </DialogFooter>
+          </div>
+
+          {selectedMinister && (
+            <DialogFooter className="sticky bottom-0 z-10 bg-background border-t px-6 py-4 flex-shrink-0">
+              {isEditMode && (
+                <>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave}>
+                    Salvar Alterações
+                  </Button>
+                </>
+              )}
+              {!isEditMode && isCoordinator && (
+                <Button onClick={() => setIsEditMode(true)}>
+                  Editar
+                </Button>
+              )}
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

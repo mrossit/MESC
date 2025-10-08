@@ -72,9 +72,8 @@
           navigator.serviceWorker.getRegistrations().then(registrations => {
             console.log('[Init] Found', registrations.length, 'service worker registrations');
 
-            // Registra novo service worker (com cache busting)
-            const swUrl = '/sw.js?v=' + Date.now();
-            navigator.serviceWorker.register(swUrl).then(
+            // Registra novo service worker
+            navigator.serviceWorker.register('/sw.js').then(
               (registration) => {
                 console.log('[SW] Registration successful:', registration.scope);
 
@@ -106,11 +105,6 @@
               }
             );
           });
-        });
-
-        // Listener global para quando novo SW assume controle
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          console.log('[SW] Controller changed, new version active');
         });
       }
     </script>

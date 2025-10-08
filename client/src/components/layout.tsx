@@ -40,7 +40,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
           {/* Header */}
           <header className="sticky top-0 z-40 border-b border-border bg-background dark:bg-dark-7 dark:border-dark-4">
             <div className="flex h-14 items-center gap-3 px-4 sm:h-16 sm:px-6">
-              {/* Mobile: Avatar on left */}
+              {/* MOBILE: Avatar no canto superior esquerdo (atalho do perfil) */}
               {isMobile && user && (
                 <Link href="/profile">
                   <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-primary/10 hover:ring-primary/30 transition-all">
@@ -52,7 +52,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 </Link>
               )}
 
-              {/* Desktop: Sidebar Trigger on left */}
+              {/* DESKTOP: Sidebar Trigger on left */}
               {!isMobile && <SidebarTrigger className="-ml-1" />}
 
               {/* Title section - responsive */}
@@ -71,22 +71,19 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 )}
               </div>
 
-              {/* Actions section - responsive */}
+              {/* Actions section - à direita */}
               <div className="flex items-center gap-2">
-                {/* Command Search - desktop only */}
-                {!isMobile && <CommandSearch />}
+                {/* Command Search (busca) */}
+                {isMobile ? <CommandSearch /> : <CommandSearch />}
 
-                {/* Install Button - desktop only */}
-                <InstallButton size="sm" className="hidden sm:inline-flex" />
-
-                {/* Notifications - desktop only */}
-                {!isMobile && <NotificationBell compact className="h-9 w-9" />}
-
-                {/* Dark Mode Toggle - always visible (discreto no mobile) */}
+                {/* Theme Toggle */}
                 <ThemeToggle />
 
-                {/* Mobile: Hamburger menu on right */}
-                {isMobile && <SidebarTrigger className="ml-auto" />}
+                {/* Notificações (sino) */}
+                <NotificationBell compact className="h-9 w-9" />
+
+                {/* MOBILE: Hamburguer menu no canto superior direito */}
+                {isMobile && <SidebarTrigger />}
               </div>
             </div>
           </header>

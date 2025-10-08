@@ -7,14 +7,23 @@ import { clearCacheAndReload, hasVersionChanged, APP_VERSION } from "@/lib/versi
 export function UpdateNotification() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [newVersion, setNewVersion] = useState<string>('');
 
   useEffect(() => {
-    // Verifica mudança de versão na inicialização
-    if (hasVersionChanged()) {
-      console.log('🔄 Nova versão detectada, limpando cache...');
-      clearCacheAndReload();
+    // Se usuário já aceitou atualização, não mostrar novamente
+    if (sessionStorage.getItem('update-accepted') === 'true') {
       return;
     }
+
+    // Listener para evento de nova versão disponível (disparado por useVersionCheck)
+    const handleAppUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('🆕 Nova versão disponível:', customEvent.detail);
+      setNewVersion(customEvent.detail.newVersion);
+      setShowUpdate(true);
+    };
+
+    window.addEventListener('app-update-available', handleAppUpdate);
 
     // Configura listener para atualizações do service worker
     if ('serviceWorker' in navigator) {
@@ -54,22 +63,51 @@ export function UpdateNotification() {
           setShowUpdate(true);
         }
       });
-
-      // Listener para quando novo SW assume o controle
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('🔄 Novo service worker ativo, recarregando...');
-        window.location.reload();
-      });
     }
-  }, []);
 
-  const handleUpdate = () => {
-    if (swRegistration?.waiting) {
-      // Envia mensagem para o SW waiting assumir o controle
-      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-    } else {
-      // Se não há SW waiting, apenas limpa cache e recarrega
-      clearCacheAndReload();
+    // Cleanup
+    return () => {
+      window.removeEventListener('app-update-available', handleAppUpdate);
+    };
+  }, [newVersion]);
+
+  const handleUpdate = async () => {
+    // Marca que usuário aceitou a atualização para não mostrar novamente
+    sessionStorage.setItem('update-accepted', 'true');
+
+    console.log('🔄 Iniciando atualização e limpeza de cache...');
+
+    try {
+      // 1. Desregistra service workers
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          console.log('[Update] Unregistering service worker');
+          await registration.unregister();
+        }
+      }
+
+      // 2. Limpa todos os caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        for (const cacheName of cacheNames) {
+          console.log('[Update] Deleting cache:', cacheName);
+          await caches.delete(cacheName);
+        }
+      }
+
+      // 3. Atualiza versão no localStorage
+      if (newVersion) {
+        localStorage.setItem('mesc-app-version', newVersion);
+      }
+
+      // 4. Força reload com cache bust
+      console.log('[Update] Reloading application...');
+      window.location.href = `${window.location.origin}${window.location.pathname}?v=${Date.now()}`;
+    } catch (error) {
+      console.error('[Update] Error during update:', error);
+      // Mesmo com erro, tenta recarregar
+      window.location.reload();
     }
   };
 
@@ -85,7 +123,7 @@ export function UpdateNotification() {
 
   return (
     <div className="fixed bottom-20 left-4 right-4 z-[100] md:bottom-4 md:left-auto md:right-4 md:max-w-md">
-      <Alert className="border-primary bg-primary/5 dark:bg-primary/10 shadow-lg">
+      <Alert className="border-primary bg-primary/5 dark:bg-primary/10 backdrop-blur-md shadow-lg">
         <RefreshCw className="h-4 w-4" />
         <AlertTitle className="flex items-center justify-between pr-6">
           Nova versão disponível!
@@ -100,7 +138,7 @@ export function UpdateNotification() {
         </AlertTitle>
         <AlertDescription className="space-y-3">
           <p className="text-sm">
-            Uma nova versão do MESC (v{APP_VERSION}) está disponível com melhorias e correções.
+            Uma nova versão do MESC (v{newVersion || APP_VERSION}) está disponível com melhorias e correções.
           </p>
           <div className="flex gap-2">
             <Button onClick={handleUpdate} size="sm" className="flex-1">

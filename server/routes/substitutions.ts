@@ -94,46 +94,31 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
 
     // 3. Buscar respostas de ministros que indicaram disponibilidade
     // Converter data para formato do domingo (YYYY-MM-DD)
-    const responsesQuery = scheduledMinisterIds.length > 0
-      ? db
-          .select({
-            userId: questionnaireResponses.userId,
-            availableSundays: questionnaireResponses.availableSundays,
-            preferredMassTimes: questionnaireResponses.preferredMassTimes,
-            canSubstitute: questionnaireResponses.canSubstitute,
-            userName: users.name,
-            lastService: users.lastService
-          })
-          .from(questionnaireResponses)
-          .innerJoin(users, eq(questionnaireResponses.userId, users.id))
-          .where(
-            and(
-              eq(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
-              eq(users.status, 'active'),
-              eq(users.role, 'ministro'),
-              notInArray(questionnaireResponses.userId, scheduledMinisterIds)
-            )
-          )
-      : db
-          .select({
-            userId: questionnaireResponses.userId,
-            availableSundays: questionnaireResponses.availableSundays,
-            preferredMassTimes: questionnaireResponses.preferredMassTimes,
-            canSubstitute: questionnaireResponses.canSubstitute,
-            userName: users.name,
-            lastService: users.lastService
-          })
-          .from(questionnaireResponses)
-          .innerJoin(users, eq(questionnaireResponses.userId, users.id))
-          .where(
-            and(
-              eq(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
-              eq(users.status, 'active'),
-              eq(users.role, 'ministro')
-            )
-          );
+    console.log('scheduledMinisterIds:', scheduledMinisterIds);
 
-    const availableResponses = await responsesQuery;
+    const baseConditions = [
+      eq(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
+      eq(users.status, 'active'),
+      eq(users.role, 'ministro')
+    ];
+
+    // Só adiciona notInArray se houver ministros escalados
+    if (scheduledMinisterIds.length > 0) {
+      baseConditions.push(notInArray(questionnaireResponses.userId, scheduledMinisterIds));
+    }
+
+    const availableResponses = await db
+      .select({
+        userId: questionnaireResponses.userId,
+        availableSundays: questionnaireResponses.availableSundays,
+        preferredMassTimes: questionnaireResponses.preferredMassTimes,
+        canSubstitute: questionnaireResponses.canSubstitute,
+        userName: users.name,
+        lastService: users.lastService
+      })
+      .from(questionnaireResponses)
+      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+      .where(and(...baseConditions));
 
     // 4. Filtrar ministros que indicaram disponibilidade para aquela data
     const eligibleMinisters = availableResponses.filter((response: any) => {
@@ -177,8 +162,10 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
 
     return selectedSubstitute.userId;
 
-  } catch (error) {
-    console.error('Erro ao buscar suplente disponível:', error);
+  } catch (error: any) {
+    console.error('❌ Erro ao buscar suplente disponível:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('Params:', { massDate, massTime });
     return null;
   }
 }
@@ -188,6 +175,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user!.id;
+    console.log('[Substitutions] Criando solicitação:', { scheduleId, substituteId, reason, requesterId });
 
     // Validar dados obrigatórios
     if (!scheduleId) {
@@ -259,35 +247,11 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     // Verificar contador mensal de substituições
     const monthlyCount = await countMonthlySubstitutions(requesterId);
 
-    // 🆕 AUTO-ESCALAÇÃO: Se não foi especificado um substituto, buscar automaticamente
-    let finalSubstituteId = substituteId;
-    let autoAssigned = false;
+    // Usar o substituteId fornecido ou null
+    const finalSubstituteId = substituteId || null;
 
-    if (!finalSubstituteId) {
-      console.log(`🔍 Buscando suplente automático para ${schedule.date} às ${schedule.time}...`);
-      const autoSubstituteId = await findAvailableSubstitute(schedule.date, schedule.time);
-
-      if (autoSubstituteId) {
-        finalSubstituteId = autoSubstituteId;
-        autoAssigned = true;
-        console.log(`✅ Suplente automático atribuído: ${autoSubstituteId}`);
-      } else {
-        console.log(`⚠️  Nenhum suplente disponível encontrado automaticamente`);
-      }
-    }
-
-    // Determinar status inicial
-    let status: "pending" | "auto_approved" = "pending";
-
-    // Auto-aprovar se:
-    // 1. Mais de 12h antes da missa E
-    // 2. Menos de 2 substituições no mês (ou coordenador/gestor pode ter ilimitado)
-    const userRole = req.user!.role;
-    const isCoordinator = userRole === 'coordenador' || userRole === 'gestor';
-
-    if (shouldAutoApprove(schedule.date, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
-      status = "auto_approved";
-    }
+    // Status sempre começa como pending - coordenador aprova manualmente
+    const status: "pending" = "pending";
 
     // Criar solicitação
     const [newRequest] = await db
@@ -295,7 +259,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       .values({
         scheduleId,
         requesterId,
-        substituteId: finalSubstituteId || null,
+        substituteId: finalSubstituteId,
         reason: reason || null,
         status,
         urgency,
@@ -303,18 +267,6 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         updatedAt: new Date()
       })
       .returning();
-
-    // Se auto-aprovado, atualizar a escala imediatamente
-    if (status === "auto_approved" && finalSubstituteId) {
-      await db
-        .update(schedules)
-        .set({
-          ministerId: finalSubstituteId,
-          substituteId: requesterId,
-          updatedAt: new Date()
-        })
-        .where(eq(schedules.id, scheduleId));
-    }
 
     // Buscar dados completos para retorno (incluindo dados do suplente se houver)
     const requestQuery = db
@@ -364,38 +316,28 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       substituteUser
     };
 
-    // Mensagem personalizada baseada na auto-escalação
-    let message = "";
-    if (autoAssigned && finalSubstituteId) {
-      message = `Solicitação criada! Foi encontrado automaticamente um suplente disponível: ${substituteUser?.name}. ` +
-                `${status === "auto_approved" ? "A substituição foi auto-aprovada." : "Aguardando confirmação do suplente."}`;
-    } else if (status === "auto_approved") {
-      message = "Solicitação criada e auto-aprovada com sucesso";
-    } else {
-      message = finalSubstituteId
-        ? "Solicitação criada com sucesso. Aguardando aprovação do suplente."
-        : "Solicitação criada. Nenhum suplente disponível foi encontrado automaticamente. Aguardando coordenador.";
-    }
+    // Mensagem simples
+    const message = finalSubstituteId
+      ? "Solicitação criada com sucesso. Aguardando aprovação."
+      : "Solicitação criada. Aguardando que o coordenador atribua um suplente.";
 
     res.json({
       success: true,
       message,
       data: responseData,
-      monthlyCount: monthlyCount + 1,
-      isAutoApproved: status === "auto_approved",
-      autoAssigned,
-      substituteInfo: substituteUser ? {
-        name: substituteUser.name,
-        phone: substituteUser.phone,
-        whatsapp: substituteUser.whatsapp
-      } : null
+      monthlyCount: monthlyCount + 1
     });
 
-  } catch (error) {
-    console.error("Erro ao criar solicitação de substituição:", error);
+  } catch (error: any) {
+    console.error("[Substitutions] Erro ao criar solicitação de substituição:", error);
+    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Request body:", req.body);
+    console.error("[Substitutions] User:", req.user);
     res.status(500).json({
       success: false,
-      message: "Erro ao criar solicitação de substituição"
+      message: "Erro ao criar solicitação de substituição",
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -472,6 +414,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
 router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { scheduleId } = req.params;
+    console.log('[Substitutions] Buscando substitutos disponíveis para schedule:', scheduleId);
 
     // Buscar informações da escala
     const [schedule] = await db
@@ -481,11 +424,14 @@ router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) 
       .limit(1);
 
     if (!schedule) {
+      console.log('[Substitutions] Escala não encontrada:', scheduleId);
       return res.status(404).json({
         success: false,
         message: "Escala não encontrada"
       });
     }
+
+    console.log('[Substitutions] Escala encontrada:', { date: schedule.date, time: schedule.time });
 
     // Buscar ministros disponíveis que:
     // 1. Não estão escalados no mesmo horário
@@ -495,15 +441,7 @@ router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) 
         id: users.id,
         name: users.name,
         email: users.email,
-        photoUrl: users.photoUrl,
-        // Contar quantas vezes serviu no mês
-        servicesThisMonth: sql<number>`
-          (SELECT COUNT(*)
-           FROM ${schedules} s
-           WHERE s.minister_id = ${users.id}
-           AND EXTRACT(MONTH FROM s.date) = EXTRACT(MONTH FROM ${sql`CURRENT_DATE`})
-           AND EXTRACT(YEAR FROM s.date) = EXTRACT(YEAR FROM ${sql`CURRENT_DATE`})
-          )`
+        photoUrl: users.photoUrl
       })
       .from(users)
       .where(
@@ -519,19 +457,22 @@ router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) 
           )`
         )
       )
-      .orderBy(sql`services_this_month ASC`)
       .limit(20);
+
+    console.log('[Substitutions] Substitutos encontrados:', availableSubstitutes.length);
 
     res.json({
       success: true,
       data: availableSubstitutes
     });
 
-  } catch (error) {
-    console.error("Erro ao buscar substitutos disponíveis:", error);
+  } catch (error: any) {
+    console.error("[Substitutions] Erro ao buscar substitutos disponíveis:", error);
+    console.error("[Substitutions] Stack trace:", error.stack);
     res.status(500).json({
       success: false,
-      message: "Erro ao buscar substitutos disponíveis"
+      message: "Erro ao buscar substitutos disponíveis",
+      error: error.message
     });
   }
 });
@@ -603,8 +544,7 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
         .update(schedules)
         .set({
           ministerId: request.substituteId,
-          substituteId: request.requesterId,
-          updatedAt: new Date()
+          substituteId: request.requesterId
         })
         .where(eq(schedules.id, request.scheduleId));
     }
