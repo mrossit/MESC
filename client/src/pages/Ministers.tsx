@@ -451,8 +451,8 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="sticky top-0 z-10 bg-background border-b px-6 py-4">
             <DialogTitle>
               {isEditMode ? "Editar Ministro" : "Detalhes do Ministro"}
             </DialogTitle>
@@ -462,7 +462,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
           </DialogHeader>
 
           {selectedMinister && (
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-y-auto flex-1 px-6 py-4">
               {/* Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Informações Pessoais</h3>
@@ -808,7 +808,7 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 bg-background border-t px-6 py-4 mt-auto">
             {isEditMode && (
               <>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

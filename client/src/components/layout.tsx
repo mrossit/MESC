@@ -98,8 +98,8 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
         </SidebarInset>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobile && <MobileBottomNav />}
+      {/* Mobile Bottom Navigation - Always rendered, hidden by CSS on desktop */}
+      <MobileBottomNav />
 
       {/* Floating Notification Bell for Mobile - removed since we have bottom nav */}
       {!isMobile && <FloatingNotificationBell />}

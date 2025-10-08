@@ -27,7 +27,8 @@
       "Read(//tmp/**)",
       "Bash(cat:*)",
       "Bash(kill:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []
