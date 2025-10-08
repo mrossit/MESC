@@ -4,6 +4,7 @@ import { users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, sql } from "drizzle-orm";
 import { storage } from "../storage";
+import { formatMinisterName } from "../utils/formatters";
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
       'preferredPosition', 'preferredTimes',
       'availableForSpecialEvents', 'canServeAsCouple', 'spouseUserId',
       'experience', 'specialSkills', 'liturgicalTraining',
-      'observations', 'active'
+      'observations', 'active', 'scheduleDisplayName'
     ];
 
     const updateData: any = {};
@@ -81,6 +82,9 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
         } else if (['liturgicalTraining', 'formationCompleted'].includes(field)) {
           // BOOLEAN fields - store as raw boolean values
           updateData[field] = Boolean(req.body[field]);
+        } else if (field === 'scheduleDisplayName') {
+          // Apply formatting to scheduleDisplayName
+          updateData[field] = formatMinisterName(req.body[field]);
         } else {
           updateData[field] = req.body[field];
         }

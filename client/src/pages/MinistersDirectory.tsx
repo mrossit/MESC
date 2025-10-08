@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -15,7 +16,7 @@ import {
 } from '../components/ui/select';
 import {
   Search, Users, Phone, Mail, Calendar, Heart,
-  Church, User, Filter, Grid, List, Info, ArrowUpDown
+  Church, User, Filter, Grid, List, Info, ArrowUpDown, Settings
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -54,12 +55,20 @@ type MinisterFamily = {
 };
 
 export default function MinistersDirectory() {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMinister, setSelectedMinister] = useState<Minister | null>(null);
   const [filterRole, setFilterRole] = useState<string>('all');
   const [sortField, setSortField] = useState<keyof Minister>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Get current user info
+  const { data: authData } = useQuery({
+    queryKey: ['/api/auth/me'],
+  });
+  const user = authData?.user;
+  const isCoordinator = user?.role === 'coordenador' || user?.role === 'gestor';
 
   // Buscar todos os ministros ativos
   const { data: ministersData, isLoading, error } = useQuery({
@@ -297,6 +306,18 @@ export default function MinistersDirectory() {
                   <List className="h-4 w-4" />
                   <span className="hidden lg:inline">Lista</span>
                 </Button>
+
+                {/* Botão para coordenadores acessarem página de edição */}
+                {isCoordinator && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setLocation('/ministros')}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden lg:inline">Gerenciar</span>
+                  </Button>
+                )}
               </div>
             </div>
             

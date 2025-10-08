@@ -7081,6 +7081,24 @@ await init_db();
 init_schema();
 import { Router as Router10 } from "express";
 import { eq as eq14, and as and11, sql as sql7 } from "drizzle-orm";
+
+// server/utils/formatters.ts
+function formatMinisterName(name) {
+  if (!name) return "";
+  if (name === "VACANTE") return "VACANTE";
+  const lowercase = ["da", "de", "di", "do", "das", "dos", "e", "em", "na", "no"];
+  return name.toLowerCase().split(" ").map((word, index2) => {
+    if (index2 === 0) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }
+    if (lowercase.includes(word)) {
+      return word;
+    }
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(" ");
+}
+
+// server/routes/ministers.ts
 var router10 = Router10();
 router10.get("/", authenticateToken, async (req, res) => {
   try {
@@ -7131,7 +7149,8 @@ router10.patch("/:id", authenticateToken, async (req, res) => {
       "specialSkills",
       "liturgicalTraining",
       "observations",
-      "active"
+      "active",
+      "scheduleDisplayName"
     ];
     const updateData = {};
     for (const field of allowedFields) {
@@ -7142,6 +7161,8 @@ router10.patch("/:id", authenticateToken, async (req, res) => {
           updateData[field] = typeof req.body[field] === "string" ? req.body[field] : JSON.stringify(req.body[field]);
         } else if (["liturgicalTraining", "formationCompleted"].includes(field)) {
           updateData[field] = Boolean(req.body[field]);
+        } else if (field === "scheduleDisplayName") {
+          updateData[field] = formatMinisterName(req.body[field]);
         } else {
           updateData[field] = req.body[field];
         }

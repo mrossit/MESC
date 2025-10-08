@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { AuthRequest, authenticateToken } from '../auth';
 import { storage } from '../storage';
+import { formatMinisterName } from '../utils/formatters';
 
 const router = Router();
 
@@ -37,11 +38,20 @@ router.put('/', async (req: AuthRequest, res) => {
       baptismDate: z.string().nullable().optional(),
       confirmationDate: z.string().nullable().optional(),
       marriageDate: z.string().nullable().optional(),
-      maritalStatus: z.string().optional()
+      maritalStatus: z.string().optional(),
+      scheduleDisplayName: z.string().nullable().optional()
     });
     
-    const data = schema.parse(req.body);
-    
+    const parsedData = schema.parse(req.body);
+
+    // Aplicar formatação ao scheduleDisplayName se fornecido
+    const data = {
+      ...parsedData,
+      scheduleDisplayName: parsedData.scheduleDisplayName
+        ? formatMinisterName(parsedData.scheduleDisplayName)
+        : parsedData.scheduleDisplayName
+    };
+
     // Atualizar no banco de dados
     const updatedUser = await storage.updateUser(userId, data);
     

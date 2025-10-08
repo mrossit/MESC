@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
@@ -71,6 +71,23 @@ export function SelectiveScheduleExport({
   const monthName = format(currentDate, 'MMMM/yyyy', { locale: ptBR });
   const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
+  // Função auxiliar para descrição de missas (deve vir antes do useMemo)
+  const getMassDescription = useCallback((date: Date, time: string): string => {
+    const dayOfWeek = getDay(date);
+    const day = date.getDate();
+
+    if (dayOfWeek === 4 && day <= 7 && time === '19:30:00') return 'Cura e Libertação';
+    if (dayOfWeek === 5 && day <= 7 && time === '19:00:00') return 'Sagrado Coração';
+    if (dayOfWeek === 6 && day <= 7) {
+      if (time === '06:30:00') return 'Imaculado Coração';
+      if (time === '16:00:00') return 'Preciosas do Pai';
+    }
+    if (month === 10 && [2, 3, 4].includes(dayOfWeek) && time === '16:00:00') {
+      return 'Novena N.Sra.';
+    }
+    return '';
+  }, [month]);
+
   // Obter todas as missas do mês
   const allMasses = useMemo(() => {
     const start = startOfMonth(currentDate);
@@ -99,28 +116,15 @@ export function SelectiveScheduleExport({
     });
 
     return masses;
-  }, [currentDate]);
+  }, [currentDate, getMassDescription]);
 
-  // State para missas selecionadas
-  const [selectedMasses, setSelectedMasses] = useState<Set<string>>(
-    new Set(allMasses.map(m => `${m.date}|${m.time}`))
-  );
+  // State para missas selecionadas - inicializa vazio e preenche com useEffect
+  const [selectedMasses, setSelectedMasses] = useState<Set<string>>(new Set());
 
-  const getMassDescription = (date: Date, time: string): string => {
-    const dayOfWeek = getDay(date);
-    const day = date.getDate();
-
-    if (dayOfWeek === 4 && day <= 7 && time === '19:30:00') return 'Cura e Libertação';
-    if (dayOfWeek === 5 && day <= 7 && time === '19:00:00') return 'Sagrado Coração';
-    if (dayOfWeek === 6 && day <= 7) {
-      if (time === '06:30:00') return 'Imaculado Coração';
-      if (time === '16:00:00') return 'Preciosas do Pai';
-    }
-    if (month === 10 && [2, 3, 4].includes(dayOfWeek) && time === '16:00:00') {
-      return 'Novena N.Sra.';
-    }
-    return '';
-  };
+  // Inicializar missas selecionadas quando allMasses mudar
+  useEffect(() => {
+    setSelectedMasses(new Set(allMasses.map(m => `${m.date}|${m.time}`)));
+  }, [allMasses]);
 
   const toggleMass = (massKey: string) => {
     const newSelected = new Set(selectedMasses);

@@ -25,7 +25,6 @@ import ChangePasswordRequired from "@/pages/change-password-required";
 import Ministers from "@/pages/Ministers";
 import MinistersDirectory from "@/pages/MinistersDirectory";
 import Schedules from "@/pages/Schedules";
-import ScheduleEditor from "@/pages/ScheduleEditor";
 import QuestionnaireUnified from "@/pages/QuestionnaireUnified";
 import QuestionnaireResponses from "@/pages/QuestionnaireResponses";
 import Profile from "@/pages/Profile";
@@ -73,12 +72,6 @@ function Router() {
       <Route path="/schedules/:action?">
         <AuthGuard>
           <Schedules />
-        </AuthGuard>
-      </Route>
-      
-      <Route path="/schedule-editor">
-        <AuthGuard>
-          <ScheduleEditor />
         </AuthGuard>
       </Route>
       
