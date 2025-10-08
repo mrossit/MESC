@@ -161,6 +161,8 @@ var init_schema = __esm({
       formationCompleted: boolean("formation_completed").default(false),
       // Observations
       observations: text("observations"),
+      // Display name for schedules (optional custom name shown in schedule lists)
+      scheduleDisplayName: varchar("schedule_display_name", { length: 100 }),
       // Registration fields
       ministerType: varchar("minister_type", { length: 50 }),
       approvedAt: timestamp("approved_at"),
