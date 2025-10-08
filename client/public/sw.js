@@ -1,4 +1,4 @@
-const VERSION = '5.4.0'; // Incrementar quando houver mudanças importantes
+const VERSION = '5.4.1'; // Incrementar quando houver mudanças importantes
 const CACHE_NAME = `mesc-v${VERSION}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
@@ -6,6 +6,9 @@ const urlsToCache = [
   '/manifest.json',
   '/sjtlogo.png'
 ];
+
+// CACHE BUSTING: Incrementar BUILD_NUMBER a cada deploy
+const BUILD_NUMBER = Date.now();
 
 // Configuração de auto-update
 const CHECK_UPDATE_INTERVAL = 30000; // 30 segundos
@@ -125,26 +128,48 @@ self.addEventListener('fetch', (event) => {
 
 // Clean up old caches and force activation
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating new service worker, version:', VERSION);
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
+      // LIMPEZA AGRESSIVA: Deleta TODOS os caches antigos
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
+      // CRÍTICO: Limpa também cache de API antiga
+      return caches.open(CACHE_NAME).then(cache => {
+        return cache.keys().then(requests => {
+          // Remove entradas de API que tenham mais de 1 hora
+          const oneHourAgo = Date.now() - (60 * 60 * 1000);
+          return Promise.all(
+            requests.map(request => {
+              if (request.url.includes('/api/')) {
+                return cache.delete(request);
+              }
+            })
+          );
+        });
+      });
+    }).then(() => {
+      console.log('[SW] All old caches cleared, claiming clients');
       // Force immediate control of all clients
       return self.clients.claim();
     }).then(() => {
       // Notify all clients about the update
       return self.clients.matchAll().then(clients => {
+        console.log(`[SW] Notifying ${clients.length} clients about update`);
         clients.forEach(client => {
           client.postMessage({
-            type: 'SW_UPDATED', 
-            version: CACHE_NAME
+            type: 'SW_UPDATED',
+            version: VERSION,
+            buildNumber: BUILD_NUMBER,
+            cacheCleared: true
           });
         });
       });

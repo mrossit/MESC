@@ -19,7 +19,10 @@
       })();
     </script>
     
-    <!-- Cache bust: v2025-08-31-01:38 -->
+    <!-- Cache bust: v5.4.1-2025 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
     
     <!-- PWA Meta Tags -->
@@ -65,19 +68,49 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(
-            (registration) => {
-              console.log('ServiceWorker registration successful:', registration.scope);
-              
-              // Only check for updates in production
-              if (location.hostname !== 'localhost' && !location.hostname.includes('replit.dev')) {
+          // Desregistra service workers antigos ANTES de registrar novo
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            console.log('[Init] Found', registrations.length, 'service worker registrations');
+
+            // Registra novo service worker (com cache busting)
+            const swUrl = '/sw.js?v=' + Date.now();
+            navigator.serviceWorker.register(swUrl).then(
+              (registration) => {
+                console.log('[SW] Registration successful:', registration.scope);
+
+                // Verifica atualizações imediatamente
                 registration.update();
+
+                // Verifica atualizações periodicamente (a cada 60 segundos)
+                setInterval(() => {
+                  console.log('[SW] Checking for updates...');
+                  registration.update();
+                }, 60000);
+
+                // Listener para novas versões
+                registration.addEventListener('updatefound', () => {
+                  const newWorker = registration.installing;
+                  console.log('[SW] Update found, installing new version...');
+
+                  if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('[SW] New version installed and waiting');
+                      }
+                    });
+                  }
+                });
+              },
+              (err) => {
+                console.error('[SW] Registration failed:', err);
               }
-            },
-            (err) => {
-              console.log('ServiceWorker registration failed:', err);
-            }
-          );
+            );
+          });
+        });
+
+        // Listener global para quando novo SW assume controle
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[SW] Controller changed, new version active');
         });
       }
     </script>
