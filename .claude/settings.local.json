@@ -29,7 +29,11 @@
       "Bash(kill:*)",
       "Bash(awk:*)",
       "Bash(npm run:*)",
-      "Bash(fuser:*)"
+      "Bash(fuser:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(npx esbuild:*)"
     ],
     "deny": [],
     "ask": []

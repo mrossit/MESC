@@ -43,11 +43,19 @@ import { cn, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
 
 // Definir mínimos de ministros por horário de missa
-const MINIMUM_MINISTERS = {
-  "08:00": 15,  // Missa das 8h - 15 ministros
-  "10:00": 20,  // Missa das 10h - 20 ministros
-  "19:00": 20,  // Missa das 19h - 20 ministros
-  "19:30": 15,  // São Judas - 15 ministros (domingo 28)
+const MINIMUM_MINISTERS: Record<string, number> = {
+  "08:00": 12,  // Missa das 8h - 12 ministros
+  "08:00:00": 12,
+  "10:00": 15,  // Missa das 10h - 15 ministros
+  "10:00:00": 15,
+  "19:00": 15,  // Missa das 19h - 15 ministros
+  "19:00:00": 15,
+  "19:30": 12,  // São Judas - 12 ministros (domingo 28)
+  "19:30:00": 12,
+  "06:30": 8,   // Missa da semana - 8 ministros
+  "06:30:00": 8,
+  "18:00": 10,  // Missa da tarde - 10 ministros
+  "18:00:00": 10,
 };
 
 interface SubstitutionRequest {

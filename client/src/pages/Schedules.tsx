@@ -58,7 +58,7 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn, formatMinisterName } from "@/lib/utils";
+import { cn, formatMinisterName, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
@@ -149,6 +149,8 @@ export default function Schedules() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedMassTime, setSelectedMassTime] = useState<string>("");
+  const [isCustomTime, setIsCustomTime] = useState<boolean>(false);
+  const [customTimeInput, setCustomTimeInput] = useState<string>("");
   const [selectedPosition, setSelectedPosition] = useState<number>(1);
   const [selectedMinisterId, setSelectedMinisterId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"month" | "list">("month");
@@ -423,6 +425,8 @@ export default function Schedules() {
         setIsAssignmentDialogOpen(false);
         setSelectedMinisterId("");
         setSelectedMassTime("");
+        setIsCustomTime(false);
+        setCustomTimeInput("");
         setSelectedPosition(1);
         setEditingAssignmentId(null); // Limpar modo de edição
       } else {
@@ -2264,24 +2268,77 @@ export default function Schedules() {
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Horário da Missa</label>
-              <Select value={selectedMassTime} onValueChange={setSelectedMassTime}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o horário" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_MASS_TIMES.map((time) => {
-                    // Formatar horário para exibição (remover segundos)
-                    const displayTime = time.substring(0, 5);
-                    return (
-                      <SelectItem key={time} value={time}>
-                        {displayTime}
+
+              {!isCustomTime ? (
+                <div className="space-y-2">
+                  <Select
+                    value={selectedMassTime}
+                    onValueChange={(value) => {
+                      if (value === "custom") {
+                        setIsCustomTime(true);
+                        setSelectedMassTime("");
+                        setCustomTimeInput("");
+                      } else {
+                        setSelectedMassTime(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o horário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="06:30:00">06:30</SelectItem>
+                      <SelectItem value="08:00:00">08:00</SelectItem>
+                      <SelectItem value="10:00:00">10:00</SelectItem>
+                      <SelectItem value="19:00:00">19:00</SelectItem>
+                      <SelectItem value="19:30:00">19:30</SelectItem>
+                      <Separator className="my-1" />
+                      <SelectItem value="custom" className="text-primary font-medium">
+                        <div className="flex items-center gap-2">
+                          <Edit2 className="h-3 w-3" />
+                          Digitar horário personalizado
+                        </div>
                       </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      type="time"
+                      value={customTimeInput}
+                      onChange={(e) => {
+                        setCustomTimeInput(e.target.value);
+                        // Adicionar :00 segundos automaticamente
+                        if (e.target.value) {
+                          setSelectedMassTime(e.target.value + ":00");
+                        }
+                      }}
+                      placeholder="HH:MM"
+                      className="flex-1 [color-scheme:light] dark:[color-scheme:dark]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsCustomTime(false);
+                        setCustomTimeInput("");
+                        setSelectedMassTime("");
+                      }}
+                      className="flex-shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Digite o horário personalizado ou clique em <X className="h-3 w-3 inline" /> para voltar às opções
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -2422,6 +2479,11 @@ export default function Schedules() {
             <Button variant="outline" onClick={() => {
               setIsAssignmentDialogOpen(false);
               setEditingAssignmentId(null);
+              setSelectedMinisterId("");
+              setSelectedMassTime("");
+              setIsCustomTime(false);
+              setCustomTimeInput("");
+              setSelectedPosition(1);
             }}>
               Cancelar
             </Button>

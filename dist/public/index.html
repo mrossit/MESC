@@ -59,8 +59,8 @@
     <!-- Security -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="format-detection" content="telephone=no">
-    <script type="module" crossorigin src="/assets/index.CwqIFU42.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index.DpTjNUYN.css">
+    <script type="module" crossorigin src="/assets/index.XHp75tWE.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index.DdFyUwvN.css">
   </head>
   <body>
     <div id="root"></div>
@@ -73,9 +73,8 @@
           navigator.serviceWorker.getRegistrations().then(registrations => {
             console.log('[Init] Found', registrations.length, 'service worker registrations');
 
-            // Registra novo service worker (com cache busting)
-            const swUrl = '/sw.js?v=' + Date.now();
-            navigator.serviceWorker.register(swUrl).then(
+            // Registra novo service worker
+            navigator.serviceWorker.register('/sw.js').then(
               (registration) => {
                 console.log('[SW] Registration successful:', registration.scope);
 
@@ -107,11 +106,6 @@
               }
             );
           });
-        });
-
-        // Listener global para quando novo SW assume controle
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          console.log('[SW] Controller changed, new version active');
         });
       }
     </script>

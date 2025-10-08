@@ -8,10 +8,12 @@ const router = Router();
 
 // Configuração de mínimos de ministros por horário de missa
 const MINIMUM_MINISTERS: Record<string, number> = {
-  "08:00:00": 15,  // Missa das 8h - 15 ministros
-  "10:00:00": 20,  // Missa das 10h - 20 ministros
-  "19:00:00": 20,  // Missa das 19h - 20 ministros
-  "19:30:00": 15,  // São Judas - 15 ministros (domingo 28)
+  "08:00:00": 12,  // Missa das 8h - 12 ministros
+  "10:00:00": 15,  // Missa das 10h - 15 ministros
+  "19:00:00": 15,  // Missa das 19h - 15 ministros
+  "19:30:00": 12,  // São Judas - 12 ministros (domingo 28)
+  "06:30:00": 8,   // Missa da semana - 8 ministros
+  "18:00:00": 10,  // Missa da tarde - 10 ministros
 };
 
 interface MassPendency {
@@ -143,10 +145,12 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
       const isSaoJudas = dayOfMonth === 28 && massTime === "19:30:00";
 
       // Obter mínimo necessário para este horário
-      const minimumRequired = MINIMUM_MINISTERS[massTime] || 15;
+      const minimumRequired = MINIMUM_MINISTERS[massTime] || 12;
 
       // Contar ministros confirmados (sem substituição pendente/aprovada)
+      // e também as posições totais criadas (para saber quantas estão vazias)
       let currentConfirmed = 0;
+      let totalPositions = scheduleGroup.length; // Total de posições na escala
       const confirmedMinisters: MassPendency['confirmedMinisters'] = [];
 
       scheduleGroup.forEach((schedule: any) => {
@@ -162,7 +166,7 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
             position: schedule.position || 0
           });
         }
-        // Se não tem substituição ou está pendente, contar o ministro original
+        // Se não tem substituição ou está pendente, contar o ministro original (se tiver)
         else if (!substitution && schedule.ministerId && schedule.ministerName) {
           currentConfirmed++;
           confirmedMinisters.push({
@@ -171,10 +175,16 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
             position: schedule.position || 0
           });
         }
-        // Se tem substituição pendente, não contar ninguém (desfalque)
+        // Se tem substituição pendente OU posição está vazia (ministerId null), não contar (desfalque)
       });
 
-      const ministersShort = Math.max(0, minimumRequired - currentConfirmed);
+      // Calcular ministros faltantes: diferença entre o mínimo requerido e os confirmados
+      // OU diferença entre posições criadas e confirmados (o que for maior)
+      const ministersShort = Math.max(
+        0,
+        minimumRequired - currentConfirmed, // Falta para atingir o mínimo
+        totalPositions - currentConfirmed   // Posições vazias
+      );
 
       // Só adicionar se há desfalque
       if (ministersShort > 0) {

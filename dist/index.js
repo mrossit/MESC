@@ -7229,14 +7229,6 @@ function calculateUrgency(massDateStr, massTime) {
   if (hoursUntilMass < 72) return "medium";
   return "low";
 }
-function shouldAutoApprove(massDateStr, massTime) {
-  const now = /* @__PURE__ */ new Date();
-  const [year, month, day] = massDateStr.split("-").map(Number);
-  const [hours, minutes] = massTime.split(":").map(Number);
-  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
-  return hoursUntilMass >= 12;
-}
 async function countMonthlySubstitutions(requesterId) {
   const now = /* @__PURE__ */ new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -7250,90 +7242,11 @@ async function countMonthlySubstitutions(requesterId) {
   );
   return result[0]?.count || 0;
 }
-async function findAvailableSubstitute(massDate, massTime) {
-  try {
-    const [year, month] = massDate.split("-").map(Number);
-    const [activeQuestionnaire] = await db.select().from(questionnaires).where(
-      and12(
-        eq15(questionnaires.year, year),
-        eq15(questionnaires.month, month),
-        eq15(questionnaires.status, "published")
-      )
-    ).limit(1);
-    if (!activeQuestionnaire) {
-      console.log("Nenhum question\xE1rio ativo encontrado para", year, month);
-      return null;
-    }
-    const scheduledMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
-      and12(
-        eq15(schedules.date, massDate),
-        eq15(schedules.time, massTime),
-        eq15(schedules.status, "scheduled")
-      )
-    );
-    const scheduledMinisterIds = scheduledMinisters.map((s) => s.ministerId).filter((id) => id !== null);
-    const responsesQuery = scheduledMinisterIds.length > 0 ? db.select({
-      userId: questionnaireResponses.userId,
-      availableSundays: questionnaireResponses.availableSundays,
-      preferredMassTimes: questionnaireResponses.preferredMassTimes,
-      canSubstitute: questionnaireResponses.canSubstitute,
-      userName: users.name,
-      lastService: users.lastService
-    }).from(questionnaireResponses).innerJoin(users, eq15(questionnaireResponses.userId, users.id)).where(
-      and12(
-        eq15(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
-        eq15(users.status, "active"),
-        eq15(users.role, "ministro"),
-        notInArray(questionnaireResponses.userId, scheduledMinisterIds)
-      )
-    ) : db.select({
-      userId: questionnaireResponses.userId,
-      availableSundays: questionnaireResponses.availableSundays,
-      preferredMassTimes: questionnaireResponses.preferredMassTimes,
-      canSubstitute: questionnaireResponses.canSubstitute,
-      userName: users.name,
-      lastService: users.lastService
-    }).from(questionnaireResponses).innerJoin(users, eq15(questionnaireResponses.userId, users.id)).where(
-      and12(
-        eq15(questionnaireResponses.questionnaireId, activeQuestionnaire.id),
-        eq15(users.status, "active"),
-        eq15(users.role, "ministro")
-      )
-    );
-    const availableResponses = await responsesQuery;
-    const eligibleMinisters = availableResponses.filter((response) => {
-      const availableSundays = response.availableSundays || [];
-      const isDateAvailable = availableSundays.includes(massDate);
-      const canSubstitute = response.canSubstitute ?? false;
-      return isDateAvailable && canSubstitute;
-    });
-    if (eligibleMinisters.length === 0) {
-      console.log("Nenhum suplente eleg\xEDvel encontrado para", massDate, massTime);
-      return null;
-    }
-    eligibleMinisters.sort((a, b) => {
-      const aPreferredTimes = a.preferredMassTimes || [];
-      const bPreferredTimes = b.preferredMassTimes || [];
-      const aPreferred = aPreferredTimes.includes(massTime);
-      const bPreferred = bPreferredTimes.includes(massTime);
-      if (aPreferred && !bPreferred) return -1;
-      if (!aPreferred && bPreferred) return 1;
-      const aLastService = a.lastService ? new Date(a.lastService).getTime() : 0;
-      const bLastService = b.lastService ? new Date(b.lastService).getTime() : 0;
-      return aLastService - bLastService;
-    });
-    const selectedSubstitute = eligibleMinisters[0];
-    console.log(`\u2705 Suplente autom\xE1tico encontrado: ${selectedSubstitute.userName} (${selectedSubstitute.userId})`);
-    return selectedSubstitute.userId;
-  } catch (error) {
-    console.error("Erro ao buscar suplente dispon\xEDvel:", error);
-    return null;
-  }
-}
 router11.post("/", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user.id;
+    console.log("[Substitutions] Criando solicita\xE7\xE3o:", { scheduleId, substituteId, reason, requesterId });
     if (!scheduleId) {
       return res.status(400).json({
         success: false,
@@ -7377,42 +7290,18 @@ router11.post("/", authenticateToken, async (req, res) => {
     }
     const urgency = calculateUrgency(schedule.date, schedule.time);
     const monthlyCount = await countMonthlySubstitutions(requesterId);
-    let finalSubstituteId = substituteId;
-    let autoAssigned = false;
-    if (!finalSubstituteId) {
-      console.log(`\u{1F50D} Buscando suplente autom\xE1tico para ${schedule.date} \xE0s ${schedule.time}...`);
-      const autoSubstituteId = await findAvailableSubstitute(schedule.date, schedule.time);
-      if (autoSubstituteId) {
-        finalSubstituteId = autoSubstituteId;
-        autoAssigned = true;
-        console.log(`\u2705 Suplente autom\xE1tico atribu\xEDdo: ${autoSubstituteId}`);
-      } else {
-        console.log(`\u26A0\uFE0F  Nenhum suplente dispon\xEDvel encontrado automaticamente`);
-      }
-    }
-    let status = "pending";
-    const userRole = req.user.role;
-    const isCoordinator = userRole === "coordenador" || userRole === "gestor";
-    if (shouldAutoApprove(schedule.date, schedule.time) && (monthlyCount < 2 || isCoordinator)) {
-      status = "auto_approved";
-    }
+    const finalSubstituteId = substituteId || null;
+    const status = "pending";
     const [newRequest] = await db.insert(substitutionRequests).values({
       scheduleId,
       requesterId,
-      substituteId: finalSubstituteId || null,
+      substituteId: finalSubstituteId,
       reason: reason || null,
       status,
       urgency,
       createdAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
     }).returning();
-    if (status === "auto_approved" && finalSubstituteId) {
-      await db.update(schedules).set({
-        ministerId: finalSubstituteId,
-        substituteId: requesterId,
-        updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq15(schedules.id, scheduleId));
-    }
     const requestQuery = db.select({
       request: substitutionRequests,
       assignment: schedules,
@@ -7443,32 +7332,23 @@ router11.post("/", authenticateToken, async (req, res) => {
       },
       substituteUser
     };
-    let message = "";
-    if (autoAssigned && finalSubstituteId) {
-      message = `Solicita\xE7\xE3o criada! Foi encontrado automaticamente um suplente dispon\xEDvel: ${substituteUser?.name}. ${status === "auto_approved" ? "A substitui\xE7\xE3o foi auto-aprovada." : "Aguardando confirma\xE7\xE3o do suplente."}`;
-    } else if (status === "auto_approved") {
-      message = "Solicita\xE7\xE3o criada e auto-aprovada com sucesso";
-    } else {
-      message = finalSubstituteId ? "Solicita\xE7\xE3o criada com sucesso. Aguardando aprova\xE7\xE3o do suplente." : "Solicita\xE7\xE3o criada. Nenhum suplente dispon\xEDvel foi encontrado automaticamente. Aguardando coordenador.";
-    }
+    const message = finalSubstituteId ? "Solicita\xE7\xE3o criada com sucesso. Aguardando aprova\xE7\xE3o." : "Solicita\xE7\xE3o criada. Aguardando que o coordenador atribua um suplente.";
     res.json({
       success: true,
       message,
       data: responseData,
-      monthlyCount: monthlyCount + 1,
-      isAutoApproved: status === "auto_approved",
-      autoAssigned,
-      substituteInfo: substituteUser ? {
-        name: substituteUser.name,
-        phone: substituteUser.phone,
-        whatsapp: substituteUser.whatsapp
-      } : null
+      monthlyCount: monthlyCount + 1
     });
   } catch (error) {
-    console.error("Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o:", error);
+    console.error("[Substitutions] Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o:", error);
+    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Request body:", req.body);
+    console.error("[Substitutions] User:", req.user);
     res.status(500).json({
       success: false,
-      message: "Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o"
+      message: "Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o",
+      error: error.message,
+      details: process.env.NODE_ENV === "development" ? error.stack : void 0
     });
   }
 });
@@ -7522,26 +7402,21 @@ router11.get("/", authenticateToken, async (req, res) => {
 router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
+    console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
     const [schedule] = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
+      console.log("[Substitutions] Escala n\xE3o encontrada:", scheduleId);
       return res.status(404).json({
         success: false,
         message: "Escala n\xE3o encontrada"
       });
     }
+    console.log("[Substitutions] Escala encontrada:", { date: schedule.date, time: schedule.time });
     const availableSubstitutes = await db.select({
       id: users.id,
       name: users.name,
       email: users.email,
-      photoUrl: users.photoUrl,
-      // Contar quantas vezes serviu no mês
-      servicesThisMonth: sql8`
-          (SELECT COUNT(*)
-           FROM ${schedules} s
-           WHERE s.minister_id = ${users.id}
-           AND EXTRACT(MONTH FROM s.date) = EXTRACT(MONTH FROM ${sql8`CURRENT_DATE`})
-           AND EXTRACT(YEAR FROM s.date) = EXTRACT(YEAR FROM ${sql8`CURRENT_DATE`})
-          )`
+      photoUrl: users.photoUrl
     }).from(users).where(
       and12(
         eq15(users.status, "active"),
@@ -7554,16 +7429,19 @@ router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
             AND s.time = ${schedule.time}
           )`
       )
-    ).orderBy(sql8`services_this_month ASC`).limit(20);
+    ).limit(20);
+    console.log("[Substitutions] Substitutos encontrados:", availableSubstitutes.length);
     res.json({
       success: true,
       data: availableSubstitutes
     });
   } catch (error) {
-    console.error("Erro ao buscar substitutos dispon\xEDveis:", error);
+    console.error("[Substitutions] Erro ao buscar substitutos dispon\xEDveis:", error);
+    console.error("[Substitutions] Stack trace:", error.stack);
     res.status(500).json({
       success: false,
-      message: "Erro ao buscar substitutos dispon\xEDveis"
+      message: "Erro ao buscar substitutos dispon\xEDveis",
+      error: error.message
     });
   }
 });
@@ -7610,8 +7488,7 @@ router11.post("/:id/respond", authenticateToken, async (req, res) => {
     if (newStatus === "approved" && request.substituteId) {
       await db.update(schedules).set({
         ministerId: request.substituteId,
-        substituteId: request.requesterId,
-        updatedAt: /* @__PURE__ */ new Date()
+        substituteId: request.requesterId
       }).where(eq15(schedules.id, request.scheduleId));
     }
     res.json({
@@ -7676,14 +7553,18 @@ import { Router as Router12 } from "express";
 import { eq as eq16, and as and13, gte as gte6, lte as lte5, sql as sql9 } from "drizzle-orm";
 var router12 = Router12();
 var MINIMUM_MINISTERS = {
-  "08:00:00": 15,
-  // Missa das 8h - 15 ministros
-  "10:00:00": 20,
-  // Missa das 10h - 20 ministros
-  "19:00:00": 20,
-  // Missa das 19h - 20 ministros
-  "19:30:00": 15
-  // São Judas - 15 ministros (domingo 28)
+  "08:00:00": 12,
+  // Missa das 8h - 12 ministros
+  "10:00:00": 15,
+  // Missa das 10h - 15 ministros
+  "19:00:00": 15,
+  // Missa das 19h - 15 ministros
+  "19:30:00": 12,
+  // São Judas - 12 ministros (domingo 28)
+  "06:30:00": 8,
+  // Missa da semana - 8 ministros
+  "18:00:00": 10
+  // Missa da tarde - 10 ministros
 };
 router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
@@ -7755,8 +7636,9 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       const location = firstSchedule.location || "Matriz";
       const dayOfMonth = new Date(massDate).getDate();
       const isSaoJudas = dayOfMonth === 28 && massTime === "19:30:00";
-      const minimumRequired = MINIMUM_MINISTERS[massTime] || 15;
+      const minimumRequired = MINIMUM_MINISTERS[massTime] || 12;
       let currentConfirmed = 0;
+      let totalPositions = scheduleGroup.length;
       const confirmedMinisters = [];
       scheduleGroup.forEach((schedule) => {
         const substitution = substitutionsMap.get(schedule.id);
@@ -7777,7 +7659,13 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
           });
         }
       });
-      const ministersShort = Math.max(0, minimumRequired - currentConfirmed);
+      const ministersShort = Math.max(
+        0,
+        minimumRequired - currentConfirmed,
+        // Falta para atingir o mínimo
+        totalPositions - currentConfirmed
+        // Posições vazias
+      );
       if (ministersShort > 0) {
         const daysUntilMass = Math.floor(
           (new Date(massDate).getTime() - today.getTime()) / (1e3 * 60 * 60 * 24)
@@ -8263,7 +8151,7 @@ var formationAdmin_default = router13;
 // server/routes/version.ts
 import { Router as Router14 } from "express";
 var router14 = Router14();
-var SYSTEM_VERSION = "5.4.0";
+var SYSTEM_VERSION = "5.4.1";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
 router14.get("/", (req, res) => {
   res.json({

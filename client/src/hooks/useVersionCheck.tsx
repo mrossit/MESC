@@ -45,42 +45,21 @@ export function useVersionCheck() {
           return;
         }
 
-        // Se a versão mudou, atualizar app
+        // Se a versão mudou, dispara evento para mostrar notificação
         if (serverVersion !== currentVersionRef.current) {
           console.log('[VersionCheck] New version detected:', serverVersion, '(current:', currentVersionRef.current + ')');
-          
-          // Limpa todos os caches
-          if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            await Promise.all(
-              cacheNames.map(cacheName => {
-                console.log('[VersionCheck] Deleting cache:', cacheName);
-                return caches.delete(cacheName);
-              })
-            );
-          }
 
-          // Limpa service worker cache
-          if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(
-              registrations.map(registration => {
-                console.log('[VersionCheck] Unregistering service worker');
-                return registration.unregister();
-              })
-            );
-          }
+          // Dispara evento customizado para UpdateNotification mostrar alerta
+          const event = new CustomEvent('app-update-available', {
+            detail: {
+              newVersion: serverVersion,
+              currentVersion: currentVersionRef.current
+            }
+          });
+          window.dispatchEvent(event);
 
-          // Atualiza versão no localStorage
-          localStorage.setItem('mesc-app-version', serverVersion);
-          
-          // Força reload com cache bust
-          const timestamp = Date.now();
-          console.log('[VersionCheck] Reloading application...');
-          
-          setTimeout(() => {
-            window.location.href = `${window.location.origin}${window.location.pathname}?v=${timestamp}`;
-          }, 500);
+          // Atualiza referência para não disparar múltiplas vezes
+          currentVersionRef.current = serverVersion;
         }
       } catch (error) {
         console.error('[VersionCheck] Error checking version:', error);
