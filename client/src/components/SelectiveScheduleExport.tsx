@@ -362,7 +362,10 @@ export function SelectiveScheduleExport({
         description: `Arquivo ${filename} foi baixado com sucesso.`,
       });
 
-      setIsDialogOpen(false);
+      // Pequeno delay antes de fechar o dialog para evitar problemas com viewport mobile
+      setTimeout(() => {
+        setIsDialogOpen(false);
+      }, 100);
     } catch (error) {
       console.error('Erro ao exportar:', error);
       toast({
