@@ -8,7 +8,9 @@ import { CachedAuthGuard as AuthGuard } from "@/components/cached-auth-guard";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { UpdateNotification } from "@/components/update-notification";
 import { checkCacheVersion } from "@/lib/cacheManager";
+import { checkInactivityAndClear } from "@/lib/version";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { SessionIndicator } from "@/components/SessionIndicator";
@@ -167,14 +169,17 @@ function App() {
   // Verifica periodicamente se há nova versão e atualiza automaticamente
   useVersionCheck();
 
-  // Verificar versão do cache ao iniciar a aplicação
+  // Verificar versão do cache e inatividade ao iniciar a aplicação
   useEffect(() => {
     checkCacheVersion();
+    checkInactivityAndClear();
 
-    // Inicializar controle de versão (comentado temporariamente para debug)
-    // initVersionControl().catch(error => {
-    //   console.error('Erro ao inicializar controle de versão:', error);
-    // });
+    // Verificar inatividade periodicamente (a cada hora)
+    const inactivityCheck = setInterval(() => {
+      checkInactivityAndClear();
+    }, 60 * 60 * 1000);
+
+    return () => clearInterval(inactivityCheck);
   }, []);
 
   return (
@@ -183,9 +188,8 @@ function App() {
         <TooltipProvider>
           <SessionIndicator />
           <Toaster />
-          <PWAUpdatePrompt />
+          <UpdateNotification />
           <PWAInstallPrompt />
-          {/* <VersionChecker /> */}
           <Router />
         </TooltipProvider>
       </ThemeProvider>
