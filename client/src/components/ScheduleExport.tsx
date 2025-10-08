@@ -367,7 +367,7 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
       </DropdownMenu>
 
       {/* Dialog para seleção de missas */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} modal={false}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Selecionar Missas para Exportar</DialogTitle>
