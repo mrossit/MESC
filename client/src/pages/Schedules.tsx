@@ -1081,6 +1081,22 @@ export default function Schedules() {
   const handleRequestSubstitution = async () => {
     if (!selectedAssignmentForSubstitution) return;
 
+    // Validação de data passada no frontend ANTES de enviar ao servidor
+    const assignmentDate = parseScheduleDate(selectedAssignmentForSubstitution.date);
+    const [hours, minutes] = selectedAssignmentForSubstitution.massTime.split(':').map(Number);
+    assignmentDate.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+
+    if (assignmentDate < now) {
+      toast({
+        title: "Erro",
+        description: "Não é possível solicitar substituição para missa que já passou",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmittingSubstitution(true);
     try {
       const response = await fetch("/api/substitutions", {
@@ -2086,6 +2102,10 @@ export default function Schedules() {
                                       variant="outline"
                                       className="flex-1 text-orange-600 hover:text-orange-700 text-[11px] sm:text-sm h-8 sm:h-9"
                                       onClick={() => {
+                                        // Limpa estados anteriores para evitar exibir erros de requisições passadas
+                                        setSubstitutionReason("");
+                                        setSelectedSubstituteId("");
+                                        setSubmittingSubstitution(false);
                                         setSelectedAssignmentForSubstitution(assignment);
                                         setIsSubstitutionDialogOpen(true);
                                       }}
