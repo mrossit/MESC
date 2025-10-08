@@ -261,7 +261,8 @@ export default function Profile() {
         confirmationParish: profile.confirmationParish || null,
         marriageDate: profile.marriageDate || null,
         marriageParish: profile.marriageParish || null,
-        maritalStatus: profile.maritalStatus || null
+        maritalStatus: profile.maritalStatus || null,
+        scheduleDisplayName: (profile as any).scheduleDisplayName || null
       };
 
       console.log('Enviando dados do perfil:', dataToSend);
@@ -552,7 +553,19 @@ export default function Profile() {
                       maxLength={15}
                     />
                   </div>
-                  
+
+                  <div>
+                    <Label htmlFor="scheduleDisplayName">Nome na Escala (opcional)</Label>
+                    <Input
+                      id="scheduleDisplayName"
+                      type="text"
+                      value={(profile as any)?.scheduleDisplayName || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, scheduleDisplayName: e.target.value } as any : null)}
+                      disabled={!isEditing}
+                      placeholder="Ex: M. Silva, João P."
+                    />
+                  </div>
+
                   <div>
                     <Label htmlFor="maritalStatus">Estado Civil</Label>
                     <Select

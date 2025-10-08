@@ -17,7 +17,17 @@
       "mcp__shadcn__get_add_command_for_items",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:gluestack.io)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx xlsx:*)",
+      "Bash(psql:*)",
+      "Bash(npx tsc:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Read(//tmp/**)",
+      "Bash(cat:*)",
+      "Bash(kill:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

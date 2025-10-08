@@ -1,6 +1,7 @@
 import { Layout } from "@/components/layout";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { authAPI } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ interface Minister {
   formationCompleted?: string[];
   observations?: string;
   active?: boolean;
+  scheduleDisplayName?: string;
 }
 
 const MASS_TIMES = ["7h", "9h", "11h", "12h", "17h", "19h"];
@@ -94,11 +96,12 @@ const SPECIAL_SKILLS = [
 ];
 
 export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean }) {
+  const [location] = useLocation();
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
     queryFn: () => authAPI.getMe(),
   });
-  
+
   const user = authData?.user;
   const [ministers, setMinisters] = useState<Minister[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +117,19 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
   useEffect(() => {
     fetchMinisters();
   }, []);
+
+  // Verificar se há um ID na URL para abrir automaticamente
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    const ministerId = searchParams.get('id');
+
+    if (ministerId && ministers.length > 0) {
+      const minister = ministers.find(m => m.id === ministerId);
+      if (minister) {
+        handleView(minister);
+      }
+    }
+  }, [location, ministers]);
 
   const fetchMinisters = async () => {
     try {
@@ -193,11 +209,12 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
 
   const handleSave = async () => {
     if (!selectedMinister) return;
-    
+
     try {
       const dataToSave = {
         ...formData,
-        birthDate: birthDate?.toISOString()
+        birthDate: birthDate?.toISOString(),
+        scheduleDisplayName: selectedMinister.scheduleDisplayName || null
       };
 
       const response = await fetch(`/api/users/${selectedMinister.id}`, {
@@ -452,22 +469,40 @@ export default function Ministers({ isEmbedded = false }: { isEmbedded?: boolean
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Nome</Label>
-                    <Input 
-                      value={selectedMinister.user.name} 
-                      disabled 
+                    <Input
+                      value={selectedMinister.name}
+                      disabled
                     />
                   </div>
                   <div>
+                    <Label>Nome na Escala (opcional)</Label>
+                    {isEditMode ? (
+                      <Input
+                        value={selectedMinister.scheduleDisplayName || ""}
+                        onChange={(e) => setSelectedMinister({
+                          ...selectedMinister,
+                          scheduleDisplayName: e.target.value
+                        })}
+                        placeholder="Ex: M. Silva, João P."
+                      />
+                    ) : (
+                      <Input
+                        value={selectedMinister.scheduleDisplayName || ""}
+                        disabled
+                      />
+                    )}
+                  </div>
+                  <div>
                     <Label>Email</Label>
-                    <Input 
-                      value={selectedMinister.user.email} 
-                      disabled 
+                    <Input
+                      value={selectedMinister.email}
+                      disabled
                     />
                   </div>
                   <div>
                     <Label>Telefone</Label>
-                    <Input 
-                      value={selectedMinister.user.phone || ""} 
+                    <Input
+                      value={selectedMinister.phone || ""} 
                       disabled 
                     />
                   </div>

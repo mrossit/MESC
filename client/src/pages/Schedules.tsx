@@ -6,7 +6,9 @@ import { invalidateScheduleCache } from "@/lib/cacheManager";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -48,7 +50,11 @@ import {
   Star,
   UserCheck,
   UserX,
-  Send
+  Send,
+  Download,
+  FileSpreadsheet,
+  MessageSquare,
+  Save
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -56,6 +62,7 @@ import { cn, formatMinisterName } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
+import * as XLSX from 'xlsx';
 
 // Helper function to capitalize first letter of a string
 const capitalizeFirst = (str: string) => {
@@ -65,6 +72,28 @@ const capitalizeFirst = (str: string) => {
 // Helper function to format time from "HH:MM:SS" to "HH:MM"
 const formatMassTime = (time: string) => {
   return time.substring(0, 5);
+};
+
+// Helper function to normalize mass time formats
+// Converts "6h30", "06:30:00", "06:30" to "06:30:00" for comparison
+const normalizeMassTime = (time: string): string => {
+  // Se já está no formato HH:MM:SS
+  if (time.match(/^\d{2}:\d{2}:\d{2}$/)) {
+    return time;
+  }
+
+  // Se está no formato "6h30", "19h30"
+  if (time.includes('h')) {
+    const [hours, minutes] = time.split('h');
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+  }
+
+  // Se está no formato "06:30"
+  if (time.match(/^\d{2}:\d{2}$/)) {
+    return `${time}:00`;
+  }
+
+  return time;
 };
 
 interface Schedule {
@@ -83,10 +112,12 @@ interface ScheduleAssignment {
   scheduleId: string;
   ministerId: string;
   ministerName?: string;
+  scheduleDisplayName?: string;
   date: string;
   massTime: string;
   position: number;
   confirmed: boolean;
+  notes?: string;
 }
 
 interface SubstitutionRequest {
@@ -145,7 +176,18 @@ export default function Schedules() {
   // Estado para seleção de horário antes de editar
   const [isTimeSelectionDialogOpen, setIsTimeSelectionDialogOpen] = useState(false);
 
+  // Estado para exportação
+  const [isExporting, setIsExporting] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'html'>('excel');
+
+  // Estados para edição de observações/comentários pelos Auxiliares 1 e 2
+  const [editingNotesForAssignment, setEditingNotesForAssignment] = useState<string | null>(null);
+  const [notesText, setNotesText] = useState<string>("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isMinister = user?.role === "ministro";
 
   // Invalidar cache ao entrar na página de escalas
   useEffect(() => {
@@ -485,6 +527,532 @@ export default function Schedules() {
     }
   };
 
+  // Função para abrir dialog de exportação
+  const handleOpenExportDialog = () => {
+    // Ministros só podem exportar PDF
+    if (isMinister) {
+      setExportFormat('pdf');
+    } else {
+      setExportFormat('excel');
+    }
+
+    setIsExportDialogOpen(true);
+  };
+
+  // Função para exportar escala
+  const handleExportSchedule = async () => {
+    try {
+      setIsExporting(true);
+      setIsExportDialogOpen(false);
+
+      console.log('🔍 Exportando escala - Assignments:', assignments.length);
+      console.log('🔍 Formato selecionado:', exportFormat);
+
+      if (assignments.length === 0) {
+        toast({
+          title: 'Aviso',
+          description: 'A escala não possui ministros escalados ainda',
+        });
+        setIsExporting(false);
+        return;
+      }
+
+      const monthName = format(currentMonth, 'MMMM/yyyy', { locale: ptBR });
+      const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+      // Definir grupos de posições com células mescladas
+      // Logo em base64 (incorporado para funcionar em PDF/HTML)
+      const logoBase64 = 'data:image/png;base64,' + (await fetch('/sjtlogo.png').then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      })));
+
+      const positionGroups = [
+        { name: "AUXILIAR", positions: [1, 2] },
+        { name: "RECOLHER", positions: [3, 4] },
+        { name: "VELAS", positions: [5, 6] },
+        { name: "ADORAÇÃO/FILA", positions: [7, 8] },
+        { name: "PURIFICAR/EXPOR", positions: [9, 10, 11, 12] },
+        { name: "MEZANINO", positions: [13, 14, 15] },
+        { name: "CORREDOR AMBÃO", positions: [16] },
+        { name: "CORREDOR CAPELA", positions: [17] },
+        { name: "CORREDOR CADEIRAS", positions: [18] },
+        { name: "NAVE CENTRAL PE PIO", positions: [19] },
+        { name: "NAVE CENTRAL LADO MÚSICOS", positions: [20, 21] },
+        { name: "NAVE CENTRAL AMBÃO", positions: [22] },
+        { name: "NAVE CENTRAL CAPELA", positions: [23] },
+        { name: "ÁTRIO EXTERNO", positions: [24, 25, 26, 27, 28] }
+      ];
+
+      // Função para determinar o tipo e cor da missa
+      // Paleta de cores: #fabfb7, #fdf9c4, #ffda9e, #c5c6c8, #b2e2f2, #e3b1c8
+      const getMassTypeAndColor = (date: Date, massTime: string) => {
+        const dayOfWeek = date.getDay();
+        const dayOfMonth = date.getDate();
+        const month = date.getMonth() + 1;
+        const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
+        const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+
+        // Novena de Outubro (dias 20-27) - Amarelo claro
+        if (isNovena) {
+          return { type: 'Novena de Outubro', color: '#fdf9c4', textColor: '#8B7500' };
+        }
+
+        // Domingo - Pêssego/Laranja claro
+        if (dayOfWeek === 0) {
+          return { type: 'Missa Dominical', color: '#ffda9e', textColor: '#8B5A00' };
+        }
+
+        // 1ª Quinta - Cura e Libertação - Azul claro
+        if (dayOfWeek === 4 && isFirstWeek && massTime === '19:30:00') {
+          return { type: 'Cura e Libertação', color: '#b2e2f2', textColor: '#0D5F7F' };
+        }
+
+        // 1ª Sexta - Sagrado Coração - Rosa salmão
+        if (dayOfWeek === 5 && isFirstWeek) {
+          return { type: 'Sagrado Coração de Jesus', color: '#fabfb7', textColor: '#8B3A3A' };
+        }
+
+        // 1º Sábado - Imaculado Coração - Rosa claro
+        if (dayOfWeek === 6 && isFirstWeek) {
+          return { type: 'Imaculado Coração de Maria', color: '#e3b1c8', textColor: '#6B2D5C' };
+        }
+
+        // Missa diária padrão - Cinza claro
+        return { type: 'Missa Diária', color: '#c5c6c8', textColor: '#2C2C2C' };
+      };
+
+      // Converter LITURGICAL_POSITIONS de objeto para array (posições 1-28)
+      const totalPositions = Object.keys(LITURGICAL_POSITIONS).length;
+      const positionsArray = Array.from({ length: totalPositions }, (_, i) => {
+        const positionKey = i + 1;
+        const name = LITURGICAL_POSITIONS[positionKey] || `Posição ${positionKey}`;
+        return {
+          positionKey: positionKey,
+          name: name,
+          abbreviation: name.split(' ')[0],
+          fullName: `${positionKey} ${name}`, // Ex: "1 Auxiliar 1"
+          numberAndName: `${name}\n${positionKey}`, // Para Excel: nome na linha 1, número na linha 2
+          htmlNumberAndName: `${name}<br>${positionKey}` // Para HTML/PDF: nome na linha 1, número na linha 2
+        };
+      });
+
+      // Obter todas as missas do mês
+      const start = startOfMonth(currentMonth);
+      const end = endOfMonth(currentMonth);
+      const allDays = eachDayOfInterval({ start, end });
+
+      console.log('📅 Total de dias no mês:', allDays.length);
+      console.log('📋 Total de assignments:', assignments.length);
+      console.log('📋 Sample assignment:', assignments[0]);
+      console.log('📋 Formato da data no assignment:', assignments[0]?.date);
+      console.log('📋 Formato do massTime no assignment:', assignments[0]?.massTime);
+
+      if (exportFormat === 'pdf') {
+        // Exportar para PDF (via print)
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          throw new Error('Não foi possível abrir a janela de impressão');
+        }
+
+        let html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Escala - ${monthNameCapitalized}</title>
+            <style>
+              @page { size: A3 landscape; margin: 0.5cm; }
+              body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; padding: 0; }
+              .header-container { display: flex; align-items: center; justify-content: center; margin: 10px 0; position: relative; }
+              .logo { position: absolute; left: 20px; width: 50px; height: auto; }
+              h1 { text-align: center; font-size: 14px; margin: 0; flex: 1; }
+              .legend { display: flex; justify-content: center; gap: 15px; margin: 10px 0; font-size: 7px; }
+              .legend-item { display: flex; align-items: center; gap: 5px; }
+              .legend-color { width: 12px; height: 12px; border: 1px solid #666; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; font-size: 7px; }
+              th { background-color: #f0f0f0; font-weight: bold; text-align: center; vertical-align: middle; }
+              .header-row { background-color: #e0e0e0; }
+              .date-col { width: 30px; }
+              .day-col { width: 80px; }
+              .time-col { width: 35px; }
+            </style>
+          </head>
+          <body>
+            <div class="header-container">
+              <img src="${logoBase64}" alt="Logo" class="logo">
+              <h1>SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}</h1>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-color" style="background: #c5c6c8;"></div>Missa Diária</div>
+              <div class="legend-item"><div class="legend-color" style="background: #ffda9e;"></div>Dominical</div>
+              <div class="legend-item"><div class="legend-color" style="background: #b2e2f2;"></div>Cura e Libertação</div>
+              <div class="legend-item"><div class="legend-color" style="background: #fabfb7;"></div>Sagrado Coração</div>
+              <div class="legend-item"><div class="legend-color" style="background: #e3b1c8;"></div>Imaculado Coração</div>
+              <div class="legend-item"><div class="legend-color" style="background: #fdf9c4;"></div>Novena Out</div>
+            </div>
+            <table>
+              <thead>
+                <!-- Linha 1: Grupos de posições com células mescladas -->
+                <tr class="header-row">
+                  <th class="date-col" rowspan="2">Data</th>
+                  <th class="day-col" rowspan="2">Dia</th>
+                  <th class="time-col" rowspan="2">Hora</th>
+                  ${positionGroups.map(group =>
+                    `<th colspan="${group.positions.length}">${group.name}</th>`
+                  ).join('')}
+                </tr>
+                <!-- Linha 2: Números das posições -->
+                <tr class="header-row">
+                  ${positionGroups.map(group =>
+                    group.positions.map(pos => `<th>${pos}</th>`).join('')
+                  ).join('')}
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        let rowCount = 0;
+        allDays.forEach(day => {
+          const massTimes = getMassTimesForDate(day);
+          console.log(`📅 Dia ${format(day, 'dd/MM')}: ${massTimes.length} missas`, massTimes);
+
+          if (massTimes.length > 0) {
+            massTimes.forEach(massTime => {
+              const dateStr = format(day, 'yyyy-MM-dd');
+              const dayName = format(day, 'EEEE', { locale: ptBR });
+              const dayNumber = day.getDate();
+              const time = massTime.substring(0, 5);
+
+              // Normalizar formato de hora para comparação
+              const normalizedMassTime = normalizeMassTime(massTime);
+
+              // Contar assignments para esta data/hora
+              const assignmentsForMass = assignments.filter(
+                a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime
+              );
+
+              console.log(`  ⏰ ${time}: ${assignmentsForMass.length} ministros escalados`);
+
+              // Obter tipo e cor da missa
+              const massInfo = getMassTypeAndColor(day, normalizedMassTime);
+
+              html += `<tr style="background-color: ${massInfo.color}; color: ${massInfo.textColor};">`;
+              html += `<td>${dayNumber}</td><td>${dayName}</td><td>${time}</td>`;
+
+              // Percorrer todas as posições (1-28)
+              for (let posKey = 1; posKey <= totalPositions; posKey++) {
+                const assignment = assignments.find(
+                  a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime && a.position === posKey
+                );
+                const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || '';
+                html += `<td>${displayName}</td>`;
+              }
+
+              html += '</tr>';
+              rowCount++;
+            });
+          }
+        });
+
+        console.log(`📊 Total de linhas geradas: ${rowCount}`);
+
+        html += `
+              </tbody>
+            </table>
+          </body>
+          </html>
+        `;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+
+        toast({
+          title: 'Sucesso',
+          description: 'Janela de impressão aberta. Salve como PDF',
+        });
+      } else if (exportFormat === 'html') {
+        // Exportar para HTML
+        let html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Escala - ${monthNameCapitalized}</title>
+            <style>
+              body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+              .header-container { display: flex; align-items: center; justify-content: center; margin: 20px 0; position: relative; }
+              .logo { position: absolute; left: 20px; width: 60px; height: auto; }
+              h1 { text-align: center; font-size: 18px; margin: 0; flex: 1; }
+              .legend { display: flex; justify-content: center; gap: 20px; margin: 15px 0; font-size: 11px; flex-wrap: wrap; }
+              .legend-item { display: flex; align-items: center; gap: 8px; }
+              .legend-color { width: 16px; height: 16px; border: 1px solid #666; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+              th { background-color: #f0f0f0; font-weight: bold; text-align: center; vertical-align: middle; }
+              .header-row { background-color: #e0e0e0; }
+              @media print {
+                @page { size: A3 landscape; margin: 0.5cm; }
+                body { font-size: 8px; }
+                .logo { width: 50px; }
+                .legend { font-size: 7px; gap: 10px; }
+                .legend-color { width: 12px; height: 12px; }
+                th, td { padding: 2px 3px; font-size: 7px; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header-container">
+              <img src="${logoBase64}" alt="Logo" class="logo">
+              <h1>SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}</h1>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-color" style="background: #c5c6c8;"></div>Missa Diária</div>
+              <div class="legend-item"><div class="legend-color" style="background: #ffda9e;"></div>Dominical</div>
+              <div class="legend-item"><div class="legend-color" style="background: #b2e2f2;"></div>Cura e Libertação</div>
+              <div class="legend-item"><div class="legend-color" style="background: #fabfb7;"></div>Sagrado Coração</div>
+              <div class="legend-item"><div class="legend-color" style="background: #e3b1c8;"></div>Imaculado Coração</div>
+              <div class="legend-item"><div class="legend-color" style="background: #fdf9c4;"></div>Novena de Outubro</div>
+            </div>
+            <table>
+              <thead>
+                <!-- Linha 1: Grupos de posições com células mescladas -->
+                <tr class="header-row">
+                  <th rowspan="2">Data</th>
+                  <th rowspan="2">Dia</th>
+                  <th rowspan="2">Hora</th>
+                  ${positionGroups.map(group =>
+                    `<th colspan="${group.positions.length}">${group.name}</th>`
+                  ).join('')}
+                </tr>
+                <!-- Linha 2: Números das posições -->
+                <tr class="header-row">
+                  ${positionGroups.map(group =>
+                    group.positions.map(pos => `<th>${pos}</th>`).join('')
+                  ).join('')}
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        allDays.forEach(day => {
+          const massTimes = getMassTimesForDate(day);
+          if (massTimes.length > 0) {
+            massTimes.forEach(massTime => {
+              const dateStr = format(day, 'yyyy-MM-dd');
+              const dayName = format(day, 'EEEE', { locale: ptBR });
+              const dayNumber = day.getDate();
+              const time = massTime.substring(0, 5);
+              const normalizedMassTime = normalizeMassTime(massTime);
+
+              // Obter tipo e cor da missa
+              const massInfo = getMassTypeAndColor(day, normalizedMassTime);
+
+              html += `<tr style="background-color: ${massInfo.color}; color: ${massInfo.textColor};">`;
+              html += `<td>${dayNumber}</td><td>${dayName}</td><td>${time}</td>`;
+
+              for (let posKey = 1; posKey <= totalPositions; posKey++) {
+                const assignment = assignments.find(
+                  a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime && a.position === posKey
+                );
+                const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || '';
+                html += `<td>${displayName}</td>`;
+              }
+
+              html += '</tr>';
+            });
+          }
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </body>
+          </html>
+        `;
+
+        // Download HTML file
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Escala_${monthNameCapitalized.replace('/', '_')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Sucesso',
+          description: 'Arquivo HTML exportado com sucesso',
+        });
+      } else {
+        // Exportar para Excel
+        const data: any[][] = [];
+
+        // Título
+        data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}`]);
+        data.push([]);
+
+        // Header linha 1: Grupos de posições
+        const headerRow1 = ['Data', 'Dia', 'Hora'];
+        positionGroups.forEach(group => {
+          headerRow1.push(group.name);
+          // Adicionar células vazias para as colunas adicionais do grupo
+          for (let i = 1; i < group.positions.length; i++) {
+            headerRow1.push('');
+          }
+        });
+        data.push(headerRow1);
+
+        // Header linha 2: Números das posições
+        const headerRow2 = ['', '', ''];
+        positionGroups.forEach(group => {
+          group.positions.forEach(pos => {
+            headerRow2.push(pos.toString());
+          });
+        });
+        data.push(headerRow2);
+
+        // Dados e informações de cores
+        const rowColors: Array<{row: number, color: string, textColor: string}> = [];
+        let currentDataRow = 4; // Linha 0: título, 1: vazia, 2-3: headers, dados começam em 4
+
+        allDays.forEach(day => {
+          const massTimes = getMassTimesForDate(day);
+          if (massTimes.length > 0) {
+            massTimes.forEach(massTime => {
+              const dateStr = format(day, 'yyyy-MM-dd');
+              const dayName = format(day, 'EEEE', { locale: ptBR });
+              const dayNumber = day.getDate();
+              const time = massTime.substring(0, 5);
+
+              // Normalizar formato de hora para comparação
+              const normalizedMassTime = normalizeMassTime(massTime);
+
+              // Obter tipo e cor da missa
+              const massInfo = getMassTypeAndColor(day, normalizedMassTime);
+              rowColors.push({ row: currentDataRow, color: massInfo.color, textColor: massInfo.textColor });
+
+              const row = [dayNumber.toString(), dayName, time];
+
+              // Adicionar ministros para cada posição (1-28)
+              for (let posKey = 1; posKey <= totalPositions; posKey++) {
+                const assignment = assignments.find(
+                  a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime && a.position === posKey
+                );
+                const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || '';
+                row.push(displayName);
+              }
+
+              data.push(row);
+              currentDataRow++;
+            });
+          }
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(data);
+
+        // Larguras das colunas (3 iniciais + totalPositions)
+        ws['!cols'] = [
+          { wch: 6 },   // Data
+          { wch: 20 },  // Dia
+          { wch: 8 },   // Hora
+          ...Array(totalPositions).fill({ wch: 18 }) // Posições
+        ];
+
+        // Merge do título (3 colunas iniciais + totalPositions = 3 + 28 = 31)
+        const lastCol = 3 + totalPositions - 1;
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } });
+
+        // Merge das colunas Data, Dia e Hora (linhas 2-3, índices 2-3)
+        ws['!merges'].push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }); // Data
+        ws['!merges'].push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }); // Dia
+        ws['!merges'].push({ s: { r: 2, c: 2 }, e: { r: 3, c: 2 } }); // Hora
+
+        // Merge dos grupos de posições (linha 2, índice 2)
+        let currentCol = 3; // Começa depois de Data, Dia, Hora
+        positionGroups.forEach(group => {
+          if (group.positions.length > 1) {
+            ws['!merges']!.push({
+              s: { r: 2, c: currentCol },
+              e: { r: 2, c: currentCol + group.positions.length - 1 }
+            });
+          }
+          currentCol += group.positions.length;
+        });
+
+        // Aplicar estilos nos headers (linhas 2 e 3, índices 2 e 3)
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        for (let row = 2; row <= 3; row++) {
+          for (let col = 0; col <= range.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            if (!ws[cellAddress]) continue;
+            if (!ws[cellAddress].s) ws[cellAddress].s = {};
+            ws[cellAddress].s.alignment = { vertical: 'center', horizontal: 'center' };
+            ws[cellAddress].s.font = { bold: true };
+          }
+        }
+
+        // Função para converter hex para RGB (0-255)
+        const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          } : { r: 255, g: 255, b: 255 };
+        };
+
+        // Aplicar cores nas linhas de dados
+        rowColors.forEach(({ row, color, textColor }) => {
+          for (let col = 0; col <= range.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            if (!ws[cellAddress]) continue;
+            if (!ws[cellAddress].s) ws[cellAddress].s = {};
+
+            // Formato ARGB (Alpha, Red, Green, Blue) em hexadecimal
+            const bgColorARGB = 'FF' + color.replace('#', '').toUpperCase();
+            const fgColorARGB = 'FF' + textColor.replace('#', '').toUpperCase();
+
+            ws[cellAddress].s.fill = {
+              patternType: 'solid',
+              fgColor: { rgb: bgColorARGB }
+            };
+            ws[cellAddress].s.font = {
+              color: { rgb: fgColorARGB }
+            };
+          }
+        });
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Escala');
+        XLSX.writeFile(wb, `Escala_${monthNameCapitalized.replace('/', '_')}.xlsx`);
+
+        toast({
+          title: 'Sucesso',
+          description: 'Planilha Excel exportada com sucesso',
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao exportar',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Buscar substitutos disponíveis quando abrir o dialog
   useEffect(() => {
     const fetchAvailableSubstitutes = async () => {
@@ -775,7 +1343,7 @@ export default function Schedules() {
                       </>
                     )}
                     {currentSchedule.status === "published" && isCoordinator && (
-                      <Button 
+                      <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleUnpublishSchedule(currentSchedule.id)}
@@ -786,18 +1354,23 @@ export default function Schedules() {
                         <span className="sm:hidden">Despublicar</span>
                       </Button>
                     )}
-                    
-                    {/* Editor Detalhado para coordenadores */}
-                    {currentSchedule && isCoordinator && (
+
+                    {/* Botão de exportação */}
+                    {currentSchedule && (
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => window.location.href = '/schedule-editor'}
+                        variant="default"
+                        onClick={handleOpenExportDialog}
+                        disabled={isExporting}
                         className="text-xs sm:text-sm"
                       >
-                        <Edit className="h-3.5 w-3.5 mr-1" />
-                        <span className="hidden sm:inline">Editor Detalhado</span>
-                        <span className="sm:hidden">Editor</span>
+                        {isExporting ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        <span className="hidden sm:inline">Exportar</span>
+                        <span className="sm:hidden">Exportar</span>
                       </Button>
                     )}
                   </div>
@@ -814,11 +1387,6 @@ export default function Schedules() {
             <CalendarIcon className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
             <span className="hidden sm:inline">Visualização Mensal</span>
             <span className="sm:hidden">Mensal</span>
-          </TabsTrigger>
-          <TabsTrigger value="list" className="text-xs sm:text-sm px-2 sm:px-3">
-            <Clock className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
-            <span className="hidden sm:inline">Lista Detalhada</span>
-            <span className="sm:hidden">Lista</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1292,123 +1860,6 @@ export default function Schedules() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="list" className="mt-4 sm:mt-6">
-          <Card>
-            <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-base sm:text-lg">Escalas Detalhadas</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Visualização completa das escalas do mês
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-6">
-              <div className="space-y-4 sm:space-y-6">
-                {getDaysInMonth().map((day) => {
-                  // Filtrar apenas dias do mês atual
-                  if (!isSameMonth(day, currentMonth)) return null;
-
-                  const dayAssignments = getAssignmentsForDate(day);
-                  const isUserScheduled = isUserScheduledOnDate(day);
-                  const availableMassTimes = getMassTimesForDate(day);
-
-                  // Não renderizar dias sem missas disponíveis
-                  if (availableMassTimes.length === 0) return null;
-
-                  // Se não é coordenador e não tem assignments, não mostrar
-                  if (dayAssignments.length === 0 && !isCoordinator) return null;
-                  
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      className={cn(
-                        "border rounded-lg p-3 sm:p-4",
-                        isUserScheduled && currentSchedule?.status === "published" && "border-2 bg-white dark:bg-slate-900 shadow-lg border-[#959D90]"
-                      )}
-                    >
-                      <h3 className="font-semibold text-sm sm:text-lg mb-2 sm:mb-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                        <span className="break-words">{format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
-                        {isUserScheduled && currentSchedule?.status === "published" && (
-                          <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs text-white" style={{ backgroundColor: '#959D90' }}>
-                            Você está escalado
-                          </Badge>
-                        )}
-                      </h3>
-
-                      <div className="space-y-3 sm:space-y-4">
-                        {availableMassTimes && availableMassTimes.map((time) => {
-                          const timeAssignments = dayAssignments.filter(a => a.massTime === time);
-                          
-                          return (
-                            <div key={time} className="bg-muted/50 rounded-lg p-2 sm:p-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium text-xs sm:text-sm">Missa das {time}</span>
-                                </div>
-                                {isCoordinator && currentSchedule && currentSchedule.status !== "published" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setSelectedDate(day);
-                                      setSelectedMassTime(time);
-                                      setIsAssignmentDialogOpen(true);
-                                    }}
-                                    className="h-7 w-7 p-0"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                              
-                              {timeAssignments.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
-                                  {timeAssignments.map((assignment) => {
-                                    const currentMinister = ministers.find(m => m.id === user?.id);
-                                    const isCurrentUser = currentMinister && assignment.ministerId === currentMinister.id;
-                                    
-                                    return (
-                                      <div
-                                        key={assignment.id}
-                                        className={cn(
-                                          "flex items-center gap-1 sm:gap-2 text-xs sm:text-sm p-1.5 sm:p-2 rounded",
-                                          isCurrentUser && "bg-white dark:bg-slate-900 border-2"
-                                        )}
-                                        style={isCurrentUser ? { borderColor: '#959D90' } : {}}
-                                      >
-                                        <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2 py-0 sm:py-0.5 flex-shrink-0">
-                                          <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position] || 'Posição'}</span>
-                                          <span className="sm:hidden">{assignment.position}</span>
-                                        </Badge>
-                                        <span className={cn("truncate flex-1 min-w-0 text-[11px] sm:text-sm", isCurrentUser && "font-medium")}>
-                                          {assignment.ministerName || "Ministro"}
-                                        </span>
-                                        <div className="flex-shrink-0">
-                                          {assignment.confirmed ? (
-                                            <Check className="h-3 w-3 text-green-600" />
-                                          ) : (
-                                            <AlertCircle className="h-3 w-3 text-yellow-600" />
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                  Nenhum ministro escalado
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Dialog para visualizar escala publicada */}
@@ -1428,10 +1879,19 @@ export default function Schedules() {
               {selectedDateAssignments && selectedDateAssignments.length > 0 ? (
                 <>
                   <div className="grid gap-2">
-                    {selectedDateAssignments
+                    {(() => {
+                      // Check if current user is Auxiliar 1 or 2 for this mass
+                      const currentMinister = ministers.find(m => m.id === user?.id);
+                      const userAssignmentsForThisMass = selectedDateAssignments.filter(
+                        a => a.ministerId === currentMinister?.id
+                      );
+                      const isUserAuxiliar1or2 = userAssignmentsForThisMass.some(
+                        a => a.position === 1 || a.position === 2
+                      );
+
+                      return selectedDateAssignments
                           .sort((a, b) => a.position - b.position)
                           .map((assignment) => {
-                            const currentMinister = ministers.find(m => m.id === user?.id);
                             const isCurrentUser = currentMinister && assignment.ministerId === currentMinister.id;
 
                             return (
@@ -1443,27 +1903,41 @@ export default function Schedules() {
                                 )}
                                 style={isCurrentUser ? { borderColor: '#959D90' } : {}}
                               >
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                                  <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                    <Badge
-                                      variant={isCurrentUser ? "default" : "secondary"}
-                                      className={cn(
-                                        "flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1",
-                                        isCurrentUser && "text-white"
+                                <div className="flex items-start gap-2 sm:gap-3 mb-2">
+                                  {/* Informações do ministro - lado esquerdo */}
+                                  <div className="flex flex-col flex-1 min-w-0 gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge
+                                        variant={isCurrentUser ? "default" : "secondary"}
+                                        className={cn(
+                                          "flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1",
+                                          isCurrentUser && "text-white"
+                                        )}
+                                        style={isCurrentUser ? { backgroundColor: '#959D90' } : {}}
+                                      >
+                                        <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
+                                        <span className="sm:hidden">{assignment.position}</span>
+                                      </Badge>
+                                      {assignment.confirmed ? (
+                                        <div className="flex items-center gap-1 text-green-600">
+                                          <Check className="h-3 w-3 sm:h-4 sm:w-4" />
+                                          <span className="text-[10px] sm:text-xs">Confirmado</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-1 text-yellow-600">
+                                          <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                                          <span className="text-[10px] sm:text-xs">Pendente</span>
+                                        </div>
                                       )}
-                                      style={isCurrentUser ? { backgroundColor: '#959D90' } : {}}
-                                    >
-                                      <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
-                                      <span className="sm:hidden">{assignment.position}</span>
-                                    </Badge>
-                                    <div className="min-w-0 flex-1">
+                                    </div>
+                                    <div className="min-w-0">
                                       <p
                                         className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "font-bold")}
                                         style={isCurrentUser ? { color: '#959D90' } : {}}
                                       >
                                         {formatMinisterName(assignment.ministerName) || "Ministro"}
                                       </p>
-                                      <p className="text-[10px] sm:hidden text-muted-foreground truncate mt-0.5">
+                                      <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5 sm:hidden">
                                         {LITURGICAL_POSITIONS[assignment.position]}
                                       </p>
                                       {isCurrentUser && (
@@ -1474,20 +1948,136 @@ export default function Schedules() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-1 flex-shrink-0 sm:ml-2">
-                                    {assignment.confirmed ? (
-                                      <div className="flex items-center gap-1 text-green-600">
-                                        <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        <span className="text-[10px] sm:text-xs">Confirmado</span>
+                                  {/* Avatar - lado direito */}
+                                  {(() => {
+                                    const minister = ministers.find(m => m.id === assignment.ministerId);
+                                    const ministerPhotoUrl = minister?.photoUrl;
+                                    const ministerName = formatMinisterName(assignment.ministerName) || "Ministro";
+                                    const initials = ministerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+                                    return (
+                                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
+                                        <AvatarImage src={ministerPhotoUrl} alt={ministerName} />
+                                        <AvatarFallback>{initials}</AvatarFallback>
+                                      </Avatar>
+                                    );
+                                  })()}
+                                </div>
+
+                                {/* Seção de observações/comentários */}
+                                {(assignment.notes || isUserAuxiliar1or2 || isCoordinator) && (
+                                  <div className="mt-3 pt-3 border-t">
+                                    {editingNotesForAssignment === assignment.id ? (
+                                      <div className="space-y-2">
+                                        <Label className="text-xs sm:text-sm font-medium">
+                                          Observações da Missa
+                                        </Label>
+                                        <Textarea
+                                          value={notesText}
+                                          onChange={(e) => setNotesText(e.target.value)}
+                                          placeholder="Escreva observações sobre a missa (ex: ocorrências, necessidades, etc.)"
+                                          className="min-h-[80px] text-xs sm:text-sm"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="default"
+                                            className="text-xs sm:text-sm h-7 sm:h-8"
+                                            disabled={savingNotes}
+                                            onClick={async () => {
+                                              try {
+                                                setSavingNotes(true);
+                                                const response = await fetch(`/api/schedule-assignments/${assignment.id}`, {
+                                                  method: "PATCH",
+                                                  headers: {
+                                                    "Content-Type": "application/json"
+                                                  },
+                                                  credentials: "include",
+                                                  body: JSON.stringify({
+                                                    notes: notesText
+                                                  })
+                                                });
+
+                                                if (response.ok) {
+                                                  toast({
+                                                    title: "Sucesso",
+                                                    description: "Observações salvas com sucesso"
+                                                  });
+                                                  setEditingNotesForAssignment(null);
+                                                  setNotesText("");
+                                                  await fetchScheduleForDate(selectedDate);
+                                                } else {
+                                                  const error = await response.json();
+                                                  throw new Error(error.message || "Erro ao salvar");
+                                                }
+                                              } catch (error: any) {
+                                                toast({
+                                                  title: "Erro",
+                                                  description: error.message || "Erro ao salvar observações",
+                                                  variant: "destructive"
+                                                });
+                                              } finally {
+                                                setSavingNotes(false);
+                                              }
+                                            }}
+                                          >
+                                            {savingNotes ? (
+                                              <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 animate-spin" />
+                                            ) : (
+                                              <Save className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                                            )}
+                                            Salvar
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-xs sm:text-sm h-7 sm:h-8"
+                                            onClick={() => {
+                                              setEditingNotesForAssignment(null);
+                                              setNotesText("");
+                                            }}
+                                          >
+                                            <X className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                                            Cancelar
+                                          </Button>
+                                        </div>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-1 text-yellow-600">
-                                        <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        <span className="text-[10px] sm:text-xs">Pendente</span>
+                                      <div>
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs sm:text-sm font-medium mb-1 flex items-center gap-1">
+                                              <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                              Observações
+                                            </p>
+                                            {assignment.notes ? (
+                                              <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                                                {assignment.notes}
+                                              </p>
+                                            ) : (
+                                              <p className="text-xs text-muted-foreground italic">
+                                                Nenhuma observação registrada
+                                              </p>
+                                            )}
+                                          </div>
+                                          {(isUserAuxiliar1or2 || isCoordinator) && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="flex-shrink-0 h-7 px-2 text-xs"
+                                              onClick={() => {
+                                                setEditingNotesForAssignment(assignment.id);
+                                                setNotesText(assignment.notes || "");
+                                              }}
+                                            >
+                                              <Edit2 className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
-                                </div>
+                                )}
 
                                 <div className="flex gap-2">
                                   {isCurrentUser && (
@@ -1505,7 +2095,7 @@ export default function Schedules() {
                                       <span className="sm:hidden">Solicitar Substituto</span>
                                     </Button>
                                   )}
-                                  {isCoordinator && (
+                                  {(isCoordinator || isUserAuxiliar1or2) && (
                                     <>
                                       <Button
                                         size="sm"
@@ -1514,12 +2104,12 @@ export default function Schedules() {
                                         onClick={() => {
                                           // Salvar o ID do assignment que está sendo editado
                                           setEditingAssignmentId(assignment.id);
-                                          
+
                                           // Preencher o modal com os dados atuais
                                           setSelectedMassTime(assignment.massTime);
                                           setSelectedPosition(assignment.position);
                                           setSelectedMinisterId(assignment.ministerId || "");
-                                          
+
                                           // Fechar dialog de visualização e abrir dialog de edição
                                           setIsViewScheduleDialogOpen(false);
                                           setIsAssignmentDialogOpen(true);
@@ -1568,7 +2158,8 @@ export default function Schedules() {
                                 </div>
                               </div>
                             );
-                          })}
+                          });
+                    })()}
                   </div>
                 </>
               ) : (
@@ -1580,30 +2171,34 @@ export default function Schedules() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-3 sm:mt-4 flex-col sm:flex-row gap-2">
+          <DialogFooter className="mt-3 sm:mt-4 flex flex-col gap-2">
             {selectedDateAssignments && selectedDateAssignments.length > 0 && selectedDate && (
-              <ScheduleExport
-                date={selectedDate}
-                assignments={selectedDateAssignments}
-              />
+              <div className="w-full sm:mr-auto">
+                <ScheduleExport
+                  date={selectedDate}
+                  assignments={selectedDateAssignments}
+                />
+              </div>
             )}
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsViewScheduleDialogOpen(false);
-                setIsTimeSelectionDialogOpen(true);
-              }}
-              className="w-full sm:w-auto text-sm"
-            >
-              Voltar
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsViewScheduleDialogOpen(false)}
-              className="w-full sm:w-auto text-sm"
-            >
-              Fechar
-            </Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto sm:ml-auto">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsViewScheduleDialogOpen(false);
+                  setIsTimeSelectionDialogOpen(true);
+                }}
+                className="w-full sm:w-auto text-sm"
+              >
+                Voltar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsViewScheduleDialogOpen(false)}
+                className="w-full sm:w-auto text-sm"
+              >
+                Fechar
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2140,6 +2735,84 @@ export default function Schedules() {
           setIsTimeSelectionDialogOpen(true);
         }}
       />
+
+      {/* Dialog de seleção de formato de exportação */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exportar Escala</DialogTitle>
+            <DialogDescription>
+              Escolha o formato de exportação para a escala de {format(currentMonth, 'MMMM/yyyy', { locale: ptBR })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {isCoordinator ? (
+              <div className="space-y-3">
+                <Label>Selecione o formato:</Label>
+                <div className="grid gap-2">
+                  <Button
+                    variant={exportFormat === 'excel' ? 'default' : 'outline'}
+                    className={cn(
+                      "justify-start transition-all duration-200",
+                      exportFormat === 'excel' && "ring-2 ring-amber-400 shadow-lg scale-[1.02] bg-amber-50 text-amber-900 hover:bg-amber-100"
+                    )}
+                    onClick={() => setExportFormat('excel')}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Excel (.xlsx)
+                  </Button>
+                  <Button
+                    variant={exportFormat === 'html' ? 'default' : 'outline'}
+                    className={cn(
+                      "justify-start transition-all duration-200",
+                      exportFormat === 'html' && "ring-2 ring-amber-400 shadow-lg scale-[1.02] bg-amber-50 text-amber-900 hover:bg-amber-100"
+                    )}
+                    onClick={() => setExportFormat('html')}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    HTML (Página Web)
+                  </Button>
+                  <Button
+                    variant={exportFormat === 'pdf' ? 'default' : 'outline'}
+                    className={cn(
+                      "justify-start transition-all duration-200",
+                      exportFormat === 'pdf' && "ring-2 ring-amber-400 shadow-lg scale-[1.02] bg-amber-50 text-amber-900 hover:bg-amber-100"
+                    )}
+                    onClick={() => setExportFormat('pdf')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    PDF (Impressão)
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Como ministro, você pode exportar apenas em formato PDF
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleExportSchedule} disabled={isExporting}>
+              {isExporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </Layout>
   );

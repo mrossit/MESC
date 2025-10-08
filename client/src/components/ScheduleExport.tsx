@@ -341,13 +341,13 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Exportar Escala</span>
             <span className="sm:hidden">Exportar</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-[200px]">
           <DropdownMenuItem onClick={() => handleExportClick("csv")}>
             <Table className="mr-2 h-4 w-4" />
             <span>Exportar como CSV</span>
