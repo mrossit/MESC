@@ -63,7 +63,10 @@ export function ScheduleExport({ date, assignments }: ScheduleExportProps) {
   const handleConfirmExport = () => {
     const filteredAssignments = assignments.filter(a => selectedMasses.includes(a.massTime));
     performExport(exportFormat, filteredAssignments);
-    setIsDialogOpen(false);
+    // Pequeno delay antes de fechar o dialog para evitar problemas com viewport mobile
+    setTimeout(() => {
+      setIsDialogOpen(false);
+    }, 100);
   };
 
   const performExport = (format: "csv" | "text" | "html", assignmentsToExport: ScheduleAssignment[]) => {
