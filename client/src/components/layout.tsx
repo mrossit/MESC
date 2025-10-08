@@ -82,8 +82,8 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 {/* Notifications - desktop only */}
                 {!isMobile && <NotificationBell compact className="h-9 w-9" />}
 
-                {/* Dark Mode Toggle - desktop only */}
-                {!isMobile && <ThemeToggle />}
+                {/* Dark Mode Toggle - always visible (discreto no mobile) */}
+                <ThemeToggle />
 
                 {/* Mobile: Hamburger menu on right */}
                 {isMobile && <SidebarTrigger className="ml-auto" />}
