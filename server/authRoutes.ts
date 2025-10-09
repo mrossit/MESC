@@ -5,6 +5,7 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { createSession } from './routes/session';
+import { auditLog, AuditAction, auditLoginAttempt, logAudit } from './middleware/auditLogger';
 
 const router = Router();
 
@@ -45,6 +46,9 @@ router.post('/login', async (req, res) => {
 
     const result = await login(email, password);
 
+    // AUDITORIA: Log login bem-sucedido
+    await auditLoginAttempt(email, true, req);
+
     // Define cookie com o token JWT
     res.cookie('token', result.token, {
       httpOnly: true,
@@ -77,6 +81,12 @@ router.post('/login', async (req, res) => {
       user: result.user
     });
   } catch (error: any) {
+    // AUDITORIA: Log login falho
+    const email = req.body?.email;
+    if (email) {
+      await auditLoginAttempt(email, false, req, error.message || 'Credenciais inválidas');
+    }
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -96,14 +106,25 @@ router.post('/login', async (req, res) => {
 router.post('/register', async (req, res) => {
   try {
     const userData = publicRegisterSchema.parse(req.body);
-    
+
     // Cria usuário com status pending
     const newUser = await register({
       ...userData,
       role: 'ministro',
       status: 'pending'
     });
-    
+
+    // AUDITORIA: Log registro público
+    await logAudit(AuditAction.USER_CREATE, {
+      userId: newUser.id,
+      email: userData.email,
+      name: userData.name,
+      role: 'ministro',
+      status: 'pending',
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     res.status(201).json({
       success: true,
       message: 'Cadastro realizado com sucesso! Aguarde a aprovação do coordenador.',
@@ -117,7 +138,7 @@ router.post('/register', async (req, res) => {
         errors: error.errors
       });
     }
-    
+
     res.status(400).json({
       success: false,
       message: error.message || 'Erro ao criar usuário'
@@ -125,21 +146,44 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Rota de registro administrativo (apenas coordenadores e reitor)
-router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coordenador']), async (req: AuthRequest, res) => {
+// Rota de registro administrativo (apenas coordenadores e gestor)
+router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
     const userData = registerSchema.parse(req.body);
-    
-    // Apenas reitor pode criar outros coordenadores ou reitor
-    if ((userData.role === 'reitor' || userData.role === 'coordenador') && req.user?.role !== 'reitor') {
+
+    // Apenas gestor pode criar outros coordenadores ou gestor
+    if ((userData.role === 'gestor' || userData.role === 'coordenador') && req.user?.role !== 'gestor') {
       return res.status(403).json({
         success: false,
-        message: 'Apenas o reitor pode criar coordenadores'
+        message: 'Apenas gestores podem criar coordenadores ou outros gestores'
       });
     }
-    
+
+    // Coordenadores só podem criar ministros
+    if (req.user?.role === 'coordenador' && userData.role !== 'ministro') {
+      return res.status(403).json({
+        success: false,
+        message: 'Coordenadores só podem criar ministros'
+      });
+    }
+
     const newUser = await register(userData);
-    
+
+    // AUDITORIA: Log criação administrativa de usuário
+    await logAudit(AuditAction.USER_CREATE, {
+      userId: req.user?.id,
+      targetUserId: newUser.id,
+      targetResource: 'user',
+      changes: {
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+        createdBy: req.user?.email
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     res.status(201).json({
       success: true,
       message: 'Usuário criado com sucesso',
@@ -153,7 +197,7 @@ router.post('/admin-register', authenticateToken, requireRole(['reitor', 'coorde
         errors: error.errors
       });
     }
-    
+
     res.status(400).json({
       success: false,
       message: error.message || 'Erro ao criar usuário'
@@ -239,7 +283,17 @@ router.get('/user', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Rota de logout
-router.post('/logout', async (req, res) => {
+router.post('/logout', authenticateToken, async (req: AuthRequest, res) => {
+  // AUDITORIA: Log logout
+  if (req.user?.id) {
+    await logAudit(AuditAction.LOGOUT, {
+      userId: req.user.id,
+      email: req.user.email,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+  }
+
   // NOVO: Marca sessão como inativa
   const sessionToken = req.cookies?.session_token;
   if (sessionToken) {
@@ -283,16 +337,24 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
   console.log('🔍 DEBUG: Tipo dos dados:', typeof req.body, Object.keys(req.body));
   try {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
-    
+
     if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         message: 'Usuário não autenticado'
       });
     }
-    
+
     const result = await changePassword(req.user.id, currentPassword, newPassword);
-    
+
+    // AUDITORIA: Log troca de senha
+    await logAudit(AuditAction.PASSWORD_CHANGE, {
+      userId: req.user.id,
+      email: req.user.email,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     res.json({
       success: true,
       message: result.message
@@ -307,7 +369,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
         errors: error.errors
       });
     }
-    
+
     res.status(400).json({
       success: false,
       message: error.message || 'Erro ao trocar senha'
@@ -331,7 +393,7 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
   try {
     // Validar dados com schema
     const { userId, newPassword } = adminResetSchema.parse(req.body);
-    
+
     // Buscar usuário por ID
     const [user] = await db
       .select()
@@ -368,6 +430,21 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
       })
       .where(eq(users.id, userId));
 
+    // AUDITORIA: Log reset administrativo de senha
+    await logAudit(AuditAction.USER_UPDATE, {
+      userId: currentUser?.id,
+      targetUserId: userId,
+      targetResource: 'user',
+      action: 'admin_password_reset',
+      changes: {
+        resetBy: currentUser?.email,
+        targetUser: user.email,
+        requiresPasswordChange: true
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usuário ${user.name} (${user.email})`);
 
     return res.json({
@@ -382,7 +459,7 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
         errors: error.errors
       });
     }
-    
+
     console.error('Erro ao resetar senha administrativamente:', error);
     res.status(500).json({
       success: false,
@@ -395,14 +472,14 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
 router.post('/reset-password', async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
         message: 'Email é obrigatório'
       });
     }
-    
+
     // Validação básica mais flexível
     if (typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({
@@ -410,12 +487,19 @@ router.post('/reset-password', async (req, res) => {
         message: 'Por favor, forneça um endereço de email válido'
       });
     }
-    
+
     // Normalizar o email
     const normalizedEmail = email.trim().toLowerCase();
-    
+
     const result = await resetPassword(normalizedEmail);
-    
+
+    // AUDITORIA: Log solicitação de reset de senha
+    await logAudit(AuditAction.PASSWORD_RESET_REQUEST, {
+      email: normalizedEmail,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     return res.json({
       success: true,
       ...result

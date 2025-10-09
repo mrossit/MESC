@@ -39,8 +39,15 @@ import UserManagement from "@/pages/UserManagement";
 import QRCodeShare from "@/pages/QRCodeShare";
 import NotFound from "@/pages/not-found";
 import Reports from "@/pages/Reports";
+import PrivacyPolicy from "@/pages/privacy-policy";
 
-function Router() {
+function RouterWithHooks() {
+  // Monitor de atividade - logout automático após 10min de inatividade
+  useActivityMonitor();
+
+  // Verifica periodicamente se há nova versão e atualiza automaticamente
+  useVersionCheck();
+
   return (
     <Switch>
       {/* Public routes */}
@@ -50,6 +57,7 @@ function Router() {
       <Route path="/change-password" component={() => <ChangePassword />} />
       <Route path="/change-password-required" component={() => <ChangePasswordRequired />} />
       <Route path="/install" component={() => <Install />} />
+      <Route path="/privacy-policy" component={() => <PrivacyPolicy />} />
       
       {/* Protected routes */}
       <Route path="/dashboard">
@@ -150,12 +158,6 @@ function Router() {
 }
 
 function App() {
-  // Monitor de atividade - logout automático após 10min de inatividade
-  useActivityMonitor();
-
-  // Verifica periodicamente se há nova versão e atualiza automaticamente
-  useVersionCheck();
-
   // Verificar versão do cache e inatividade ao iniciar a aplicação
   useEffect(() => {
     checkCacheVersion();
@@ -177,7 +179,7 @@ function App() {
           <Toaster />
           <UpdateNotification />
           <PWAInstallPrompt />
-          <Router />
+          <RouterWithHooks />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

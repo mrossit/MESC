@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthRequest, authenticateToken } from '../auth';
 import { storage } from '../storage';
 import { formatMinisterName } from '../utils/formatters';
+import { auditPersonalDataAccess, logAudit, AuditAction } from '../middleware/auditLogger';
 
 const router = Router();
 
@@ -10,10 +11,10 @@ const router = Router();
 router.use(authenticateToken);
 
 // Obter perfil do usuário atual
-router.get('/', async (req: AuthRequest, res) => {
+router.get('/', auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
-    
+
     // Usar storage em memória
     const user = await storage.getUser(userId);
     if (!user) {
@@ -30,7 +31,7 @@ router.get('/', async (req: AuthRequest, res) => {
 router.put('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
-    
+
     const schema = z.object({
       name: z.string().optional(),
       phone: z.string().optional(),
@@ -41,7 +42,7 @@ router.put('/', async (req: AuthRequest, res) => {
       maritalStatus: z.string().optional(),
       scheduleDisplayName: z.string().nullable().optional()
     });
-    
+
     const parsedData = schema.parse(req.body);
 
     // Aplicar formatação ao scheduleDisplayName se fornecido
@@ -54,11 +55,27 @@ router.put('/', async (req: AuthRequest, res) => {
 
     // Atualizar no banco de dados
     const updatedUser = await storage.updateUser(userId, data);
-    
+
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
+    // AUDITORIA: Log atualização de perfil
+    // Verificar se contém dados religiosos (LGPD Art. 11)
+    const hasReligiousData = parsedData.baptismDate || parsedData.confirmationDate || parsedData.marriageDate;
+
+    await logAudit(
+      hasReligiousData ? AuditAction.RELIGIOUS_DATA_UPDATE : AuditAction.PERSONAL_DATA_UPDATE,
+      {
+        userId: userId,
+        targetResource: 'profile',
+        changes: Object.keys(data),
+        hasReligiousData,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
+      }
+    );
+
     return res.json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (error) {
     console.error('Error updating profile:', error);
@@ -79,7 +96,7 @@ router.post('/photo', async (req, res) => {
 });
 
 // Obter familiares do usuário
-router.get('/family', async (req: AuthRequest, res) => {
+router.get('/family', auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const relationships = await storage.getFamilyMembers(userId);
@@ -134,6 +151,19 @@ router.post('/family', async (req: AuthRequest, res) => {
     // Adicionar no banco de dados
     const relationship = await storage.addFamilyMember(userId, relatedUserId, relationshipType);
 
+    // AUDITORIA: Log adição de relacionamento familiar
+    await logAudit(AuditAction.PERSONAL_DATA_UPDATE, {
+      userId: userId,
+      targetResource: 'family_relationship',
+      action: 'add_family_member',
+      changes: {
+        relatedUserId,
+        relationshipType
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     return res.json({
       message: 'Family member added successfully',
       relationship: {
@@ -163,9 +193,22 @@ router.post('/family', async (req: AuthRequest, res) => {
 router.delete('/family/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
 
     // Remover o relacionamento
     await storage.removeFamilyMember(id);
+
+    // AUDITORIA: Log remoção de relacionamento familiar
+    await logAudit(AuditAction.PERSONAL_DATA_UPDATE, {
+      userId: userId,
+      targetResource: 'family_relationship',
+      action: 'remove_family_member',
+      changes: {
+        relationshipId: id
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     return res.json({ message: 'Family member removed successfully' });
   } catch (error) {

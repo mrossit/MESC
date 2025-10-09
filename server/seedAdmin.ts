@@ -36,7 +36,7 @@ async function seedAdmin() {
     if (admin) {
       console.log('✅ Usuário administrador criado com sucesso!');
       console.log('📧 Email:', adminData.email);
-      console.log('🔑 Senha inicial:', adminData.password);
+      console.log('🔑 Senha: Verifique a senha hardcoded no arquivo seedAdmin.ts');
       console.log('⚠️  IMPORTANTE: Troque a senha no primeiro acesso!');
     } else {
       console.log('ℹ️  Usuário administrador já existe.');
@@ -70,7 +70,7 @@ async function seedAdmin() {
     if (coord) {
       console.log('\n✅ Usuário coordenador criado com sucesso!');
       console.log('📧 Email:', coordenadorData.email);
-      console.log('🔑 Senha inicial:', coordenadorData.password);
+      console.log('🔑 Senha: Verifique a senha hardcoded no arquivo seedAdmin.ts');
     }
     
     // Cria um ministro de exemplo
@@ -102,7 +102,7 @@ async function seedAdmin() {
     if (ministro) {
       console.log('\n✅ Usuário ministro criado com sucesso!');
       console.log('📧 Email:', ministroData.email);
-      console.log('🔑 Senha inicial:', ministroData.password);
+      console.log('🔑 Senha: Verifique a senha hardcoded no arquivo seedAdmin.ts');
     }
     
     console.log('\n✨ Seed concluído com sucesso!');

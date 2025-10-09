@@ -1,13 +1,116 @@
+# ==========================================
+# DEPENDÊNCIAS
+# ==========================================
 node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# SISTEMA OPERACIONAL
+# ==========================================
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ==========================================
+# SEGURANÇA - NUNCA COMMITAR! 🔒
+# ==========================================
+
+# Arquivos de ambiente (contêm secrets)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# Bancos de dados (podem conter dados pessoais - LGPD)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+local.db*
+eueuchurch*.db
+questionnaire.db*
+production.db*
+
+# Backups (nunca versionar backups!)
+backups/
+backup-*.sql
+backup-*.db
+backup-*.json
+*.sql
+*.sql.gz
+*.dump
+
+# Chaves privadas e certificados
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+
+# Logs (podem conter informações sensíveis)
+logs/
+*.log
+npm-debug.log*
+combined.log
+error.log
+
+# ==========================================
+# BUILD E DISTRIBUIÇÃO
+# ==========================================
+dist/
+build/
+.output/
+.vite/
+.cache/
+*.tsbuildinfo
+
 server/public
 vite.config.ts.*
 *.tar.gz
 
-# Backups (nunca versionar backups de banco!)
-backups/
-*.sql
-*.sql.gz
-backup-*.json
+# ==========================================
+# COVERAGE E TESTES
+# ==========================================
+coverage/
+.nyc_output/
+*.lcov
 
-# BMAD (local only)
+# ==========================================
+# IDEs E EDITORES
+# ==========================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# TEMPORÁRIOS E CACHE
+# ==========================================
+.tmp/
+tmp/
+temp/
+.cache/
+*.tmp
+
+# ==========================================
+# REPLIT
+# ==========================================
+.replit
+replit.nix
+.breakpoints
+.upm/
+.config/
+
+# ==========================================
+# BMAD (local only - arquivos de agentes)
+# ==========================================

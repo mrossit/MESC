@@ -232,8 +232,9 @@ export class DatabaseStorage implements IStorage {
 
   // MESC specific user operations
   async createUser(userData: InsertUser): Promise<User> {
-    // Generate a temporary password for admin-created users
-    const tempPassword = Math.random().toString(36).slice(-12);
+    // Generate a secure temporary password for admin-created users
+    const crypto = require('crypto');
+    const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12) + '!Aa1';
     const bcrypt = await import('bcrypt');
     const passwordHash = await bcrypt.hash(tempPassword, 10);
     

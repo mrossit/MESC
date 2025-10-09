@@ -2504,7 +2504,7 @@ export default function Schedules() {
                 <>
                   Você está solicitando substituição para o dia{" "}
                   <strong>
-                    {format(new Date(selectedAssignmentForSubstitution.date), "dd 'de' MMMM", { locale: ptBR })}
+                    {format(parseScheduleDate(String(selectedAssignmentForSubstitution.date)), "dd 'de' MMMM", { locale: ptBR })}
                   </strong>{" "}
                   na missa das <strong>{formatMassTime(selectedAssignmentForSubstitution.massTime)}</strong> como{" "}
                   <strong>{LITURGICAL_POSITIONS[selectedAssignmentForSubstitution.position]}</strong>.

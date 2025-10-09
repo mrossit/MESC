@@ -178,7 +178,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             .select({
               id: substitutionRequests.id,
               scheduleId: substitutionRequests.scheduleId,
+              assignmentId: substitutionRequests.scheduleId, // Alias para compatibilidade com o cliente
               requesterId: substitutionRequests.requesterId,
+              requestingMinisterId: substitutionRequests.requesterId, // Alias para compatibilidade
               substituteId: substitutionRequests.substituteId,
               status: substitutionRequests.status,
               reason: substitutionRequests.reason
@@ -190,7 +192,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
                   schedulesList.map((s: any) => sql`${s.id}`),
                   sql`, `
                 )})`,
-                sql`${substitutionRequests.status} IN ('pending', 'approved')`
+                sql`${substitutionRequests.status} IN ('pending', 'approved', 'auto_approved')`
               )
             )
         : [];

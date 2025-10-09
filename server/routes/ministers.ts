@@ -5,11 +5,12 @@ import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { formatMinisterName } from "../utils/formatters";
+import { auditPersonalDataAccess, logAudit, AuditAction } from "../middleware/auditLogger";
 
 const router = Router();
 
 // Get all ministers (users with role 'ministro' OR 'coordenador')
-router.get("/", requireAuth, async (req: AuthRequest, res) => {
+router.get("/", requireAuth, auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const ministersList = await db
       .select()
@@ -26,7 +27,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Get single minister
-router.get("/:id", requireAuth, async (req: AuthRequest, res) => {
+router.get("/:id", requireAuth, auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const minister = await db
       .select()
@@ -110,8 +111,15 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
       return res.status(404).json({ message: "Ministro não encontrado" });
     }
 
-    // Log activity (using console.log for now since storage.logActivity doesn't exist)
-    console.log(`[Activity Log] UPDATE_MINISTER: Dados do ministro ${result[0].name} atualizados`, { ministerId: userId, fields: Object.keys(updateData) });
+    // AUDITORIA: Log atualização de dados pessoais
+    await logAudit(AuditAction.PERSONAL_DATA_UPDATE, {
+      userId: currentUser.id,
+      targetUserId: userId,
+      targetResource: 'minister',
+      changes: Object.keys(updateData),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     res.json(result[0]);
   } catch (error) {

@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
@@ -22,6 +23,60 @@ const app = express();
 
 // Trust proxy for Replit deployment (needed for rate limiter and CORS)
 app.set('trust proxy', true);
+
+// Helmet - Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Necessário para Vite HMR em dev
+        "'unsafe-eval'",   // Necessário para Vite HMR em dev
+        "https://cdn.jsdelivr.net" // Para bibliotecas CDN
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Necessário para styled components e Tailwind
+        "https://fonts.googleapis.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com"
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https:"
+      ],
+      connectSrc: [
+        "'self'",
+        process.env.NODE_ENV === 'development' ? "ws:" : "",
+        process.env.NODE_ENV === 'development' ? "wss:" : ""
+      ].filter(Boolean),
+      workerSrc: ["'self'", "blob:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Permitir embed de recursos externos
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: {
+    maxAge: 31536000, // 1 ano
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: {
+    action: 'deny' // Prevenir clickjacking
+  },
+  noSniff: true,
+  xssFilter: true,
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin'
+  }
+}));
 
 // CRITICAL: Health check endpoints MUST be registered FIRST
 // before any middleware that might delay the response
@@ -56,19 +111,35 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sem origin (mobile apps, Postman, etc)
-    if (!origin) return callback(null, true);
-
-    // Permitir qualquer domínio Replit
-    if (origin && origin.includes('.replit.dev')) {
+    // Em desenvolvimento local, permitir requests sem origin (Postman, cURL, etc)
+    if (!origin && process.env.NODE_ENV === 'development') {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    // Em produção, bloquear requests sem origin
+    if (!origin) {
+      console.warn('🔴 CORS: Request sem origin bloqueado');
+      return callback(new Error('Origin not allowed by CORS'));
+    }
+
+    // Verificar se a origem está na whitelist
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      // Permitir match exato
+      if (origin === allowedOrigin) return true;
+
+      // Permitir subdomínios .replit.dev apenas em desenvolvimento
+      if (process.env.NODE_ENV === 'development' && origin.includes('.replit.dev')) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Origem não permitida: ${origin}`);
-      callback(null, true); // Temporariamente permitindo todas as origens para debug
+      console.warn(`🔴 CORS: Origem não permitida bloqueada: ${origin}`);
+      callback(new Error('Origin not allowed by CORS'));
     }
   },
   credentials: true, // Permitir cookies e headers de auth
@@ -153,7 +224,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5005', 10);
+  const port = parseInt(process.env.PORT || '5000', 10);
   
   server.on('error', (error: any) => {
     console.error('Server error:', error);
@@ -163,11 +234,7 @@ app.use((req, res, next) => {
     process.exit(1);
   });
   
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
     console.log(`Server successfully started on http://0.0.0.0:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
