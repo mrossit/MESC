@@ -2,6 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
+import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { format, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ScheduleDay {
   date: string;
@@ -14,30 +19,85 @@ interface ScheduleDay {
   }>;
 }
 
+interface Schedule {
+  id: string;
+  massDate: string;
+  massTime: string;
+  ministerId: string | null;
+  position: number;
+}
+
 export function ScheduleOverview() {
-  const scheduleData: ScheduleDay[] = [
-    {
-      date: "12 Nov",
-      dayName: "Domingo",
-      status: "incomplete",
-      masses: [
-        { time: "7h", ministers: 10, total: 10 },
-        { time: "9h", ministers: 10, total: 10 },
-        { time: "11h", ministers: 10, total: 10 },
-        { time: "19h", ministers: 7, total: 10 },
-      ]
-    },
-    {
-      date: "13 Nov",
-      dayName: "Segunda",
-      status: "urgent",
-      masses: [
-        { time: "7h", ministers: 4, total: 4 },
-        { time: "12h", ministers: 4, total: 4 },
-        { time: "19h", ministers: 1, total: 4 },
-      ]
-    },
-  ];
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 0 }); // Domingo
+  const weekEnd = endOfWeek(today, { weekStartsOn: 0 }); // Sábado
+
+  const { data: schedules, isLoading } = useQuery<Schedule[]>({
+    queryKey: ["/api/schedules", {
+      start: format(weekStart, 'yyyy-MM-dd'),
+      end: format(weekEnd, 'yyyy-MM-dd')
+    }],
+    queryFn: async () => {
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      const endDate = format(weekEnd, 'yyyy-MM-dd');
+      const response = await fetch(`/api/schedules?start=${startDate}&end=${endDate}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch schedules');
+      return response.json();
+    }
+  });
+
+  // Agrupar escalas por data e horário
+  const scheduleData: ScheduleDay[] = [];
+
+  if (schedules && schedules.length > 0) {
+    const groupedByDate: Record<string, Record<string, { filled: number; total: number }>> = {};
+
+    schedules.forEach(schedule => {
+      const dateKey = schedule.massDate;
+      const timeKey = schedule.massTime;
+
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = {};
+      }
+      if (!groupedByDate[dateKey][timeKey]) {
+        groupedByDate[dateKey][timeKey] = { filled: 0, total: 0 };
+      }
+
+      groupedByDate[dateKey][timeKey].total++;
+      if (schedule.ministerId) {
+        groupedByDate[dateKey][timeKey].filled++;
+      }
+    });
+
+    // Converter para formato de exibição - pegar apenas próximos 2 dias com missas
+    const sortedDates = Object.keys(groupedByDate).sort().slice(0, 2);
+
+    sortedDates.forEach(dateStr => {
+      const date = new Date(dateStr + 'T00:00:00');
+      const masses = Object.entries(groupedByDate[dateStr]).map(([time, data]) => ({
+        time: time.slice(0, 5), // "HH:MM"
+        ministers: data.filled,
+        total: data.total
+      }));
+
+      const totalFilled = masses.reduce((sum, m) => sum + m.ministers, 0);
+      const totalRequired = masses.reduce((sum, m) => sum + m.total, 0);
+      const fillRate = totalRequired > 0 ? totalFilled / totalRequired : 0;
+
+      let status: "complete" | "incomplete" | "urgent" = "complete";
+      if (fillRate < 0.5) status = "urgent";
+      else if (fillRate < 1) status = "incomplete";
+
+      scheduleData.push({
+        date: format(date, "dd MMM", { locale: ptBR }),
+        dayName: format(date, "EEEE", { locale: ptBR }),
+        status,
+        masses
+      });
+    });
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -58,6 +118,32 @@ export function ScheduleOverview() {
     return "bg-burgundy dark:bg-burgundy-soft";
   };
 
+  if (isLoading) {
+    return (
+      <Card className="border border-neutral-border/30 dark:border-border">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-foreground">
+            Escala da Semana
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="border border-neutral-border rounded-lg p-4">
+                <Skeleton className="h-6 w-32 mb-3" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="  border border-neutral-border/30 dark:border-border">
       <CardHeader>
@@ -65,19 +151,26 @@ export function ScheduleOverview() {
           <CardTitle className="text-lg font-semibold text-foreground">
             Escala da Semana
           </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-primary hover:text-primary hover:bg-neutral-accentWarm/10"
-            data-testid="button-view-full-schedule"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
+          <Link href="/schedules">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary hover:text-primary hover:bg-neutral-accentWarm/10"
+              data-testid="button-view-full-schedule"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {scheduleData.map((day, index) => (
+        {scheduleData.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhuma escala programada para esta semana
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {scheduleData.map((day, index) => (
             <div 
               key={index} 
               className="border border-neutral-border rounded-lg p-4"
@@ -107,7 +200,8 @@ export function ScheduleOverview() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

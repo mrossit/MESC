@@ -1,8 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Send, Download } from "lucide-react";
+import { useLocation } from "wouter";
 
 export function QuickActions() {
+  const [, setLocation] = useLocation();
+
   const actions = [
     {
       title: "Nova Escala",
@@ -10,7 +13,7 @@ export function QuickActions() {
       icon: Plus,
       iconBg: "bg-burgundy/15 dark:bg-burgundy/25",
       iconColor: "text-burgundy dark:text-burgundy-soft",
-      onClick: () => console.log("Nova escala"),
+      onClick: () => setLocation("/schedules/auto-generation"),
     },
     {
       title: "Enviar Questionário",
@@ -18,7 +21,7 @@ export function QuickActions() {
       icon: Send,
       iconBg: "bg-sage/20 dark:bg-sage/30",
       iconColor: "text-sage-dark dark:text-sage-light",
-      onClick: () => console.log("Enviar questionário"),
+      onClick: () => setLocation("/questionnaire-responses"),
     },
     {
       title: "Exportar Relatório",
@@ -26,7 +29,7 @@ export function QuickActions() {
       icon: Download,
       iconBg: "bg-cream-light/35 dark:bg-cream-light/20",
       iconColor: "text-sage dark:text-cream-light",
-      onClick: () => console.log("Exportar relatório"),
+      onClick: () => setLocation("/reports"),
     },
   ];
 
