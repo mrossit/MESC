@@ -68,9 +68,9 @@ app.use(helmet({
     includeSubDomains: true,
     preload: true
   },
-  frameguard: {
-    action: 'deny' // Prevenir clickjacking
-  },
+  frameguard: process.env.NODE_ENV === 'development' 
+    ? false // Permitir iframe no preview do Replit durante desenvolvimento
+    : { action: 'deny' }, // Prevenir clickjacking em produção
   noSniff: true,
   xssFilter: true,
   referrerPolicy: {
