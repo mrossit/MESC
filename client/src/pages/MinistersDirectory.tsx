@@ -16,7 +16,7 @@ import {
 } from '../components/ui/select';
 import {
   Search, Users, Phone, Mail, Calendar, Heart,
-  Church, User, Filter, Grid, List, Info, ArrowUpDown, Settings
+  Church, User, Filter, Grid, List, Info, ArrowUpDown, MessageCircle
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -307,17 +307,6 @@ export default function MinistersDirectory() {
                   <span className="hidden lg:inline">Lista</span>
                 </Button>
 
-                {/* Botão para coordenadores acessarem página de edição */}
-                {isCoordinator && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setLocation('/ministros')}
-                    className="flex items-center gap-2"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span className="hidden lg:inline">Gerenciar</span>
-                  </Button>
-                )}
               </div>
             </div>
             
@@ -556,25 +545,39 @@ export default function MinistersDirectory() {
               )} */}
 
               {/* Ações */}
-              <div className="flex gap-2 pt-4">
-                {selectedMinister.phone && (
+              <div className="flex flex-col gap-2 pt-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedMinister.phone && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(`tel:${formatPhoneForCall(selectedMinister.phone!)}`, '_self')}
+                      >
+                        <Phone className="h-4 w-4 mr-2" />
+                        Ligar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-200 dark:bg-green-950 dark:hover:bg-green-900 dark:text-green-400 dark:border-green-800"
+                        onClick={() => {
+                          const phoneNumber = formatPhoneForCall(selectedMinister.phone!);
+                          window.open(`https://wa.me/${phoneNumber}`, '_blank');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        WhatsApp
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
-                    className="flex-1"
-                    onClick={() => window.open(`tel:${formatPhoneForCall(selectedMinister.phone!)}`, '_self')}
+                    className={selectedMinister.phone ? "col-span-2" : "col-span-2"}
+                    onClick={() => window.open(`mailto:${selectedMinister.email}`, '_self')}
                   >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Ligar
+                    <Mail className="h-4 w-4 mr-2" />
+                    Email
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => window.open(`mailto:${selectedMinister.email}`, '_self')}
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Email
-                </Button>
+                </div>
               </div>
             </div>
           )}

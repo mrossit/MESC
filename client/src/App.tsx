@@ -24,7 +24,6 @@ import Dashboard from "@/pages/dashboard";
 import Approvals from "@/pages/approvals";
 import ChangePassword from "@/pages/change-password";
 import ChangePasswordRequired from "@/pages/change-password-required";
-import Ministers from "@/pages/Ministers";
 import MinistersDirectory from "@/pages/MinistersDirectory";
 import Schedules from "@/pages/Schedules";
 import QuestionnaireUnified from "@/pages/QuestionnaireUnified";
@@ -98,18 +97,6 @@ function Router() {
       <Route path="/settings">
         <AuthGuard>
           <Settings />
-        </AuthGuard>
-      </Route>
-      
-      <Route path="/ministers">
-        <AuthGuard allowedRoles={["gestor", "coordenador"]}>
-          <Ministers />
-        </AuthGuard>
-      </Route>
-      
-      <Route path="/ministros">
-        <AuthGuard allowedRoles={["gestor", "coordenador"]}>
-          <Ministers />
         </AuthGuard>
       </Route>
       
