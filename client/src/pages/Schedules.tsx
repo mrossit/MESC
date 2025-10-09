@@ -1213,34 +1213,58 @@ export default function Schedules() {
 
   const getUserSubstitutionStatus = (date: Date) => {
     if (!user?.id) return null;
-    
+
     const dayAssignments = getAssignmentsForDate(date);
     const currentMinister = ministers.find(m => m.id === user.id);
     if (!currentMinister) return null;
-    
+
     // Check if user has a substitution request for this date
     // We need to check by requestingMinisterId, not by current assignment
     // because when approved, the assignment is transferred to the substitute
     const dayAssignmentIds = dayAssignments.map(a => a.id);
-    const userSubstitutionRequest = substitutions.find(s => 
-      dayAssignmentIds.includes(s.assignmentId) && 
-      s.requestingMinisterId === currentMinister.id
-    );
-    
-    
+
+    // DEBUG: Log para verificar dados
+    if (dayAssignments.length > 0 && substitutions.length > 0) {
+      console.log('[DEBUG] getUserSubstitutionStatus para', format(date, 'dd/MM/yyyy'));
+      console.log('[DEBUG] dayAssignmentIds:', dayAssignmentIds);
+      console.log('[DEBUG] substitutions:', substitutions);
+      console.log('[DEBUG] currentMinister.id:', currentMinister.id);
+    }
+
+    const userSubstitutionRequest = substitutions.find(s => {
+      const hasAssignment = dayAssignmentIds.includes(s.assignmentId);
+      const isRequester = s.requestingMinisterId === currentMinister.id;
+
+      // DEBUG
+      if (hasAssignment || isRequester) {
+        console.log('[DEBUG] Checking substitution:', {
+          subId: s.id,
+          assignmentId: s.assignmentId,
+          requestingMinisterId: s.requestingMinisterId,
+          hasAssignment,
+          isRequester,
+          match: hasAssignment && isRequester
+        });
+      }
+
+      return hasAssignment && isRequester;
+    });
+
     if (!userSubstitutionRequest) {
       // Also check if user is currently assigned (no substitution requested)
       const userAssignment = dayAssignments.find(a => a.ministerId === currentMinister.id);
       return userAssignment ? null : null;
     }
-    
+
+    console.log('[DEBUG] Found substitution:', userSubstitutionRequest);
+
     // Return status: 'pending' for red, 'approved' or 'auto_approved' for green
     if (userSubstitutionRequest.status === 'pending') {
       return 'pending';
     } else if (userSubstitutionRequest.status === 'approved' || userSubstitutionRequest.status === 'auto_approved') {
       return 'approved';
     }
-    
+
     return null;
   };
 
