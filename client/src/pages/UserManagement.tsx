@@ -68,7 +68,10 @@ import {
   Ban,
   CheckCircle,
   MoreHorizontal,
-  Clock
+  Clock,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -143,6 +146,10 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userUsage, setUserUsage] = useState<{ isUsed: boolean; reason?: string } | null>(null);
+
+  // Sorting state
+  const [sortField, setSortField] = useState<keyof User>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Mutations
   const updateRoleMutation = useMutation({
@@ -338,7 +345,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
         scheduleDisplayName: formData.scheduleDisplayName || null
       };
 
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
+      const response = await fetch(`/api/ministers/${selectedUser.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
@@ -453,11 +460,40 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     return "Iniciante";
   };
 
-  const filteredUsers = users.filter(targetUser =>
-    targetUser.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    targetUser.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    targetUser.city?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSort = (field: keyof User) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredUsers = users
+    .filter(targetUser =>
+      targetUser.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      targetUser.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      targetUser.city?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      return 0;
+    });
 
   const stats = {
     total: users.length,
@@ -542,9 +578,48 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Perfil</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('name')}
+                    className="flex items-center gap-1 hover:bg-transparent p-0 h-auto font-medium"
+                  >
+                    Nome
+                    {sortField === 'name' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                    ) : (
+                      <ArrowUpDown className="h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('role')}
+                    className="flex items-center gap-1 hover:bg-transparent p-0 h-auto font-medium"
+                  >
+                    Perfil
+                    {sortField === 'role' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                    ) : (
+                      <ArrowUpDown className="h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:bg-transparent p-0 h-auto font-medium"
+                  >
+                    Status
+                    {sortField === 'status' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                    ) : (
+                      <ArrowUpDown className="h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
+                </TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Info Ministerial</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -602,6 +677,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                         variant="ghost"
                         size="icon"
                         onClick={() => handleView(targetUser)}
+                        title="Visualizar"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -611,6 +687,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEdit(targetUser)}
+                            title="Editar"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -1060,16 +1137,9 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                   </Button>
                 </>
               ) : (
-                <>
-                  {isCoordinator && (
-                    <Button onClick={() => setIsEditMode(true)}>
-                      Editar
-                    </Button>
-                  )}
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Fechar
-                  </Button>
-                </>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Fechar
+                </Button>
               )}
             </DialogFooter>
           )}

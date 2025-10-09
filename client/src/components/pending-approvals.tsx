@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, X, User } from "lucide-react";
+import { Check, X, User, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { User as UserType } from "@/lib/types";
+import { Link } from "wouter";
 
 export function PendingApprovals() {
   const queryClient = useQueryClient();
@@ -89,14 +90,25 @@ export function PendingApprovals() {
           <CardTitle className="text-lg font-semibold text-foreground">
             Aprovações Pendentes
           </CardTitle>
-          {pendingUsers.length > 0 && (
-            <Badge
-              className="bg-burgundy/20 text-burgundy dark:bg-burgundy/30 dark:text-burgundy-soft"
-              data-testid="badge-pending-count"
-            >
-              {pendingUsers.length} novos
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {pendingUsers.length > 0 && (
+              <Badge
+                className="bg-burgundy/20 text-burgundy dark:bg-burgundy/30 dark:text-burgundy-soft"
+                data-testid="badge-pending-count"
+              >
+                {pendingUsers.length} novos
+              </Badge>
+            )}
+            <Link href="/approvals">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary hover:text-primary hover:bg-neutral-accentWarm/10"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
