@@ -149,8 +149,9 @@ router.post("/approve-reset/:requestId", async (req, res) => {
       });
     }
 
-    // Gera uma senha temporária
-    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+    // Gera uma senha temporária segura
+    const crypto = require('crypto');
+    const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12) + '!Aa1';
     const hashedPassword = await hashPassword(tempPassword);
 
     // Atualiza a senha do usuário e marca como requer troca
@@ -163,30 +164,33 @@ router.post("/approve-reset/:requestId", async (req, res) => {
       })
       .where(eq(users.id, request.userId));
 
-    // Atualiza a solicitação
+    // Atualiza a solicitação SEM armazenar a senha
     await db
       .update(passwordResetRequests)
       .set({
         status: 'approved',
         processedBy: adminId,
         processedAt: new Date(),
-        adminNotes: adminNotes || `Senha temporária: ${tempPassword}`
+        adminNotes: adminNotes || 'Senha resetada pelo administrador'
       })
       .where(eq(passwordResetRequests.id, requestId));
 
-    // Notifica o usuário
+    // Notifica o usuário SEM incluir a senha
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
-      message: `Sua senha foi resetada. Senha temporária: ${tempPassword}. Você deverá alterá-la no próximo login.`,
+      message: 'Sua senha foi resetada pelo administrador. Entre em contato para receber sua senha temporária. Você deverá alterá-la no próximo login.',
       type: 'announcement',
+      priority: 'high',
       read: false
     });
 
-    res.json({ 
-      success: true, 
-      message: "Reset aprovado com sucesso",
-      tempPassword // Retorna para o admin poder informar ao usuário
+    // Retorna senha APENAS no response (mostrada uma vez ao admin)
+    res.json({
+      success: true,
+      message: "Reset aprovado. Copie a senha e informe ao usuário.",
+      tempPassword, // Mostrar apenas uma vez
+      warning: "Esta senha será mostrada apenas agora. Copie antes de fechar."
     });
 
   } catch (error) {

@@ -1,5 +1,11 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -750,7 +756,8 @@ var init_storage = __esm({
       }
       // MESC specific user operations
       async createUser(userData) {
-        const tempPassword = Math.random().toString(36).slice(-12);
+        const crypto3 = __require("crypto");
+        const tempPassword = crypto3.randomBytes(12).toString("base64").slice(0, 12) + "!Aa1";
         const bcrypt2 = await import("bcrypt");
         const passwordHash = await bcrypt2.hash(tempPassword, 10);
         const [user] = await db.insert(users).values({
@@ -1343,10 +1350,24 @@ var init_storage = __esm({
 });
 
 // server/utils/logger.ts
-var Logger, logger;
+var SENSITIVE_KEYS, Logger, logger;
 var init_logger = __esm({
   "server/utils/logger.ts"() {
     "use strict";
+    SENSITIVE_KEYS = [
+      "password",
+      "passwordHash",
+      "currentPassword",
+      "newPassword",
+      "tempPassword",
+      "temporaryPassword",
+      "token",
+      "jwt",
+      "secret",
+      "apiKey",
+      "privateKey",
+      "authorization"
+    ];
     Logger = class {
       logLevel;
       constructor() {
@@ -1355,11 +1376,39 @@ var init_logger = __esm({
       shouldLog(level) {
         return level <= this.logLevel;
       }
+      /**
+       * Sanitiza dados sensíveis antes de logar
+       */
+      sanitize(data) {
+        if (data === null || data === void 0) {
+          return data;
+        }
+        if (typeof data !== "object") {
+          return data;
+        }
+        if (Array.isArray(data)) {
+          return data.map((item) => this.sanitize(item));
+        }
+        const sanitized = {};
+        for (const key of Object.keys(data)) {
+          const lowerKey = key.toLowerCase();
+          const isSensitive = SENSITIVE_KEYS.some((sk) => lowerKey.includes(sk.toLowerCase()));
+          if (isSensitive) {
+            sanitized[key] = "[REDACTED]";
+          } else if (typeof data[key] === "object" && data[key] !== null) {
+            sanitized[key] = this.sanitize(data[key]);
+          } else {
+            sanitized[key] = data[key];
+          }
+        }
+        return sanitized;
+      }
       formatMessage(level, message, context) {
         const timestamp2 = (/* @__PURE__ */ new Date()).toISOString();
         const baseMessage = `[${timestamp2}] [${level}] ${message}`;
         if (context && typeof context === "object") {
-          return `${baseMessage} :: ${JSON.stringify(context)}`;
+          const sanitizedContext = this.sanitize(context);
+          return `${baseMessage} :: ${JSON.stringify(sanitizedContext)}`;
         }
         return baseMessage;
       }
@@ -2679,16 +2728,14 @@ async function resetPassword(email) {
     if (!user) {
       return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
     }
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    const crypto3 = __require("crypto");
+    const tempPassword = crypto3.randomBytes(12).toString("base64").slice(0, 12) + "!Aa1";
     const passwordHash = await hashPassword(tempPassword);
     await db.update(users).set({
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq2(users.id, user.id));
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV] Senha tempor\xE1ria gerada para ${email}: ${tempPassword}`);
-    }
     return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
   } catch (error) {
     throw error;
@@ -2883,13 +2930,19 @@ router2.post("/register", async (req, res) => {
     });
   }
 });
-router2.post("/admin-register", authenticateToken, requireRole(["reitor", "coordenador"]), async (req, res) => {
+router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const userData = registerSchema.parse(req.body);
-    if ((userData.role === "reitor" || userData.role === "coordenador") && req.user?.role !== "reitor") {
+    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor") {
       return res.status(403).json({
         success: false,
-        message: "Apenas o reitor pode criar coordenadores"
+        message: "Apenas gestores podem criar coordenadores ou outros gestores"
+      });
+    }
+    if (req.user?.role === "coordenador" && userData.role !== "ministro") {
+      return res.status(403).json({
+        success: false,
+        message: "Coordenadores s\xF3 podem criar ministros"
       });
     }
     const newUser = await register(userData);
@@ -3229,7 +3282,8 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
         message: "Solicita\xE7\xE3o n\xE3o encontrada"
       });
     }
-    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+    const crypto3 = __require("crypto");
+    const tempPassword = crypto3.randomBytes(12).toString("base64").slice(0, 12) + "!Aa1";
     const hashedPassword = await hashPassword(tempPassword);
     await db.update(users).set({
       passwordHash: hashedPassword,
@@ -3240,20 +3294,22 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
       status: "approved",
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
-      adminNotes: adminNotes || `Senha tempor\xE1ria: ${tempPassword}`
+      adminNotes: adminNotes || "Senha resetada pelo administrador"
     }).where(eq5(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
-      message: `Sua senha foi resetada. Senha tempor\xE1ria: ${tempPassword}. Voc\xEA dever\xE1 alter\xE1-la no pr\xF3ximo login.`,
+      message: "Sua senha foi resetada pelo administrador. Entre em contato para receber sua senha tempor\xE1ria. Voc\xEA dever\xE1 alter\xE1-la no pr\xF3ximo login.",
       type: "announcement",
+      priority: "high",
       read: false
     });
     res.json({
       success: true,
-      message: "Reset aprovado com sucesso",
-      tempPassword
-      // Retorna para o admin poder informar ao usuário
+      message: "Reset aprovado. Copie a senha e informe ao usu\xE1rio.",
+      tempPassword,
+      // Mostrar apenas uma vez
+      warning: "Esta senha ser\xE1 mostrada apenas agora. Copie antes de fechar."
     });
   } catch (error) {
     console.error("Erro ao aprovar reset:", error);

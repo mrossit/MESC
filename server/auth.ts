@@ -5,20 +5,17 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// JWT secret - deve vir de variável de ambiente
+// JWT secret - SEMPRE deve vir de variável de ambiente
 function getJWTSecret(): string {
-  if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
+  if (!process.env.JWT_SECRET) {
+    throw new Error(
+      '🔴 CRITICAL: JWT_SECRET environment variable is required!\n' +
+      'Please set JWT_SECRET in your .env file with a strong random value.\n' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+    );
   }
-  
-  // Only allow fallback in explicit development environment
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('⚠️  JWT_SECRET não definido, usando valor padrão para desenvolvimento');
-    return 'sjt-mesc-development-secret-2025';
-  }
-  
-  // All other environments (production, staging, test, etc.) require JWT_SECRET
-  throw new Error('JWT_SECRET environment variable is required. Please set this environment variable for security.');
+
+  return process.env.JWT_SECRET;
 }
 
 const JWT_SECRET = getJWTSecret();
@@ -300,8 +297,9 @@ export async function resetPassword(email: string) {
       return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
     }
 
-    // Gera senha temporária
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    // Gera senha temporária segura usando crypto
+    const crypto = require('crypto');
+    const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12) + '!Aa1';
     const passwordHash = await hashPassword(tempPassword);
 
     // Atualiza a senha e marca que precisa trocar
@@ -315,10 +313,8 @@ export async function resetPassword(email: string) {
       .where(eq(users.id, user.id));
 
     // TODO: Enviar email com a senha temporária
-    // Log temporário apenas para desenvolvimento (não retornar ao cliente)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEV] Senha temporária gerada para ${email}: ${tempPassword}`);
-    }
+    // NOTA: Senha temporária NÃO deve ser logada por segurança
+    // Deve ser enviada apenas via email ou canal seguro
 
     return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
   } catch (error) {

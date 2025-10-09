@@ -34,7 +34,18 @@
       "Bash(git commit:*)",
       "Bash(git restore:*)",
       "Bash(npx esbuild:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "WebSearch",
+      "WebFetch(domain:www.testsprite.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npx testsprite:*)",
+      "WebFetch(domain:docs.testsprite.com)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(killall:*)",
+      "Bash(echo $REPL_SLUG)"
     ],
     "deny": [],
     "ask": []

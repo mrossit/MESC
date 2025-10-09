@@ -4,10 +4,31 @@ import type { Request, Response } from 'express';
 /**
  * Rate limiter para endpoints de autenticação (mais restritivo)
  * Previne ataques de força bruta em login/registro
+ *
+ * SEGURANÇA: Usa EMAIL + IP como chave, não apenas IP
+ * Isso previne bypass via proxy rotation
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Máximo 5 tentativas por IP
+  max: 5, // Máximo 5 tentativas por email/IP
+
+  // CRÍTICO: Rate limit por EMAIL, não apenas IP
+  // Desabilita todas as validações pois usamos chave customizada baseada em email
+  validate: false,
+  keyGenerator: (req: Request) => {
+    // Usar email do body como chave principal (se disponível)
+    const email = req.body?.email;
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+    if (email) {
+      // Combinar email + IP para prevenir ataques de múltiplos IPs no mesmo email
+      return `auth:${email.toLowerCase()}:${ip}`;
+    }
+
+    // Fallback para IP se email não estiver disponível
+    return `auth:ip:${ip}`;
+  },
+
   message: {
     error: 'Muitas tentativas de autenticação. Tente novamente em 15 minutos.'
   },
@@ -15,10 +36,15 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false, // Desabilita headers `X-RateLimit-*`
   skipSuccessfulRequests: false, // Contar mesmo se request for bem-sucedido
   handler: (req: Request, res: Response) => {
+    const email = req.body?.email;
+
     res.status(429).json({
       error: 'Muitas tentativas de autenticação',
-      message: 'Você excedeu o limite de tentativas. Por favor, aguarde 15 minutos e tente novamente.',
-      retryAfter: '15 minutes'
+      message: email
+        ? `Muitas tentativas de login para ${email}. Aguarde 15 minutos e tente novamente.`
+        : 'Você excedeu o limite de tentativas. Por favor, aguarde 15 minutos e tente novamente.',
+      retryAfter: '15 minutes',
+      accountLocked: !!email // Indicar se a conta específica está bloqueada
     });
   }
 });
@@ -48,10 +74,27 @@ export const apiRateLimiter = rateLimit({
 /**
  * Rate limiter para recuperação de senha (muito restritivo)
  * Previne abuso do sistema de email
+ *
+ * SEGURANÇA: Usa EMAIL como chave para prevenir spam
  */
 export const passwordResetRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 3, // Máximo 3 tentativas por hora por IP
+  max: 3, // Máximo 3 tentativas por hora por email
+
+  // Rate limit por EMAIL para prevenir spam de reset
+  // Desabilita todas as validações pois usamos chave customizada baseada em email
+  validate: false,
+  keyGenerator: (req: Request) => {
+    const email = req.body?.email;
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+    if (email) {
+      return `password-reset:${email.toLowerCase()}`;
+    }
+
+    return `password-reset:ip:${ip}`;
+  },
+
   message: {
     error: 'Muitas tentativas de recuperação de senha.'
   },
