@@ -123,8 +123,7 @@ export function EnhancedScheduleExport({
       const dayName = WEEKDAY_NAMES[dayOfWeek];
       const massTimes = getMassTimesForDate(day);
 
-      massTimes.forEach(massTimeInfo => {
-        const massTime = massTimeInfo.time;
+      massTimes.forEach(massTime => {
         const massDescription = getMassDescription(day, massTime);
         const fullDayLabel = massDescription ? `${dayName} - ${massDescription}` : dayName;
         const timeFormatted = massTime.substring(0, 5);
@@ -194,8 +193,7 @@ export function EnhancedScheduleExport({
       const dayFormatted = format(day, "EEEE, d 'de' MMMM", { locale: ptBR });
       const massTimes = getMassTimesForDate(day);
 
-      massTimes.forEach(massTimeInfo => {
-        const massTime = massTimeInfo.time;
+      massTimes.forEach(massTime => {
         const massDescription = getMassDescription(day, massTime);
         const timeFormatted = massTime.substring(0, 5);
 
@@ -247,8 +245,7 @@ export function EnhancedScheduleExport({
       const dayFormatted = format(day, 'EEEE', { locale: ptBR });
       const massTimes = getMassTimesForDate(day);
 
-      massTimes.forEach(massTimeInfo => {
-        const massTime = massTimeInfo.time;
+      massTimes.forEach(massTime => {
         const timeFormatted = massTime.substring(0, 5);
 
         const ministersForThisMass = assignments
@@ -489,8 +486,8 @@ export function EnhancedScheduleExport({
                           {daysWithMasses.slice(0, 3).map(day => {
                             const massTimes = getMassTimesForDate(day);
                             return massTimes.slice(0, 1).map(mt => (
-                              <div key={`${day}-${mt.time}`}>
-                                {day.getDate()} | {WEEKDAY_NAMES[getDay(day)]} | {mt.time.substring(0, 5)} | ...
+                              <div key={`${day}-${mt}`}>
+                                {day.getDate()} | {WEEKDAY_NAMES[getDay(day)]} | {mt.substring(0, 5)} | ...
                               </div>
                             ));
                           })}
@@ -503,8 +500,8 @@ export function EnhancedScheduleExport({
                             const massTimes = getMassTimesForDate(day);
                             const dateFormatted = format(day, "EEEE, d 'de' MMMM", { locale: ptBR });
                             return massTimes.slice(0, 1).map(mt => (
-                              <div key={`${day}-${mt.time}`} className="mb-2">
-                                <strong>{dateFormatted} - {mt.time.substring(0, 5)}</strong><br />
+                              <div key={`${day}-${mt}`} className="mb-2">
+                                <strong>{dateFormatted} - {mt.substring(0, 5)}</strong><br />
                                 Posição | Ministro | Status<br />
                                 ════════════════════<br />
                                 Auxiliar 1 | [Nome] | Confirmado<br />
@@ -522,8 +519,8 @@ export function EnhancedScheduleExport({
                             const dayName = format(day, 'EEEE', { locale: ptBR });
                             const massTimes = getMassTimesForDate(day);
                             return massTimes.slice(0, 1).map(mt => (
-                              <div key={`${day}-${mt.time}`}>
-                                "{dateFormatted}","{dayName}","{mt.time.substring(0, 5)}","...","...","..."
+                              <div key={`${day}-${mt}`}>
+                                "{dateFormatted}","{dayName}","{mt.substring(0, 5)}","...","...","..."
                               </div>
                             ));
                           })}

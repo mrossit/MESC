@@ -139,8 +139,7 @@ export function MonthlyScheduleExport({
 
         const massTimes = getMassTimesForDate(day);
 
-        massTimes.forEach((massTimeInfo, massIndex) => {
-          const massTime = massTimeInfo.time;
+        massTimes.forEach((massTime, massIndex) => {
           const massDescription = getMassDescription(day, massTime);
           const fullDayLabel = massDescription
             ? `${dayName} - ${massDescription}`

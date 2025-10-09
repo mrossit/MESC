@@ -172,19 +172,19 @@ export default function CompactScheduleEditor() {
     allDays.forEach(day => {
       const massTimes = getMassTimesForDate(day);
       if (massTimes.length > 0) {
-        massTimes.forEach(massInfo => {
+        massTimes.forEach(massTime => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const dayOfWeek = getDay(day);
           const dayName = WEEKDAY_NAMES[dayOfWeek];
 
           const slotAssignments = assignments.filter(
-            a => a.date === dateStr && a.massTime === massInfo.time
+            a => a.date === dateStr && a.massTime === massTime
           );
 
           slots.push({
             date: dateStr,
             dateObj: day,
-            massTime: massInfo.time,
+            massTime: massTime,
             dayName,
             assignments: slotAssignments,
           });
@@ -290,7 +290,7 @@ export default function CompactScheduleEditor() {
       data.push(['', '', '', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15']);
 
       // Header com nomes das posições
-      const positionNames = LITURGICAL_POSITIONS.slice(0, 15).map(p => p.abbreviation || p.name);
+      const positionNames = Object.values(LITURGICAL_POSITIONS).slice(0, 15);
       data.push(['Data', 'Dia', 'Hora', ...positionNames]);
 
       // Dados
@@ -445,9 +445,9 @@ export default function CompactScheduleEditor() {
                       <TableHead className="w-16">Data</TableHead>
                       <TableHead className="w-32">Dia</TableHead>
                       <TableHead className="w-16">Hora</TableHead>
-                      {LITURGICAL_POSITIONS.slice(0, 15).map((pos, idx) => (
+                      {Object.values(LITURGICAL_POSITIONS).slice(0, 15).map((pos, idx) => (
                         <TableHead key={idx} className="text-center text-xs">
-                          {pos.abbreviation || pos.name}
+                          {pos}
                         </TableHead>
                       ))}
                     </TableRow>
@@ -500,7 +500,7 @@ export default function CompactScheduleEditor() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Editar Posição {editingPosition + 1} - {LITURGICAL_POSITIONS[editingPosition]?.name}
+              Editar Posição {editingPosition + 1} - {LITURGICAL_POSITIONS[editingPosition + 1]}
             </DialogTitle>
             <DialogDescription>
               {editingSlot && `${format(editingSlot.dateObj, 'dd/MM/yyyy')} - ${editingSlot.massTime.substring(0, 5)}`}

@@ -32,7 +32,7 @@ export const userRoleEnum = pgEnum('user_role', ['gestor', 'coordenador', 'minis
 export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
 export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
-export const substitutionStatusEnum = pgEnum('substitution_status', ['pending', 'approved', 'rejected', 'cancelled', 'auto_approved']);
+export const substitutionStatusEnum = pgEnum('substitution_status', ['available', 'pending', 'approved', 'rejected', 'cancelled', 'auto_approved']);
 export const urgencyLevelEnum = pgEnum('urgency_level', ['low', 'medium', 'high', 'critical']);
 export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'substitution', 'formation', 'announcement', 'reminder']);
 export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
@@ -204,7 +204,7 @@ export const substitutionRequests = pgTable('substitution_requests', {
   requesterId: varchar('requester_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   substituteId: varchar('substitute_id').references(() => users.id, { onDelete: 'set null' }),
   reason: text('reason'), // Opcional - ministro pode ou não informar motivo
-  status: substitutionStatusEnum('status').notNull().default('pending'),
+  status: substitutionStatusEnum('status').notNull().default('available'),
   urgency: urgencyLevelEnum('urgency').notNull().default('medium'),
   approvedBy: varchar('approved_by').references(() => users.id),
   approvedAt: timestamp('approved_at'),

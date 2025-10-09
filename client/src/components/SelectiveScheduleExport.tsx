@@ -99,17 +99,17 @@ export function SelectiveScheduleExport({
     allDays.forEach(day => {
       const massTimes = getMassTimesForDate(day);
       if (massTimes.length > 0) {
-        massTimes.forEach(massTimeInfo => {
+        massTimes.forEach(massTime => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const dayOfWeek = getDay(day);
-          const massDescription = getMassDescription(day, massTimeInfo.time);
+          const massDescription = getMassDescription(day, massTime);
 
           masses.push({
             date: dateStr,
-            time: massTimeInfo.time,
+            time: massTime,
             dateObj: day,
             dayOfWeek,
-            label: `${format(day, 'd/MM')} (${WEEKDAY_NAMES[dayOfWeek]}) - ${massTimeInfo.time.substring(0, 5)}${massDescription ? ' - ' + massDescription : ''}`
+            label: `${format(day, 'd/MM')} (${WEEKDAY_NAMES[dayOfWeek]}) - ${massTime.substring(0, 5)}${massDescription ? ' - ' + massDescription : ''}`
           });
         });
       }

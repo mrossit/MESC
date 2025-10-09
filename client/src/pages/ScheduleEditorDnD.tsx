@@ -172,7 +172,7 @@ export default function ScheduleEditorDnD() {
     if (selectedDate && selectedTime) {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const massTimesForDay = getMassTimesForDate(selectedDate);
-      const massTime = massTimesForDay.find(mt => mt.time === selectedTime);
+      const massTime = massTimesForDay.find(mt => mt === selectedTime);
 
       if (massTime) {
         const slotAssignments = assignments.filter(
@@ -180,10 +180,10 @@ export default function ScheduleEditorDnD() {
         );
 
         return [{
-          time: massTime.time,
+          time: massTime,
           date: dateStr,
           assignments: slotAssignments,
-          maxMinisters: massTime.minMinisters || 15,
+          maxMinisters: 20,
         }];
       }
       return [];
@@ -199,14 +199,14 @@ export default function ScheduleEditorDnD() {
       massTimesForDay.forEach((massTime) => {
         const dateStr = format(sunday, 'yyyy-MM-dd');
         const slotAssignments = assignments.filter(
-          (a) => a.date === dateStr && a.massTime === massTime.time
+          (a) => a.date === dateStr && a.massTime === massTime
         );
 
         slots.push({
-          time: massTime.time,
+          time: massTime,
           date: dateStr,
           assignments: slotAssignments,
-          maxMinisters: massTime.minMinisters || 15,
+          maxMinisters: 20,
         });
       });
     });
