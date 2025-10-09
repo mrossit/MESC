@@ -1,35 +1,38 @@
-import React, { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { authAPI } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { authAPI } from "@/lib/auth";
-import { useTableSort } from "@/hooks/useTableSort";
-import { SortableTableHeader } from "@/components/ui/sortable-table-header";
-import { 
-  Users, 
-  Shield, 
-  Crown, 
-  User, 
-  KeyRound, 
-  AlertCircle, 
-  Trash2, 
-  Ban, 
-  CheckCircle, 
-  Search,
-  MoreHorizontal,
-  Mail,
-  Phone 
-} from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,68 +41,117 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "@/hooks/use-toast";
+import {
+  Users,
+  Search,
+  Plus,
+  Edit,
+  Eye,
+  UserCheck,
+  UserX,
+  Phone,
+  Mail,
+  MapPin,
+  CalendarIcon,
+  Church,
+  Crown,
+  Shield,
+  User,
+  KeyRound,
+  AlertCircle,
+  Trash2,
+  Ban,
+  CheckCircle,
+  MoreHorizontal,
+  Clock
+} from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { LITURGICAL_POSITIONS } from "@shared/constants";
 
-type User = {
+interface User {
   id: string;
   name: string;
   email: string;
-  role: "gestor" | "coordenador" | "ministro";
-  status: "active" | "inactive" | "pending";
   phone?: string;
-  createdAt: string;
-  // Campos de ministro agora unificados
+  status: 'active' | 'inactive' | 'pending';
+  role: "gestor" | "coordenador" | "ministro";
   birthDate?: string;
   address?: string;
   city?: string;
   zipCode?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
   preferredPosition?: number;
+  preferredTimes?: string[];
+  availableForSpecialEvents?: boolean;
+  canServeAsCouple?: boolean;
+  spouseUserId?: string;
   experience?: string;
+  specialSkills?: string[];
+  liturgicalTraining?: string[];
+  lastService?: string;
   totalServices?: number;
+  formationCompleted?: string[];
+  observations?: string;
+  scheduleDisplayName?: string;
+  createdAt: string;
   active?: boolean;
-};
+}
 
-export default function UserManagement() {
+const MASS_TIMES = ["7h", "9h", "11h", "12h", "17h", "19h"];
+
+const SPECIAL_SKILLS = [
+  "Liturgia",
+  "Canto",
+  "Leitura",
+  "Acólito",
+  "Coordenação",
+  "Formação"
+];
+
+export default function UserManagement({ isEmbedded = false }: { isEmbedded?: boolean }) {
+  const [location] = useLocation();
+  const { data: authData } = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: () => authAPI.getMe(),
+  });
+
+  const user = authData?.user;
+  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+
+  // State management
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState<Partial<User>>({});
+  const [birthDate, setBirthDate] = useState<Date | undefined>();
+
+  // Admin dialogs
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userUsage, setUserUsage] = useState<{ isUsed: boolean; reason?: string } | null>(null);
-  const { toast } = useToast();
-  
-  // Get current user info with fresh data
-  const { data: currentUserData, refetch: refetchUser } = useQuery({
-    queryKey: ["/api/auth/me"],
-    queryFn: () => authAPI.getMe(),
-    staleTime: 0,
-    gcTime: 0,
-  });
 
-  // Buscar todos os usuários (não apenas os ativos)
-  const { data: users = [], isLoading, error, refetch, isFetching } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error: any) => {
-      // Se for 401, tenta revalidar a sessão primeiro
-      if (error?.message?.includes('401')) {
-        refetchUser();
-        return failureCount < 1;
-      }
-      return failureCount < 2;
-    },
-    staleTime: 0,
-    gcTime: 0
-  });
-
-  // All mutations must be defined before any early returns to comply with Rules of Hooks
+  // Mutations
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       return apiRequest("PATCH", `/api/users/${userId}/role`, { role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers();
       toast({
         title: "Sucesso",
         description: "Perfil do usuário atualizado com sucesso.",
@@ -120,6 +172,7 @@ export default function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers();
       toast({
         title: "Sucesso",
         description: "Status do usuário atualizado com sucesso.",
@@ -160,11 +213,11 @@ export default function UserManagement() {
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const response = await apiRequest("DELETE", `/api/users/${userId}`);
-      // DELETE returns 204 No Content, no JSON to parse
       return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers();
       toast({
         title: "Usuário excluído",
         description: "O usuário foi excluído permanentemente do sistema.",
@@ -173,12 +226,11 @@ export default function UserManagement() {
       setUserToDelete(null);
     },
     onError: (error: any) => {
-      // Se o backend indicar que deve bloquear ao invés de excluir, fazer o bloqueio automaticamente
       if (error.shouldBlock && userToDelete) {
         blockUserMutation.mutate(userToDelete.id);
         return;
       }
-      
+
       toast({
         title: "Erro ao excluir usuário",
         description: error.message || "O usuário não pode ser excluído pois já foi utilizado no sistema.",
@@ -194,6 +246,7 @@ export default function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers();
       toast({
         title: "Usuário bloqueado",
         description: "O usuário foi bloqueado e não poderá mais acessar o sistema.",
@@ -210,23 +263,200 @@ export default function UserManagement() {
     },
   });
 
-  // Filter and sort data - MUST be before early returns to respect hooks rules
-  const searchFilteredUsers = users.filter(user => {
-    try {
-      return user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.city && user.city.toLowerCase().includes(searchTerm.toLowerCase()));
-    } catch (err) {
-      console.error("Error filtering user:", user, err);
-      return false;
-    }
-  });
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  // Use sorting hook - MUST be called on every render
-  const { sortedData: filteredUsers, sortConfig, handleSort } = useTableSort(
-    searchFilteredUsers,
-    'name' as keyof User,
-    'asc'
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    const userId = searchParams.get('id');
+
+    if (userId && users.length > 0) {
+      const foundUser = users.find(u => u.id === userId);
+      if (foundUser) {
+        handleView(foundUser);
+      }
+    }
+  }, [location, users]);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("/api/users", {
+        credentials: "include"
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar usuários",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao conectar com o servidor",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleView = (selectedUser: User) => {
+    setSelectedUser(selectedUser);
+    setFormData(selectedUser);
+    setIsEditMode(false);
+    setIsDialogOpen(true);
+    if (selectedUser.birthDate) {
+      setBirthDate(new Date(selectedUser.birthDate));
+    }
+  };
+
+  const handleEdit = (selectedUser: User) => {
+    setSelectedUser(selectedUser);
+    setFormData({
+      ...selectedUser,
+      preferredTimes: selectedUser.preferredTimes || []
+    });
+    setBirthDate(selectedUser.birthDate ? new Date(selectedUser.birthDate) : undefined);
+    setIsEditMode(true);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const dataToSave = {
+        ...formData,
+        birthDate: birthDate?.toISOString(),
+        scheduleDisplayName: formData.scheduleDisplayName || null
+      };
+
+      const response = await fetch(`/api/users/${selectedUser.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(dataToSave)
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Sucesso",
+          description: "Dados atualizados com sucesso"
+        });
+        fetchUsers();
+        setIsDialogOpen(false);
+        setIsEditMode(false);
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Erro",
+          description: error.message || "Erro ao atualizar usuário",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error saving user:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar dados",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteUser = async (targetUser: User) => {
+    setUserToDelete(targetUser);
+
+    try {
+      const response = await apiRequest("GET", `/api/users/${targetUser.id}/check-usage`);
+
+      if (response.ok) {
+        const usage = await response.json();
+        setUserUsage(usage);
+      } else {
+        console.warn(`Check usage returned ${response.status}, defaulting to block`);
+        setUserUsage(null);
+      }
+    } catch (error) {
+      console.error("Error checking user usage:", error);
+      setUserUsage(null);
+    }
+
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteOrBlock = () => {
+    if (userToDelete) {
+      const isUserUsed = userUsage?.isUsed;
+
+      if (userUsage === null || isUserUsed) {
+        blockUserMutation.mutate(userToDelete.id);
+      } else {
+        deleteUserMutation.mutate(userToDelete.id);
+      }
+    }
+  };
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "gestor": return <Crown className="h-4 w-4" />;
+      case "coordenador": return <Shield className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "gestor": return "Reitor";
+      case "coordenador": return "Coordenador";
+      default: return "Ministro";
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "gestor": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "coordenador": return "bg-blue-100 text-blue-800 border-blue-200";
+      default: return "bg-green-100 text-green-800 border-green-200";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800 border-green-200";
+      case "inactive": return "bg-red-100 text-red-800 border-red-200";
+      default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    }
+  };
+
+  const getExperienceColor = (experience?: string) => {
+    if (!experience || experience === "iniciante") return "secondary";
+    if (experience === "sênior") return "default";
+    if (experience === "intermediário") return "outline";
+    return "secondary";
+  };
+
+  const getExperienceLabel = (experience?: string) => {
+    if (!experience) return "Iniciante";
+    if (experience === "sênior") return "Sênior";
+    if (experience === "intermediário") return "Intermediário";
+    if (experience === "iniciante") return "Iniciante";
+    return "Iniciante";
+  };
+
+  const filteredUsers = users.filter(targetUser =>
+    targetUser.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    targetUser.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    targetUser.city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
@@ -239,324 +469,151 @@ export default function UserManagement() {
     pending: users.filter(u => u.status === "pending").length,
   };
 
-  // Show loading state
-  if (isLoading) return <Layout><div className="text-center p-6">Carregando usuários...</div></Layout>;
-  
-  // Show error alert when users query fails
-  if (error) {
+  if (loading) {
     return (
-      <Layout>
-        <div className="container mx-auto p-6">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Erro ao carregar usuários</AlertTitle>
-            <AlertDescription>
-              {error.message?.includes('401') 
-                ? 'Sessão expirada. Faça login novamente.' 
-                : 'Não foi possível carregar a lista de usuários. Tente novamente mais tarde.'
-              }
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-muted-foreground">Carregando usuários...</div>
+      </div>
     );
   }
 
-  const handleDeleteUser = async (user: User) => {
-    setUserToDelete(user);
-    
-    // Check if user has been used in the system
-    try {
-      const response = await apiRequest("GET", `/api/users/${user.id}/check-usage`);
-      
-      // Check if response is OK and has JSON content
-      if (response.ok) {
-        const usage = await response.json();
-        setUserUsage(usage);
-      } else {
-        // Non-200 response, treat as "cannot verify" (safer default)
-        console.warn(`Check usage returned ${response.status}, defaulting to block`);
-        setUserUsage(null);
-      }
-    } catch (error) {
-      console.error("Error checking user usage:", error);
-      setUserUsage(null);
-    }
-    
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDeleteOrBlock = () => {
-    if (userToDelete) {
-      // Tanto gestores quanto coordenadores podem deletar usuários não utilizados
-      const isUserUsed = userUsage?.isUsed;
-      
-      // Segurança: se não conseguimos verificar o uso ou se é usado, sempre bloquear
-      if (userUsage === null || isUserUsed) {
-        blockUserMutation.mutate(userToDelete.id);
-      } else {
-        // Só deletar se explicitamente não usado (userUsage.isUsed === false)
-        deleteUserMutation.mutate(userToDelete.id);
-      }
-    }
-  };
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "gestor":
-        return <Crown className="h-4 w-4" />;
-      case "coordenador":
-        return <Shield className="h-4 w-4" />;
-      default:
-        return <User className="h-4 w-4" />;
-    }
-  };
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "gestor":
-        return "Reitor";
-      case "coordenador":
-        return "Coordenador";
-      default:
-        return "Ministro";
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "gestor":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "coordenador":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      default:
-        return "bg-green-100 text-green-800 border-green-200";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "inactive":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "active":
-        return "Ativo";
-      case "inactive":
-        return "Inativo";
-      default:
-        return "Pendente";
-    }
-  };
-
-  // Helper functions moved here after hooks usage
-
-
-  return (
-    <Layout title="Gestão de Usuários" subtitle="Gerencie perfis, permissões e dados dos usuários">
-      <div className="space-y-6">
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="h-5 w-5 text-mesc-text" />
-                <span className="text-sm font-medium text-muted-foreground">Total</span>
-              </div>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {stats.active} ativos • {stats.inactive} inativos
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Crown className="h-5 w-5 text-purple-600" />
-                <span className="text-sm font-medium text-muted-foreground">Reitores</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-600">{stats.reitores}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-5 w-5 text-blue-600" />
-                <span className="text-sm font-medium text-muted-foreground">Coordenadores</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-600">{stats.coordenadores}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <User className="h-5 w-5 text-green-600" />
-                <span className="text-sm font-medium text-muted-foreground">Ministros</span>
-              </div>
-              <div className="text-2xl font-bold text-green-600">{stats.ministros}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Users List */}
+  const content = (
+    <div className="max-w-7xl mx-auto p-6 ml-[-4px] mr-[-4px] pl-[8px] pr-[8px] pt-[14px] pb-[14px] space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle>Lista de Usuários</CardTitle>
-                <CardDescription>
-                  Gerencie todos os usuários do sistema
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nome, email ou cidade..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-full sm:w-[300px]"
-                  />
-                </div>
-                <Button
-                  onClick={async () => {
-                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-                    await refetch();
-                    toast({
-                      title: "Dados atualizados",
-                      description: "Lista de usuários recarregada do servidor.",
-                    });
-                  }}
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-refresh-users"
-                  disabled={isFetching}
-                >
-                  {isFetching ? "Atualizando..." : "Atualizar"}
-                </Button>
-              </div>
-            </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuários</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <SortableTableHeader
-                        sortKey="name"
-                        currentSortKey={sortConfig.key as string | null}
-                        direction={sortConfig.direction}
-                        onSort={() => handleSort('name' as keyof User)}
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ativos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Coordenadores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.coordenadores}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ministros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{stats.ministros}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Table */}
+      <Card className="border-opacity-30">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>Gerenciamento de Usuários</CardTitle>
+              <CardDescription>
+                Gerencie perfis, permissões e informações ministeriais
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-full sm:w-auto">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full sm:w-64"
+                />
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Perfil</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Contato</TableHead>
+                <TableHead>Info Ministerial</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((targetUser) => (
+                <TableRow key={targetUser.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{targetUser.name}</div>
+                      {targetUser.city && (
+                        <div className="text-sm text-muted-foreground">{targetUser.city}</div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getRoleColor(targetUser.role)}>
+                      <div className="flex items-center gap-1">
+                        {getRoleIcon(targetUser.role)}
+                        {getRoleLabel(targetUser.role)}
+                      </div>
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(targetUser.status)}>
+                      {targetUser.status === 'active' ? 'Ativo' : targetUser.status === 'pending' ? 'Pendente' : 'Inativo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Mail className="h-3 w-3" />
+                        {targetUser.email}
+                      </div>
+                      {targetUser.phone && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          {targetUser.phone}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {targetUser.role === "ministro" && (
+                      <div className="text-sm text-muted-foreground">
+                        {targetUser.totalServices ? `${targetUser.totalServices} serviços` : "Novo ministro"}
+                        {targetUser.experience && ` • ${targetUser.experience}`}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(targetUser)}
                       >
-                        Usuário
-                      </SortableTableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableTableHeader
-                        sortKey="email"
-                        currentSortKey={sortConfig.key as string | null}
-                        direction={sortConfig.direction}
-                        onSort={() => handleSort('email' as keyof User)}
-                      >
-                        Contato
-                      </SortableTableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableTableHeader
-                        sortKey="role"
-                        currentSortKey={sortConfig.key as string | null}
-                        direction={sortConfig.direction}
-                        onSort={() => handleSort('role' as keyof User)}
-                      >
-                        Perfil
-                      </SortableTableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableTableHeader
-                        sortKey="status"
-                        currentSortKey={sortConfig.key as string | null}
-                        direction={sortConfig.direction}
-                        onSort={() => handleSort('status' as keyof User)}
-                      >
-                        Status
-                      </SortableTableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableTableHeader
-                        sortKey="totalServices"
-                        currentSortKey={sortConfig.key as string | null}
-                        direction={sortConfig.direction}
-                        onSort={() => handleSort('totalServices' as keyof User)}
-                      >
-                        Informações
-                      </SortableTableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        Nenhum usuário encontrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            {user.city && (
-                              <div className="text-sm text-muted-foreground">{user.city}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-sm">
-                              <Mail className="h-3 w-3" />
-                              {user.email}
-                            </div>
-                            {user.phone && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {user.phone}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={`gap-1 ${getRoleColor(user.role)}`}>
-                            {getRoleIcon(user.role)}
-                            {getRoleLabel(user.role)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(user.status)}>
-                            {getStatusLabel(user.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {user.role === "ministro" && (
-                            <div className="text-sm text-muted-foreground">
-                              {user.totalServices ? `${user.totalServices} serviços` : "Novo ministro"}
-                              {user.experience && ` • ${user.experience}`}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {isCoordinator && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(targetUser)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-8 w-8 p-0">
@@ -567,95 +624,89 @@ export default function UserManagement() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              
-                              {/* Alterar Perfil - Ministro */}
+
                               <DropdownMenuItem
-                                onClick={() => updateRoleMutation.mutate({ 
-                                  userId: user.id, 
-                                  role: "ministro" 
+                                onClick={() => updateRoleMutation.mutate({
+                                  userId: targetUser.id,
+                                  role: "ministro"
                                 })}
-                                disabled={user.role === "ministro"}
+                                disabled={targetUser.role === "ministro"}
                               >
                                 <User className="mr-2 h-4 w-4" />
                                 Alterar para Ministro
                               </DropdownMenuItem>
-                              
-                              {/* Alterar Perfil - Coordenador */}
+
                               <DropdownMenuItem
-                                onClick={() => updateRoleMutation.mutate({ 
-                                  userId: user.id, 
-                                  role: "coordenador" 
+                                onClick={() => updateRoleMutation.mutate({
+                                  userId: targetUser.id,
+                                  role: "coordenador"
                                 })}
-                                disabled={user.role === "coordenador"}
+                                disabled={targetUser.role === "coordenador"}
                               >
                                 <Shield className="mr-2 h-4 w-4" />
                                 Alterar para Coordenador
                               </DropdownMenuItem>
-                              
-                              {/* Alterar Perfil - Gestor */}
+
                               <DropdownMenuItem
-                                onClick={() => updateRoleMutation.mutate({ 
-                                  userId: user.id, 
-                                  role: "gestor" 
+                                onClick={() => updateRoleMutation.mutate({
+                                  userId: targetUser.id,
+                                  role: "gestor"
                                 })}
-                                disabled={user.role === "gestor"}
+                                disabled={targetUser.role === "gestor"}
                               >
                                 <Crown className="mr-2 h-4 w-4" />
                                 Alterar para Reitor
                               </DropdownMenuItem>
-                              
+
                               <DropdownMenuSeparator />
-                              
-                              {/* Alterar Status - Ativo */}
+
                               <DropdownMenuItem
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  userId: user.id, 
-                                  status: "active" 
+                                onClick={() => updateStatusMutation.mutate({
+                                  userId: targetUser.id,
+                                  status: "active"
                                 })}
-                                disabled={user.status === "active"}
+                                disabled={targetUser.status === "active"}
                               >
                                 <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                 Ativar Usuário
                               </DropdownMenuItem>
-                              
-                              {/* Alterar Status - Inativo */}
+
                               <DropdownMenuItem
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  userId: user.id, 
-                                  status: "inactive" 
+                                onClick={() => updateStatusMutation.mutate({
+                                  userId: targetUser.id,
+                                  status: "inactive"
                                 })}
-                                disabled={user.status === "inactive"}
+                                disabled={targetUser.status === "inactive"}
                               >
                                 <Ban className="mr-2 h-4 w-4 text-red-600" />
                                 Inativar Usuário
                               </DropdownMenuItem>
-                              
-                              {/* Alterar Status - Pendente */}
+
                               <DropdownMenuItem
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  userId: user.id, 
-                                  status: "pending" 
+                                onClick={() => updateStatusMutation.mutate({
+                                  userId: targetUser.id,
+                                  status: "pending"
                                 })}
-                                disabled={user.status === "pending"}
+                                disabled={targetUser.status === "pending"}
                               >
                                 <AlertCircle className="mr-2 h-4 w-4 text-yellow-600" />
                                 Marcar como Pendente
                               </DropdownMenuItem>
-                              
+
                               <DropdownMenuSeparator />
-                              
+
                               <DropdownMenuItem
                                 onClick={() => {
-                                  setSelectedUserId(user.id);
+                                  setSelectedUserId(targetUser.id);
                                   setResetPasswordOpen(true);
                                 }}
                               >
                                 <KeyRound className="mr-2 h-4 w-4" />
                                 Resetar Senha
                               </DropdownMenuItem>
-                              
+
                               <DropdownMenuItem
-                                onClick={() => handleDeleteUser(user)}
+                                onClick={() => handleDeleteUser(targetUser)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -663,126 +714,490 @@ export default function UserManagement() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reset Password Dialog */}
-        <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Resetar Senha do Usuário</DialogTitle>
-              <DialogDescription>
-                Digite uma nova senha temporária para o usuário. Ele será solicitado a criar uma nova senha no próximo login.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Nova Senha Temporária</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Digite a nova senha"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setResetPasswordOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => {
-                  if (selectedUserId && newPassword) {
-                    resetPasswordMutation.mutate({ userId: selectedUserId, newPassword });
-                  }
-                }}
-                disabled={!newPassword || resetPasswordMutation.isPending}
-              >
-                {resetPasswordMutation.isPending ? "Resetando..." : "Resetar Senha"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete/Block Confirmation Dialog */}
-        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {(() => {
-                  const willBlock = userUsage?.isUsed === true || userUsage === null;
-                  return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
-                })()}
-              </DialogTitle>
-            </DialogHeader>
-            
-            {(() => {
-              const willBlock = userUsage?.isUsed === true || userUsage === null;
-              
-              if (willBlock) {
-                return (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      {userUsage?.isUsed ? (
-                        <>
-                          Este usuário não pode ser excluído pois já foi utilizado no sistema.
-                          {userUsage.reason && (
-                            <p className="mt-2 text-sm text-muted-foreground">{userUsage.reason}</p>
-                          )}
-                          <p className="mt-2 font-medium">O usuário será bloqueado ao invés de excluído.</p>
-                        </>
-                      ) : (
-                        <>
-                          Não foi possível verificar se o usuário foi utilizado no sistema.
-                          <p className="mt-2 font-medium">Por segurança, o usuário será bloqueado ao invés de excluído.</p>
                         </>
                       )}
-                    </AlertDescription>
-                  </Alert>
-                );
-              } else {
-                return (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Tem certeza que deseja excluir permanentemente o usuário <strong>{userToDelete?.name}</strong>? 
-                      Esta ação não pode ser desfeita.
-                    </AlertDescription>
-                  </Alert>
-                );
-              }
-            })()}
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={confirmDeleteOrBlock}
-                disabled={deleteUserMutation.isPending || blockUserMutation.isPending}
-              >
-                {(() => {
-                  if (deleteUserMutation.isPending || blockUserMutation.isPending) {
-                    return "Processando...";
-                  }
-                  const willBlock = userUsage?.isUsed === true || userUsage === null;
-                  return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
-                })()}
-              </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Edit/View Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) {
+          setIsEditMode(false);
+        }
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <DialogTitle>
+              {isEditMode ? "Editar Usuário" : "Detalhes do Usuário"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode ? "Atualize as informações do usuário" : "Visualizar informações completas"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-6">
+            {selectedUser && (
+              <>
+                {/* Informações Básicas */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Informações Pessoais</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 md:col-span-1">
+                    <Label>Nome</Label>
+                    <Input
+                      value={selectedUser.name}
+                      disabled
+                    />
+                  </div>
+                  <div className="sm:col-span-2 md:col-span-1">
+                    <Label>Nome na Escala (opcional)</Label>
+                    {isEditMode ? (
+                      <Input
+                        value={formData.scheduleDisplayName || ""}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          scheduleDisplayName: e.target.value
+                        })}
+                        placeholder="Ex: M. Silva, João P."
+                      />
+                    ) : (
+                      <Input
+                        value={selectedUser.scheduleDisplayName || ""}
+                        disabled
+                      />
+                    )}
+                  </div>
+                  <div className="sm:col-span-2 md:col-span-1">
+                    <Label>Email</Label>
+                    <Input
+                      value={selectedUser.email}
+                      disabled
+                    />
+                  </div>
+                  <div className="sm:col-span-2 md:col-span-1">
+                    <Label>Telefone</Label>
+                    <Input
+                      value={selectedUser.phone || ""}
+                      disabled
+                    />
+                  </div>
+                  <div className="sm:col-span-2 md:col-span-1">
+                    <Label>Data de Nascimento</Label>
+                    {isEditMode ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !birthDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {birthDate ? format(birthDate, "dd/MM/yyyy") : "Selecione uma data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={birthDate}
+                            onSelect={setBirthDate}
+                            initialFocus
+                            locale={ptBR}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Input
+                        value={birthDate ? format(birthDate, "dd/MM/yyyy") : "-"}
+                        disabled
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações Ministeriais */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Informações Ministeriais</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Posição Litúrgica Preferida</Label>
+                    {isEditMode ? (
+                      <Select
+                        value={formData.preferredPosition?.toString() || ""}
+                        onValueChange={(value) => setFormData({...formData, preferredPosition: parseInt(value)})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma posição" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => (
+                            <SelectItem key={key} value={key}>
+                              {value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={formData.preferredPosition ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS] : "-"}
+                        disabled
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label>Nível de Experiência</Label>
+                    {isEditMode ? (
+                      <Select
+                        value={formData.experience || "iniciante"}
+                        onValueChange={(value) => setFormData({...formData, experience: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="iniciante">Iniciante</SelectItem>
+                          <SelectItem value="intermediário">Intermediário</SelectItem>
+                          <SelectItem value="sênior">Sênior</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={getExperienceLabel(formData.experience)}
+                        disabled
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Horários de Missa Preferidos</Label>
+                  {isEditMode ? (
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                      {MASS_TIMES.map((time) => (
+                        <div key={time} className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={formData.preferredTimes?.includes(time) || false}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData({
+                                  ...formData,
+                                  preferredTimes: [...(formData.preferredTimes || []), time]
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  preferredTimes: formData.preferredTimes?.filter(t => t !== time) || []
+                                });
+                              }
+                            }}
+                          />
+                          <Label>{time}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-2">
+                      {formData.preferredTimes?.length ? (
+                        formData.preferredTimes.map((time) => (
+                          <Badge key={time} variant="secondary">{time}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Nenhum horário selecionado</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Habilidades Especiais</Label>
+                  {isEditMode ? (
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                      {SPECIAL_SKILLS.map((skill) => (
+                        <div key={skill} className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={formData.specialSkills?.includes(skill) || false}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData({
+                                  ...formData,
+                                  specialSkills: [...(formData.specialSkills || []), skill]
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  specialSkills: formData.specialSkills?.filter(s => s !== skill) || []
+                                });
+                              }
+                            }}
+                          />
+                          <Label>{skill}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-2">
+                      {formData.specialSkills?.length ? (
+                        formData.specialSkills.map((skill) => (
+                          <Badge key={skill} variant="outline">{skill}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Nenhuma habilidade selecionada</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={formData.availableForSpecialEvents || false}
+                        onCheckedChange={(checked) => setFormData({...formData, availableForSpecialEvents: checked as boolean})}
+                        disabled={!isEditMode}
+                      />
+                      <Label>Disponível para eventos especiais</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={formData.canServeAsCouple || false}
+                        onCheckedChange={(checked) => setFormData({...formData, canServeAsCouple: checked as boolean})}
+                        disabled={!isEditMode}
+                      />
+                      <Label>Pode servir em casal</Label>
+                    </div>
+                  </div>
+
+                  {isCoordinator && (
+                    <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
+                      <Checkbox
+                        checked={formData.status === 'active'}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          status: checked ? 'active' : 'inactive'
+                        })}
+                        disabled={!isEditMode}
+                      />
+                      <Label className="font-medium">Ministro Ativo</Label>
+                      {formData.status === 'inactive' && (
+                        <Badge variant="destructive" className="ml-2">Inativo</Badge>
+                      )}
+                      {formData.status === 'pending' && (
+                        <Badge variant="outline" className="ml-2">Pendente</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Observações</Label>
+                  <Textarea
+                    value={formData.observations || ""}
+                    onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                    disabled={!isEditMode}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Estatísticas */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Estatísticas</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">{formData.totalServices || 0}</div>
+                      <p className="text-xs text-muted-foreground">Total de Serviços</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">
+                        {formData.formationCompleted?.length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Formações Concluídas</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">
+                        {formData.lastService ?
+                          format(new Date(formData.lastService), "dd/MM", { locale: ptBR }) :
+                          "-"
+                        }
+                      </div>
+                      <p className="text-xs text-muted-foreground">Último Serviço</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+              </>
+            )}
+            </div>
+          </div>
+
+          {selectedUser && (
+            <DialogFooter className="border-t px-6 py-4 flex-shrink-0">
+              {isEditMode ? (
+                <>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditMode(false);
+                    setFormData(selectedUser);
+                  }}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave}>
+                    Salvar Alterações
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {isCoordinator && (
+                    <Button onClick={() => setIsEditMode(true)}>
+                      Editar
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Fechar
+                  </Button>
+                </>
+              )}
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resetar Senha do Usuário</DialogTitle>
+            <DialogDescription>
+              Digite uma nova senha temporária para o usuário. Ele será solicitado a criar uma nova senha no próximo login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova Senha Temporária</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Digite a nova senha"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedUserId && newPassword) {
+                  resetPasswordMutation.mutate({ userId: selectedUserId, newPassword });
+                }
+              }}
+              disabled={!newPassword || resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? "Resetando..." : "Resetar Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete/Block Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {(() => {
+                const willBlock = userUsage?.isUsed === true || userUsage === null;
+                return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
+              })()}
+            </DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const willBlock = userUsage?.isUsed === true || userUsage === null;
+
+            if (willBlock) {
+              return (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {userUsage?.isUsed ? (
+                      <>
+                        Este usuário não pode ser excluído pois já foi utilizado no sistema.
+                        {userUsage.reason && (
+                          <p className="mt-2 text-sm text-muted-foreground">{userUsage.reason}</p>
+                        )}
+                        <p className="mt-2 font-medium">O usuário será bloqueado ao invés de excluído.</p>
+                      </>
+                    ) : (
+                      <>
+                        Não foi possível verificar se o usuário foi utilizado no sistema.
+                        <p className="mt-2 font-medium">Por segurança, o usuário será bloqueado ao invés de excluído.</p>
+                      </>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              );
+            } else {
+              return (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Tem certeza que deseja excluir permanentemente o usuário <strong>{userToDelete?.name}</strong>?
+                    Esta ação não pode ser desfeita.
+                  </AlertDescription>
+                </Alert>
+              );
+            }
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteOrBlock}
+              disabled={deleteUserMutation.isPending || blockUserMutation.isPending}
+            >
+              {(() => {
+                if (deleteUserMutation.isPending || blockUserMutation.isPending) {
+                  return "Processando...";
+                }
+                const willBlock = userUsage?.isUsed === true || userUsage === null;
+                return willBlock ? "Bloquear Usuário" : "Excluir Usuário";
+              })()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+
+  if (isEmbedded) {
+    return content;
+  }
+
+  return (
+    <Layout
+      title="Gestão de Usuários"
+      subtitle="Gerencie perfis, permissões e dados dos usuários"
+    >
+      {content}
     </Layout>
   );
 }
