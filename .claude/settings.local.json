@@ -45,7 +45,8 @@
       "Bash(netstat:*)",
       "Bash(ss:*)",
       "Bash(killall:*)",
-      "Bash(echo $REPL_SLUG)"
+      "Bash(echo $REPL_SLUG)",
+      "Bash(env)"
     ],
     "deny": [],
     "ask": []

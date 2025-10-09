@@ -1,4 +1,5 @@
-const VERSION = '5.4.1'; // Incrementar quando houver mudanças importantes
+// VERSÃO DINÂMICA: Usa timestamp para sempre invalidar cache
+const VERSION = `${Date.now()}`; // Sempre gera nova versão
 const CACHE_NAME = `mesc-v${VERSION}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
@@ -7,8 +8,11 @@ const urlsToCache = [
   '/sjtlogo.png'
 ];
 
-// CACHE BUSTING: Incrementar BUILD_NUMBER a cada deploy
+// CACHE BUSTING: Usa timestamp para garantir reload
 const BUILD_NUMBER = Date.now();
+
+// Auto-reload quando service worker atualiza
+let RELOAD_ON_UPDATE = true;
 
 // Configuração de auto-update
 const CHECK_UPDATE_INTERVAL = 30000; // 30 segundos
@@ -142,11 +146,9 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      // CRÍTICO: Limpa também cache de API antiga
+      // CRÍTICO: Limpa TODOS os caches de API
       return caches.open(CACHE_NAME).then(cache => {
         return cache.keys().then(requests => {
-          // Remove entradas de API que tenham mais de 1 hora
-          const oneHourAgo = Date.now() - (60 * 60 * 1000);
           return Promise.all(
             requests.map(request => {
               if (request.url.includes('/api/')) {
@@ -161,7 +163,7 @@ self.addEventListener('activate', (event) => {
       // Force immediate control of all clients
       return self.clients.claim();
     }).then(() => {
-      // Notify all clients about the update
+      // Notify all clients about the update and force reload
       return self.clients.matchAll().then(clients => {
         console.log(`[SW] Notifying ${clients.length} clients about update`);
         clients.forEach(client => {
@@ -169,7 +171,8 @@ self.addEventListener('activate', (event) => {
             type: 'SW_UPDATED',
             version: VERSION,
             buildNumber: BUILD_NUMBER,
-            cacheCleared: true
+            cacheCleared: true,
+            forceReload: RELOAD_ON_UPDATE
           });
         });
       });
