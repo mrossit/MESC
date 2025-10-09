@@ -19,10 +19,11 @@
       })();
     </script>
     
-    <!-- Cache bust: v5.4.1-2025 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <!-- Cache bust: Updated dynamically -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="cache-version" content="v<?= time() ?>">
     <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
     
     <!-- PWA Meta Tags -->
@@ -67,6 +68,21 @@
     <!-- PWA Update Prompt -->
     <script>
       if ('serviceWorker' in navigator) {
+        // Listener para mensagens do service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          console.log('[SW Message]', event.data);
+
+          if (event.data && event.data.type === 'SW_UPDATED') {
+            console.log('[SW] New version detected:', event.data.version);
+
+            // Se forceReload for true, recarrega automaticamente
+            if (event.data.forceReload) {
+              console.log('[SW] Force reloading page...');
+              window.location.reload(true);
+            }
+          }
+        });
+
         window.addEventListener('load', () => {
           // Desregistra service workers antigos ANTES de registrar novo
           navigator.serviceWorker.getRegistrations().then(registrations => {
@@ -80,11 +96,11 @@
                 // Verifica atualizações imediatamente
                 registration.update();
 
-                // Verifica atualizações periodicamente (a cada 60 segundos)
+                // Verifica atualizações periodicamente (a cada 30 segundos)
                 setInterval(() => {
                   console.log('[SW] Checking for updates...');
                   registration.update();
-                }, 60000);
+                }, 30000);
 
                 // Listener para novas versões
                 registration.addEventListener('updatefound', () => {
@@ -93,8 +109,17 @@
 
                   if (newWorker) {
                     newWorker.addEventListener('statechange', () => {
-                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('[SW] New version installed and waiting');
+                      if (newWorker.state === 'installed') {
+                        console.log('[SW] New version installed');
+
+                        // Se há um controller ativo, significa que há uma atualização
+                        if (navigator.serviceWorker.controller) {
+                          console.log('[SW] Waiting for activation...');
+                          // Envia mensagem para ativar imediatamente
+                          newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                      } else if (newWorker.state === 'activated') {
+                        console.log('[SW] New version activated');
                       }
                     });
                   }
