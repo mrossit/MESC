@@ -206,6 +206,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
     const now = new Date();
+    console.log('[Substitutions] Verificando data:', {
+      scheduleDate: schedule.date,
+      scheduleTime: schedule.time,
+      massDateTime: massDateTime.toISOString(),
+      now: now.toISOString(),
+      isPast: massDateTime < now
+    });
 
     if (massDateTime < now) {
       return res.status(400).json({
