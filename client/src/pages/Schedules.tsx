@@ -1131,8 +1131,8 @@ export default function Schedules() {
       setSelectedAssignmentForSubstitution(null);
       setAvailableSubstitutes([]);
 
-      // Recarregar escalas
-      fetchSchedules();
+      // Recarregar escalas (incluindo substituições para atualizar legendas)
+      await fetchSchedules();
     } catch (error: any) {
       toast({
         title: "Erro",

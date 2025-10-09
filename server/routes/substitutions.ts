@@ -257,8 +257,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     // Usar o substituteId fornecido ou null
     const finalSubstituteId = substituteId || null;
 
-    // Status sempre começa como pending - coordenador aprova manualmente
-    const status: "pending" = "pending";
+    // Status:
+    // - Se tem substituteId (indicação direta) → 'pending' (aguarda aceitação do indicado)
+    // - Se NÃO tem substituteId (aberto) → 'available' (vai para quadro público)
+    const status = finalSubstituteId ? "pending" : "available";
 
     // Criar solicitação
     const [newRequest] = await db
@@ -323,10 +325,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       substituteUser
     };
 
-    // Mensagem simples
+    // Mensagem baseada no status
     const message = finalSubstituteId
-      ? "Solicitação criada com sucesso. Aguardando aprovação."
-      : "Solicitação criada. Aguardando que o coordenador atribua um suplente.";
+      ? "Solicitação criada. Aguardando resposta do ministro indicado."
+      : "Solicitação publicada no quadro de substituições. Outros ministros poderão se prontificar.";
 
     res.json({
       success: true,

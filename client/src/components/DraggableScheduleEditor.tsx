@@ -108,7 +108,7 @@ function SortableMinisterCard({ assignment, onRemove }: SortableMinisterCardProp
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Posição {assignment.position + 1}</span>
           {assignment.confirmed && (
-            <Badge variant="success" className="text-xs px-1.5 py-0">
+            <Badge variant="default" className="text-xs px-1.5 py-0">
               Confirmado
             </Badge>
           )}
