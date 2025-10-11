@@ -150,9 +150,10 @@ export function MinisterDashboard() {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {upcomingSchedules.slice(0, 5).map((schedule) => (
-                <div 
-                  key={schedule.id} 
-                  className="flex items-center justify-between p-3 bg-neutral-peachCream/10 dark:bg-gray-800 rounded-lg border border-neutral-border/20 dark:border-gray-700 hover:bg-neutral-peachCream/20 dark:hover:bg-gray-700 transition-colors"
+                <div
+                  key={schedule.id}
+                  className="flex items-center justify-between p-3 bg-neutral-peachCream/10 dark:bg-gray-800 rounded-lg border border-neutral-border/20 dark:border-gray-700 hover:bg-neutral-peachCream/20 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  onClick={() => setLocation(`/schedules?date=${schedule.date}`)}
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -191,7 +192,10 @@ export function MinisterDashboard() {
         <SaintOfTheDay />
 
         {/* Formação */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card
+          className="border border-neutral-border/30 dark:border-border cursor-pointer hover:bg-accent/50 transition-colors"
+          onClick={() => setLocation('/formation')}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <BookOpen className="h-5 w-5 text-blue-500" />
@@ -203,7 +207,7 @@ export function MinisterDashboard() {
               <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
                 <BookOpen className="h-7 w-7 text-blue-500/70" />
               </div>
-              <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
+              <p className="text-muted-foreground font-medium mb-1">Ver conteúdos</p>
               <p className="text-xs text-muted-foreground/70 max-w-xs">
                 Acompanhe seu progresso nos módulos de formação
               </p>
