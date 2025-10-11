@@ -958,13 +958,22 @@ export class ScheduleGenerator {
       }
       
       // REGRA 6: Novena de São Judas (dias 20-27 de outubro às 19h30)
+      // 🚨 IMPORTANTE: Durante a novena (20-27/10), APENAS a missa da noite!
+      //    - Oct 20 (Seg): 19:30
+      //    - Oct 21 (Ter): 19:30
+      //    - Oct 22 (Qua): 19:30
+      //    - Oct 23 (Qui): 19:30
+      //    - Oct 24 (Sex): 19:30
+      //    - Oct 25 (Sáb): 19:00 (única missa do dia!)
+      //    - Oct 26 (Dom): Domingos normais (8h, 10h, 19h) + novena 19:30
+      //    - Oct 27 (Seg): 19:30
       if (month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27) {
         // Determinar qual dia da novena é
         const novenaDayNumber = dayOfMonth - 19; // Dia 20 = 1ª novena, dia 27 = 8ª novena
 
         // Horário depende do dia da semana
         let novenaTime = '19:30';
-        if (dayOfWeek === 6) { // Sábado (dia 24)
+        if (dayOfWeek === 6) { // Sábado (dia 24 ou 25)
           novenaTime = '19:00';
         }
 
@@ -978,6 +987,11 @@ export class ScheduleGenerator {
           type: 'missa_sao_judas'
         });
         console.log(`[SCHEDULE_GEN] 🙏 Novena São Judas (${novenaDayNumber}º dia): ${dateStr} ${novenaTime} (26 ministros)`);
+
+        // 🚨 REGRA CRÍTICA: Se for sábado durante novena (Oct 25), marcar para remover outras missas
+        if (dayOfWeek === 6) {
+          console.log(`[SCHEDULE_GEN] 🚫 Sábado ${dateStr} está na novena - apenas missa às ${novenaTime}!`);
+        }
       }
 
       // REGRA 7: Festa de São Judas (dia 28)
@@ -1007,17 +1021,56 @@ export class ScheduleGenerator {
    */
   private resolveTimeConflicts(massTimes: MassTime[]): MassTime[] {
     console.log(`[SCHEDULE_GEN] 🔧 Resolvendo conflitos entre ${massTimes.length} missas...`);
-    
-    // 🚨 REGRA ESPECIAL: REMOVER TODAS as missas diárias do dia 28 (São Judas)
+
+    // 🚨 REGRA ESPECIAL 1: REMOVER TODAS as missas diárias do dia 28 (São Judas)
+    // 🚨 REGRA ESPECIAL 2: REMOVER TODAS as missas de sábados regulares em OUTUBRO (exceto dia 4 e 25)
+    // 🚨 REGRA ESPECIAL 3: REMOVER missas MATUTINAS durante novena (Oct 20-27, exceto domingo 26)
     const filteredMasses = massTimes.filter(mass => {
+      // Extract date parts
+      const dateParts = mass.date?.split('-');
+      if (!dateParts || dateParts.length !== 3) return true;
+
+      const year = parseInt(dateParts[0]);
+      const month = parseInt(dateParts[1]);
+      const day = parseInt(dateParts[2]);
+      const massDate = new Date(year, month - 1, day);
+      const dayOfWeek = massDate.getDay(); // 0=Sunday, 6=Saturday
+
+      // REGRA 1: Remover missas diárias do dia 28
       if (mass.date && mass.date.endsWith('-28') && mass.type === 'missa_diaria') {
         console.log(`[SCHEDULE_GEN] 🚫 REMOVENDO missa diária do dia 28: ${mass.date} ${mass.time}`);
-        return false; // Remover missa diária do dia 28
+        return false;
       }
+
+      // REGRA 2: Em OUTUBRO, remover TODAS as missas de sábados regulares (exceto dia 4 e 25)
+      // Oct 4 = Primeiro Sábado (Imaculado Coração)
+      // Oct 25 = Sábado da Novena (apenas 19:00)
+      // Oct 11, 18 = Sábados regulares (SEM MISSAS!)
+      if (month === 10 && dayOfWeek === 6 && day !== 4 && day !== 25) {
+        console.log(`[SCHEDULE_GEN] 🚫 REMOVENDO missa de sábado regular em outubro: ${mass.date} ${mass.time} (${mass.type})`);
+        return false;
+      }
+
+      // REGRA 3: Durante novena (Oct 20-27), APENAS missas noturnas (exceto domingo 26)
+      // Oct 20-24 (Seg-Sex): Apenas 19:30 novena
+      // Oct 25 (Sáb): Apenas 19:00 novena
+      // Oct 26 (Dom): Domingos normais (8h, 10h, 19h) + novena 19:30 ✅
+      // Oct 27 (Seg): Apenas 19:30 novena
+      if (month === 10 && day >= 20 && day <= 27 && dayOfWeek !== 0) {
+        // Check if it's a morning mass (before 12:00)
+        const hour = parseInt(mass.time.split(':')[0]);
+        const isMorningMass = hour < 12;
+
+        if (isMorningMass && mass.type !== 'missa_sao_judas' && mass.type !== 'missa_sao_judas_festa') {
+          console.log(`[SCHEDULE_GEN] 🚫 REMOVENDO missa matutina durante novena: ${mass.date} ${mass.time} (${mass.type})`);
+          return false;
+        }
+      }
+
       return true; // Manter todas as outras
     });
-    
-    console.log(`[SCHEDULE_GEN] 📊 Filtro dia 28: ${massTimes.length} → ${filteredMasses.length} missas`);
+
+    console.log(`[SCHEDULE_GEN] 📊 Filtros aplicados: ${massTimes.length} → ${filteredMasses.length} missas`);
     
     // Agrupar por data e horário
     const timeSlots = new Map<string, MassTime[]>();
