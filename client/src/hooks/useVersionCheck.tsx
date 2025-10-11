@@ -41,13 +41,11 @@ export function useVersionCheck() {
         if (currentVersionRef.current === null) {
           currentVersionRef.current = serverVersion;
           localStorage.setItem('mesc-app-version', serverVersion);
-          console.log('[VersionCheck] Current version:', serverVersion);
           return;
         }
 
         // Se a versão mudou, dispara evento para mostrar notificação
         if (serverVersion !== currentVersionRef.current) {
-          console.log('[VersionCheck] New version detected:', serverVersion, '(current:', currentVersionRef.current + ')');
 
           // Dispara evento customizado para UpdateNotification mostrar alerta
           const event = new CustomEvent('app-update-available', {

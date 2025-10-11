@@ -265,7 +265,6 @@ export default function Profile() {
         scheduleDisplayName: (profile as any).scheduleDisplayName || null
       };
 
-      console.log('Enviando dados do perfil:', dataToSend);
 
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -274,11 +273,9 @@ export default function Profile() {
         body: JSON.stringify(dataToSend)
       });
 
-      console.log('Resposta da API:', res.status);
 
       if (res.ok) {
         const updatedProfile = await res.json();
-        console.log('Perfil atualizado:', updatedProfile);
         setProfile(updatedProfile);
         setSuccess('Perfil atualizado com sucesso!');
         setIsEditing(false);

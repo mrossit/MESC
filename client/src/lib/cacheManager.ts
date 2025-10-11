@@ -18,7 +18,6 @@ export function checkCacheVersion(): void {
   const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
 
   if (storedVersion !== CACHE_VERSION) {
-    console.log(`[CacheManager] Versão mudou de ${storedVersion} para ${CACHE_VERSION}. Limpando cache...`);
     clearAllCache();
     localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
   }
@@ -30,7 +29,6 @@ export function checkCacheVersion(): void {
 export function clearAllCache(): void {
   if (typeof window === 'undefined') return;
 
-  console.log('[CacheManager] Limpando todo o cache...');
 
   // Limpa cache do React Query
   queryClient.clear();
@@ -50,14 +48,12 @@ export function clearAllCache(): void {
     }
   });
 
-  console.log('[CacheManager] Cache limpo com sucesso');
 }
 
 /**
  * Limpa cache de queries específicas (ex: escalas, ministros, etc)
  */
 export function invalidateScheduleCache(): void {
-  console.log('[CacheManager] Invalidando cache de escalas...');
 
   queryClient.invalidateQueries({
     predicate: (query) => {
@@ -75,7 +71,6 @@ export function invalidateScheduleCache(): void {
  * Limpa cache quando sair de uma página de edição
  */
 export function clearEditCache(): void {
-  console.log('[CacheManager] Limpando cache de edição...');
   invalidateScheduleCache();
 }
 
@@ -83,7 +78,6 @@ export function clearEditCache(): void {
  * Force refresh de dados específicos (útil ao voltar para uma página)
  */
 export function forceRefreshAuth(): Promise<void> {
-  console.log('[CacheManager] Forçando refresh de autenticação...');
   return queryClient.invalidateQueries({
     queryKey: ['/api/auth/me'],
     refetchType: 'active'
@@ -96,7 +90,6 @@ export function forceRefreshAuth(): Promise<void> {
 export function clearCacheOnLogout(): void {
   if (typeof window === 'undefined') return;
 
-  console.log('[CacheManager] Limpando cache no logout...');
   clearAllCache();
   localStorage.removeItem('token');
 }

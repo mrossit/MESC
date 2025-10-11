@@ -44,6 +44,46 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
 
     logger.info(`Iniciando geração automática de escalas para ${month}/${year} por usuário ${req.user?.id}`);
 
+    // ✅ VALIDAÇÃO CRÍTICA: Verificar se há questionário com respostas antes de gerar
+    if (db) {
+      // 1. Verificar se questionário existe para o mês
+      const [targetQuestionnaire] = await db.select()
+        .from(questionnaires)
+        .where(
+          and(
+            eq(questionnaires.month, month),
+            eq(questionnaires.year, year)
+          )
+        )
+        .limit(1);
+
+      if (!targetQuestionnaire) {
+        logger.warn(`Tentativa de gerar escalas sem questionário: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: `Não há questionário criado para ${month}/${year}. Crie um questionário antes de gerar escalas.`,
+          errorCode: 'NO_QUESTIONNAIRE'
+        });
+      }
+
+      // 2. Verificar se questionário tem respostas
+      const responses = await db.select()
+        .from(questionnaireResponses)
+        .where(eq(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+
+      if (responses.length === 0) {
+        logger.warn(`Tentativa de gerar escalas sem respostas: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Não há respostas do questionário para este mês. Aguarde os ministros responderem antes de gerar escalas.',
+          errorCode: 'NO_RESPONSES',
+          questionnaireStatus: targetQuestionnaire.status
+        });
+      }
+
+      logger.info(`Validação OK: questionário ${targetQuestionnaire.id} com ${responses.length} respostas`);
+    }
+
     // Verificar se já existem escalas para o mês
     if (!replaceExisting && db) {
       const existingSchedules = await db.select({ id: schedules.id })
@@ -227,9 +267,24 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
       });
     }
 
+    console.log('[PREVIEW ROUTE] 🚀 Starting schedule preview with 30s timeout');
+
+    // 🔥 EMERGENCY FIX: Add 30-second timeout protection
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('⏱️ Schedule generation timed out after 30 seconds. This indicates a performance issue that needs to be fixed.'));
+      }, 30000);
+    });
+
     console.log('[PREVIEW ROUTE] Calling generateAutomaticSchedule with:', { year, month, isPreview: true });
-    const generatedSchedules = await generateAutomaticSchedule(year, month, true); // Preview aceita questionários abertos
-    console.log('[PREVIEW ROUTE] Generated schedules count:', generatedSchedules.length);
+
+    // Race between generation and timeout
+    const generatedSchedules = await Promise.race([
+      generateAutomaticSchedule(year, month, true), // Preview aceita questionários abertos
+      timeoutPromise
+    ]);
+
+    console.log('[PREVIEW ROUTE] ✅ Generated schedules count:', generatedSchedules.length);
 
     // 🚨 CORREÇÃO DIRETA NA ROTA: Remover missas diárias do dia 28
     const correctedSchedules = generatedSchedules.filter(schedule => {

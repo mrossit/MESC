@@ -4,10 +4,30 @@ import { Users, Percent, Calendar, UserCheck, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DashboardStats } from "@/lib/types";
 import { Link } from "wouter";
+import { useDebugRender } from "@/lib/debug";
 
 export function DashboardStatsCards() {
+  // Track renders in debug panel (development only)
+  useDebugRender('DashboardStatsCards');
+  // Get current month and year for questionnaire stats
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1;
+  const currentYear = currentDate.getFullYear();
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
+  });
+
+  // Fetch real questionnaire stats
+  const { data: questionnaireStats } = useQuery({
+    queryKey: ["/api/questionnaires/stats", currentMonth, currentYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/questionnaires/admin/stats?month=${currentMonth}&year=${currentYear}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch questionnaire stats');
+      return res.json();
+    }
   });
 
   if (isLoading) {
@@ -46,10 +66,10 @@ export function DashboardStatsCards() {
     },
     {
       title: "Taxa de Resposta",
-      value: `${stats?.responseRate || 0}%`,
+      value: `${questionnaireStats?.responseRate || stats?.responseRate || 0}%`,
       icon: Percent,
-      change: "+4%",
-      changeText: "vs meta 63%",
+      change: questionnaireStats?.exists ? `${questionnaireStats.totalResponses}/${questionnaireStats.totalActiveUsers}` : "+4%",
+      changeText: questionnaireStats?.exists ? "respostas recebidas" : "vs meta 63%",
       iconBg: "bg-cream-light/30 dark:bg-cream-light/20",
       iconColor: "text-sage dark:text-cream-light",
       link: "/schedules/substitutions"

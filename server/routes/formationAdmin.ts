@@ -29,6 +29,34 @@ function requireAdmin(req: any, res: any, next: any) {
 router.use(authenticateToken, requireAdmin);
 
 // ========================================
+// SEED DATABASE
+// ========================================
+
+// Run formation seed - populates database with initial formation content
+router.post('/seed', async (req, res) => {
+  try {
+    // Import the seed function
+    const { default: seedFormation } = await import('../seeds/formation-seed');
+
+    // Run the seed
+    const result = await seedFormation();
+
+    res.status(200).json({
+      success: true,
+      message: 'Formation content seeded successfully',
+      ...result
+    });
+  } catch (error: any) {
+    console.error('Error running formation seed:', error);
+    res.status(500).json({
+      error: 'Erro ao popular banco de dados',
+      message: error.message,
+      details: error.stack
+    });
+  }
+});
+
+// ========================================
 // FORMATION TRACKS
 // ========================================
 

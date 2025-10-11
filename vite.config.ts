@@ -30,15 +30,41 @@ export default defineConfig({
     // Gerar hash nos arquivos para cache busting automático
     rollupOptions: {
       output: {
-        // Hash nos nomes dos arquivos JS/CSS
-        entryFileNames: 'assets/[name].[hash].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]',
+        // CRITICAL: Hash patterns for cache busting
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'js/[name]-[hash].js',
+        entryFileNames: 'js/[name]-[hash].js',
+        // Manual chunks for better code splitting
+        manualChunks: {
+          // Vendor chunks - separate large libraries
+          'vendor-react': ['react', 'react-dom', 'react/jsx-runtime'],
+          'vendor-router': ['wouter'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-label',
+            '@radix-ui/react-switch',
+          ],
+          'vendor-form': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'vendor-date': ['date-fns'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-charts': ['recharts'],
+        },
       },
     },
-    // Desabilitar minificação de nomes para facilitar debug (opcional)
     minify: 'terser',
-    sourcemap: false,
+    sourcemap: false, // Disable for production
+    chunkSizeWarningLimit: 500, // Keep warning at 500KB
   },
   server: {
     proxy: {

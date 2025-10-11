@@ -1,6 +1,7 @@
-// VERSÃO DINÂMICA: Usa timestamp para sempre invalidar cache
-const VERSION = `${Date.now()}`; // Sempre gera nova versão
-const CACHE_NAME = `mesc-v${VERSION}`;
+// FIXED VERSION: Use static version from package.json, not runtime timestamp
+const VERSION = '5.4.2'; // Update this when deploying new versions
+const BUILD_TIME = '2025-10-11'; // Update at build time, not runtime
+const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIME}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
 const urlsToCache = [
@@ -8,8 +9,14 @@ const urlsToCache = [
   '/sjtlogo.png'
 ];
 
-// CACHE BUSTING: Usa timestamp para garantir reload
-const BUILD_NUMBER = Date.now();
+// Build info for debugging
+const BUILD_INFO = {
+  version: VERSION,
+  buildTime: BUILD_TIME,
+  cacheName: CACHE_NAME
+};
+
+console.log('[SW] Initializing Service Worker:', BUILD_INFO);
 
 // Auto-reload quando service worker atualiza
 let RELOAD_ON_UPDATE = true;

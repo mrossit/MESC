@@ -228,7 +228,6 @@ export default function Schedules() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('📋 Ministers loaded:', data);
         // Carregar TODOS os ministros (não filtrar por ativo) para permitir edição completa
         // Ordenar: ativos primeiro, depois alfabeticamente
         const sortedMinisters = data.sort((a: any, b: any) => {
@@ -262,7 +261,6 @@ export default function Schedules() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('📅 Schedule data for date:', data);
 
         if (data.assignments && data.assignments.length > 0) {
           setSelectedDateAssignments(data.assignments);
@@ -351,7 +349,6 @@ export default function Schedules() {
     try {
       // Se estamos editando, deletar o assignment antigo primeiro
       if (editingAssignmentId) {
-        console.log('🗑️ Removendo assignment antigo:', editingAssignmentId);
 
         const deleteResponse = await fetch(`/api/schedules/${editingAssignmentId}`, {
           method: "DELETE",
@@ -364,7 +361,6 @@ export default function Schedules() {
           throw new Error(errorData.message || "Erro ao remover escalação anterior");
         }
 
-        console.log('✅ Assignment antigo removido com sucesso');
       }
 
       const currentSchedule = schedules.find(s =>
@@ -394,7 +390,6 @@ export default function Schedules() {
         skipDuplicateCheck: !!editingAssignmentId // NOVO: permitir edição sem verificação de duplicação
       };
 
-      console.log('📤 Enviando requisição de adição:', requestData);
 
       const response = await fetch("/api/schedules/add-minister", {
         method: "POST",
@@ -405,7 +400,6 @@ export default function Schedules() {
         body: JSON.stringify(requestData)
       });
 
-      console.log('📥 Resposta recebida - Status:', response.status);
 
       if (response.ok) {
         const action = editingAssignmentId ? "atualizado" : "escalado";
@@ -549,8 +543,6 @@ export default function Schedules() {
       setIsExporting(true);
       setIsExportDialogOpen(false);
 
-      console.log('🔍 Exportando escala - Assignments:', assignments.length);
-      console.log('🔍 Formato selecionado:', exportFormat);
 
       if (assignments.length === 0) {
         toast({
@@ -647,11 +639,6 @@ export default function Schedules() {
       const end = endOfMonth(currentMonth);
       const allDays = eachDayOfInterval({ start, end });
 
-      console.log('📅 Total de dias no mês:', allDays.length);
-      console.log('📋 Total de assignments:', assignments.length);
-      console.log('📋 Sample assignment:', assignments[0]);
-      console.log('📋 Formato da data no assignment:', assignments[0]?.date);
-      console.log('📋 Formato do massTime no assignment:', assignments[0]?.massTime);
 
       if (exportFormat === 'pdf') {
         // Exportar para PDF (via print)
@@ -720,7 +707,6 @@ export default function Schedules() {
         let rowCount = 0;
         allDays.forEach(day => {
           const massTimes = getMassTimesForDate(day);
-          console.log(`📅 Dia ${format(day, 'dd/MM')}: ${massTimes.length} missas`, massTimes);
 
           if (massTimes.length > 0) {
             massTimes.forEach(massTime => {
@@ -737,7 +723,6 @@ export default function Schedules() {
                 a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime
               );
 
-              console.log(`  ⏰ ${time}: ${assignmentsForMass.length} ministros escalados`);
 
               // Obter tipo e cor da missa
               const massInfo = getMassTypeAndColor(day, normalizedMassTime);
@@ -760,7 +745,6 @@ export default function Schedules() {
           }
         });
 
-        console.log(`📊 Total de linhas geradas: ${rowCount}`);
 
         html += `
               </tbody>
@@ -1225,27 +1209,12 @@ export default function Schedules() {
 
     // DEBUG: Log para verificar dados
     if (dayAssignments.length > 0 && substitutions.length > 0) {
-      console.log('[DEBUG] getUserSubstitutionStatus para', format(date, 'dd/MM/yyyy'));
-      console.log('[DEBUG] dayAssignmentIds:', dayAssignmentIds);
-      console.log('[DEBUG] substitutions:', substitutions);
-      console.log('[DEBUG] currentMinister.id:', currentMinister.id);
     }
 
     const userSubstitutionRequest = substitutions.find(s => {
       const hasAssignment = dayAssignmentIds.includes(s.assignmentId);
       const isRequester = s.requestingMinisterId === currentMinister.id;
 
-      // DEBUG
-      if (hasAssignment || isRequester) {
-        console.log('[DEBUG] Checking substitution:', {
-          subId: s.id,
-          assignmentId: s.assignmentId,
-          requestingMinisterId: s.requestingMinisterId,
-          hasAssignment,
-          isRequester,
-          match: hasAssignment && isRequester
-        });
-      }
 
       return hasAssignment && isRequester;
     });
@@ -1256,7 +1225,6 @@ export default function Schedules() {
       return userAssignment ? null : null;
     }
 
-    console.log('[DEBUG] Found substitution:', userSubstitutionRequest);
 
     // Return status: 'pending' for red, 'approved' or 'auto_approved' for green
     if (userSubstitutionRequest.status === 'pending') {

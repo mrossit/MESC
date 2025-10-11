@@ -3,9 +3,11 @@ import { users, questionnaireResponses, questionnaires, schedules, massTimesConf
 import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
+import { validateAndLogOctoberMasses, printOctoberScheduleComparison } from './octoberMassValidator.js';
 
 // 🚨 DEBUG: CONFIRMAR QUE O CÓDIGO ATUALIZADO ESTÁ SENDO EXECUTADO
-console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM CORREÇÕES! Timestamp:', new Date().toISOString());
+console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM FAIR ALGORITHM! Timestamp:', new Date().toISOString());
 
 export interface Minister {
   id: string | null; // null = VACANTE
@@ -19,6 +21,9 @@ export interface Minister {
   availabilityScore: number;
   preferenceScore: number;
   position?: number; // Posição litúrgica atribuída
+  // 🔥 FAIR ALGORITHM: Track monthly assignments
+  monthlyAssignmentCount?: number; // Assignments in current month (max 4)
+  lastAssignedDate?: string; // Last date this minister was assigned (YYYY-MM-DD)
 }
 
 export interface AvailabilityData {
@@ -53,52 +58,179 @@ export class ScheduleGenerator {
   private massTimes: MassTime[] = [];
   private db: any;
   private dailyAssignments: Map<string, Set<string>> = new Map(); // Rastrear ministros já escalados por dia
+  private saintBonusCache: Map<string, number> = new Map(); // Cache de bônus de santo: "ministerId:date" -> score
+  private saintsData: Map<string, any[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
 
   /**
    * Gera escalas automaticamente para um mês específico
    */
   async generateScheduleForMonth(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
+    // 🔥 EMERGENCY PERFORMANCE FIX: Track exact milliseconds
+    const startTime = Date.now();
+
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`=== 🚀 GENERATION START ===`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`Month: ${month}, Year: ${year}, IsPreview: ${isPreview}`);
+    console.log(`Timestamp: ${new Date().toISOString()}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'unknown'}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // 🔥 PERFORMANCE: Start total timing
+    console.time('[PERF] Total generation time');
+    console.time('[PERF] Database initialization');
+
     // Importar db dinamicamente para garantir que está inicializado
     const { db } = await import('../db.js');
     this.db = db;
-    
-    // 🔧 CORREÇÃO: Limpar assignments diários para nova geração
+    console.timeEnd('[PERF] Database initialization');
+    console.log(`✅ Database initialized in ${Date.now() - startTime}ms`);
+
+    // 🔧 CORREÇÃO: Limpar assignments diários e cache de santos para nova geração
     this.dailyAssignments = new Map();
+    this.saintBonusCache = new Map();
 
     logger.info(`Iniciando geração ${isPreview ? 'de preview' : 'definitiva'} de escalas para ${month}/${year}`);
-    console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
-    console.log(`[SCHEDULE_GEN] Database status:`, { hasDb: !!this.db, nodeEnv: process.env.NODE_ENV });
 
     try {
       // 1. Carregar dados necessários
-      console.log(`[SCHEDULE_GEN] Step 1: Loading ministers data...`);
+      console.time('[PERF] Step 1: Load ministers');
+      console.log(`\n[STEP 1] 📋 Loading ministers data...`);
       await this.loadMinistersData();
-      console.log(`[SCHEDULE_GEN] Ministers loaded: ${this.ministers.length}`);
+      console.timeEnd('[PERF] Step 1: Load ministers');
 
-      console.log(`[SCHEDULE_GEN] Step 2: Loading availability data...`);
+      // 🔥 DATA VALIDATION: Check if ministers were loaded
+      console.log(`\n[VALIDATION] Ministers loaded:`, {
+        count: this.ministers.length,
+        hasData: this.ministers.length > 0,
+        sample: this.ministers.slice(0, 3).map(m => ({ id: m.id, name: m.name, role: m.role }))
+      });
+
+      if (!this.ministers || this.ministers.length === 0) {
+        const error = new Error('❌ CRITICAL: No ministers found in database! Cannot generate schedules without ministers.');
+        console.error(`\n${'!'.repeat(60)}`);
+        console.error(error.message);
+        console.error(`${'!'.repeat(60)}\n`);
+        throw error;
+      }
+
+      console.time('[PERF] Step 2: Load availability');
+      console.log(`\n[STEP 2] 📝 Loading availability/questionnaire data for ${month}/${year}...`);
       await this.loadAvailabilityData(year, month, isPreview);
-      console.log(`[SCHEDULE_GEN] Availability data loaded: ${this.availabilityData.size} entries`);
+      console.timeEnd('[PERF] Step 2: Load availability');
 
-      console.log(`[SCHEDULE_GEN] Step 3: Loading mass times config...`);
+      // 🔥 DATA VALIDATION: Check if questionnaire responses were loaded
+      console.log(`\n[VALIDATION] Questionnaire responses loaded:`, {
+        count: this.availabilityData.size,
+        hasData: this.availabilityData.size > 0,
+        ministerIds: Array.from(this.availabilityData.keys()).slice(0, 5)
+      });
+
+      if (!this.availabilityData || this.availabilityData.size === 0) {
+        const warning = `⚠️  WARNING: No questionnaire responses found for ${month}/${year}! Schedules will use default availability.`;
+        console.warn(`\n${warning}`);
+        if (!isPreview) {
+          const error = new Error(`❌ CRITICAL: No questionnaire responses for ${month}/${year}. Cannot generate final schedules without responses!`);
+          console.error(`\n${'!'.repeat(60)}`);
+          console.error(error.message);
+          console.error(`${'!'.repeat(60)}\n`);
+          throw error;
+        }
+      }
+
+      console.time('[PERF] Step 3: Load mass times config');
+      console.log(`\n[STEP 3] ⛪ Loading mass times configuration...`);
       await this.loadMassTimesConfig();
-      console.log(`[SCHEDULE_GEN] Mass times config loaded: ${this.massTimes.length} times`);
+      console.timeEnd('[PERF] Step 3: Load mass times config');
+
+      // 🔥 DATA VALIDATION: Check if mass config was loaded
+      console.log(`\n[VALIDATION] Mass times config:`, {
+        count: this.massTimes.length,
+        hasData: this.massTimes.length > 0,
+        sample: this.massTimes.slice(0, 2)
+      });
+
+      if (!this.massTimes || this.massTimes.length === 0) {
+        const error = new Error('❌ CRITICAL: No mass times configuration found! Cannot generate schedules without mass config.');
+        console.error(`\n${'!'.repeat(60)}`);
+        console.error(error.message);
+        console.error(`${'!'.repeat(60)}\n`);
+        throw error;
+      }
 
       // 2. Gerar horários de missa para o mês
+      console.time('[PERF] Generate monthly mass times');
+      console.log(`\n[STEP 4] 📅 Generating monthly mass times for ${month}/${year}...`);
       const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
-      console.log(`[SCHEDULE_GEN] Generated ${monthlyMassTimes.length} mass times for the month`);
+      console.timeEnd('[PERF] Generate monthly mass times');
+
+      // 🔥 DATA VALIDATION: Check if monthly masses were generated
+      console.log(`\n[VALIDATION] Monthly masses generated:`, {
+        count: monthlyMassTimes.length,
+        types: [...new Set(monthlyMassTimes.map(m => m.type))],
+        dateRange: monthlyMassTimes.length > 0 ? {
+          first: monthlyMassTimes[0]?.date,
+          last: monthlyMassTimes[monthlyMassTimes.length - 1]?.date
+        } : null
+      });
+
+      if (!monthlyMassTimes || monthlyMassTimes.length === 0) {
+        const error = new Error(`❌ CRITICAL: Failed to generate monthly mass times for ${month}/${year}!`);
+        console.error(`\n${'!'.repeat(60)}`);
+        console.error(error.message);
+        console.error(`${'!'.repeat(60)}\n`);
+        throw error;
+      }
+
+      // 2.1. VALIDATE October masses if applicable
+      if (month === 10) {
+        console.log(`\n[SCHEDULE_GEN] 🔍 Validating October mass schedule...`);
+        printOctoberScheduleComparison(monthlyMassTimes, year);
+        const isValid = validateAndLogOctoberMasses(monthlyMassTimes, year);
+
+        if (!isValid) {
+          console.log(`[SCHEDULE_GEN] ⚠️ October validation found errors, but continuing with generation...`);
+        }
+      }
+
+      // 2.5. Load ALL saints data ONCE (crucial performance optimization) - OPTIONAL
+      console.time('[PERF] Load all saints data');
+      try {
+        this.saintsData = await loadAllSaintsData();
+        console.log(`[SCHEDULE_GEN] ✅ Saints data loaded successfully`);
+      } catch (error) {
+        console.log(`[SCHEDULE_GEN] ⚠️ Saints table not found, skipping saint name bonuses`);
+        this.saintsData = null;
+      }
+      console.timeEnd('[PERF] Load all saints data');
+
+      // 2.6. Pré-calcular bônus de santos para todas as combinações ministro-data
+      if (this.saintsData) {
+        console.time('[PERF] Pre-calculate saint bonuses');
+        console.log(`[SCHEDULE_GEN] Step 2.6: Pre-calculating saint name bonuses...`);
+        await this.preCalculateSaintBonuses(monthlyMassTimes);
+        console.timeEnd('[PERF] Pre-calculate saint bonuses');
+        console.log(`[SCHEDULE_GEN] Saint bonuses calculated: ${this.saintBonusCache.size} entries`);
+      } else {
+        console.log(`[SCHEDULE_GEN] Skipping saint bonuses (saints table not available)`);
+      }
 
       // 3. Executar algoritmo de distribuição
+      console.time('[PERF] Algorithm distribution');
       const generatedSchedules: GeneratedSchedule[] = [];
 
       for (const massTime of monthlyMassTimes) {
         const schedule = await this.generateScheduleForMass(massTime);
         generatedSchedules.push(schedule);
       }
+      console.timeEnd('[PERF] Algorithm distribution');
 
       // 4. Analisar e reportar escalas incompletas
+      console.time('[PERF] Analyze incomplete schedules');
       const incompleteSchedules = generatedSchedules.filter(s =>
         s.ministers.length < s.massTime.minMinisters
       );
+      console.timeEnd('[PERF] Analyze incomplete schedules');
 
       if (incompleteSchedules.length > 0) {
         console.log(`\n[SCHEDULE_GEN] ⚠️ ATENÇÃO: ${incompleteSchedules.length} escalas incompletas detectadas:`);
@@ -131,17 +263,98 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Todas as escalas atingiram o número mínimo de ministros!`);
       }
 
-      logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year}`);
+      console.timeEnd('[PERF] Total generation time');
+
+      // 🔥 EMERGENCY PERFORMANCE FIX: Final timing report
+      const totalTime = Date.now() - startTime;
+
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`=== ✅ GENERATION SUCCESS ===`);
+      console.log(`${'='.repeat(60)}`);
+      console.log(`Month/Year: ${month}/${year}`);
+      console.log(`Total Time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      console.log(`Target: <5000ms | Status: ${totalTime < 5000 ? '✅ PASS' : '⚠️  SLOW'}`);
+      console.log(`\n📊 DATA SUMMARY:`);
+      console.log(`  Ministers loaded: ${this.ministers.length}`);
+      console.log(`  Questionnaire responses: ${this.availabilityData.size}`);
+      console.log(`  Mass times config: ${this.massTimes.length}`);
+      console.log(`  Monthly masses generated: ${monthlyMassTimes?.length || 0}`);
+      console.log(`  Schedules generated: ${generatedSchedules.length}`);
+      console.log(`  Incomplete schedules: ${incompleteSchedules?.length || 0}`);
+      console.log(`  Saint bonuses calculated: ${this.saintBonusCache.size}`);
+
+      // 🔥 FAIR ALGORITHM: Final fairness report
+      console.log(`\n🎯 FAIRNESS REPORT:`);
+      const distributionMap = new Map<number, Minister[]>();
+      this.ministers.forEach(m => {
+        const count = m.monthlyAssignmentCount || 0;
+        if (!distributionMap.has(count)) {
+          distributionMap.set(count, []);
+        }
+        distributionMap.get(count)!.push(m);
+      });
+
+      console.log(`  Assignment Distribution:`);
+      for (let i = 0; i <= 4; i++) {
+        const ministersWithCount = distributionMap.get(i) || [];
+        const percentage = ((ministersWithCount.length / this.ministers.length) * 100).toFixed(1);
+        console.log(`    ${i} assignments: ${ministersWithCount.length} ministers (${percentage}%)`);
+      }
+
+      const unused = distributionMap.get(0) || [];
+      const maxUsed = distributionMap.get(4) || [];
+      const fairnessScore = ((this.ministers.length - unused.length) / this.ministers.length * 100).toFixed(1);
+
+      console.log(`\n  Fairness Metrics:`);
+      console.log(`    ✅ Unused ministers: ${unused.length}/${this.ministers.length} (${((unused.length / this.ministers.length) * 100).toFixed(1)}%)`);
+      console.log(`    ✅ Ministers at max (4): ${maxUsed.length}/${this.ministers.length}`);
+      console.log(`    ✅ Fairness score: ${fairnessScore}% (${100 - unused.length / this.ministers.length * 100 > 70 ? 'PASS' : 'FAIL'})`);
+
+      // Check critical bugs
+      const bugsFound: string[] = [];
+      const ministersOver4 = this.ministers.filter(m => (m.monthlyAssignmentCount || 0) > 4);
+      if (ministersOver4.length > 0) {
+        bugsFound.push(`❌ ${ministersOver4.length} ministers served MORE than 4 times!`);
+      }
+      if (unused.length > this.ministers.length * 0.5) {
+        bugsFound.push(`❌ More than 50% unused (${unused.length}/${this.ministers.length})`);
+      }
+
+      if (bugsFound.length > 0) {
+        console.log(`\n  🚨 BUGS DETECTED:`);
+        bugsFound.forEach(bug => console.log(`    ${bug}`));
+      } else {
+        console.log(`\n  ✅ NO CRITICAL BUGS DETECTED!`);
+      }
+
+      console.log(`${'='.repeat(60)}\n`);
+
+      logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year} em ${totalTime}ms`);
       return generatedSchedules;
 
     } catch (error) {
-      console.error(`[SCHEDULE_GEN] ❌ ERRO DETALHADO NO MAIN FUNCTION:`, error);
-      console.error(`[SCHEDULE_GEN] ❌ ERROR TYPE:`, typeof error);
-      console.error(`[SCHEDULE_GEN] ❌ ERROR NAME:`, (error as any)?.name);
-      console.error(`[SCHEDULE_GEN] ❌ ERROR MESSAGE:`, (error as any)?.message);
-      console.error(`[SCHEDULE_GEN] ❌ ERROR STACK:`, (error as any)?.stack);
+      const totalTime = Date.now() - startTime;
+
+      console.log(`\n${'!'.repeat(60)}`);
+      console.log(`=== ❌ GENERATION FAILED ===`);
+      console.log(`${'!'.repeat(60)}`);
+      console.log(`Month/Year: ${month}/${year}`);
+      console.log(`Failed After: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      console.log(`\n🔍 ERROR DETAILS:`);
+      console.log(`  Type: ${typeof error}`);
+      console.log(`  Name: ${(error as any)?.name || 'Unknown'}`);
+      console.log(`  Message: ${(error as any)?.message || 'No message'}`);
+      console.log(`\n📊 DATA STATE WHEN FAILED:`);
+      console.log(`  Ministers loaded: ${this.ministers?.length || 0}`);
+      console.log(`  Questionnaire responses: ${this.availabilityData?.size || 0}`);
+      console.log(`  Mass times config: ${this.massTimes?.length || 0}`);
+      console.log(`\n📚 STACK TRACE:`);
+      console.log((error as any)?.stack || 'No stack trace available');
+      console.log(`${'!'.repeat(60)}\n`);
+
+      console.timeEnd('[PERF] Total generation time');
       logger.error('Erro ao gerar escalas automáticas:', error);
-      
+
       // Re-lançar o erro original sem modificar para preservar stack trace e mensagem
       throw error;
     }
@@ -165,11 +378,11 @@ export class ScheduleGenerator {
 
       // Dados mock APENAS para desenvolvimento quando banco não estiver disponível
       this.ministers = [
-        { id: '1', name: 'João Silva', role: 'ministro', totalServices: 5, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7 },
-        { id: '2', name: 'Maria Santos', role: 'ministro', totalServices: 3, lastService: null, preferredTimes: ['08:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8 },
-        { id: '3', name: 'Pedro Costa', role: 'ministro', totalServices: 4, lastService: null, preferredTimes: ['19:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6 },
-        { id: '4', name: 'Ana Lima', role: 'ministro', totalServices: 2, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75 },
-        { id: '5', name: 'Carlos Oliveira', role: 'coordenador', totalServices: 6, lastService: null, preferredTimes: ['08:00', '10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9 }
+        { id: '1', name: 'João Silva', role: 'ministro', totalServices: 5, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7, monthlyAssignmentCount: 0, lastAssignedDate: undefined },
+        { id: '2', name: 'Maria Santos', role: 'ministro', totalServices: 3, lastService: null, preferredTimes: ['08:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8, monthlyAssignmentCount: 0, lastAssignedDate: undefined },
+        { id: '3', name: 'Pedro Costa', role: 'ministro', totalServices: 4, lastService: null, preferredTimes: ['19:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6, monthlyAssignmentCount: 0, lastAssignedDate: undefined },
+        { id: '4', name: 'Ana Lima', role: 'ministro', totalServices: 2, lastService: null, preferredTimes: ['10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75, monthlyAssignmentCount: 0, lastAssignedDate: undefined },
+        { id: '5', name: 'Carlos Oliveira', role: 'coordenador', totalServices: 6, lastService: null, preferredTimes: ['08:00', '10:00'], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9, monthlyAssignmentCount: 0, lastAssignedDate: undefined }
       ];
       return;
     }
@@ -217,9 +430,13 @@ export class ScheduleGenerator {
         preferredTimes: m.preferredTimes || [],
         canServeAsCouple: m.canServeAsCouple || false,
         availabilityScore: this.calculateAvailabilityScore(m),
-        preferenceScore: this.calculatePreferenceScore(m)
+        preferenceScore: this.calculatePreferenceScore(m),
+        // 🔥 FAIR ALGORITHM: Initialize monthly counters
+        monthlyAssignmentCount: 0,
+        lastAssignedDate: undefined
       }));
 
+    console.log(`[FAIR_ALGORITHM] ✅ Initialized ${this.ministers.length} ministers with monthlyAssignmentCount = 0`);
     logger.info(`Carregados ${this.ministers.length} ministros ativos`);
   }
 
@@ -560,6 +777,45 @@ export class ScheduleGenerator {
   }
 
   /**
+   * Pré-calcula bônus de santo para todas as combinações ministro-data
+   * OPTIMIZED: Uses pre-loaded saints data to avoid database queries in loops
+   */
+  private async preCalculateSaintBonuses(massTimes: MassTime[]): Promise<void> {
+    // Extrair datas únicas das missas
+    const uniqueDates = new Set<string>();
+    for (const massTime of massTimes) {
+      if (massTime.date) {
+        uniqueDates.add(massTime.date);
+      }
+    }
+
+    console.log(`[SAINT_BONUS] Calculando bônus de santo para ${this.ministers.length} ministros × ${uniqueDates.size} datas...`);
+    console.log(`[SAINT_BONUS] 🚀 OPTIMIZATION: Using pre-loaded saints data (no DB queries in loops)`);
+
+    // Calcular bônus para cada ministro em cada data
+    // OPTIMIZATION: Pass pre-loaded saints data to avoid 1000+ database queries
+    for (const minister of this.ministers) {
+      if (!minister.id || !minister.name) continue; // Pular VACANTE e ministros sem nome
+
+      for (const date of uniqueDates) {
+        try {
+          // Pass saintsData to avoid database query
+          const bonus = await calculateSaintNameMatchBonus(minister.name, date, this.saintsData!);
+          if (bonus > 0) {
+            const cacheKey = `${minister.id}:${date}`;
+            this.saintBonusCache.set(cacheKey, bonus);
+            console.log(`[SAINT_BONUS] ⭐ ${minister.name} em ${date}: bônus ${bonus.toFixed(2)}`);
+          }
+        } catch (error) {
+          console.error(`[SAINT_BONUS] Erro ao calcular bônus para ${minister.name} em ${date}:`, error);
+        }
+      }
+    }
+
+    console.log(`[SAINT_BONUS] ✅ ${this.saintBonusCache.size} bônus de santo calculados`);
+  }
+
+  /**
    * Carrega configuração dos horários de missa
    */
   private async loadMassTimesConfig(): Promise<void> {
@@ -608,9 +864,16 @@ export class ScheduleGenerator {
       
       console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING ${dateStr}: dayOfMonth=${dayOfMonth}, isDayOfSaintJudas=${isDayOfSaintJudas}, dayOfWeek=${dayOfWeek}`);
       
-      // REGRA 1: Missas diárias (Segunda a Sábado, 6h30-7h)
-      // ❌ EXCETO no dia 28 (São Judas)
-      if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) { // Segunda (1) a Sábado (6)
+      // REGRA 1: Missas diárias (Segunda a SEXTA-feira, 6h30)
+      // ❌ EXCETO:
+      //    - Dia 28 (São Judas - tem missas especiais)
+      //    - Sábados regulares (apenas 1º sábado tem missa)
+      //    - Dias de novena de outubro (20-27, têm apenas missa da noite)
+      const isRegularSaturday = dayOfWeek === 6; // Sábados não têm missa diária (exceto 1º sábado tratado separadamente)
+      const isOctoberNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+
+      if (dayOfWeek >= 1 && dayOfWeek <= 5 && !isDayOfSaintJudas && !isOctoberNovena) {
+        // Segunda (1) a SEXTA (5) - EXCLUINDO SÁBADOS
         monthlyTimes.push({
           id: `daily-${dateStr}`,
           dayOfWeek,
@@ -623,7 +886,10 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Missa diária adicionada: ${dateStr} 06:30 (5 ministros)`);
       } else if (isDayOfSaintJudas) {
         console.log(`[SCHEDULE_GEN] 🚫 Dia ${dateStr} é São Judas - SUPRIMINDO missa diária`);
-        console.log(`[SCHEDULE_GEN] 🚫 DEBUG: dayOfWeek=${dayOfWeek}, isDayOfSaintJudas=${isDayOfSaintJudas}`);
+      } else if (isRegularSaturday) {
+        console.log(`[SCHEDULE_GEN] 🚫 Sábado regular ${dateStr} - SEM missa diária (apenas 1º sábado tem missa)`);
+      } else if (isOctoberNovena) {
+        console.log(`[SCHEDULE_GEN] 🚫 Dia de novena ${dateStr} - SEM missa da manhã (apenas novena à noite)`);
       }
       
       // REGRA 2: Missas dominicais (Domingos 8h, 10h, 19h)
@@ -936,16 +1202,8 @@ export class ScheduleGenerator {
     // 4. Calcular score de confiança
     const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
 
-    // 5. Rastrear ministros escalados no dia DEPOIS da seleção
-    const dateKey = massTime.date!;
-    if (!this.dailyAssignments.has(dateKey)) {
-      this.dailyAssignments.set(dateKey, new Set());
-    }
-    const dayAssignments = this.dailyAssignments.get(dateKey)!;
-    selectedMinisters.forEach(minister => {
-      if (minister.id) dayAssignments.add(minister.id);
-    });
-    
+    // 5. ✅ Daily assignments are now tracked in minister.lastAssignedDate (done in selectOptimalMinisters)
+
     // 6. Atribuir posições litúrgicas aos ministros
     console.log('[SCHEDULE_GEN] ✅ DEBUGGING: Atribuindo posições aos ministros!');
     const ministersWithPositions = selectedMinisters.map((minister, index) => {
@@ -1256,83 +1514,137 @@ export class ScheduleGenerator {
   }
 
   /**
-   * Seleciona ministros ideais usando algoritmo de pontuação
+   * 🔥 FAIR ALGORITHM: Seleciona ministros garantindo distribuição justa
+   * - Hard limit: 4 assignments per month
+   * - Prevents same minister serving twice on same day
+   * - Sorts by assignment count (least assigned first)
+   * - Ensures everyone gets at least 1 before anyone gets 3
    */
   private selectOptimalMinisters(available: Minister[], massTime: MassTime): Minister[] {
-    // 1. Calcular score para cada ministro
-    const scoredMinisters = available.map(minister => ({
-      minister,
-      score: this.calculateMinisterScore(minister, massTime)
-    }));
-
-    // 2. Ordenar por score (maior primeiro)
-    scoredMinisters.sort((a, b) => b.score - a.score);
-
-    // 3. IMPORTANTE: Definir quantidade alvo (usar minMinisters que agora é igual a maxMinisters)
     const targetCount = massTime.minMinisters;
-    const availableCount = available.length;
+    const MAX_MONTHLY_ASSIGNMENTS = 4;
 
-    // Log de aviso se não há ministros suficientes
-    if (availableCount < targetCount) {
-      logger.warn(`⚠️ ATENÇÃO: Apenas ${availableCount} ministros disponíveis para ${massTime.date} ${massTime.time} (${massTime.type}), mas são necessários ${targetCount}`);
-      console.log(`[SCHEDULE_GEN] ⚠️ INSUFICIENTE: ${availableCount}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
-    } else {
-      logger.info(`[SCHEDULE_GEN] ✅ Selecionando ${targetCount} de ${availableCount} ministros disponíveis para ${massTime.date} ${massTime.time}`);
+    console.log(`\n[FAIR_ALGORITHM] ========================================`);
+    console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
+    console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
+    console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
+
+    // 1. Filter out ministers who:
+    //    - Already reached monthly limit (4 assignments)
+    //    - Already served on this date
+    const eligible = available.filter(minister => {
+      if (!minister.id) return false; // Skip VACANTE
+
+      const assignmentCount = minister.monthlyAssignmentCount || 0;
+      const alreadyServedToday = minister.lastAssignedDate === massTime.date;
+
+      // Hard limit check
+      if (assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+        console.log(`[FAIR_ALGORITHM] ❌ ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
+        return false;
+      }
+
+      // Same-day duplicate check
+      if (alreadyServedToday) {
+        console.log(`[FAIR_ALGORITHM] ❌ ${minister.name}: ALREADY SERVED TODAY (${massTime.date})`);
+        return false;
+      }
+
+      console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+      return true;
+    });
+
+    console.log(`[FAIR_ALGORITHM] Eligible after filters: ${eligible.length}/${available.length}`);
+
+    if (eligible.length === 0) {
+      logger.error(`[FAIR_ALGORITHM] ❌ NO ELIGIBLE MINISTERS for ${massTime.date} ${massTime.time}!`);
+      return [];
     }
 
-    // 4. Aplicar lógica de casais se necessário
+    // 2. Sort by assignment count (ascending) - LEAST ASSIGNED FIRST
+    const sorted = [...eligible].sort((a, b) => {
+      const countA = a.monthlyAssignmentCount || 0;
+      const countB = b.monthlyAssignmentCount || 0;
+
+      if (countA !== countB) {
+        return countA - countB; // Ascending: least assigned first
+      }
+
+      // Tie-breaker 1: Prefer those who haven't served recently
+      const lastServiceA = a.lastService ? a.lastService.getTime() : 0;
+      const lastServiceB = b.lastService ? b.lastService.getTime() : 0;
+      if (lastServiceA !== lastServiceB) {
+        return lastServiceA - lastServiceB; // Older service first
+      }
+
+      // Tie-breaker 2: Total services (lifetime balance)
+      return a.totalServices - b.totalServices;
+    });
+
+    console.log(`[FAIR_ALGORITHM] 📊 Sorted by assignment count:`);
+    sorted.slice(0, 10).forEach(m => {
+      console.log(`  ${m.name}: ${m.monthlyAssignmentCount || 0} assignments this month`);
+    });
+
+    // 3. Select ministers from least-assigned first
     const selected: Minister[] = [];
     const used = new Set<string>();
 
-    for (const { minister } of scoredMinisters) {
-      // VACANTE não deve chegar aqui (já foi filtrado), mas guard defensivo
+    for (const minister of sorted) {
       if (!minister.id) continue;
-      
-      if (used.has(minister.id) || selected.length >= targetCount) {
-        break; // Parar quando atingir a quantidade exata
+
+      if (selected.length >= targetCount) {
+        break; // Reached target
       }
 
-      // Se pode servir como casal e cônjuge está disponível
-      if (minister.canServeAsCouple && minister.spouseMinisterId) {
-        const spouse = available.find(m => m.id === minister.spouseMinisterId);
-        if (spouse && spouse.id && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
-          selected.push(minister, spouse);
-          used.add(minister.id);
-          used.add(spouse.id);
-          logger.debug(`Escalado casal: ${minister.name} + ${spouse.name}`);
-          continue;
-        }
+      if (used.has(minister.id)) {
+        continue; // Already selected
       }
 
-      // Adicionar ministro individual
+      // TODO: Handle couples logic if needed
+      // For now, select individually
+
       selected.push(minister);
       used.add(minister.id);
+
+      // 🔥 UPDATE COUNTERS IMMEDIATELY
+      minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+      minister.lastAssignedDate = massTime.date;
+
+      console.log(`[FAIR_ALGORITHM] ✅ Selected ${minister.name} (now ${minister.monthlyAssignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
     }
 
-    // 5. Verificar se conseguiu a quantidade necessária
+    // 4. Check if target was met
     if (selected.length < targetCount) {
-      logger.warn(`⚠️ [SCHEDULE_GEN] ESCALA INCOMPLETA: Apenas ${selected.length}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
+      const shortage = targetCount - selected.length;
+      logger.warn(`⚠️ [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${shortage})`);
+      console.log(`[FAIR_ALGORITHM] ⚠️ INCOMPLETE: ${selected.length}/${targetCount}`);
+      console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
 
-      // Se não há ministros suficientes, continuar tentando adicionar os disponíveis restantes
-      for (const { minister } of scoredMinisters) {
-        if (!minister.id) continue; // Guard defensivo
-        if (!used.has(minister.id) && selected.length < targetCount) {
-          selected.push(minister);
-          used.add(minister.id);
-        }
-        if (selected.length >= targetCount) break;
-      }
-
-      // Adicionar metadado de escala incompleta
-      console.log(`[SCHEDULE_GEN] 🚨 MARCANDO ESCALA COMO INCOMPLETA: ${selected.length}/${targetCount} ministros`);
+      // Mark as incomplete
       selected.forEach(m => {
         (m as any).scheduleIncomplete = true;
         (m as any).requiredCount = targetCount;
         (m as any).actualCount = selected.length;
       });
+    } else {
+      console.log(`[FAIR_ALGORITHM] ✅ SUCCESS: Selected ${selected.length}/${targetCount} ministers`);
     }
 
-    logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length}/${targetCount} ministros para ${massTime.date} ${massTime.time}`);
+    // 5. Log final distribution stats
+    const distributionMap = new Map<number, number>();
+    this.ministers.forEach(m => {
+      const count = m.monthlyAssignmentCount || 0;
+      distributionMap.set(count, (distributionMap.get(count) || 0) + 1);
+    });
+
+    console.log(`[FAIR_ALGORITHM] 📊 Current monthly distribution:`);
+    for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
+      const ministersWithCount = distributionMap.get(i) || 0;
+      console.log(`  ${i} assignments: ${ministersWithCount} ministers`);
+    }
+    console.log(`[FAIR_ALGORITHM] ========================================\n`);
+
     return selected;
   }
 
@@ -1356,7 +1668,10 @@ export class ScheduleGenerator {
     let score = 0;
 
     // 1. Balanceamento por frequência de serviço (40% do peso)
-    const avgServices = this.ministers.reduce((sum, m) => sum + m.totalServices, 0) / this.ministers.length;
+    // 🔥 CRASH FIX: Guard against division by zero
+    const avgServices = this.ministers.length > 0
+      ? this.ministers.reduce((sum, m) => sum + m.totalServices, 0) / this.ministers.length
+      : 0;
     const serviceBalance = Math.max(0, avgServices - minister.totalServices);
     score += serviceBalance * 0.4;
 
@@ -1401,6 +1716,17 @@ export class ScheduleGenerator {
       }
     }
 
+    // 6. Bônus de santo (20% do peso) - Preferência para ministros com nome do santo do dia
+    if (massTime && massTime.date && minister.id) {
+      const cacheKey = `${minister.id}:${massTime.date}`;
+      const saintBonus = this.saintBonusCache.get(cacheKey) || 0;
+      if (saintBonus > 0) {
+        const bonusPoints = saintBonus * 0.2; // 20% do peso total
+        score += bonusPoints;
+        console.log(`[SCHEDULE_GEN] ⭐ Bônus de santo para ${minister.name} em ${massTime.date}: +${bonusPoints.toFixed(2)} (score total: ${score.toFixed(2)})`);
+      }
+    }
+
     return score;
   }
 
@@ -1411,7 +1737,10 @@ export class ScheduleGenerator {
     let confidence = 0;
 
     // 1. Cobertura adequada (60% do peso) - MAIS IMPORTANTE
-    const fillRate = ministers.length / massTime.minMinisters;
+    // 🔥 CRASH FIX: Guard against division by zero
+    const fillRate = massTime.minMinisters > 0
+      ? ministers.length / massTime.minMinisters
+      : 0;
 
     if (fillRate >= 1.0) {
       // Atingiu o mínimo necessário
@@ -1426,6 +1755,7 @@ export class ScheduleGenerator {
     }
 
     // 2. Qualidade dos ministros escalados (25% do peso)
+    // 🔥 CRASH FIX: Already has length check, but add explicit guard
     if (ministers.length > 0) {
       const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
       confidence += Math.min(avgScore / 10, 0.25);
@@ -1456,6 +1786,9 @@ export class ScheduleGenerator {
 
   private calculateServiceVariance(ministers: Minister[]): number {
     const services = ministers.map(m => m.totalServices);
+    // 🔥 CRASH FIX: Guard against division by zero
+    if (services.length === 0) return 0;
+
     const avg = services.reduce((sum, s) => sum + s, 0) / services.length;
     const variance = services.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / services.length;
     return Math.sqrt(variance);

@@ -47,7 +47,6 @@ export function PWAUpdatePrompt() {
       // Listen for service worker updates
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'SW_UPDATED') {
-          console.log('Service worker updated to version:', event.data.version);
           setForceUpdateAvailable(true);
           setShowUpdatePrompt(true);
         }

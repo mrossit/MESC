@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScheduleAssignment } from '../../types';
@@ -11,6 +10,8 @@ export async function exportToExcel(
   currentMonth: Date,
   assignments: ScheduleAssignment[]
 ): Promise<void> {
+  // Dynamic import - only load XLSX when user clicks export
+  const XLSX = await import('xlsx');
   const monthName = format(currentMonth, 'MMMM/yyyy', { locale: ptBR });
   const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 

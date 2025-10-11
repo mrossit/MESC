@@ -185,7 +185,6 @@ export default function QuestionnaireResponses() {
       }
       
       const data = await response.json();
-      console.log('Detailed response data:', data);
       setDetailedResponse(data);
     } catch (err) {
       console.error('Error loading details:', err);
@@ -833,13 +832,9 @@ export default function QuestionnaireResponses() {
                 <div className="space-y-4">
                   {(() => {
                     try {
-                      console.log('DetailedResponse:', detailedResponse);
-                      console.log('Questions:', detailedResponse?.template?.questions);
-                      console.log('Responses:', detailedResponse?.response?.responses);
 
                       // Verificar estrutura dos dados
                       if (!detailedResponse?.template?.questions || !Array.isArray(detailedResponse.template.questions)) {
-                        console.log('No questions found in template');
                         return (
                           <div className="text-center py-4 text-muted-foreground">
                             Nenhuma pergunta disponível
@@ -863,20 +858,16 @@ export default function QuestionnaireResponses() {
                         responsesObj = rawResponses || {};
                       }
 
-                      console.log('Converted responses:', responsesObj);
                       const questionElements = [];
 
                       for (let i = 0; i < detailedResponse.template.questions.length; i++) {
                         const question = detailedResponse.template.questions[i];
                         const answer = responsesObj[question.id];
 
-                        console.log(`Question ${i}:`, question);
-                        console.log(`Answer for question ${question.id}:`, answer);
 
                         // Pular perguntas condicionais não aplicáveis
                         if (question.conditional) {
                           const parentAnswer = responsesObj[question.conditional.questionId];
-                          console.log(`Conditional check - parent answer: ${parentAnswer}, expected: ${question.conditional.value}`);
                           if (parentAnswer !== question.conditional.value) {
                             continue;
                           }
@@ -884,7 +875,6 @@ export default function QuestionnaireResponses() {
 
                         // Pular se não houver resposta (mas permitir false e 0)
                         if (answer === undefined || answer === null || answer === '') {
-                          console.log(`Skipping question ${question.id} - no answer`);
                           continue;
                         }
 

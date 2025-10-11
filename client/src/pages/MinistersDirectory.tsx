@@ -74,7 +74,6 @@ export default function MinistersDirectory() {
   const { data: ministersData, isLoading, error } = useQuery({
     queryKey: ['/api/users/active'],
     queryFn: async () => {
-      console.log('Buscando usuários ativos...');
       const res = await fetch('/api/users/active', {
         credentials: 'include',
         headers: {
@@ -82,7 +81,6 @@ export default function MinistersDirectory() {
         }
       });
 
-      console.log('Response status:', res.status);
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -91,7 +89,6 @@ export default function MinistersDirectory() {
       }
 
       const data = await res.json();
-      console.log('Dados recebidos:', data.length, 'usuários');
 
       // Filtrar ministros, coordenadores e gestores ativos
       const filtered = data.filter((user: Minister) =>
@@ -99,7 +96,6 @@ export default function MinistersDirectory() {
         (!user.status || user.status === 'active')
       );
 
-      console.log('Após filtro:', filtered.length, 'usuários');
       return filtered;
     }
   });

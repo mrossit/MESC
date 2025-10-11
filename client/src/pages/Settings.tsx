@@ -7,12 +7,15 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Checkbox } from '../components/ui/checkbox';
-import { 
-  Bell, Settings2, Heart, Church, Calendar, Users, 
+import {
+  Bell, Settings2, Heart, Church, Calendar, Users,
   Save, AlertCircle, CheckCircle, Sparkles, Clock,
-  HandHeart, PartyPopper
+  HandHeart, PartyPopper, Code2, RefreshCw, Info
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authAPI } from '@/lib/auth';
+import { APP_VERSION } from '@/lib/queryClient';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 type UserSettings = {
   pushNotifications: boolean;
@@ -49,7 +52,22 @@ export default function Settings() {
   const [savingActivities, setSavingActivities] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [switchingRole, setSwitchingRole] = useState(false);
   const queryClient = useQueryClient();
+
+  // Dev mode detection
+  const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
+
+  // Get current user
+  const { data: authData } = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: () => authAPI.getMe(),
+  });
+
+  // WebSocket connection status
+  const { isConnected } = useWebSocket({
+    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+  });
 
   // Buscar configurações do usuário
   const { data: settingsData, isLoading } = useQuery({
@@ -73,7 +91,6 @@ export default function Settings() {
         return data;
       } catch (error) {
         // Em caso de erro de rede ou outro, retorna valores padrão
-        console.log('Settings endpoint not available, using defaults');
         return {
           pushNotifications: false,
           emailNotifications: true,
@@ -98,7 +115,6 @@ export default function Settings() {
           return null;
         }
         const data = await res.json();
-        console.log('🔄 Dados recebidos do servidor:', data);
         return data;
       } catch (error) {
         console.error('Error fetching activities:', error);
@@ -123,13 +139,11 @@ export default function Settings() {
   // Carregar dados quando disponíveis
   useEffect(() => {
     if (activitiesLoaded && activitiesData) {
-      console.log('📋 Atualizando estado com dados do servidor:', activitiesData);
       setExtraActivities(activitiesData);
       // Reset flag quando novos dados são carregados
       setHasUserInteracted(false);
     } else if (activitiesLoaded && !activitiesData) {
       // Se não há dados, usar valores padrão
-      console.log('📋 Usando valores padrão');
       setExtraActivities({
         sickCommunion: false,
         mondayAdoration: false,
@@ -157,7 +171,6 @@ export default function Settings() {
       if (res.ok) {
         // Atualizar o cache da query diretamente sem invalidar
         queryClient.setQueryData(['extra-activities'], activities);
-        console.log('✅ Preferências de atividades salvas:', activities);
         // Mostrar indicador de sucesso brevemente
         setTimeout(() => setSavingActivities(false), 500);
       } else {
@@ -185,7 +198,6 @@ export default function Settings() {
 
       // Criar novo timer
       saveTimerRef.current = setTimeout(() => {
-        console.log('✅ Salvando alterações do usuário:', extraActivities);
         saveExtraActivities(extraActivities);
       }, 1000); // Aguarda 1 segundo após a última mudança
     }
@@ -259,17 +271,50 @@ export default function Settings() {
       } else if (settingsRes.status === 404 || activitiesRes.status === 404) {
         // Se o endpoint não existir, apenas mostra sucesso (para desenvolvimento)
         setSuccess('Configurações salvas!');
-        console.log('Some settings endpoints not implemented yet');
       } else {
         const errorData = await activitiesRes.json().catch(() => ({ error: 'Erro ao salvar' }));
         setError(errorData.error || 'Erro ao salvar configurações');
       }
     } catch (err) {
       // Em caso de erro de rede, salva localmente
-      console.log('Settings saved locally:', { settings, extraActivities });
       setSuccess('Configurações salvas!');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Dev mode: Switch user role for testing
+  const handleRoleSwitch = async (newRole: 'ministro' | 'coordenador' | 'gestor') => {
+    if (!isDev) return;
+
+    setSwitchingRole(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch('/api/dev/switch-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (res.ok) {
+        // Invalidate all queries to refresh with new role
+        await queryClient.invalidateQueries();
+        setSuccess(`Role alterado para: ${newRole}`);
+
+        // Reload page after short delay to ensure all components update
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        setError('Erro ao alterar role. Endpoint /api/dev/switch-role pode não estar implementado.');
+      }
+    } catch (err) {
+      setError('Erro ao alterar role');
+    } finally {
+      setSwitchingRole(false);
     }
   };
 
@@ -326,7 +371,7 @@ export default function Settings() {
             )}
 
             <Tabs defaultValue="notifications" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className={`grid w-full ${isDev ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="notifications" className="text-xs sm:text-sm">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Notificações
@@ -335,6 +380,12 @@ export default function Settings() {
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Disponibilidade
                 </TabsTrigger>
+                {isDev && (
+                  <TabsTrigger value="dev" className="text-xs sm:text-sm">
+                    <Code2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Dev Mode
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="notifications" className="space-y-6 mt-6">
@@ -535,9 +586,127 @@ export default function Settings() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* DEV MODE TAB - Only visible in development */}
+              {isDev && (
+                <TabsContent value="dev" className="space-y-6 mt-6">
+                  <Card className="border-yellow-500 border-2">
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                        <Code2 className="h-5 w-5 text-yellow-600" />
+                        Modo Desenvolvedor
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">
+                        Ferramentas de teste - apenas visível em desenvolvimento
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Current Role Display */}
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-sm text-blue-800">
+                          <strong>Role Atual:</strong> {authData?.user?.role || 'Carregando...'}
+                          <br />
+                          <strong>Usuário:</strong> {authData?.user?.name || 'Carregando...'} ({authData?.user?.email || 'Carregando...'})
+                        </AlertDescription>
+                      </Alert>
+
+                      {/* Role Switcher */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">
+                          Alternar Role para Teste
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Mude rapidamente entre diferentes roles para testar todas as perspectivas da aplicação
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <Button
+                            variant={authData?.user?.role === 'ministro' ? 'default' : 'outline'}
+                            onClick={() => handleRoleSwitch('ministro')}
+                            disabled={switchingRole || authData?.user?.role === 'ministro'}
+                            className="w-full"
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            Ministro
+                          </Button>
+
+                          <Button
+                            variant={authData?.user?.role === 'coordenador' ? 'default' : 'outline'}
+                            onClick={() => handleRoleSwitch('coordenador')}
+                            disabled={switchingRole || authData?.user?.role === 'coordenador'}
+                            className="w-full"
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            Coordenador
+                          </Button>
+
+                          <Button
+                            variant={authData?.user?.role === 'gestor' ? 'default' : 'outline'}
+                            onClick={() => handleRoleSwitch('gestor')}
+                            disabled={switchingRole || authData?.user?.role === 'gestor'}
+                            className="w-full"
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            Gestor
+                          </Button>
+                        </div>
+
+                        {switchingRole && (
+                          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Alterando role...
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Test Accounts Info */}
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          <strong>Contas de Teste:</strong>
+                          <ul className="mt-2 space-y-1 ml-4 list-disc">
+                            <li>test.ministro@test.com (role: ministro)</li>
+                            <li>test.coord@test.com (role: coordenador)</li>
+                            <li>test.gestor@test.com (role: gestor)</li>
+                          </ul>
+                          <p className="mt-2 text-muted-foreground">
+                            Senha padrão: <code className="bg-muted px-1 py-0.5 rounded">test123</code>
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+
+                      {/* Warning */}
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          <strong>Atenção:</strong> Esta funcionalidade está disponível apenas em ambiente de desenvolvimento.
+                          Ao alterar o role, a página será recarregada automaticamente.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* System Info Footer */}
+        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground px-2">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" />
+              <span>Versão {APP_VERSION}</span>
+            </div>
+            {(authData?.user?.role === "coordenador" || authData?.user?.role === "gestor") && (
+              <div className="flex items-center gap-1.5">
+                <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <span>{isConnected ? 'Tempo real ativo' : 'Modo polling'}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </Layout>
   );

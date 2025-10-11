@@ -50,7 +50,6 @@ export function ScheduleEditDialog({
   // Debug: log quando os dados de ministros mudarem e mostrar erro se necessário
   useEffect(() => {
     if (open) {
-      console.log('[ScheduleEditDialog] Ministers data:', { allMinisters, loadingMinisters, ministersError });
 
       if (ministersError) {
         console.error('[ScheduleEditDialog] Error loading ministers:', ministersError);
@@ -149,7 +148,6 @@ export function ScheduleEditDialog({
       setSaving(true);
 
       const ministerIds = ministers.map(m => m.id);
-      console.log('[ScheduleEditDialog] Salvando escala:', { date, time, ministerIds, ministers });
 
       // Atualizar escala usando o endpoint batch-update
       await apiRequest('PATCH', '/api/schedules/batch-update', {

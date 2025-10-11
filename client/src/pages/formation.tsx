@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { 
-  BookOpen, 
-  GraduationCap, 
-  Award, 
-  Clock, 
+import {
+  BookOpen,
+  GraduationCap,
+  Award,
+  Clock,
   CheckCircle2,
   PlayCircle,
   FileText,
@@ -27,14 +27,17 @@ import {
   Calendar,
   BookMarked,
   Shield,
-  Sparkles
+  Sparkles,
+  Settings
 } from "lucide-react";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { authAPI } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { FormationTrack, FormationLesson, FormationLessonSection, FormationLessonProgress } from "@shared/schema";
+import FormationAdmin from "@/pages/FormationAdmin";
 
 // Component to handle lesson content with API data
 function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; moduleId: string; lessonNumber: string }) {
@@ -311,6 +314,16 @@ export default function Formation() {
   const [location, navigate] = useLocation();
   const [mapZoom, setMapZoom] = useState(1);
   const [showMapInfo, setShowMapInfo] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+
+  // Get current user to check if they're a coordinator/gestor
+  const { data: authData } = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: () => authAPI.getMe(),
+  });
+
+  const user = authData?.user;
+  const isAdmin = user?.role === "coordenador" || user?.role === "gestor";
 
   // Fetch formation tracks
   const { data: tracks = [], isLoading: tracksLoading } = useQuery<FormationTrack[]>({
@@ -332,6 +345,11 @@ export default function Formation() {
   // Se está visualizando uma aula específica
   if (lesson && track && module) {
     return <LessonContent trackId={track} moduleId={module} lessonNumber={lesson} />;
+  }
+
+  // Se está em modo admin, mostrar interface administrativa
+  if (adminMode && isAdmin) {
+    return <FormationAdmin />;
   }
 
   if (track === 'library') {
@@ -517,9 +535,22 @@ export default function Formation() {
                   </p>
                 </div>
               </div>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                Disponível
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  Disponível
+                </Badge>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAdminMode(!adminMode)}
+                    className="ml-2"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Modo Admin
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

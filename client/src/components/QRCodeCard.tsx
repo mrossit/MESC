@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Share2, Smartphone, Users } from 'lucide-react';
@@ -14,7 +13,9 @@ export default function QRCodeCard({ url = 'https://saojudastadeu.replit.app' }:
   useEffect(() => {
     const generateQRCode = async () => {
       try {
-        const qrDataURL = await QRCode.toDataURL(url, {
+        // Dynamic import - only load QRCode library when needed
+        const QRCode = await import('qrcode');
+        const qrDataURL = await QRCode.default.toDataURL(url, {
           width: 300,
           margin: 2,
           color: {
