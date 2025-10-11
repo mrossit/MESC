@@ -441,6 +441,152 @@ export class ScheduleGenerator {
   }
 
   /**
+   * 🔄 COMPATIBILITY LAYER: Adapter for October 2025 questionnaire format
+   *
+   * October 2025 uses array format: [{questionId: "...", answer: "..."}]
+   * Future questionnaires will use different formats
+   *
+   * This adapter reads the existing October data WITHOUT modifying the database
+   */
+  private adaptQuestionnaireResponse(
+    response: any,
+    questionnaireYear: number,
+    questionnaireMonth: number
+  ): {
+    availableSundays: any[];
+    preferredMassTimes: any[];
+    alternativeTimes: any[];
+    dailyMassAvailability: any[];
+    canSubstitute: boolean;
+    specialEvents: Record<string, any>;
+  } {
+    console.log(`[COMPATIBILITY_LAYER] Adapting response for ${questionnaireMonth}/${questionnaireYear}`);
+
+    // Default empty structure
+    let availableSundays: any[] = [];
+    let preferredMassTimes: any[] = [];
+    let alternativeTimes: any[] = [];
+    let dailyMassAvailability: any[] = [];
+    let canSubstitute = false;
+    let specialEvents: Record<string, any> = {};
+
+    // 🎯 VERSION DETECTION: October 2025 uses array format
+    if (questionnaireMonth === 10 && questionnaireYear === 2025) {
+      console.log(`[COMPATIBILITY_LAYER] ✅ Detected October 2025 format - using array parser`);
+
+      try {
+        let responsesArray = response.responses;
+
+        // Parse if string (shouldn't happen with JSONB but just in case)
+        if (typeof responsesArray === 'string') {
+          responsesArray = JSON.parse(responsesArray);
+        }
+
+        // Process October 2025 array format: [{questionId: "...", answer: "..."}]
+        if (Array.isArray(responsesArray)) {
+          responsesArray.forEach((item: any) => {
+            switch(item.questionId) {
+              case 'available_sundays':
+                availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                break;
+              case 'main_service_time':
+                preferredMassTimes = item.answer ? [item.answer] : [];
+                break;
+              case 'other_times_available':
+                if (item.answer && item.answer !== 'Não') {
+                  if (typeof item.answer === 'object' && item.answer.selectedOptions) {
+                    alternativeTimes = item.answer.selectedOptions;
+                  } else if (Array.isArray(item.answer)) {
+                    alternativeTimes = item.answer;
+                  } else if (typeof item.answer === 'string') {
+                    alternativeTimes = [item.answer];
+                  }
+                }
+                break;
+              case 'can_substitute':
+                canSubstitute = item.answer === 'Sim' || item.answer === true;
+                break;
+              case 'daily_mass_availability':
+                if (item.answer && item.answer !== 'Não posso' && item.answer !== 'Não') {
+                  if (typeof item.answer === 'object' && item.answer.selectedOptions) {
+                    dailyMassAvailability = item.answer.selectedOptions;
+                  } else if (item.answer === 'Sim') {
+                    dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                  } else if (Array.isArray(item.answer)) {
+                    dailyMassAvailability = item.answer;
+                  } else if (typeof item.answer === 'string') {
+                    dailyMassAvailability = [item.answer];
+                  }
+                }
+                break;
+              // Novena de São Judas
+              case 'saint_judas_novena':
+                if (Array.isArray(item.answer)) {
+                  specialEvents[item.questionId] = item.answer;
+                } else if (item.answer === 'Nenhum dia') {
+                  specialEvents[item.questionId] = [];
+                } else {
+                  specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                }
+                break;
+              // Special event masses
+              case 'healing_liberation_mass':
+              case 'sacred_heart_mass':
+              case 'immaculate_heart_mass':
+              case 'saint_judas_feast_7h':
+              case 'saint_judas_feast_10h':
+              case 'saint_judas_feast_12h':
+              case 'saint_judas_feast_15h':
+              case 'saint_judas_feast_17h':
+              case 'saint_judas_feast_evening':
+              case 'adoration_monday':
+                specialEvents[item.questionId] = item.answer;
+                break;
+            }
+          });
+
+          console.log(`[COMPATIBILITY_LAYER] ✅ October 2025 format parsed successfully`);
+          console.log(`[COMPATIBILITY_LAYER]    - Sundays: ${availableSundays.length}`);
+          console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
+          console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
+        }
+      } catch (error) {
+        console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing October 2025 format:`, error);
+      }
+    } else {
+      // 🆕 FUTURE FORMATS: Add new format parsers here for November 2025 onwards
+      console.log(`[COMPATIBILITY_LAYER] ⚠️ Unknown format for ${questionnaireMonth}/${questionnaireYear}`);
+      console.log(`[COMPATIBILITY_LAYER] ℹ️ Add new format parser here when questionnaire structure changes`);
+
+      // For now, try to parse as October format (backward compatibility)
+      // TODO: When November questionnaire is created with new format, add parser here
+    }
+
+    // Fallback to separate JSONB fields (legacy support)
+    if (!availableSundays.length && response.availableSundays) {
+      availableSundays = typeof response.availableSundays === 'string'
+        ? JSON.parse(response.availableSundays)
+        : response.availableSundays;
+      console.log(`[COMPATIBILITY_LAYER] ℹ️ Used fallback availableSundays field`);
+    }
+    if (!preferredMassTimes.length && response.preferredMassTimes) {
+      preferredMassTimes = typeof response.preferredMassTimes === 'string'
+        ? JSON.parse(response.preferredMassTimes)
+        : response.preferredMassTimes;
+      console.log(`[COMPATIBILITY_LAYER] ℹ️ Used fallback preferredMassTimes field`);
+    }
+
+    return {
+      availableSundays,
+      preferredMassTimes,
+      alternativeTimes,
+      dailyMassAvailability,
+      canSubstitute,
+      specialEvents
+    };
+  }
+
+  /**
    * Carrega dados de disponibilidade dos questionários
    */
   private async loadAvailabilityData(year: number, month: number, isPreview: boolean = false): Promise<void> {
@@ -543,111 +689,18 @@ export class ScheduleGenerator {
       .where(eq(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
 
     console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
+    console.log(`[SCHEDULE_GEN] 🔄 Using COMPATIBILITY LAYER for ${year}/${month}`);
 
     responses.forEach((r: any, index: number) => {
-      // CORREÇÃO: Os dados estão no campo JSONB "responses", não nos campos específicos
-      let availableSundays = [];
-      let preferredMassTimes = [];
-      let alternativeTimes = [];
-      let dailyMassAvailability = [];
-      let canSubstitute = false;
-      let specialEvents = {};
+      // 🔄 USE COMPATIBILITY LAYER: Adapter handles all format variations
+      const adapted = this.adaptQuestionnaireResponse(r, year, month);
 
-      // Processar o campo JSONB responses que contém um array de respostas
-      if (r.responses) {
-        try {
-          let responsesArray = r.responses;
-
-          // Se for string, fazer parse
-          if (typeof responsesArray === 'string') {
-            responsesArray = JSON.parse(responsesArray);
-          }
-
-          // Processar cada resposta do array
-          if (Array.isArray(responsesArray)) {
-            responsesArray.forEach((item: any) => {
-              switch(item.questionId) {
-                case 'available_sundays':
-                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
-                  break;
-                case 'main_service_time':
-                  // Converter horário principal em array
-                  preferredMassTimes = item.answer ? [item.answer] : [];
-                  break;
-                case 'other_times_available':
-                  // Processar horários alternativos
-                  if (item.answer && item.answer !== 'Não') {
-                    // 🔧 CORREÇÃO: answer pode ser um objeto com { answer: "Sim", selectedOptions: [...] }
-                    if (typeof item.answer === 'object' && item.answer.selectedOptions) {
-                      alternativeTimes = item.answer.selectedOptions;
-                    } else if (Array.isArray(item.answer)) {
-                      alternativeTimes = item.answer;
-                    } else if (typeof item.answer === 'string') {
-                      alternativeTimes = [item.answer];
-                    }
-                  }
-                  break;
-                case 'can_substitute':
-                  canSubstitute = item.answer === 'Sim' || item.answer === true;
-                  break;
-                case 'daily_mass_availability':
-                  if (item.answer && item.answer !== 'Não posso' && item.answer !== 'Não') {
-                    // 🔧 CORREÇÃO: answer pode ser um objeto com { answer: "Apenas em alguns dias", selectedOptions: [...] }
-                    if (typeof item.answer === 'object' && item.answer.selectedOptions) {
-                      dailyMassAvailability = item.answer.selectedOptions;
-                    } else if (item.answer === 'Sim') {
-                      // "Sim" significa disponível todos os dias da semana
-                      dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-                    } else if (Array.isArray(item.answer)) {
-                      dailyMassAvailability = item.answer;
-                    } else if (typeof item.answer === 'string') {
-                      dailyMassAvailability = [item.answer];
-                    }
-                  }
-                  break;
-                // Novena de São Judas (array de dias)
-                case 'saint_judas_novena':
-                  // Array com strings como ["Sexta 23/10 às 19h30", "Terça 20/10 às 19h30"]
-                  if (Array.isArray(item.answer)) {
-                    specialEvents[item.questionId] = item.answer;
-                  } else if (item.answer === 'Nenhum dia') {
-                    specialEvents[item.questionId] = [];
-                  } else {
-                    specialEvents[item.questionId] = item.answer ? [item.answer] : [];
-                  }
-                  break;
-                // Eventos especiais (respostas Sim/Não)
-                case 'healing_liberation_mass':
-                case 'sacred_heart_mass':
-                case 'immaculate_heart_mass':
-                case 'saint_judas_feast_7h':
-                case 'saint_judas_feast_10h':
-                case 'saint_judas_feast_12h':
-                case 'saint_judas_feast_15h':
-                case 'saint_judas_feast_17h':
-                case 'saint_judas_feast_evening':
-                case 'adoration_monday':
-                  specialEvents[item.questionId] = item.answer;
-                  break;
-              }
-            });
-          }
-        } catch (e) {
-          console.log(`[SCHEDULE_GEN] ⚠️ Erro ao processar responses para usuário ${r.userId}:`, e);
-        }
-      }
-
-      // Fallback para campos específicos se existirem (backward compatibility)
-      if (!availableSundays.length && r.availableSundays) {
-        availableSundays = typeof r.availableSundays === 'string'
-          ? JSON.parse(r.availableSundays)
-          : r.availableSundays;
-      }
-      if (!preferredMassTimes.length && r.preferredMassTimes) {
-        preferredMassTimes = typeof r.preferredMassTimes === 'string'
-          ? JSON.parse(r.preferredMassTimes)
-          : r.preferredMassTimes;
-      }
+      let availableSundays = adapted.availableSundays;
+      let preferredMassTimes = adapted.preferredMassTimes;
+      let alternativeTimes = adapted.alternativeTimes;
+      let dailyMassAvailability = adapted.dailyMassAvailability;
+      let canSubstitute = adapted.canSubstitute;
+      let specialEvents = adapted.specialEvents;
 
       // 🔧 NORMALIZAÇÃO: Converter domingos de texto para números (1-5)
       const normalizedSundays = this.normalizeSundayFormat(availableSundays, month, year);
