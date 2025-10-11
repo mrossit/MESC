@@ -21,6 +21,7 @@ __export(schema_exports, {
   activeSessionsRelations: () => activeSessionsRelations,
   activityLogs: () => activityLogs,
   activityLogsRelations: () => activityLogsRelations,
+  celebrationRankEnum: () => celebrationRankEnum,
   families: () => families,
   familiesRelations: () => familiesRelations,
   familyRelationships: () => familyRelationships,
@@ -46,7 +47,17 @@ __export(schema_exports, {
   insertQuestionnaireSchema: () => insertQuestionnaireSchema,
   insertUserSchema: () => insertUserSchema,
   lessonContentTypeEnum: () => lessonContentTypeEnum,
+  liturgicalCelebrations: () => liturgicalCelebrations,
+  liturgicalColorEnum: () => liturgicalColorEnum,
+  liturgicalCycleEnum: () => liturgicalCycleEnum,
+  liturgicalMassOverrides: () => liturgicalMassOverrides,
+  liturgicalSeasons: () => liturgicalSeasons,
+  liturgicalYears: () => liturgicalYears,
+  massExecutionLogs: () => massExecutionLogs,
+  massExecutionLogsRelations: () => massExecutionLogsRelations,
   massTimesConfig: () => massTimesConfig,
+  ministerCheckIns: () => ministerCheckIns,
+  ministerCheckInsRelations: () => ministerCheckInsRelations,
   notificationTypeEnum: () => notificationTypeEnum,
   notifications: () => notifications,
   notificationsRelations: () => notificationsRelations,
@@ -55,11 +66,14 @@ __export(schema_exports, {
   questionnaireResponsesRelations: () => questionnaireResponsesRelations,
   questionnaires: () => questionnaires,
   questionnairesRelations: () => questionnairesRelations,
+  saints: () => saints,
   scheduleStatusEnum: () => scheduleStatusEnum,
   scheduleTypeEnum: () => scheduleTypeEnum,
   schedules: () => schedules,
   schedulesRelations: () => schedulesRelations,
   sessions: () => sessions,
+  standbyMinisters: () => standbyMinisters,
+  standbyMinistersRelations: () => standbyMinistersRelations,
   substitutionRequests: () => substitutionRequests,
   substitutionRequestsRelations: () => substitutionRequestsRelations,
   substitutionStatusEnum: () => substitutionStatusEnum,
@@ -85,7 +99,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -102,12 +116,15 @@ var init_schema = __esm({
     userStatusEnum = pgEnum("user_status", ["active", "inactive", "pending"]);
     scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published", "completed"]);
     scheduleTypeEnum = pgEnum("schedule_type", ["missa", "celebracao", "evento"]);
-    substitutionStatusEnum = pgEnum("substitution_status", ["pending", "approved", "rejected", "cancelled", "auto_approved"]);
+    substitutionStatusEnum = pgEnum("substitution_status", ["available", "pending", "approved", "rejected", "cancelled", "auto_approved"]);
     urgencyLevelEnum = pgEnum("urgency_level", ["low", "medium", "high", "critical"]);
     notificationTypeEnum = pgEnum("notification_type", ["schedule", "substitution", "formation", "announcement", "reminder"]);
     formationCategoryEnum = pgEnum("formation_category", ["liturgia", "espiritualidade", "pratica"]);
     formationStatusEnum = pgEnum("formation_status", ["not_started", "in_progress", "completed"]);
     lessonContentTypeEnum = pgEnum("lesson_content_type", ["text", "video", "audio", "document", "quiz", "interactive"]);
+    liturgicalCycleEnum = pgEnum("liturgical_cycle", ["A", "B", "C"]);
+    liturgicalColorEnum = pgEnum("liturgical_color", ["white", "red", "green", "purple", "rose", "black"]);
+    celebrationRankEnum = pgEnum("celebration_rank", ["SOLEMNITY", "FEAST", "MEMORIAL", "OPTIONAL_MEMORIAL", "FERIAL"]);
     users = pgTable("users", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
       email: varchar("email", { length: 255 }).unique().notNull(),
@@ -237,8 +254,59 @@ var init_schema = __esm({
       status: varchar("status", { length: 20 }).notNull().default("scheduled"),
       substituteId: varchar("substitute_id").references(() => users.id),
       notes: text("notes"),
+      onSiteAdjustments: jsonb("on_site_adjustments").$type(),
       createdAt: timestamp("created_at").defaultNow()
     });
+    massExecutionLogs = pgTable("mass_execution_logs", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
+      auxiliaryId: varchar("auxiliary_id").notNull().references(() => users.id),
+      changesMade: jsonb("changes_made").$type(),
+      comments: text("comments"),
+      massQuality: integer("mass_quality"),
+      // 1-5 stars
+      attendance: jsonb("attendance").$type(),
+      incidents: jsonb("incidents").$type(),
+      highlights: text("highlights"),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_mass_execution_logs_schedule").on(table.scheduleId),
+      index("idx_mass_execution_logs_auxiliary").on(table.auxiliaryId)
+    ]);
+    standbyMinisters = pgTable("standby_ministers", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
+      ministerId: varchar("minister_id").notNull().references(() => users.id),
+      confirmedAvailable: boolean("confirmed_available").default(false),
+      checkInTime: timestamp("check_in_time"),
+      calledAt: timestamp("called_at"),
+      calledBy: varchar("called_by").references(() => users.id),
+      respondedAt: timestamp("responded_at"),
+      response: varchar("response", { length: 50 }),
+      // 'available', 'unavailable', 'on_way', 'arrived'
+      responseMessage: text("response_message"),
+      assignedPosition: integer("assigned_position"),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_standby_ministers_schedule").on(table.scheduleId),
+      index("idx_standby_ministers_minister").on(table.ministerId),
+      index("idx_standby_ministers_called").on(table.calledAt)
+    ]);
+    ministerCheckIns = pgTable("minister_check_ins", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
+      ministerId: varchar("minister_id").notNull().references(() => users.id),
+      position: integer("position").notNull(),
+      checkedInAt: timestamp("checked_in_at").defaultNow(),
+      checkedInBy: varchar("checked_in_by").references(() => users.id),
+      // Auxiliary who checked them in
+      status: varchar("status", { length: 20 }).default("present"),
+      // present, late, absent
+      notes: text("notes")
+    }, (table) => [
+      index("idx_minister_check_ins_schedule").on(table.scheduleId),
+      index("idx_minister_check_ins_minister").on(table.ministerId)
+    ]);
     substitutionRequests = pgTable("substitution_requests", {
       id: uuid("id").primaryKey().defaultRandom(),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
@@ -246,7 +314,7 @@ var init_schema = __esm({
       substituteId: varchar("substitute_id").references(() => users.id, { onDelete: "set null" }),
       reason: text("reason"),
       // Opcional - ministro pode ou não informar motivo
-      status: substitutionStatusEnum("status").notNull().default("pending"),
+      status: substitutionStatusEnum("status").notNull().default("available"),
       urgency: urgencyLevelEnum("urgency").notNull().default("medium"),
       approvedBy: varchar("approved_by").references(() => users.id),
       approvedAt: timestamp("approved_at"),
@@ -409,6 +477,109 @@ var init_schema = __esm({
       index("idx_activity_logs_action").on(table.action),
       index("idx_activity_logs_created").on(table.createdAt)
     ]);
+    liturgicalYears = pgTable("liturgical_years", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      year: integer("year").notNull().unique(),
+      // Civil year when liturgical year starts
+      cycle: liturgicalCycleEnum("cycle").notNull(),
+      // A, B, or C
+      startDate: date("start_date").notNull(),
+      // First Sunday of Advent
+      endDate: date("end_date").notNull(),
+      // Saturday before next Advent
+      easterDate: date("easter_date").notNull(),
+      // Calculated Easter Sunday
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_liturgical_years_year").on(table.year)
+    ]);
+    liturgicalSeasons = pgTable("liturgical_seasons", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      yearId: uuid("year_id").notNull().references(() => liturgicalYears.id),
+      name: varchar("name", { length: 100 }).notNull(),
+      // Advent, Christmas, Lent, Easter, Ordinary Time
+      color: liturgicalColorEnum("color").notNull(),
+      startDate: date("start_date").notNull(),
+      endDate: date("end_date").notNull(),
+      orderIndex: integer("order_index").default(0),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_liturgical_seasons_year").on(table.yearId),
+      index("idx_liturgical_seasons_dates").on(table.startDate, table.endDate)
+    ]);
+    liturgicalCelebrations = pgTable("liturgical_celebrations", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      date: date("date").notNull(),
+      name: varchar("name", { length: 255 }).notNull(),
+      rank: celebrationRankEnum("rank").notNull(),
+      color: liturgicalColorEnum("color").notNull(),
+      isMovable: boolean("is_movable").default(false),
+      // True for Easter-dependent dates
+      specialMassConfig: jsonb("special_mass_config").$type(),
+      saintOfTheDay: varchar("saint_of_the_day", { length: 255 }),
+      readings: jsonb("readings"),
+      notes: text("notes"),
+      yearId: uuid("year_id").references(() => liturgicalYears.id),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_liturgical_celebrations_date").on(table.date),
+      index("idx_liturgical_celebrations_rank").on(table.rank),
+      index("idx_liturgical_celebrations_year").on(table.yearId)
+    ]);
+    liturgicalMassOverrides = pgTable("liturgical_mass_overrides", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      celebrationId: uuid("celebration_id").references(() => liturgicalCelebrations.id),
+      date: date("date").notNull(),
+      time: time("time").notNull(),
+      minMinisters: integer("min_ministers").notNull(),
+      maxMinisters: integer("max_ministers").notNull(),
+      description: varchar("description", { length: 255 }),
+      reason: text("reason"),
+      createdBy: varchar("created_by").references(() => users.id),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_liturgical_mass_overrides_date").on(table.date),
+      index("idx_liturgical_mass_overrides_celebration").on(table.celebrationId)
+    ]);
+    saints = pgTable("saints", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      name: varchar("name", { length: 255 }).notNull(),
+      feastDay: varchar("feast_day", { length: 10 }).notNull(),
+      // MM-DD format
+      title: varchar("title", { length: 255 }),
+      // e.g., "Apóstolo", "Mártir", "Doutor da Igreja"
+      patronOf: text("patron_of"),
+      // What they're patron saint of
+      biography: text("biography"),
+      imageUrl: varchar("image_url", { length: 500 }),
+      isBrazilian: boolean("is_brazilian").default(false),
+      rank: celebrationRankEnum("rank").notNull().default("OPTIONAL_MEMORIAL"),
+      liturgicalColor: liturgicalColorEnum("liturgical_color").notNull().default("white"),
+      // Liturgical texts
+      collectPrayer: text("collect_prayer"),
+      // Oração Coleta
+      firstReading: jsonb("first_reading").$type(),
+      responsorialPsalm: jsonb("responsorial_psalm").$type(),
+      gospel: jsonb("gospel").$type(),
+      prayerOfTheFaithful: text("prayer_of_the_faithful"),
+      communionAntiphon: text("communion_antiphon"),
+      // Additional information
+      attributes: jsonb("attributes").$type(),
+      // Common symbols, attributes
+      quotes: jsonb("quotes").$type(),
+      // Famous quotes by/about the saint
+      relatedSaints: jsonb("related_saints").$type(),
+      // Related saint IDs
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_saints_feast_day").on(table.feastDay),
+      index("idx_saints_name").on(table.name),
+      index("idx_saints_brazilian").on(table.isBrazilian)
+    ]);
     familiesRelations = relations(families, ({ many }) => ({
       members: many(users)
     }));
@@ -468,7 +639,48 @@ var init_schema = __esm({
         fields: [schedules.substituteId],
         references: [users.id]
       }),
-      substitutionRequests: many(substitutionRequests)
+      substitutionRequests: many(substitutionRequests),
+      massExecutionLogs: many(massExecutionLogs),
+      standbyMinisters: many(standbyMinisters),
+      ministerCheckIns: many(ministerCheckIns)
+    }));
+    massExecutionLogsRelations = relations(massExecutionLogs, ({ one }) => ({
+      schedule: one(schedules, {
+        fields: [massExecutionLogs.scheduleId],
+        references: [schedules.id]
+      }),
+      auxiliary: one(users, {
+        fields: [massExecutionLogs.auxiliaryId],
+        references: [users.id]
+      })
+    }));
+    standbyMinistersRelations = relations(standbyMinisters, ({ one }) => ({
+      schedule: one(schedules, {
+        fields: [standbyMinisters.scheduleId],
+        references: [schedules.id]
+      }),
+      minister: one(users, {
+        fields: [standbyMinisters.ministerId],
+        references: [users.id]
+      }),
+      callerUser: one(users, {
+        fields: [standbyMinisters.calledBy],
+        references: [users.id]
+      })
+    }));
+    ministerCheckInsRelations = relations(ministerCheckIns, ({ one }) => ({
+      schedule: one(schedules, {
+        fields: [ministerCheckIns.scheduleId],
+        references: [schedules.id]
+      }),
+      minister: one(users, {
+        fields: [ministerCheckIns.ministerId],
+        references: [users.id]
+      }),
+      checkedInByUser: one(users, {
+        fields: [ministerCheckIns.checkedInBy],
+        references: [users.id]
+      })
     }));
     substitutionRequestsRelations = relations(substitutionRequests, ({ one }) => ({
       schedule: one(schedules, {
@@ -1443,13 +1655,301 @@ var init_logger = __esm({
   }
 });
 
+// server/utils/saintNameMatching.ts
+import { eq as eq9 } from "drizzle-orm";
+async function loadAllSaintsData() {
+  if (saintsCache) {
+    return saintsCache;
+  }
+  console.time("[PERF] Load all saints data");
+  const allSaints = await db.select().from(saints);
+  console.timeEnd("[PERF] Load all saints data");
+  saintsCache = /* @__PURE__ */ new Map();
+  for (const saint of allSaints) {
+    const feastDay = saint.feastDay;
+    if (!saintsCache.has(feastDay)) {
+      saintsCache.set(feastDay, []);
+    }
+    saintsCache.get(feastDay).push(saint);
+  }
+  console.log(`[SAINT_CACHE] Loaded ${allSaints.length} saints indexed by ${saintsCache.size} feast days`);
+  return saintsCache;
+}
+async function calculateSaintNameMatchBonus(ministerName, date2, saintsData) {
+  try {
+    const [year, month, day] = date2.split("-");
+    const feastDay = `${month}-${day}`;
+    const cache = saintsData || await loadAllSaintsData();
+    const saintsForDay = cache.get(feastDay) || [];
+    if (saintsForDay.length === 0) {
+      return 0;
+    }
+    const normalizedMinisterName = ministerName.toLowerCase().trim();
+    const ministerNameParts = normalizedMinisterName.split(" ");
+    let bestMatchScore = 0;
+    for (const saint of saintsForDay) {
+      const saintName = saint.name.toLowerCase();
+      const saintNameParts = saintName.split(" ");
+      let matchScore = 0;
+      let matchedParts = 0;
+      for (const ministerPart of ministerNameParts) {
+        if (ministerPart.length < 3) continue;
+        for (const saintPart of saintNameParts) {
+          if (saintPart.length < 3) continue;
+          if (ministerPart === saintPart) {
+            matchScore += 1;
+            matchedParts++;
+          } else if (ministerPart.includes(saintPart) || saintPart.includes(ministerPart)) {
+            matchScore += 0.5;
+            matchedParts++;
+          } else if (calculateSimilarity(ministerPart, saintPart) > 0.7) {
+            matchScore += 0.3;
+            matchedParts++;
+          }
+        }
+      }
+      const normalizedScore = matchScore / Math.max(ministerNameParts.length, saintNameParts.length);
+      let rankMultiplier = 1;
+      switch (saint.rank) {
+        case "SOLEMNITY":
+          rankMultiplier = 1.5;
+          break;
+        case "FEAST":
+          rankMultiplier = 1.3;
+          break;
+        case "MEMORIAL":
+          rankMultiplier = 1.2;
+          break;
+      }
+      const finalScore = Math.min(normalizedScore * rankMultiplier, 1);
+      bestMatchScore = Math.max(bestMatchScore, finalScore);
+      if (finalScore > 0.3) {
+        console.log(
+          `[SAINT_MATCH] "${ministerName}" matches "${saint.name}" (${saint.rank}): score ${finalScore.toFixed(2)}`
+        );
+      }
+    }
+    return bestMatchScore;
+  } catch (error) {
+    console.error("[SAINT_MATCH] Error calculating saint name match:", error);
+    return 0;
+  }
+}
+function calculateSimilarity(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  if (longer.length === 0) {
+    return 1;
+  }
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          // substitution
+          matrix[i][j - 1] + 1,
+          // insertion
+          matrix[i - 1][j] + 1
+          // deletion
+        );
+      }
+    }
+  }
+  return matrix[str2.length][str1.length];
+}
+var saintsCache;
+var init_saintNameMatching = __esm({
+  async "server/utils/saintNameMatching.ts"() {
+    "use strict";
+    await init_db();
+    init_schema();
+    saintsCache = null;
+  }
+});
+
+// server/utils/octoberMassValidator.ts
+function validateOctoberMasses(masses) {
+  const errors = [];
+  masses.forEach((mass) => {
+    if (!mass.date) return;
+    const date2 = new Date(mass.date);
+    const month = date2.getMonth() + 1;
+    if (month !== 10) return;
+    const dayOfWeek = date2.getDay();
+    const dayOfMonth = date2.getDate();
+    if (dayOfWeek === 6) {
+      if (dayOfMonth > 7 && mass.time === "06:30" && mass.type === "missa_diaria") {
+        errors.push({
+          date: mass.date,
+          time: mass.time,
+          type: mass.type || "unknown",
+          error: `Regular Saturday ${dayOfMonth} should have NO morning mass (only 1st Saturday has 6:30)`,
+          severity: "ERROR"
+        });
+      }
+      if ((dayOfMonth === 11 || dayOfMonth === 18) && mass.time === "06:30") {
+        errors.push({
+          date: mass.date,
+          time: mass.time,
+          type: mass.type || "unknown",
+          error: `October ${dayOfMonth} is a regular Saturday - should have NO mass`,
+          severity: "ERROR"
+        });
+      }
+    }
+    if (dayOfMonth >= 20 && dayOfMonth <= 27) {
+      if (mass.time === "06:30") {
+        errors.push({
+          date: mass.date,
+          time: mass.time,
+          type: mass.type || "unknown",
+          error: `October ${dayOfMonth} during novena should NOT have 6:30 morning mass (only evening novena)`,
+          severity: "ERROR"
+        });
+      }
+      if (mass.type === "missa_sao_judas") {
+        if (dayOfWeek === 6 && mass.time !== "19:00") {
+          errors.push({
+            date: mass.date,
+            time: mass.time,
+            type: mass.type,
+            error: `Novena Saturday (${dayOfMonth}) should be at 19:00, not ${mass.time}`,
+            severity: "WARNING"
+          });
+        }
+        if (dayOfWeek >= 1 && dayOfWeek <= 5 && mass.time !== "19:30") {
+          errors.push({
+            date: mass.date,
+            time: mass.time,
+            type: mass.type,
+            error: `Novena weekday (${dayOfMonth}) should be at 19:30, not ${mass.time}`,
+            severity: "WARNING"
+          });
+        }
+      }
+    }
+    if (dayOfMonth === 28 && mass.type === "missa_diaria") {
+      errors.push({
+        date: mass.date,
+        time: mass.time,
+        type: mass.type,
+        error: `October 28 (St Jude Feast) should NOT have regular daily mass`,
+        severity: "ERROR"
+      });
+    }
+    if (dayOfWeek === 6 && dayOfMonth <= 7) {
+      if (mass.time === "06:30" && mass.type !== "missa_imaculado_coracao") {
+        errors.push({
+          date: mass.date,
+          time: mass.time,
+          type: mass.type || "unknown",
+          error: `1st Saturday should be Immaculate Heart mass, not ${mass.type}`,
+          severity: "WARNING"
+        });
+      }
+    }
+  });
+  return errors;
+}
+function validateAndLogOctoberMasses(masses, year) {
+  const octoberMasses = masses.filter((m) => {
+    if (!m.date) return false;
+    const date2 = new Date(m.date);
+    return date2.getMonth() + 1 === 10 && date2.getFullYear() === year;
+  });
+  if (octoberMasses.length === 0) {
+    console.log("[OCT_VALIDATION] No October masses to validate");
+    return true;
+  }
+  console.log(`
+[OCT_VALIDATION] \u{1F4CB} Validating ${octoberMasses.length} October masses...`);
+  const errors = validateOctoberMasses(octoberMasses);
+  if (errors.length === 0) {
+    console.log("[OCT_VALIDATION] \u2705 All October masses are VALID!");
+    return true;
+  }
+  console.log(`[OCT_VALIDATION] \u274C Found ${errors.length} validation issues:
+`);
+  const errorList = errors.filter((e) => e.severity === "ERROR");
+  const warningList = errors.filter((e) => e.severity === "WARNING");
+  if (errorList.length > 0) {
+    console.log(`[OCT_VALIDATION] \u{1F6A8} ERRORS (${errorList.length}):`);
+    errorList.forEach((err, idx) => {
+      console.log(`[OCT_VALIDATION]   ${idx + 1}. ${err.date} ${err.time} (${err.type})`);
+      console.log(`[OCT_VALIDATION]      ${err.error}`);
+    });
+    console.log("");
+  }
+  if (warningList.length > 0) {
+    console.log(`[OCT_VALIDATION] \u26A0\uFE0F  WARNINGS (${warningList.length}):`);
+    warningList.forEach((err, idx) => {
+      console.log(`[OCT_VALIDATION]   ${idx + 1}. ${err.date} ${err.time} (${err.type})`);
+      console.log(`[OCT_VALIDATION]      ${err.error}`);
+    });
+    console.log("");
+  }
+  return errorList.length === 0;
+}
+function printOctoberScheduleComparison(masses, year) {
+  const octoberMasses = masses.filter((m) => {
+    if (!m.date) return false;
+    const date2 = new Date(m.date);
+    return date2.getMonth() + 1 === 10 && date2.getFullYear() === year;
+  });
+  console.log("\n[OCT_VALIDATION] \u{1F4C5} OCTOBER SCHEDULE COMPARISON:");
+  console.log("[OCT_VALIDATION] ================================================\n");
+  const massesByDate = /* @__PURE__ */ new Map();
+  octoberMasses.forEach((mass) => {
+    if (!mass.date) return;
+    if (!massesByDate.has(mass.date)) {
+      massesByDate.set(mass.date, []);
+    }
+    massesByDate.get(mass.date).push(mass);
+  });
+  const sortedDates = Array.from(massesByDate.keys()).sort();
+  sortedDates.forEach((date2) => {
+    const masses2 = massesByDate.get(date2).sort((a, b) => a.time.localeCompare(b.time));
+    const dateObj = new Date(date2);
+    const day = dateObj.getDate();
+    const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "S\xE1b"][dateObj.getDay()];
+    console.log(`[OCT_VALIDATION] Oct ${day.toString().padStart(2, "0")} (${dayOfWeek}):`);
+    if (masses2.length === 0) {
+      console.log(`[OCT_VALIDATION]   (no masses)`);
+    } else {
+      masses2.forEach((mass) => {
+        const typeLabel = mass.type || "unknown";
+        console.log(`[OCT_VALIDATION]   ${mass.time} - ${typeLabel}`);
+      });
+    }
+  });
+  console.log("\n[OCT_VALIDATION] ================================================\n");
+}
+var init_octoberMassValidator = __esm({
+  "server/utils/octoberMassValidator.ts"() {
+    "use strict";
+  }
+});
+
 // server/utils/scheduleGenerator.ts
 var scheduleGenerator_exports = {};
 __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
   generateAutomaticSchedule: () => generateAutomaticSchedule
 });
-import { eq as eq9, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
+import { eq as eq10, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
 import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday } from "date-fns";
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
@@ -1457,11 +1957,13 @@ async function generateAutomaticSchedule(year, month, isPreview = false) {
 }
 var ScheduleGenerator;
 var init_scheduleGenerator = __esm({
-  "server/utils/scheduleGenerator.ts"() {
+  async "server/utils/scheduleGenerator.ts"() {
     "use strict";
     init_logger();
     init_schema();
-    console.log("\u{1F680} [SCHEDULE_GENERATOR] M\xD3DULO CARREGADO - VERS\xC3O COM CORRE\xC7\xD5ES! Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
+    await init_saintNameMatching();
+    init_octoberMassValidator();
+    console.log("\u{1F680} [SCHEDULE_GENERATOR] M\xD3DULO CARREGADO - VERS\xC3O COM FAIR ALGORITHM! Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
     ScheduleGenerator = class {
       ministers = [];
       availabilityData = /* @__PURE__ */ new Map();
@@ -1469,36 +1971,151 @@ var init_scheduleGenerator = __esm({
       db;
       dailyAssignments = /* @__PURE__ */ new Map();
       // Rastrear ministros já escalados por dia
+      saintBonusCache = /* @__PURE__ */ new Map();
+      // Cache de bônus de santo: "ministerId:date" -> score
+      saintsData = null;
+      // Cache de santos: "MM-DD" -> saints[]
       /**
        * Gera escalas automaticamente para um mês específico
        */
       async generateScheduleForMonth(year, month, isPreview = false) {
+        const startTime = Date.now();
+        console.log(`
+${"=".repeat(60)}`);
+        console.log(`=== \u{1F680} GENERATION START ===`);
+        console.log(`${"=".repeat(60)}`);
+        console.log(`Month: ${month}, Year: ${year}, IsPreview: ${isPreview}`);
+        console.log(`Timestamp: ${(/* @__PURE__ */ new Date()).toISOString()}`);
+        console.log(`Environment: ${process.env.NODE_ENV || "unknown"}`);
+        console.log(`${"=".repeat(60)}
+`);
+        console.time("[PERF] Total generation time");
+        console.time("[PERF] Database initialization");
         const { db: db2 } = await init_db().then(() => db_exports);
         this.db = db2;
+        console.timeEnd("[PERF] Database initialization");
+        console.log(`\u2705 Database initialized in ${Date.now() - startTime}ms`);
         this.dailyAssignments = /* @__PURE__ */ new Map();
+        this.saintBonusCache = /* @__PURE__ */ new Map();
         logger.info(`Iniciando gera\xE7\xE3o ${isPreview ? "de preview" : "definitiva"} de escalas para ${month}/${year}`);
-        console.log(`[SCHEDULE_GEN] Starting generation for ${month}/${year}, preview: ${isPreview}`);
-        console.log(`[SCHEDULE_GEN] Database status:`, { hasDb: !!this.db, nodeEnv: process.env.NODE_ENV });
         try {
-          console.log(`[SCHEDULE_GEN] Step 1: Loading ministers data...`);
+          console.time("[PERF] Step 1: Load ministers");
+          console.log(`
+[STEP 1] \u{1F4CB} Loading ministers data...`);
           await this.loadMinistersData();
-          console.log(`[SCHEDULE_GEN] Ministers loaded: ${this.ministers.length}`);
-          console.log(`[SCHEDULE_GEN] Step 2: Loading availability data...`);
+          console.timeEnd("[PERF] Step 1: Load ministers");
+          console.log(`
+[VALIDATION] Ministers loaded:`, {
+            count: this.ministers.length,
+            hasData: this.ministers.length > 0,
+            sample: this.ministers.slice(0, 3).map((m) => ({ id: m.id, name: m.name, role: m.role }))
+          });
+          if (!this.ministers || this.ministers.length === 0) {
+            const error = new Error("\u274C CRITICAL: No ministers found in database! Cannot generate schedules without ministers.");
+            console.error(`
+${"!".repeat(60)}`);
+            console.error(error.message);
+            console.error(`${"!".repeat(60)}
+`);
+            throw error;
+          }
+          console.time("[PERF] Step 2: Load availability");
+          console.log(`
+[STEP 2] \u{1F4DD} Loading availability/questionnaire data for ${month}/${year}...`);
           await this.loadAvailabilityData(year, month, isPreview);
-          console.log(`[SCHEDULE_GEN] Availability data loaded: ${this.availabilityData.size} entries`);
-          console.log(`[SCHEDULE_GEN] Step 3: Loading mass times config...`);
+          console.timeEnd("[PERF] Step 2: Load availability");
+          console.log(`
+[VALIDATION] Questionnaire responses loaded:`, {
+            count: this.availabilityData.size,
+            hasData: this.availabilityData.size > 0,
+            ministerIds: Array.from(this.availabilityData.keys()).slice(0, 5)
+          });
+          if (!this.availabilityData || this.availabilityData.size === 0) {
+            const warning = `\u26A0\uFE0F  WARNING: No questionnaire responses found for ${month}/${year}! Schedules will use default availability.`;
+            console.warn(`
+${warning}`);
+            if (!isPreview) {
+              const error = new Error(`\u274C CRITICAL: No questionnaire responses for ${month}/${year}. Cannot generate final schedules without responses!`);
+              console.error(`
+${"!".repeat(60)}`);
+              console.error(error.message);
+              console.error(`${"!".repeat(60)}
+`);
+              throw error;
+            }
+          }
+          console.time("[PERF] Step 3: Load mass times config");
+          console.log(`
+[STEP 3] \u26EA Loading mass times configuration...`);
           await this.loadMassTimesConfig();
-          console.log(`[SCHEDULE_GEN] Mass times config loaded: ${this.massTimes.length} times`);
+          console.timeEnd("[PERF] Step 3: Load mass times config");
+          console.log(`
+[VALIDATION] Mass times config:`, {
+            count: this.massTimes.length,
+            hasData: this.massTimes.length > 0,
+            sample: this.massTimes.slice(0, 2)
+          });
+          if (!this.massTimes || this.massTimes.length === 0) {
+            const error = new Error("\u274C CRITICAL: No mass times configuration found! Cannot generate schedules without mass config.");
+            console.error(`
+${"!".repeat(60)}`);
+            console.error(error.message);
+            console.error(`${"!".repeat(60)}
+`);
+            throw error;
+          }
+          console.time("[PERF] Generate monthly mass times");
+          console.log(`
+[STEP 4] \u{1F4C5} Generating monthly mass times for ${month}/${year}...`);
           const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
-          console.log(`[SCHEDULE_GEN] Generated ${monthlyMassTimes.length} mass times for the month`);
+          console.timeEnd("[PERF] Generate monthly mass times");
+          console.log(`
+[VALIDATION] Monthly masses generated:`, {
+            count: monthlyMassTimes.length,
+            types: [...new Set(monthlyMassTimes.map((m) => m.type))],
+            dateRange: monthlyMassTimes.length > 0 ? {
+              first: monthlyMassTimes[0]?.date,
+              last: monthlyMassTimes[monthlyMassTimes.length - 1]?.date
+            } : null
+          });
+          if (!monthlyMassTimes || monthlyMassTimes.length === 0) {
+            const error = new Error(`\u274C CRITICAL: Failed to generate monthly mass times for ${month}/${year}!`);
+            console.error(`
+${"!".repeat(60)}`);
+            console.error(error.message);
+            console.error(`${"!".repeat(60)}
+`);
+            throw error;
+          }
+          if (month === 10) {
+            console.log(`
+[SCHEDULE_GEN] \u{1F50D} Validating October mass schedule...`);
+            printOctoberScheduleComparison(monthlyMassTimes, year);
+            const isValid = validateAndLogOctoberMasses(monthlyMassTimes, year);
+            if (!isValid) {
+              console.log(`[SCHEDULE_GEN] \u26A0\uFE0F October validation found errors, but continuing with generation...`);
+            }
+          }
+          console.time("[PERF] Load all saints data");
+          this.saintsData = await loadAllSaintsData();
+          console.timeEnd("[PERF] Load all saints data");
+          console.time("[PERF] Pre-calculate saint bonuses");
+          console.log(`[SCHEDULE_GEN] Step 2.6: Pre-calculating saint name bonuses...`);
+          await this.preCalculateSaintBonuses(monthlyMassTimes);
+          console.timeEnd("[PERF] Pre-calculate saint bonuses");
+          console.log(`[SCHEDULE_GEN] Saint bonuses calculated: ${this.saintBonusCache.size} entries`);
+          console.time("[PERF] Algorithm distribution");
           const generatedSchedules = [];
           for (const massTime of monthlyMassTimes) {
             const schedule = await this.generateScheduleForMass(massTime);
             generatedSchedules.push(schedule);
           }
+          console.timeEnd("[PERF] Algorithm distribution");
+          console.time("[PERF] Analyze incomplete schedules");
           const incompleteSchedules = generatedSchedules.filter(
             (s) => s.ministers.length < s.massTime.minMinisters
           );
+          console.timeEnd("[PERF] Analyze incomplete schedules");
           if (incompleteSchedules.length > 0) {
             console.log(`
 [SCHEDULE_GEN] \u26A0\uFE0F ATEN\xC7\xC3O: ${incompleteSchedules.length} escalas incompletas detectadas:`);
@@ -1527,14 +2144,92 @@ var init_scheduleGenerator = __esm({
           } else {
             console.log(`[SCHEDULE_GEN] \u2705 Todas as escalas atingiram o n\xFAmero m\xEDnimo de ministros!`);
           }
-          logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year}`);
+          console.timeEnd("[PERF] Total generation time");
+          const totalTime = Date.now() - startTime;
+          console.log(`
+${"=".repeat(60)}`);
+          console.log(`=== \u2705 GENERATION SUCCESS ===`);
+          console.log(`${"=".repeat(60)}`);
+          console.log(`Month/Year: ${month}/${year}`);
+          console.log(`Total Time: ${totalTime}ms (${(totalTime / 1e3).toFixed(2)}s)`);
+          console.log(`Target: <5000ms | Status: ${totalTime < 5e3 ? "\u2705 PASS" : "\u26A0\uFE0F  SLOW"}`);
+          console.log(`
+\u{1F4CA} DATA SUMMARY:`);
+          console.log(`  Ministers loaded: ${this.ministers.length}`);
+          console.log(`  Questionnaire responses: ${this.availabilityData.size}`);
+          console.log(`  Mass times config: ${this.massTimes.length}`);
+          console.log(`  Monthly masses generated: ${monthlyMassTimes?.length || 0}`);
+          console.log(`  Schedules generated: ${generatedSchedules.length}`);
+          console.log(`  Incomplete schedules: ${incompleteSchedules?.length || 0}`);
+          console.log(`  Saint bonuses calculated: ${this.saintBonusCache.size}`);
+          console.log(`
+\u{1F3AF} FAIRNESS REPORT:`);
+          const distributionMap = /* @__PURE__ */ new Map();
+          this.ministers.forEach((m) => {
+            const count7 = m.monthlyAssignmentCount || 0;
+            if (!distributionMap.has(count7)) {
+              distributionMap.set(count7, []);
+            }
+            distributionMap.get(count7).push(m);
+          });
+          console.log(`  Assignment Distribution:`);
+          for (let i = 0; i <= 4; i++) {
+            const ministersWithCount = distributionMap.get(i) || [];
+            const percentage = (ministersWithCount.length / this.ministers.length * 100).toFixed(1);
+            console.log(`    ${i} assignments: ${ministersWithCount.length} ministers (${percentage}%)`);
+          }
+          const unused = distributionMap.get(0) || [];
+          const maxUsed = distributionMap.get(4) || [];
+          const fairnessScore = ((this.ministers.length - unused.length) / this.ministers.length * 100).toFixed(1);
+          console.log(`
+  Fairness Metrics:`);
+          console.log(`    \u2705 Unused ministers: ${unused.length}/${this.ministers.length} (${(unused.length / this.ministers.length * 100).toFixed(1)}%)`);
+          console.log(`    \u2705 Ministers at max (4): ${maxUsed.length}/${this.ministers.length}`);
+          console.log(`    \u2705 Fairness score: ${fairnessScore}% (${100 - unused.length / this.ministers.length * 100 > 70 ? "PASS" : "FAIL"})`);
+          const bugsFound = [];
+          const ministersOver4 = this.ministers.filter((m) => (m.monthlyAssignmentCount || 0) > 4);
+          if (ministersOver4.length > 0) {
+            bugsFound.push(`\u274C ${ministersOver4.length} ministers served MORE than 4 times!`);
+          }
+          if (unused.length > this.ministers.length * 0.5) {
+            bugsFound.push(`\u274C More than 50% unused (${unused.length}/${this.ministers.length})`);
+          }
+          if (bugsFound.length > 0) {
+            console.log(`
+  \u{1F6A8} BUGS DETECTED:`);
+            bugsFound.forEach((bug) => console.log(`    ${bug}`));
+          } else {
+            console.log(`
+  \u2705 NO CRITICAL BUGS DETECTED!`);
+          }
+          console.log(`${"=".repeat(60)}
+`);
+          logger.info(`Geradas ${generatedSchedules.length} escalas para ${month}/${year} em ${totalTime}ms`);
           return generatedSchedules;
         } catch (error) {
-          console.error(`[SCHEDULE_GEN] \u274C ERRO DETALHADO NO MAIN FUNCTION:`, error);
-          console.error(`[SCHEDULE_GEN] \u274C ERROR TYPE:`, typeof error);
-          console.error(`[SCHEDULE_GEN] \u274C ERROR NAME:`, error?.name);
-          console.error(`[SCHEDULE_GEN] \u274C ERROR MESSAGE:`, error?.message);
-          console.error(`[SCHEDULE_GEN] \u274C ERROR STACK:`, error?.stack);
+          const totalTime = Date.now() - startTime;
+          console.log(`
+${"!".repeat(60)}`);
+          console.log(`=== \u274C GENERATION FAILED ===`);
+          console.log(`${"!".repeat(60)}`);
+          console.log(`Month/Year: ${month}/${year}`);
+          console.log(`Failed After: ${totalTime}ms (${(totalTime / 1e3).toFixed(2)}s)`);
+          console.log(`
+\u{1F50D} ERROR DETAILS:`);
+          console.log(`  Type: ${typeof error}`);
+          console.log(`  Name: ${error?.name || "Unknown"}`);
+          console.log(`  Message: ${error?.message || "No message"}`);
+          console.log(`
+\u{1F4CA} DATA STATE WHEN FAILED:`);
+          console.log(`  Ministers loaded: ${this.ministers?.length || 0}`);
+          console.log(`  Questionnaire responses: ${this.availabilityData?.size || 0}`);
+          console.log(`  Mass times config: ${this.massTimes?.length || 0}`);
+          console.log(`
+\u{1F4DA} STACK TRACE:`);
+          console.log(error?.stack || "No stack trace available");
+          console.log(`${"!".repeat(60)}
+`);
+          console.timeEnd("[PERF] Total generation time");
           logger.error("Erro ao gerar escalas autom\xE1ticas:", error);
           throw error;
         }
@@ -1551,11 +2246,11 @@ var init_scheduleGenerator = __esm({
           logger.warn("Database n\xE3o dispon\xEDvel, criando dados mock para preview em desenvolvimento");
           console.log("[SCHEDULE_GEN] Creating mock ministers data for development preview only");
           this.ministers = [
-            { id: "1", name: "Jo\xE3o Silva", role: "ministro", totalServices: 5, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7 },
-            { id: "2", name: "Maria Santos", role: "ministro", totalServices: 3, lastService: null, preferredTimes: ["08:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8 },
-            { id: "3", name: "Pedro Costa", role: "ministro", totalServices: 4, lastService: null, preferredTimes: ["19:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6 },
-            { id: "4", name: "Ana Lima", role: "ministro", totalServices: 2, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75 },
-            { id: "5", name: "Carlos Oliveira", role: "coordenador", totalServices: 6, lastService: null, preferredTimes: ["08:00", "10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9 }
+            { id: "1", name: "Jo\xE3o Silva", role: "ministro", totalServices: 5, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "2", name: "Maria Santos", role: "ministro", totalServices: 3, lastService: null, preferredTimes: ["08:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "3", name: "Pedro Costa", role: "ministro", totalServices: 4, lastService: null, preferredTimes: ["19:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "4", name: "Ana Lima", role: "ministro", totalServices: 2, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "5", name: "Carlos Oliveira", role: "coordenador", totalServices: 6, lastService: null, preferredTimes: ["08:00", "10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9, monthlyAssignmentCount: 0, lastAssignedDate: void 0 }
           ];
           return;
         }
@@ -1577,7 +2272,7 @@ var init_scheduleGenerator = __esm({
           }).from(users).where(
             and7(
               or5(
-                eq9(users.status, "active"),
+                eq10(users.status, "active"),
                 sql4`${users.status} IS NULL`
                 // Incluir usuários com status null
               ),
@@ -1597,8 +2292,12 @@ var init_scheduleGenerator = __esm({
           preferredTimes: m.preferredTimes || [],
           canServeAsCouple: m.canServeAsCouple || false,
           availabilityScore: this.calculateAvailabilityScore(m),
-          preferenceScore: this.calculatePreferenceScore(m)
+          preferenceScore: this.calculatePreferenceScore(m),
+          // 🔥 FAIR ALGORITHM: Initialize monthly counters
+          monthlyAssignmentCount: 0,
+          lastAssignedDate: void 0
         }));
+        console.log(`[FAIR_ALGORITHM] \u2705 Initialized ${this.ministers.length} ministers with monthlyAssignmentCount = 0`);
         logger.info(`Carregados ${this.ministers.length} ministros ativos`);
       }
       /**
@@ -1657,8 +2356,8 @@ var init_scheduleGenerator = __esm({
         const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
           and7(
-            eq9(questionnaires.month, month),
-            eq9(questionnaires.year, year)
+            eq10(questionnaires.month, month),
+            eq10(questionnaires.year, year)
           )
         ).limit(1);
         if (!targetQuestionnaire) {
@@ -1673,7 +2372,7 @@ var init_scheduleGenerator = __esm({
           }
           return;
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         responses.forEach((r, index2) => {
           let availableSundays = [];
@@ -1851,6 +2550,36 @@ var init_scheduleGenerator = __esm({
         return normalized;
       }
       /**
+       * Pré-calcula bônus de santo para todas as combinações ministro-data
+       * OPTIMIZED: Uses pre-loaded saints data to avoid database queries in loops
+       */
+      async preCalculateSaintBonuses(massTimes) {
+        const uniqueDates = /* @__PURE__ */ new Set();
+        for (const massTime of massTimes) {
+          if (massTime.date) {
+            uniqueDates.add(massTime.date);
+          }
+        }
+        console.log(`[SAINT_BONUS] Calculando b\xF4nus de santo para ${this.ministers.length} ministros \xD7 ${uniqueDates.size} datas...`);
+        console.log(`[SAINT_BONUS] \u{1F680} OPTIMIZATION: Using pre-loaded saints data (no DB queries in loops)`);
+        for (const minister of this.ministers) {
+          if (!minister.id || !minister.name) continue;
+          for (const date2 of uniqueDates) {
+            try {
+              const bonus = await calculateSaintNameMatchBonus(minister.name, date2, this.saintsData);
+              if (bonus > 0) {
+                const cacheKey = `${minister.id}:${date2}`;
+                this.saintBonusCache.set(cacheKey, bonus);
+                console.log(`[SAINT_BONUS] \u2B50 ${minister.name} em ${date2}: b\xF4nus ${bonus.toFixed(2)}`);
+              }
+            } catch (error) {
+              console.error(`[SAINT_BONUS] Erro ao calcular b\xF4nus para ${minister.name} em ${date2}:`, error);
+            }
+          }
+        }
+        console.log(`[SAINT_BONUS] \u2705 ${this.saintBonusCache.size} b\xF4nus de santo calculados`);
+      }
+      /**
        * Carrega configuração dos horários de missa
        */
       async loadMassTimesConfig() {
@@ -1864,7 +2593,7 @@ var init_scheduleGenerator = __esm({
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq9(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq10(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -1888,7 +2617,9 @@ var init_scheduleGenerator = __esm({
           const dayOfMonth = getDate(currentDate);
           const isDayOfSaintJudas = dayOfMonth === 28;
           console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING ${dateStr}: dayOfMonth=${dayOfMonth}, isDayOfSaintJudas=${isDayOfSaintJudas}, dayOfWeek=${dayOfWeek}`);
-          if (dayOfWeek >= 1 && dayOfWeek <= 6 && !isDayOfSaintJudas) {
+          const isRegularSaturday = dayOfWeek === 6;
+          const isOctoberNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+          if (dayOfWeek >= 1 && dayOfWeek <= 5 && !isDayOfSaintJudas && !isOctoberNovena) {
             monthlyTimes.push({
               id: `daily-${dateStr}`,
               dayOfWeek,
@@ -1903,7 +2634,10 @@ var init_scheduleGenerator = __esm({
             console.log(`[SCHEDULE_GEN] \u2705 Missa di\xE1ria adicionada: ${dateStr} 06:30 (5 ministros)`);
           } else if (isDayOfSaintJudas) {
             console.log(`[SCHEDULE_GEN] \u{1F6AB} Dia ${dateStr} \xE9 S\xE3o Judas - SUPRIMINDO missa di\xE1ria`);
-            console.log(`[SCHEDULE_GEN] \u{1F6AB} DEBUG: dayOfWeek=${dayOfWeek}, isDayOfSaintJudas=${isDayOfSaintJudas}`);
+          } else if (isRegularSaturday) {
+            console.log(`[SCHEDULE_GEN] \u{1F6AB} S\xE1bado regular ${dateStr} - SEM missa di\xE1ria (apenas 1\xBA s\xE1bado tem missa)`);
+          } else if (isOctoberNovena) {
+            console.log(`[SCHEDULE_GEN] \u{1F6AB} Dia de novena ${dateStr} - SEM missa da manh\xE3 (apenas novena \xE0 noite)`);
           }
           if (dayOfWeek === 0) {
             const sundayConfigs = [
@@ -2161,14 +2895,6 @@ var init_scheduleGenerator = __esm({
         console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
         const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);
         const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
-        const dateKey = massTime.date;
-        if (!this.dailyAssignments.has(dateKey)) {
-          this.dailyAssignments.set(dateKey, /* @__PURE__ */ new Set());
-        }
-        const dayAssignments = this.dailyAssignments.get(dateKey);
-        selectedMinisters.forEach((minister) => {
-          if (minister.id) dayAssignments.add(minister.id);
-        });
         console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros!");
         const ministersWithPositions = selectedMinisters.map((minister, index2) => {
           const ministerWithPosition = {
@@ -2256,9 +2982,9 @@ var init_scheduleGenerator = __esm({
                   parseInt(dateStr.split("/")[0]).toString()
                   // "5" ao invés de "05"
                 ];
-                for (const format4 of possibleFormats) {
+                for (const format9 of possibleFormats) {
                   if (availability.availableSundays.some(
-                    (sunday) => sunday.includes(format4) || sunday === format4
+                    (sunday) => sunday.includes(format9) || sunday === format9
                   )) {
                     availableForSunday = true;
                     break;
@@ -2393,68 +3119,106 @@ var init_scheduleGenerator = __esm({
         return false;
       }
       /**
-       * Seleciona ministros ideais usando algoritmo de pontuação
+       * 🔥 FAIR ALGORITHM: Seleciona ministros garantindo distribuição justa
+       * - Hard limit: 4 assignments per month
+       * - Prevents same minister serving twice on same day
+       * - Sorts by assignment count (least assigned first)
+       * - Ensures everyone gets at least 1 before anyone gets 3
        */
       selectOptimalMinisters(available, massTime) {
-        const scoredMinisters = available.map((minister) => ({
-          minister,
-          score: this.calculateMinisterScore(minister, massTime)
-        }));
-        scoredMinisters.sort((a, b) => b.score - a.score);
         const targetCount = massTime.minMinisters;
-        const availableCount = available.length;
-        if (availableCount < targetCount) {
-          logger.warn(`\u26A0\uFE0F ATEN\xC7\xC3O: Apenas ${availableCount} ministros dispon\xEDveis para ${massTime.date} ${massTime.time} (${massTime.type}), mas s\xE3o necess\xE1rios ${targetCount}`);
-          console.log(`[SCHEDULE_GEN] \u26A0\uFE0F INSUFICIENTE: ${availableCount}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
-        } else {
-          logger.info(`[SCHEDULE_GEN] \u2705 Selecionando ${targetCount} de ${availableCount} ministros dispon\xEDveis para ${massTime.date} ${massTime.time}`);
+        const MAX_MONTHLY_ASSIGNMENTS = 4;
+        console.log(`
+[FAIR_ALGORITHM] ========================================`);
+        console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
+        console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
+        console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
+        const eligible = available.filter((minister) => {
+          if (!minister.id) return false;
+          const assignmentCount = minister.monthlyAssignmentCount || 0;
+          const alreadyServedToday = minister.lastAssignedDate === massTime.date;
+          if (assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+            console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
+            return false;
+          }
+          if (alreadyServedToday) {
+            console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: ALREADY SERVED TODAY (${massTime.date})`);
+            return false;
+          }
+          console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+          return true;
+        });
+        console.log(`[FAIR_ALGORITHM] Eligible after filters: ${eligible.length}/${available.length}`);
+        if (eligible.length === 0) {
+          logger.error(`[FAIR_ALGORITHM] \u274C NO ELIGIBLE MINISTERS for ${massTime.date} ${massTime.time}!`);
+          return [];
         }
+        const sorted = [...eligible].sort((a, b) => {
+          const countA = a.monthlyAssignmentCount || 0;
+          const countB = b.monthlyAssignmentCount || 0;
+          if (countA !== countB) {
+            return countA - countB;
+          }
+          const lastServiceA = a.lastService ? a.lastService.getTime() : 0;
+          const lastServiceB = b.lastService ? b.lastService.getTime() : 0;
+          if (lastServiceA !== lastServiceB) {
+            return lastServiceA - lastServiceB;
+          }
+          return a.totalServices - b.totalServices;
+        });
+        console.log(`[FAIR_ALGORITHM] \u{1F4CA} Sorted by assignment count:`);
+        sorted.slice(0, 10).forEach((m) => {
+          console.log(`  ${m.name}: ${m.monthlyAssignmentCount || 0} assignments this month`);
+        });
         const selected = [];
         const used = /* @__PURE__ */ new Set();
-        for (const { minister } of scoredMinisters) {
+        for (const minister of sorted) {
           if (!minister.id) continue;
-          if (used.has(minister.id) || selected.length >= targetCount) {
+          if (selected.length >= targetCount) {
             break;
           }
-          if (minister.canServeAsCouple && minister.spouseMinisterId) {
-            const spouse = available.find((m) => m.id === minister.spouseMinisterId);
-            if (spouse && spouse.id && !used.has(spouse.id) && selected.length + 2 <= targetCount) {
-              selected.push(minister, spouse);
-              used.add(minister.id);
-              used.add(spouse.id);
-              logger.debug(`Escalado casal: ${minister.name} + ${spouse.name}`);
-              continue;
-            }
+          if (used.has(minister.id)) {
+            continue;
           }
           selected.push(minister);
           used.add(minister.id);
+          minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+          minister.lastAssignedDate = massTime.date;
+          console.log(`[FAIR_ALGORITHM] \u2705 Selected ${minister.name} (now ${minister.monthlyAssignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
         }
         if (selected.length < targetCount) {
-          logger.warn(`\u26A0\uFE0F [SCHEDULE_GEN] ESCALA INCOMPLETA: Apenas ${selected.length}/${targetCount} ministros para ${massTime.type} em ${massTime.date} ${massTime.time}`);
-          for (const { minister } of scoredMinisters) {
-            if (!minister.id) continue;
-            if (!used.has(minister.id) && selected.length < targetCount) {
-              selected.push(minister);
-              used.add(minister.id);
-            }
-            if (selected.length >= targetCount) break;
-          }
-          console.log(`[SCHEDULE_GEN] \u{1F6A8} MARCANDO ESCALA COMO INCOMPLETA: ${selected.length}/${targetCount} ministros`);
+          const shortage = targetCount - selected.length;
+          logger.warn(`\u26A0\uFE0F [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${shortage})`);
+          console.log(`[FAIR_ALGORITHM] \u26A0\uFE0F INCOMPLETE: ${selected.length}/${targetCount}`);
+          console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
           selected.forEach((m) => {
             m.scheduleIncomplete = true;
             m.requiredCount = targetCount;
             m.actualCount = selected.length;
           });
+        } else {
+          console.log(`[FAIR_ALGORITHM] \u2705 SUCCESS: Selected ${selected.length}/${targetCount} ministers`);
         }
-        logger.info(`[SCHEDULE_GEN] Selecionados ${selected.length}/${targetCount} ministros para ${massTime.date} ${massTime.time}`);
+        const distributionMap = /* @__PURE__ */ new Map();
+        this.ministers.forEach((m) => {
+          const count7 = m.monthlyAssignmentCount || 0;
+          distributionMap.set(count7, (distributionMap.get(count7) || 0) + 1);
+        });
+        console.log(`[FAIR_ALGORITHM] \u{1F4CA} Current monthly distribution:`);
+        for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
+          const ministersWithCount = distributionMap.get(i) || 0;
+          console.log(`  ${i} assignments: ${ministersWithCount} ministers`);
+        }
+        console.log(`[FAIR_ALGORITHM] ========================================
+`);
         return selected;
       }
       /**
        * Seleciona ministros de backup
        */
-      selectBackupMinisters(available, selected, count6) {
+      selectBackupMinisters(available, selected, count7) {
         const selectedIds = new Set(selected.map((m) => m.id).filter((id) => id !== null));
-        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count6);
+        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count7);
         return backup;
       }
       /**
@@ -2462,7 +3226,7 @@ var init_scheduleGenerator = __esm({
        */
       calculateMinisterScore(minister, massTime) {
         let score = 0;
-        const avgServices = this.ministers.reduce((sum, m) => sum + m.totalServices, 0) / this.ministers.length;
+        const avgServices = this.ministers.length > 0 ? this.ministers.reduce((sum, m) => sum + m.totalServices, 0) / this.ministers.length : 0;
         const serviceBalance = Math.max(0, avgServices - minister.totalServices);
         score += serviceBalance * 0.4;
         if (minister.lastService) {
@@ -2495,6 +3259,15 @@ var init_scheduleGenerator = __esm({
             console.log(`[SCHEDULE_GEN] \u26A0\uFE0F Penalidade aplicada a ${minister.name} - j\xE1 escalado hoje (${massTime.date})`);
           }
         }
+        if (massTime && massTime.date && minister.id) {
+          const cacheKey = `${minister.id}:${massTime.date}`;
+          const saintBonus = this.saintBonusCache.get(cacheKey) || 0;
+          if (saintBonus > 0) {
+            const bonusPoints = saintBonus * 0.2;
+            score += bonusPoints;
+            console.log(`[SCHEDULE_GEN] \u2B50 B\xF4nus de santo para ${minister.name} em ${massTime.date}: +${bonusPoints.toFixed(2)} (score total: ${score.toFixed(2)})`);
+          }
+        }
         return score;
       }
       /**
@@ -2502,7 +3275,7 @@ var init_scheduleGenerator = __esm({
        */
       calculateScheduleConfidence(ministers, massTime) {
         let confidence = 0;
-        const fillRate = ministers.length / massTime.minMinisters;
+        const fillRate = massTime.minMinisters > 0 ? ministers.length / massTime.minMinisters : 0;
         if (fillRate >= 1) {
           confidence += 0.6;
           if (ministers.length > massTime.minMinisters) {
@@ -2534,6 +3307,7 @@ var init_scheduleGenerator = __esm({
       }
       calculateServiceVariance(ministers) {
         const services = ministers.map((m) => m.totalServices);
+        if (services.length === 0) return 0;
         const avg2 = services.reduce((sum, s) => sum + s, 0) / services.length;
         const variance = services.reduce((sum, s) => sum + Math.pow(s - avg2, 2), 0) / services.length;
         return Math.sqrt(variance);
@@ -2546,9 +3320,1716 @@ var init_scheduleGenerator = __esm({
   }
 });
 
+// server/websocket.ts
+var websocket_exports = {};
+__export(websocket_exports, {
+  getWebSocketServer: () => getWebSocketServer,
+  initializeWebSocket: () => initializeWebSocket,
+  notifyCriticalMass: () => notifyCriticalMass,
+  notifySubstitutionRequest: () => notifySubstitutionRequest
+});
+import { WebSocketServer, WebSocket } from "ws";
+import { eq as eq18, and as and14, gte as gte7, lte as lte7, sql as sql10, or as or7 } from "drizzle-orm";
+import { format as format7, addDays as addDays4 } from "date-fns";
+function initializeWebSocket(httpServer) {
+  wss = new WebSocketServer({
+    server: httpServer,
+    path: "/ws"
+  });
+  wss.on("connection", (ws, req) => {
+    console.log("[WS] New WebSocket connection");
+    ws.isAlive = true;
+    clients.add(ws);
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
+    ws.on("message", async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        if (data.type === "AUTH") {
+          ws.userId = data.userId;
+          ws.userRole = data.userRole;
+          console.log(`[WS] Client authenticated: ${ws.userId} (${ws.userRole})`);
+          if (ws.userRole === "coordenador" || ws.userRole === "gestor") {
+            const alerts = await getCriticalAlerts();
+            ws.send(JSON.stringify({
+              type: "ALERT_UPDATE",
+              data: alerts,
+              timestamp: (/* @__PURE__ */ new Date()).toISOString()
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("[WS] Error processing message:", error);
+      }
+    });
+    ws.on("close", () => {
+      console.log("[WS] Client disconnected");
+      clients.delete(ws);
+    });
+    ws.on("error", (error) => {
+      console.error("[WS] WebSocket error:", error);
+      clients.delete(ws);
+    });
+  });
+  const heartbeatInterval = setInterval(() => {
+    wss?.clients.forEach((ws) => {
+      const client = ws;
+      if (client.isAlive === false) {
+        clients.delete(client);
+        return client.terminate();
+      }
+      client.isAlive = false;
+      client.ping();
+    });
+  }, 3e4);
+  wss.on("close", () => {
+    clearInterval(heartbeatInterval);
+  });
+  setInterval(async () => {
+    await broadcastCriticalAlerts();
+  }, 3e4);
+  console.log("[WS] WebSocket server initialized on /ws");
+  return wss;
+}
+async function getCriticalAlerts() {
+  const now = /* @__PURE__ */ new Date();
+  const next12Hours = addDays4(now, 0.5);
+  const next48Hours = addDays4(now, 2);
+  const criticalMasses = await db.select({
+    date: schedules.date,
+    time: schedules.time,
+    vacancies: sql10`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+  }).from(schedules).where(
+    and14(
+      gte7(schedules.date, format7(now, "yyyy-MM-dd")),
+      lte7(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
+    )
+  ).groupBy(schedules.date, schedules.time).having(sql10`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+  const criticalWithHours = criticalMasses.map((m) => ({
+    ...m,
+    hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1e3 * 60 * 60)),
+    massTime: m.time
+  }));
+  const urgentSubstitutions = await db.select({
+    id: substitutionRequests.id,
+    scheduleId: substitutionRequests.scheduleId,
+    requesterId: substitutionRequests.requesterId,
+    requesterName: users.name,
+    reason: substitutionRequests.reason,
+    status: substitutionRequests.status,
+    massDate: schedules.date,
+    massTime: schedules.time
+  }).from(substitutionRequests).innerJoin(users, eq18(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq18(substitutionRequests.scheduleId, schedules.id)).where(
+    and14(
+      or7(
+        eq18(substitutionRequests.status, "pending"),
+        eq18(substitutionRequests.status, "available")
+      ),
+      gte7(schedules.date, format7(now, "yyyy-MM-dd")),
+      lte7(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
+    )
+  ).orderBy(schedules.date);
+  return {
+    criticalMasses: criticalWithHours,
+    urgentSubstitutions: urgentSubstitutions.map((s) => ({
+      ...s,
+      hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1e3 * 60 * 60))
+    })),
+    totalCritical: criticalWithHours.length + urgentSubstitutions.length
+  };
+}
+async function broadcastCriticalAlerts() {
+  try {
+    const alerts = await getCriticalAlerts();
+    clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+        client.send(JSON.stringify({
+          type: "ALERT_UPDATE",
+          data: alerts,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      }
+    });
+  } catch (error) {
+    console.error("[WS] Error broadcasting critical alerts:", error);
+  }
+}
+function notifySubstitutionRequest(substitutionData) {
+  const message = {
+    type: "SUBSTITUTION_REQUEST",
+    data: substitutionData,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+      client.send(JSON.stringify(message));
+    }
+  });
+  console.log("[WS] Notified coordinators about new substitution request");
+}
+function notifyCriticalMass(massData) {
+  const message = {
+    type: "CRITICAL_MASS",
+    data: massData,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+      client.send(JSON.stringify(message));
+    }
+  });
+  console.log("[WS] Notified coordinators about critical mass");
+}
+function getWebSocketServer() {
+  return wss;
+}
+var wss, clients;
+var init_websocket = __esm({
+  async "server/websocket.ts"() {
+    "use strict";
+    await init_db();
+    init_schema();
+    wss = null;
+    clients = /* @__PURE__ */ new Set();
+  }
+});
+
+// server/seeds/formation-seed.ts
+var formation_seed_exports = {};
+__export(formation_seed_exports, {
+  default: () => formation_seed_default,
+  seedFormation: () => seedFormation
+});
+import { eq as eq21 } from "drizzle-orm";
+async function seedFormation() {
+  console.log("\u{1F331} Starting formation seed...");
+  try {
+    const tracks = [
+      {
+        id: "liturgy-track-1",
+        title: "Forma\xE7\xE3o Lit\xFArgica B\xE1sica",
+        description: "Fundamentos da liturgia eucar\xEDstica e orienta\xE7\xF5es pr\xE1ticas para Ministros Extraordin\xE1rios da Sagrada Comunh\xE3o",
+        category: "liturgia",
+        icon: "Cross",
+        orderIndex: 0,
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: "spirituality-track-1",
+        title: "Forma\xE7\xE3o Espiritual",
+        description: "Aprofundamento na espiritualidade eucar\xEDstica e na vida de ora\xE7\xE3o do ministro",
+        category: "espiritualidade",
+        icon: "Heart",
+        orderIndex: 1,
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    ];
+    console.log("\u{1F4DA} Inserting tracks...");
+    for (const track of tracks) {
+      const existing = await db.select().from(formationTracks).where(eq21(formationTracks.id, track.id)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(formationTracks).values(track);
+        console.log(`  \u2713 Created track: ${track.title}`);
+      } else {
+        console.log(`  \u2937 Track already exists: ${track.title}`);
+      }
+    }
+    console.log("\n\u{1F4D6} Creating Liturgy Track modules and lessons...");
+    const liturgyModule1 = {
+      trackId: "liturgy-track-1",
+      title: "A Eucaristia na Igreja",
+      description: "Fundamentos teol\xF3gicos e hist\xF3ricos da celebra\xE7\xE3o eucar\xEDstica",
+      category: "liturgia",
+      orderIndex: 0,
+      estimatedDuration: 90,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [module1] = await db.insert(formationModules).values(liturgyModule1).onConflictDoNothing().returning();
+    if (module1) {
+      console.log(`  \u2713 Module 1: ${liturgyModule1.title}`);
+      const [lesson1_1] = await db.insert(formationLessons).values({
+        moduleId: module1.id,
+        trackId: "liturgy-track-1",
+        title: "O Sacramento da Eucaristia",
+        description: "Compreendendo a Eucaristia como fonte e \xE1pice da vida crist\xE3",
+        lessonNumber: 1,
+        durationMinutes: 30,
+        orderIndex: 0,
+        objectives: [
+          "Compreender o significado teol\xF3gico da Eucaristia",
+          "Reconhecer a Eucaristia como memorial da P\xE1scoa de Cristo",
+          "Valorizar a presen\xE7a real de Cristo no Sacramento"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson1_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson1_1.id,
+            type: "text",
+            title: "Introdu\xE7\xE3o",
+            content: `A Eucaristia \xE9 o sacramento central da vida crist\xE3. Como ensina o Catecismo da Igreja Cat\xF3lica (CIC 1324): "A Eucaristia \xE9 fonte e \xE1pice de toda a vida crist\xE3".
+
+Neste sacramento, Jesus Cristo se faz presente de modo \xFAnico e especial, oferecendo-se ao Pai em sacrif\xEDcio e dando-se a n\xF3s como alimento espiritual.`,
+            orderIndex: 0,
+            estimatedMinutes: 5,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_1.id,
+            type: "text",
+            title: "A Institui\xE7\xE3o da Eucaristia",
+            content: `Na \xFAltima ceia, Jesus instituiu a Eucaristia dizendo: "Isto \xE9 o meu corpo que \xE9 dado por v\xF3s; fazei isto em mem\xF3ria de mim" (Lc 22,19).
+
+A Eucaristia \xE9 memorial da P\xE1scoa de Cristo, ou seja, torna presente e atual o sacrif\xEDcio \xFAnico de Cristo na cruz. N\xE3o \xE9 uma simples lembran\xE7a, mas uma presen\xE7a real e eficaz.`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_1.id,
+            type: "text",
+            title: "A Presen\xE7a Real",
+            content: `A Igreja professa a f\xE9 na presen\xE7a real de Cristo na Eucaristia. Pelo poder do Esp\xEDrito Santo e pelas palavras de Cristo, o p\xE3o e o vinho se tornam verdadeiramente o Corpo e o Sangue de Cristo.
+
+Esta transforma\xE7\xE3o \xE9 chamada de "transubstancia\xE7\xE3o". O Conc\xEDlio de Trento afirma que Cristo est\xE1 presente "verdadeira, real e substancialmente" na Eucaristia.`,
+            orderIndex: 2,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_1.id,
+            type: "text",
+            title: "Reflex\xE3o Final",
+            content: `Como Ministros Extraordin\xE1rios da Sagrada Comunh\xE3o, somos chamados a servir com profunda rever\xEAncia, reconhecendo que tocamos e distribu\xEDmos o Corpo de Cristo.
+
+Nossa f\xE9 na presen\xE7a real deve se manifestar em nossos gestos, palavras e atitudes durante o servi\xE7o lit\xFArgico.`,
+            orderIndex: 3,
+            estimatedMinutes: 5,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.1: ${lesson1_1.title} (4 sections)`);
+      }
+      const [lesson1_2] = await db.insert(formationLessons).values({
+        moduleId: module1.id,
+        trackId: "liturgy-track-1",
+        title: "A Celebra\xE7\xE3o Eucar\xEDstica",
+        description: "Estrutura e partes da Santa Missa",
+        lessonNumber: 2,
+        durationMinutes: 35,
+        orderIndex: 1,
+        objectives: [
+          "Conhecer a estrutura da celebra\xE7\xE3o eucar\xEDstica",
+          "Compreender o significado de cada parte da Missa",
+          "Identificar os momentos principais da liturgia"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson1_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson1_2.id,
+            type: "text",
+            title: "As Duas Grandes Partes da Missa",
+            content: `A celebra\xE7\xE3o eucar\xEDstica possui duas grandes partes que formam um \xFAnico ato de culto:
+
+1. **Liturgia da Palavra**: Onde Deus fala ao seu povo e Cristo anuncia o Evangelho
+2. **Liturgia Eucar\xEDstica**: Onde o povo oferece o p\xE3o e o vinho que se tornam o Corpo e Sangue de Cristo
+
+Estas duas partes s\xE3o t\xE3o intimamente ligadas que constituem um s\xF3 ato de culto (IGMR 28).`,
+            orderIndex: 0,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_2.id,
+            type: "text",
+            title: "Ritos Iniciais",
+            content: `Os ritos iniciais preparam a assembleia para ouvir a Palavra e celebrar a Eucaristia:
+
+- **Entrada**: Canto e prociss\xE3o
+- **Sauda\xE7\xE3o**: O sacerdote sa\xFAda o povo
+- **Ato Penitencial**: Reconhecemos nossos pecados
+- **Gl\xF3ria**: Hino de louvor (exceto Advento e Quaresma)
+- **Ora\xE7\xE3o do Dia**: Coleta que une as inten\xE7\xF5es do povo`,
+            orderIndex: 1,
+            estimatedMinutes: 7,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_2.id,
+            type: "text",
+            title: "Liturgia da Palavra",
+            content: `Na Liturgia da Palavra, Deus fala ao seu povo:
+
+- **Primeira Leitura**: Geralmente do Antigo Testamento
+- **Salmo Responsorial**: Resposta orante \xE0 Palavra
+- **Segunda Leitura**: Das cartas apost\xF3licas (domingos e solenidades)
+- **Evangelho**: Ponto alto da Liturgia da Palavra
+- **Homilia**: Explica\xE7\xE3o das leituras
+- **Profiss\xE3o de F\xE9**: Credo
+- **Ora\xE7\xE3o dos Fi\xE9is**: Preces pela Igreja e pelo mundo`,
+            orderIndex: 2,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_2.id,
+            type: "text",
+            title: "Liturgia Eucar\xEDstica e Ritos Finais",
+            content: `**Liturgia Eucar\xEDstica:**
+- **Prepara\xE7\xE3o das Oferendas**: Apresenta\xE7\xE3o do p\xE3o e vinho
+- **Ora\xE7\xE3o Eucar\xEDstica**: Consagra\xE7\xE3o - momento central da Missa
+- **Rito da Comunh\xE3o**: Pai Nosso, sinal da paz, fra\xE7\xE3o do p\xE3o, comunh\xE3o
+
+**Ritos Finais:**
+- **Avisos**: Comunica\xE7\xF5es \xE0 assembleia
+- **B\xEAn\xE7\xE3o**: Sacerdote aben\xE7oa o povo
+- **Despedida**: "Ide em paz"
+
+Como ministros, participamos especialmente do Rito da Comunh\xE3o.`,
+            orderIndex: 3,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.2: ${lesson1_2.title} (4 sections)`);
+      }
+      const [lesson1_3] = await db.insert(formationLessons).values({
+        moduleId: module1.id,
+        trackId: "liturgy-track-1",
+        title: "Formas de Receber a Comunh\xE3o",
+        description: "Hist\xF3ria e orienta\xE7\xF5es sobre as formas de distribui\xE7\xE3o da Sagrada Comunh\xE3o",
+        lessonNumber: 3,
+        durationMinutes: 25,
+        orderIndex: 2,
+        objectives: [
+          "Conhecer a hist\xF3ria das formas de comunh\xE3o",
+          "Compreender as normas atuais da Igreja",
+          "Respeitar as diferentes formas de piedade dos fi\xE9is"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson1_3) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson1_3.id,
+            type: "text",
+            title: "Perspectiva Hist\xF3rica",
+            content: `Ao longo da hist\xF3ria da Igreja, a forma de receber a comunh\xE3o passou por diferentes pr\xE1ticas:
+
+- **Primeiros s\xE9culos**: A comunh\xE3o era recebida na m\xE3o, com grande rever\xEAncia
+- **Idade M\xE9dia**: Estabeleceu-se a pr\xE1tica da comunh\xE3o na boca
+- **P\xF3s-Vaticano II**: A Igreja permitiu novamente a comunh\xE3o na m\xE3o em algumas regi\xF5es
+
+Ambas as formas s\xE3o leg\xEDtimas e expressam a f\xE9 na presen\xE7a real de Cristo.`,
+            orderIndex: 0,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_3.id,
+            type: "text",
+            title: "Normas Atuais",
+            content: `A Instru\xE7\xE3o Redemptionis Sacramentum estabelece:
+
+**Comunh\xE3o na Boca:**
+- Forma tradicional
+- O fiel inclina a cabe\xE7a
+- O ministro coloca a h\xF3stia diretamente na l\xEDngua
+
+**Comunh\xE3o na M\xE3o:**
+- Permitida onde aprovada pela Confer\xEAncia Episcopal
+- O fiel estende as m\xE3os (uma sobre a outra)
+- Recebe a h\xF3stia e a leva \xE0 boca imediatamente
+- As m\xE3os devem estar limpas e dignas
+
+O fiel tem o direito de escolher a forma de receber a comunh\xE3o.`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson1_3.id,
+            type: "text",
+            title: "Atitude do Ministro",
+            content: `Como ministros, devemos:
+
+1. **Respeitar**: A escolha de cada fiel sobre como receber a comunh\xE3o
+2. **Estar preparados**: Para distribuir de ambas as formas com igual rever\xEAncia
+3. **Evitar julgamentos**: N\xE3o cabe a n\xF3s julgar a piedade alheia
+4. **Manter rever\xEAncia**: Em ambos os modos de distribui\xE7\xE3o
+5. **Seguir as normas**: Da diocese e da par\xF3quia
+
+Nossa atitude deve sempre refletir a f\xE9 na presen\xE7a real de Cristo.`,
+            orderIndex: 2,
+            estimatedMinutes: 7,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.3: ${lesson1_3.title} (3 sections)`);
+      }
+    }
+    const liturgyModule2 = {
+      trackId: "liturgy-track-1",
+      title: "O Ministro Extraordin\xE1rio da Sagrada Comunh\xE3o",
+      description: "Identidade, miss\xE3o e espiritualidade do ministro",
+      category: "liturgia",
+      orderIndex: 1,
+      estimatedDuration: 75,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [module2] = await db.insert(formationModules).values(liturgyModule2).onConflictDoNothing().returning();
+    if (module2) {
+      console.log(`  \u2713 Module 2: ${liturgyModule2.title}`);
+      const [lesson2_1] = await db.insert(formationLessons).values({
+        moduleId: module2.id,
+        trackId: "liturgy-track-1",
+        title: "Voca\xE7\xE3o e Miss\xE3o do Ministro",
+        description: "Compreendendo o chamado para o servi\xE7o eucar\xEDstico",
+        lessonNumber: 1,
+        durationMinutes: 30,
+        orderIndex: 0,
+        objectives: [
+          "Reconhecer o minist\xE9rio como voca\xE7\xE3o",
+          "Compreender a miss\xE3o do ministro extraordin\xE1rio",
+          "Identificar as qualidades necess\xE1rias para o servi\xE7o"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson2_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson2_1.id,
+            type: "text",
+            title: "Um Chamado Especial",
+            content: `O minist\xE9rio extraordin\xE1rio da Sagrada Comunh\xE3o \xE9 um verdadeiro chamado de Deus. N\xE3o se trata apenas de uma fun\xE7\xE3o pr\xE1tica, mas de uma voca\xE7\xE3o ao servi\xE7o do Corpo de Cristo.
+
+S\xE3o Paulo nos ensina: "Cada um exer\xE7a, em benef\xEDcio dos outros, o dom que recebeu, como bons administradores da multiforme gra\xE7a de Deus" (1Pd 4,10).
+
+Este minist\xE9rio exige:
+- F\xE9 profunda na presen\xE7a real de Cristo
+- Vida sacramental intensa
+- Testemunho de vida crist\xE3
+- Disponibilidade para servir`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson2_1.id,
+            type: "text",
+            title: "A Miss\xE3o do Ministro",
+            content: `**Fun\xE7\xF5es principais:**
+
+1. **Durante a Missa:**
+   - Auxiliar na distribui\xE7\xE3o da Sagrada Comunh\xE3o
+   - Servir o Corpo e Sangue de Cristo aos fi\xE9is
+
+2. **Fora da Missa:**
+   - Levar a comunh\xE3o aos enfermos e impossibilitados
+   - Realizar celebra\xE7\xF5es dominicais sem presb\xEDtero (quando autorizado)
+   - Expor o Sant\xEDssimo Sacramento para adora\xE7\xE3o (com autoriza\xE7\xE3o)
+
+**Car\xE1ter extraordin\xE1rio:**
+Este minist\xE9rio \xE9 "extraordin\xE1rio" porque complementa o minist\xE9rio ordin\xE1rio do bispo, presb\xEDtero e di\xE1cono. \xC9 exercido em casos de necessidade pastoral.`,
+            orderIndex: 1,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson2_1.id,
+            type: "text",
+            title: "Qualidades Necess\xE1rias",
+            content: `O C\xF3digo de Direito Can\xF4nico (c\xE2n. 910) e as orienta\xE7\xF5es lit\xFArgicas estabelecem que o ministro deve:
+
+**Requisitos b\xE1sicos:**
+- Ser cat\xF3lico praticante
+- Estar em estado de gra\xE7a
+- Ter idade m\xEDnima (geralmente 16 anos)
+- Ter recebido os sacramentos da inicia\xE7\xE3o crist\xE3
+
+**Qualidades espirituais:**
+- F\xE9 viva na Eucaristia
+- Vida de ora\xE7\xE3o constante
+- Participa\xE7\xE3o dominical na Missa
+- Testemunho de vida crist\xE3
+
+**Qualidades humanas:**
+- Maturidade e equil\xEDbrio
+- Discri\xE7\xE3o e prud\xEAncia
+- Pontualidade e responsabilidade
+- Esp\xEDrito de servi\xE7o
+
+**Forma\xE7\xE3o cont\xEDnua:**
+O ministro deve buscar forma\xE7\xE3o permanente em liturgia, espiritualidade e doutrina cat\xF3lica.`,
+            orderIndex: 2,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 2.1: ${lesson2_1.title} (3 sections)`);
+      }
+      const [lesson2_2] = await db.insert(formationLessons).values({
+        moduleId: module2.id,
+        trackId: "liturgy-track-1",
+        title: "Procedimentos Lit\xFArgicos Pr\xE1ticos",
+        description: "Como realizar o minist\xE9rio com rever\xEAncia e corre\xE7\xE3o",
+        lessonNumber: 2,
+        durationMinutes: 45,
+        orderIndex: 1,
+        objectives: [
+          "Conhecer os procedimentos corretos para distribuir a comunh\xE3o",
+          "Aprender a postura e gestos adequados",
+          "Saber lidar com situa\xE7\xF5es especiais"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson2_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson2_2.id,
+            type: "text",
+            title: "Prepara\xE7\xE3o Antes da Missa",
+            content: `**Prepara\xE7\xE3o pessoal:**
+- Chegar com anteced\xEAncia (15-20 minutos)
+- Fazer uma ora\xE7\xE3o preparat\xF3ria
+- Verificar a escala e seu posicionamento
+- Estar em estado de gra\xE7a (confiss\xE3o recente)
+- Vestir-se adequadamente com dignidade
+
+**Prepara\xE7\xE3o pr\xE1tica:**
+- Higienizar bem as m\xE3os
+- Verificar se h\xE1 \xE1gua e toalha dispon\xEDveis
+- Conhecer o n\xFAmero aproximado de comungantes
+- Identificar qualquer orienta\xE7\xE3o especial do dia`,
+            orderIndex: 0,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson2_2.id,
+            type: "text",
+            title: "Durante a Distribui\xE7\xE3o da Comunh\xE3o",
+            content: `**Momento de aproxima\xE7\xE3o ao altar:**
+- Aguardar o sinal do sacerdote
+- Aproximar-se com rever\xEAncia
+- Fazer genuflex\xE3o antes de subir ao altar
+- Receber a \xE2mbula ou o c\xE1lice das m\xE3os do sacerdote
+
+**F\xF3rmula sacramental:**
+Ao apresentar a h\xF3stia a cada fiel, dizer claramente:
+"O Corpo de Cristo"
+
+O fiel responde: "Am\xE9m"
+
+Esta resposta n\xE3o \xE9 uma mera formalidade, mas uma profiss\xE3o de f\xE9 na presen\xE7a real.
+
+**Postura:**
+- Manter postura reverente e digna
+- Olhar cada comungante nos olhos
+- Aguardar a resposta "Am\xE9m" antes de depositar a h\xF3stia
+- Manter aten\xE7\xE3o e cuidado com cada part\xEDcula
+- Se uma h\xF3stia cair, recolh\xEA-la imediatamente com rever\xEAncia`,
+            orderIndex: 1,
+            estimatedMinutes: 15,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson2_2.id,
+            type: "text",
+            title: "Distribuindo a Comunh\xE3o na Boca e na M\xE3o",
+            content: `**Na boca:**
+1. Segurar a h\xF3stia entre o polegar e o indicador
+2. Aguardar que o fiel incline a cabe\xE7a e abra a boca
+3. Colocar a h\xF3stia delicadamente sobre a l\xEDngua
+4. Evitar tocar os l\xE1bios ou l\xEDngua do fiel
+
+**Na m\xE3o:**
+1. O fiel deve estender as m\xE3os (uma sobre a outra)
+2. Colocar a h\xF3stia com rever\xEAncia sobre a palma da m\xE3o
+3. Observar discretamente se o fiel leva a h\xF3stia \xE0 boca imediatamente
+4. Caso note algo irregular, informar discretamente o sacerdote ap\xF3s a Missa
+
+**Aten\xE7\xE3o especial:**
+- Crian\xE7as: Verificar se j\xE1 fizeram primeira comunh\xE3o
+- Quem se aproxima de bra\xE7os cruzados: Dar a b\xEAn\xE7\xE3o ("Que Deus te aben\xE7oe")
+- Cel\xEDacos: Podem existir h\xF3stias especiais dispon\xEDveis`,
+            orderIndex: 2,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson2_2.id,
+            type: "text",
+            title: "Ap\xF3s a Distribui\xE7\xE3o",
+            content: `**Purifica\xE7\xE3o dos vasos:**
+- Retornar ao altar com rever\xEAncia
+- Se houver h\xF3stias restantes, entregar ao sacerdote ou di\xE1cono
+- Se for o c\xE1lice, o sacerdote ou di\xE1cono far\xE1 a purifica\xE7\xE3o
+- Nunca deixar part\xEDculas na \xE2mbula - consumi-las com rever\xEAncia
+
+**Retorno ao lugar:**
+- Fazer genuflex\xE3o ao Sant\xEDssimo
+- Retornar ao seu lugar
+- Fazer uma a\xE7\xE3o de gra\xE7as pessoal
+
+**P\xF3s-Missa:**
+- Ajudar na arruma\xE7\xE3o se necess\xE1rio
+- Fazer uma ora\xE7\xE3o de agradecimento
+- Lavar as m\xE3os se tiver tocado as esp\xE9cies
+
+**Lembrete importante:**
+Ap\xF3s distribuir a comunh\xE3o, recomenda-se n\xE3o comer nem beber nada por 15 minutos, como sinal de rever\xEAncia.`,
+            orderIndex: 3,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 2.2: ${lesson2_2.title} (4 sections)`);
+      }
+    }
+    const liturgyModule3 = {
+      trackId: "liturgy-track-1",
+      title: "Espiritualidade Eucar\xEDstica",
+      description: "Viv\xEAncia espiritual e compromisso do ministro",
+      category: "liturgia",
+      orderIndex: 2,
+      estimatedDuration: 60,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [module3] = await db.insert(formationModules).values(liturgyModule3).onConflictDoNothing().returning();
+    if (module3) {
+      console.log(`  \u2713 Module 3: ${liturgyModule3.title}`);
+      const [lesson3_1] = await db.insert(formationLessons).values({
+        moduleId: module3.id,
+        trackId: "liturgy-track-1",
+        title: "A Vida de Ora\xE7\xE3o do Ministro",
+        description: "Cultivando uma espiritualidade eucar\xEDstica profunda",
+        lessonNumber: 1,
+        durationMinutes: 30,
+        orderIndex: 0,
+        objectives: [
+          "Compreender a import\xE2ncia da ora\xE7\xE3o pessoal",
+          "Conhecer pr\xE1ticas de piedade eucar\xEDstica",
+          "Desenvolver uma rela\xE7\xE3o pessoal com Cristo na Eucaristia"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson3_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson3_1.id,
+            type: "text",
+            title: "Fundamento da Vida Espiritual",
+            content: `"Sem mim, nada podeis fazer" (Jo 15,5)
+
+O minist\xE9rio eucar\xEDstico brota de uma vida de ora\xE7\xE3o intensa. N\xE3o podemos dar aos outros o que n\xE3o temos. Para distribuir o P\xE3o da Vida, precisamos primeiro nos alimentar dele.
+
+**A ora\xE7\xE3o do ministro deve incluir:**
+- **Missa Dominical**: Participa\xE7\xE3o ativa e consciente
+- **Ora\xE7\xE3o di\xE1ria**: Momento pessoal com Deus
+- **Leitura orante da Escritura**: Lectio Divina
+- **Adora\xE7\xE3o eucar\xEDstica**: Tempo de contempla\xE7\xE3o
+- **Exame de consci\xEAncia**: Revis\xE3o da vida di\xE1ria`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson3_1.id,
+            type: "text",
+            title: "Pr\xE1ticas de Piedade Eucar\xEDstica",
+            content: `**Antes da Missa:**
+- Chegar com anteced\xEAncia
+- Fazer uma ora\xE7\xE3o preparat\xF3ria
+- Revisar as leituras do dia
+- Pedir ao Esp\xEDrito Santo que renove sua f\xE9
+
+**Durante a Missa:**
+- Participar ativamente de cada parte
+- Comungar com devo\xE7\xE3o
+- Fazer a\xE7\xE3o de gra\xE7as ap\xF3s comungar
+
+**Adora\xE7\xE3o Eucar\xEDstica:**
+- Visitar o Sant\xEDssimo regularmente
+- Participar de horas de adora\xE7\xE3o
+- Fazer vig\xEDlias quando poss\xEDvel
+
+**Devo\xE7\xF5es complementares:**
+- Ter\xE7o meditando os mist\xE9rios
+- Leitura espiritual
+- Ora\xE7\xE3o da Igreja (Liturgia das Horas)`,
+            orderIndex: 1,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson3_1.id,
+            type: "text",
+            title: "Crescendo na Intimidade com Cristo",
+            content: `A rela\xE7\xE3o com Cristo eucar\xEDstico \xE9 como qualquer relacionamento: precisa ser cultivada.
+
+**Passos para aprofundar a intimidade:**
+
+1. **Regularidade**: Estabelecer hor\xE1rios fixos de ora\xE7\xE3o
+2. **Sil\xEAncio**: Criar momentos de escuta
+3. **Confian\xE7a**: Abrir o cora\xE7\xE3o como a um amigo
+4. **Perseveran\xE7a**: Manter a ora\xE7\xE3o mesmo na aridez
+5. **A\xE7\xE3o**: Deixar a ora\xE7\xE3o transformar a vida
+
+**Frutos esperados:**
+- Maior amor \xE0 Eucaristia
+- Desejo de servir com generosidade
+- Paz interior
+- Testemunho de vida que atrai outros
+
+"Permanecei em mim, e eu permanecerei em v\xF3s" (Jo 15,4)`,
+            orderIndex: 2,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 3.1: ${lesson3_1.title} (3 sections)`);
+      }
+      const [lesson3_2] = await db.insert(formationLessons).values({
+        moduleId: module3.id,
+        trackId: "liturgy-track-1",
+        title: "O Testemunho de Vida do Ministro",
+        description: "Vivendo coerentemente com o minist\xE9rio exercido",
+        lessonNumber: 2,
+        durationMinutes: 30,
+        orderIndex: 1,
+        objectives: [
+          "Compreender a responsabilidade do testemunho",
+          "Identificar \xE1reas de crescimento pessoal",
+          "Comprometer-se com uma vida coerente com a f\xE9"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (lesson3_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: lesson3_2.id,
+            type: "text",
+            title: "A Chamada \xE0 Santidade",
+            content: `"Sede santos, porque eu sou santo" (1Pd 1,16)
+
+O ministro extraordin\xE1rio n\xE3o \xE9 apenas algu\xE9m que distribui a comunh\xE3o. \xC9 uma testemunha viva de Cristo. A comunidade observa nossa vida e nosso exemplo.
+
+**O que o povo espera ver:**
+- Coer\xEAncia entre f\xE9 e vida
+- Participa\xE7\xE3o ass\xEDdua na Missa
+- Vida sacramental intensa
+- Caridade no relacionamento com todos
+- Humildade no servi\xE7o
+
+N\xE3o precisamos ser perfeitos, mas devemos estar em caminho de convers\xE3o constante.`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson3_2.id,
+            type: "text",
+            title: "\xC1reas de Aten\xE7\xE3o Especial",
+            content: `**Vida sacramental:**
+- Confiss\xE3o regular (recomenda-se mensal)
+- Comunh\xE3o frequente e devota
+- Estar em estado de gra\xE7a ao ministrar
+
+**Vida familiar:**
+- Cultivar o amor conjugal (se casado)
+- Educar os filhos na f\xE9
+- Fazer da fam\xEDlia "igreja dom\xE9stica"
+
+**Vida comunit\xE1ria:**
+- Participar da vida paroquial
+- Colaborar nas pastorais
+- Manter bom relacionamento com todos
+
+**Vida profissional:**
+- Ser honesto no trabalho
+- Ser testemunha de Cristo no ambiente profissional
+- Praticar a justi\xE7a e a caridade
+
+**Vida social:**
+- Evitar ambientes e situa\xE7\xF5es incompat\xEDveis com a f\xE9
+- Ser sal e luz no mundo (Mt 5,13-14)`,
+            orderIndex: 1,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: lesson3_2.id,
+            type: "text",
+            title: "Lidando com as Pr\xF3prias Fragilidades",
+            content: `Todos temos limita\xE7\xF5es e fraquezas. O importante \xE9 reconhec\xEA-las e buscar crescer.
+
+**Quando cometer erros:**
+1. Reconhecer humildemente
+2. Buscar a confiss\xE3o
+3. Reparar o mal causado quando poss\xEDvel
+4. Continuar servindo com humildade
+
+**Evitar:**
+- Hipocrisia (parecer santo sem buscar s\xEA-lo)
+- Esc\xE2ndalo (a\xE7\xF5es que afastam outros da f\xE9)
+- Orgulho espiritual (sentir-se superior)
+- Tibieza (frieza na vida espiritual)
+
+**Lembrar sempre:**
+"Quem se gloria, glorie-se no Senhor" (1Cor 1,31)
+
+Nossa santidade n\xE3o \xE9 m\xE9rito nosso, mas dom de Deus. Servimos pela gra\xE7a d'Ele.`,
+            orderIndex: 2,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 3.2: ${lesson3_2.title} (3 sections)`);
+      }
+    }
+    console.log("\n\u{1F64F} Creating Spirituality Track modules and lessons...");
+    const spiritModule1 = {
+      trackId: "spirituality-track-1",
+      title: "Fundamentos da Vida Espiritual",
+      description: "Bases da espiritualidade crist\xE3 cat\xF3lica",
+      category: "espiritualidade",
+      orderIndex: 0,
+      estimatedDuration: 80,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [spiritMod1] = await db.insert(formationModules).values(spiritModule1).onConflictDoNothing().returning();
+    if (spiritMod1) {
+      console.log(`  \u2713 Module 1: ${spiritModule1.title}`);
+      const [spiritLesson1_1] = await db.insert(formationLessons).values({
+        moduleId: spiritMod1.id,
+        trackId: "spirituality-track-1",
+        title: "A Ora\xE7\xE3o como Di\xE1logo com Deus",
+        description: "Compreendendo e praticando a ora\xE7\xE3o crist\xE3",
+        lessonNumber: 1,
+        durationMinutes: 35,
+        orderIndex: 0,
+        objectives: [
+          "Compreender a ora\xE7\xE3o como encontro pessoal com Deus",
+          "Conhecer diferentes formas de ora\xE7\xE3o",
+          "Desenvolver uma vida de ora\xE7\xE3o constante"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson1_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson1_1.id,
+            type: "text",
+            title: "O Que \xC9 Ora\xE7\xE3o?",
+            content: `"A ora\xE7\xE3o \xE9 a eleva\xE7\xE3o da alma a Deus ou o pedido a Deus de bens convenientes" (S\xE3o Jo\xE3o Damasceno, citado no CIC 2559).
+
+A ora\xE7\xE3o n\xE3o \xE9 apenas falar com Deus, mas estar com Deus. \xC9 um relacionamento pessoal de amor, confian\xE7a e entrega.
+
+Jesus nos ensinou a orar:
+- Pelo exemplo: Passava noites em ora\xE7\xE3o (Lc 6,12)
+- Pelos ensinamentos: "Orai sem cessar" (1Ts 5,17)
+- Pelo Pai Nosso: Modelo de toda ora\xE7\xE3o crist\xE3
+
+A ora\xE7\xE3o crist\xE3 \xE9 trinit\xE1ria: dirigimo-nos ao Pai, por Cristo, no Esp\xEDrito Santo.`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_1.id,
+            type: "text",
+            title: "Formas de Ora\xE7\xE3o",
+            content: `A tradi\xE7\xE3o da Igreja reconhece v\xE1rias formas de ora\xE7\xE3o:
+
+**Segundo a express\xE3o:**
+- **Vocal**: Palavras pronunciadas (Pai Nosso, Ave Maria)
+- **Meditativa**: Reflex\xE3o sobre a Palavra de Deus
+- **Contemplativa**: Sil\xEAncio amoroso na presen\xE7a de Deus
+
+**Segundo o conte\xFAdo:**
+- **Adora\xE7\xE3o**: Reconhecer Deus como Criador
+- **Louvor**: Glorificar a Deus por quem Ele \xE9
+- **S\xFAplica**: Pedir o que necessitamos
+- **Intercess\xE3o**: Pedir pelos outros
+- **A\xE7\xE3o de gra\xE7as**: Agradecer os dons recebidos
+
+Todas as formas s\xE3o v\xE1lidas e complementares. O importante \xE9 orar com o cora\xE7\xE3o.`,
+            orderIndex: 1,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_1.id,
+            type: "text",
+            title: "Dificuldades na Ora\xE7\xE3o",
+            content: `\xC9 normal enfrentar dificuldades na ora\xE7\xE3o:
+
+**Distra\xE7\xF5es:**
+- S\xE3o normais, especialmente no in\xEDcio
+- Quando perceber, retornar suavemente \xE0 ora\xE7\xE3o
+- N\xE3o se culpar, mas recome\xE7ar com paci\xEAncia
+
+**Aridez espiritual:**
+- Per\xEDodos sem "sentir" a presen\xE7a de Deus
+- \xC9 uma prova da f\xE9, n\xE3o abandono de Deus
+- Continuar orando com fidelidade
+
+**Falta de tempo:**
+- Estabelecer prioridades
+- Come\xE7ar com pouco tempo, mas com regularidade
+- "Quem diz que n\xE3o tem tempo, n\xE3o tem vontade" (Santa Teresa)
+
+**Como perseverar:**
+1. Hor\xE1rio fixo para ora\xE7\xE3o
+2. Lugar apropriado e silencioso
+3. Usar recursos (B\xEDblia, livros espirituais)
+4. Pedir ajuda do Esp\xEDrito Santo
+5. N\xE3o desistir nas dificuldades`,
+            orderIndex: 2,
+            estimatedMinutes: 13,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.1: ${spiritLesson1_1.title} (3 sections)`);
+      }
+      const [spiritLesson1_2] = await db.insert(formationLessons).values({
+        moduleId: spiritMod1.id,
+        trackId: "spirituality-track-1",
+        title: "Os Sacramentos: Encontro com Cristo",
+        description: "A vida sacramental como fonte de gra\xE7a",
+        lessonNumber: 2,
+        durationMinutes: 25,
+        orderIndex: 1,
+        objectives: [
+          "Compreender os sacramentos como encontros com Cristo",
+          "Valorizar especialmente a Eucaristia e a Reconcilia\xE7\xE3o",
+          "Viver intensamente a vida sacramental"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson1_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson1_2.id,
+            type: "text",
+            title: "Sacramentos: Sinais Eficazes da Gra\xE7a",
+            content: `Os sacramentos s\xE3o "obras-primas de Deus" (CIC 1116). S\xE3o sinais sens\xEDveis e eficazes da gra\xE7a, institu\xEDdos por Cristo e confiados \xE0 Igreja.
+
+**Os sete sacramentos:**
+
+**Inicia\xE7\xE3o Crist\xE3:**
+1. Batismo - Nascimento para a vida nova
+2. Confirma\xE7\xE3o - Fortaleza do Esp\xEDrito Santo
+3. Eucaristia - Alimento da vida eterna
+
+**Cura:**
+4. Reconcilia\xE7\xE3o - Perd\xE3o dos pecados
+5. Un\xE7\xE3o dos Enfermos - Conforto na doen\xE7a
+
+**Servi\xE7o:**
+6. Ordem - Minist\xE9rio apost\xF3lico
+7. Matrim\xF4nio - Comunh\xE3o de vida e amor
+
+Cada sacramento comunica uma gra\xE7a espec\xEDfica e nos configura a Cristo.`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_2.id,
+            type: "text",
+            title: "Eucaristia e Reconcilia\xE7\xE3o: Fontes de Vida",
+            content: `**A Eucaristia:**
+- Centro e \xE1pice da vida crist\xE3
+- Atualiza\xE7\xE3o do sacrif\xEDcio de Cristo
+- Comunh\xE3o com o Corpo e Sangue do Senhor
+- Alimento para o caminho
+
+Para o ministro: Participar da Missa dominical com devo\xE7\xE3o, chegando cedo e preparando o cora\xE7\xE3o.
+
+**A Reconcilia\xE7\xE3o:**
+- Sacramento da miseric\xF3rdia de Deus
+- Cura as feridas do pecado
+- Restaura a amizade com Deus
+- Fortalece para n\xE3o pecar
+
+Recomenda-se a confiss\xE3o mensal para quem exerce minist\xE9rios. \xC9 um encontro de cura e liberta\xE7\xE3o.`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_2.id,
+            type: "text",
+            title: "Vivendo Sacramentalmente",
+            content: `**Prepara\xE7\xE3o para os sacramentos:**
+- Estado de gra\xE7a (confiss\xE3o se necess\xE1rio)
+- Jejum eucar\xEDstico (1 hora)
+- Disposi\xE7\xE3o interior de f\xE9 e amor
+- Roupa adequada e digna
+
+**Ap\xF3s receber os sacramentos:**
+- A\xE7\xE3o de gra\xE7as
+- Compromisso de convers\xE3o
+- Testemunho de vida transformada
+
+**Frutos de uma vida sacramental intensa:**
+- Crescimento na santidade
+- For\xE7a para vencer o pecado
+- Alegria e paz interior
+- Capacidade de amar e servir
+
+Os sacramentos n\xE3o s\xE3o "obriga\xE7\xF5es", mas encontros de amor com Cristo!`,
+            orderIndex: 2,
+            estimatedMinutes: 5,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.2: ${spiritLesson1_2.title} (3 sections)`);
+      }
+      const [spiritLesson1_3] = await db.insert(formationLessons).values({
+        moduleId: spiritMod1.id,
+        trackId: "spirituality-track-1",
+        title: "A Palavra de Deus na Vida do Ministro",
+        description: "Leitura orante da Sagrada Escritura",
+        lessonNumber: 3,
+        durationMinutes: 20,
+        orderIndex: 2,
+        objectives: [
+          "Valorizar a Sagrada Escritura",
+          "Aprender a fazer lectio divina",
+          "Comprometer-se com a leitura di\xE1ria da Palavra"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson1_3) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson1_3.id,
+            type: "text",
+            title: "A B\xEDblia: Palavra Viva de Deus",
+            content: `"Desconhecer as Escrituras \xE9 desconhecer Cristo" (S\xE3o Jer\xF4nimo).
+
+A B\xEDblia n\xE3o \xE9 apenas um livro antigo, mas Palavra viva e eficaz (Hb 4,12). Deus continua falando atrav\xE9s dela hoje.
+
+**Por que ler a B\xEDblia:**
+- Para conhecer a Deus e seu plano de salva\xE7\xE3o
+- Para conhecer Jesus Cristo mais profundamente
+- Para encontrar orienta\xE7\xE3o para a vida
+- Para alimentar a f\xE9 e a esperan\xE7a
+- Para crescer na intimidade com Deus
+
+O Conc\xEDlio Vaticano II recomenda: "\xC9 preciso que os fi\xE9is tenham amplo acesso \xE0 Sagrada Escritura" (DV 22).`,
+            orderIndex: 0,
+            estimatedMinutes: 7,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_3.id,
+            type: "text",
+            title: "Lectio Divina: Leitura Orante",
+            content: `A lectio divina \xE9 um m\xE9todo antigo de leitura orante da B\xEDblia:
+
+**1. LECTIO (Leitura):**
+- Ler o texto com aten\xE7\xE3o
+- O que o texto diz em si mesmo?
+
+**2. MEDITATIO (Medita\xE7\xE3o):**
+- Refletir sobre o texto
+- O que o texto diz para mim?
+
+**3. ORATIO (Ora\xE7\xE3o):**
+- Responder a Deus
+- O que quero dizer a Deus?
+
+**4. CONTEMPLATIO (Contempla\xE7\xE3o):**
+- Permanecer em sil\xEAncio com Deus
+- Deixar Deus transformar o cora\xE7\xE3o
+
+**5. ACTIO (A\xE7\xE3o):**
+- Compromisso concreto
+- O que vou fazer?
+
+Dedicar 10-15 minutos di\xE1rios para essa pr\xE1tica.`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson1_3.id,
+            type: "text",
+            title: "Dicas Pr\xE1ticas",
+            content: `**Como come\xE7ar:**
+1. Escolher um hor\xE1rio di\xE1rio fixo
+2. Come\xE7ar pelos Evangelhos (Mateus, Marcos, Lucas, Jo\xE3o)
+3. Ter uma B\xEDblia cat\xF3lica com boas notas
+4. Pedir a luz do Esp\xEDrito Santo antes de ler
+5. Ler devagar, saboreando cada palavra
+
+**Recursos \xFAteis:**
+- Aplicativos de B\xEDblia cat\xF3licos
+- Coment\xE1rios e subs\xEDdios b\xEDblicos
+- Grupos de partilha da Palavra
+- Homilias e catequeses
+
+**Aten\xE7\xE3o:**
+Sempre ler a B\xEDblia na f\xE9 da Igreja. Evitar interpreta\xE7\xF5es particulares. Em d\xFAvida, consultar um padre ou catequista.
+
+"Tua palavra \xE9 l\xE2mpada para os meus passos, luz para o meu caminho" (Sl 119,105)`,
+            orderIndex: 2,
+            estimatedMinutes: 3,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 1.3: ${spiritLesson1_3.title} (3 sections)`);
+      }
+    }
+    const spiritModule2 = {
+      trackId: "spirituality-track-1",
+      title: "As Virtudes na Vida do Ministro",
+      description: "Cultivando as virtudes teologais e cardeais",
+      category: "espiritualidade",
+      orderIndex: 1,
+      estimatedDuration: 70,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [spiritMod2] = await db.insert(formationModules).values(spiritModule2).onConflictDoNothing().returning();
+    if (spiritMod2) {
+      console.log(`  \u2713 Module 2: ${spiritModule2.title}`);
+      const [spiritLesson2_1] = await db.insert(formationLessons).values({
+        moduleId: spiritMod2.id,
+        trackId: "spirituality-track-1",
+        title: "Virtudes Teologais: F\xE9, Esperan\xE7a e Caridade",
+        description: "As tr\xEAs virtudes que unem o homem a Deus",
+        lessonNumber: 1,
+        durationMinutes: 35,
+        orderIndex: 0,
+        objectives: [
+          "Compreender as virtudes teologais",
+          "Identificar como viv\xEA-las concretamente",
+          "Crescer na f\xE9, esperan\xE7a e caridade"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson2_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson2_1.id,
+            type: "text",
+            title: "A F\xE9: Dom e Resposta",
+            content: `"A f\xE9 \xE9 a certeza das coisas que se esperam, a demonstra\xE7\xE3o das realidades que n\xE3o se veem" (Hb 11,1).
+
+**A f\xE9 \xE9:**
+- Dom gratuito de Deus
+- Resposta livre do homem
+- Ades\xE3o pessoal a Deus
+- Aceita\xE7\xE3o da verdade revelada
+
+**Vivendo a f\xE9:**
+- Professar: Crer e proclamar a f\xE9 (Credo)
+- Celebrar: Participar dos sacramentos
+- Viver: Conformar a vida aos mandamentos
+- Orar: Dialogar com Deus na ora\xE7\xE3o
+
+**Para o ministro:**
+A f\xE9 na presen\xE7a real de Cristo na Eucaristia deve ser viva e consciente. Cada gesto lit\xFArgico deve expressar essa f\xE9 profunda.
+
+"Creio, Senhor, mas aumenta a minha f\xE9!" (Mc 9,24)`,
+            orderIndex: 0,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson2_1.id,
+            type: "text",
+            title: "A Esperan\xE7a: \xC2ncora da Alma",
+            content: `"A esperan\xE7a n\xE3o decepciona, porque o amor de Deus foi derramado em nossos cora\xE7\xF5es" (Rm 5,5).
+
+**A esperan\xE7a crist\xE3:**
+- Confia nas promessas de Cristo
+- Aguarda a vida eterna
+- Conta com a gra\xE7a do Esp\xEDrito Santo
+- N\xE3o \xE9 ingenuidade, mas certeza fundada em Deus
+
+**Contra a esperan\xE7a:**
+- Desespero: Perder a confian\xE7a em Deus
+- Presun\xE7\xE3o: Confiar apenas em si mesmo
+
+**Vivendo a esperan\xE7a:**
+- Nas dificuldades: Confiar na provid\xEAncia
+- No pecado: Crer no perd\xE3o divino
+- No sofrimento: Unir-se \xE0 cruz de Cristo
+- No servi\xE7o: Trabalhar pelo Reino sem desanimar
+
+"Espera no Senhor, s\xEA forte! Coragem! Espera no Senhor!" (Sl 27,14)`,
+            orderIndex: 1,
+            estimatedMinutes: 11,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson2_1.id,
+            type: "text",
+            title: "A Caridade: A Maior das Virtudes",
+            content: `"Deus \xE9 amor" (1Jo 4,8). A caridade \xE9 a virtude pela qual amamos a Deus acima de tudo e ao pr\xF3ximo como a n\xF3s mesmos.
+
+**Duplo mandamento:**
+1. Amar a Deus de todo o cora\xE7\xE3o (verticalidade)
+2. Amar o pr\xF3ximo como a si mesmo (horizontalidade)
+
+N\xE3o h\xE1 caridade para com Deus sem caridade para com o pr\xF3ximo, e vice-versa.
+
+**Express\xF5es da caridade:**
+- **Paci\xEAncia**: Suportar com amor
+- **Bondade**: Fazer o bem aos outros
+- **Perd\xE3o**: N\xE3o guardar rancor
+- **Servi\xE7o**: Doar-se generosamente
+- **Verdade**: Falar com amor, mas com verdade
+
+**Para o ministro:**
+O minist\xE9rio \xE9 exerc\xEDcio de caridade. Servimos porque amamos a Cristo presente na Eucaristia e nos irm\xE3os.
+
+"Permaneceis no meu amor" (Jo 15,9)`,
+            orderIndex: 2,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 2.1: ${spiritLesson2_1.title} (3 sections)`);
+      }
+      const [spiritLesson2_2] = await db.insert(formationLessons).values({
+        moduleId: spiritMod2.id,
+        trackId: "spirituality-track-1",
+        title: "Virtudes Cardeais: Prud\xEAncia e Justi\xE7a",
+        description: "Vivendo com sabedoria e retid\xE3o",
+        lessonNumber: 2,
+        durationMinutes: 20,
+        orderIndex: 1,
+        objectives: [
+          "Conhecer as virtudes da prud\xEAncia e justi\xE7a",
+          "Aplic\xE1-las na vida e no minist\xE9rio",
+          "Crescer em sabedoria e retid\xE3o"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson2_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson2_2.id,
+            type: "text",
+            title: "Prud\xEAncia: A Sabedoria Pr\xE1tica",
+            content: `A prud\xEAncia \xE9 a virtude que disp\xF5e a raz\xE3o a discernir, em toda circunst\xE2ncia, o verdadeiro bem e a escolher os meios adequados para realiz\xE1-lo.
+
+**Atos da prud\xEAncia:**
+1. **Aconselhar-se**: Buscar orienta\xE7\xE3o
+2. **Julgar**: Discernir o que fazer
+3. **Decidir**: Escolher e agir
+
+**No minist\xE9rio:**
+- Saber quando falar e quando calar
+- Discernir situa\xE7\xF5es delicadas
+- Agir com equil\xEDbrio e bom senso
+- Evitar extremos
+
+**Pecados contra a prud\xEAncia:**
+- Precipita\xE7\xE3o: Agir sem pensar
+- Neglig\xEAncia: N\xE3o dar import\xE2ncia devida
+- Inconst\xE2ncia: Mudar sem motivo
+
+"Sede prudentes como as serpentes e simples como as pombas" (Mt 10,16)`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson2_2.id,
+            type: "text",
+            title: "Justi\xE7a: Dar a Cada Um o Que Lhe \xC9 Devido",
+            content: `A justi\xE7a \xE9 a vontade firme e constante de dar a Deus e ao pr\xF3ximo o que lhes \xE9 devido.
+
+**Justi\xE7a para com Deus:**
+- Culto de adora\xE7\xE3o (virtude da religi\xE3o)
+- Gratid\xE3o pelos dons recebidos
+- Fidelidade \xE0s promessas feitas
+
+**Justi\xE7a para com o pr\xF3ximo:**
+- Respeitar os direitos de cada um
+- Promover a equidade nas rela\xE7\xF5es
+- N\xE3o julgar precipitadamente
+- Respeitar a boa fama (n\xE3o caluniar)
+
+**Justi\xE7a social:**
+- Preocupa\xE7\xE3o com o bem comum
+- Aten\xE7\xE3o aos mais pobres e necessitados
+- Compromisso com uma sociedade mais justa
+
+**No minist\xE9rio:**
+- Tratar todos com igualdade e respeito
+- N\xE3o fazer acep\xE7\xE3o de pessoas
+- Cumprir fielmente os compromissos assumidos
+
+"Buscai primeiro o Reino de Deus e a sua justi\xE7a" (Mt 6,33)`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 2.2: ${spiritLesson2_2.title} (2 sections)`);
+      }
+      const [spiritLesson2_3] = await db.insert(formationLessons).values({
+        moduleId: spiritMod2.id,
+        trackId: "spirituality-track-1",
+        title: "Virtudes Cardeais: Fortaleza e Temperan\xE7a",
+        description: "For\xE7a nas dificuldades e dom\xEDnio de si mesmo",
+        lessonNumber: 3,
+        durationMinutes: 15,
+        orderIndex: 2,
+        objectives: [
+          "Desenvolver a fortaleza espiritual",
+          "Praticar a temperan\xE7a no dia a dia",
+          "Vencer as tenta\xE7\xF5es e prova\xE7\xF5es"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson2_3) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson2_3.id,
+            type: "text",
+            title: "Fortaleza: Firmeza nas Dificuldades",
+            content: `A fortaleza assegura, nas dificuldades, a firmeza e a const\xE2ncia na busca do bem.
+
+**Duas dimens\xF5es:**
+1. **Resistir**: Suportar as prova\xE7\xF5es sem desanimar
+2. **Atacar**: Enfrentar os obst\xE1culos com coragem
+
+**Manifesta\xE7\xF5es:**
+- Paci\xEAncia no sofrimento
+- Perseveran\xE7a na ora\xE7\xE3o
+- Coragem para testemunhar a f\xE9
+- Firmeza diante das tenta\xE7\xF5es
+
+**No minist\xE9rio:**
+- Continuar servindo mesmo quando dif\xEDcil
+- N\xE3o desanimar com cr\xEDticas ou incompreens\xF5es
+- Manter-se fiel mesmo na aridez espiritual
+- Ter coragem de corrigir quando necess\xE1rio
+
+"Tudo posso naquele que me fortalece" (Fl 4,13)`,
+            orderIndex: 0,
+            estimatedMinutes: 8,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson2_3.id,
+            type: "text",
+            title: "Temperan\xE7a: Equil\xEDbrio e Modera\xE7\xE3o",
+            content: `A temperan\xE7a modera a atra\xE7\xE3o pelos prazeres sens\xEDveis e assegura o dom\xEDnio da vontade sobre os instintos.
+
+**\xC1reas de exerc\xEDcio:**
+- **Alimenta\xE7\xE3o**: Comer e beber com modera\xE7\xE3o
+- **Sono**: Descanso adequado sem pregui\xE7a
+- **Divers\xE3o**: Lazer saud\xE1vel e equilibrado
+- **Sexualidade**: Vivida conforme estado de vida
+- **Consumo**: Evitar materialismo e apego
+
+**Virtudes relacionadas:**
+- Humildade: N\xE3o se exaltar
+- Mansid\xE3o: Dominar a ira
+- Mod\xE9stia: Apresenta\xE7\xE3o digna
+
+**No minist\xE9rio:**
+- Vestir-se adequadamente
+- Evitar excessos antes de servir
+- Manter equil\xEDbrio entre servi\xE7o e vida pessoal
+- N\xE3o buscar reconhecimento ou destaque
+
+"Sede s\xF3brios e vigiai" (1Pd 5,8)`,
+            orderIndex: 1,
+            estimatedMinutes: 7,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 2.3: ${spiritLesson2_3.title} (2 sections)`);
+      }
+    }
+    const spiritModule3 = {
+      trackId: "spirituality-track-1",
+      title: "Maria e os Santos: Companheiros de Jornada",
+      description: "A comunh\xE3o dos santos e a intercess\xE3o de Maria",
+      category: "espiritualidade",
+      orderIndex: 2,
+      estimatedDuration: 50,
+      isActive: true,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    const [spiritMod3] = await db.insert(formationModules).values(spiritModule3).onConflictDoNothing().returning();
+    if (spiritMod3) {
+      console.log(`  \u2713 Module 3: ${spiritModule3.title}`);
+      const [spiritLesson3_1] = await db.insert(formationLessons).values({
+        moduleId: spiritMod3.id,
+        trackId: "spirituality-track-1",
+        title: "Maria, M\xE3e da Eucaristia",
+        description: "A rela\xE7\xE3o de Maria com a Eucaristia e seu exemplo para n\xF3s",
+        lessonNumber: 1,
+        durationMinutes: 25,
+        orderIndex: 0,
+        objectives: [
+          "Compreender o papel de Maria na Eucaristia",
+          "Imitar as atitudes marianas",
+          "Confiar na intercess\xE3o de Nossa Senhora"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson3_1) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson3_1.id,
+            type: "text",
+            title: "Maria e a Eucaristia",
+            content: `Maria tem uma rela\xE7\xE3o \xFAnica com a Eucaristia:
+
+**Ela \xE9:**
+- **M\xE3e da Eucaristia**: Gerou em seu ventre o Corpo que se tornou alimento
+- **Primeira sagr\xE1rio**: Guardou Jesus em seu corpo
+- **Modelo eucar\xEDstico**: Viveu em comunh\xE3o perfeita com Cristo
+
+S\xE3o Jo\xE3o Paulo II ensinou: "Maria pode guiar-nos para este Sant\xEDssimo Sacramento, porque tem com Ele uma rela\xE7\xE3o profunda" (Ecclesia de Eucharistia, 53).
+
+**A Visita\xE7\xE3o:**
+Quando Maria leva Jesus a Isabel, \xE9 como uma "prociss\xE3o eucar\xEDstica". Ela nos ensina a levar Cristo aos outros.`,
+            orderIndex: 0,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson3_1.id,
+            type: "text",
+            title: "Atitudes Marianas para o Ministro",
+            content: `**F\xE9:**
+"Eis aqui a serva do Senhor" (Lc 1,38)
+- Crer na palavra de Deus
+- Aceitar os planos divinos
+- Confiar mesmo sem compreender tudo
+
+**Humildade:**
+"Fez em mim grandes coisas" (Lc 1,49)
+- Reconhecer tudo como dom de Deus
+- N\xE3o buscar destaque pessoal
+- Servir com simplicidade
+
+**Disponibilidade:**
+"Fazei tudo o que Ele vos disser" (Jo 2,5)
+- Estar pronto para servir
+- Obedecer com prontid\xE3o
+- Indicar sempre Jesus, n\xE3o a si mesmo
+
+**Sil\xEAncio:**
+"Maria guardava todas estas coisas no cora\xE7\xE3o" (Lc 2,51)
+- Contemplar os mist\xE9rios de Deus
+- Discri\xE7\xE3o no servi\xE7o
+- Ora\xE7\xE3o silenciosa`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson3_1.id,
+            type: "text",
+            title: "Devo\xE7\xE3o Mariana do Ministro",
+            content: `**Pr\xE1ticas recomendadas:**
+- **Ter\xE7o di\xE1rio**: Meditar os mist\xE9rios com Maria
+- **Angelus**: Tr\xEAs vezes ao dia
+- **Consagra\xE7\xE3o a Maria**: Entregar-se aos cuidados maternos
+- **Escapul\xE1rio**: Usar como sinal de prote\xE7\xE3o
+- **S\xE1bado mariano**: Dedicar especialmente \xE0 Nossa Senhora
+
+**Ora\xE7\xE3o antes do minist\xE9rio:**
+"Maria, M\xE3e da Eucaristia,
+Ensina-me a amar teu Filho presente no Sacramento.
+D\xE1-me tuas m\xE3os puras para distribuir a Comunh\xE3o,
+Tua humildade para servir,
+E teu cora\xE7\xE3o para adorar.
+Que eu seja, como tu, portador de Jesus para o mundo.
+Am\xE9m."
+
+"A Virgem Maria com seu exemplo nos orienta para este Sant\xEDssimo Sacramento" (CIC 2674)`,
+            orderIndex: 2,
+            estimatedMinutes: 5,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 3.1: ${spiritLesson3_1.title} (3 sections)`);
+      }
+      const [spiritLesson3_2] = await db.insert(formationLessons).values({
+        moduleId: spiritMod3.id,
+        trackId: "spirituality-track-1",
+        title: "Os Santos: Exemplos de Santidade",
+        description: "Aprendendo com os santos que amaram a Eucaristia",
+        lessonNumber: 2,
+        durationMinutes: 25,
+        orderIndex: 1,
+        objectives: [
+          "Conhecer santos eucar\xEDsticos",
+          "Aprender com seus exemplos",
+          "Invocar sua intercess\xE3o"
+        ],
+        isActive: true,
+        createdAt: /* @__PURE__ */ new Date()
+      }).onConflictDoNothing().returning();
+      if (spiritLesson3_2) {
+        await db.insert(formationLessonSections).values([
+          {
+            lessonId: spiritLesson3_2.id,
+            type: "text",
+            title: "Santos Eucar\xEDsticos",
+            content: `Muitos santos se destacaram por seu amor \xE0 Eucaristia:
+
+**S\xE3o Tars\xEDcio (s\xE9c. III)**
+- M\xE1rtir da Eucaristia
+- Morreu protegendo o Sant\xEDssimo Sacramento
+- Padroeiro dos coroinhas e ministros
+- Exemplo de coragem e fidelidade
+
+**S\xE3o Francisco de Assis (1182-1226)**
+- Profunda rever\xEAncia \xE0 Eucaristia
+- Dizia: "O homem deve tremer, o mundo estremecer e o c\xE9u alegrar-se quando Cristo est\xE1 no altar"
+- Insistia na dignidade dos vasos sagrados e do altar
+
+**S\xE3o Tom\xE1s de Aquino (1225-1274)**
+- Doutor Eucar\xEDstico
+- Escreveu hinos eucar\xEDsticos (Tantum Ergo, Pange Lingua)
+- Dedicou sua intelig\xEAncia a explicar o mist\xE9rio eucar\xEDstico
+
+**Santa Teresa de Calcut\xE1 (1910-1997)**
+- Via Jesus nos pobres e na Eucaristia
+- Dizia: "A Eucaristia est\xE1 ligada \xE0 Paix\xE3o e \xE0 pobreza"
+- Hora di\xE1ria de adora\xE7\xE3o eucar\xEDstica`,
+            orderIndex: 0,
+            estimatedMinutes: 12,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson3_2.id,
+            type: "text",
+            title: "Mais Santos para Inspirar",
+            content: `**Santa Clara de Assis**
+- Adora\xE7\xE3o perp\xE9tua em seu mosteiro
+- Afastou inimigos expondo o Sant\xEDssimo
+
+**S\xE3o Pedro Juli\xE3o Eymard**
+- Fundador dos Sacramentinos
+- "Ap\xF3stolo da Eucaristia"
+- Promoveu a adora\xE7\xE3o eucar\xEDstica
+
+**Santo Padre Pio**
+- Missas de v\xE1rias horas por seu fervor
+- Estigmas como uni\xE3o \xE0 Paix\xE3o de Cristo
+- A\xE7\xE3o de gra\xE7as prolongada ap\xF3s a Missa
+
+**Santa Faustina Kowalska**
+- Vis\xF5es de Jesus Eucar\xEDstico
+- Ensinou sobre a miseric\xF3rdia de Cristo presente na Eucaristia
+
+Cada santo nos mostra um caminho para amar mais a Eucaristia!`,
+            orderIndex: 1,
+            estimatedMinutes: 10,
+            createdAt: /* @__PURE__ */ new Date()
+          },
+          {
+            lessonId: spiritLesson3_2.id,
+            type: "text",
+            title: "Comunh\xE3o dos Santos",
+            content: `A Igreja \xE9 una: os que est\xE3o no c\xE9u, no purgat\xF3rio e na terra formam uma s\xF3 fam\xEDlia.
+
+**Intercess\xE3o dos santos:**
+- N\xE3o adoramos os santos, mas os veneramos
+- Pedimos sua intercess\xE3o junto a Deus
+- Eles s\xE3o nossos irm\xE3os mais velhos na f\xE9
+
+**Como invocar os santos:**
+- Escolher um santo patrono pessoal
+- Conhecer sua vida e virtudes
+- Imit\xE1-los no amor a Cristo
+- Pedir sua intercess\xE3o nas necessidades
+
+**Ora\xE7\xE3o de invoca\xE7\xE3o:**
+"S\xE3o Tars\xEDcio, m\xE1rtir da Eucaristia,
+Intercede por n\xF3s, ministros extraordin\xE1rios.
+D\xE1-nos tua coragem para defender a f\xE9,
+Teu amor ao Sant\xEDssimo Sacramento,
+E tua pureza de cora\xE7\xE3o.
+Que sejamos dignos de servir ao Corpo de Cristo.
+Am\xE9m."`,
+            orderIndex: 2,
+            estimatedMinutes: 3,
+            createdAt: /* @__PURE__ */ new Date()
+          }
+        ]);
+        console.log(`    \u2713 Lesson 3.2: ${spiritLesson3_2.title} (3 sections)`);
+      }
+    }
+    console.log("\n\u2705 Formation seed completed successfully!");
+    console.log("\n\u{1F4CA} Summary:");
+    console.log("  \u2022 2 tracks created");
+    console.log("  \u2022 6 modules created (3 per track)");
+    console.log("  \u2022 15 lessons created");
+    console.log("  \u2022 Multiple sections per lesson");
+    return {
+      success: true,
+      message: "Formation content seeded successfully",
+      stats: {
+        tracks: 2,
+        modules: 6,
+        lessons: 15
+      }
+    };
+  } catch (error) {
+    console.error("\u274C Error seeding formation:", error);
+    throw error;
+  }
+}
+var formation_seed_default;
+var init_formation_seed = __esm({
+  async "server/seeds/formation-seed.ts"() {
+    "use strict";
+    await init_db();
+    init_schema();
+    formation_seed_default = seedFormation;
+  }
+});
+
 // server/index.ts
 import express2 from "express";
 import cors from "cors";
+import helmet from "helmet";
 
 // server/routes.ts
 await init_storage();
@@ -2563,14 +5044,14 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { eq as eq2 } from "drizzle-orm";
 function getJWTSecret() {
-  if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
+  if (!process.env.JWT_SECRET) {
+    throw new Error(
+      `\u{1F534} CRITICAL: JWT_SECRET environment variable is required!
+Please set JWT_SECRET in your .env file with a strong random value.
+Generate one with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+    );
   }
-  if (process.env.NODE_ENV === "development") {
-    console.warn("\u26A0\uFE0F  JWT_SECRET n\xE3o definido, usando valor padr\xE3o para desenvolvimento");
-    return "sjt-mesc-development-secret-2025";
-  }
-  throw new Error("JWT_SECRET environment variable is required. Please set this environment variable for security.");
+  return process.env.JWT_SECRET;
 }
 var JWT_SECRET = getJWTSecret();
 var JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
@@ -2833,6 +5314,102 @@ router.get("/cleanup", async (req, res) => {
 });
 var session_default = router;
 
+// server/middleware/auditLogger.ts
+await init_db();
+init_schema();
+init_logger();
+function sanitizeAuditData(data) {
+  if (!data || typeof data !== "object") {
+    return data;
+  }
+  const sensitiveFields = [
+    "password",
+    "passwordHash",
+    "currentPassword",
+    "newPassword",
+    "token",
+    "jwt",
+    "secret",
+    "apiKey",
+    "privateKey"
+  ];
+  const sanitized = {};
+  for (const key of Object.keys(data)) {
+    if (sensitiveFields.includes(key.toLowerCase())) {
+      sanitized[key] = "[REDACTED]";
+    } else if (typeof data[key] === "object" && data[key] !== null) {
+      sanitized[key] = sanitizeAuditData(data[key]);
+    } else {
+      sanitized[key] = data[key];
+    }
+  }
+  return sanitized;
+}
+async function logAudit(action, metadata = {}) {
+  try {
+    const sanitizedMetadata = sanitizeAuditData(metadata);
+    logger.info(`[AUDIT] ${action}`, sanitizedMetadata);
+    await db.insert(activityLogs).values({
+      userId: metadata.userId || null,
+      action,
+      details: JSON.stringify(sanitizedMetadata),
+      ipAddress: metadata.ipAddress || null,
+      userAgent: metadata.userAgent || null,
+      createdAt: /* @__PURE__ */ new Date()
+    });
+  } catch (error) {
+    logger.error("[AUDIT] Failed to log audit entry", { error, action });
+  }
+}
+function auditLog(action, extractMetadata) {
+  return async (req, res, next) => {
+    const startTime = Date.now();
+    const baseMetadata = {
+      userId: req.user?.id,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+      method: req.method,
+      path: req.path
+    };
+    const customMetadata = extractMetadata ? extractMetadata(req) : {};
+    res.on("finish", async () => {
+      const duration = Date.now() - startTime;
+      const fullMetadata = {
+        ...baseMetadata,
+        ...customMetadata,
+        statusCode: res.statusCode,
+        duration
+      };
+      if (res.statusCode < 400) {
+        await logAudit(action, fullMetadata);
+      }
+    });
+    next();
+  };
+}
+function auditPersonalDataAccess(dataType) {
+  return auditLog(
+    dataType === "religious" ? "RELIGIOUS_DATA_ACCESS" /* RELIGIOUS_DATA_ACCESS */ : "PERSONAL_DATA_ACCESS" /* PERSONAL_DATA_ACCESS */,
+    (req) => ({
+      dataType,
+      query: sanitizeAuditData(req.query),
+      params: sanitizeAuditData(req.params)
+    })
+  );
+}
+async function auditLoginAttempt(email, success, req, reason) {
+  await logAudit(
+    success ? "LOGIN" /* LOGIN */ : "LOGIN_FAILED" /* LOGIN_FAILED */,
+    {
+      email,
+      success,
+      reason,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    }
+  );
+}
+
 // server/authRoutes.ts
 var router2 = Router2();
 var loginSchema = z.object({
@@ -2861,6 +5438,7 @@ router2.post("/login", async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const result = await login(email, password);
+    await auditLoginAttempt(email, true, req);
     res.cookie("token", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== "development",
@@ -2890,6 +5468,10 @@ router2.post("/login", async (req, res) => {
       user: result.user
     });
   } catch (error) {
+    const email = req.body?.email;
+    if (email) {
+      await auditLoginAttempt(email, false, req, error.message || "Credenciais inv\xE1lidas");
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -2910,6 +5492,15 @@ router2.post("/register", async (req, res) => {
       ...userData,
       role: "ministro",
       status: "pending"
+    });
+    await logAudit("USER_CREATE" /* USER_CREATE */, {
+      userId: newUser.id,
+      email: userData.email,
+      name: userData.name,
+      role: "ministro",
+      status: "pending",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
     });
     res.status(201).json({
       success: true,
@@ -2946,6 +5537,19 @@ router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coord
       });
     }
     const newUser = await register(userData);
+    await logAudit("USER_CREATE" /* USER_CREATE */, {
+      userId: req.user?.id,
+      targetUserId: newUser.id,
+      targetResource: "user",
+      changes: {
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+        createdBy: req.user?.email
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     res.status(201).json({
       success: true,
       message: "Usu\xE1rio criado com sucesso",
@@ -3030,7 +5634,15 @@ router2.get("/user", authenticateToken, async (req, res) => {
     });
   }
 });
-router2.post("/logout", async (req, res) => {
+router2.post("/logout", authenticateToken, async (req, res) => {
+  if (req.user?.id) {
+    await logAudit("LOGOUT" /* LOGOUT */, {
+      userId: req.user.id,
+      email: req.user.email,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
+  }
   const sessionToken = req.cookies?.session_token;
   if (sessionToken) {
     try {
@@ -3072,6 +5684,12 @@ router2.post("/change-password", authenticateToken, async (req, res) => {
       });
     }
     const result = await changePassword(req.user.id, currentPassword, newPassword);
+    await logAudit("PASSWORD_CHANGE" /* PASSWORD_CHANGE */, {
+      userId: req.user.id,
+      email: req.user.email,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     res.json({
       success: true,
       message: result.message
@@ -3122,6 +5740,19 @@ router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", 
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq4(users.id, userId));
+    await logAudit("USER_UPDATE" /* USER_UPDATE */, {
+      userId: currentUser?.id,
+      targetUserId: userId,
+      targetResource: "user",
+      action: "admin_password_reset",
+      changes: {
+        resetBy: currentUser?.email,
+        targetUser: user.email,
+        requiresPasswordChange: true
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     console.log(`[ADMIN RESET] ${currentUser?.name} (${currentUser?.role}) resetou senha do usu\xE1rio ${user.name} (${user.email})`);
     return res.json({
       success: true,
@@ -3159,6 +5790,11 @@ router2.post("/reset-password", async (req, res) => {
     }
     const normalizedEmail = email.trim().toLowerCase();
     const result = await resetPassword(normalizedEmail);
+    await logAudit("PASSWORD_RESET_REQUEST" /* PASSWORD_RESET_REQUEST */, {
+      email: normalizedEmail,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     return res.json({
       success: true,
       ...result
@@ -3393,7 +6029,18 @@ var authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1e3,
   // 15 minutos
   max: 5,
-  // Máximo 5 tentativas por IP
+  // Máximo 5 tentativas por email/IP
+  // CRÍTICO: Rate limit por EMAIL, não apenas IP
+  // Desabilita todas as validações pois usamos chave customizada baseada em email
+  validate: false,
+  keyGenerator: (req) => {
+    const email = req.body?.email;
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    if (email) {
+      return `auth:${email.toLowerCase()}:${ip}`;
+    }
+    return `auth:ip:${ip}`;
+  },
   message: {
     error: "Muitas tentativas de autentica\xE7\xE3o. Tente novamente em 15 minutos."
   },
@@ -3404,10 +6051,13 @@ var authRateLimiter = rateLimit({
   skipSuccessfulRequests: false,
   // Contar mesmo se request for bem-sucedido
   handler: (req, res) => {
+    const email = req.body?.email;
     res.status(429).json({
       error: "Muitas tentativas de autentica\xE7\xE3o",
-      message: "Voc\xEA excedeu o limite de tentativas. Por favor, aguarde 15 minutos e tente novamente.",
-      retryAfter: "15 minutes"
+      message: email ? `Muitas tentativas de login para ${email}. Aguarde 15 minutos e tente novamente.` : "Voc\xEA excedeu o limite de tentativas. Por favor, aguarde 15 minutos e tente novamente.",
+      retryAfter: "15 minutes",
+      accountLocked: !!email
+      // Indicar se a conta específica está bloqueada
     });
   }
 });
@@ -3434,7 +6084,18 @@ var passwordResetRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1e3,
   // 1 hora
   max: 3,
-  // Máximo 3 tentativas por hora por IP
+  // Máximo 3 tentativas por hora por email
+  // Rate limit por EMAIL para prevenir spam de reset
+  // Desabilita todas as validações pois usamos chave customizada baseada em email
+  validate: false,
+  keyGenerator: (req) => {
+    const email = req.body?.email;
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    if (email) {
+      return `password-reset:${email.toLowerCase()}`;
+    }
+    return `password-reset:ip:${ip}`;
+  },
   message: {
     error: "Muitas tentativas de recupera\xE7\xE3o de senha."
   },
@@ -3450,6 +6111,19 @@ var passwordResetRateLimiter = rateLimit({
     });
   }
 });
+
+// server/middleware/noCacheHeaders.ts
+function noCacheHeaders(req, res, next) {
+  if (req.path.startsWith("/api")) {
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "Surrogate-Control": "no-store"
+    });
+  }
+  next();
+}
 
 // server/routes/questionnaireAdmin.ts
 await init_db();
@@ -4662,6 +7336,209 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
     res.status(500).json({ error: "Failed to fetch response summary" });
   }
 });
+router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const schema = z2.object({
+      month: z2.number().min(1).max(12),
+      year: z2.number().min(2024).max(2050)
+    });
+    const { month, year } = schema.parse(req.body);
+    if (!db) {
+      return res.status(503).json({ error: "Database service unavailable" });
+    }
+    const [questionnaire] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, month),
+      eq6(questionnaires.year, year),
+      ne(questionnaires.status, "deleted")
+    ));
+    if (!questionnaire) {
+      return res.status(404).json({
+        error: "Question\xE1rio n\xE3o encontrado",
+        message: `Nenhum question\xE1rio encontrado para ${getMonthName(month)}/${year}. Crie um primeiro.`
+      });
+    }
+    const [updated] = await db.update(questionnaires).set({
+      status: "sent",
+      // 'sent' is the open status
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq6(questionnaires.id, questionnaire.id)).returning();
+    res.json({
+      message: `Question\xE1rio de ${getMonthName(month)}/${year} aberto com sucesso`,
+      questionnaire: {
+        ...updated,
+        questions: updated.questions
+      }
+    });
+  } catch (error) {
+    console.error("Error opening questionnaire:", error);
+    res.status(500).json({ error: "Failed to open questionnaire" });
+  }
+});
+router4.get("/current-status", authenticateToken, async (req, res) => {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const currentHour = now.getHours();
+    if (!db) {
+      return res.status(503).json({ error: "Database service unavailable" });
+    }
+    const [questionnaire] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, currentMonth),
+      eq6(questionnaires.year, currentYear),
+      ne(questionnaires.status, "deleted")
+    ));
+    const shouldAutoClose = currentDay >= 25;
+    const isAfter23 = currentHour >= 23;
+    let autoCloseTriggered = false;
+    if (questionnaire && questionnaire.status === "sent" && shouldAutoClose && isAfter23) {
+      const [updated] = await db.update(questionnaires).set({
+        status: "closed",
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq6(questionnaires.id, questionnaire.id)).returning();
+      autoCloseTriggered = true;
+      return res.json({
+        currentDay,
+        currentMonth,
+        currentYear,
+        shouldAutoClose,
+        autoCloseTriggered,
+        questionnaire: {
+          id: updated.id,
+          month: updated.month,
+          year: updated.year,
+          status: updated.status,
+          title: updated.title
+        },
+        message: "Question\xE1rio fechado automaticamente (dia 25 ou posterior)"
+      });
+    }
+    res.json({
+      currentDay,
+      currentMonth,
+      currentYear,
+      shouldAutoClose,
+      isAfter23,
+      autoCloseTriggered: false,
+      questionnaire: questionnaire ? {
+        id: questionnaire.id,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        title: questionnaire.title
+      } : null,
+      message: shouldAutoClose ? isAfter23 ? "Per\xEDodo de auto-fechamento (ap\xF3s 23h do dia 25)" : "Aguardando 23h para auto-fechamento" : `Auto-fechamento programado para dia 25 (hoje \xE9 dia ${currentDay})`
+    });
+  } catch (error) {
+    console.error("Error checking current status:", error);
+    res.status(500).json({ error: "Failed to check current status" });
+  }
+});
+router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    if (!month || !year) {
+      return res.status(400).json({
+        error: "Par\xE2metros obrigat\xF3rios ausentes",
+        message: "Os par\xE2metros month e year s\xE3o obrigat\xF3rios"
+      });
+    }
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    if (!db) {
+      return res.status(503).json({ error: "Database service unavailable" });
+    }
+    const [questionnaire] = await db.select().from(questionnaires).where(and4(
+      eq6(questionnaires.month, monthNum),
+      eq6(questionnaires.year, yearNum),
+      ne(questionnaires.status, "deleted")
+    ));
+    if (!questionnaire) {
+      return res.json({
+        month: monthNum,
+        year: yearNum,
+        exists: false,
+        status: null,
+        totalActiveUsers: 0,
+        totalResponses: 0,
+        responseRate: 0,
+        pendingResponses: 0,
+        availableCount: 0,
+        unavailableCount: 0,
+        message: "Question\xE1rio n\xE3o encontrado"
+      });
+    }
+    const activeUsers = await db.select({
+      id: users.id
+    }).from(users).where(and4(
+      or3(
+        eq6(users.role, "ministro"),
+        eq6(users.role, "coordenador")
+      ),
+      eq6(users.status, "active")
+    ));
+    const totalActiveUsers = activeUsers.length;
+    const responses = await db.select({
+      id: questionnaireResponses.id,
+      userId: questionnaireResponses.userId,
+      responses: questionnaireResponses.responses,
+      submittedAt: questionnaireResponses.submittedAt
+    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, questionnaire.id));
+    const totalResponses = responses.length;
+    const responseRate = totalActiveUsers > 0 ? parseFloat((totalResponses / totalActiveUsers * 100).toFixed(2)) : 0;
+    const pendingResponses = totalActiveUsers - totalResponses;
+    let availableCount = 0;
+    let unavailableCount = 0;
+    responses.forEach((response) => {
+      try {
+        const parsedResponses = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+        const monthlyAvailability = parsedResponses.find((r) => r.questionId === "monthly_availability");
+        if (monthlyAvailability) {
+          const answer = typeof monthlyAvailability.answer === "object" ? monthlyAvailability.answer.answer : monthlyAvailability.answer;
+          if (answer === "Sim" || answer === "yes") {
+            availableCount++;
+          } else if (answer === "N\xE3o" || answer === "no") {
+            unavailableCount++;
+          }
+        } else {
+          const oldAvailability = parsedResponses.find((r) => r.questionId === "availability");
+          if (oldAvailability) {
+            if (oldAvailability.answer === "yes" || oldAvailability.answer === "Dispon\xEDvel") {
+              availableCount++;
+            } else if (oldAvailability.answer === "no" || oldAvailability.answer === "Indispon\xEDvel") {
+              unavailableCount++;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing response:", e);
+      }
+    });
+    res.json({
+      month: monthNum,
+      year: yearNum,
+      monthName: getMonthName(monthNum),
+      exists: true,
+      questionnaireId: questionnaire.id,
+      status: questionnaire.status,
+      title: questionnaire.title,
+      totalActiveUsers,
+      totalResponses,
+      responseRate,
+      responseRateFormatted: `${responseRate}%`,
+      pendingResponses,
+      availableCount,
+      unavailableCount,
+      notRespondedCount: pendingResponses,
+      lastUpdated: questionnaire.updatedAt,
+      createdAt: questionnaire.createdAt
+    });
+  } catch (error) {
+    console.error("Error fetching questionnaire stats:", error);
+    res.status(500).json({ error: "Failed to fetch questionnaire stats" });
+  }
+});
 var questionnaireAdmin_default = router4;
 
 // server/routes/questionnaires.ts
@@ -5778,9 +8655,9 @@ router5.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
 router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { questionnaireId } = req.params;
-    const { format: format4 = "detailed" } = req.query;
+    const { format: format9 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
-    const csvContent = format4 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -5795,12 +8672,12 @@ router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coorden
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const { format: format4 = "detailed" } = req.query;
+    const { format: format9 = "detailed" } = req.query;
     if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
       return res.status(400).json({ error: "Invalid month or year" });
     }
     const exportData = await getMonthlyResponsesForExport(month, year);
-    const csvContent = format4 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const monthName = monthNames[month - 1];
     const filename = `respostas_${monthName}_${year}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -5879,11 +8756,11 @@ var questionnaires_default = router5;
 // server/routes/scheduleGeneration.ts
 import { Router as Router6 } from "express";
 import { z as z4 } from "zod";
-init_scheduleGenerator();
+await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and8, gte as gte3, lte as lte3, eq as eq10, sql as sql5, ne as ne3, desc as desc4 } from "drizzle-orm";
+import { and as and8, gte as gte3, lte as lte3, eq as eq11, sql as sql5, ne as ne3, desc as desc4 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
 var router6 = Router6();
@@ -5911,6 +8788,33 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
   try {
     const { year, month, saveToDatabase, replaceExisting } = generateScheduleSchema.parse(req.body);
     logger.info(`Iniciando gera\xE7\xE3o autom\xE1tica de escalas para ${month}/${year} por usu\xE1rio ${req.user?.id}`);
+    if (db) {
+      const [targetQuestionnaire] = await db.select().from(questionnaires).where(
+        and8(
+          eq11(questionnaires.month, month),
+          eq11(questionnaires.year, year)
+        )
+      ).limit(1);
+      if (!targetQuestionnaire) {
+        logger.warn(`Tentativa de gerar escalas sem question\xE1rio: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: `N\xE3o h\xE1 question\xE1rio criado para ${month}/${year}. Crie um question\xE1rio antes de gerar escalas.`,
+          errorCode: "NO_QUESTIONNAIRE"
+        });
+      }
+      const responses = await db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+      if (responses.length === 0) {
+        logger.warn(`Tentativa de gerar escalas sem respostas: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: "N\xE3o h\xE1 respostas do question\xE1rio para este m\xEAs. Aguarde os ministros responderem antes de gerar escalas.",
+          errorCode: "NO_RESPONSES",
+          questionnaireStatus: targetQuestionnaire.status
+        });
+      }
+      logger.info(`Valida\xE7\xE3o OK: question\xE1rio ${targetQuestionnaire.id} com ${responses.length} respostas`);
+    }
     if (!replaceExisting && db) {
       const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(sql5`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`).limit(1);
       if (existingSchedules.length > 0) {
@@ -6049,9 +8953,19 @@ router6.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "
         message: "Ano e m\xEAs devem ser v\xE1lidos"
       });
     }
+    console.log("[PREVIEW ROUTE] \u{1F680} Starting schedule preview with 30s timeout");
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("\u23F1\uFE0F Schedule generation timed out after 30 seconds. This indicates a performance issue that needs to be fixed."));
+      }, 3e4);
+    });
     console.log("[PREVIEW ROUTE] Calling generateAutomaticSchedule with:", { year, month, isPreview: true });
-    const generatedSchedules = await generateAutomaticSchedule(year, month, true);
-    console.log("[PREVIEW ROUTE] Generated schedules count:", generatedSchedules.length);
+    const generatedSchedules = await Promise.race([
+      generateAutomaticSchedule(year, month, true),
+      // Preview aceita questionários abertos
+      timeoutPromise
+    ]);
+    console.log("[PREVIEW ROUTE] \u2705 Generated schedules count:", generatedSchedules.length);
     const correctedSchedules = generatedSchedules.filter((schedule) => {
       const isDay28 = schedule.massTime.date?.endsWith("-28");
       const isDailyMass = schedule.massTime.type === "missa_diaria";
@@ -6085,7 +8999,7 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const { ScheduleGenerator: ScheduleGenerator2 } = await Promise.resolve().then(() => (init_scheduleGenerator(), scheduleGenerator_exports));
+    const { ScheduleGenerator: ScheduleGenerator2 } = await init_scheduleGenerator().then(() => scheduleGenerator_exports);
     const generator = new ScheduleGenerator2();
     const ministersData = await db.select({
       id: users.id,
@@ -6095,15 +9009,15 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       totalServices: users.totalServices
     }).from(users).where(
       and8(
-        eq10(users.status, "active"),
+        eq11(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq10(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    const massTimesData = await db.select().from(massTimesConfig).where(eq11(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq11(questionnaireResponses.questionnaireId, questionnaires.id)).where(
       and8(
-        eq10(questionnaires.month, month),
-        eq10(questionnaires.year, year)
+        eq11(questionnaires.month, month),
+        eq11(questionnaires.year, year)
       )
     );
     res.json({
@@ -6146,7 +9060,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(
       and8(
         sql5`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
         sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
@@ -6186,8 +9100,8 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
     if (replaceExisting) {
       await db.delete(schedules).where(
         and8(
-          eq10(schedules.date, schedule.massTime.date),
-          eq10(schedules.time, schedule.massTime.time)
+          eq11(schedules.date, schedule.massTime.date),
+          eq11(schedules.time, schedule.massTime.time)
         )
       );
     }
@@ -6337,7 +9251,7 @@ router6.get("/by-date/:date", authenticateToken, async (req, res) => {
       status: schedules.status,
       notes: schedules.notes,
       ministerName: users.name
-    }).from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(eq10(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+    }).from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(eq11(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
     const formattedAssignments = assignments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -6379,9 +9293,9 @@ router6.get("/:date/:time", authenticateToken, async (req, res) => {
       type: schedules.type,
       location: schedules.location,
       position: schedules.position
-    }).from(schedules).leftJoin(users, eq10(schedules.ministerId, users.id)).where(and8(
-      eq10(schedules.date, date2),
-      eq10(schedules.time, time2)
+    }).from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(and8(
+      eq11(schedules.date, date2),
+      eq11(schedules.time, time2)
     )).orderBy(schedules.position);
     res.json({
       date: date2,
@@ -6416,9 +9330,9 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     if (!data.skipDuplicateCheck) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
       const [existing] = await db.select().from(schedules).where(and8(
-        eq10(schedules.date, data.date),
-        eq10(schedules.time, data.time),
-        eq10(schedules.ministerId, data.ministerId)
+        eq11(schedules.date, data.date),
+        eq11(schedules.time, data.time),
+        eq11(schedules.ministerId, data.ministerId)
       )).limit(1);
       if (existing) {
         logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
@@ -6434,8 +9348,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
     } else {
       const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and8(
-        eq10(schedules.date, data.date),
-        eq10(schedules.time, data.time)
+        eq11(schedules.date, data.date),
+        eq11(schedules.time, data.time)
       )).orderBy(desc4(schedules.position));
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
       logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
@@ -6464,7 +9378,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(eq10(schedules.id, id));
+    await db.delete(schedules).where(eq11(schedules.id, id));
     res.json({ success: true, message: "Ministro removido da escala" });
   } catch (error) {
     logger.error("Error removing minister from schedule:", error);
@@ -6487,8 +9401,8 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     }
     console.log("[batch-update] Fetching existing schedules for:", { date: date2, time: time2 });
     const existingSchedules = await db.select().from(schedules).where(and8(
-      eq10(schedules.date, date2),
-      eq10(schedules.time, time2)
+      eq11(schedules.date, date2),
+      eq11(schedules.time, time2)
     ));
     console.log("[batch-update] Found existing schedules:", existingSchedules.length);
     for (let i = 0; i < ministers.length; i++) {
@@ -6499,7 +9413,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
         await db.update(schedules).set({
           ministerId,
           position
-        }).where(eq10(schedules.id, existingSchedules[i].id));
+        }).where(eq11(schedules.id, existingSchedules[i].id));
       } else {
         console.log("[batch-update] Creating new schedule at position:", position);
         await db.insert(schedules).values({
@@ -6516,13 +9430,13 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
       const schedulesToDelete = existingSchedules.slice(ministers.length);
       console.log("[batch-update] Removing excess schedules:", schedulesToDelete.length);
       for (const schedule of schedulesToDelete) {
-        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq10(substitutionRequests.scheduleId, schedule.id)).limit(1);
+        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq11(substitutionRequests.scheduleId, schedule.id)).limit(1);
         if (hasSubstitutions.length > 0) {
           console.log("[batch-update] Schedule has substitutions, setting ministerId to null:", schedule.id);
-          await db.update(schedules).set({ ministerId: null }).where(eq10(schedules.id, schedule.id));
+          await db.update(schedules).set({ ministerId: null }).where(eq11(schedules.id, schedule.id));
         } else {
           console.log("[batch-update] Deleting schedule:", schedule.id);
-          await db.delete(schedules).where(eq10(schedules.id, schedule.id));
+          await db.delete(schedules).where(eq11(schedules.id, schedule.id));
         }
       }
     }
@@ -6536,14 +9450,1365 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
 });
 var scheduleGeneration_default = router6;
 
-// server/routes/upload.ts
+// server/routes/smartScheduleGeneration.ts
 await init_db();
 init_schema();
 import { Router as Router7 } from "express";
+await init_scheduleGenerator();
+import { eq as eq12, and as and9, gte as gte4, lte as lte4, ne as ne4 } from "drizzle-orm";
+
+// server/utils/liturgicalCalculations.ts
+function calculateEaster(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = (h + l - 7 * m + 114) % 31 + 1;
+  return new Date(year, month - 1, day);
+}
+function getLiturgicalCycle(year) {
+  const remainder = year % 3;
+  if (remainder === 0) return "A";
+  if (remainder === 1) return "B";
+  return "C";
+}
+function getAdventStart(year) {
+  const christmas = new Date(year, 11, 25);
+  const dayOfWeek = christmas.getDay();
+  const daysToSunday = dayOfWeek === 0 ? 7 : dayOfWeek;
+  const daysBack = 28 + daysToSunday;
+  const adventStart = new Date(year, 11, 25 - daysBack);
+  return adventStart;
+}
+function getMovableFeasts(year) {
+  const easter = calculateEaster(year);
+  return {
+    ashWednesday: addDays2(easter, -46),
+    palmSunday: addDays2(easter, -7),
+    holyThursday: addDays2(easter, -3),
+    goodFriday: addDays2(easter, -2),
+    holySaturday: addDays2(easter, -1),
+    easterSunday: easter,
+    divineMercySunday: addDays2(easter, 7),
+    ascension: addDays2(easter, 39),
+    // or 43 in some regions
+    pentecost: addDays2(easter, 49),
+    trinitySunday: addDays2(easter, 56),
+    corpusChristi: addDays2(easter, 60)
+    // or next Sunday in some regions
+  };
+}
+function getLiturgicalSeasons(year) {
+  const adventStart = getAdventStart(year);
+  const christmas = new Date(year, 11, 25);
+  const epiphany = new Date(year + 1, 0, 6);
+  const baptismOfTheLord = getNextSunday(epiphany);
+  const movableFeasts = getMovableFeasts(year + 1);
+  const ashWednesday = movableFeasts.ashWednesday;
+  const easterSunday = movableFeasts.easterSunday;
+  const pentecost = movableFeasts.pentecost;
+  const nextAdventStart = getAdventStart(year + 1);
+  return [
+    {
+      name: "Advent",
+      color: "purple",
+      startDate: adventStart,
+      endDate: addDays2(christmas, -1)
+    },
+    {
+      name: "Christmas",
+      color: "white",
+      startDate: christmas,
+      endDate: baptismOfTheLord
+    },
+    {
+      name: "Ordinary Time I",
+      color: "green",
+      startDate: addDays2(baptismOfTheLord, 1),
+      endDate: addDays2(ashWednesday, -1)
+    },
+    {
+      name: "Lent",
+      color: "purple",
+      startDate: ashWednesday,
+      endDate: addDays2(easterSunday, -1)
+    },
+    {
+      name: "Easter",
+      color: "white",
+      startDate: easterSunday,
+      endDate: pentecost
+    },
+    {
+      name: "Ordinary Time II",
+      color: "green",
+      startDate: addDays2(pentecost, 1),
+      endDate: addDays2(nextAdventStart, -1)
+    }
+  ];
+}
+function addDays2(date2, days) {
+  const result = new Date(date2);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+function getNextSunday(date2) {
+  const result = new Date(date2);
+  const daysUntilSunday = (7 - result.getDay()) % 7;
+  result.setDate(result.getDate() + (daysUntilSunday === 0 ? 7 : daysUntilSunday));
+  return result;
+}
+function getCurrentLiturgicalSeason(date2 = /* @__PURE__ */ new Date()) {
+  const year = date2.getFullYear();
+  const seasons = getLiturgicalSeasons(year - 1);
+  seasons.push(...getLiturgicalSeasons(year));
+  const currentSeason = seasons.find(
+    (season) => date2 >= season.startDate && date2 <= season.endDate
+  );
+  if (!currentSeason) {
+    return { name: "Ordinary Time", color: "green", cycle: getLiturgicalCycle(year) };
+  }
+  return {
+    ...currentSeason,
+    cycle: getLiturgicalCycle(year)
+  };
+}
+function isStJudeDay(date2) {
+  return date2.getDate() === 28;
+}
+function isStJudeNovena(date2) {
+  const month = date2.getMonth();
+  const day = date2.getDate();
+  return month === 9 && day >= 20 && day <= 27;
+}
+function isStJudeFeast(date2) {
+  return date2.getMonth() === 9 && date2.getDate() === 28;
+}
+
+// server/routes/smartScheduleGeneration.ts
+import { format as format4, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2 } from "date-fns";
+var router7 = Router7();
+router7.post("/generate-smart", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { month, year, options } = req.body;
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "M\xEAs e ano s\xE3o obrigat\xF3rios"
+      });
+    }
+    console.log(`[SMART_GEN] Generating smart schedule for ${month}/${year}`, options);
+    const generator = new ScheduleGenerator();
+    const generatedSchedules = await generator.generateScheduleForMonth(year, month, false);
+    const statistics = calculateGenerationStatistics(generatedSchedules, options);
+    const warnings = [];
+    if (statistics.coverage < 0.8) {
+      warnings.push(`Cobertura baixa: apenas ${(statistics.coverage * 100).toFixed(0)}% das posi\xE7\xF5es foram preenchidas`);
+    }
+    if (statistics.distributionVariance > 0.3) {
+      warnings.push(`Distribui\xE7\xE3o desbalanceada: vari\xE2ncia de ${(statistics.distributionVariance * 100).toFixed(0)}%`);
+    }
+    if (statistics.conflicts.length > 0) {
+      warnings.push(`${statistics.conflicts.length} conflitos detectados`);
+    }
+    const schedule = generatedSchedules.map((s) => ({
+      date: s.massTime.date,
+      time: s.massTime.time,
+      type: s.massTime.type || "missa",
+      ministerId: null,
+      position: 0,
+      assignments: s.ministers.map((m, idx) => ({
+        ministerId: m.id,
+        ministerName: m.name,
+        position: m.position || idx + 1,
+        score: m.availabilityScore,
+        matchQuality: m.availabilityScore > 0.8 ? "excellent" : m.availabilityScore > 0.5 ? "good" : "acceptable"
+      }))
+    }));
+    res.json({
+      success: true,
+      message: `Escala gerada com sucesso para ${month}/${year}`,
+      data: {
+        schedule,
+        statistics,
+        warnings
+      }
+    });
+  } catch (error) {
+    console.error("[SMART_GEN] Error generating smart schedule:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao gerar escala inteligente"
+    });
+  }
+});
+router7.post("/preview", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { month, year, options } = req.body;
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "M\xEAs e ano s\xE3o obrigat\xF3rios"
+      });
+    }
+    console.log(`[PREVIEW] Generating preview for ${month}/${year}`);
+    const generator = new ScheduleGenerator();
+    const generatedSchedules = await generator.generateScheduleForMonth(year, month, true);
+    const statistics = calculateGenerationStatistics(generatedSchedules, options || {});
+    const liturgicalInfo = await getLiturgicalInfoForMonth(year, month);
+    res.json({
+      success: true,
+      data: {
+        schedules: generatedSchedules.map((s) => ({
+          massTime: s.massTime,
+          ministers: s.ministers,
+          backupMinisters: s.backupMinisters,
+          confidence: s.confidence
+        })),
+        statistics,
+        liturgicalInfo
+      }
+    });
+  } catch (error) {
+    console.error("[PREVIEW] Error generating preview:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao gerar preview"
+    });
+  }
+});
+router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { date: date2, time: time2, ministerId, newPosition, oldPosition } = req.body;
+    if (!date2 || !time2 || !ministerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Data, hor\xE1rio e ministro s\xE3o obrigat\xF3rios"
+      });
+    }
+    console.log(`[MANUAL_ADJUST] Moving minister ${ministerId} from pos ${oldPosition} to ${newPosition} on ${date2} ${time2}`);
+    const availability = await checkMinisterAvailability(ministerId, date2, time2);
+    if (!availability.available) {
+      return res.status(400).json({
+        success: false,
+        message: `Ministro n\xE3o est\xE1 dispon\xEDvel: ${availability.reason}`,
+        data: { availability }
+      });
+    }
+    const existingAssignments = await db.select().from(schedules).where(
+      and9(
+        eq12(schedules.date, date2),
+        eq12(schedules.ministerId, ministerId),
+        ne4(schedules.time, time2)
+      )
+    );
+    if (existingAssignments.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Ministro j\xE1 escalado em outro hor\xE1rio neste dia: ${existingAssignments[0].time}`,
+        data: { existingAssignments }
+      });
+    }
+    const existing = await db.select().from(schedules).where(
+      and9(
+        eq12(schedules.date, date2),
+        eq12(schedules.time, time2),
+        eq12(schedules.ministerId, ministerId)
+      )
+    );
+    if (existing.length > 0) {
+      await db.update(schedules).set({ position: newPosition }).where(eq12(schedules.id, existing[0].id));
+    } else {
+      await db.insert(schedules).values({
+        date: date2,
+        time: time2,
+        type: "missa",
+        ministerId,
+        position: newPosition,
+        status: "scheduled"
+      });
+    }
+    const fairnessImpact = await calculateFairnessImpact(ministerId, date2);
+    res.json({
+      success: true,
+      message: "Ajuste realizado com sucesso",
+      data: {
+        fairnessImpact,
+        availability
+      }
+    });
+  } catch (error) {
+    console.error("[MANUAL_ADJUST] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao realizar ajuste manual"
+    });
+  }
+});
+router7.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { month, year, scheduleData } = req.body;
+    if (!month || !year || !scheduleData) {
+      return res.status(400).json({
+        success: false,
+        message: "Dados incompletos para publica\xE7\xE3o"
+      });
+    }
+    console.log(`[PUBLISH] Publishing schedule for ${month}/${year}`);
+    const validation = await validateScheduleBeforePublish(scheduleData, month, year);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: "Escala n\xE3o passou na valida\xE7\xE3o",
+        data: { validation }
+      });
+    }
+    const savedCount = await saveScheduleToDatabase(scheduleData, month, year);
+    const notificationResults = await sendMinisterNotifications(scheduleData, month, year);
+    console.log(`[PUBLISH] Published ${savedCount} assignments, sent ${notificationResults.sent} notifications`);
+    res.json({
+      success: true,
+      message: `Escala publicada com sucesso! ${savedCount} atribui\xE7\xF5es criadas.`,
+      data: {
+        assignmentsCreated: savedCount,
+        notificationsSent: notificationResults.sent,
+        notificationsFailed: notificationResults.failed,
+        validation
+      }
+    });
+  } catch (error) {
+    console.error("[PUBLISH] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao publicar escala"
+    });
+  }
+});
+router7.get("/validation/:year/:month", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { month, year } = req.params;
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    const startDate = format4(new Date(yearNum, monthNum - 1, 1), "yyyy-MM-dd");
+    const endDate = format4(endOfMonth2(new Date(yearNum, monthNum - 1, 1)), "yyyy-MM-dd");
+    const monthSchedules = await db.select().from(schedules).where(
+      and9(
+        gte4(schedules.date, startDate),
+        lte4(schedules.date, endDate)
+      )
+    );
+    const validation = await validateScheduleBeforePublish(monthSchedules, monthNum, yearNum);
+    res.json({
+      success: true,
+      data: validation
+    });
+  } catch (error) {
+    console.error("[VALIDATION] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao validar escala"
+    });
+  }
+});
+function calculateGenerationStatistics(schedules3, options) {
+  const assignmentsPerMinister = {};
+  const specialMassCoverage = {};
+  let totalPositions = 0;
+  let filledPositions = 0;
+  for (const schedule of schedules3) {
+    const massType = schedule.massTime.type || "regular";
+    totalPositions += schedule.massTime.minMinisters;
+    filledPositions += schedule.ministers.length;
+    if (massType !== "missa_diaria" && massType !== "missa_dominical") {
+      if (!specialMassCoverage[massType]) {
+        specialMassCoverage[massType] = 0;
+      }
+      specialMassCoverage[massType] += schedule.ministers.length / schedule.massTime.minMinisters * 100;
+    }
+    for (const minister of schedule.ministers) {
+      if (!minister.id) continue;
+      assignmentsPerMinister[minister.id] = (assignmentsPerMinister[minister.id] || 0) + 1;
+    }
+  }
+  const coverage = totalPositions > 0 ? filledPositions / totalPositions : 0;
+  const assignments = Object.values(assignmentsPerMinister);
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count7) => sum + count7, 0) / assignments.length : 0;
+  const variance = assignments.length > 0 ? Math.sqrt(
+    assignments.reduce((sum, count7) => sum + Math.pow(count7 - avgAssignments, 2), 0) / assignments.length
+  ) / (avgAssignments || 1) : 0;
+  const fairness = Math.max(0, 1 - variance);
+  const maxAllowed = options.maxAssignmentsPerMinister || 4;
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count7]) => count7 > maxAllowed || count7 < 1).map(([ministerId, count7]) => ({
+    ministerId,
+    count: count7,
+    reason: count7 > maxAllowed ? "too_many" : "too_few"
+  }));
+  const conflicts = [];
+  if (variance > 0.3) {
+    conflicts.push("Distribui\xE7\xE3o desigual de atribui\xE7\xF5es entre ministros");
+  }
+  if (coverage < 0.9) {
+    conflicts.push("Algumas missas n\xE3o atingiram o n\xFAmero m\xEDnimo de ministros");
+  }
+  return {
+    coverage,
+    fairness,
+    conflicts,
+    distributionVariance: variance,
+    specialMassCoverage,
+    assignmentsPerMinister,
+    outliers
+  };
+}
+async function checkMinisterAvailability(ministerId, date2, time2) {
+  const minister = await db.select().from(users).where(eq12(users.id, ministerId)).limit(1);
+  if (minister.length === 0) {
+    return { available: false, reason: "Ministro n\xE3o encontrado" };
+  }
+  const dateObj = new Date(date2);
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq12(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    and9(
+      eq12(questionnaireResponses.userId, ministerId),
+      eq12(questionnaires.month, month),
+      eq12(questionnaires.year, year)
+    )
+  );
+  if (responses.length === 0) {
+    return { available: true, reason: "Sem resposta de question\xE1rio (assumindo dispon\xEDvel)" };
+  }
+  return { available: true };
+}
+async function calculateFairnessImpact(ministerId, date2) {
+  const dateObj = new Date(date2);
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+  const startDate = format4(startOfMonth2(dateObj), "yyyy-MM-dd");
+  const endDate = format4(endOfMonth2(dateObj), "yyyy-MM-dd");
+  const allAssignments = await db.select().from(schedules).where(
+    and9(
+      gte4(schedules.date, startDate),
+      lte4(schedules.date, endDate)
+    )
+  );
+  const counts = {};
+  for (const assignment of allAssignments) {
+    if (!assignment.ministerId) continue;
+    counts[assignment.ministerId] = (counts[assignment.ministerId] || 0) + 1;
+  }
+  const valuesBefore = Object.values(counts);
+  const avgBefore = valuesBefore.reduce((sum, c) => sum + c, 0) / valuesBefore.length;
+  const varianceBefore = Math.sqrt(
+    valuesBefore.reduce((sum, c) => sum + Math.pow(c - avgBefore, 2), 0) / valuesBefore.length
+  );
+  counts[ministerId] = (counts[ministerId] || 0) + 1;
+  const valuesAfter = Object.values(counts);
+  const avgAfter = valuesAfter.reduce((sum, c) => sum + c, 0) / valuesAfter.length;
+  const varianceAfter = Math.sqrt(
+    valuesAfter.reduce((sum, c) => sum + Math.pow(c - avgAfter, 2), 0) / valuesAfter.length
+  );
+  return {
+    before: varianceBefore,
+    after: varianceAfter,
+    change: varianceAfter - varianceBefore
+  };
+}
+async function validateScheduleBeforePublish(scheduleData, month, year) {
+  const warnings = [];
+  const errors = [];
+  const sundays = scheduleData.filter((s) => {
+    const date2 = new Date(s.date || s.massTime?.date);
+    return date2.getDay() === 0;
+  });
+  const sundaysUnderstaffed = sundays.filter((s) => {
+    const ministerCount = s.ministers?.length || s.assignments?.length || 0;
+    const minRequired = 15;
+    return ministerCount < minRequired;
+  });
+  const allSundaysCovered = sundaysUnderstaffed.length === 0;
+  if (!allSundaysCovered) {
+    errors.push(`${sundaysUnderstaffed.length} missas dominicais sem o m\xEDnimo de ministros`);
+  }
+  const specialMasses = scheduleData.filter((s) => {
+    const type = s.type || s.massTime?.type;
+    return type && !["missa_diaria", "missa_dominical"].includes(type);
+  });
+  const specialUnderstaffed = specialMasses.filter((s) => {
+    const ministerCount = s.ministers?.length || s.assignments?.length || 0;
+    const minRequired = s.massTime?.minMinisters || 20;
+    return ministerCount < minRequired;
+  });
+  const specialCelebrationsCovered = specialUnderstaffed.length === 0;
+  if (!specialCelebrationsCovered) {
+    warnings.push(`${specialUnderstaffed.length} celebra\xE7\xF5es especiais com poucos ministros`);
+  }
+  const ministerCounts = {};
+  for (const schedule of scheduleData) {
+    const ministers = schedule.ministers || schedule.assignments || [];
+    for (const minister of ministers) {
+      const id = minister.id || minister.ministerId;
+      if (id) {
+        ministerCounts[id] = (ministerCounts[id] || 0) + 1;
+      }
+    }
+  }
+  const overAssigned = Object.entries(ministerCounts).filter(([_, count7]) => count7 > 4);
+  const noOverAssignments = overAssigned.length === 0;
+  if (!noOverAssignments) {
+    warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
+  }
+  const counts = Object.values(ministerCounts);
+  const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  const variance = counts.length > 0 ? Math.sqrt(counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length) / avg2 : 0;
+  if (variance > 0.3) {
+    warnings.push(`Distribui\xE7\xE3o desbalanceada (vari\xE2ncia: ${(variance * 100).toFixed(0)}%)`);
+  }
+  const valid = errors.length === 0;
+  return {
+    valid,
+    checks: {
+      allSundaysCovered,
+      specialCelebrationsCovered,
+      noOverAssignments,
+      distributionVariance: variance
+    },
+    warnings,
+    errors
+  };
+}
+async function saveScheduleToDatabase(scheduleData, month, year) {
+  let savedCount = 0;
+  for (const schedule of scheduleData) {
+    const date2 = schedule.date || schedule.massTime?.date;
+    const time2 = schedule.time || schedule.massTime?.time;
+    const type = schedule.type || schedule.massTime?.type || "missa";
+    const ministers = schedule.ministers || schedule.assignments || [];
+    for (const minister of ministers) {
+      const ministerId = minister.id || minister.ministerId;
+      const position = minister.position || 0;
+      if (!ministerId) continue;
+      const existing = await db.select().from(schedules).where(
+        and9(
+          eq12(schedules.date, date2),
+          eq12(schedules.time, time2),
+          eq12(schedules.ministerId, ministerId)
+        )
+      );
+      if (existing.length === 0) {
+        await db.insert(schedules).values({
+          date: date2,
+          time: time2,
+          type,
+          ministerId,
+          position,
+          status: "scheduled"
+        });
+        savedCount++;
+      }
+    }
+  }
+  return savedCount;
+}
+async function sendMinisterNotifications(scheduleData, month, year) {
+  const uniqueMinisters = /* @__PURE__ */ new Set();
+  for (const schedule of scheduleData) {
+    const ministers = schedule.ministers || schedule.assignments || [];
+    for (const minister of ministers) {
+      const id = minister.id || minister.ministerId;
+      if (id) uniqueMinisters.add(id);
+    }
+  }
+  return {
+    sent: uniqueMinisters.size,
+    failed: 0
+  };
+}
+async function getLiturgicalInfoForMonth(year, month) {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = endOfMonth2(startDate);
+  const season = getCurrentLiturgicalSeason(startDate);
+  const movableFeasts = getMovableFeasts(year);
+  const celebrations = await db.select().from(liturgicalCelebrations).where(
+    and9(
+      gte4(liturgicalCelebrations.date, format4(startDate, "yyyy-MM-dd")),
+      lte4(liturgicalCelebrations.date, format4(endDate, "yyyy-MM-dd"))
+    )
+  );
+  return {
+    season,
+    movableFeasts,
+    specialCelebrations: celebrations
+  };
+}
+var smartScheduleGeneration_default = router7;
+
+// server/routes/testScheduleGeneration.ts
+import { Router as Router8 } from "express";
+await init_scheduleGenerator();
+import { addMonths } from "date-fns";
+var router8 = Router8();
+function generateMockMinisters(count7 = 50) {
+  const firstNames = [
+    "Jo\xE3o",
+    "Maria",
+    "Jos\xE9",
+    "Ana",
+    "Pedro",
+    "Paula",
+    "Carlos",
+    "Juliana",
+    "Rafael",
+    "Mariana",
+    "Lucas",
+    "Beatriz",
+    "Fernando",
+    "Camila",
+    "Roberto",
+    "Larissa",
+    "Marcos",
+    "Fernanda",
+    "Andr\xE9",
+    "Patr\xEDcia",
+    "Gabriel",
+    "Isabela",
+    "Thiago",
+    "Aline",
+    "Felipe",
+    "Cristina",
+    "Rodrigo",
+    "Vanessa",
+    "Bruno",
+    "Renata",
+    "Diego",
+    "Adriana",
+    "Gustavo",
+    "Simone",
+    "Leandro",
+    "Tatiana",
+    "Ricardo",
+    "Luciana",
+    "Marcelo",
+    "Daniela",
+    "Alexandre",
+    "Carla",
+    "F\xE1bio",
+    "Priscila",
+    "Vin\xEDcius",
+    "Amanda",
+    "Maur\xEDcio",
+    "Silvia",
+    "Leonardo",
+    "Bianca"
+  ];
+  const lastNames = [
+    "Silva",
+    "Santos",
+    "Oliveira",
+    "Souza",
+    "Rodrigues",
+    "Ferreira",
+    "Alves",
+    "Pereira",
+    "Lima",
+    "Gomes",
+    "Costa",
+    "Ribeiro",
+    "Martins",
+    "Carvalho",
+    "Rocha",
+    "Almeida",
+    "Nascimento",
+    "Ara\xFAjo",
+    "Melo",
+    "Barbosa",
+    "Cardoso",
+    "Correia",
+    "Dias",
+    "Teixeira",
+    "Cavalcanti",
+    "Monteiro",
+    "Freitas",
+    "Mendes"
+  ];
+  const ministers = [];
+  for (let i = 0; i < count7; i++) {
+    const firstName = firstNames[i % firstNames.length];
+    const lastName = lastNames[Math.floor(i / firstNames.length) % lastNames.length];
+    const name = `${firstName} ${lastName}`;
+    const experienceYears = Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? 1 : Math.random() < 0.7 ? 2 : 3;
+    const totalServices = Math.floor(Math.random() * 20) + experienceYears * 10;
+    const preferredTimes = [];
+    if (Math.random() > 0.5) preferredTimes.push("08:00");
+    if (Math.random() > 0.5) preferredTimes.push("10:00");
+    if (Math.random() > 0.3) preferredTimes.push("19:00");
+    ministers.push({
+      id: `mock-${i + 1}`,
+      name,
+      role: i < 5 ? "coordenador" : "ministro",
+      totalServices,
+      lastService: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1e3) : null,
+      preferredTimes,
+      canServeAsCouple: i % 10 === 0,
+      // 10% can serve as couples
+      spouseMinisterId: i % 10 === 0 && i > 0 ? `mock-${i}` : null,
+      availabilityScore: 0.5 + Math.random() * 0.5,
+      // 0.5 to 1.0
+      preferenceScore: Math.random()
+    });
+  }
+  return ministers;
+}
+function generateMockAvailabilityData(ministers, month, year) {
+  const availabilityMap = /* @__PURE__ */ new Map();
+  for (const minister of ministers) {
+    if (!minister.id) continue;
+    const availableSundays = [];
+    const sundaysInMonth = 4 + (Math.random() > 0.7 ? 1 : 0);
+    for (let i = 1; i <= sundaysInMonth; i++) {
+      if (Math.random() > 0.2) {
+        availableSundays.push(i.toString());
+      }
+    }
+    const preferredMassTimes = [];
+    if (Math.random() > 0.3) preferredMassTimes.push("8h");
+    if (Math.random() > 0.4) preferredMassTimes.push("10h");
+    if (Math.random() > 0.5) preferredMassTimes.push("19h");
+    const alternativeTimes = [];
+    if (preferredMassTimes.length > 0 && Math.random() > 0.5) {
+      const allTimes = ["8h", "10h", "19h"];
+      for (const time2 of allTimes) {
+        if (!preferredMassTimes.includes(time2) && Math.random() > 0.6) {
+          alternativeTimes.push(time2);
+        }
+      }
+    }
+    const dailyMassAvailability = [];
+    const weekdays = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+    for (const day of weekdays) {
+      if (Math.random() > 0.7) {
+        dailyMassAvailability.push(day);
+      }
+    }
+    availabilityMap.set(minister.id, {
+      ministerId: minister.id,
+      availableSundays,
+      preferredMassTimes,
+      alternativeTimes,
+      dailyMassAvailability,
+      canSubstitute: Math.random() > 0.4
+      // 60% can substitute
+    });
+  }
+  return availabilityMap;
+}
+router8.post("/test-generation", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const { ministerCount = 50 } = req.body;
+    const nextMonth = addMonths(/* @__PURE__ */ new Date(), 1);
+    const month = nextMonth.getMonth() + 1;
+    const year = nextMonth.getFullYear();
+    console.log(`[TEST_GEN] Generating test schedule for ${month}/${year} with ${ministerCount} mock ministers`);
+    const mockMinisters = generateMockMinisters(ministerCount);
+    const mockAvailability = generateMockAvailabilityData(mockMinisters, month, year);
+    console.log(`[TEST_GEN] Created ${mockMinisters.length} mock ministers`);
+    console.log(`[TEST_GEN] Created ${mockAvailability.size} availability records`);
+    const generator = new TestScheduleGenerator(mockMinisters, mockAvailability);
+    const schedules3 = await generator.generateScheduleForMonth(year, month, true);
+    console.log(`[TEST_GEN] Generated ${schedules3.length} mass schedules`);
+    const statistics = calculateTestStatistics(schedules3, mockMinisters);
+    const response = {
+      success: true,
+      message: `Teste gerado com sucesso para ${month}/${year}`,
+      data: {
+        month,
+        year,
+        mockData: {
+          ministerCount: mockMinisters.length,
+          ministers: mockMinisters.slice(0, 10).map((m) => ({ id: m.id, name: m.name, totalServices: m.totalServices })),
+          // Sample
+          availabilityCount: mockAvailability.size
+        },
+        schedules: schedules3.map((s) => ({
+          date: s.massTime.date,
+          time: s.massTime.time,
+          type: s.massTime.type,
+          ministersAssigned: s.ministers.length,
+          ministersRequired: s.massTime.minMinisters,
+          confidence: s.confidence,
+          ministers: s.ministers.map((m) => ({
+            id: m.id,
+            name: m.name,
+            position: m.position,
+            totalServices: m.totalServices
+          }))
+        })),
+        statistics
+      }
+    };
+    res.json(response);
+  } catch (error) {
+    console.error("[TEST_GEN] Error generating test schedule:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao gerar escala de teste",
+      error: process.env.NODE_ENV === "development" ? error.stack : void 0
+    });
+  }
+});
+var TestScheduleGenerator = class extends ScheduleGenerator {
+  mockMinisters;
+  mockAvailability;
+  constructor(ministers, availability) {
+    super();
+    this.mockMinisters = ministers;
+    this.mockAvailability = availability;
+  }
+  /**
+   * Override to use mock data instead of database
+   */
+  async generateScheduleForMonth(year, month, isPreview = true) {
+    console.log(`[TEST_GENERATOR] Using ${this.mockMinisters.length} mock ministers`);
+    this.ministers = this.mockMinisters;
+    this.availabilityData = this.mockAvailability;
+    this.dailyAssignments = /* @__PURE__ */ new Map();
+    this.saintBonusCache = /* @__PURE__ */ new Map();
+    this.db = null;
+    this.massTimes = [
+      { id: "1", dayOfWeek: 0, time: "08:00", minMinisters: 15, maxMinisters: 20 },
+      { id: "2", dayOfWeek: 0, time: "10:00", minMinisters: 20, maxMinisters: 28 },
+      { id: "3", dayOfWeek: 0, time: "19:00", minMinisters: 20, maxMinisters: 28 },
+      { id: "4", dayOfWeek: 1, time: "06:30", minMinisters: 5, maxMinisters: 8 },
+      { id: "5", dayOfWeek: 2, time: "06:30", minMinisters: 5, maxMinisters: 8 },
+      { id: "6", dayOfWeek: 3, time: "06:30", minMinisters: 5, maxMinisters: 8 },
+      { id: "7", dayOfWeek: 4, time: "06:30", minMinisters: 5, maxMinisters: 8 },
+      { id: "8", dayOfWeek: 5, time: "06:30", minMinisters: 5, maxMinisters: 8 },
+      { id: "9", dayOfWeek: 6, time: "06:30", minMinisters: 5, maxMinisters: 8 }
+    ];
+    const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
+    console.log(`[TEST_GENERATOR] Generated ${monthlyMassTimes.length} mass times for the month`);
+    const generatedSchedules = [];
+    for (const massTime of monthlyMassTimes) {
+      const schedule = await this.generateScheduleForMass(massTime);
+      generatedSchedules.push(schedule);
+    }
+    const incompleteSchedules = generatedSchedules.filter(
+      (s) => s.ministers.length < s.massTime.minMinisters
+    );
+    if (incompleteSchedules.length > 0) {
+      console.log(`[TEST_GENERATOR] \u26A0\uFE0F ${incompleteSchedules.length} incomplete schedules detected`);
+      incompleteSchedules.forEach((s) => {
+        console.log(`  - ${s.massTime.date} ${s.massTime.time}: ${s.ministers.length}/${s.massTime.minMinisters} ministers`);
+      });
+    } else {
+      console.log(`[TEST_GENERATOR] \u2705 All schedules have minimum ministers!`);
+    }
+    return generatedSchedules;
+  }
+};
+function calculateTestStatistics(schedules3, ministers) {
+  const assignmentsPerMinister = {};
+  let totalPositions = 0;
+  let filledPositions = 0;
+  let totalConfidence = 0;
+  for (const schedule of schedules3) {
+    totalPositions += schedule.massTime.minMinisters;
+    filledPositions += schedule.ministers.length;
+    totalConfidence += schedule.confidence;
+    for (const minister of schedule.ministers) {
+      if (!minister.id) continue;
+      assignmentsPerMinister[minister.id] = (assignmentsPerMinister[minister.id] || 0) + 1;
+    }
+  }
+  const coverage = totalPositions > 0 ? filledPositions / totalPositions * 100 : 0;
+  const averageConfidence = schedules3.length > 0 ? totalConfidence / schedules3.length : 0;
+  const assignments = Object.values(assignmentsPerMinister);
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count7) => sum + count7, 0) / assignments.length : 0;
+  const variance = assignments.length > 0 ? Math.sqrt(
+    assignments.reduce((sum, count7) => sum + Math.pow(count7 - avgAssignments, 2), 0) / assignments.length
+  ) : 0;
+  const fairness = Math.max(0, 1 - variance / (avgAssignments || 1));
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count7]) => count7 > 4 || count7 < 1).map(([ministerId, count7]) => ({
+    ministerId,
+    ministerName: ministers.find((m) => m.id === ministerId)?.name || "Unknown",
+    count: count7,
+    reason: count7 > 4 ? "too_many_assignments" : "too_few_assignments"
+  }));
+  const massTypes = {};
+  for (const schedule of schedules3) {
+    const type = schedule.massTime.type || "regular";
+    massTypes[type] = (massTypes[type] || 0) + 1;
+  }
+  return {
+    totalMasses: schedules3.length,
+    totalPositions,
+    filledPositions,
+    coverage: Math.round(coverage * 100) / 100,
+    averageConfidence: Math.round(averageConfidence * 100) / 100,
+    uniqueMinistersUsed: Object.keys(assignmentsPerMinister).length,
+    totalMinistersAvailable: ministers.length,
+    utilizationRate: Math.round(Object.keys(assignmentsPerMinister).length / ministers.length * 100),
+    averageAssignmentsPerMinister: Math.round(avgAssignments * 10) / 10,
+    distributionVariance: Math.round(variance * 100) / 100,
+    fairnessScore: Math.round(fairness * 100),
+    outliers,
+    massTypeBreakdown: massTypes,
+    incompleteSchedules: schedules3.filter((s) => s.ministers.length < s.massTime.minMinisters).length,
+    highConfidenceSchedules: schedules3.filter((s) => s.confidence >= 0.8).length,
+    mediumConfidenceSchedules: schedules3.filter((s) => s.confidence >= 0.6 && s.confidence < 0.8).length,
+    lowConfidenceSchedules: schedules3.filter((s) => s.confidence < 0.6).length
+  };
+}
+var testScheduleGeneration_default = router8;
+
+// server/routes/auxiliaryPanel.ts
+await init_db();
+init_schema();
+import { Router as Router9 } from "express";
+import { eq as eq13, and as and10, inArray as inArray2, sql as sql7 } from "drizzle-orm";
+import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
+var router9 = Router9();
+async function isAuxiliaryForMass(userId, scheduleId) {
+  const assignment = await db.select().from(schedules).where(
+    and10(
+      eq13(schedules.id, scheduleId),
+      eq13(schedules.ministerId, userId),
+      inArray2(schedules.position, [1, 2])
+    )
+  ).limit(1);
+  return assignment.length > 0;
+}
+function isWithinAllowedWindow(massDate, massTime) {
+  try {
+    const massDateTime = parseISO(`${massDate}T${massTime}`);
+    const now = /* @__PURE__ */ new Date();
+    const windowStart = subHours(massDateTime, 1);
+    const windowEnd = addHours(massDateTime, 2);
+    return isWithinInterval(now, { start: windowStart, end: windowEnd });
+  } catch (error) {
+    console.error("Error checking time window:", error);
+    return false;
+  }
+}
+router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const massSchedule = await db.select().from(schedules).where(eq13(schedules.id, scheduleId)).limit(1);
+    if (massSchedule.length === 0) {
+      return res.status(404).json({ message: "Escala n\xE3o encontrada" });
+    }
+    const schedule = massSchedule[0];
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso permitido apenas para Auxiliares 1 e 2 desta missa" });
+    }
+    if (!isWithinAllowedWindow(schedule.date, schedule.time)) {
+      return res.status(403).json({
+        message: "Painel do Auxiliar dispon\xEDvel apenas de 1h antes at\xE9 2h depois da missa",
+        allowedWindow: {
+          start: format6(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
+          end: format6(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
+        }
+      });
+    }
+    const allAssignments = await db.select({
+      id: schedules.id,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      ministerName: users.name,
+      ministerPhone: users.phone,
+      ministerWhatsapp: users.whatsapp,
+      onSiteAdjustments: schedules.onSiteAdjustments
+    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
+      and10(
+        eq13(schedules.date, schedule.date),
+        eq13(schedules.time, schedule.time),
+        eq13(schedules.status, "scheduled")
+      )
+    ).orderBy(schedules.position);
+    const checkIns = await db.select().from(ministerCheckIns).where(eq13(ministerCheckIns.scheduleId, scheduleId));
+    const standbyList = await db.select({
+      id: standbyMinisters.id,
+      ministerId: standbyMinisters.ministerId,
+      ministerName: users.name,
+      ministerPhone: users.phone,
+      ministerWhatsapp: users.whatsapp,
+      confirmedAvailable: standbyMinisters.confirmedAvailable,
+      calledAt: standbyMinisters.calledAt,
+      response: standbyMinisters.response,
+      assignedPosition: standbyMinisters.assignedPosition
+    }).from(standbyMinisters).leftJoin(users, eq13(standbyMinisters.ministerId, users.id)).where(eq13(standbyMinisters.scheduleId, scheduleId));
+    const executionLog = await db.select().from(massExecutionLogs).where(eq13(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const massDateTime = parseISO(`${schedule.date}T${schedule.time}`);
+    const now = /* @__PURE__ */ new Date();
+    const minutesUntilMass = Math.floor((massDateTime.getTime() - now.getTime()) / (1e3 * 60));
+    let currentPhase;
+    if (minutesUntilMass > 30) {
+      currentPhase = "pre-mass";
+    } else if (minutesUntilMass > -30) {
+      currentPhase = "during-mass";
+    } else {
+      currentPhase = "post-mass";
+    }
+    res.json({
+      success: true,
+      data: {
+        massInfo: {
+          id: scheduleId,
+          date: schedule.date,
+          time: schedule.time,
+          type: schedule.type,
+          location: schedule.location
+        },
+        currentPhase,
+        minutesUntilMass,
+        assignments: allAssignments.map((a) => ({
+          id: a.id,
+          ministerId: a.ministerId,
+          ministerName: a.ministerName,
+          phone: a.ministerPhone,
+          whatsapp: a.ministerWhatsapp,
+          position: a.position,
+          onSiteAdjustments: a.onSiteAdjustments,
+          checkInStatus: checkIns.find((c) => c.ministerId === a.ministerId)?.status || "not-checked-in",
+          checkInTime: checkIns.find((c) => c.ministerId === a.ministerId)?.checkedInAt
+        })),
+        standbyMinisters: standbyList,
+        executionLog: executionLog.length > 0 ? executionLog[0] : null,
+        statistics: {
+          totalPositions: allAssignments.length,
+          checkedIn: checkIns.filter((c) => c.status === "present").length,
+          absent: checkIns.filter((c) => c.status === "absent").length,
+          standbyCalled: standbyList.filter((s) => s.calledAt !== null).length
+        }
+      }
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_PANEL] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao carregar painel do auxiliar"
+    });
+  }
+});
+router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
+    }
+    const massInfo = await db.select().from(schedules).where(eq13(schedules.id, scheduleId)).limit(1);
+    if (massInfo.length === 0) {
+      return res.status(404).json({ message: "Escala n\xE3o encontrada" });
+    }
+    const { date: date2, time: time2 } = massInfo[0];
+    const availableStandby = await db.select({
+      ministerId: users.id,
+      ministerName: users.name,
+      phone: users.phone,
+      whatsapp: users.whatsapp,
+      totalServices: users.totalServices,
+      lastService: users.lastService
+    }).from(users).where(
+      and10(
+        eq13(users.status, "active"),
+        eq13(users.role, "ministro")
+      )
+    ).limit(20);
+    const assignedMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
+      and10(
+        eq13(schedules.date, date2),
+        eq13(schedules.time, time2)
+      )
+    );
+    const assignedIds = new Set(assignedMinisters.map((a) => a.ministerId).filter(Boolean));
+    const standbyOptions = availableStandby.filter((m) => !assignedIds.has(m.ministerId));
+    res.json({
+      success: true,
+      data: standbyOptions.slice(0, 10)
+      // Top 10 most suitable
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_STANDBY] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao buscar ministros suplentes"
+    });
+  }
+});
+router9.post("/check-in", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId, ministerId, status, notes } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
+    }
+    const assignment = await db.select().from(schedules).where(
+      and10(
+        eq13(schedules.id, scheduleId),
+        eq13(schedules.ministerId, ministerId)
+      )
+    ).limit(1);
+    if (assignment.length === 0) {
+      return res.status(404).json({ message: "Ministro n\xE3o encontrado nesta escala" });
+    }
+    const position = assignment[0].position || 0;
+    const existingCheckIn = await db.select().from(ministerCheckIns).where(
+      and10(
+        eq13(ministerCheckIns.scheduleId, scheduleId),
+        eq13(ministerCheckIns.ministerId, ministerId)
+      )
+    ).limit(1);
+    if (existingCheckIn.length > 0) {
+      await db.update(ministerCheckIns).set({
+        status,
+        notes,
+        checkedInAt: /* @__PURE__ */ new Date()
+      }).where(eq13(ministerCheckIns.id, existingCheckIn[0].id));
+    } else {
+      await db.insert(ministerCheckIns).values({
+        scheduleId,
+        ministerId,
+        position,
+        status,
+        notes,
+        checkedInBy: userId
+      });
+    }
+    res.json({
+      success: true,
+      message: `Ministro marcado como ${status}`
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_CHECKIN] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao registrar presen\xE7a"
+    });
+  }
+});
+router9.put("/redistribute", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId, changes } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
+    }
+    if (!Array.isArray(changes)) {
+      return res.status(400).json({ message: "Formato de mudan\xE7as inv\xE1lido" });
+    }
+    const appliedChanges = [];
+    for (const change of changes) {
+      const { ministerId, fromPosition, toPosition, reason } = change;
+      await db.update(schedules).set({ position: toPosition }).where(
+        and10(
+          eq13(schedules.id, scheduleId),
+          eq13(schedules.ministerId, ministerId),
+          eq13(schedules.position, fromPosition)
+        )
+      );
+      appliedChanges.push({
+        type: "position_change",
+        ministerId,
+        fromPosition,
+        toPosition,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        details: reason
+      });
+    }
+    const existingLog = await db.select().from(massExecutionLogs).where(eq13(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    if (existingLog.length > 0) {
+      const currentChanges = existingLog[0].changesMade || [];
+      await db.update(massExecutionLogs).set({
+        changesMade: [...currentChanges, ...appliedChanges]
+      }).where(eq13(massExecutionLogs.id, existingLog[0].id));
+    } else {
+      await db.insert(massExecutionLogs).values({
+        scheduleId,
+        auxiliaryId: userId,
+        changesMade: appliedChanges
+      });
+    }
+    res.json({
+      success: true,
+      message: `${appliedChanges.length} mudan\xE7as aplicadas com sucesso`
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_REDISTRIBUTE] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao redistribuir posi\xE7\xF5es"
+    });
+  }
+});
+router9.post("/call-standby", authenticateToken, async (req, res) => {
+  try {
+    const { scheduleId, ministerId, position } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
+    }
+    const massInfo = await db.select().from(schedules).where(eq13(schedules.id, scheduleId)).limit(1);
+    if (massInfo.length === 0) {
+      return res.status(404).json({ message: "Escala n\xE3o encontrada" });
+    }
+    const { date: date2, time: time2 } = massInfo[0];
+    const auxiliary = await db.select({ name: users.name }).from(users).where(eq13(users.id, userId)).limit(1);
+    const auxiliaryName = auxiliary[0]?.name || "Auxiliar";
+    await db.insert(standbyMinisters).values({
+      scheduleId,
+      ministerId,
+      calledAt: /* @__PURE__ */ new Date(),
+      calledBy: userId,
+      response: "pending",
+      assignedPosition: position
+    });
+    await db.insert(notifications).values({
+      userId: ministerId,
+      type: "schedule",
+      title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
+      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format6(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
+      priority: "high",
+      data: {
+        scheduleId,
+        position,
+        calledBy: userId,
+        massDate: date2,
+        massTime: time2
+      }
+    });
+    res.json({
+      success: true,
+      message: "Suplente convocado com sucesso"
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_CALL_STANDBY] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao convocar suplente"
+    });
+  }
+});
+router9.post("/mass-report", authenticateToken, async (req, res) => {
+  try {
+    const {
+      scheduleId,
+      attendance,
+      massQuality,
+      comments,
+      incidents,
+      highlights
+    } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "N\xE3o autenticado" });
+    }
+    const isAuxiliary = await isAuxiliaryForMass(userId, scheduleId);
+    if (!isAuxiliary) {
+      return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
+    }
+    const existingLog = await db.select().from(massExecutionLogs).where(eq13(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    if (existingLog.length > 0) {
+      await db.update(massExecutionLogs).set({
+        attendance,
+        massQuality,
+        comments,
+        incidents,
+        highlights
+      }).where(eq13(massExecutionLogs.id, existingLog[0].id));
+    } else {
+      await db.insert(massExecutionLogs).values({
+        scheduleId,
+        auxiliaryId: userId,
+        attendance,
+        massQuality,
+        comments,
+        incidents,
+        highlights
+      });
+    }
+    if (attendance && Array.isArray(attendance)) {
+      for (const record of attendance) {
+        if (record.absent) {
+          continue;
+        }
+        if (record.checkedIn && record.ministerId) {
+          await db.update(users).set({
+            lastService: /* @__PURE__ */ new Date(),
+            totalServices: sql7`${users.totalServices} + 1`
+          }).where(eq13(users.id, record.ministerId));
+        }
+      }
+    }
+    if (incidents && incidents.length > 0) {
+      const coordinators = await db.select().from(users).where(
+        and10(
+          inArray2(users.role, ["coordenador", "gestor"]),
+          eq13(users.status, "active")
+        )
+      );
+      for (const coordinator of coordinators) {
+        await db.insert(notifications).values({
+          userId: coordinator.id,
+          type: "announcement",
+          title: "Relat\xF3rio de Missa com Incidentes",
+          message: `O auxiliar reportou ${incidents.length} incidente(s) na missa de ${scheduleId}`,
+          data: { scheduleId, incidents }
+        });
+      }
+    }
+    res.json({
+      success: true,
+      message: "Relat\xF3rio enviado com sucesso"
+    });
+  } catch (error) {
+    console.error("[AUXILIARY_REPORT] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao enviar relat\xF3rio"
+    });
+  }
+});
+var auxiliaryPanel_default = router9;
+
+// server/routes/upload.ts
+await init_db();
+init_schema();
+import { Router as Router10 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq11 } from "drizzle-orm";
-var router7 = Router7();
+import { eq as eq14 } from "drizzle-orm";
+var router10 = Router10();
 var upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -6582,7 +10847,7 @@ var handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-router7.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
+router10.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
@@ -6609,7 +10874,7 @@ router7.post("/profile-photo", authenticateToken, upload.single("photo"), handle
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq11(users.id, userId));
+    }).where(eq14(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -6631,7 +10896,7 @@ router7.post("/profile-photo", authenticateToken, upload.single("photo"), handle
     res.status(500).json({ error: "Erro interno ao processar a foto. Tente novamente." });
   }
 });
-router7.delete("/profile-photo", authenticateToken, async (req, res) => {
+router10.delete("/profile-photo", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     if (!db) {
@@ -6641,7 +10906,7 @@ router7.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq11(users.id, userId));
+    }).where(eq14(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -6651,16 +10916,16 @@ router7.delete("/profile-photo", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro interno ao remover a foto. Tente novamente." });
   }
 });
-var upload_default = router7;
+var upload_default = router10;
 
 // server/routes/notifications.ts
-import { Router as Router8 } from "express";
+import { Router as Router11 } from "express";
 import { z as z5 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq12, and as and9 } from "drizzle-orm";
-var router8 = Router8();
+import { eq as eq15, and as and11 } from "drizzle-orm";
+var router11 = Router11();
 var createNotificationSchema = z5.object({
   title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
   message: z5.string().min(1, "Mensagem \xE9 obrigat\xF3ria"),
@@ -6683,7 +10948,7 @@ function mapNotificationType(frontendType) {
       return "announcement";
   }
 }
-router8.get("/", authenticateToken, async (req, res) => {
+router11.get("/", authenticateToken, async (req, res) => {
   try {
     const notifications2 = await storage.getUserNotifications(req.user.id);
     res.json(notifications2);
@@ -6691,21 +10956,30 @@ router8.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
   }
 });
-router8.get("/unread-count", authenticateToken, async (req, res) => {
+router11.get("/unread-count", authenticateToken, async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      console.warn("[NOTIFICATIONS] No user in request");
+      return res.json({ count: 0 });
+    }
     const allNotifications = await storage.getUserNotifications(req.user.id);
-    const count6 = allNotifications.filter((n) => !n.read).length;
-    res.json({ count: count6 });
+    if (!allNotifications || !Array.isArray(allNotifications)) {
+      console.warn("[NOTIFICATIONS] Invalid notifications data");
+      return res.json({ count: 0 });
+    }
+    const count7 = allNotifications.filter((n) => n && !n.read).length;
+    res.json({ count: count7 });
   } catch (error) {
-    res.status(500).json({ error: "Erro ao contar notifica\xE7\xF5es" });
+    console.error("[NOTIFICATIONS] Error counting notifications:", error);
+    res.json({ count: 0 });
   }
 });
-router8.patch("/:id/read", authenticateToken, async (req, res) => {
+router11.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await db.select().from(notifications).where(and9(
-      eq12(notifications.id, id),
-      eq12(notifications.userId, req.user.id)
+    const notification = await db.select().from(notifications).where(and11(
+      eq15(notifications.id, id),
+      eq15(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -6716,7 +10990,7 @@ router8.patch("/:id/read", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router8.patch("/read-all", authenticateToken, async (req, res) => {
+router11.patch("/read-all", authenticateToken, async (req, res) => {
   try {
     const userNotifications = await storage.getUserNotifications(req.user.id);
     const unreadNotifications = userNotifications.filter((n) => !n.read);
@@ -6726,13 +11000,13 @@ router8.patch("/read-all", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router8.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { massId, date: date2, time: time2, location, message, urgencyLevel } = req.body;
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq12(users.status, "active")
+      eq15(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -6765,7 +11039,7 @@ router8.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ges
     res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : "Unknown error" });
   }
 });
-router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     let recipientUserIds = [];
@@ -6774,18 +11048,18 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq12(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq15(users.status, "active"));
       } else {
-        recipients = await db.select({ id: users.id }).from(users).where(and9(
-          eq12(users.role, data.recipientRole),
-          eq12(users.status, "active")
+        recipients = await db.select({ id: users.id }).from(users).where(and11(
+          eq15(users.role, data.recipientRole),
+          eq15(users.status, "active")
         ));
       }
       recipientUserIds = recipients.map((r) => r.id);
     } else {
-      const recipients = await db.select({ id: users.id }).from(users).where(and9(
-        eq12(users.role, "ministro"),
-        eq12(users.status, "active")
+      const recipients = await db.select({ id: users.id }).from(users).where(and11(
+        eq15(users.role, "ministro"),
+        eq15(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
     }
@@ -6821,24 +11095,24 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     }
   }
 });
-router8.delete("/:id", authenticateToken, async (req, res) => {
+router11.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await storage.getUser(req.user.id);
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq12(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq15(notifications.id, id)).limit(1);
     } else {
-      notification = await db.select().from(notifications).where(and9(
-        eq12(notifications.id, id),
-        eq12(notifications.userId, req.user.id)
+      notification = await db.select().from(notifications).where(and11(
+        eq15(notifications.id, id),
+        eq15(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq12(notifications.id, id));
+    await db.delete(notifications).where(eq15(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -6849,13 +11123,13 @@ router8.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
-var notifications_default = router8;
+var notifications_default = router11;
 
 // server/routes/reports.ts
 await init_db();
 init_schema();
-import { Router as Router9 } from "express";
-import { eq as eq13, sql as sql6, and as and10, gte as gte4, lte as lte4, desc as desc6, asc, count as count3, avg } from "drizzle-orm";
+import { Router as Router12 } from "express";
+import { eq as eq16, sql as sql8, and as and12, gte as gte6, lte as lte6, desc as desc6, asc, count as count3, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
 await init_db();
@@ -6888,8 +11162,8 @@ function createActivityLogger(req) {
 }
 
 // server/routes/reports.ts
-var router9 = Router9();
-router9.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+var router12 = Router12();
+router12.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "availability" });
   try {
@@ -6898,7 +11172,7 @@ router9.get("/availability", authenticateToken, requireRole(["gestor", "coordena
       userId: questionnaireResponses.userId,
       userName: users.name,
       totalResponses: count3(questionnaireResponses.id),
-      availableDays: sql6`
+      availableDays: sql8`
           COALESCE(
             SUM(
               jsonb_array_length(
@@ -6907,12 +11181,12 @@ router9.get("/availability", authenticateToken, requireRole(["gestor", "coordena
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq13(users.id, questionnaireResponses.userId)).where(
-      and10(
-        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql6`true`,
-        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql6`true`
+    }).from(questionnaireResponses).leftJoin(users, eq16(users.id, questionnaireResponses.userId)).where(
+      and12(
+        startDate ? gte6(questionnaireResponses.submittedAt, new Date(startDate)) : sql8`true`,
+        endDate ? lte6(questionnaireResponses.submittedAt, new Date(endDate)) : sql8`true`
       )
-    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql6`available_days`)).limit(Number(limit));
+    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql8`available_days`)).limit(Number(limit));
     res.json({
       topAvailable: availabilityData,
       period: { startDate, endDate }
@@ -6922,7 +11196,7 @@ router9.get("/availability", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch availability metrics" });
   }
 });
-router9.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "substitutions" });
   try {
@@ -6931,35 +11205,35 @@ router9.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
       userId: substitutionRequests.requesterId,
       userName: users.name,
       totalRequests: count3(substitutionRequests.id),
-      approvedRequests: sql6`
+      approvedRequests: sql8`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved_requests"),
-      pendingRequests: sql6`
+      pendingRequests: sql8`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq13(users.id, substitutionRequests.requesterId)).where(
-      and10(
-        startDate ? gte4(substitutionRequests.createdAt, new Date(startDate)) : sql6`true`,
-        endDate ? lte4(substitutionRequests.createdAt, new Date(endDate)) : sql6`true`
+    }).from(substitutionRequests).leftJoin(users, eq16(users.id, substitutionRequests.requesterId)).where(
+      and12(
+        startDate ? gte6(substitutionRequests.createdAt, new Date(startDate)) : sql8`true`,
+        endDate ? lte6(substitutionRequests.createdAt, new Date(endDate)) : sql8`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc6(count3(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
       userId: schedules.ministerId,
       userName: users.name,
       totalAssignments: count3(schedules.id),
-      substitutionRequests: sql6`
+      substitutionRequests: sql8`
           (SELECT COUNT(*) FROM ${substitutionRequests}
            WHERE ${substitutionRequests.requesterId} = ${schedules.ministerId}
-           ${startDate ? sql6`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql6``}
-           ${endDate ? sql6`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql6``})
+           ${startDate ? sql8`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql8``}
+           ${endDate ? sql8`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql8``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq13(users.id, schedules.ministerId)).where(
-      and10(
-        schedules.status ? eq13(schedules.status, "published") : sql6`true`,
-        startDate ? gte4(schedules.createdAt, new Date(startDate)) : sql6`true`,
-        endDate ? lte4(schedules.createdAt, new Date(endDate)) : sql6`true`
+    }).from(schedules).leftJoin(users, eq16(users.id, schedules.ministerId)).where(
+      and12(
+        schedules.status ? eq16(schedules.status, "published") : sql8`true`,
+        startDate ? gte6(schedules.createdAt, new Date(startDate)) : sql8`true`,
+        endDate ? lte6(schedules.createdAt, new Date(endDate)) : sql8`true`
       )
-    ).groupBy(schedules.ministerId, users.name).having(sql6`COUNT(${schedules.id}) > 0`).orderBy(asc(sql6`substitution_requests`), desc6(count3(schedules.id))).limit(10);
+    ).groupBy(schedules.ministerId, users.name).having(sql8`COUNT(${schedules.id}) > 0`).orderBy(asc(sql8`substitution_requests`), desc6(count3(schedules.id))).limit(10);
     res.json({
       mostRequests,
       reliableServers,
@@ -6970,7 +11244,7 @@ router9.get("/substitutions", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch substitution metrics" });
   }
 });
-router9.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "engagement" });
   try {
@@ -6979,22 +11253,22 @@ router9.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
       userId: activityLogs.userId,
       userName: users.name,
       totalActions: count3(activityLogs.id),
-      lastActivity: sql6`MAX(${activityLogs.createdAt})`.as("last_activity"),
-      uniqueDays: sql6`
+      lastActivity: sql8`MAX(${activityLogs.createdAt})`.as("last_activity"),
+      uniqueDays: sql8`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq13(users.id, activityLogs.userId)).where(
-      and10(
-        startDate ? gte4(activityLogs.createdAt, new Date(startDate)) : sql6`true`,
-        endDate ? lte4(activityLogs.createdAt, new Date(endDate)) : sql6`true`
+    }).from(activityLogs).leftJoin(users, eq16(users.id, activityLogs.userId)).where(
+      and12(
+        startDate ? gte6(activityLogs.createdAt, new Date(startDate)) : sql8`true`,
+        endDate ? lte6(activityLogs.createdAt, new Date(endDate)) : sql8`true`
       )
     ).groupBy(activityLogs.userId, users.name).orderBy(desc6(count3(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
       totalMinisters: count3(users.id),
-      respondedMinisters: sql6`
+      respondedMinisters: sql8`
           COUNT(DISTINCT ${questionnaireResponses.userId})
         `.as("responded_ministers"),
-      responseRate: sql6`
+      responseRate: sql8`
           ROUND(
             COUNT(DISTINCT ${questionnaireResponses.userId})::numeric /
             NULLIF(COUNT(DISTINCT ${users.id}), 0) * 100,
@@ -7003,12 +11277,12 @@ router9.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
         `.as("response_rate")
     }).from(users).leftJoin(
       questionnaireResponses,
-      and10(
-        eq13(users.id, questionnaireResponses.userId),
-        startDate ? gte4(questionnaireResponses.submittedAt, new Date(startDate)) : sql6`true`,
-        endDate ? lte4(questionnaireResponses.submittedAt, new Date(endDate)) : sql6`true`
+      and12(
+        eq16(users.id, questionnaireResponses.userId),
+        startDate ? gte6(questionnaireResponses.submittedAt, new Date(startDate)) : sql8`true`,
+        endDate ? lte6(questionnaireResponses.submittedAt, new Date(endDate)) : sql8`true`
       )
-    ).where(eq13(users.status, "active"));
+    ).where(eq16(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -7019,7 +11293,7 @@ router9.get("/engagement", authenticateToken, requireRole(["gestor", "coordenado
     res.status(500).json({ error: "Failed to fetch engagement metrics" });
   }
 });
-router9.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "formation" });
   try {
@@ -7027,19 +11301,19 @@ router9.get("/formation", authenticateToken, requireRole(["gestor", "coordenador
     const topPerformers = await db.select({
       userId: formationProgress.userId,
       userName: users.name,
-      completedModules: sql6`
+      completedModules: sql8`
           COUNT(CASE WHEN ${formationProgress.status} = 'completed' THEN 1 END)
         `.as("completed_modules"),
-      inProgressModules: sql6`
+      inProgressModules: sql8`
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq13(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql6`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq16(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql8`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
-      totalModules: sql6`
+      totalModules: sql8`
           (SELECT COUNT(*) FROM formation_modules)
         `.as("total_modules"),
-      totalEnrolled: count3(sql6`DISTINCT ${formationProgress.userId}`),
+      totalEnrolled: count3(sql8`DISTINCT ${formationProgress.userId}`),
       avgCompletionRate: avg(formationProgress.progressPercentage)
     }).from(formationProgress);
     res.json({
@@ -7051,7 +11325,7 @@ router9.get("/formation", authenticateToken, requireRole(["gestor", "coordenador
     res.status(500).json({ error: "Failed to fetch formation metrics" });
   }
 });
-router9.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "families" });
   try {
@@ -7059,13 +11333,13 @@ router9.get("/families", authenticateToken, requireRole(["gestor", "coordenador"
       familyId: families.id,
       familyName: families.name,
       totalMembers: count3(users.id),
-      activeMembers: sql6`
+      activeMembers: sql8`
           COUNT(CASE WHEN ${users.status} = 'active' THEN 1 END)
         `.as("active_members"),
-      totalServices: sql6`
+      totalServices: sql8`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq13(users.familyId, families.id)).groupBy(families.id, families.name).having(sql6`COUNT(${users.id}) > 1`).orderBy(desc6(sql6`active_members`), desc6(sql6`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq16(users.familyId, families.id)).groupBy(families.id, families.name).having(sql8`COUNT(${users.id}) > 1`).orderBy(desc6(sql8`active_members`), desc6(sql8`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -7074,34 +11348,34 @@ router9.get("/families", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch family metrics" });
   }
 });
-router9.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity2 = createActivityLogger(req);
   await logActivity2("view_reports", { type: "summary" });
   try {
     const now = /* @__PURE__ */ new Date();
-    const startOfMonth2 = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq13(users.status, "active"));
+    const startOfMonth5 = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth5 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const activeMinistersCount = await db.select({ count: count3() }).from(users).where(eq16(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count3(),
-      approved: sql6`
+      approved: sql8`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved")
     }).from(substitutionRequests).where(
-      and10(
-        gte4(substitutionRequests.createdAt, startOfMonth2),
-        lte4(substitutionRequests.createdAt, endOfMonth2)
+      and12(
+        gte6(substitutionRequests.createdAt, startOfMonth5),
+        lte6(substitutionRequests.createdAt, endOfMonth5)
       )
     );
     const formationThisMonth = await db.select({ count: count3() }).from(formationProgress).where(
-      and10(
-        eq13(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte4(formationProgress.completedAt, startOfMonth2) : sql6`false`,
-        formationProgress.completedAt ? lte4(formationProgress.completedAt, endOfMonth2) : sql6`false`
+      and12(
+        eq16(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte6(formationProgress.completedAt, startOfMonth5) : sql8`false`,
+        formationProgress.completedAt ? lte6(formationProgress.completedAt, endOfMonth5) : sql8`false`
       )
     );
     const avgAvailability = await db.select({
-      avgDays: sql6`
+      avgDays: sql8`
           AVG(
             jsonb_array_length(
               COALESCE(${questionnaireResponses.responses}->>'availableDays', '[]')::jsonb
@@ -7109,9 +11383,9 @@ router9.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
           )
         `.as("avg_days")
     }).from(questionnaireResponses).where(
-      and10(
-        gte4(questionnaireResponses.submittedAt, startOfMonth2),
-        lte4(questionnaireResponses.submittedAt, endOfMonth2)
+      and12(
+        gte6(questionnaireResponses.submittedAt, startOfMonth5),
+        lte6(questionnaireResponses.submittedAt, endOfMonth5)
       )
     );
     res.json({
@@ -7132,13 +11406,13 @@ router9.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch summary metrics" });
   }
 });
-var reports_default = router9;
+var reports_default = router12;
 
 // server/routes/ministers.ts
 await init_db();
 init_schema();
-import { Router as Router10 } from "express";
-import { eq as eq14, and as and11, sql as sql7 } from "drizzle-orm";
+import { Router as Router13 } from "express";
+import { eq as eq17, and as and13, sql as sql9 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -7157,11 +11431,11 @@ function formatMinisterName(name) {
 }
 
 // server/routes/ministers.ts
-var router10 = Router10();
-router10.get("/", authenticateToken, async (req, res) => {
+var router13 = Router13();
+router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const ministersList = await db.select().from(users).where(
-      sql7`${users.role} IN ('ministro', 'coordenador')`
+      sql9`${users.role} IN ('ministro', 'coordenador')`
     );
     res.json(ministersList);
   } catch (error) {
@@ -7169,11 +11443,11 @@ router10.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar ministros" });
   }
 });
-router10.get("/:id", authenticateToken, async (req, res) => {
+router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
-    const minister = await db.select().from(users).where(and11(
-      eq14(users.id, req.params.id),
-      eq14(users.role, "ministro")
+    const minister = await db.select().from(users).where(and13(
+      eq17(users.id, req.params.id),
+      eq17(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -7184,7 +11458,7 @@ router10.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar ministro" });
   }
 });
-router10.patch("/:id", authenticateToken, async (req, res) => {
+router13.patch("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.params.id;
     const currentUser = req.user;
@@ -7230,26 +11504,33 @@ router10.patch("/:id", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
-    const result = await db.update(users).set(updateData).where(and11(
-      eq14(users.id, userId),
-      eq14(users.role, "ministro")
+    const result = await db.update(users).set(updateData).where(and13(
+      eq17(users.id, userId),
+      eq17(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
     }
-    console.log(`[Activity Log] UPDATE_MINISTER: Dados do ministro ${result[0].name} atualizados`, { ministerId: userId, fields: Object.keys(updateData) });
+    await logAudit("PERSONAL_DATA_UPDATE" /* PERSONAL_DATA_UPDATE */, {
+      userId: currentUser.id,
+      targetUserId: userId,
+      targetResource: "minister",
+      changes: Object.keys(updateData),
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     res.json(result[0]);
   } catch (error) {
     console.error("Error updating minister:", error);
     res.status(500).json({ message: "Erro ao atualizar ministro" });
   }
 });
-router10.get("/:id/stats", authenticateToken, async (req, res) => {
+router13.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
-    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and11(
-      eq14(users.id, ministerId),
-      eq14(users.role, "ministro")
+    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and13(
+      eq17(users.id, ministerId),
+      eq17(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -7266,14 +11547,14 @@ router10.get("/:id/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar estat\xEDsticas" });
   }
 });
-var ministers_default = router10;
+var ministers_default = router13;
 
 // server/routes/substitutions.ts
 await init_db();
 init_schema();
-import { Router as Router11 } from "express";
-import { eq as eq15, and as and12, sql as sql8, gte as gte5, desc as desc7, count as count4, notInArray } from "drizzle-orm";
-var router11 = Router11();
+import { Router as Router14 } from "express";
+import { eq as eq19, and as and15, sql as sql11, gte as gte8, desc as desc7, count as count4, notInArray } from "drizzle-orm";
+var router14 = Router14();
 function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
   const [year, month, day] = massDateStr.split("-").map(Number);
@@ -7290,15 +11571,15 @@ async function countMonthlySubstitutions(requesterId) {
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDayOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const result = await db.select({ count: count4() }).from(substitutionRequests).where(
-    and12(
-      eq15(substitutionRequests.requesterId, requesterId),
-      gte5(substitutionRequests.createdAt, firstDayOfMonth),
-      sql8`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
+    and15(
+      eq19(substitutionRequests.requesterId, requesterId),
+      gte8(substitutionRequests.createdAt, firstDayOfMonth),
+      sql11`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
     )
   );
   return result[0]?.count || 0;
 }
-router11.post("/", authenticateToken, async (req, res) => {
+router14.post("/", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user.id;
@@ -7309,7 +11590,7 @@ router11.post("/", authenticateToken, async (req, res) => {
         message: "ID da escala \xE9 obrigat\xF3rio"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq19(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -7320,6 +11601,13 @@ router11.post("/", authenticateToken, async (req, res) => {
     const [hours, minutes] = schedule.time.split(":").map(Number);
     const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     const now = /* @__PURE__ */ new Date();
+    console.log("[Substitutions] Verificando data:", {
+      scheduleDate: schedule.date,
+      scheduleTime: schedule.time,
+      massDateTime: massDateTime.toISOString(),
+      now: now.toISOString(),
+      isPast: massDateTime < now
+    });
     if (massDateTime < now) {
       return res.status(400).json({
         success: false,
@@ -7333,9 +11621,9 @@ router11.post("/", authenticateToken, async (req, res) => {
       });
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
-      and12(
-        eq15(substitutionRequests.scheduleId, scheduleId),
-        eq15(substitutionRequests.status, "pending")
+      and15(
+        eq19(substitutionRequests.scheduleId, scheduleId),
+        eq19(substitutionRequests.status, "pending")
       )
     ).limit(1);
     if (existingRequest) {
@@ -7347,7 +11635,7 @@ router11.post("/", authenticateToken, async (req, res) => {
     const urgency = calculateUrgency(schedule.date, schedule.time);
     const monthlyCount = await countMonthlySubstitutions(requesterId);
     const finalSubstituteId = substituteId || null;
-    const status = "pending";
+    const status = finalSubstituteId ? "pending" : "available";
     const [newRequest] = await db.insert(substitutionRequests).values({
       scheduleId,
       requesterId,
@@ -7367,7 +11655,7 @@ router11.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         profilePhoto: users.photoUrl
       }
-    }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).where(eq15(substitutionRequests.id, newRequest.id)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq19(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq19(substitutionRequests.requesterId, users.id)).where(eq19(substitutionRequests.id, newRequest.id)).limit(1);
     const [requestWithDetails] = await requestQuery;
     let substituteUser = null;
     if (finalSubstituteId) {
@@ -7377,7 +11665,7 @@ router11.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         phone: users.phone,
         whatsapp: users.whatsapp
-      }).from(users).where(eq15(users.id, finalSubstituteId)).limit(1);
+      }).from(users).where(eq19(users.id, finalSubstituteId)).limit(1);
       substituteUser = substitute || null;
     }
     const responseData = {
@@ -7388,7 +11676,13 @@ router11.post("/", authenticateToken, async (req, res) => {
       },
       substituteUser
     };
-    const message = finalSubstituteId ? "Solicita\xE7\xE3o criada com sucesso. Aguardando aprova\xE7\xE3o." : "Solicita\xE7\xE3o criada. Aguardando que o coordenador atribua um suplente.";
+    const message = finalSubstituteId ? "Solicita\xE7\xE3o criada. Aguardando resposta do ministro indicado." : "Solicita\xE7\xE3o publicada no quadro de substitui\xE7\xF5es. Outros ministros poder\xE3o se prontificar.";
+    const { notifySubstitutionRequest: notifySubstitutionRequest2 } = await init_websocket().then(() => websocket_exports);
+    notifySubstitutionRequest2({
+      ...responseData,
+      urgency,
+      hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60))
+    });
     res.json({
       success: true,
       message,
@@ -7408,7 +11702,7 @@ router11.post("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router11.get("/", authenticateToken, async (req, res) => {
+router14.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -7424,7 +11718,7 @@ router11.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
+      }).from(substitutionRequests).innerJoin(schedules, eq19(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq19(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
     } else {
       requests = await db.select({
         request: substitutionRequests,
@@ -7435,8 +11729,10 @@ router11.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq15(substitutionRequests.requesterId, users.id)).where(
-        sql8`${substitutionRequests.requesterId} = ${userId} OR ${substitutionRequests.substituteId} = ${userId}`
+      }).from(substitutionRequests).innerJoin(schedules, eq19(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq19(substitutionRequests.requesterId, users.id)).where(
+        sql11`${substitutionRequests.requesterId} = ${userId}
+            OR ${substitutionRequests.substituteId} = ${userId}
+            OR ${substitutionRequests.status} = 'available'`
       ).orderBy(desc7(substitutionRequests.createdAt));
     }
     const mappedRequests = requests.map((req2) => ({
@@ -7455,11 +11751,11 @@ router11.get("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
+router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
-    const [schedule] = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq19(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       console.log("[Substitutions] Escala n\xE3o encontrada:", scheduleId);
       return res.status(404).json({
@@ -7474,11 +11770,11 @@ router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
       email: users.email,
       photoUrl: users.photoUrl
     }).from(users).where(
-      and12(
-        eq15(users.status, "active"),
-        eq15(users.role, "ministro"),
+      and15(
+        eq19(users.status, "active"),
+        eq19(users.role, "ministro"),
         // Não está escalado no mesmo horário
-        sql8`NOT EXISTS (
+        sql11`NOT EXISTS (
             SELECT 1 FROM ${schedules} s
             WHERE s.minister_id = ${users.id}
             AND s.date = ${schedule.date}
@@ -7501,7 +11797,7 @@ router11.get("/available/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router11.post("/:id/respond", authenticateToken, async (req, res) => {
+router14.post("/:id/respond", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { response, responseMessage } = req.body;
@@ -7512,7 +11808,7 @@ router11.post("/:id/respond", authenticateToken, async (req, res) => {
         message: "Resposta inv\xE1lida. Use 'accepted' ou 'rejected'"
       });
     }
-    const [request] = await db.select().from(substitutionRequests).where(eq15(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq19(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -7540,12 +11836,12 @@ router11.post("/:id/respond", authenticateToken, async (req, res) => {
       approvedAt: /* @__PURE__ */ new Date(),
       responseMessage: responseMessage || null,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq15(substitutionRequests.id, id));
+    }).where(eq19(substitutionRequests.id, id));
     if (newStatus === "approved" && request.substituteId) {
       await db.update(schedules).set({
         ministerId: request.substituteId,
         substituteId: request.requesterId
-      }).where(eq15(schedules.id, request.scheduleId));
+      }).where(eq19(schedules.id, request.scheduleId));
     }
     res.json({
       success: true,
@@ -7559,11 +11855,80 @@ router11.post("/:id/respond", authenticateToken, async (req, res) => {
     });
   }
 });
-router11.delete("/:id", authenticateToken, async (req, res) => {
+router14.post("/:id/claim", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const [request] = await db.select().from(substitutionRequests).where(eq15(substitutionRequests.id, id)).limit(1);
+    const { message } = req.body;
+    const [request] = await db.select().from(substitutionRequests).where(eq19(substitutionRequests.id, id)).limit(1);
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Solicita\xE7\xE3o n\xE3o encontrada"
+      });
+    }
+    if (request.status !== "available") {
+      return res.status(400).json({
+        success: false,
+        message: "Esta solicita\xE7\xE3o n\xE3o est\xE1 mais dispon\xEDvel"
+      });
+    }
+    if (request.requesterId === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Voc\xEA n\xE3o pode reivindicar sua pr\xF3pria solicita\xE7\xE3o"
+      });
+    }
+    const [schedule] = await db.select().from(schedules).where(eq19(schedules.id, request.scheduleId)).limit(1);
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Escala n\xE3o encontrada"
+      });
+    }
+    const conflictingSchedule = await db.select().from(schedules).where(
+      and15(
+        eq19(schedules.ministerId, userId),
+        eq19(schedules.date, schedule.date),
+        eq19(schedules.time, schedule.time),
+        eq19(schedules.status, "scheduled")
+      )
+    ).limit(1);
+    if (conflictingSchedule.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Voc\xEA j\xE1 est\xE1 escalado neste hor\xE1rio"
+      });
+    }
+    await db.update(substitutionRequests).set({
+      status: "approved",
+      substituteId: userId,
+      approvedBy: userId,
+      approvedAt: /* @__PURE__ */ new Date(),
+      responseMessage: message || null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq19(substitutionRequests.id, id));
+    await db.update(schedules).set({
+      ministerId: userId,
+      substituteId: request.requesterId
+    }).where(eq19(schedules.id, request.scheduleId));
+    res.json({
+      success: true,
+      message: "Substitui\xE7\xE3o aceita com sucesso!"
+    });
+  } catch (error) {
+    console.error("Erro ao reivindicar substitui\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao reivindicar substitui\xE7\xE3o"
+    });
+  }
+});
+router14.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const [request] = await db.select().from(substitutionRequests).where(eq19(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -7578,16 +11943,16 @@ router11.delete("/:id", authenticateToken, async (req, res) => {
         message: "Voc\xEA n\xE3o tem permiss\xE3o para cancelar esta solicita\xE7\xE3o"
       });
     }
-    if (request.status !== "pending") {
+    if (request.status !== "pending" && request.status !== "available") {
       return res.status(400).json({
         success: false,
-        message: "Apenas solicita\xE7\xF5es pendentes podem ser canceladas"
+        message: "Apenas solicita\xE7\xF5es pendentes ou dispon\xEDveis podem ser canceladas"
       });
     }
     await db.update(substitutionRequests).set({
       status: "cancelled",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq15(substitutionRequests.id, id));
+    }).where(eq19(substitutionRequests.id, id));
     res.json({
       success: true,
       message: "Solicita\xE7\xE3o cancelada com sucesso"
@@ -7600,14 +11965,14 @@ router11.delete("/:id", authenticateToken, async (req, res) => {
     });
   }
 });
-var substitutions_default = router11;
+var substitutions_default = router14;
 
 // server/routes/mass-pendencies.ts
 await init_db();
 init_schema();
-import { Router as Router12 } from "express";
-import { eq as eq16, and as and13, gte as gte6, lte as lte5, sql as sql9 } from "drizzle-orm";
-var router12 = Router12();
+import { Router as Router15 } from "express";
+import { eq as eq20, and as and16, gte as gte9, lte as lte8, sql as sql12 } from "drizzle-orm";
+var router15 = Router15();
 var MINIMUM_MINISTERS = {
   "08:00:00": 12,
   // Missa das 8h - 12 ministros
@@ -7622,14 +11987,14 @@ var MINIMUM_MINISTERS = {
   "18:00:00": 10
   // Missa da tarde - 10 ministros
 };
-router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfMonth2 = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth2 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const startDateStr = startOfMonth2.toISOString().split("T")[0];
-    const endDateStr = endOfMonth2.toISOString().split("T")[0];
+    const startOfMonth5 = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth5 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startDateStr = startOfMonth5.toISOString().split("T")[0];
+    const endDateStr = endOfMonth5.toISOString().split("T")[0];
     const monthSchedules = await db.select({
       date: schedules.date,
       time: schedules.time,
@@ -7639,11 +12004,11 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       position: schedules.position,
       status: schedules.status,
       id: schedules.id
-    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
-      and13(
-        gte6(schedules.date, startDateStr),
-        lte5(schedules.date, endDateStr),
-        eq16(schedules.status, "scheduled")
+    }).from(schedules).leftJoin(users, eq20(schedules.ministerId, users.id)).where(
+      and16(
+        gte9(schedules.date, startDateStr),
+        lte8(schedules.date, endDateStr),
+        eq20(schedules.status, "scheduled")
       )
     ).orderBy(schedules.date, schedules.time);
     const scheduleIds = monthSchedules.map((s) => s.id);
@@ -7653,12 +12018,12 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       substituteId: substitutionRequests.substituteId,
       status: substitutionRequests.status
     }).from(substitutionRequests).where(
-      and13(
-        sql9`${substitutionRequests.scheduleId} IN (${sql9.join(
-          scheduleIds.map((id) => sql9`${id}`),
-          sql9`, `
+      and16(
+        sql12`${substitutionRequests.scheduleId} IN (${sql12.join(
+          scheduleIds.map((id) => sql12`${id}`),
+          sql12`, `
         )})`,
-        sql9`${substitutionRequests.status} IN ('pending', 'approved')`
+        sql12`${substitutionRequests.status} IN ('pending', 'approved')`
       )
     ) : [];
     const substitutionsMap = /* @__PURE__ */ new Map();
@@ -7678,9 +12043,9 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       name: users.name,
       lastService: users.lastService
     }).from(users).where(
-      and13(
-        eq16(users.status, "active"),
-        eq16(users.role, "ministro")
+      and16(
+        eq20(users.status, "active"),
+        eq20(users.role, "ministro")
       )
     );
     const pendencies = [];
@@ -7767,14 +12132,14 @@ router12.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     res.status(500).json({ message: "Erro ao buscar pend\xEAncias" });
   }
 });
-var mass_pendencies_default = router12;
+var mass_pendencies_default = router15;
 
 // server/routes/formationAdmin.ts
 await init_db();
 init_schema();
-import { Router as Router13 } from "express";
-import { eq as eq17, asc as asc2 } from "drizzle-orm";
-var router13 = Router13();
+import { Router as Router16 } from "express";
+import { eq as eq22, asc as asc2 } from "drizzle-orm";
+var router16 = Router16();
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
     return res.status(403).json({
@@ -7784,8 +12149,26 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-router13.use(authenticateToken, requireAdmin);
-router13.get("/tracks", async (req, res) => {
+router16.use(authenticateToken, requireAdmin);
+router16.post("/seed", async (req, res) => {
+  try {
+    const { default: seedFormation2 } = await init_formation_seed().then(() => formation_seed_exports);
+    const result = await seedFormation2();
+    res.status(200).json({
+      success: true,
+      message: "Formation content seeded successfully",
+      ...result
+    });
+  } catch (error) {
+    console.error("Error running formation seed:", error);
+    res.status(500).json({
+      error: "Erro ao popular banco de dados",
+      message: error.message,
+      details: error.stack
+    });
+  }
+});
+router16.get("/tracks", async (req, res) => {
   try {
     const tracks = await db.select().from(formationTracks).orderBy(asc2(formationTracks.orderIndex));
     res.json({ tracks });
@@ -7797,10 +12180,10 @@ router13.get("/tracks", async (req, res) => {
     });
   }
 });
-router13.get("/tracks/:id", async (req, res) => {
+router16.get("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const track = await db.select().from(formationTracks).where(eq17(formationTracks.id, id)).limit(1);
+    const track = await db.select().from(formationTracks).where(eq22(formationTracks.id, id)).limit(1);
     if (track.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -7816,7 +12199,7 @@ router13.get("/tracks/:id", async (req, res) => {
     });
   }
 });
-router13.post("/tracks", async (req, res) => {
+router16.post("/tracks", async (req, res) => {
   try {
     const trackData = req.body;
     const newTrack = await db.insert(formationTracks).values(trackData).returning();
@@ -7832,11 +12215,11 @@ router13.post("/tracks", async (req, res) => {
     });
   }
 });
-router13.patch("/tracks/:id", async (req, res) => {
+router16.patch("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationTracks.id, id)).returning();
+    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq22(formationTracks.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -7855,17 +12238,17 @@ router13.patch("/tracks/:id", async (req, res) => {
     });
   }
 });
-router13.delete("/tracks/:id", async (req, res) => {
+router16.delete("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const modules = await db.select().from(formationModules).where(eq17(formationModules.trackId, id));
+    const modules = await db.select().from(formationModules).where(eq22(formationModules.trackId, id));
     if (modules.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta trilha possui m\xF3dulos. Delete os m\xF3dulos primeiro ou desative a trilha."
       });
     }
-    const deleted = await db.delete(formationTracks).where(eq17(formationTracks.id, id)).returning();
+    const deleted = await db.delete(formationTracks).where(eq22(formationTracks.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -7884,10 +12267,10 @@ router13.delete("/tracks/:id", async (req, res) => {
     });
   }
 });
-router13.get("/tracks/:trackId/modules", async (req, res) => {
+router16.get("/tracks/:trackId/modules", async (req, res) => {
   try {
     const { trackId } = req.params;
-    const modules = await db.select().from(formationModules).where(eq17(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
+    const modules = await db.select().from(formationModules).where(eq22(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
     res.json({ modules });
   } catch (error) {
     console.error("Error fetching formation modules:", error);
@@ -7897,10 +12280,10 @@ router13.get("/tracks/:trackId/modules", async (req, res) => {
     });
   }
 });
-router13.get("/modules/:id", async (req, res) => {
+router16.get("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const module = await db.select().from(formationModules).where(eq17(formationModules.id, id)).limit(1);
+    const module = await db.select().from(formationModules).where(eq22(formationModules.id, id)).limit(1);
     if (module.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -7916,7 +12299,7 @@ router13.get("/modules/:id", async (req, res) => {
     });
   }
 });
-router13.post("/modules", async (req, res) => {
+router16.post("/modules", async (req, res) => {
   try {
     const moduleData = req.body;
     const newModule = await db.insert(formationModules).values(moduleData).returning();
@@ -7932,11 +12315,11 @@ router13.post("/modules", async (req, res) => {
     });
   }
 });
-router13.patch("/modules/:id", async (req, res) => {
+router16.patch("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationModules).set(updates).where(eq17(formationModules.id, id)).returning();
+    const updated = await db.update(formationModules).set(updates).where(eq22(formationModules.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -7955,17 +12338,17 @@ router13.patch("/modules/:id", async (req, res) => {
     });
   }
 });
-router13.delete("/modules/:id", async (req, res) => {
+router16.delete("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq17(formationLessons.moduleId, id));
+    const lessons = await db.select().from(formationLessons).where(eq22(formationLessons.moduleId, id));
     if (lessons.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Este m\xF3dulo possui li\xE7\xF5es. Delete as li\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationModules).where(eq17(formationModules.id, id)).returning();
+    const deleted = await db.delete(formationModules).where(eq22(formationModules.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -7984,10 +12367,10 @@ router13.delete("/modules/:id", async (req, res) => {
     });
   }
 });
-router13.get("/modules/:moduleId/lessons", async (req, res) => {
+router16.get("/modules/:moduleId/lessons", async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq17(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
+    const lessons = await db.select().from(formationLessons).where(eq22(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
     res.json({ lessons });
   } catch (error) {
     console.error("Error fetching formation lessons:", error);
@@ -7997,10 +12380,10 @@ router13.get("/modules/:moduleId/lessons", async (req, res) => {
     });
   }
 });
-router13.get("/lessons/:id", async (req, res) => {
+router16.get("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lesson = await db.select().from(formationLessons).where(eq17(formationLessons.id, id)).limit(1);
+    const lesson = await db.select().from(formationLessons).where(eq22(formationLessons.id, id)).limit(1);
     if (lesson.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -8016,7 +12399,7 @@ router13.get("/lessons/:id", async (req, res) => {
     });
   }
 });
-router13.post("/lessons", async (req, res) => {
+router16.post("/lessons", async (req, res) => {
   try {
     const lessonData = req.body;
     const newLesson = await db.insert(formationLessons).values(lessonData).returning();
@@ -8032,11 +12415,11 @@ router13.post("/lessons", async (req, res) => {
     });
   }
 });
-router13.patch("/lessons/:id", async (req, res) => {
+router16.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationLessons.id, id)).returning();
+    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq22(formationLessons.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -8055,17 +12438,17 @@ router13.patch("/lessons/:id", async (req, res) => {
     });
   }
 });
-router13.delete("/lessons/:id", async (req, res) => {
+router16.delete("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.lessonId, id));
+    const sections = await db.select().from(formationLessonSections).where(eq22(formationLessonSections.lessonId, id));
     if (sections.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta li\xE7\xE3o possui se\xE7\xF5es. Delete as se\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationLessons).where(eq17(formationLessons.id, id)).returning();
+    const deleted = await db.delete(formationLessons).where(eq22(formationLessons.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -8084,10 +12467,10 @@ router13.delete("/lessons/:id", async (req, res) => {
     });
   }
 });
-router13.get("/lessons/:lessonId/sections", async (req, res) => {
+router16.get("/lessons/:lessonId/sections", async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
+    const sections = await db.select().from(formationLessonSections).where(eq22(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
     res.json({ sections });
   } catch (error) {
     console.error("Error fetching lesson sections:", error);
@@ -8097,10 +12480,10 @@ router13.get("/lessons/:lessonId/sections", async (req, res) => {
     });
   }
 });
-router13.get("/sections/:id", async (req, res) => {
+router16.get("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const section = await db.select().from(formationLessonSections).where(eq17(formationLessonSections.id, id)).limit(1);
+    const section = await db.select().from(formationLessonSections).where(eq22(formationLessonSections.id, id)).limit(1);
     if (section.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -8116,7 +12499,7 @@ router13.get("/sections/:id", async (req, res) => {
     });
   }
 });
-router13.post("/sections", async (req, res) => {
+router16.post("/sections", async (req, res) => {
   try {
     const sectionData = req.body;
     const newSection = await db.insert(formationLessonSections).values(sectionData).returning();
@@ -8132,11 +12515,11 @@ router13.post("/sections", async (req, res) => {
     });
   }
 });
-router13.patch("/sections/:id", async (req, res) => {
+router16.patch("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq17(formationLessonSections.id, id)).returning();
+    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq22(formationLessonSections.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -8155,10 +12538,10 @@ router13.patch("/sections/:id", async (req, res) => {
     });
   }
 });
-router13.delete("/sections/:id", async (req, res) => {
+router16.delete("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.delete(formationLessonSections).where(eq17(formationLessonSections.id, id)).returning();
+    const deleted = await db.delete(formationLessonSections).where(eq22(formationLessonSections.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -8177,7 +12560,7 @@ router13.delete("/sections/:id", async (req, res) => {
     });
   }
 });
-router13.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
+router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
   try {
     const { lessonId } = req.params;
     const { sectionIds } = req.body;
@@ -8188,7 +12571,7 @@ router13.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
       });
     }
     const updates = sectionIds.map(
-      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq17(formationLessonSections.id, id))
+      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq22(formationLessonSections.id, id))
     );
     await Promise.all(updates);
     res.json({
@@ -8202,28 +12585,926 @@ router13.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
     });
   }
 });
-var formationAdmin_default = router13;
+var formationAdmin_default = router16;
 
 // server/routes/version.ts
-import { Router as Router14 } from "express";
-var router14 = Router14();
+import { Router as Router17 } from "express";
+var router17 = Router17();
 var SYSTEM_VERSION = "5.4.1";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
-router14.get("/", (req, res) => {
+router17.get("/", (req, res) => {
   res.json({
     version: SYSTEM_VERSION,
     buildTime: BUILD_TIME,
     timestamp: Date.now()
   });
 });
-var version_default = router14;
+var version_default = router17;
+
+// server/routes/liturgical.ts
+await init_db();
+init_schema();
+import { Router as Router18 } from "express";
+import { eq as eq23, and as and17, gte as gte10, lte as lte9 } from "drizzle-orm";
+
+// shared/constants/massConfig.ts
+var REGULAR_MASS_SCHEDULE = {
+  SUNDAY: [
+    { time: "08:00", min: 15, max: 20, label: "Missa das 8h" },
+    { time: "10:00", min: 20, max: 28, label: "Missa das 10h" },
+    { time: "19:00", min: 20, max: 28, label: "Missa das 19h" }
+  ],
+  WEEKDAY: [
+    { time: "06:30", min: 5, max: 8, label: "Missa da Semana" }
+  ],
+  SATURDAY: [
+    { time: "06:30", min: 5, max: 8, label: "Missa de S\xE1bado" }
+  ]
+};
+var SPECIAL_MONTHLY_MASSES = {
+  FIRST_THURSDAY_HEALING: {
+    time: "19:30",
+    // or 19:00 if holiday
+    alternativeTime: "19:00",
+    min: 20,
+    max: 28,
+    label: "Cura e Liberta\xE7\xE3o (1\xAA Quinta-feira)",
+    description: "Missa de Cura e Liberta\xE7\xE3o na primeira quinta-feira do m\xEAs"
+  },
+  FIRST_FRIDAY_SACRED_HEART: {
+    time: "06:30",
+    min: 8,
+    max: 12,
+    label: "Sagrado Cora\xE7\xE3o (1\xAA Sexta-feira)",
+    description: "Devo\xE7\xE3o ao Sagrado Cora\xE7\xE3o de Jesus"
+  },
+  FIRST_SATURDAY_IMMACULATE_HEART: {
+    time: "06:30",
+    min: 8,
+    max: 12,
+    label: "Imaculado Cora\xE7\xE3o (1\xBA S\xE1bado)",
+    description: "Devo\xE7\xE3o ao Imaculado Cora\xE7\xE3o de Maria"
+  }
+};
+var ST_JUDE_DAY_28_MASSES = {
+  WEEKDAY: [
+    { time: "07:00", min: 12, max: 12, label: "Missa da Manh\xE3" },
+    { time: "15:00", min: 12, max: 12, label: "Missa da Tarde" },
+    { time: "19:30", min: 20, max: 25, label: "Missa da Noite" }
+  ],
+  SATURDAY: [
+    { time: "07:00", min: 12, max: 12, label: "Missa da Manh\xE3" },
+    { time: "15:00", min: 12, max: 12, label: "Missa da Tarde" },
+    { time: "19:00", min: 20, max: 25, label: "Missa da Noite" }
+  ],
+  SUNDAY: [
+    { time: "08:00", min: 20, max: 20, label: "Missa das 8h" },
+    { time: "10:00", min: 25, max: 28, label: "Missa das 10h" },
+    { time: "15:00", min: 18, max: 20, label: "Missa das 15h" },
+    { time: "19:00", min: 25, max: 28, label: "Missa das 19h" }
+  ],
+  // Special configuration for October 28 (Feast Day)
+  OCTOBER_FEAST_DAY: [
+    { time: "07:00", min: 12, max: 12, label: "Missa das 7h" },
+    { time: "10:00", min: 12, max: 12, label: "Missa das 10h" },
+    { time: "12:00", min: 12, max: 12, label: "Missa do Meio-dia" },
+    { time: "15:00", min: 12, max: 12, label: "Missa das 15h" },
+    { time: "17:00", min: 15, max: 15, label: "Missa das 17h" },
+    { time: "19:30", min: 20, max: 25, label: "Missa Solene" }
+  ]
+};
+var ST_JUDE_NOVENA_MASSES = {
+  WEEKDAY: [
+    { time: "19:30", min: 18, max: 20, label: "Missa da Novena" }
+  ],
+  SATURDAY: [
+    { time: "19:00", min: 18, max: 20, label: "Missa da Novena" }
+  ]
+};
+function getMassConfigForDate(date2) {
+  const dayOfWeek = date2.getDay();
+  const dayOfMonth = date2.getDate();
+  const month = date2.getMonth();
+  if (month === 9 && dayOfMonth >= 20 && dayOfMonth <= 27) {
+    if (dayOfWeek === 6) {
+      return ST_JUDE_NOVENA_MASSES.SATURDAY;
+    }
+    if (dayOfWeek !== 0) {
+      return ST_JUDE_NOVENA_MASSES.WEEKDAY;
+    }
+  }
+  if (month === 9 && dayOfMonth === 28) {
+    return ST_JUDE_DAY_28_MASSES.OCTOBER_FEAST_DAY;
+  }
+  if (dayOfMonth === 28) {
+    if (dayOfWeek === 0) {
+      return ST_JUDE_DAY_28_MASSES.SUNDAY;
+    }
+    if (dayOfWeek === 6) {
+      return ST_JUDE_DAY_28_MASSES.SATURDAY;
+    }
+    return ST_JUDE_DAY_28_MASSES.WEEKDAY;
+  }
+  if (dayOfWeek === 0) {
+    return REGULAR_MASS_SCHEDULE.SUNDAY;
+  }
+  if (dayOfWeek === 6) {
+    return REGULAR_MASS_SCHEDULE.SATURDAY;
+  }
+  return REGULAR_MASS_SCHEDULE.WEEKDAY;
+}
+function getSpecialMonthlyMass(date2) {
+  const dayOfWeek = date2.getDay();
+  const dayOfMonth = date2.getDate();
+  if (dayOfWeek === 4 && dayOfMonth >= 1 && dayOfMonth <= 7) {
+    return SPECIAL_MONTHLY_MASSES.FIRST_THURSDAY_HEALING;
+  }
+  if (dayOfWeek === 5 && dayOfMonth >= 1 && dayOfMonth <= 7) {
+    return SPECIAL_MONTHLY_MASSES.FIRST_FRIDAY_SACRED_HEART;
+  }
+  if (dayOfWeek === 6 && dayOfMonth >= 1 && dayOfMonth <= 7) {
+    return SPECIAL_MONTHLY_MASSES.FIRST_SATURDAY_IMMACULATE_HEART;
+  }
+  return null;
+}
+
+// server/routes/liturgical.ts
+var router18 = Router18();
+router18.get("/current-season", async (req, res) => {
+  try {
+    const currentDate = /* @__PURE__ */ new Date();
+    const seasonInfo = getCurrentLiturgicalSeason(currentDate);
+    const year = currentDate.getFullYear();
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq23(liturgicalYears.year, year)).limit(1);
+    res.json({
+      success: true,
+      data: {
+        season: seasonInfo.name,
+        color: seasonInfo.color,
+        cycle: seasonInfo.cycle,
+        year: liturgicalYear?.year || year,
+        easterDate: liturgicalYear?.easterDate
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching current liturgical season:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar temporada lit\xFArgica atual"
+    });
+  }
+});
+router18.get("/seasons/:year", async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq23(liturgicalYears.year, year)).limit(1);
+    if (!liturgicalYear) {
+      return res.status(404).json({
+        success: false,
+        message: "Ano lit\xFArgico n\xE3o encontrado"
+      });
+    }
+    const seasons = await db.select().from(liturgicalSeasons).where(eq23(liturgicalSeasons.yearId, liturgicalYear.id));
+    res.json({
+      success: true,
+      data: {
+        year: liturgicalYear.year,
+        cycle: liturgicalYear.cycle,
+        easterDate: liturgicalYear.easterDate,
+        seasons
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching liturgical seasons:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar temporadas lit\xFArgicas"
+    });
+  }
+});
+router18.get("/celebrations/:year/:month", async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq23(liturgicalYears.year, year)).limit(1);
+    if (!liturgicalYear) {
+      return res.status(404).json({
+        success: false,
+        message: "Ano lit\xFArgico n\xE3o encontrado"
+      });
+    }
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    const celebrations = await db.select().from(liturgicalCelebrations).where(
+      and17(
+        eq23(liturgicalCelebrations.yearId, liturgicalYear.id),
+        gte10(liturgicalCelebrations.date, startDate.toISOString().split("T")[0]),
+        lte9(liturgicalCelebrations.date, endDate.toISOString().split("T")[0])
+      )
+    ).orderBy(liturgicalCelebrations.date);
+    res.json({
+      success: true,
+      data: {
+        year,
+        month,
+        celebrations
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching liturgical celebrations:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar celebra\xE7\xF5es lit\xFArgicas"
+    });
+  }
+});
+router18.get("/celebration/:date", async (req, res) => {
+  try {
+    const dateStr = req.params.date;
+    const date2 = new Date(dateStr);
+    const year = date2.getFullYear();
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq23(liturgicalYears.year, year)).limit(1);
+    if (!liturgicalYear) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
+    const [celebration] = await db.select().from(liturgicalCelebrations).where(
+      and17(
+        eq23(liturgicalCelebrations.yearId, liturgicalYear.id),
+        eq23(liturgicalCelebrations.date, dateStr)
+      )
+    ).limit(1);
+    res.json({
+      success: true,
+      data: celebration || null
+    });
+  } catch (error) {
+    console.error("Error fetching celebration for date:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar celebra\xE7\xE3o"
+    });
+  }
+});
+router18.get("/mass-config/:date", async (req, res) => {
+  try {
+    const dateStr = req.params.date;
+    const date2 = new Date(dateStr);
+    const year = date2.getFullYear();
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq23(liturgicalYears.year, year)).limit(1);
+    const overrides = await db.select().from(liturgicalMassOverrides).where(eq23(liturgicalMassOverrides.date, dateStr));
+    if (overrides.length > 0) {
+      return res.json({
+        success: true,
+        data: {
+          date: dateStr,
+          masses: overrides.map((override) => ({
+            time: override.time,
+            min: override.minMinisters,
+            max: override.maxMinisters,
+            label: override.description || `Missa das ${override.time}`,
+            isOverride: true
+          })),
+          source: "override"
+        }
+      });
+    }
+    if (liturgicalYear) {
+      const [celebration] = await db.select().from(liturgicalCelebrations).where(
+        and17(
+          eq23(liturgicalCelebrations.yearId, liturgicalYear.id),
+          eq23(liturgicalCelebrations.date, dateStr)
+        )
+      ).limit(1);
+      if (celebration?.specialMassConfig) {
+        const config = celebration.specialMassConfig;
+        if (config.times && config.minMinisters && config.maxMinisters) {
+          return res.json({
+            success: true,
+            data: {
+              date: dateStr,
+              celebration: celebration.name,
+              rank: celebration.rank,
+              color: celebration.color,
+              masses: config.times.map((time2) => ({
+                time: time2,
+                min: config.minMinisters[time2],
+                max: config.maxMinisters[time2],
+                label: `${celebration.name} - ${time2}`,
+                requiresProcession: config.requiresProcession,
+                requiresIncense: config.requiresIncense
+              })),
+              source: "celebration"
+            }
+          });
+        }
+      }
+    }
+    const massConfig = getMassConfigForDate(date2);
+    const specialMonthlyMass = getSpecialMonthlyMass(date2);
+    const masses = massConfig.map((config) => ({
+      time: config.time,
+      min: config.min,
+      max: config.max,
+      label: config.label || `Missa das ${config.time}`
+    }));
+    if (specialMonthlyMass) {
+      masses.push({
+        time: specialMonthlyMass.time,
+        min: specialMonthlyMass.min,
+        max: specialMonthlyMass.max,
+        label: specialMonthlyMass.label || `Missa das ${specialMonthlyMass.time}`
+      });
+    }
+    res.json({
+      success: true,
+      data: {
+        date: dateStr,
+        masses,
+        source: "default",
+        specialInfo: {
+          isStJudeDay: isStJudeDay(date2),
+          isStJudeNovena: isStJudeNovena(date2),
+          isStJudeFeast: isStJudeFeast(date2)
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching mass configuration:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar configura\xE7\xE3o de missas"
+    });
+  }
+});
+router18.post("/overrides", async (req, res) => {
+  try {
+    const { date: date2, time: time2, minMinisters, maxMinisters, description, reason } = req.body;
+    if (!date2 || !time2 || !minMinisters || !maxMinisters) {
+      return res.status(400).json({
+        success: false,
+        message: "Dados incompletos: date, time, minMinisters, maxMinisters s\xE3o obrigat\xF3rios"
+      });
+    }
+    const [override] = await db.insert(liturgicalMassOverrides).values({
+      date: date2,
+      time: time2,
+      minMinisters,
+      maxMinisters,
+      description,
+      reason,
+      createdBy: "admin"
+      // TODO: Use req.user.id
+    }).returning();
+    res.json({
+      success: true,
+      data: override,
+      message: "Override de missa criado com sucesso"
+    });
+  } catch (error) {
+    console.error("Error creating mass override:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao criar override de missa"
+    });
+  }
+});
+router18.get("/overrides/:date", async (req, res) => {
+  try {
+    const { date: date2 } = req.params;
+    const overrides = await db.select().from(liturgicalMassOverrides).where(eq23(liturgicalMassOverrides.date, date2));
+    res.json({
+      success: true,
+      data: overrides
+    });
+  } catch (error) {
+    console.error("Error fetching mass overrides:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar overrides de missa"
+    });
+  }
+});
+router18.delete("/overrides/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.delete(liturgicalMassOverrides).where(eq23(liturgicalMassOverrides.id, id));
+    res.json({
+      success: true,
+      message: "Override de missa removido com sucesso"
+    });
+  } catch (error) {
+    console.error("Error deleting mass override:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao remover override de missa"
+    });
+  }
+});
+var liturgical_default = router18;
+
+// server/routes/saints.ts
+await init_db();
+init_schema();
+import { Router as Router19 } from "express";
+import { eq as eq24, sql as sql14, like, or as or8 } from "drizzle-orm";
+var router19 = Router19();
+router19.get("/today", async (req, res) => {
+  try {
+    const today = /* @__PURE__ */ new Date();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    const feastDay = `${month}-${day}`;
+    const saintsToday = await db.select().from(saints).where(eq24(saints.feastDay, feastDay)).orderBy(saints.rank);
+    res.json({
+      success: true,
+      data: {
+        date: today.toISOString().split("T")[0],
+        feastDay,
+        saints: saintsToday
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching saints of the day:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos do dia"
+    });
+  }
+});
+router19.get("/date/:date", async (req, res) => {
+  try {
+    const dateStr = req.params.date;
+    const date2 = new Date(dateStr);
+    const month = String(date2.getMonth() + 1).padStart(2, "0");
+    const day = String(date2.getDate()).padStart(2, "0");
+    const feastDay = `${month}-${day}`;
+    const saintsOnDate = await db.select().from(saints).where(eq24(saints.feastDay, feastDay)).orderBy(saints.rank);
+    res.json({
+      success: true,
+      data: {
+        date: dateStr,
+        feastDay,
+        saints: saintsOnDate
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching saints for date:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos da data"
+    });
+  }
+});
+router19.get("/month/:month", async (req, res) => {
+  try {
+    const month = String(req.params.month).padStart(2, "0");
+    const monthSaints = await db.select().from(saints).where(like(saints.feastDay, `${month}-%`)).orderBy(saints.feastDay);
+    res.json({
+      success: true,
+      data: {
+        month: parseInt(month),
+        saints: monthSaints
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching saints for month:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos do m\xEAs"
+    });
+  }
+});
+router19.get("/brazilian", async (req, res) => {
+  try {
+    const brazilianSaints = await db.select().from(saints).where(eq24(saints.isBrazilian, true)).orderBy(saints.feastDay);
+    res.json({
+      success: true,
+      data: brazilianSaints
+    });
+  } catch (error) {
+    console.error("Error fetching Brazilian saints:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos brasileiros"
+    });
+  }
+});
+router19.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [saint] = await db.select().from(saints).where(eq24(saints.id, id)).limit(1);
+    if (!saint) {
+      return res.status(404).json({
+        success: false,
+        message: "Santo n\xE3o encontrado"
+      });
+    }
+    res.json({
+      success: true,
+      data: saint
+    });
+  } catch (error) {
+    console.error("Error fetching saint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santo"
+    });
+  }
+});
+router19.get("/search/:query", async (req, res) => {
+  try {
+    const { query } = req.params;
+    const searchResults = await db.select().from(saints).where(
+      or8(
+        like(saints.name, `%${query}%`),
+        like(saints.title, `%${query}%`),
+        like(saints.patronOf, `%${query}%`)
+      )
+    ).orderBy(saints.feastDay);
+    res.json({
+      success: true,
+      data: searchResults
+    });
+  } catch (error) {
+    console.error("Error searching saints:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos"
+    });
+  }
+});
+router19.get("/name-match/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const nameParts = name.toLowerCase().split(" ");
+    const matchingSaints = await db.select().from(saints).where(
+      sql14`LOWER(${saints.name}) LIKE ANY(ARRAY[${sql14.join(
+        nameParts.map((part) => sql14`${"%" + part + "%"}`),
+        sql14`, `
+      )}])`
+    ).orderBy(saints.rank);
+    const saintsWithScore = matchingSaints.map((saint) => {
+      const saintNameLower = saint.name.toLowerCase();
+      let score = 0;
+      nameParts.forEach((part) => {
+        if (saintNameLower.includes(part)) {
+          score += part.length;
+        }
+      });
+      return {
+        ...saint,
+        matchScore: score
+      };
+    });
+    saintsWithScore.sort((a, b) => b.matchScore - a.matchScore);
+    res.json({
+      success: true,
+      data: {
+        ministerName: name,
+        matches: saintsWithScore
+      }
+    });
+  } catch (error) {
+    console.error("Error matching saint names:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar correspond\xEAncia de nomes"
+    });
+  }
+});
+router19.get("/readings/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [saint] = await db.select({
+      name: saints.name,
+      feastDay: saints.feastDay,
+      rank: saints.rank,
+      liturgicalColor: saints.liturgicalColor,
+      collectPrayer: saints.collectPrayer,
+      firstReading: saints.firstReading,
+      responsorialPsalm: saints.responsorialPsalm,
+      gospel: saints.gospel,
+      prayerOfTheFaithful: saints.prayerOfTheFaithful,
+      communionAntiphon: saints.communionAntiphon
+    }).from(saints).where(eq24(saints.id, id)).limit(1);
+    if (!saint) {
+      return res.status(404).json({
+        success: false,
+        message: "Santo n\xE3o encontrado"
+      });
+    }
+    res.json({
+      success: true,
+      data: saint
+    });
+  } catch (error) {
+    console.error("Error fetching saint readings:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar leituras do santo"
+    });
+  }
+});
+router19.get("/", async (req, res) => {
+  try {
+    const { rank, brazilian } = req.query;
+    let query = db.select().from(saints);
+    if (rank) {
+      query = query.where(eq24(saints.rank, rank));
+    }
+    if (brazilian === "true") {
+      query = query.where(eq24(saints.isBrazilian, true));
+    }
+    const allSaints = await query.orderBy(saints.feastDay);
+    res.json({
+      success: true,
+      data: allSaints
+    });
+  } catch (error) {
+    console.error("Error fetching all saints:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar santos"
+    });
+  }
+});
+var saints_default = router19;
+
+// server/routes/dashboard.ts
+await init_db();
+init_schema();
+import { Router as Router20 } from "express";
+import { eq as eq25, and as and18, gte as gte11, lte as lte10, sql as sql15, or as or9, isNull, count as count5, desc as desc9 } from "drizzle-orm";
+import { format as format8, addDays as addDays5, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
+var router20 = Router20();
+router20.get("/urgent-alerts", async (req, res) => {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const next48Hours = addDays5(now, 2);
+    const next7Days = addDays5(now, 7);
+    const incompleteMasses = await db.select({
+      date: schedules.date,
+      time: schedules.time,
+      totalSlots: sql15`COUNT(*)`,
+      filledSlots: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      vacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+    }).from(schedules).where(
+      and18(
+        gte11(schedules.date, format8(now, "yyyy-MM-dd")),
+        lte10(schedules.date, format8(next7Days, "yyyy-MM-dd"))
+      )
+    ).groupBy(schedules.date, schedules.time).having(sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+    const criticalMasses = incompleteMasses.filter((mass) => new Date(mass.date) <= next48Hours).map((m) => ({
+      ...m,
+      hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1e3 * 60 * 60)),
+      massTime: m.time
+    }));
+    const regularIncomplete = incompleteMasses.filter((mass) => new Date(mass.date) > next48Hours).map((m) => ({
+      ...m,
+      massTime: m.time
+    }));
+    const pendingSubstitutions = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      requesterName: users.name,
+      reason: substitutionRequests.reason,
+      status: substitutionRequests.status,
+      massDate: schedules.date,
+      massTime: schedules.time
+    }).from(substitutionRequests).innerJoin(users, eq25(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq25(substitutionRequests.scheduleId, schedules.id)).where(
+      and18(
+        or9(
+          eq25(substitutionRequests.status, "pending"),
+          eq25(substitutionRequests.status, "available")
+        ),
+        gte11(schedules.date, format8(now, "yyyy-MM-dd"))
+      )
+    ).orderBy(schedules.date);
+    const urgentSubstitutions = pendingSubstitutions.filter((sub) => new Date(sub.massDate) <= next48Hours).map((s) => ({
+      ...s,
+      hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1e3 * 60 * 60))
+    }));
+    const regularSubstitutions = pendingSubstitutions.filter((sub) => new Date(sub.massDate) > next48Hours);
+    res.json({
+      success: true,
+      data: {
+        criticalMasses,
+        incompleteMasses: regularIncomplete,
+        urgentSubstitutions,
+        pendingSubstitutions: regularSubstitutions,
+        totalAlerts: criticalMasses.length + urgentSubstitutions.length
+      }
+    });
+  } catch (error) {
+    console.error("[DASHBOARD_ALERTS] Error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch urgent alerts" });
+  }
+});
+router20.get("/next-week-masses", async (req, res) => {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const next7Days = addDays5(now, 7);
+    const masses = await db.select({
+      date: schedules.date,
+      massTime: schedules.time,
+      totalSlots: sql15`COUNT(*)`,
+      totalAssigned: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      totalVacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      requiredMinisters: sql15`COUNT(*)`,
+      // All slots are required
+      hasPendingSubstitutions: sql15`EXISTS(
+          SELECT 1 FROM ${substitutionRequests}
+          WHERE ${substitutionRequests.scheduleId} IN (
+            SELECT id FROM ${schedules} AS s2
+            WHERE s2.date = ${schedules.date} AND s2.time = ${schedules.time}
+          )
+          AND ${substitutionRequests.status} IN ('pending', 'available')
+        )`
+    }).from(schedules).where(
+      and18(
+        gte11(schedules.date, format8(now, "yyyy-MM-dd")),
+        lte10(schedules.date, format8(next7Days, "yyyy-MM-dd"))
+      )
+    ).groupBy(schedules.date, schedules.time).orderBy(schedules.date, schedules.time);
+    const massesWithStatus = masses.map((mass) => {
+      const staffingRate = mass.requiredMinisters > 0 ? mass.totalAssigned / mass.requiredMinisters * 100 : 0;
+      let status = "full";
+      if (staffingRate < 80) status = "critical";
+      else if (staffingRate < 100) status = "warning";
+      const id = `${mass.date}-${mass.massTime}`;
+      return {
+        id,
+        date: mass.date,
+        massTime: mass.massTime,
+        totalAssigned: mass.totalAssigned,
+        totalVacancies: mass.totalVacancies,
+        requiredMinisters: mass.requiredMinisters,
+        staffingRate: Math.round(staffingRate),
+        status,
+        hasPendingSubstitutions: mass.hasPendingSubstitutions
+      };
+    });
+    res.json({
+      success: true,
+      data: massesWithStatus
+    });
+  } catch (error) {
+    console.error("[DASHBOARD_NEXT_WEEK] Error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch next week masses" });
+  }
+});
+router20.get("/ministry-stats", async (req, res) => {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const thirtyDaysAgo = subDays(now, 30);
+    const thisMonthStart = startOfMonth4(now);
+    const thisMonthEnd = endOfMonth4(now);
+    const [activeMinistersResult] = await db.select({ count: count5() }).from(users).where(
+      and18(
+        eq25(users.status, "active"),
+        or9(
+          eq25(users.role, "ministro"),
+          eq25(users.role, "coordenador")
+        )
+      )
+    );
+    const inactiveMinisters = await db.select({
+      id: users.id,
+      name: users.name,
+      lastService: users.lastService,
+      daysSinceService: sql15`EXTRACT(DAY FROM NOW() - ${users.lastService})`
+    }).from(users).where(
+      and18(
+        eq25(users.status, "active"),
+        or9(
+          eq25(users.role, "ministro"),
+          eq25(users.role, "coordenador")
+        ),
+        or9(
+          lte10(users.lastService, thirtyDaysAgo),
+          isNull(users.lastService)
+        )
+      )
+    ).orderBy(desc9(sql15`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
+    const [monthStats] = await db.select({
+      totalMasses: sql15`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
+      fullyStaffedMasses: sql15`COUNT(DISTINCT CASE
+          WHEN NOT EXISTS(
+            SELECT 1 FROM schedules AS s2
+            WHERE s2.date = ${schedules.date}
+            AND s2.time = ${schedules.time}
+            AND s2.minister_id IS NULL
+          ) THEN (${schedules.date}, ${schedules.time})
+        END)`
+    }).from(schedules).where(
+      and18(
+        gte11(schedules.date, format8(thisMonthStart, "yyyy-MM-dd")),
+        lte10(schedules.date, format8(thisMonthEnd, "yyyy-MM-dd"))
+      )
+    );
+    const [currentQuestionnaire] = await db.select({
+      id: questionnaires.id,
+      status: questionnaires.status
+    }).from(questionnaires).where(
+      and18(
+        eq25(questionnaires.month, now.getMonth() + 1),
+        eq25(questionnaires.year, now.getFullYear())
+      )
+    ).limit(1);
+    let responseRate = 0;
+    if (currentQuestionnaire) {
+      const [responseStats] = await db.select({
+        totalResponses: count5(questionnaireResponses.id)
+      }).from(questionnaireResponses).where(eq25(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
+      responseRate = Math.round(
+        responseStats.totalResponses / (activeMinistersResult.count || 1) * 100
+      );
+    }
+    const [pendingSubsCount] = await db.select({ count: count5() }).from(substitutionRequests).where(
+      and18(
+        or9(
+          eq25(substitutionRequests.status, "pending"),
+          eq25(substitutionRequests.status, "available")
+        )
+      )
+    );
+    const [incompleteMassesCount] = await db.select({
+      count: sql15`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
+    }).from(schedules).where(
+      and18(
+        gte11(schedules.date, format8(now, "yyyy-MM-dd")),
+        isNull(schedules.ministerId)
+      )
+    );
+    res.json({
+      success: true,
+      data: {
+        activeMinisters: activeMinistersResult.count,
+        responseRate,
+        monthCoverage: {
+          total: monthStats?.totalMasses || 0,
+          fullyStaffed: monthStats?.fullyStaffedMasses || 0,
+          percentage: monthStats?.totalMasses > 0 ? Math.round((monthStats.fullyStaffedMasses || 0) / monthStats.totalMasses * 100) : 0
+        },
+        pendingActions: (pendingSubsCount.count || 0) + (incompleteMassesCount.count || 0),
+        inactiveMinisters: inactiveMinisters.slice(0, 10),
+        // Top 10
+        questionnaireStatus: currentQuestionnaire?.status || "closed"
+      }
+    });
+  } catch (error) {
+    console.error("[DASHBOARD_STATS] Error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch ministry stats" });
+  }
+});
+router20.get("/incomplete", async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const now = /* @__PURE__ */ new Date();
+    const futureDate = addDays5(now, days);
+    const incomplete = await db.select({
+      date: schedules.date,
+      massTime: schedules.time,
+      vacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      totalSlots: sql15`COUNT(*)`,
+      positions: sql15`ARRAY_AGG(
+          CASE WHEN ${schedules.ministerId} IS NULL
+          THEN ${schedules.position}
+          END
+        ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
+    }).from(schedules).where(
+      and18(
+        gte11(schedules.date, format8(now, "yyyy-MM-dd")),
+        lte10(schedules.date, format8(futureDate, "yyyy-MM-dd"))
+      )
+    ).groupBy(schedules.date, schedules.time).having(sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
+    res.json({
+      success: true,
+      data: incomplete.map((item) => ({
+        ...item,
+        id: `${item.date}-${item.massTime}`,
+        title: `Missa ${item.massTime}`,
+        requiredMinisters: item.totalSlots,
+        totalAssigned: item.totalSlots - item.vacancies
+      }))
+    });
+  } catch (error) {
+    console.error("[SCHEDULES_INCOMPLETE] Error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch incomplete schedules" });
+  }
+});
+var dashboard_default = router20;
 
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z6 } from "zod";
-import { eq as eq18, count as count5, or as or6 } from "drizzle-orm";
+import { eq as eq26, count as count6, or as or10 } from "drizzle-orm";
 function handleApiError(error, operation) {
   if (error instanceof z6.ZodError) {
     return {
@@ -8264,6 +13545,7 @@ function handleApiError(error, operation) {
 }
 async function registerRoutes(app2) {
   app2.use(cookieParser());
+  app2.use(noCacheHeaders);
   app2.use(csrfTokenGenerator);
   app2.get("/api/csrf-token", getCsrfToken);
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
@@ -8271,6 +13553,9 @@ async function registerRoutes(app2) {
   app2.use("/api/questionnaires", csrfProtection, questionnaires_default);
   app2.use("/api/questionnaires/admin", csrfProtection, questionnaireAdmin_default);
   app2.use("/api/schedules", csrfProtection, scheduleGeneration_default);
+  app2.use("/api/schedules", csrfProtection, smartScheduleGeneration_default);
+  app2.use("/api/schedules", csrfProtection, testScheduleGeneration_default);
+  app2.use("/api/auxiliary", csrfProtection, auxiliaryPanel_default);
   app2.use("/api/upload", csrfProtection, upload_default);
   app2.use("/api/notifications", csrfProtection, notifications_default);
   app2.use("/api/reports", reports_default);
@@ -8280,6 +13565,10 @@ async function registerRoutes(app2) {
   app2.use("/api/mass-pendencies", mass_pendencies_default);
   app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
   app2.use("/api/version", version_default);
+  app2.use("/api/liturgical", liturgical_default);
+  app2.use("/api/saints", saints_default);
+  app2.use("/api/dashboard", dashboard_default);
+  app2.use("/api/schedules/incomplete", dashboard_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -8475,7 +13764,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq18(users.id, userId));
+      }).from(users).where(eq26(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -8674,25 +13963,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count6() }).from(questionnaireResponses).where(eq26(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
-        const [substitutionCheck] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
-          eq18(substitutionRequests.requesterId, userId),
-          eq18(substitutionRequests.substituteId, userId)
+        const [substitutionCheck] = await db.select({ count: count6() }).from(substitutionRequests).where(or10(
+          eq26(substitutionRequests.requesterId, userId),
+          eq26(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -8729,12 +14018,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
-            eq18(substitutionRequests.requesterId, userId),
-            eq18(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count6() }).from(questionnaireResponses).where(eq26(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count6() }).from(substitutionRequests).where(or10(
+            eq26(substitutionRequests.requesterId, userId),
+            eq26(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -8763,12 +14052,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count5() }).from(questionnaireResponses).where(eq18(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count5() }).from(schedules).where(eq18(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count5() }).from(substitutionRequests).where(or6(
-            eq18(substitutionRequests.requesterId, userId),
-            eq18(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count6() }).from(questionnaireResponses).where(eq26(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count6() }).from(schedules).where(eq26(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count6() }).from(substitutionRequests).where(or10(
+            eq26(substitutionRequests.requesterId, userId),
+            eq26(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -9174,7 +14463,53 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
+  if (process.env.NODE_ENV === "development") {
+    app2.post("/api/dev/switch-role", authenticateToken, async (req, res) => {
+      try {
+        const { role } = req.body;
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+        }
+        if (!["ministro", "coordenador", "gestor"].includes(role)) {
+          return res.status(400).json({ message: "Role inv\xE1lido" });
+        }
+        await storage.updateUser(userId, { role });
+        res.json({
+          message: `Role alterado para ${role} com sucesso`,
+          role
+        });
+      } catch (error) {
+        console.error("Error switching role:", error);
+        res.status(500).json({ message: "Erro ao alterar role" });
+      }
+    });
+    console.log("[DEV MODE] Role switcher endpoint enabled at /api/dev/switch-role");
+  }
+  app2.use((err, req, res, next) => {
+    console.error("\u{1F6A8} [CRITICAL ERROR] Uncaught error in route:", err);
+    console.error("\u{1F6A8} [CRITICAL ERROR] Stack:", err.stack);
+    console.error("\u{1F6A8} [CRITICAL ERROR] Request:", { method: req.method, url: req.url });
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Internal server error",
+        message: err.message || "An unexpected error occurred",
+        details: process.env.NODE_ENV === "development" ? err.stack : void 0
+      });
+    }
+  });
   const httpServer = createServer(app2);
+  const { initializeWebSocket: initializeWebSocket2 } = await init_websocket().then(() => websocket_exports);
+  initializeWebSocket2(httpServer);
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("\u{1F6A8} [UNHANDLED REJECTION]", reason);
+    console.error("\u{1F6A8} [UNHANDLED REJECTION] Stack:", reason?.stack);
+  });
+  process.on("uncaughtException", (error) => {
+    console.error("\u{1F6A8} [UNCAUGHT EXCEPTION]", error);
+    console.error("\u{1F6A8} [UNCAUGHT EXCEPTION] Stack:", error.stack);
+  });
+  console.log("\u2705 [EMERGENCY] Error handlers installed");
   return httpServer;
 }
 
@@ -9213,15 +14548,43 @@ var vite_config_default = defineConfig({
     // Gerar hash nos arquivos para cache busting automático
     rollupOptions: {
       output: {
-        // Hash nos nomes dos arquivos JS/CSS
-        entryFileNames: "assets/[name].[hash].js",
-        chunkFileNames: "assets/[name].[hash].js",
-        assetFileNames: "assets/[name].[hash].[ext]"
+        // CRITICAL: Hash patterns for cache busting
+        assetFileNames: "assets/[name]-[hash][extname]",
+        chunkFileNames: "js/[name]-[hash].js",
+        entryFileNames: "js/[name]-[hash].js",
+        // Manual chunks for better code splitting
+        manualChunks: {
+          // Vendor chunks - separate large libraries
+          "vendor-react": ["react", "react-dom", "react/jsx-runtime"],
+          "vendor-router": ["wouter"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-ui": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tooltip",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-label",
+            "@radix-ui/react-switch"
+          ],
+          "vendor-form": ["react-hook-form", "@hookform/resolvers", "zod"],
+          "vendor-date": ["date-fns"],
+          "vendor-icons": ["lucide-react"],
+          "vendor-charts": ["recharts"]
+        }
       }
     },
-    // Desabilitar minificação de nomes para facilitar debug (opcional)
     minify: "terser",
-    sourcemap: false
+    sourcemap: false,
+    // Disable for production
+    chunkSizeWarningLimit: 500
+    // Keep warning at 500KB
   },
   server: {
     proxy: {
@@ -9346,6 +14709,63 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 var app = express2();
 app.set("trust proxy", true);
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        // Necessário para Vite HMR em dev
+        "'unsafe-eval'",
+        // Necessário para Vite HMR em dev
+        "https://cdn.jsdelivr.net"
+        // Para bibliotecas CDN
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        // Necessário para styled components e Tailwind
+        "https://fonts.googleapis.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com"
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https:"
+      ],
+      connectSrc: [
+        "'self'",
+        process.env.NODE_ENV === "development" ? "ws:" : "",
+        process.env.NODE_ENV === "development" ? "wss:" : ""
+      ].filter(Boolean),
+      workerSrc: ["'self'", "blob:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === "production" ? [] : null
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  // Permitir embed de recursos externos
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: {
+    maxAge: 31536e3,
+    // 1 ano
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: process.env.NODE_ENV === "development" ? false : { action: "deny" },
+  // Prevenir clickjacking em produção
+  noSniff: true,
+  xssFilter: true,
+  referrerPolicy: {
+    policy: "strict-origin-when-cross-origin"
+  }
+}));
 app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
@@ -9364,15 +14784,25 @@ app.get("/", (_req, res, next) => {
 var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5000", "http://localhost:3000", "http://127.0.0.1:5000"];
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (origin && origin.includes(".replit.dev")) {
+    if (!origin && process.env.NODE_ENV === "development") {
       return callback(null, true);
     }
-    if (allowedOrigins.includes(origin)) {
+    if (!origin) {
+      console.warn("\u{1F534} CORS: Request sem origin bloqueado");
+      return callback(new Error("Origin not allowed by CORS"));
+    }
+    const isAllowed = allowedOrigins.some((allowedOrigin) => {
+      if (origin === allowedOrigin) return true;
+      if (process.env.NODE_ENV === "development" && origin.includes(".replit.dev")) {
+        return true;
+      }
+      return false;
+    });
+    if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Origem n\xE3o permitida: ${origin}`);
-      callback(null, true);
+      console.warn(`\u{1F534} CORS: Origem n\xE3o permitida bloqueada: ${origin}`);
+      callback(new Error("Origin not allowed by CORS"));
     }
   },
   credentials: true,
@@ -9428,7 +14858,7 @@ app.use((req, res, next) => {
       process.exit(1);
     }
   }
-  const port = parseInt(process.env.PORT || "5005", 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.on("error", (error) => {
     console.error("Server error:", error);
     if (error.code === "EADDRINUSE") {
@@ -9436,11 +14866,7 @@ app.use((req, res, next) => {
     }
     process.exit(1);
   });
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true
-  }, () => {
+  server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
     console.log(`Server successfully started on http://0.0.0.0:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);

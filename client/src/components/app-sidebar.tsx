@@ -94,7 +94,6 @@ export function AppSidebar() {
   const user = authData?.user;
   
   // Debug log
-  console.log('AppSidebar - User role:', user?.role);
   
   // Fetch unread notification count
   const { data: unreadCount } = useQuery<{ count: number }>({

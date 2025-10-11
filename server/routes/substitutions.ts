@@ -330,6 +330,14 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       ? "Solicitação criada. Aguardando resposta do ministro indicado."
       : "Solicitação publicada no quadro de substituições. Outros ministros poderão se prontificar.";
 
+    // Send real-time notification to coordinators
+    const { notifySubstitutionRequest } = await import('../websocket');
+    notifySubstitutionRequest({
+      ...responseData,
+      urgency,
+      hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60))
+    });
+
     res.json({
       success: true,
       message,
@@ -378,7 +386,10 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
         .innerJoin(users, eq(substitutionRequests.requesterId, users.id))
         .orderBy(desc(substitutionRequests.createdAt));
     } else {
-      // Ministros veem apenas suas solicitações e solicitações direcionadas a eles
+      // Ministros veem:
+      // 1. Suas próprias solicitações
+      // 2. Solicitações direcionadas a eles (pending com substituteId = userId)
+      // 3. Solicitações abertas (available) que qualquer ministro pode aceitar
       requests = await db
         .select({
           request: substitutionRequests,
@@ -394,7 +405,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
         .innerJoin(schedules, eq(substitutionRequests.scheduleId, schedules.id))
         .innerJoin(users, eq(substitutionRequests.requesterId, users.id))
         .where(
-          sql`${substitutionRequests.requesterId} = ${userId} OR ${substitutionRequests.substituteId} = ${userId}`
+          sql`${substitutionRequests.requesterId} = ${userId}
+            OR ${substitutionRequests.substituteId} = ${userId}
+            OR ${substitutionRequests.status} = 'available'`
         )
         .orderBy(desc(substitutionRequests.createdAt));
     }
@@ -574,6 +587,114 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// POST /api/substitutions/:id/claim - Reivindicar substituição aberta (available)
+router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const { message } = req.body;
+
+    // Buscar solicitação
+    const [request] = await db
+      .select()
+      .from(substitutionRequests)
+      .where(eq(substitutionRequests.id, id))
+      .limit(1);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Solicitação não encontrada"
+      });
+    }
+
+    // Verificar se a solicitação está aberta (available)
+    if (request.status !== 'available') {
+      return res.status(400).json({
+        success: false,
+        message: "Esta solicitação não está mais disponível"
+      });
+    }
+
+    // Verificar se o usuário não é o solicitante original
+    if (request.requesterId === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Você não pode reivindicar sua própria solicitação"
+      });
+    }
+
+    // Buscar informações da escala
+    const [schedule] = await db
+      .select()
+      .from(schedules)
+      .where(eq(schedules.id, request.scheduleId))
+      .limit(1);
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Escala não encontrada"
+      });
+    }
+
+    // Verificar se o usuário já está escalado naquela data/hora
+    const conflictingSchedule = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.ministerId, userId),
+          eq(schedules.date, schedule.date),
+          eq(schedules.time, schedule.time),
+          eq(schedules.status, 'scheduled')
+        )
+      )
+      .limit(1);
+
+    if (conflictingSchedule.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Você já está escalado neste horário"
+      });
+    }
+
+    // Atualizar solicitação como aprovada com o substituto
+    await db
+      .update(substitutionRequests)
+      .set({
+        status: 'approved',
+        substituteId: userId,
+        approvedBy: userId,
+        approvedAt: new Date(),
+        responseMessage: message || null,
+        updatedAt: new Date()
+      })
+      .where(eq(substitutionRequests.id, id));
+
+    // Atualizar a escala com o novo ministro
+    await db
+      .update(schedules)
+      .set({
+        ministerId: userId,
+        substituteId: request.requesterId
+      })
+      .where(eq(schedules.id, request.scheduleId));
+
+    res.json({
+      success: true,
+      message: "Substituição aceita com sucesso!"
+    });
+
+  } catch (error) {
+    console.error("Erro ao reivindicar substituição:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao reivindicar substituição"
+    });
+  }
+});
+
 // DELETE /api/substitutions/:id - Cancelar solicitação
 router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
@@ -605,11 +726,11 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Apenas solicitações pendentes podem ser canceladas
-    if (request.status !== 'pending') {
+    // Apenas solicitações pendentes ou disponíveis podem ser canceladas
+    if (request.status !== 'pending' && request.status !== 'available') {
       return res.status(400).json({
         success: false,
-        message: "Apenas solicitações pendentes podem ser canceladas"
+        message: "Apenas solicitações pendentes ou disponíveis podem ser canceladas"
       });
     }
 

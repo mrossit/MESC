@@ -1020,4 +1020,279 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
   }
 });
 
+// ========================================
+// NEW ENDPOINTS FOR QUESTIONNAIRE MANAGEMENT
+// ========================================
+
+// POST /api/questionnaires/open - Manually open a questionnaire
+router.post('/open', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  try {
+    const schema = z.object({
+      month: z.number().min(1).max(12),
+      year: z.number().min(2024).max(2050)
+    });
+
+    const { month, year } = schema.parse(req.body);
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
+
+    // Find the questionnaire for this month/year
+    const [questionnaire] = await db.select().from(questionnaires)
+      .where(and(
+        eq(questionnaires.month, month),
+        eq(questionnaires.year, year),
+        ne(questionnaires.status, 'deleted')
+      ));
+
+    if (!questionnaire) {
+      return res.status(404).json({
+        error: 'Questionário não encontrado',
+        message: `Nenhum questionário encontrado para ${getMonthName(month)}/${year}. Crie um primeiro.`
+      });
+    }
+
+    // Update status to 'open' (sent)
+    const [updated] = await db
+      .update(questionnaires)
+      .set({
+        status: 'sent', // 'sent' is the open status
+        updatedAt: new Date()
+      })
+      .where(eq(questionnaires.id, questionnaire.id))
+      .returning();
+
+    res.json({
+      message: `Questionário de ${getMonthName(month)}/${year} aberto com sucesso`,
+      questionnaire: {
+        ...updated,
+        questions: updated.questions
+      }
+    });
+  } catch (error) {
+    console.error('Error opening questionnaire:', error);
+    res.status(500).json({ error: 'Failed to open questionnaire' });
+  }
+});
+
+// GET /api/questionnaires/current-status - Check if questionnaire should auto-close
+router.get('/current-status', requireAuth, async (req: any, res) => {
+  try {
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const currentHour = now.getHours();
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
+
+    // Find questionnaire for current month
+    const [questionnaire] = await db.select().from(questionnaires)
+      .where(and(
+        eq(questionnaires.month, currentMonth),
+        eq(questionnaires.year, currentYear),
+        ne(questionnaires.status, 'deleted')
+      ));
+
+    // Check if we're at or past day 25
+    const shouldAutoClose = currentDay >= 25;
+    const isAfter23 = currentHour >= 23;
+
+    let autoCloseTriggered = false;
+
+    // If questionnaire exists, is open (sent), and should auto-close
+    if (questionnaire && questionnaire.status === 'sent' && shouldAutoClose && isAfter23) {
+      // Auto-close the questionnaire
+      const [updated] = await db
+        .update(questionnaires)
+        .set({
+          status: 'closed',
+          updatedAt: new Date()
+        })
+        .where(eq(questionnaires.id, questionnaire.id))
+        .returning();
+
+      autoCloseTriggered = true;
+
+      return res.json({
+        currentDay,
+        currentMonth,
+        currentYear,
+        shouldAutoClose,
+        autoCloseTriggered,
+        questionnaire: {
+          id: updated.id,
+          month: updated.month,
+          year: updated.year,
+          status: updated.status,
+          title: updated.title
+        },
+        message: 'Questionário fechado automaticamente (dia 25 ou posterior)'
+      });
+    }
+
+    res.json({
+      currentDay,
+      currentMonth,
+      currentYear,
+      shouldAutoClose,
+      isAfter23,
+      autoCloseTriggered: false,
+      questionnaire: questionnaire ? {
+        id: questionnaire.id,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        title: questionnaire.title
+      } : null,
+      message: shouldAutoClose
+        ? (isAfter23 ? 'Período de auto-fechamento (após 23h do dia 25)' : 'Aguardando 23h para auto-fechamento')
+        : `Auto-fechamento programado para dia 25 (hoje é dia ${currentDay})`
+    });
+  } catch (error) {
+    console.error('Error checking current status:', error);
+    res.status(500).json({ error: 'Failed to check current status' });
+  }
+});
+
+// GET /api/questionnaires/stats - Get real response count and rate
+router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  try {
+    const { month, year } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({
+        error: 'Parâmetros obrigatórios ausentes',
+        message: 'Os parâmetros month e year são obrigatórios'
+      });
+    }
+
+    const monthNum = parseInt(month as string);
+    const yearNum = parseInt(year as string);
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
+
+    // Find the questionnaire
+    const [questionnaire] = await db.select().from(questionnaires)
+      .where(and(
+        eq(questionnaires.month, monthNum),
+        eq(questionnaires.year, yearNum),
+        ne(questionnaires.status, 'deleted')
+      ));
+
+    if (!questionnaire) {
+      return res.json({
+        month: monthNum,
+        year: yearNum,
+        exists: false,
+        status: null,
+        totalActiveUsers: 0,
+        totalResponses: 0,
+        responseRate: 0,
+        pendingResponses: 0,
+        availableCount: 0,
+        unavailableCount: 0,
+        message: 'Questionário não encontrado'
+      });
+    }
+
+    // Count total active ministers (ministros and coordenadores who can respond)
+    const activeUsers = await db.select({
+      id: users.id
+    }).from(users)
+      .where(and(
+        or(
+          eq(users.role, 'ministro'),
+          eq(users.role, 'coordenador')
+        ),
+        eq(users.status, 'active')
+      ));
+
+    const totalActiveUsers = activeUsers.length;
+
+    // Count responses for this questionnaire
+    const responses = await db.select({
+      id: questionnaireResponses.id,
+      userId: questionnaireResponses.userId,
+      responses: questionnaireResponses.responses,
+      submittedAt: questionnaireResponses.submittedAt
+    }).from(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
+
+    const totalResponses = responses.length;
+    const responseRate = totalActiveUsers > 0
+      ? parseFloat(((totalResponses / totalActiveUsers) * 100).toFixed(2))
+      : 0;
+    const pendingResponses = totalActiveUsers - totalResponses;
+
+    // Count available vs unavailable
+    let availableCount = 0;
+    let unavailableCount = 0;
+
+    responses.forEach((response: any) => {
+      try {
+        const parsedResponses = typeof response.responses === 'string'
+          ? JSON.parse(response.responses)
+          : response.responses;
+
+        // Check for monthly_availability question
+        const monthlyAvailability = parsedResponses.find((r: any) => r.questionId === 'monthly_availability');
+
+        if (monthlyAvailability) {
+          const answer = typeof monthlyAvailability.answer === 'object'
+            ? monthlyAvailability.answer.answer
+            : monthlyAvailability.answer;
+
+          if (answer === 'Sim' || answer === 'yes') {
+            availableCount++;
+          } else if (answer === 'Não' || answer === 'no') {
+            unavailableCount++;
+          }
+        }
+        // Fallback to old structure
+        else {
+          const oldAvailability = parsedResponses.find((r: any) => r.questionId === 'availability');
+          if (oldAvailability) {
+            if (oldAvailability.answer === 'yes' || oldAvailability.answer === 'Disponível') {
+              availableCount++;
+            } else if (oldAvailability.answer === 'no' || oldAvailability.answer === 'Indisponível') {
+              unavailableCount++;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing response:', e);
+      }
+    });
+
+    res.json({
+      month: monthNum,
+      year: yearNum,
+      monthName: getMonthName(monthNum),
+      exists: true,
+      questionnaireId: questionnaire.id,
+      status: questionnaire.status,
+      title: questionnaire.title,
+      totalActiveUsers,
+      totalResponses,
+      responseRate,
+      responseRateFormatted: `${responseRate}%`,
+      pendingResponses,
+      availableCount,
+      unavailableCount,
+      notRespondedCount: pendingResponses,
+      lastUpdated: questionnaire.updatedAt,
+      createdAt: questionnaire.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching questionnaire stats:', error);
+    res.status(500).json({ error: 'Failed to fetch questionnaire stats' });
+  }
+});
+
 export default router;

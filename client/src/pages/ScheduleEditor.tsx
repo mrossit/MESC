@@ -97,7 +97,6 @@ export default function ScheduleEditor() {
           a.user.name.localeCompare(b.user.name)
         );
         setMinisters(sortedMinisters);
-        console.log(`📋 Carregados ${sortedMinisters.length} ministros (ativos + inativos)`);
       }
 
     } catch (error) {
@@ -119,7 +118,6 @@ export default function ScheduleEditor() {
   // Limpar cache ao desmontar o componente (quando sair da edição)
   useEffect(() => {
     return () => {
-      console.log('[ScheduleEditor] Limpando cache ao sair da edição');
       clearEditCache();
     };
   }, []);

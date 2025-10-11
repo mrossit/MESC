@@ -48,7 +48,6 @@ export function VersionChecker() {
     // Verificar inatividade a cada 5 minutos
     const inactivityInterval = setInterval(async () => {
       if (checkInactivity(10)) {
-        console.log('🧹 Limpando cache por inatividade...');
         await clearAppCache();
         recordActivity(); // Reset timer
       }

@@ -1,5 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// CRITICAL: App version for cache invalidation
+// This VERSION changes on every build, forcing cache refresh
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '5.4.2';
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -87,8 +91,8 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false, // Desabilita refetch ao focar janela
-      staleTime: 5 * 60 * 1000, // 5 minutos - tempo razoável de cache
-      gcTime: 30 * 60 * 1000, // 30 minutos - mantém dados por mais tempo
+      staleTime: 5 * 60 * 1000, // 5 minutos - dados frescos
+      gcTime: 10 * 60 * 1000, // 10 minutos - garbage collection mais agressiva
       retry: (failureCount, error: any) => {
         // Don't retry on 401 (unauthorized)
         if (error?.message?.startsWith("401")) {
@@ -103,3 +107,19 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// CRITICAL: Add version to localStorage for cache invalidation check
+if (typeof window !== 'undefined') {
+  const storedVersion = localStorage.getItem('app_version');
+  if (storedVersion !== APP_VERSION) {
+    console.warn(`Version changed from ${storedVersion} to ${APP_VERSION} - clearing caches`);
+    // Clear React Query cache
+    queryClient.clear();
+    // Clear localStorage except auth token
+    const token = localStorage.getItem('token');
+    localStorage.clear();
+    if (token) localStorage.setItem('token', token);
+    // Update version
+    localStorage.setItem('app_version', APP_VERSION);
+  }
+}

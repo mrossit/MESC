@@ -8,9 +8,13 @@ import authRoutes from "./authRoutes";
 import { passwordResetRoutes } from "./passwordResetRoutes";
 import { csrfTokenGenerator, csrfProtection, getCsrfToken } from "./middleware/csrf";
 import { authRateLimiter, passwordResetRateLimiter } from "./middleware/rateLimiter";
+import { noCacheHeaders } from "./middleware/noCacheHeaders";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
+import smartScheduleRoutes from "./routes/smartScheduleGeneration";
+import testScheduleRoutes from "./routes/testScheduleGeneration";
+import auxiliaryPanelRoutes from "./routes/auxiliaryPanel";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
@@ -21,6 +25,9 @@ import substitutionsRoutes from "./routes/substitutions";
 import massPendenciesRoutes from "./routes/mass-pendencies";
 import formationAdminRoutes from "./routes/formationAdmin";
 import versionRoutes from "./routes/version";
+import liturgicalRoutes from "./routes/liturgical";
+import saintsRoutes from "./routes/saints";
+import dashboardRoutes from "./routes/dashboard";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -77,6 +84,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cookie parser middleware
   app.use(cookieParser());
 
+  // CRITICAL: No-cache headers for API routes (prevents stale data caching)
+  app.use(noCacheHeaders);
+
   // CSRF token generator - gera token para todas as rotas
   app.use(csrfTokenGenerator);
 
@@ -97,6 +107,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Schedule generation routes - com proteção CSRF
   app.use('/api/schedules', csrfProtection, scheduleGenerationRoutes);
+
+  // Smart schedule generation routes (advanced algorithm) - com proteção CSRF
+  app.use('/api/schedules', csrfProtection, smartScheduleRoutes);
+
+  // Test schedule generation routes (mock data testing) - com proteção CSRF
+  app.use('/api/schedules', csrfProtection, testScheduleRoutes);
+
+  // Auxiliary panel routes (for positions 1 and 2) - com proteção CSRF
+  app.use('/api/auxiliary', csrfProtection, auxiliaryPanelRoutes);
 
   // Upload routes - com proteção CSRF
   app.use('/api/upload', csrfProtection, uploadRoutes);
@@ -124,6 +143,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Version endpoint (public - sem auth, sem CSRF)
   app.use('/api/version', versionRoutes);
+
+  // Liturgical calendar routes (read endpoints sem CSRF, write endpoints com CSRF)
+  app.use('/api/liturgical', liturgicalRoutes);
+
+  // Saints calendar routes (read-only, no CSRF needed)
+  app.use('/api/saints', saintsRoutes);
+
+  // Dashboard routes (mix of read and incomplete schedules)
+  app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/schedules/incomplete', dashboardRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
@@ -1266,6 +1295,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEV MODE ONLY: Role switcher for testing
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/api/dev/switch-role', authenticateToken, async (req: AuthRequest, res) => {
+      try {
+        const { role } = req.body;
+        const userId = req.user?.id;
+
+        if (!userId) {
+          return res.status(401).json({ message: 'Usuário não autenticado' });
+        }
+
+        // Validate role
+        if (!['ministro', 'coordenador', 'gestor'].includes(role)) {
+          return res.status(400).json({ message: 'Role inválido' });
+        }
+
+        // Update user role in database
+        await storage.updateUser(userId, { role });
+
+        // Clear any cached user data
+        res.json({
+          message: `Role alterado para ${role} com sucesso`,
+          role
+        });
+      } catch (error) {
+        console.error('Error switching role:', error);
+        res.status(500).json({ message: 'Erro ao alterar role' });
+      }
+    });
+
+    console.log('[DEV MODE] Role switcher endpoint enabled at /api/dev/switch-role');
+  }
+
+  // 🔥 EMERGENCY ERROR HANDLERS - Must be added AFTER all routes
+
+  // Global error handler for uncaught route errors
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('🚨 [CRITICAL ERROR] Uncaught error in route:', err);
+    console.error('🚨 [CRITICAL ERROR] Stack:', err.stack);
+    console.error('🚨 [CRITICAL ERROR] Request:', { method: req.method, url: req.url });
+
+    // Always return 500 with safe error message
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: err.message || 'An unexpected error occurred',
+        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
+    }
+  });
+
   const httpServer = createServer(app);
+
+  // Initialize WebSocket server for real-time notifications
+  const { initializeWebSocket } = await import('./websocket');
+  initializeWebSocket(httpServer);
+
+  // 🔥 EMERGENCY: Process-level error handlers
+  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    console.error('🚨 [UNHANDLED REJECTION]', reason);
+    console.error('🚨 [UNHANDLED REJECTION] Stack:', reason?.stack);
+    // Don't exit - log and continue
+  });
+
+  process.on('uncaughtException', (error: Error) => {
+    console.error('🚨 [UNCAUGHT EXCEPTION]', error);
+    console.error('🚨 [UNCAUGHT EXCEPTION] Stack:', error.stack);
+    // Don't exit - log and continue (only for non-fatal errors)
+  });
+
+  console.log('✅ [EMERGENCY] Error handlers installed');
+
   return httpServer;
 }

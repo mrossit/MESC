@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,8 +18,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
-import { 
+import {
   Users,
   Calendar,
   Clock,
@@ -35,7 +43,9 @@ import {
   UserPlus,
   Bell,
   Smartphone,
-  XCircle
+  XCircle,
+  Plus,
+  ListPlus
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -111,6 +121,22 @@ interface MassPendency {
   urgencyLevel: "low" | "medium" | "high" | "critical";
 }
 
+interface UpcomingAssignment {
+  id: string;
+  date: string;
+  massTime: string;
+  position: number;
+  confirmed: boolean;
+  scheduleId: string;
+}
+
+interface AvailableSubstitute {
+  id: string;
+  name: string;
+  email: string;
+  photoUrl: string | null;
+}
+
 export default function Substitutions() {
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -136,6 +162,28 @@ export default function Substitutions() {
   const [requestToCancel, setRequestToCancel] = useState<SubstitutionRequest | null>(null);
   const [cancellingRequest, setCancellingRequest] = useState(false);
 
+  // New substitution request dialog state
+  const [isNewRequestDialogOpen, setIsNewRequestDialogOpen] = useState(false);
+  const [selectedScheduleForRequest, setSelectedScheduleForRequest] = useState<UpcomingAssignment | null>(null);
+  const [requestReason, setRequestReason] = useState("");
+  const [requestType, setRequestType] = useState<"open" | "directed">("open");
+  const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
+  const [creatingRequest, setCreatingRequest] = useState(false);
+
+  // Fetch upcoming assignments for the current minister
+  const { data: upcomingAssignments = [] } = useQuery<UpcomingAssignment[]>({
+    queryKey: ["/api/schedules/minister/upcoming"],
+    queryFn: async () => {
+      const response = await fetch("/api/schedules/minister/upcoming", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch upcoming assignments");
+      const data = await response.json();
+      return data.assignments || [];
+    },
+    enabled: !!user && !isCoordinator,
+  });
+
   // Fetch all ministers for selection
   const { data: allMinisters = [] } = useQuery({
     queryKey: ["/api/ministers"],
@@ -147,6 +195,21 @@ export default function Substitutions() {
       return response.json();
     },
     enabled: !!user,
+  });
+
+  // Fetch available substitutes for selected schedule
+  const { data: availableSubstitutes = [], refetch: refetchAvailableSubstitutes } = useQuery<AvailableSubstitute[]>({
+    queryKey: ["/api/substitutions/available", selectedScheduleForRequest?.id],
+    queryFn: async () => {
+      if (!selectedScheduleForRequest) return [];
+      const response = await fetch(`/api/substitutions/available/${selectedScheduleForRequest.id}`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch available substitutes");
+      const result = await response.json();
+      return result.data || [];
+    },
+    enabled: !!selectedScheduleForRequest && requestType === "directed",
   });
 
   // Fetch mass pendencies (real data from backend)
@@ -379,6 +442,79 @@ export default function Substitutions() {
     setIsNotificationDialogOpen(true);
   };
 
+  const openNewRequestDialog = () => {
+    setIsNewRequestDialogOpen(true);
+    setSelectedScheduleForRequest(null);
+    setRequestReason("");
+    setRequestType("open");
+    setSelectedSubstituteId("");
+  };
+
+  const handleCreateRequest = async () => {
+    if (!selectedScheduleForRequest) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione uma escala",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (requestType === "directed" && !selectedSubstituteId) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione um ministro substituto",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingRequest(true);
+    try {
+      const response = await fetch("/api/substitutions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          scheduleId: selectedScheduleForRequest.id,
+          substituteId: requestType === "directed" ? selectedSubstituteId : null,
+          reason: requestReason || "Não especificado"
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Sucesso",
+          description: result.message || "Solicitação criada com sucesso"
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
+        setIsNewRequestDialogOpen(false);
+        setRequestReason("");
+        setSelectedScheduleForRequest(null);
+        setRequestType("open");
+        setSelectedSubstituteId("");
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Erro",
+          description: error.message || "Erro ao criar solicitação",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error creating request:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar solicitação",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingRequest(false);
+    }
+  };
+
   return (
     <Layout 
       title="Substituições"
@@ -593,11 +729,20 @@ export default function Substitutions() {
         )}
 
         <TabsContent value="substitutions" className="space-y-4">
+          {!isCoordinator && (
+            <div className="flex justify-end">
+              <Button onClick={openNewRequestDialog} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Solicitação
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Solicitações de Substituição</CardTitle>
               <CardDescription>
-                {isCoordinator 
+                {isCoordinator
                   ? "Todas as solicitações de substituição do ministério"
                   : "Suas solicitações e pedidos que você pode atender"}
               </CardDescription>
@@ -708,7 +853,8 @@ export default function Substitutions() {
                         
                         {/* Botões de ação */}
                         <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
-                          {item.request.status === "pending" && !isMyRequest && (
+                          {/* Botão para aceitar solicitação direcionada (pending) */}
+                          {item.request.status === "pending" && !isMyRequest && isForMe && (
                             <Button
                               size="sm"
                               onClick={() => handleRespondToRequest(item)}
@@ -718,7 +864,52 @@ export default function Substitutions() {
                               Responder
                             </Button>
                           )}
-                          {item.request.status === "pending" && isMyRequest && (
+
+                          {/* Botão para reivindicar solicitação aberta (available) */}
+                          {item.request.status === "available" && !isMyRequest && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`/api/substitutions/${item.request.id}/claim`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    credentials: "include",
+                                    body: JSON.stringify({ message: "Aceito substituir" })
+                                  });
+
+                                  if (response.ok) {
+                                    toast({
+                                      title: "Sucesso",
+                                      description: "Substituição aceita com sucesso!"
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+                                  } else {
+                                    const error = await response.json();
+                                    toast({
+                                      title: "Erro",
+                                      description: error.message,
+                                      variant: "destructive"
+                                    });
+                                  }
+                                } catch (error) {
+                                  toast({
+                                    title: "Erro",
+                                    description: "Erro ao aceitar substituição",
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              className="flex-1 sm:flex-initial"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Aceitar Substituição
+                            </Button>
+                          )}
+
+                          {/* Botão para cancelar própria solicitação */}
+                          {(item.request.status === "pending" || item.request.status === "available") && isMyRequest && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -989,8 +1180,8 @@ export default function Substitutions() {
           </div>
 
           <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setIsCancelDialogOpen(false);
                 setRequestToCancel(null);
@@ -1000,7 +1191,7 @@ export default function Substitutions() {
             >
               Voltar
             </Button>
-            <Button 
+            <Button
               variant="destructive"
               onClick={handleCancelRequest}
               disabled={cancellingRequest}
@@ -1015,6 +1206,199 @@ export default function Substitutions() {
                 <>
                   <XCircle className="h-4 w-4 mr-2" />
                   Confirmar Cancelamento
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para criar nova solicitação de substituição */}
+      <Dialog open={isNewRequestDialogOpen} onOpenChange={setIsNewRequestDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Solicitar Substituição</DialogTitle>
+            <DialogDescription>
+              Preencha os dados abaixo para solicitar uma substituição em uma de suas escalas
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Selecionar escala */}
+            <div className="space-y-2">
+              <Label htmlFor="schedule-select">Escala para substituição *</Label>
+              <Select
+                value={selectedScheduleForRequest?.id || ""}
+                onValueChange={(value) => {
+                  const schedule = upcomingAssignments.find(a => a.id === value);
+                  setSelectedScheduleForRequest(schedule || null);
+                }}
+              >
+                <SelectTrigger id="schedule-select">
+                  <SelectValue placeholder="Selecione uma escala" />
+                </SelectTrigger>
+                <SelectContent>
+                  {upcomingAssignments.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      Nenhuma escala futura disponível
+                    </div>
+                  ) : (
+                    upcomingAssignments.map((assignment) => (
+                      <SelectItem key={assignment.id} value={assignment.id}>
+                        {format(new Date(assignment.date), "dd/MM/yyyy")} às{" "}
+                        {assignment.massTime} - {LITURGICAL_POSITIONS[assignment.position]}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tipo de solicitação */}
+            <div className="space-y-3">
+              <Label>Tipo de solicitação</Label>
+              <RadioGroup value={requestType} onValueChange={(value: "open" | "directed") => {
+                setRequestType(value);
+                setSelectedSubstituteId("");
+              }}>
+                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                  <RadioGroupItem value="open" id="open" />
+                  <div className="grid gap-1.5 leading-none flex-1">
+                    <label
+                      htmlFor="open"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Solicitação Aberta
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Qualquer ministro disponível pode se candidatar à substituição
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                  <RadioGroupItem value="directed" id="directed" />
+                  <div className="grid gap-1.5 leading-none flex-1">
+                    <label
+                      htmlFor="directed"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Solicitação Direcionada
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Escolha um ministro específico para substituí-lo
+                    </p>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Seleção de ministro (apenas para solicitação direcionada) */}
+            {requestType === "directed" && (
+              <div className="space-y-2">
+                <Label htmlFor="substitute-select">Ministro Substituto *</Label>
+                <Select
+                  value={selectedSubstituteId}
+                  onValueChange={setSelectedSubstituteId}
+                  disabled={!selectedScheduleForRequest}
+                >
+                  <SelectTrigger id="substitute-select">
+                    <SelectValue placeholder={
+                      selectedScheduleForRequest
+                        ? "Selecione um ministro"
+                        : "Primeiro selecione uma escala"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubstitutes.length === 0 ? (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        {selectedScheduleForRequest
+                          ? "Nenhum ministro disponível"
+                          : "Selecione uma escala primeiro"}
+                      </div>
+                    ) : (
+                      availableSubstitutes.map((minister) => (
+                        <SelectItem key={minister.id} value={minister.id}>
+                          {minister.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedScheduleForRequest && availableSubstitutes.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    Não há ministros disponíveis para esta escala. Considere criar uma solicitação aberta.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Motivo */}
+            <div className="space-y-2">
+              <Label htmlFor="reason">Motivo (opcional)</Label>
+              <Textarea
+                id="reason"
+                value={requestReason}
+                onChange={(e) => setRequestReason(e.target.value)}
+                placeholder="Informe o motivo da solicitação (opcional)"
+                className="min-h-[100px]"
+              />
+            </div>
+
+            {/* Informações sobre urgência */}
+            {selectedScheduleForRequest && (
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-medium mb-1">Informações importantes:</p>
+                    <ul className="space-y-1 text-xs">
+                      <li>
+                        • Solicitações com mais de 12 horas de antecedência são aprovadas automaticamente
+                      </li>
+                      <li>
+                        • Solicitações com menos de 12 horas precisam de aprovação do coordenador
+                      </li>
+                      <li>
+                        • Você receberá uma notificação quando a substituição for confirmada
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsNewRequestDialogOpen(false);
+                setRequestReason("");
+                setSelectedScheduleForRequest(null);
+                setRequestType("open");
+                setSelectedSubstituteId("");
+              }}
+              disabled={creatingRequest}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateRequest}
+              disabled={
+                creatingRequest ||
+                !selectedScheduleForRequest ||
+                (requestType === "directed" && !selectedSubstituteId)
+              }
+            >
+              {creatingRequest ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Criar Solicitação
                 </>
               )}
             </Button>

@@ -173,7 +173,6 @@ export default function QRCodeShare() {
     // Tentar carregar o logo
     logoImg.onerror = () => {
       // Se não conseguir carregar o logo, gerar sem ele
-      console.log('Logo não encontrado, gerando card sem logo');
       
       // Continuar sem o logo - título maior sem logo
       ctx.fillStyle = '#1A1A1A';

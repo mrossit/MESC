@@ -1,6 +1,6 @@
 {
   "name": "rest-express",
-  "version": "1.0.0",
+  "version": "5.4.2",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -10,6 +10,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx server/seedAdmin.ts",
+    "db:seed:liturgical": "tsx server/seeds/index.ts",
     "db:backup": "NODE_ENV=production tsx scripts/backup-db.ts",
     "db:restore": "NODE_ENV=production tsx scripts/restore-db.ts",
     "db:studio": "drizzle-kit studio",

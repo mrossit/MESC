@@ -38,6 +38,9 @@ export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'su
 export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
 export const formationStatusEnum = pgEnum('formation_status', ['not_started', 'in_progress', 'completed']);
 export const lessonContentTypeEnum = pgEnum('lesson_content_type', ['text', 'video', 'audio', 'document', 'quiz', 'interactive']);
+export const liturgicalCycleEnum = pgEnum('liturgical_cycle', ['A', 'B', 'C']);
+export const liturgicalColorEnum = pgEnum('liturgical_color', ['white', 'red', 'green', 'purple', 'rose', 'black']);
+export const celebrationRankEnum = pgEnum('celebration_rank', ['SOLEMNITY', 'FEAST', 'MEMORIAL', 'OPTIONAL_MEMORIAL', 'FERIAL']);
 
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
@@ -194,8 +197,87 @@ export const schedules = pgTable('schedules', {
   status: varchar('status', { length: 20 }).notNull().default('scheduled'),
   substituteId: varchar('substitute_id').references(() => users.id),
   notes: text('notes'),
+  onSiteAdjustments: jsonb('on_site_adjustments').$type<{
+    originalPosition?: number;
+    newPosition?: number;
+    adjustedBy?: string;
+    adjustedAt?: string;
+    reason?: string;
+  }[]>(),
   createdAt: timestamp('created_at').defaultNow()
 });
+
+// Mass Execution Logs (for auxiliary leaders)
+export const massExecutionLogs = pgTable('mass_execution_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  auxiliaryId: varchar('auxiliary_id').notNull().references(() => users.id),
+  changesMade: jsonb('changes_made').$type<{
+    type: 'check_in' | 'position_change' | 'standby_called' | 'emergency_redistribution';
+    ministerId?: string;
+    ministerName?: string;
+    fromPosition?: number;
+    toPosition?: number;
+    timestamp: string;
+    details?: string;
+  }[]>(),
+  comments: text('comments'),
+  massQuality: integer('mass_quality'), // 1-5 stars
+  attendance: jsonb('attendance').$type<{
+    ministerId: string;
+    ministerName: string;
+    position: number;
+    checkedIn: boolean;
+    checkInTime?: string;
+    absent?: boolean;
+  }[]>(),
+  incidents: jsonb('incidents').$type<{
+    type: 'late_arrival' | 'no_show' | 'position_conflict' | 'other';
+    description: string;
+    ministersInvolved?: string[];
+    timestamp: string;
+  }[]>(),
+  highlights: text('highlights'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_mass_execution_logs_schedule').on(table.scheduleId),
+  index('idx_mass_execution_logs_auxiliary').on(table.auxiliaryId)
+]);
+
+// Standby Ministers (available for emergency calls)
+export const standbyMinisters = pgTable('standby_ministers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  ministerId: varchar('minister_id').notNull().references(() => users.id),
+  confirmedAvailable: boolean('confirmed_available').default(false),
+  checkInTime: timestamp('check_in_time'),
+  calledAt: timestamp('called_at'),
+  calledBy: varchar('called_by').references(() => users.id),
+  respondedAt: timestamp('responded_at'),
+  response: varchar('response', { length: 50 }), // 'available', 'unavailable', 'on_way', 'arrived'
+  responseMessage: text('response_message'),
+  assignedPosition: integer('assigned_position'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_standby_ministers_schedule').on(table.scheduleId),
+  index('idx_standby_ministers_minister').on(table.ministerId),
+  index('idx_standby_ministers_called').on(table.calledAt)
+]);
+
+// Minister Check-ins (real-time presence tracking)
+export const ministerCheckIns = pgTable('minister_check_ins', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  ministerId: varchar('minister_id').notNull().references(() => users.id),
+  position: integer('position').notNull(),
+  checkedInAt: timestamp('checked_in_at').defaultNow(),
+  checkedInBy: varchar('checked_in_by').references(() => users.id), // Auxiliary who checked them in
+  status: varchar('status', { length: 20 }).default('present'), // present, late, absent
+  notes: text('notes')
+}, (table) => [
+  index('idx_minister_check_ins_schedule').on(table.scheduleId),
+  index('idx_minister_check_ins_minister').on(table.ministerId)
+]);
 
 // Substitution requests
 export const substitutionRequests = pgTable('substitution_requests', {
@@ -383,6 +465,122 @@ export const activityLogs = pgTable('activity_logs', {
   index('idx_activity_logs_created').on(table.createdAt)
 ]);
 
+// Liturgical Calendar Tables
+export const liturgicalYears = pgTable('liturgical_years', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  year: integer('year').notNull().unique(), // Civil year when liturgical year starts
+  cycle: liturgicalCycleEnum('cycle').notNull(), // A, B, or C
+  startDate: date('start_date').notNull(), // First Sunday of Advent
+  endDate: date('end_date').notNull(), // Saturday before next Advent
+  easterDate: date('easter_date').notNull(), // Calculated Easter Sunday
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_liturgical_years_year').on(table.year)
+]);
+
+export const liturgicalSeasons = pgTable('liturgical_seasons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  yearId: uuid('year_id').notNull().references(() => liturgicalYears.id),
+  name: varchar('name', { length: 100 }).notNull(), // Advent, Christmas, Lent, Easter, Ordinary Time
+  color: liturgicalColorEnum('color').notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_liturgical_seasons_year').on(table.yearId),
+  index('idx_liturgical_seasons_dates').on(table.startDate, table.endDate)
+]);
+
+export const liturgicalCelebrations = pgTable('liturgical_celebrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  date: date('date').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  rank: celebrationRankEnum('rank').notNull(),
+  color: liturgicalColorEnum('color').notNull(),
+  isMovable: boolean('is_movable').default(false), // True for Easter-dependent dates
+  specialMassConfig: jsonb('special_mass_config').$type<{
+    times?: string[];
+    minMinisters?: { [time: string]: number };
+    maxMinisters?: { [time: string]: number };
+    requiresProcession?: boolean;
+    requiresIncense?: boolean;
+  }>(),
+  saintOfTheDay: varchar('saint_of_the_day', { length: 255 }),
+  readings: jsonb('readings'),
+  notes: text('notes'),
+  yearId: uuid('year_id').references(() => liturgicalYears.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_liturgical_celebrations_date').on(table.date),
+  index('idx_liturgical_celebrations_rank').on(table.rank),
+  index('idx_liturgical_celebrations_year').on(table.yearId)
+]);
+
+// Liturgical Settings - Override mass times for special occasions
+export const liturgicalMassOverrides = pgTable('liturgical_mass_overrides', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  celebrationId: uuid('celebration_id').references(() => liturgicalCelebrations.id),
+  date: date('date').notNull(),
+  time: time('time').notNull(),
+  minMinisters: integer('min_ministers').notNull(),
+  maxMinisters: integer('max_ministers').notNull(),
+  description: varchar('description', { length: 255 }),
+  reason: text('reason'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_liturgical_mass_overrides_date').on(table.date),
+  index('idx_liturgical_mass_overrides_celebration').on(table.celebrationId)
+]);
+
+// Saints calendar - Brazilian saints and feast days
+export const saints = pgTable('saints', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  feastDay: varchar('feast_day', { length: 10 }).notNull(), // MM-DD format
+  title: varchar('title', { length: 255 }), // e.g., "Apóstolo", "Mártir", "Doutor da Igreja"
+  patronOf: text('patron_of'), // What they're patron saint of
+  biography: text('biography'),
+  imageUrl: varchar('image_url', { length: 500 }),
+  isBrazilian: boolean('is_brazilian').default(false),
+  rank: celebrationRankEnum('rank').notNull().default('OPTIONAL_MEMORIAL'),
+  liturgicalColor: liturgicalColorEnum('liturgical_color').notNull().default('white'),
+
+  // Liturgical texts
+  collectPrayer: text('collect_prayer'), // Oração Coleta
+  firstReading: jsonb('first_reading').$type<{
+    reference: string;
+    text?: string;
+  }>(),
+  responsorialPsalm: jsonb('responsorial_psalm').$type<{
+    reference: string;
+    response?: string;
+    text?: string;
+  }>(),
+  gospel: jsonb('gospel').$type<{
+    reference: string;
+    text?: string;
+  }>(),
+  prayerOfTheFaithful: text('prayer_of_the_faithful'),
+  communionAntiphon: text('communion_antiphon'),
+
+  // Additional information
+  attributes: jsonb('attributes').$type<string[]>(), // Common symbols, attributes
+  quotes: jsonb('quotes').$type<string[]>(), // Famous quotes by/about the saint
+  relatedSaints: jsonb('related_saints').$type<string[]>(), // Related saint IDs
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_saints_feast_day').on(table.feastDay),
+  index('idx_saints_name').on(table.name),
+  index('idx_saints_brazilian').on(table.isBrazilian)
+]);
+
 // Relations
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)
@@ -449,7 +647,51 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
     fields: [schedules.substituteId],
     references: [users.id]
   }),
-  substitutionRequests: many(substitutionRequests)
+  substitutionRequests: many(substitutionRequests),
+  massExecutionLogs: many(massExecutionLogs),
+  standbyMinisters: many(standbyMinisters),
+  ministerCheckIns: many(ministerCheckIns)
+}));
+
+export const massExecutionLogsRelations = relations(massExecutionLogs, ({ one }) => ({
+  schedule: one(schedules, {
+    fields: [massExecutionLogs.scheduleId],
+    references: [schedules.id]
+  }),
+  auxiliary: one(users, {
+    fields: [massExecutionLogs.auxiliaryId],
+    references: [users.id]
+  })
+}));
+
+export const standbyMinistersRelations = relations(standbyMinisters, ({ one }) => ({
+  schedule: one(schedules, {
+    fields: [standbyMinisters.scheduleId],
+    references: [schedules.id]
+  }),
+  minister: one(users, {
+    fields: [standbyMinisters.ministerId],
+    references: [users.id]
+  }),
+  callerUser: one(users, {
+    fields: [standbyMinisters.calledBy],
+    references: [users.id]
+  })
+}));
+
+export const ministerCheckInsRelations = relations(ministerCheckIns, ({ one }) => ({
+  schedule: one(schedules, {
+    fields: [ministerCheckIns.scheduleId],
+    references: [schedules.id]
+  }),
+  minister: one(users, {
+    fields: [ministerCheckIns.ministerId],
+    references: [users.id]
+  }),
+  checkedInByUser: one(users, {
+    fields: [ministerCheckIns.checkedInBy],
+    references: [users.id]
+  })
 }));
 
 export const substitutionRequestsRelations = relations(substitutionRequests, ({ one }) => ({
@@ -646,3 +888,11 @@ export type FormationLessonSection = typeof formationLessonSections.$inferSelect
 export type InsertFormationLessonSection = z.infer<typeof insertFormationLessonSectionSchema>;
 export type FormationLessonProgress = typeof formationLessonProgress.$inferSelect;
 export type InsertFormationLessonProgress = z.infer<typeof insertFormationLessonProgressSchema>;
+export type Saint = typeof saints.$inferSelect;
+export type InsertSaint = typeof saints.$inferInsert;
+export type MassExecutionLog = typeof massExecutionLogs.$inferSelect;
+export type InsertMassExecutionLog = typeof massExecutionLogs.$inferInsert;
+export type StandbyMinister = typeof standbyMinisters.$inferSelect;
+export type InsertStandbyMinister = typeof standbyMinisters.$inferInsert;
+export type MinisterCheckIn = typeof ministerCheckIns.$inferSelect;
+export type InsertMinisterCheckIn = typeof ministerCheckIns.$inferInsert;

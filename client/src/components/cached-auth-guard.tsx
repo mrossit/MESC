@@ -14,7 +14,6 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
   
   // Primeiro, tenta pegar dados do cache com type safety
   const cachedData = queryClient.getQueryData<AuthResponse>(["/api/auth/me"]);
-  console.log(`[CachedAuthGuard] Cached data for ${location}:`, cachedData);
   
   // Usa a mesma query key que o ProtectedRoute para compartilhar cache
   const { data, isLoading, error } = useQuery({
@@ -28,16 +27,6 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     initialData: isAuthResponse(cachedData) ? cachedData : undefined,
   });
   
-  // Log do estado
-  console.log(`[CachedAuthGuard] State:`, {
-    location,
-    isLoading,
-    hasError: !!error,
-    hasUser: hasValidUser(data),
-    userRole: hasValidUser(data) ? data.user.role : undefined,
-    allowedRoles,
-    usingCache: hasValidUser(cachedData)
-  });
   
   // Se tem dados em cache válidos, usa eles imediatamente
   if (hasValidUser(cachedData)) {
@@ -55,14 +44,12 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     if (allowedRoles && allowedRoles.length > 0) {
       const userRole = userData.role;
       const hasPermission = allowedRoles.includes(userRole);
-      console.log(`[CachedAuthGuard] Cache permission: ${userRole} in [${allowedRoles}] = ${hasPermission}`);
       
       if (!hasPermission) {
         return <Redirect to="/dashboard" />;
       }
     }
     
-    console.log(`[CachedAuthGuard] Access granted from cache`);
     return <>{children}</>;
   }
   
@@ -84,7 +71,6 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     if (location === "/login" || location === "/register") {
       return <>{children}</>;
     }
-    console.log(`[CachedAuthGuard] No auth, redirecting to login`);
     return <Redirect to="/login" />;
   }
   
@@ -101,13 +87,11 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
   if (allowedRoles && allowedRoles.length > 0) {
     const userRole = data.user.role;
     const hasPermission = allowedRoles.includes(userRole);
-    console.log(`[CachedAuthGuard] Permission: ${userRole} in [${allowedRoles}] = ${hasPermission}`);
     
     if (!hasPermission) {
       return <Redirect to="/dashboard" />;
     }
   }
   
-  console.log(`[CachedAuthGuard] Access granted`);
   return <>{children}</>;
 }

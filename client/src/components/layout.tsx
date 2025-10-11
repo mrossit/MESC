@@ -8,11 +8,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { DebugPanel } from "@/components/debug-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,6 +24,7 @@ interface LayoutProps {
 
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const isMobile = useIsMobile();
+  const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
 
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -31,6 +34,11 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
   });
 
   const user = authData?.user;
+
+  // WebSocket connection for debug panel
+  const { isConnected } = useWebSocket({
+    enabled: user?.role === "coordenador" || user?.role === "gestor",
+  });
 
   return (
     <SidebarProvider>
@@ -59,9 +67,20 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               <div className="flex-1 min-w-0">
                 {title && (
                   <div className="flex flex-col">
-                    <h2 className="truncate text-base font-semibold sm:text-lg md:text-xl lg:text-2xl">
-                      {title === "Escalas Litúrgicas" ? "Escala de Missas" : title}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate text-base font-semibold sm:text-lg md:text-xl lg:text-2xl">
+                        {title === "Escalas Litúrgicas" ? "Escala de Missas" : title}
+                      </h2>
+                      {/* Dev Mode: Show current role */}
+                      {(import.meta.env.DEV || window.location.hostname === 'localhost') && user && (
+                        <Badge
+                          variant={user.role === 'gestor' ? 'default' : user.role === 'coordenador' ? 'secondary' : 'outline'}
+                          className="text-[10px] sm:text-xs px-1.5 py-0 h-5"
+                        >
+                          {user.role}
+                        </Badge>
+                      )}
+                    </div>
                     {subtitle && (
                       <p className="hidden truncate text-xs text-muted-foreground sm:block sm:text-sm">
                         {subtitle}
@@ -100,6 +119,9 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
 
       {/* Floating Notification Bell for Mobile - removed since we have bottom nav */}
       {!isMobile && <FloatingNotificationBell />}
+
+      {/* Debug Panel - Only in development */}
+      {isDev && <DebugPanel isConnected={isConnected} />}
     </SidebarProvider>
   );
 }

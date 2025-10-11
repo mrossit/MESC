@@ -21,7 +21,6 @@ export function hasVersionChanged(): boolean {
   }
 
   if (storedVersion !== APP_VERSION) {
-    console.log(`Version changed: ${storedVersion} -> ${APP_VERSION}`);
     return true;
   }
 
@@ -92,7 +91,6 @@ export function checkInactivityAndClear(): void {
 
     // Se passou mais de 7 dias, limpa cache
     if (hoursSinceUpdate > 168) {
-      console.log('App inactive for too long, clearing cache...');
       clearCacheAndReload();
       return;
     }

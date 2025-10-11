@@ -100,7 +100,6 @@ export const authAPI = {
       // 🔒 NOVO: Salvar session_token para controle de inatividade (10min)
       if (data.sessionToken) {
         localStorage.setItem('session_token', data.sessionToken);
-        console.log('[AUTH] Session token salvo - monitoramento de 10min ativado');
       }
 
       return data;

@@ -18,7 +18,6 @@ export function UpdateNotification() {
     // Listener para evento de nova versão disponível (disparado por useVersionCheck)
     const handleAppUpdate = (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('🆕 Nova versão disponível:', customEvent.detail);
       setNewVersion(customEvent.detail.newVersion);
       setShowUpdate(true);
     };
@@ -41,7 +40,6 @@ export function UpdateNotification() {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('🆕 Nova versão disponível!');
                 setShowUpdate(true);
               }
             });
@@ -59,7 +57,6 @@ export function UpdateNotification() {
       // Listener para mensagens do service worker
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'SW_UPDATED') {
-          console.log('📢 Service Worker atualizado:', event.data.version);
           setShowUpdate(true);
         }
       });
@@ -75,14 +72,12 @@ export function UpdateNotification() {
     // Marca que usuário aceitou a atualização para não mostrar novamente
     sessionStorage.setItem('update-accepted', 'true');
 
-    console.log('🔄 Iniciando atualização e limpeza de cache...');
 
     try {
       // 1. Desregistra service workers
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
-          console.log('[Update] Unregistering service worker');
           await registration.unregister();
         }
       }
@@ -91,7 +86,6 @@ export function UpdateNotification() {
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         for (const cacheName of cacheNames) {
-          console.log('[Update] Deleting cache:', cacheName);
           await caches.delete(cacheName);
         }
       }
@@ -102,7 +96,6 @@ export function UpdateNotification() {
       }
 
       // 4. Força reload com cache bust
-      console.log('[Update] Reloading application...');
       window.location.href = `${window.location.origin}${window.location.pathname}?v=${Date.now()}`;
     } catch (error) {
       console.error('[Update] Error during update:', error);

@@ -27,7 +27,6 @@ export function useActivityMonitor() {
   const lastActivityRef = useRef<number>(Date.now());
 
   const handleInactivity = useCallback(async () => {
-    console.log('[ACTIVITY] 🔒 10 minutos de inatividade - encerrando sessão');
 
     // Limpa tokens e dados sensíveis
     localStorage.removeItem('auth_token');
@@ -95,11 +94,9 @@ export function useActivityMonitor() {
       const data = await response.json();
 
       if (data.expired) {
-        console.log('[ACTIVITY] ❌ Sessão expirada no servidor:', data.reason);
         
         // Se estiver na página de login, apenas limpa o localStorage silenciosamente
         if (window.location.pathname === '/login') {
-          console.log('[ACTIVITY] Na página de login - limpando tokens silenciosamente');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('session_token');
           localStorage.removeItem('token');
@@ -109,7 +106,6 @@ export function useActivityMonitor() {
           await handleInactivity();
         }
       } else {
-        console.log(`[ACTIVITY] ✅ Sessão ativa - ${data.minutesRemaining} min restantes`);
       }
 
     } catch (error) {
@@ -133,7 +129,6 @@ export function useActivityMonitor() {
         credentials: 'include'
       });
 
-      console.log('[ACTIVITY] 💓 Heartbeat enviado');
 
     } catch (error) {
       // Silencioso - pode estar offline
@@ -149,7 +144,6 @@ export function useActivityMonitor() {
       return;
     }
 
-    console.log('[ACTIVITY] 🎯 Monitor de atividade iniciado (timeout: 10min)');
 
     // Eventos que indicam atividade do usuário
     const activityEvents = [
@@ -188,7 +182,6 @@ export function useActivityMonitor() {
 
     // Cleanup
     return () => {
-      console.log('[ACTIVITY] 🛑 Monitor de atividade desativado');
 
       activityEvents.forEach(event => {
         document.removeEventListener(event, handleActivity);

@@ -72,6 +72,7 @@ export default function QuestionnaireUnified() {
   const [submitting, setSubmitting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -131,19 +132,41 @@ export default function QuestionnaireUnified() {
     loadQuestionnaire();
   }, [selectedMonth, selectedYear]);
 
+  // Check auto-close status on page load
+  useEffect(() => {
+    const checkAutoClose = async () => {
+      if (!isAdmin) return; // Only coordinators need to check
+
+      try {
+        const response = await fetch('/api/questionnaires/admin/current-status', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // If auto-close was triggered, reload the questionnaire to get updated status
+          if (data.autoCloseTriggered && template?.id === data.questionnaire?.id) {
+            loadQuestionnaire(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auto-close status:', error);
+      }
+    };
+
+    checkAutoClose();
+  }, [template?.id, isAdmin]);
+
   useEffect(() => {
     // Determinar modo baseado no status do template e papel do usuário
     if (template) {
-      console.log('Determinando modo - template.status:', template.status, 'isAdmin:', isAdmin);
       
       if (isAdmin && template.status === 'draft') {
-        console.log('Modo: admin (draft + isAdmin)');
         setMode('admin');
       } else if (template.status === 'sent') {
-        console.log('Modo: respond (sent)');
         setMode('respond');
       } else {
-        console.log('Modo: view (default)');
         setMode('view');
       }
     }
@@ -204,7 +227,6 @@ export default function QuestionnaireUnified() {
     // Reset existing response para evitar estado "sujo" ao mudar mês/ano
     setExistingResponse(null);
     
-    console.log('loadQuestionnaire - isAdmin:', isAdmin, 'user:', user);
     
     try {
       // Tentar carregar template existente
@@ -212,9 +234,6 @@ export default function QuestionnaireUnified() {
         ? `/api/questionnaires/admin/templates/${selectedYear}/${selectedMonth}`
         : `/api/questionnaires/templates/${selectedYear}/${selectedMonth}`;
       
-      console.log('Carregando questionário de:', endpoint);
-      console.log('isAdmin:', isAdmin);
-      console.log('URL completa:', window.location.origin + endpoint);
         
       const templateRes = await fetch(endpoint, {
         credentials: 'include',
@@ -224,9 +243,7 @@ export default function QuestionnaireUnified() {
         }
       });
       
-      console.log('Resposta do servidor:', templateRes.status);
       const contentType = templateRes.headers.get('content-type');
-      console.log('Content-Type recebido:', contentType);
       
       let templateData = null;
       if (templateRes.ok) {
@@ -242,13 +259,10 @@ export default function QuestionnaireUnified() {
           templateData = await templateRes.json();
         } catch (parseError) {
           console.error('Erro ao fazer parse do JSON:', parseError);
-          console.log('Response status:', templateRes.status);
           try {
             const clonedResponse = templateRes.clone();
             const text = await clonedResponse.text();
-            console.log('Response text:', text.substring(0, 500));
           } catch (e) {
-            console.log('Não foi possível ler o texto da resposta');
           }
           throw new Error('Invalid JSON response');
         }
@@ -294,7 +308,6 @@ export default function QuestionnaireUnified() {
         // Template não existe
         if (isAdmin) {
           // Se é admin, pode gerar novo
-          console.log('[loadQuestionnaire] Template não existe (404), admin pode gerar novo');
           // Não chamar generateTemplate() aqui pois causa loop/erro
           setTemplate(null);
         } else {
@@ -305,7 +318,6 @@ export default function QuestionnaireUnified() {
         // Questionário existe mas não está disponível
         try {
           const errorData = await templateRes.json();
-          console.log('Questionário não disponível:', errorData);
           setTemplate(null);
           if (!preserveSuccessMessage) {
             setError(errorData.error || 'Questionário ainda não está disponível');
@@ -319,7 +331,6 @@ export default function QuestionnaireUnified() {
         }
       } else {
         // Outro erro
-        console.log(`Status não tratado: ${templateRes.status}`);
         setTemplate(null);
       }
 
@@ -328,16 +339,12 @@ export default function QuestionnaireUnified() {
         credentials: 'include'
       });
 
-      console.log('[loadQuestionnaire] Verificando respostas existentes, status:', responseRes.status);
 
       if (responseRes.ok) {
         const responseData = await responseRes.json();
-        console.log('[loadQuestionnaire] Dados de resposta recebidos:', responseData);
 
         // Verificar se temos dados válidos - o backend pode retornar null
         if (responseData && responseData.id) {
-          console.log('[loadQuestionnaire] Resposta válida encontrada, ID:', responseData.id);
-          console.log('[loadQuestionnaire] Número de respostas:', responseData.responses?.length);
 
           // IMPORTANTE: Sempre setar existingResponse se temos um ID válido
           // Isso garante que o botão e badge sejam atualizados corretamente
@@ -352,11 +359,9 @@ export default function QuestionnaireUnified() {
             setResponses(existingResponses);
           }
         } else {
-          console.log('[loadQuestionnaire] Resposta retornou null ou sem ID');
           setExistingResponse(null);
         }
       } else {
-        console.log('[loadQuestionnaire] Nenhuma resposta encontrada (404 ou erro)');
         setExistingResponse(null);
       }
     } catch (err) {
@@ -399,9 +404,6 @@ export default function QuestionnaireUnified() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log('[Frontend] Template recebido:', data);
-        console.log('[Frontend] Número de perguntas:', data.questions?.length);
-        console.log('[Frontend] Primeira pergunta:', data.questions?.[0]?.question);
         
         // Invalidar cache antes de setar o novo template
         queryClient.invalidateQueries({ 
@@ -442,11 +444,9 @@ export default function QuestionnaireUnified() {
         setSuccess('Template salvo com sucesso!');
         
         // Auto-habilitar modo resposta após salvar
-        console.log('Template salvo, isAdmin:', isAdmin, 'changing mode to respond');
         if (isAdmin) {
           setTimeout(() => {
             setMode('respond');
-            console.log('Mode changed to respond');
           }, 500);
         }
       } else {
@@ -463,7 +463,6 @@ export default function QuestionnaireUnified() {
   const sendQuestionnaire = async (resend = false) => {
     if (!template) return;
     
-    console.log('[Frontend] Enviando questionário - Reenvio:', resend);
     
     setLoading(true);
     setError(null);
@@ -471,7 +470,6 @@ export default function QuestionnaireUnified() {
     
     try {
       const requestBody = { resend };
-      console.log('[Frontend] Body da requisição:', requestBody);
       
       const res = await fetch(`/api/questionnaires/admin/templates/${selectedYear}/${selectedMonth}/send`, {
         method: 'POST',
@@ -485,7 +483,6 @@ export default function QuestionnaireUnified() {
         data = await res.json();
       } catch (e) {
         // Se não conseguir fazer parse do JSON, continuar sem erro
-        console.log('Resposta não é JSON válido, continuando...');
       }
       
       if (res.ok) {
@@ -499,7 +496,6 @@ export default function QuestionnaireUnified() {
           try {
             await loadQuestionnaire(true);
           } catch (e) {
-            console.log('Erro ao recarregar (ignorado):', e);
           }
         }, 100);
         
@@ -586,14 +582,6 @@ export default function QuestionnaireUnified() {
                 shouldDisable = depVal !== expected;
               }
             }
-            
-            console.log('handleResponseChange - clearing dependent question:', {
-              questionId: question.id,
-              dependsOn: question.metadata.dependsOn,
-              depVal,
-              shouldDisable,
-              currentValue: prev[question.id]
-            });
             
             // Se deve desabilitar, limpar a resposta
             if (shouldDisable) {
@@ -695,13 +683,6 @@ export default function QuestionnaireUnified() {
 
       // Check payload size
       const payloadSize = new Blob([JSON.stringify(payload)]).size / 1024;
-      console.log('Sending questionnaire response:', {
-        templateId: template.id,
-        month: selectedMonth,
-        year: selectedYear,
-        responseCount: formattedResponses.length,
-        payloadSizeKB: payloadSize.toFixed(2)
-      });
 
       if (payloadSize > 100) {
         console.warn(`Large questionnaire payload: ${payloadSize.toFixed(2)}KB`);
@@ -725,7 +706,6 @@ export default function QuestionnaireUnified() {
 
         // Atualizar existingResponse imediatamente com os dados retornados
         // O backend retorna o objeto completo da resposta
-        console.log('Resposta recebida do servidor:', responseData);
         setExistingResponse(responseData);
 
         // Força re-render imediato para atualizar o botão
@@ -812,10 +792,10 @@ export default function QuestionnaireUnified() {
 
   const handleReopenQuestionnaire = async () => {
     if (!template?.id) return;
-    
+
     setReopening(true);
     setError(null);
-    
+
     try {
       const response = await fetch(`/api/questionnaires/admin/templates/${template.id}/reopen`, {
         method: 'PATCH',
@@ -837,6 +817,39 @@ export default function QuestionnaireUnified() {
       setError(error instanceof Error ? error.message : 'Erro ao reabrir questionário');
     } finally {
       setReopening(false);
+    }
+  };
+
+  const handleOpenQuestionnaire = async () => {
+    setOpening(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/questionnaires/admin/open', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          month: selectedMonth,
+          year: selectedYear
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to open questionnaire');
+      }
+
+      const data = await response.json();
+      setTemplate(data.questionnaire);
+      setSuccess(data.message || 'Questionário aberto com sucesso!');
+    } catch (error) {
+      console.error('Error opening questionnaire:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao abrir questionário');
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -1361,7 +1374,6 @@ export default function QuestionnaireUnified() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Button 
                         onClick={() => {
-                          console.log('Mudando para modo respond');
                           setMode('respond');
                         }} 
                         variant="outline" 
@@ -1376,9 +1388,9 @@ export default function QuestionnaireUnified() {
                         {saving ? 'Salvando...' : 'Salvar'}
                       </Button>
                       {template.status === 'closed' ? (
-                        <Button onClick={handleReopenQuestionnaire} disabled={reopening} className="flex-1" variant="outline">
+                        <Button onClick={handleOpenQuestionnaire} disabled={opening} className="flex-1" variant="outline">
                           <Unlock className="mr-2 h-4 w-4" />
-                          {reopening ? 'Reabrindo...' : 'Reabrir'}
+                          {opening ? 'Abrindo...' : 'Abrir Questionário'}
                         </Button>
                       ) : (
                         <Button onClick={handleCloseQuestionnaire} disabled={closing} className="flex-1" variant="outline">
