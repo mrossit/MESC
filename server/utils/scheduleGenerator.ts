@@ -553,13 +553,110 @@ export class ScheduleGenerator {
       } catch (error) {
         console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing October 2025 format:`, error);
       }
+    } else if (questionnaireMonth >= 11 && questionnaireYear >= 2025) {
+      // 🆕 VERSION 2.0: November 2025 onwards - Improved format
+      console.log(`[COMPATIBILITY_LAYER] ✅ Detected v2.0 format (Nov 2025+)`);
+
+      try {
+        let data = response.responses;
+
+        // Parse if string
+        if (typeof data === 'string') {
+          data = JSON.parse(data);
+        }
+
+        // Check if it's the new v2.0 format with version field
+        if (data && typeof data === 'object' && data.version === '2.0') {
+          console.log(`[COMPATIBILITY_LAYER] 🎯 Parsing v2.0 format with explicit dates`);
+
+          // Extract availability from the new format
+          const availability = data.availability || {};
+          const preferences = data.preferences || {};
+          const substitute = data.substitute || {};
+
+          // Parse Sunday availability (dates like '2025-11-02_08:00': true)
+          const sundayDates: string[] = [];
+          Object.keys(availability).forEach(key => {
+            if (key.match(/^\d{4}-\d{2}-\d{2}_/) && availability[key] === true) {
+              // Extract date and time
+              const [datePart, timePart] = key.split('_');
+              sundayDates.push(`${datePart} ${timePart}`);
+            }
+          });
+          availableSundays = sundayDates;
+
+          // Parse preferred times
+          preferredMassTimes = preferences.preferred_times || [];
+
+          // Parse daily mass availability (weekday_06:30: ['mon', 'tue', 'wed'])
+          const dailyAvail: string[] = [];
+          Object.keys(availability).forEach(key => {
+            if (key.startsWith('weekday_') && Array.isArray(availability[key])) {
+              const days = availability[key];
+              const dayMap: Record<string, string> = {
+                'mon': 'Segunda',
+                'tue': 'Terça',
+                'wed': 'Quarta',
+                'thu': 'Quinta',
+                'fri': 'Sexta',
+                'sat': 'Sábado'
+              };
+              days.forEach((day: string) => {
+                const ptDay = dayMap[day];
+                if (ptDay && !dailyAvail.includes(ptDay)) {
+                  dailyAvail.push(ptDay);
+                }
+              });
+            }
+          });
+          dailyMassAvailability = dailyAvail;
+
+          // Parse special events (first_thursday_healing, etc.)
+          if (availability.first_thursday_healing) {
+            specialEvents['healing_liberation_mass'] = 'Sim';
+          }
+          if (availability.first_friday_sacred) {
+            specialEvents['sacred_heart_mass'] = 'Sim';
+          }
+          if (availability.first_saturday_immaculate) {
+            specialEvents['immaculate_heart_mass'] = 'Sim';
+          }
+
+          // Parse substitution
+          canSubstitute = substitute.available || false;
+
+          console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 format parsed successfully`);
+          console.log(`[COMPATIBILITY_LAYER]    - Available dates: ${availableSundays.length}`);
+          console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
+          console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
+        } else {
+          // Not v2.0, try October format as fallback
+          console.log(`[COMPATIBILITY_LAYER] ℹ️ No version field, trying October format as fallback`);
+
+          if (Array.isArray(data)) {
+            // Use October parser logic
+            data.forEach((item: any) => {
+              switch(item.questionId) {
+                case 'available_sundays':
+                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                  break;
+                case 'main_service_time':
+                  preferredMassTimes = item.answer ? [item.answer] : [];
+                  break;
+                case 'can_substitute':
+                  canSubstitute = item.answer === 'Sim' || item.answer === true;
+                  break;
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing v2.0 format:`, error);
+      }
     } else {
-      // 🆕 FUTURE FORMATS: Add new format parsers here for November 2025 onwards
+      // Unknown format
       console.log(`[COMPATIBILITY_LAYER] ⚠️ Unknown format for ${questionnaireMonth}/${questionnaireYear}`);
       console.log(`[COMPATIBILITY_LAYER] ℹ️ Add new format parser here when questionnaire structure changes`);
-
-      // For now, try to parse as October format (backward compatibility)
-      // TODO: When November questionnaire is created with new format, add parser here
     }
 
     // Fallback to separate JSONB fields (legacy support)
