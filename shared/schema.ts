@@ -131,6 +131,7 @@ export const users = pgTable("users", {
 export const families = pgTable('families', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
+  preferServeTogether: boolean('prefer_serve_together').default(true), // Default: families prefer to serve together
   createdAt: timestamp('created_at').defaultNow()
 });
 

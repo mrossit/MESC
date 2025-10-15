@@ -14,6 +14,7 @@ import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import smartScheduleRoutes from "./routes/smartScheduleGeneration";
 import testScheduleRoutes from "./routes/testScheduleGeneration";
+import schedulesRoutes from "./routes/schedules";
 import auxiliaryPanelRoutes from "./routes/auxiliaryPanel";
 import uploadRoutes from "./routes/upload";
 import notificationsRoutes from "./routes/notifications";
@@ -104,6 +105,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Questionnaire admin routes - com proteção CSRF
   app.use('/api/questionnaires/admin', csrfProtection, questionnaireAdminRoutes);
+
+  // Schedule CRUD routes (publish/unpublish, etc) - MUST be first for route priority
+  app.use('/api/schedules', csrfProtection, schedulesRoutes);
 
   // Schedule generation routes - com proteção CSRF
   app.use('/api/schedules', csrfProtection, scheduleGenerationRoutes);

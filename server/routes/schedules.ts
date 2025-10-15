@@ -197,8 +197,25 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             )
         : [];
 
+      // Create monthly schedule metadata object
+      // The frontend expects a Schedule object with month, year, status
+      // Determine status: "published" if ANY schedule is published, "draft" otherwise
+      const hasPublishedSchedules = schedulesList.some((s: any) => s.status === "published");
+      const scheduleStatus = hasPublishedSchedules ? "published" : "draft";
+
+      const monthlySchedule = schedulesList.length > 0 ? {
+        id: `schedule-${yearNum}-${monthNum}`, // Synthetic ID for the month
+        title: `Escala ${monthNum}/${yearNum}`,
+        month: monthNum,
+        year: yearNum,
+        status: scheduleStatus as "draft" | "published" | "completed",
+        createdBy: schedulesList[0].ministerId || "system",
+        createdAt: schedulesList[0].createdAt?.toISOString() || new Date().toISOString(),
+        publishedAt: hasPublishedSchedules ? new Date().toISOString() : undefined
+      } : null;
+
       res.json({
-        schedules: schedulesList,
+        schedules: monthlySchedule ? [monthlySchedule] : [],
         assignments: assignmentsList,
         substitutions: substitutionsList
       });
@@ -320,7 +337,8 @@ router.put("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (r
   }
 });
 
-// Publish schedule
+// Publish schedule (month-based)
+// ID format: "schedule-YYYY-MM" (e.g., "schedule-2025-10")
 router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     // Only coordinators can publish schedules
@@ -332,31 +350,54 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
       return res.status(403).json({ message: "Sem permissão para publicar escalas" });
     }
 
-    const updatedSchedule = await db
+    // Parse month/year from synthetic ID format: "schedule-2025-10"
+    const match = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
+    if (!match) {
+      return res.status(400).json({ message: "ID de escala inválido. Formato esperado: schedule-YYYY-MM" });
+    }
+
+    const year = parseInt(match[1]);
+    const month = parseInt(match[2]);
+
+    // Calculate date range for the month
+    const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+    // Update all schedules in this month to "published" status
+    const result = await db
       .update(schedules)
-      .set({ 
-        status: "scheduled"
+      .set({
+        status: "published"
       })
-      .where(eq(schedules.id, req.params.id))
+      .where(
+        and(
+          gte(schedules.date, startDateStr),
+          lte(schedules.date, endDateStr)
+        )
+      )
       .returning();
 
-    if (updatedSchedule.length === 0) {
-      return res.status(404).json({ message: "Escala não encontrada" });
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Nenhuma escala encontrada para este mês" });
     }
 
     await logActivity(
       req.user?.id!,
       "schedule_published",
-      `Escala publicada`,
-      { scheduleId: req.params.id }
+      `Escala publicada para ${month}/${year}`,
+      { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
 
     // TODO: Send notifications to all ministers
 
-    res.json({ message: "Escala publicada com sucesso" });
+    res.json({
+      message: `Escala publicada com sucesso! ${result.length} escalas atualizadas.`,
+      schedulesUpdated: result.length
+    });
   } catch (error) {
     console.error("Error publishing schedule:", error);
-    res.status(500).json({ message: "Erro ao publicar escala" });  
+    res.status(500).json({ message: "Erro ao publicar escala" });
   }
 });
 
@@ -416,41 +457,81 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
   }
 });
 
-// Unpublish schedule (cancel publication)
+// Unpublish schedule (cancel publication) - month-based
+// ID format: "schedule-YYYY-MM" (e.g., "schedule-2025-10")
 router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
+    console.log('[UNPUBLISH_API] Received request for ID:', req.params.id);
+    console.log('[UNPUBLISH_API] User ID:', req.user?.id);
+
     // Only coordinators can unpublish schedules
     if (!req.user?.id) {
+      console.log('[UNPUBLISH_API] No user ID found');
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
     if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+      console.log('[UNPUBLISH_API] User not authorized, role:', user[0]?.role);
       return res.status(403).json({ message: "Sem permissão para cancelar publicação" });
     }
 
-    const updatedSchedule = await db
+    console.log('[UNPUBLISH_API] User authorized:', user[0].name, 'role:', user[0].role);
+
+    // Parse month/year from synthetic ID format: "schedule-2025-10"
+    const match = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
+    if (!match) {
+      console.log('[UNPUBLISH_API] Invalid ID format:', req.params.id);
+      return res.status(400).json({ message: "ID de escala inválido. Formato esperado: schedule-YYYY-MM" });
+    }
+
+    const year = parseInt(match[1]);
+    const month = parseInt(match[2]);
+    console.log('[UNPUBLISH_API] Parsed year:', year, 'month:', month);
+
+    // Calculate date range for the month
+    const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+    console.log('[UNPUBLISH_API] Date range:', startDateStr, 'to', endDateStr);
+
+    // Update all schedules in this month back to "scheduled" status
+    const result = await db
       .update(schedules)
-      .set({ 
+      .set({
         status: "scheduled"
       })
-      .where(eq(schedules.id, req.params.id))
+      .where(
+        and(
+          gte(schedules.date, startDateStr),
+          lte(schedules.date, endDateStr)
+        )
+      )
       .returning();
 
-    if (updatedSchedule.length === 0) {
-      return res.status(404).json({ message: "Escala não encontrada" });
+    console.log('[UNPUBLISH_API] Updated', result.length, 'schedules');
+
+    if (result.length === 0) {
+      console.log('[UNPUBLISH_API] No schedules found for this month');
+      return res.status(404).json({ message: "Nenhuma escala encontrada para este mês" });
     }
 
     await logActivity(
       req.user?.id!,
       "schedule_unpublished",
-      `Publicação da escala cancelada`,
-      { scheduleId: req.params.id }
+      `Publicação cancelada para ${month}/${year}`,
+      { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
 
-    res.json({ message: "Publicação cancelada com sucesso" });
+    console.log('[UNPUBLISH_API] Success! Returning response');
+
+    res.json({
+      message: `Publicação cancelada com sucesso! ${result.length} escalas atualizadas.`,
+      schedulesUpdated: result.length
+    });
   } catch (error) {
     console.error("Error unpublishing schedule:", error);
-    res.status(500).json({ message: "Erro ao cancelar publicação" });  
+    res.status(500).json({ message: "Erro ao cancelar publicação" });
   }
 });
 

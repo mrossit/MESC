@@ -6,7 +6,7 @@ import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleG
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses, substitutionRequests } from '@shared/schema';
-import { and, gte, lte, eq, sql, ne, desc } from 'drizzle-orm';
+import { and, gte, lte, eq, sql, ne, desc, inArray } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 
@@ -138,6 +138,15 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     };
 
     logger.info(`Geração concluída: ${generatedSchedules.length} escalas, confidence média: ${response.data.averageConfidence}`);
+    
+    // DEBUG: Log da estrutura da resposta
+    console.log('[RESPONSE_DEBUG] Estrutura da resposta:', {
+      success: response.success,
+      totalSchedules: response.data.totalSchedules,
+      schedulesCount: response.data.schedules?.length,
+      hasQualityMetrics: !!response.data.qualityMetrics,
+      qualityMetricsKeys: response.data.qualityMetrics ? Object.keys(response.data.qualityMetrics) : []
+    });
 
     res.json(response);
 
@@ -162,12 +171,276 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
 });
 
 /**
+ * EMERGENCY BYPASS: Salva escalas sem validações de constraint
+ * POST /api/schedules/emergency-save
+ */
+router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    console.log('=== EMERGENCY SAVE START ===');
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Schedules count:', req.body.schedules?.length);
+    console.log('Month:', req.body.month, 'Year:', req.body.year);
+
+    const { schedules: schedulesInput, month, year } = req.body;
+
+    if (!schedulesInput || !Array.isArray(schedulesInput)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Schedules array is required'
+      });
+    }
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Serviço de banco de dados indisponível'
+      });
+    }
+
+    console.log('First schedule sample:', JSON.stringify(schedulesInput[0], null, 2));
+
+    const results = [];
+    const errors = [];
+
+    // FIRST: Delete existing schedules for the month if replaceExisting
+    if (month && year) {
+      try {
+        console.log(`=== DELETING EXISTING SCHEDULES FOR ${month}/${year} ===`);
+
+        // Get date range for the month
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+        console.log(`Date range: ${startDate} to ${endDate}`);
+
+        // Get existing schedule IDs in this month
+        const existingSchedules = await db.select({ id: schedules.id })
+          .from(schedules)
+          .where(
+            and(
+              gte(schedules.date, startDate),
+              lte(schedules.date, endDate)
+            )
+          );
+
+        console.log(`Found ${existingSchedules.length} existing schedules to delete`);
+
+        if (existingSchedules.length > 0) {
+          const scheduleIds = existingSchedules.map(s => s.id);
+
+          // Delete substitution requests first (foreign key constraint)
+          const deletedSubstitutions = await db.delete(substitutionRequests).where(
+            inArray(substitutionRequests.scheduleId, scheduleIds)
+          );
+          console.log(`Deleted substitution requests`);
+
+          // Now delete schedules
+          const deletedSchedules = await db.delete(schedules).where(
+            and(
+              gte(schedules.date, startDate),
+              lte(schedules.date, endDate)
+            )
+          );
+          console.log(`Deleted ${existingSchedules.length} schedules`);
+        }
+      } catch (deleteErr: any) {
+        console.error('Error deleting existing schedules:', deleteErr);
+        // Continue anyway - maybe there were no schedules to delete
+      }
+    }
+
+    // Try to insert each schedule individually
+    for (let i = 0; i < schedulesInput.length; i++) {
+      const schedule = schedulesInput[i];
+
+      try {
+        // Validate required fields
+        if (!schedule.date || !schedule.time) {
+          throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
+        }
+
+        // Validate ministerId if provided
+        if (schedule.ministerId) {
+          const [ministerExists] = await db.select({ id: users.id })
+            .from(users)
+            .where(eq(users.id, schedule.ministerId))
+            .limit(1);
+
+          if (!ministerExists) {
+            throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
+          }
+        }
+
+        // Create the record with all required fields
+        // ✅ CRITICAL FIX: Only include columns that exist in database
+        // Database columns: id, status, created_at, date, time, type, location, minister_id, substitute_id, notes, position
+        const recordToInsert = {
+          date: schedule.date,
+          time: schedule.time,
+          type: (schedule.type as any) || 'missa',
+          location: schedule.location || null,
+          ministerId: schedule.ministerId || null,
+          position: schedule.position !== undefined ? schedule.position : (i + 1),
+          status: 'scheduled' as const,
+          notes: schedule.notes || null
+          // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
+        };
+
+        const [inserted] = await db.insert(schedules).values(recordToInsert).returning();
+
+        results.push({
+          success: true,
+          id: inserted.id,
+          index: i
+        });
+
+      } catch (err: any) {
+        console.error(`[${i}] ❌ Failed to insert schedule:`, err);
+        console.error(`[${i}] Error type:`, typeof err);
+        console.error(`[${i}] Error message:`, err?.message);
+        console.error(`[${i}] Error code:`, err?.code);
+        console.error(`[${i}] Error stack:`, err?.stack);
+        console.error(`[${i}] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
+
+        errors.push({
+          success: false,
+          error: err?.message || String(err),
+          code: err?.code,
+          detail: err?.detail,
+          constraint: err?.constraint,
+          errorType: err?.name,
+          fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+          index: i,
+          schedule: {
+            date: schedule.date,
+            time: schedule.time,
+            ministerId: schedule.ministerId,
+            position: schedule.position
+          }
+        });
+      }
+    }
+
+    const savedCount = results.filter(r => r.success).length;
+    const failedCount = errors.length;
+
+    console.log(`=== EMERGENCY SAVE COMPLETE ===`);
+    console.log(`Saved: ${savedCount}, Failed: ${failedCount}`);
+    if (failedCount > 0) {
+      console.log('First 5 errors:', JSON.stringify(errors.slice(0, 5), null, 2));
+    }
+
+    res.json({
+      success: failedCount === 0,
+      message: failedCount === 0
+        ? `${savedCount} escalas salvas com sucesso via emergency save`
+        : `Salvos: ${savedCount}, Falhas: ${failedCount}`,
+      data: {
+        savedCount,
+        failedCount,
+        results,
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Return only first 10 errors to avoid huge response
+        errorSummary: errors.length > 0 ? {
+          total: errors.length,
+          sampleError: errors[0],
+          uniqueErrors: [...new Set(errors.map(e => e.error))],
+          uniqueCodes: [...new Set(errors.map(e => e.code))],
+          uniqueConstraints: [...new Set(errors.map(e => e.constraint))]
+        } : undefined
+      }
+    });
+
+  } catch (error: any) {
+    console.error('=== EMERGENCY SAVE CRITICAL ERROR ===');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erro crítico no emergency save',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+/**
+ * DEBUG: Inspecionar dados que serão salvos
+ * POST /api/schedules/inspect-save-data
+ */
+router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const { schedules: schedulesInput } = req.body;
+
+    if (!schedulesInput || !Array.isArray(schedulesInput)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Schedules array is required'
+      });
+    }
+
+    // Analyze the data
+    const analysis = {
+      total: schedulesInput.length,
+      sample: schedulesInput.slice(0, 3),
+      ministerIds: [...new Set(schedulesInput.map(s => s.ministerId).filter(Boolean))],
+      uniqueDates: [...new Set(schedulesInput.map(s => s.date))],
+      uniqueTimes: [...new Set(schedulesInput.map(s => s.time))],
+      missingDate: schedulesInput.filter(s => !s.date).length,
+      missingTime: schedulesInput.filter(s => !s.time).length,
+      missingMinisterId: schedulesInput.filter(s => !s.ministerId).length,
+      dataTypes: {
+        date: typeof schedulesInput[0]?.date,
+        time: typeof schedulesInput[0]?.time,
+        ministerId: typeof schedulesInput[0]?.ministerId,
+        position: typeof schedulesInput[0]?.position
+      }
+    };
+
+    // Check if minister IDs exist
+    if (db && analysis.ministerIds.length > 0) {
+      const existingMinisters = await db.select({ id: users.id })
+        .from(users)
+        .where(inArray(users.id, analysis.ministerIds.slice(0, 50))); // Check first 50
+
+      analysis.ministerIdsInDb = existingMinisters.length;
+      analysis.ministerIdsRequested = analysis.ministerIds.length;
+
+      // Find missing minister IDs
+      const existingIds = new Set(existingMinisters.map(m => m.id));
+      analysis.missingMinisterIds = analysis.ministerIds.filter(id => !existingIds.has(id)).slice(0, 10);
+    }
+
+    res.json({
+      success: true,
+      analysis
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+/**
  * Salva escalas aprovadas no banco de dados
  * POST /api/schedules/save-generated
  */
 router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
+    console.log('=== SAVE-GENERATED START ===');
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Schedules count:', req.body.schedules?.length);
+    console.log('Replace existing:', req.body.replaceExisting);
+
     const { schedules: schedulesToSave, replaceExisting } = saveSchedulesSchema.parse(req.body);
+
+    console.log('Parsed schedules:', schedulesToSave.length);
+    console.log('First schedule sample:', schedulesToSave[0]);
 
     if (!db) {
       return res.status(503).json({
@@ -178,19 +451,50 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
 
     // Se replaceExisting, remover escalas existentes do período
     if (replaceExisting && schedulesToSave.length > 0) {
+      console.log('=== CASCADE DELETION START ===');
       // Ordenar por data para garantir o range correto
       const sortedSchedules = [...schedulesToSave].sort((a, b) => a.date.localeCompare(b.date));
       const firstDate = sortedSchedules[0].date;
       const lastDate = sortedSchedules[sortedSchedules.length - 1].date;
-      
-      await db.delete(schedules).where(
+
+      console.log(`Date range: ${firstDate} to ${lastDate}`);
+
+      // FIRST: Delete related substitution requests (foreign key constraint)
+      const existingSchedules = await db.select({ id: schedules.id })
+        .from(schedules)
+        .where(
+          and(
+            gte(schedules.date, firstDate),
+            lte(schedules.date, lastDate)
+          )
+        );
+
+      console.log(`Found ${existingSchedules.length} existing schedules to delete`);
+
+      if (existingSchedules.length > 0) {
+        const scheduleIds = existingSchedules.map(s => s.id);
+        console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), '...');
+
+        // Delete substitution requests before deleting schedules
+        const deletedSubstitutions = await db.delete(substitutionRequests).where(
+          inArray(substitutionRequests.scheduleId, scheduleIds)
+        );
+
+        console.log(`Deleted substitution requests:`, deletedSubstitutions);
+        logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
+      }
+
+      // Now safe to delete old schedules
+      const deletedSchedules = await db.delete(schedules).where(
         and(
           gte(schedules.date, firstDate),
           lte(schedules.date, lastDate)
         )
       );
 
+      console.log(`Deleted schedules:`, deletedSchedules);
       logger.info(`Removidas escalas existentes entre ${firstDate} e ${lastDate}`);
+      console.log('=== CASCADE DELETION COMPLETE ===');
     }
 
     // Inserir novas escalas com position
@@ -217,20 +521,29 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
         }
       }
 
+      // ✅ CRITICAL FIX: Only include columns that exist in database
+      // Database columns: id, status, created_at, date, time, type, location, minister_id, substitute_id, notes, position
+      // NOT including: on_site_adjustments, mass_type, month, year
       return {
         date: s.date,
         time: s.time,
         type: s.type as any,
         location: s.location || null,
-        ministerId: s.ministerId,
+        ministerId: s.ministerId, // Drizzle will map this to minister_id
         position: s.position ?? positionInGroup, // Use provided position or calculated group position
         notes: s.notes || null,
         status: 'scheduled' as const
+        // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
       };
     });
 
+    console.log('=== INSERTING SCHEDULES ===');
+    console.log(`Inserting ${schedulesToInsert.length} schedules`);
+    console.log('Sample schedule to insert:', schedulesToInsert[0]);
+
     const saved = await db.insert(schedules).values(schedulesToInsert).returning();
 
+    console.log(`Successfully inserted ${saved.length} schedules`);
     logger.info(`Salvas ${saved.length} escalas no banco de dados`);
 
     res.json({
@@ -243,10 +556,23 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
     });
 
   } catch (error: any) {
+    console.error('=== SAVE-GENERATED ERROR ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error detail:', error.detail);
+    console.error('Error constraint:', error.constraint);
+    console.error('Error stack:', error.stack);
+    console.error('Full error object:', JSON.stringify(error, null, 2));
+
     logger.error('Erro ao salvar escalas:', error);
+
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao salvar escalas'
+      message: error.message || 'Erro ao salvar escalas',
+      errorCode: error.code,
+      errorDetail: error.detail,
+      constraint: error.constraint
     });
   }
 });
@@ -459,6 +785,26 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
 
     // Se replaceExisting, remover escalas existentes para esta data/hora
     if (replaceExisting) {
+      // FIRST: Get existing schedule IDs for this date/time
+      const existingSchedules = await db.select({ id: schedules.id })
+        .from(schedules)
+        .where(
+          and(
+            eq(schedules.date, schedule.massTime.date),
+            eq(schedules.time, schedule.massTime.time)
+          )
+        );
+
+      if (existingSchedules.length > 0) {
+        const scheduleIds = existingSchedules.map(s => s.id);
+
+        // Delete related substitution requests first (foreign key constraint)
+        await db.delete(substitutionRequests).where(
+          inArray(substitutionRequests.scheduleId, scheduleIds)
+        );
+      }
+
+      // Now safe to delete old schedules
       await db.delete(schedules).where(
         and(
           eq(schedules.date, schedule.massTime.date),

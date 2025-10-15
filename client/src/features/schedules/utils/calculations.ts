@@ -2,6 +2,17 @@ import { parseISO, isSameDay } from 'date-fns';
 import { ScheduleAssignment, SubstitutionRequest, Minister, SubstitutionStatus } from '../types';
 
 /**
+ * Parse date string safely to avoid timezone issues
+ * CRITICAL: Always add time component to force local timezone interpretation
+ */
+function parseScheduleDateSafe(dateStr: string): Date {
+  // Remove existing time component if present
+  const datePart = dateStr.split('T')[0];
+  // Add noon time to avoid timezone shift issues
+  return parseISO(datePart + 'T12:00:00');
+}
+
+/**
  * Gets assignments for a specific date
  */
 export function getAssignmentsForDate(
@@ -10,7 +21,7 @@ export function getAssignmentsForDate(
 ): ScheduleAssignment[] {
   return assignments.filter(a => {
     const assignmentDate = typeof a.date === 'string'
-      ? parseISO(a.date.split('T')[0])
+      ? parseScheduleDateSafe(a.date) // Use timezone-safe parser
       : a.date;
     return isSameDay(assignmentDate, date);
   });

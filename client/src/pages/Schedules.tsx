@@ -209,6 +209,11 @@ export default function Schedules() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('[FETCH_SCHEDULES] Received data:', {
+          schedules: data.schedules,
+          assignmentsCount: data.assignments?.length,
+          substitutionsCount: data.substitutions?.length
+        });
         setSchedules(data.schedules || []);
         setAssignments(data.assignments || []);
         setSubstitutions(data.substitutions || []);
@@ -468,20 +473,33 @@ export default function Schedules() {
 
   const handleUnpublishSchedule = async (scheduleId: string) => {
     try {
+      console.log('[UNPUBLISH] Attempting to unpublish schedule:', scheduleId);
       const response = await fetch(`/api/schedules/${scheduleId}/unpublish`, {
         method: "PATCH",
         credentials: "include"
       });
 
+      console.log('[UNPUBLISH] Response status:', response.status);
+
       if (response.ok) {
+        const data = await response.json();
+        console.log('[UNPUBLISH] Success response:', data);
         toast({
           title: "Sucesso",
-          description: "Publicação cancelada com sucesso"
+          description: data.message || "Publicação cancelada com sucesso"
         });
         fetchSchedules();
+      } else {
+        const errorData = await response.json();
+        console.error('[UNPUBLISH] Error response:', errorData);
+        toast({
+          title: "Erro",
+          description: errorData.message || "Erro ao cancelar publicação",
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error("Error unpublishing schedule:", error);
+      console.error("[UNPUBLISH] Exception:", error);
       toast({
         title: "Erro",
         description: "Erro ao cancelar publicação",
@@ -1167,8 +1185,9 @@ export default function Schedules() {
     return assignments.filter(a => {
       // Parse date string directly to avoid timezone issues
       // The date from API is in format YYYY-MM-DD
+      // CRITICAL: Add T00:00:00 to force local timezone parsing
       const assignmentDate = typeof a.date === 'string'
-        ? parseISO(a.date.split('T')[0]) // Handle both YYYY-MM-DD and full ISO strings
+        ? parseScheduleDate(a.date.split('T')[0]) // Use helper that adds time component
         : a.date;
       return isSameDay(assignmentDate, date);
     });
@@ -1283,6 +1302,10 @@ export default function Schedules() {
     s.month === currentMonth.getMonth() + 1 &&
     s.year === currentMonth.getFullYear()
   );
+
+  console.log('[SCHEDULES_PAGE] Current month:', currentMonth.getMonth() + 1, 'year:', currentMonth.getFullYear());
+  console.log('[SCHEDULES_PAGE] Available schedules:', schedules);
+  console.log('[SCHEDULES_PAGE] Current schedule found:', currentSchedule);
 
   return (
     <Layout 
@@ -1943,12 +1966,26 @@ export default function Schedules() {
                                       )}
                                     </div>
                                     <div className="min-w-0">
-                                      <p
-                                        className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "font-bold")}
-                                        style={isCurrentUser ? { color: '#959D90' } : {}}
-                                      >
-                                        {formatMinisterName(assignment.ministerName) || "Ministro"}
-                                      </p>
+                                      <div className="flex items-center gap-1">
+                                        <p
+                                          className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "font-bold")}
+                                          style={isCurrentUser ? { color: '#959D90' } : {}}
+                                        >
+                                          {formatMinisterName(assignment.ministerName) || "Ministro"}
+                                        </p>
+                                        {(() => {
+                                          const minister = ministers.find(m => m.id === assignment.ministerId);
+                                          if (minister?.familyId) {
+                                            return (
+                                              <Badge variant="outline" className="ml-1 text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 h-4 sm:h-5 gap-0.5">
+                                                <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                                <span className="hidden sm:inline">Família</span>
+                                              </Badge>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
                                       <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5 sm:hidden">
                                         {LITURGICAL_POSITIONS[assignment.position]}
                                       </p>

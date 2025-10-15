@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Switch } from '../components/ui/switch';
 import {
   User, Calendar, Heart, Church, Users, Save, Camera,
   X, Plus, AlertCircle, CheckCircle, Droplets, Cross, Trash2
@@ -46,6 +47,12 @@ type FamilyMember = {
     email: string;
     photoUrl?: string;
   };
+};
+
+type FamilyPreference = {
+  hasFamilyId: boolean;
+  preferServeTogether: boolean;
+  familyName?: string;
 };
 
 const relationshipTypes = [
@@ -111,6 +118,40 @@ export default function Profile() {
       return res.json();
     },
     enabled: showAddFamily
+  });
+
+  // Buscar preferência da família
+  const { data: familyPrefData } = useQuery<FamilyPreference>({
+    queryKey: ['/api/profile/family-preference'],
+    queryFn: async () => {
+      const res = await fetch('/api/profile/family-preference', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch family preference');
+      return res.json();
+    }
+  });
+
+  // Mutation para atualizar preferência da família
+  const updateFamilyPrefMutation = useMutation({
+    mutationFn: async (preferServeTogether: boolean) => {
+      const res = await fetch('/api/profile/family-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ preferServeTogether })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update family preference');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setSuccess('Preferência atualizada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['/api/profile/family-preference'] });
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    }
   });
   
   useEffect(() => {
@@ -788,6 +829,43 @@ export default function Profile() {
               </TabsContent>
               
               <TabsContent value="family" className="space-y-4">
+                {/* Preferência de servir junto */}
+                {familyPrefData?.hasFamilyId && familyMembers.length > 0 && (
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Users className="h-5 w-5 text-blue-600" />
+                            <h4 className="font-semibold text-blue-900">Preferência da Família</h4>
+                          </div>
+                          <p className="text-sm text-blue-700">
+                            {familyPrefData.preferServeTogether
+                              ? 'Sua família prefere servir junta nas escalas'
+                              : 'Sua família prefere servir em dias separados'}
+                          </p>
+                          {familyPrefData.familyName && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Família: {familyPrefData.familyName}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor="serve-together" className="text-sm text-blue-900 cursor-pointer">
+                            Servir junto
+                          </Label>
+                          <Switch
+                            id="serve-together"
+                            checked={familyPrefData.preferServeTogether}
+                            onCheckedChange={(checked) => updateFamilyPrefMutation.mutate(checked)}
+                            disabled={updateFamilyPrefMutation.isPending}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Familiares no Ministério</h3>
                   <Dialog open={showAddFamily} onOpenChange={setShowAddFamily}>
@@ -896,11 +974,11 @@ export default function Profile() {
                   </div>
                 )}
                 
-                {familyMembers.length > 0 && (
+                {familyMembers.length > 0 && !familyPrefData?.hasFamilyId && (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Ao criar escalas, o sistema priorizará colocar familiares juntos sempre que possível
+                      Adicione mais familiares para criar uma família e poder gerenciar a preferência de servir juntos
                     </AlertDescription>
                   </Alert>
                 )}
