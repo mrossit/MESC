@@ -20,6 +20,7 @@ import {
   isStJudeFeast,
 } from '../utils/liturgicalCalculations';
 import { getMassConfigForDate, getSpecialMonthlyMass } from '../../shared/constants/massConfig';
+import { generateLiturgicalQuestionnaire, convertToAlgorithmFormat } from '../utils/liturgicalQuestionnaireGenerator';
 
 const router = Router();
 
@@ -430,6 +431,47 @@ router.delete('/overrides/:id', async (req, res) => {
       success: false,
       message: 'Erro ao remover override de missa',
     });
+  }
+});
+
+/**
+ * GET /api/liturgical/questionnaire/:year/:month
+ * Generate liturgically-aware questionnaire for a specific month
+ */
+router.get('/questionnaire/:year/:month', (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: 'Invalid year or month' });
+    }
+
+    const questionnaire = generateLiturgicalQuestionnaire(month, year);
+    res.json(questionnaire);
+  } catch (error) {
+    console.error('[LITURGICAL] Error generating questionnaire:', error);
+    res.status(500).json({ error: 'Failed to generate questionnaire' });
+  }
+});
+
+/**
+ * POST /api/liturgical/convert
+ * Convert user responses to algorithm format
+ */
+router.post('/convert', (req, res) => {
+  try {
+    const { responses, month, year } = req.body;
+
+    if (!responses || !month || !year) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const algorithmFormat = convertToAlgorithmFormat(responses, month, year);
+    res.json(algorithmFormat);
+  } catch (error) {
+    console.error('[LITURGICAL] Error converting responses:', error);
+    res.status(500).json({ error: 'Failed to convert responses' });
   }
 });
 

@@ -1,10 +1,11 @@
 import { logger } from './logger.js';
-import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig } from '@shared/schema';
+import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families } from '@shared/schema';
 import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
 import { validateAndLogOctoberMasses, printOctoberScheduleComparison } from './octoberMassValidator.js';
+import { isAvailableForMass } from './ministerAvailabilityChecker.js';
 
 // 🚨 DEBUG: CONFIRMAR QUE O CÓDIGO ATUALIZADO ESTÁ SENDO EXECUTADO
 console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM FAIR ALGORITHM! Timestamp:', new Date().toISOString());
@@ -18,12 +19,17 @@ export interface Minister {
   preferredTimes: string[];
   canServeAsCouple: boolean;
   spouseMinisterId: string | null;
+  familyId: string | null; // Family group ID
   availabilityScore: number;
   preferenceScore: number;
   position?: number; // Posição litúrgica atribuída
   // 🔥 FAIR ALGORITHM: Track monthly assignments
   monthlyAssignmentCount?: number; // Assignments in current month (max 4)
   lastAssignedDate?: string; // Last date this minister was assigned (YYYY-MM-DD)
+  // V2.0 questionnaire response data
+  questionnaireResponse?: {
+    responses: any;
+  };
 }
 
 export interface AvailabilityData {
@@ -60,6 +66,8 @@ export class ScheduleGenerator {
   private dailyAssignments: Map<string, Set<string>> = new Map(); // Rastrear ministros já escalados por dia
   private saintBonusCache: Map<string, number> = new Map(); // Cache de bônus de santo: "ministerId:date" -> score
   private saintsData: Map<string, any[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
+  private familyGroups: Map<string, string[]> = new Map(); // Family ID -> list of minister IDs
+  private familyPreferences: Map<string, boolean> = new Map(); // Family ID -> prefer_serve_together
 
   /**
    * Gera escalas automaticamente para um mês específico
@@ -312,19 +320,23 @@ export class ScheduleGenerator {
 
       // Check critical bugs
       const bugsFound: string[] = [];
+      // 🔥 NOTA: Ministros PODEM servir mais de 4 vezes se forem para missas diárias!
+      // Quando marcam disponibilidade para dias da semana, servem em TODOS aqueles dias.
       const ministersOver4 = this.ministers.filter(m => (m.monthlyAssignmentCount || 0) > 4);
       if (ministersOver4.length > 0) {
-        bugsFound.push(`❌ ${ministersOver4.length} ministers served MORE than 4 times!`);
+        console.log(`\n  📊 Ministers with 5+ assignments (mostly daily masses):`);
+        console.log(`    ℹ️  ${ministersOver4.length} ministers served 5+ times (expected for daily mass volunteers)`);
       }
+
       if (unused.length > this.ministers.length * 0.5) {
         bugsFound.push(`❌ More than 50% unused (${unused.length}/${this.ministers.length})`);
       }
 
       if (bugsFound.length > 0) {
-        console.log(`\n  🚨 BUGS DETECTED:`);
+        console.log(`\n  🚨 POTENTIAL ISSUES:`);
         bugsFound.forEach(bug => console.log(`    ${bug}`));
       } else {
-        console.log(`\n  ✅ NO CRITICAL BUGS DETECTED!`);
+        console.log(`\n  ✅ NO CRITICAL ISSUES DETECTED!`);
       }
 
       console.log(`${'='.repeat(60)}\n`);
@@ -405,7 +417,8 @@ export class ScheduleGenerator {
         lastService: users.lastService,
         preferredTimes: users.preferredTimes,
         canServeAsCouple: users.canServeAsCouple,
-        spouseMinisterId: users.spouseMinisterId
+        spouseMinisterId: users.spouseMinisterId,
+        familyId: users.familyId
       }).from(users).where(
         and(
           or(
@@ -429,6 +442,7 @@ export class ScheduleGenerator {
         totalServices: m.totalServices || 0,
         preferredTimes: m.preferredTimes || [],
         canServeAsCouple: m.canServeAsCouple || false,
+        familyId: m.familyId || null,
         availabilityScore: this.calculateAvailabilityScore(m),
         preferenceScore: this.calculatePreferenceScore(m),
         // 🔥 FAIR ALGORITHM: Initialize monthly counters
@@ -436,8 +450,66 @@ export class ScheduleGenerator {
         lastAssignedDate: undefined
       }));
 
+    // Load family groups
+    await this.loadFamilyData();
+
     console.log(`[FAIR_ALGORITHM] ✅ Initialized ${this.ministers.length} ministers with monthlyAssignmentCount = 0`);
     logger.info(`Carregados ${this.ministers.length} ministros ativos`);
+  }
+
+  /**
+   * 👨‍👩‍👧‍👦 FAMILY SYSTEM: Load family relationships and preferences
+   *
+   * Groups ministers by family and loads their preferences.
+   * When preferServeTogether is true (default), families are assigned to serve together.
+   * When preferServeTogether is false, family members can serve on different days.
+   */
+  private async loadFamilyData(): Promise<void> {
+    this.familyGroups.clear();
+    this.familyPreferences.clear();
+
+    // Group ministers by family_id
+    for (const minister of this.ministers) {
+      if (minister.familyId) {
+        if (!this.familyGroups.has(minister.familyId)) {
+          this.familyGroups.set(minister.familyId, []);
+        }
+        this.familyGroups.get(minister.familyId)!.push(minister.id!);
+      }
+    }
+
+    // Load family preferences from database
+    const uniqueFamilyIds = Array.from(this.familyGroups.keys());
+    if (uniqueFamilyIds.length > 0) {
+      const familiesData = await this.db
+        .select({
+          id: families.id,
+          name: families.name,
+          preferServeTogether: families.preferServeTogether,
+        })
+        .from(families)
+        .where(sql`${families.id} = ANY(${uniqueFamilyIds})`);
+
+      for (const family of familiesData) {
+        this.familyPreferences.set(family.id, family.preferServeTogether ?? true);
+      }
+    }
+
+    const familyCount = this.familyGroups.size;
+    const membersCount = Array.from(this.familyGroups.values()).reduce((sum, members) => sum + members.length, 0);
+
+    console.log(`[FAMILY_SYSTEM] ✅ Loaded ${familyCount} families with ${membersCount} total members`);
+
+    // Log family details
+    for (const [familyId, memberIds] of this.familyGroups.entries()) {
+      const memberNames = memberIds
+        .map(id => this.ministers.find(m => m.id === id)?.name)
+        .filter(Boolean)
+        .join(', ');
+      const preferTogether = this.familyPreferences.get(familyId) ?? true;
+      const preferenceText = preferTogether ? '(prefer together)' : '(prefer separate)';
+      console.log(`[FAMILY_SYSTEM] Family ${familyId.substring(0, 8)}: ${memberNames} ${preferenceText}`);
+    }
   }
 
   /**
@@ -470,20 +542,87 @@ export class ScheduleGenerator {
     let canSubstitute = false;
     let specialEvents: Record<string, any> = {};
 
-    // 🎯 VERSION DETECTION: October 2025 uses array format
-    if (questionnaireMonth === 10 && questionnaireYear === 2025) {
-      console.log(`[COMPATIBILITY_LAYER] ✅ Detected October 2025 format - using array parser`);
+    // 🎯 VERSION DETECTION: Check for v2.0 format FIRST (works for Oct 2025 onwards)
+    let responsesData = response.responses;
+    if (typeof responsesData === 'string') {
+      responsesData = JSON.parse(responsesData);
+    }
+
+    const isV2Format = responsesData && typeof responsesData === 'object' && responsesData.format_version === '2.0';
+
+    // Handle v2.0 format (Oct 2025+)
+    if (isV2Format && questionnaireMonth >= 10 && questionnaireYear >= 2025) {
+      console.log(`[COMPATIBILITY_LAYER] 🎯 Processing v2.0 STANDARDIZED format for ${questionnaireMonth}/${questionnaireYear}`);
 
       try {
-        let responsesArray = response.responses;
+        const data = responsesData;
 
-        // Parse if string (shouldn't happen with JSONB but just in case)
-        if (typeof responsesArray === 'string') {
-          responsesArray = JSON.parse(responsesArray);
-        }
+        // Parse Sunday masses from masses object: { '2025-10-05': { '10:00': true } }
+        const sundayDates: string[] = [];
+        const masses = data.masses || {};
+        Object.keys(masses).forEach(date => {
+          const timesForDate = masses[date];
+          if (timesForDate && typeof timesForDate === 'object') {
+            Object.keys(timesForDate).forEach(time => {
+              if (timesForDate[time] === true) {
+                sundayDates.push(`${date} ${time}`);
+              }
+            });
+          }
+        });
+        availableSundays = sundayDates;
 
-        // Process October 2025 array format: [{questionId: "...", answer: "..."}]
-        if (Array.isArray(responsesArray)) {
+        // Extract preferred times from masses (most common times)
+        const timeCount: Record<string, number> = {};
+        Object.values(masses).forEach((timesForDate: any) => {
+          if (timesForDate && typeof timesForDate === 'object') {
+            Object.entries(timesForDate).forEach(([time, available]) => {
+              if (available === true) {
+                timeCount[time] = (timeCount[time] || 0) + 1;
+              }
+            });
+          }
+        });
+        preferredMassTimes = Object.keys(timeCount).sort((a, b) => timeCount[b] - timeCount[a]);
+
+        // Parse weekday availability
+        const weekdaysData = data.weekdays || {};
+        const dailyAvail: string[] = [];
+        const dayMap: Record<string, string> = {
+          'monday': 'Segunda',
+          'tuesday': 'Terça',
+          'wednesday': 'Quarta',
+          'thursday': 'Quinta',
+          'friday': 'Sexta'
+        };
+        Object.entries(weekdaysData).forEach(([day, available]) => {
+          if (available === true && dayMap[day]) {
+            dailyAvail.push(dayMap[day]);
+          }
+        });
+        dailyMassAvailability = dailyAvail;
+
+        // 🔥 CRITICAL: Parse special events (including saint_judas_feast!)
+        const specialEventsData = data.special_events || {};
+
+        // Copy all special events to the specialEvents object
+        Object.assign(specialEvents, specialEventsData);
+
+        // Parse substitution
+        canSubstitute = data.can_substitute === true;
+
+        console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sundays, ${Object.keys(specialEvents).length} special events`);
+      } catch (error) {
+        console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing v2.0:`, error);
+      }
+    }
+    // Handle October 2025 LEGACY array format
+    else if (questionnaireMonth === 10 && questionnaireYear === 2025 && Array.isArray(responsesData)) {
+      try {
+        console.log(`[COMPATIBILITY_LAYER] ✅ October 2025 using LEGACY array format`);
+
+          // Process October 2025 array format: [{questionId: "...", answer: "..."}]
+          const responsesArray = responsesData;
           responsesArray.forEach((item: any) => {
             switch(item.questionId) {
               case 'available_sundays':
@@ -545,115 +684,16 @@ export class ScheduleGenerator {
             }
           });
 
-          console.log(`[COMPATIBILITY_LAYER] ✅ October 2025 format parsed successfully`);
-          console.log(`[COMPATIBILITY_LAYER]    - Sundays: ${availableSundays.length}`);
-          console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
-          console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
-        }
+        console.log(`[COMPATIBILITY_LAYER] ✅ October 2025 format parsed successfully`);
+        console.log(`[COMPATIBILITY_LAYER]    - Sundays: ${availableSundays.length}`);
+        console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
+        console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
       } catch (error) {
         console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing October 2025 format:`, error);
       }
-    } else if (questionnaireMonth >= 11 && questionnaireYear >= 2025) {
-      // 🆕 VERSION 2.0: November 2025 onwards - Improved format
-      console.log(`[COMPATIBILITY_LAYER] ✅ Detected v2.0 format (Nov 2025+)`);
-
-      try {
-        let data = response.responses;
-
-        // Parse if string
-        if (typeof data === 'string') {
-          data = JSON.parse(data);
-        }
-
-        // Check if it's the new v2.0 format with version field
-        if (data && typeof data === 'object' && data.version === '2.0') {
-          console.log(`[COMPATIBILITY_LAYER] 🎯 Parsing v2.0 format with explicit dates`);
-
-          // Extract availability from the new format
-          const availability = data.availability || {};
-          const preferences = data.preferences || {};
-          const substitute = data.substitute || {};
-
-          // Parse Sunday availability (dates like '2025-11-02_08:00': true)
-          const sundayDates: string[] = [];
-          Object.keys(availability).forEach(key => {
-            if (key.match(/^\d{4}-\d{2}-\d{2}_/) && availability[key] === true) {
-              // Extract date and time
-              const [datePart, timePart] = key.split('_');
-              sundayDates.push(`${datePart} ${timePart}`);
-            }
-          });
-          availableSundays = sundayDates;
-
-          // Parse preferred times
-          preferredMassTimes = preferences.preferred_times || [];
-
-          // Parse daily mass availability (weekday_06:30: ['mon', 'tue', 'wed'])
-          const dailyAvail: string[] = [];
-          Object.keys(availability).forEach(key => {
-            if (key.startsWith('weekday_') && Array.isArray(availability[key])) {
-              const days = availability[key];
-              const dayMap: Record<string, string> = {
-                'mon': 'Segunda',
-                'tue': 'Terça',
-                'wed': 'Quarta',
-                'thu': 'Quinta',
-                'fri': 'Sexta',
-                'sat': 'Sábado'
-              };
-              days.forEach((day: string) => {
-                const ptDay = dayMap[day];
-                if (ptDay && !dailyAvail.includes(ptDay)) {
-                  dailyAvail.push(ptDay);
-                }
-              });
-            }
-          });
-          dailyMassAvailability = dailyAvail;
-
-          // Parse special events (first_thursday_healing, etc.)
-          if (availability.first_thursday_healing) {
-            specialEvents['healing_liberation_mass'] = 'Sim';
-          }
-          if (availability.first_friday_sacred) {
-            specialEvents['sacred_heart_mass'] = 'Sim';
-          }
-          if (availability.first_saturday_immaculate) {
-            specialEvents['immaculate_heart_mass'] = 'Sim';
-          }
-
-          // Parse substitution
-          canSubstitute = substitute.available || false;
-
-          console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 format parsed successfully`);
-          console.log(`[COMPATIBILITY_LAYER]    - Available dates: ${availableSundays.length}`);
-          console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
-          console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
-        } else {
-          // Not v2.0, try October format as fallback
-          console.log(`[COMPATIBILITY_LAYER] ℹ️ No version field, trying October format as fallback`);
-
-          if (Array.isArray(data)) {
-            // Use October parser logic
-            data.forEach((item: any) => {
-              switch(item.questionId) {
-                case 'available_sundays':
-                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
-                  break;
-                case 'main_service_time':
-                  preferredMassTimes = item.answer ? [item.answer] : [];
-                  break;
-                case 'can_substitute':
-                  canSubstitute = item.answer === 'Sim' || item.answer === true;
-                  break;
-              }
-            });
-          }
-        }
-      } catch (error) {
-        console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing v2.0 format:`, error);
-      }
-    } else {
+    }
+    // Fallback for unknown formats
+    else {
       // Unknown format
       console.log(`[COMPATIBILITY_LAYER] ⚠️ Unknown format for ${questionnaireMonth}/${questionnaireYear}`);
       console.log(`[COMPATIBILITY_LAYER] ℹ️ Add new format parser here when questionnaire structure changes`);
@@ -822,6 +862,14 @@ export class ScheduleGenerator {
       console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.userId}:`, processedData);
 
       this.availabilityData.set(r.userId, processedData);
+
+      // 🆕 ADD RAW QUESTIONNAIRE RESPONSE to minister object for v2.0 availability checking
+      const minister = this.ministers.find(m => m.id === r.userId);
+      if (minister) {
+        minister.questionnaireResponse = {
+          responses: r.responses
+        };
+      }
     });
 
     console.log(`[SCHEDULE_GEN] ✅ Carregadas respostas de ${responses.length} ministros no availabilityData`);
@@ -1018,9 +1066,9 @@ export class ScheduleGenerator {
       // ❌ EXCETO:
       //    - Dia 28 (São Judas - tem missas especiais)
       //    - Sábados regulares (apenas 1º sábado tem missa)
-      //    - Dias de novena de outubro (20-27, têm apenas missa da noite)
+      //    - Dias de novena de outubro (20-27, têm apenas missa da noite, exceto domingos 19 e 26)
       const isRegularSaturday = dayOfWeek === 6; // Sábados não têm missa diária (exceto 1º sábado tratado separadamente)
-      const isOctoberNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+      const isOctoberNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27 && dayOfWeek !== 0;
 
       if (dayOfWeek >= 1 && dayOfWeek <= 5 && !isDayOfSaintJudas && !isOctoberNovena) {
         // Segunda (1) a SEXTA (5) - EXCLUINDO SÁBADOS
@@ -1107,40 +1155,49 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Missa Imaculado Coração de Maria (1º sábado): ${dateStr} 06:30 (6 ministros)`);
       }
       
-      // REGRA 6: Novena de São Judas (dias 20-27 de outubro às 19h30)
-      // 🚨 IMPORTANTE: Durante a novena (20-27/10), APENAS a missa da noite!
+      // REGRA 6: Novena de São Judas (dias 19-27 de outubro às 19h30)
+      // 🚨 IMPORTANTE: Durante a novena (19-27/10), APENAS a missa da noite!
+      //    - Oct 19 (Dom): Domingos normais (8h, 10h, 19h) - novena unificada com 19h ✅
       //    - Oct 20 (Seg): 19:30
       //    - Oct 21 (Ter): 19:30
       //    - Oct 22 (Qua): 19:30
       //    - Oct 23 (Qui): 19:30
       //    - Oct 24 (Sex): 19:30
       //    - Oct 25 (Sáb): 19:00 (única missa do dia!)
-      //    - Oct 26 (Dom): Domingos normais (8h, 10h, 19h) + novena 19:30
+      //    - Oct 26 (Dom): Domingos normais (8h, 10h, 19h) - novena unificada com 19h ✅
       //    - Oct 27 (Seg): 19:30
-      if (month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27) {
+      if (month === 10 && dayOfMonth >= 19 && dayOfMonth <= 27) {
         // Determinar qual dia da novena é
-        const novenaDayNumber = dayOfMonth - 19; // Dia 20 = 1ª novena, dia 27 = 8ª novena
+        const novenaDayNumber = dayOfMonth - 18; // Dia 19 = 1ª novena, dia 27 = 9ª novena
 
-        // Horário depende do dia da semana
-        let novenaTime = '19:30';
-        if (dayOfWeek === 6) { // Sábado (dia 24 ou 25)
-          novenaTime = '19:00';
-        }
+        // 🔥 CORREÇÃO: Nos domingos (19 e 26), a novena é UNIFICADA com a missa dominical às 19h
+        // Não adicionar missa extra às 19:30
+        if (dayOfWeek === 0) {
+          console.log(`[SCHEDULE_GEN] 🙏 Novena São Judas (${novenaDayNumber}º dia): ${dateStr} - UNIFICADA com missa dominical às 19:00`);
+          // Não adiciona missa separada, a missa dominical às 19h já foi adicionada acima
+        } else {
+          // Para dias de semana e sábado, adicionar missa específica da novena
+          // Horário depende do dia da semana
+          let novenaTime = '19:30';
+          if (dayOfWeek === 6) { // Sábado (dia 25)
+            novenaTime = '19:00';
+          }
 
-        monthlyTimes.push({
-          id: `novena-sao-judas-${dateStr}`,
-          dayOfWeek,
-          time: novenaTime,
-          date: dateStr,
-          minMinisters: 26,
-          maxMinisters: 26,
-          type: 'missa_sao_judas'
-        });
-        console.log(`[SCHEDULE_GEN] 🙏 Novena São Judas (${novenaDayNumber}º dia): ${dateStr} ${novenaTime} (26 ministros)`);
+          monthlyTimes.push({
+            id: `novena-sao-judas-${dateStr}`,
+            dayOfWeek,
+            time: novenaTime,
+            date: dateStr,
+            minMinisters: 26,
+            maxMinisters: 26,
+            type: 'missa_sao_judas'
+          });
+          console.log(`[SCHEDULE_GEN] 🙏 Novena São Judas (${novenaDayNumber}º dia): ${dateStr} ${novenaTime} (26 ministros)`);
 
-        // 🚨 REGRA CRÍTICA: Se for sábado durante novena (Oct 25), marcar para remover outras missas
-        if (dayOfWeek === 6) {
-          console.log(`[SCHEDULE_GEN] 🚫 Sábado ${dateStr} está na novena - apenas missa às ${novenaTime}!`);
+          // 🚨 REGRA CRÍTICA: Se for sábado durante novena (Oct 25), marcar para remover outras missas
+          if (dayOfWeek === 6) {
+            console.log(`[SCHEDULE_GEN] 🚫 Sábado ${dateStr} está na novena - apenas missa às ${novenaTime}!`);
+          }
         }
       }
 
@@ -1201,12 +1258,13 @@ export class ScheduleGenerator {
         return false;
       }
 
-      // REGRA 3: Durante novena (Oct 20-27), APENAS missas noturnas (exceto domingo 26)
+      // REGRA 3: Durante novena (Oct 19-27), APENAS missas noturnas (exceto domingos 19 e 26)
+      // Oct 19 (Dom): Domingos normais (8h, 10h, 19h) + novena 19:30 ✅
       // Oct 20-24 (Seg-Sex): Apenas 19:30 novena
       // Oct 25 (Sáb): Apenas 19:00 novena
       // Oct 26 (Dom): Domingos normais (8h, 10h, 19h) + novena 19:30 ✅
       // Oct 27 (Seg): Apenas 19:30 novena
-      if (month === 10 && day >= 20 && day <= 27 && dayOfWeek !== 0) {
+      if (month === 10 && day >= 19 && day <= 27 && dayOfWeek !== 0) {
         // Check if it's a morning mass (before 12:00)
         const hour = parseInt(mass.time.split(':')[0]);
         const isMorningMass = hour < 12;
@@ -1492,12 +1550,11 @@ export class ScheduleGenerator {
 
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
-        // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
-        const date = new Date(massTime.date!);
-        const dayOfMonth = date.getDate();
-        const sundayOfMonth = Math.ceil(dayOfMonth / 7); // 1-7 = 1º domingo, 8-14 = 2º domingo, etc.
+        console.log(`[AVAILABILITY_CHECK] Verificando domingo ${massTime.date} ${massTime.time}`);
 
-        console.log(`[AVAILABILITY_CHECK] Domingo ${sundayOfMonth} do mês (${massTime.date})`);
+        // Definir chaves de busca no início
+        const dateTimeKey = `${massTime.date} ${massTime.time}`;
+        const dateOnlyKey = massTime.date;
 
         // Se o ministro marcou "Nenhum domingo", ele não está disponível
         if (availability.availableSundays?.includes('Nenhum domingo')) {
@@ -1505,30 +1562,58 @@ export class ScheduleGenerator {
           return false;
         }
 
-        // Verificar se está disponível para este domingo específico
-        // Os domingos são armazenados como "1", "2", "3", "4", "5"
+        // 🔥 V2.0 FORMAT: availableSundays é um array de "YYYY-MM-DD HH:MM"
+        // Exemplo: ["2025-10-05 10:00", "2025-10-12 08:00"]
         let availableForSunday = false;
         if (availability.availableSundays && availability.availableSundays.length > 0) {
-          // Verificar se o domingo atual está na lista
-          availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
-          console.log(`[AVAILABILITY_CHECK] ${minister.name} disponível nos domingos: ${availability.availableSundays.join(', ')}`);
-          console.log(`[AVAILABILITY_CHECK] Verificando domingo ${sundayOfMonth}: ${availableForSunday ? '✅ SIM' : '❌ NÃO'}`);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} disponível em: ${availability.availableSundays.join(', ')}`);
 
+          // Verificar match exato (data + hora)
+          availableForSunday = availability.availableSundays.some(entry => {
+            // Format v2.0: pode ser "2025-10-05 10:00" (com hora)
+            if (entry.includes(' ')) {
+              return entry === dateTimeKey;
+            }
+            // Ou apenas data: "2025-10-05"
+            if (entry === dateOnlyKey) {
+              return true;
+            }
+            // Legacy formats
+            if (entry.includes(dateStr)) {
+              return true;
+            }
+            return false;
+          });
+
+          console.log(`[AVAILABILITY_CHECK] Verificando ${dateTimeKey}: ${availableForSunday ? '✅ SIM' : '❌ NÃO'}`);
+
+          // Se não encontrou no formato v2.0, tentar formato legado
           if (!availableForSunday) {
-            // Tentar também com múltiplos formatos legados
-            const possibleFormats = [
-              `Domingo ${dateStr}`,  // "Domingo 05/10"
-              dateStr,                // "05/10"
-              `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
-              parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
-            ];
+            // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
+            const date = new Date(massTime.date!);
+            const dayOfMonth = date.getDate();
+            const sundayOfMonth = Math.ceil(dayOfMonth / 7);
 
-            for (const format of possibleFormats) {
-              if (availability.availableSundays.some(sunday =>
-                sunday.includes(format) || sunday === format
-              )) {
-                availableForSunday = true;
-                break;
+            // Formato legado: "1", "2", "3", "4", "5"
+            availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+
+            if (!availableForSunday) {
+              // Outros formatos legados
+              const possibleFormats = [
+                `Domingo ${dateStr}`,  // "Domingo 05/10"
+                dateStr,                // "05/10"
+                `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
+                parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
+              ];
+
+              for (const format of possibleFormats) {
+                if (availability.availableSundays.some(sunday =>
+                  sunday.includes(format) || sunday === format
+                )) {
+                  availableForSunday = true;
+                  console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format}`);
+                  break;
+                }
               }
             }
           }
@@ -1537,34 +1622,26 @@ export class ScheduleGenerator {
         // Se não está disponível para o domingo, verificar se pelo menos tem o horário preferido
         if (!availableForSunday) {
           // Se não marcou domingos mas marcou horário preferido, pode estar disponível
-          if (availability.preferredMassTimes?.includes(timeStr)) {
+          if (availability.preferredMassTimes?.includes(timeStr) || availability.preferredMassTimes?.includes(massTime.time)) {
             logger.debug(`${minister.name} tem preferência pelo horário ${timeStr}, considerando disponível`);
             return true;
           }
+          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} NÃO disponível para ${dateTimeKey}`);
           return false;
         }
 
-        // Se está disponível para o domingo, verificar compatibilidade de horário
+        // Se está disponível para o domingo, verificar compatibilidade de horário (opcional - afeta apenas pontuação)
         if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
-          // Verificar se o horário atual está nas preferências ou alternativas
           const hasPreferredTime = availability.preferredMassTimes.some(time => {
-            const timeValue = String(time);
-            return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
-          });
-          const hasAlternativeTime = availability.alternativeTimes?.some(time => {
             const timeValue = String(time);
             return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
           });
 
           console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários preferidos: ${availability.preferredMassTimes.join(', ')}`);
-          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Horários alternativos: ${availability.alternativeTimes?.join(', ') || 'nenhum'}`);
-          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time} (${timeStr}): preferido=${hasPreferredTime}, alternativo=${hasAlternativeTime}`);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time}: preferido=${hasPreferredTime}`);
 
-          // Se não tem nem preferência nem alternativa para este horário, dar prioridade menor mas não excluir
-          // Excluir apenas se explicitamente não pode neste horário
-          if (!hasPreferredTime && !hasAlternativeTime) {
-            // Ainda assim está disponível, mas com prioridade menor
-            logger.debug(`${minister.name} disponível mas sem preferência para ${timeStr}`);
+          if (!hasPreferredTime) {
+            logger.debug(`${minister.name} disponível mas sem preferência forte para ${timeStr}`);
           }
         }
 
@@ -1574,26 +1651,45 @@ export class ScheduleGenerator {
 
       // Verificar disponibilidade para missas diárias (segunda a sábado)
       if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
-        console.log(`[AVAILABILITY_CHECK] Verificando dia específico para ${minister.name}`);
-        console.log(`[AVAILABILITY_CHECK]   dailyMassAvailability: ${JSON.stringify(availability.dailyMassAvailability)}`);
-        console.log(`[AVAILABILITY_CHECK]   Procurando por: "${dayName}"`);
-        
-        // Se marcou "Não posso" para missas diárias, não está disponível
-        if (availability.dailyMassAvailability?.includes('Não posso')) {
-          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} marcou "Não posso"`);
+        // 🔥 CRITICAL FIX: Para missas ESPECIAIS em dias de semana (festa, novena, cura, etc.),
+        // NÃO verificar dailyMassAvailability! A disponibilidade específica já foi checada acima.
+        if (massTime.type && massTime.type !== 'missa_diaria') {
+          console.log(`[AVAILABILITY_CHECK] ⏭️  ${minister.name}: Missa especial em dia de semana (${massTime.type}), pulando verificação de dailyMassAvailability`);
+          // A disponibilidade específica para o evento já foi verificada em isAvailableForSpecialMass
+          // Continuar para permitir que ministros participem de eventos especiais
+          // mesmo que não estejam disponíveis para missas diárias regulares
+          return true;
+        }
+
+        // Para MISSAS DIÁRIAS REGULARES (06:30), verificar disponibilidade do dia da semana
+        console.log(`[AVAILABILITY_CHECK] Verificando disponibilidade diária para ${minister.name}`);
+
+        // 🔧 FIX: Usar dados JÁ PROCESSADOS em availabilityData ao invés de reprocessar JSON
+        // Os dados corretos já estão em availability.dailyMassAvailability
+        if (!availability.dailyMassAvailability || availability.dailyMassAvailability.length === 0) {
+          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} não tem dailyMassAvailability`);
           return false;
         }
 
-        // Se tem dados de missas diárias, verificar o dia específico
-        if (availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0) {
-          const isAvailable = availability.dailyMassAvailability.includes(dayName);
-          console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailable ? '✅ DISPONÍVEL' : '❌ NÃO disponível'} para ${dayName}`);
-          return isAvailable;
-        }
+        // Mapear dayOfWeek (0-6) para nome do dia
+        const weekdayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        const weekdayNamesAlt = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const currentDayName = weekdayNames[massTime.dayOfWeek];
+        const currentDayNameAlt = weekdayNamesAlt[massTime.dayOfWeek];
 
-        // Se não respondeu sobre missas diárias, considerar não disponível
-        console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} sem dados de disponibilidade diária`);
-        return false;
+        // Verificar se o ministro marcou este dia como disponível
+        const isAvailableForDay = availability.dailyMassAvailability.some(day => {
+          const dayLower = day.toLowerCase();
+          return dayLower === currentDayName.toLowerCase() ||
+                 dayLower === currentDayNameAlt.toLowerCase() ||
+                 dayLower.includes(currentDayName.toLowerCase());
+        });
+
+        console.log(`[AVAILABILITY_CHECK] ${minister.name}: dailyMassAvailability = ${availability.dailyMassAvailability.join(', ')}`);
+        console.log(`[AVAILABILITY_CHECK] ${minister.name}: Procurando por "${currentDayName}" ou "${currentDayNameAlt}"`);
+        console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailableForDay ? '✅ DISPONÍVEL' : '❌ NÃO disponível'} para ${dayName} (${massTime.date})`);
+
+        return isAvailableForDay;
       }
 
       // Para outros casos, considerar disponível se tem resposta
@@ -1616,7 +1712,15 @@ export class ScheduleGenerator {
    */
   private isAvailableForSpecialMass(ministerId: string, massType: string, massTime?: string, massDate?: string): boolean {
     const availability = this.availabilityData.get(ministerId);
-    if (!availability) return false;
+    if (!availability) {
+      console.log(`[SPECIAL_MASS] ❌ ${ministerId}: No availability data for ${massType}`);
+      return false;
+    }
+
+    // Log para debug
+    if (massType === 'missa_sao_judas_festa') {
+      console.log(`[SPECIAL_MASS] 🔍 Checking ${ministerId} for ${massType} at ${massDate} ${massTime}`);
+    }
 
     // Para missas diárias regulares, verificar disponibilidade geral (não por dia específico)
     if (massType === 'missa_diaria') {
@@ -1633,33 +1737,47 @@ export class ScheduleGenerator {
       return hasAnyDailyAvailability;
     }
 
-    // Mapear tipos de missa para campos do questionário
+    // 🔥 CRITICAL FIX: Mapear tipos de missa para campos CORRETOS do questionário v2.0
     const massTypeMapping: { [key: string]: string } = {
-      'missa_cura_libertacao': 'healing_liberation_mass',
-      'missa_sagrado_coracao': 'sacred_heart_mass',
-      'missa_imaculado_coracao': 'immaculate_heart_mass',
+      'missa_cura_libertacao': 'healing_liberation',     // v2.0: healing_liberation (não healing_liberation_mass!)
+      'missa_sagrado_coracao': 'first_friday',           // v2.0: first_friday (não sacred_heart_mass!)
+      'missa_imaculado_coracao': 'first_saturday',       // v2.0: first_saturday (não immaculate_heart_mass!)
       'missa_sao_judas': 'saint_judas_novena'
     };
 
     // Para missas de São Judas festa, mapear o horário específico
-    if (massType === 'missa_sao_judas_festa' && massTime) {
-      const timeToQuestionKey: { [key: string]: string } = {
-        '07:00': 'saint_judas_feast_7h',
-        '10:00': 'saint_judas_feast_10h',
-        '12:00': 'saint_judas_feast_12h',
-        '15:00': 'saint_judas_feast_15h',
-        '17:00': 'saint_judas_feast_17h',
-        '19:30': 'saint_judas_feast_evening'
-      };
+    if (massType === 'missa_sao_judas_festa' && massTime && massDate) {
+      const specialEvents = (availability as any).specialEvents;
+      console.log(`[SPECIAL_MASS] 📦 Special events for ${ministerId}:`, typeof specialEvents, specialEvents ? Object.keys(specialEvents) : 'null');
 
-      const questionKey = timeToQuestionKey[massTime];
-      if (questionKey) {
-        const specialEvents = (availability as any).specialEvents;
-        if (specialEvents && typeof specialEvents === 'object') {
+      if (specialEvents && typeof specialEvents === 'object') {
+        console.log(`[SPECIAL_MASS] 🔑 saint_judas_feast exists:`, !!specialEvents.saint_judas_feast, typeof specialEvents.saint_judas_feast);
+        // 🔥 CRITICAL FIX: Para v2.0, procurar em saint_judas_feast com datetime key
+        if (specialEvents.saint_judas_feast && typeof specialEvents.saint_judas_feast === 'object') {
+          const datetimeKey = `${massDate}_${massTime}`; // e.g., "2025-10-28_10:00"
+          console.log(`[SPECIAL_MASS] ✅ Checking key: ${datetimeKey}`);
+          const response = specialEvents.saint_judas_feast[datetimeKey];
+          console.log(`[SPECIAL_MASS] 📍 Response value:`, response, typeof response);
+          const isAvailable = response === true;
+          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${datetimeKey}): ${response} = ${isAvailable}`);
+          return isAvailable;
+        }
+
+        // 🔄 FALLBACK: Para formato legacy, procurar por questionKey
+        const timeToQuestionKey: { [key: string]: string } = {
+          '07:00': 'saint_judas_feast_7h',
+          '10:00': 'saint_judas_feast_10h',
+          '12:00': 'saint_judas_feast_12h',
+          '15:00': 'saint_judas_feast_15h',
+          '17:00': 'saint_judas_feast_17h',
+          '19:30': 'saint_judas_feast_evening'
+        };
+
+        const questionKey = timeToQuestionKey[massTime];
+        if (questionKey) {
           const response = specialEvents[questionKey];
-          // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos
           const isAvailable = response === 'Sim' || response === true;
-          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
+          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (legacy ${questionKey}): ${response} = ${isAvailable}`);
           return isAvailable;
         }
       }
@@ -1676,27 +1794,37 @@ export class ScheduleGenerator {
     if (specialEvents && typeof specialEvents === 'object') {
       const response = specialEvents[questionKey];
 
-      // 🔧 CORREÇÃO ESPECIAL: Para novena de São Judas, verificar se a data/dia específico está no array
+      // 🔧 CRITICAL FIX: Para novena de São Judas, suportar AMBOS formatos (v2.0 e legacy)
       if (questionKey === 'saint_judas_novena' && Array.isArray(response)) {
-        // Resposta é array como ["Sexta 23/10 às 19h30", "Terça 20/10 às 19h30"]
-        // Precisamos verificar se a data da missa está nesse array
-        if (massDate) {
-          // Extrair dia do mês da data (ex: "2025-10-23" -> "23")
-          const dayOfMonth = parseInt(massDate.split('-')[2]);
+        console.log(`[NOVENA_CHECK] 🔍 Checking novena availability for minister ${ministerId}`);
+        console.log(`[NOVENA_CHECK] 📅 Mass date: ${massDate}, time: ${massTime}`);
+        console.log(`[NOVENA_CHECK] 📋 Novena responses: ${JSON.stringify(response)}`);
 
-          // Verificar se algum item do array contém esse dia
-          const isAvailable = response.some((day: string) => {
-            // Procurar padrões como "23/10" ou "23"
-            // Usar regex para extrair o dia: \d{1,2}/10
-            const match = day.match(/(\d{1,2})\/10/);
-            if (match) {
-              const responseDay = parseInt(match[1]);
-              return responseDay === dayOfMonth;
+        if (massDate && massTime) {
+          // Verificar se algum item do array corresponde à data/horário da missa
+          const isAvailable = response.some((dateTimeStr: string) => {
+            // 🔧 FORMAT 1: V2.0 exact match (ISO format: "2025-10-20_19:30")
+            const massDateTime = `${massDate}_${massTime}`;
+            if (dateTimeStr === massDateTime) {
+              console.log(`[NOVENA_CHECK]    - "${dateTimeStr}" ✅ EXACT MATCH (v2.0 format)`);
+              return true;
             }
+
+            // 🔧 FORMAT 2: Legacy format - extract day from "Terça 20/10 às 19h30"
+            const legacyMatch = dateTimeStr.match(/(\d{1,2})\/10/);
+            if (legacyMatch) {
+              const dayOfMonth = parseInt(massDate.split('-')[2]);
+              const responseDay = parseInt(legacyMatch[1]);
+              const matches = responseDay === dayOfMonth;
+              console.log(`[NOVENA_CHECK]    - "${dateTimeStr}" → day ${responseDay} ${matches ? '✅ MATCH (legacy)' : '❌'}`);
+              return matches;
+            }
+
+            console.log(`[NOVENA_CHECK]    - "${dateTimeStr}" ❌ no match`);
             return false;
           });
 
-          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para novena dia ${dayOfMonth}/10: ${isAvailable} (tem: ${response.join(', ')})`);
+          console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} novena ${massDate} ${massTime}: ${isAvailable ? '✅ AVAILABLE' : '❌ NOT AVAILABLE'}`);
           return isAvailable;
         }
         // Se não temos data, mas tem respostas, considerar disponível
@@ -1720,6 +1848,7 @@ export class ScheduleGenerator {
    * 🔥 FAIR ALGORITHM: Seleciona ministros garantindo distribuição justa
    * - Hard limit: 4 assignments per month
    * - Prevents same minister serving twice on same day
+   * - 👨‍👩‍👧‍👦 GROUPS families together when prefer_serve_together is true
    * - Sorts by assignment count (least assigned first)
    * - Ensures everyone gets at least 1 before anyone gets 3
    */
@@ -1727,13 +1856,19 @@ export class ScheduleGenerator {
     const targetCount = massTime.minMinisters;
     const MAX_MONTHLY_ASSIGNMENTS = 4;
 
+    // 🔥 CORREÇÃO CRÍTICA: Missas diárias não contam para o limite de 4 atribuições!
+    // Quando um ministro marca disponibilidade para dias da semana, ele está se disponibilizando
+    // para TODOS aqueles dias no mês, não apenas para 4 vezes.
+    const isDailyMass = massTime.type === 'missa_diaria';
+
     console.log(`\n[FAIR_ALGORITHM] ========================================`);
     console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
     console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
     console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
+    console.log(`[FAIR_ALGORITHM] Is daily mass (no monthly limit): ${isDailyMass}`);
 
     // 1. Filter out ministers who:
-    //    - Already reached monthly limit (4 assignments)
+    //    - Already reached monthly limit (4 assignments) - EXCETO para missas diárias
     //    - Already served on this date
     const eligible = available.filter(minister => {
       if (!minister.id) return false; // Skip VACANTE
@@ -1741,8 +1876,8 @@ export class ScheduleGenerator {
       const assignmentCount = minister.monthlyAssignmentCount || 0;
       const alreadyServedToday = minister.lastAssignedDate === massTime.date;
 
-      // Hard limit check
-      if (assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+      // Hard limit check - MAS NÃO para missas diárias!
+      if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
         console.log(`[FAIR_ALGORITHM] ❌ ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
         return false;
       }
@@ -1753,7 +1888,11 @@ export class ScheduleGenerator {
         return false;
       }
 
-      console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+      if (isDailyMass) {
+        console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible for DAILY MASS (${assignmentCount} total assignments)`);
+      } else {
+        console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+      }
       return true;
     });
 
@@ -1789,23 +1928,86 @@ export class ScheduleGenerator {
       console.log(`  ${m.name}: ${m.monthlyAssignmentCount || 0} assignments this month`);
     });
 
-    // 3. Select ministers from least-assigned first
+    // 3. 👨‍👩‍👧‍👦 SELECT MINISTERS: Prioritize family groups first, then individuals
     const selected: Minister[] = [];
     const used = new Set<string>();
+    const processedFamilies = new Set<string>();
+
+    // PHASE 1: Process families that prefer to serve together
+    console.log(`\n[FAMILY_SYSTEM] 👨‍👩‍👧‍👦 Phase 1: Processing families that prefer to serve together...`);
+    for (const minister of sorted) {
+      if (!minister.id || used.has(minister.id)) continue;
+      if (selected.length >= targetCount) break;
+
+      // Check if minister has a family and family wants to serve together
+      if (minister.familyId && this.familyGroups.has(minister.familyId)) {
+        const familyId = minister.familyId;
+
+        // Skip if we already processed this family
+        if (processedFamilies.has(familyId)) continue;
+
+        // Check family preference
+        const preferTogether = this.familyPreferences.get(familyId) ?? true;
+
+        if (preferTogether) {
+          // Get all family members who are in the eligible pool
+          const familyMemberIds = this.familyGroups.get(familyId)!;
+          const availableFamilyMembers = sorted.filter(m =>
+            m.id && familyMemberIds.includes(m.id) && !used.has(m.id)
+          );
+
+          if (availableFamilyMembers.length > 0) {
+            const familyNames = availableFamilyMembers.map(m => m.name).join(' & ');
+
+            // Try to add all available family members together
+            let addedCount = 0;
+            for (const familyMember of availableFamilyMembers) {
+              if (selected.length >= targetCount) break;
+
+              selected.push(familyMember);
+              used.add(familyMember.id!);
+
+              // Update counters
+              familyMember.monthlyAssignmentCount = (familyMember.monthlyAssignmentCount || 0) + 1;
+              familyMember.lastAssignedDate = massTime.date;
+
+              addedCount++;
+            }
+
+            console.log(`[FAMILY_SYSTEM] ✅ Assigned family together: ${familyNames} (${addedCount} members)`);
+            processedFamilies.add(familyId);
+          }
+        }
+      }
+    }
+
+    // PHASE 2: Fill remaining spots with individuals
+    console.log(`\n[FAIR_ALGORITHM] Phase 2: Filling remaining spots with individual ministers...`);
+    console.log(`[FAIR_ALGORITHM] Current: ${selected.length}/${targetCount} ministers selected`);
 
     for (const minister of sorted) {
       if (!minister.id) continue;
+      if (selected.length >= targetCount) break;
+      if (used.has(minister.id)) continue;
 
-      if (selected.length >= targetCount) {
-        break; // Reached target
+      // Skip if minister is in a family that prefers to serve together
+      // but wasn't fully available (so we don't break up the family)
+      if (minister.familyId && this.familyGroups.has(minister.familyId)) {
+        const familyId = minister.familyId;
+        const preferTogether = this.familyPreferences.get(familyId) ?? true;
+
+        if (preferTogether && !processedFamilies.has(familyId)) {
+          // Family wants to serve together but wasn't processed yet
+          // This means not all members were available, so skip this member
+          console.log(`[FAMILY_SYSTEM] ⏭️  Skipping ${minister.name}: Family prefers to serve together`);
+          continue;
+        }
+
+        // If family prefers separate service, or was already processed, allow individual assignment
+        if (!preferTogether) {
+          console.log(`[FAMILY_SYSTEM] ✅ ${minister.name}: Family prefers separate service, can serve individually`);
+        }
       }
-
-      if (used.has(minister.id)) {
-        continue; // Already selected
-      }
-
-      // TODO: Handle couples logic if needed
-      // For now, select individually
 
       selected.push(minister);
       used.add(minister.id);

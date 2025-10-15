@@ -6,6 +6,7 @@ import {
   substitutionRequests,
   notifications,
   massTimesConfig,
+  families,
   familyRelationships,
   formationTracks,
   formationModules,
@@ -169,6 +170,8 @@ export interface IStorage {
   getFamilyMembers(userId: string): Promise<FamilyRelationship[]>;
   addFamilyMember(userId: string, relatedUserId: string, relationshipType: string): Promise<FamilyRelationship>;
   removeFamilyMember(relationshipId: string): Promise<void>;
+  getFamilyPreference(userId: string): Promise<{ name: string; preferServeTogether: boolean } | null>;
+  updateFamilyPreference(userId: string, preferServeTogether: boolean): Promise<void>;
   
   // User activity checking for deletion safety
   checkUserMinisterialActivity(userId: string): Promise<{ isUsed: boolean; reason: string }>;
@@ -733,6 +736,45 @@ export class DatabaseStorage implements IStorage {
 
     // Delete the original relationship
     await db.delete(familyRelationships).where(eq(familyRelationships.id, relationshipId));
+  }
+
+  async getFamilyPreference(userId: string): Promise<{ name: string; preferServeTogether: boolean } | null> {
+    // Get the user to find their familyId
+    const user = await this.getUser(userId);
+
+    if (!user || !user.familyId) {
+      return null;
+    }
+
+    // Get the family information
+    const [family] = await db
+      .select()
+      .from(families)
+      .where(eq(families.id, user.familyId));
+
+    if (!family) {
+      return null;
+    }
+
+    return {
+      name: family.name,
+      preferServeTogether: family.preferServeTogether ?? true
+    };
+  }
+
+  async updateFamilyPreference(userId: string, preferServeTogether: boolean): Promise<void> {
+    // Get the user to find their familyId
+    const user = await this.getUser(userId);
+
+    if (!user || !user.familyId) {
+      throw new Error('User has no family');
+    }
+
+    // Update the family preference
+    await db
+      .update(families)
+      .set({ preferServeTogether })
+      .where(eq(families.id, user.familyId));
   }
 
   // Family questionnaire sharing methods

@@ -27,6 +27,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { useEffect, useRef, useState, memo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { APP_VERSION } from "@/lib/queryClient";
+import { parseScheduleDate } from "@/lib/utils";
 
 // Memoized connection status indicator to prevent unnecessary re-renders
 const ConnectionStatus = memo(({ isConnected }: { isConnected: boolean }) => (
@@ -221,7 +222,7 @@ export default function Dashboard() {
                     <Clock className="h-5 w-5" />
                     <div>
                       <p className="font-semibold">
-                        {format(new Date(mass.date), "dd/MM - EEEE", { locale: ptBR })} às {mass.massTime}
+                        {format(parseScheduleDate(mass.date), "dd/MM - EEEE", { locale: ptBR })} às {mass.massTime}
                       </p>
                       <p className="text-sm opacity-90">
                         {mass.vacancies} vagas vazias • {mass.hoursUntil}h até a missa
@@ -245,7 +246,7 @@ export default function Dashboard() {
                         Substituição pendente - {sub.requesterName}
                       </p>
                       <p className="text-sm opacity-90">
-                        {format(new Date(sub.massDate), "dd/MM", { locale: ptBR })} • {sub.hoursUntil}h restantes
+                        {format(parseScheduleDate(sub.massDate), "dd/MM", { locale: ptBR })} • {sub.hoursUntil}h restantes
                       </p>
                     </div>
                   </div>
@@ -399,7 +400,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-4 flex-1">
                       <div className="min-w-[100px]">
                         <p className="font-semibold">
-                          {format(new Date(mass.date), "dd/MM - EEE", { locale: ptBR })}
+                          {format(parseScheduleDate(mass.date), "dd/MM - EEE", { locale: ptBR })}
                         </p>
                         <p className="text-sm text-muted-foreground">{mass.massTime}</p>
                       </div>

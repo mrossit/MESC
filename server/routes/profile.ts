@@ -217,6 +217,73 @@ router.delete('/family/:id', async (req: AuthRequest, res) => {
   }
 });
 
+// Obter preferência da família
+router.get('/family-preference', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const familyPreference = await storage.getFamilyPreference(userId);
+
+    if (!familyPreference) {
+      // Usuário não tem família ou família não existe
+      return res.json({
+        hasFamilyId: false,
+        preferServeTogether: true // Default
+      });
+    }
+
+    return res.json({
+      hasFamilyId: true,
+      preferServeTogether: familyPreference.preferServeTogether ?? true,
+      familyName: familyPreference.name
+    });
+  } catch (error) {
+    console.error('Error fetching family preference:', error);
+    res.status(500).json({ error: 'Failed to fetch family preference' });
+  }
+});
+
+// Atualizar preferência da família
+router.put('/family-preference', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+
+    const schema = z.object({
+      preferServeTogether: z.boolean()
+    });
+
+    const { preferServeTogether } = schema.parse(req.body);
+
+    // Atualizar a preferência da família
+    await storage.updateFamilyPreference(userId, preferServeTogether);
+
+    // AUDITORIA: Log alteração de preferência familiar
+    await logAudit(AuditAction.PERSONAL_DATA_UPDATE, {
+      userId: userId,
+      targetResource: 'family_preference',
+      action: 'update_family_preference',
+      changes: {
+        preferServeTogether
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
+    return res.json({
+      message: 'Family preference updated successfully',
+      preferServeTogether
+    });
+  } catch (error) {
+    console.error('Error updating family preference:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid data', details: error.errors });
+    }
+    if (error instanceof Error && error.message === 'User has no family') {
+      return res.status(400).json({ error: 'You must be part of a family to set this preference' });
+    }
+    res.status(500).json({ error: 'Failed to update family preference' });
+  }
+});
+
 // Obter preferências de atividades extras
 router.get('/extra-activities', async (req: AuthRequest, res) => {
   try {

@@ -28,6 +28,7 @@ router.get('/urgent-alerts', async (req, res) => {
     const next7Days = addDays(now, 7);
 
     // 1. Find incomplete masses (where there are VACANTE slots)
+    // IMPORTANT: Only show published schedules
     const incompleteMasses = await db
       .select({
         date: schedules.date,
@@ -39,6 +40,7 @@ router.get('/urgent-alerts', async (req, res) => {
       .from(schedules)
       .where(
         and(
+          eq(schedules.status, 'published'),
           gte(schedules.date, format(now, 'yyyy-MM-dd')),
           lte(schedules.date, format(next7Days, 'yyyy-MM-dd'))
         )
@@ -63,6 +65,7 @@ router.get('/urgent-alerts', async (req, res) => {
       }));
 
     // 2. Pending substitutions
+    // IMPORTANT: Only show substitutions for published schedules
     const pendingSubstitutions = await db
       .select({
         id: substitutionRequests.id,
@@ -79,6 +82,7 @@ router.get('/urgent-alerts', async (req, res) => {
       .innerJoin(schedules, eq(substitutionRequests.scheduleId, schedules.id))
       .where(
         and(
+          eq(schedules.status, 'published'),
           or(
             eq(substitutionRequests.status, 'pending'),
             eq(substitutionRequests.status, 'available')
@@ -123,6 +127,7 @@ router.get('/next-week-masses', async (req, res) => {
     const now = new Date();
     const next7Days = addDays(now, 7);
 
+    // IMPORTANT: Only show published schedules
     const masses = await db
       .select({
         date: schedules.date,
@@ -143,6 +148,7 @@ router.get('/next-week-masses', async (req, res) => {
       .from(schedules)
       .where(
         and(
+          eq(schedules.status, 'published'),
           gte(schedules.date, format(now, 'yyyy-MM-dd')),
           lte(schedules.date, format(next7Days, 'yyyy-MM-dd'))
         )
@@ -235,6 +241,7 @@ router.get('/ministry-stats', async (req, res) => {
       .orderBy(desc(sql`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
 
     // Current month coverage
+    // IMPORTANT: Only count published schedules
     const [monthStats] = await db
       .select({
         totalMasses: sql<number>`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
@@ -244,12 +251,14 @@ router.get('/ministry-stats', async (req, res) => {
             WHERE s2.date = ${schedules.date}
             AND s2.time = ${schedules.time}
             AND s2.minister_id IS NULL
+            AND s2.status = 'published'
           ) THEN (${schedules.date}, ${schedules.time})
         END)`,
       })
       .from(schedules)
       .where(
         and(
+          eq(schedules.status, 'published'),
           gte(schedules.date, format(thisMonthStart, 'yyyy-MM-dd')),
           lte(schedules.date, format(thisMonthEnd, 'yyyy-MM-dd'))
         )
@@ -297,6 +306,7 @@ router.get('/ministry-stats', async (req, res) => {
         )
       );
 
+    // IMPORTANT: Only count incomplete masses for published schedules
     const [incompleteMassesCount] = await db
       .select({
         count: sql<number>`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
@@ -304,6 +314,7 @@ router.get('/ministry-stats', async (req, res) => {
       .from(schedules)
       .where(
         and(
+          eq(schedules.status, 'published'),
           gte(schedules.date, format(now, 'yyyy-MM-dd')),
           isNull(schedules.ministerId)
         )
@@ -342,6 +353,7 @@ router.get('/incomplete', async (req, res) => {
     const now = new Date();
     const futureDate = addDays(now, days);
 
+    // IMPORTANT: Only show incomplete masses for published schedules
     const incomplete = await db
       .select({
         date: schedules.date,
@@ -357,6 +369,7 @@ router.get('/incomplete', async (req, res) => {
       .from(schedules)
       .where(
         and(
+          eq(schedules.status, 'published'),
           gte(schedules.date, format(now, 'yyyy-MM-dd')),
           lte(schedules.date, format(futureDate, 'yyyy-MM-dd'))
         )

@@ -111,15 +111,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Em desenvolvimento local, permitir requests sem origin (Postman, cURL, etc)
-    if (!origin && process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-
-    // Em produção, bloquear requests sem origin
+    // Permitir requests sem origin (arquivos estáticos, navegação direta, Postman, cURL, etc)
+    // Isso é seguro porque requests sem origin não podem acessar cookies/credentials
     if (!origin) {
-      console.warn('🔴 CORS: Request sem origin bloqueado');
-      return callback(new Error('Origin not allowed by CORS'));
+      return callback(null, true);
     }
 
     // Verificar se a origem está na whitelist
@@ -127,8 +122,8 @@ app.use(cors({
       // Permitir match exato
       if (origin === allowedOrigin) return true;
 
-      // Permitir subdomínios .replit.dev apenas em desenvolvimento
-      if (process.env.NODE_ENV === 'development' && origin.includes('.replit.dev')) {
+      // Permitir subdomínios .replit.dev e .replit.com (em dev e prod)
+      if (origin.includes('.replit.dev') || origin.includes('.replit.com')) {
         return true;
       }
 

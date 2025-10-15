@@ -1,6 +1,7 @@
 import { format, getDaysInMonth, getDay, lastDayOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { logger } from './logger';
+import { LITURGICAL_THEMES, getMonthDescription } from '../../shared/constants/liturgicalThemes';
 
 interface Question {
   id: string;
@@ -22,21 +23,8 @@ interface Question {
   order?: number;
 }
 
-// Mapa de temas mensais com concordância correta
-const MONTHLY_THEMES: { [key: number]: { theme: string; article: string } } = {
-  1: { theme: 'Renovação', article: 'à' },
-  2: { theme: 'Amor', article: 'ao' },
-  3: { theme: 'Conversão', article: 'à' },
-  4: { theme: 'Ressurreição', article: 'à' },
-  5: { theme: 'Maria', article: 'à' },
-  6: { theme: 'Sagrado Coração', article: 'ao' },
-  7: { theme: 'Família', article: 'à' },
-  8: { theme: 'Vocações', article: 'às' },
-  9: { theme: 'Bíblia', article: 'à' },
-  10: { theme: 'Missões', article: 'às' },
-  11: { theme: 'Finados', article: 'aos' },
-  12: { theme: 'Natal', article: 'ao' }
-};
+// Temas mensais são importados de shared/constants/liturgicalThemes.ts
+// Esta abordagem centraliza os temas e garante consistência em toda a aplicação
 
 // Funções auxiliares para calcular datas de missas especiais
 function getFirstThursdayOfMonth(month: number, year: number): { day: number; isHoliday: boolean } {
@@ -109,8 +97,10 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
   const questions: Question[] = [];
   const monthName = format(new Date(year, month - 1), 'MMMM', { locale: ptBR });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-  const themeInfo = MONTHLY_THEMES[month] || { theme: 'do mês', article: 'a' };
-  logger.debug(`Tema detectado para questionário: ${themeInfo.theme}`);
+  const theme = LITURGICAL_THEMES[month];
+  const themeName = theme ? theme.name : 'do mês';
+  const themeDedication = theme ? theme.dedication : 'ao mês';
+  logger.debug(`Tema detectado para questionário: ${themeName}`);
   
   // Obter todos os domingos do mês
   const sundayDates: string[] = [];
@@ -134,7 +124,7 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
   questions.push({
     id: 'monthly_availability',
     type: 'multiple_choice',
-    question: `Neste mês de ${capitalizedMonth} dedicado ${themeInfo.article} "${themeInfo.theme}", você tem disponibilidade para servir no seu horário de costume?`,
+    question: `Neste mês de ${capitalizedMonth} dedicado ${themeDedication}, você tem disponibilidade para servir no seu horário de costume?`,
     options: ['Sim', 'Não'],
     required: true,
     category: 'regular',

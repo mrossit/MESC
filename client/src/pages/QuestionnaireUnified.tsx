@@ -12,9 +12,10 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
-import { 
-  Calendar, CheckCircle, AlertCircle, Send, Plus, Edit2, Trash2, 
-  Save, ChevronUp, ChevronDown, ChevronLeft, RotateCcw, Users, FileText, Settings, X, Play, Lock, Unlock, RefreshCw
+import { Switch } from '../components/ui/switch';
+import {
+  Calendar, CheckCircle, AlertCircle, Send, Plus, Edit2, Trash2,
+  Save, ChevronUp, ChevronDown, ChevronLeft, RotateCcw, Users, FileText, Settings, X, Play, Lock, Unlock, RefreshCw, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -70,6 +71,7 @@ export default function QuestionnaireUnified() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -109,6 +111,7 @@ export default function QuestionnaireUnified() {
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
   const [loadingFamilyMembers, setLoadingFamilyMembers] = useState(false);
   const [familySharingScenario, setFamilySharingScenario] = useState<'none' | 'some_responded' | 'need_choice'>('none');
+  const [preferServeTogether, setPreferServeTogether] = useState(true);
   
   // Buscar informações do usuário
   const { data: authData } = useQuery({
@@ -678,7 +681,8 @@ export default function QuestionnaireUnified() {
         month: selectedMonth,
         year: selectedYear,
         responses: formattedResponses,
-        sharedWithFamilyIds: selectedFamilyMembers
+        sharedWithFamilyIds: selectedFamilyMembers,
+        familyServePreference: preferServeTogether ? 'together' : 'separately'
       };
 
       // Check payload size
@@ -703,10 +707,16 @@ export default function QuestionnaireUnified() {
       if (res.ok) {
         const responseData = await res.json();
         setSuccess('Questionário enviado com sucesso!');
+        setIsSubmitted(true);
 
         // Atualizar existingResponse imediatamente com os dados retornados
         // O backend retorna o objeto completo da resposta
         setExistingResponse(responseData);
+
+        // Reset isSubmitted after 5 seconds para permitir reenvio
+        setTimeout(() => {
+          setIsSubmitted(false);
+        }, 5000);
 
         // Força re-render imediato para atualizar o botão
         setTimeout(() => {
@@ -2019,13 +2029,54 @@ export default function QuestionnaireUnified() {
                           )}
 
                           {selectedFamilyMembers.length > 0 && (
-                            <Alert className="mt-4">
-                              <AlertCircle className="h-4 w-4" />
-                              <AlertDescription>
-                                Suas respostas serão copiadas para {selectedFamilyMembers.length} familiar(es). 
-                                Eles poderão reenviar o questionário com modificações enquanto estiver aberto.
-                              </AlertDescription>
-                            </Alert>
+                            <>
+                              <Alert className="mt-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                  Suas respostas serão copiadas para {selectedFamilyMembers.length} familiar(es).
+                                  Eles poderão reenviar o questionário com modificações enquanto estiver aberto.
+                                </AlertDescription>
+                              </Alert>
+
+                              {/* Preferência de Escalação Familiar */}
+                              <Card className="mt-4 border-blue-200 bg-blue-50/50">
+                                <CardContent className="pt-6">
+                                  <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                      <Label htmlFor="serve-together" className="text-base font-medium">
+                                        Preferência de Escalação
+                                      </Label>
+                                      <p className="text-sm text-muted-foreground">
+                                        Como vocês preferem servir nas missas?
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                      <span className={!preferServeTogether ? 'font-medium' : 'text-muted-foreground'}>
+                                        Separados
+                                      </span>
+                                      <Switch
+                                        id="serve-together"
+                                        checked={preferServeTogether}
+                                        onCheckedChange={setPreferServeTogether}
+                                      />
+                                      <span className={preferServeTogether ? 'font-medium' : 'text-muted-foreground'}>
+                                        Juntos
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Alert explicativo */}
+                                  <Alert className={`mt-4 ${preferServeTogether ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                                    <AlertCircle className={`h-4 w-4 ${preferServeTogether ? 'text-green-600' : 'text-amber-600'}`} />
+                                    <AlertDescription className={preferServeTogether ? 'text-green-800' : 'text-amber-800'}>
+                                      {preferServeTogether
+                                        ? 'Vocês serão escalados preferencialmente na mesma missa sempre que possível.'
+                                        : 'Vocês podem ser escalados em missas diferentes para melhor distribuição.'}
+                                    </AlertDescription>
+                                  </Alert>
+                                </CardContent>
+                              </Card>
+                            </>
                           )}
                         </CardContent>
                       </Card>
@@ -2043,17 +2094,34 @@ export default function QuestionnaireUnified() {
                       ) : (
                         <Button
                           onClick={handleSubmitResponse}
-                          disabled={submitting}
+                          disabled={submitting || isSubmitted}
                           size="lg"
-                          className="gap-2 px-8 py-3 text-lg font-semibold shadow-lg"
+                          className={`gap-2 px-8 py-3 text-lg font-semibold shadow-lg transition-all ${
+                            isSubmitted ? 'bg-green-600 hover:bg-green-700' : ''
+                          }`}
                           data-testid="button-submit-questionnaire"
                         >
-                          <Send className="h-5 w-5" />
-                          {submitting
-                            ? 'Enviando...'
-                            : existingResponse?.responses?.length > 0
-                            ? 'Reenviar Respostas'
-                            : 'Enviar Respostas'}
+                          {submitting ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : isSubmitted ? (
+                            <>
+                              <CheckCircle className="h-5 w-5" />
+                              Enviado com sucesso ✓
+                            </>
+                          ) : existingResponse?.responses?.length > 0 ? (
+                            <>
+                              <RefreshCw className="h-5 w-5" />
+                              REENVIAR RESPOSTAS
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-5 w-5" />
+                              Enviar Respostas
+                            </>
+                          )}
                         </Button>
                       )}
                     </div>

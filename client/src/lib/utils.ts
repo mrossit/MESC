@@ -8,14 +8,21 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Parse a date string in YYYY-MM-DD format correctly avoiding timezone issues
- * Uses parseISO from date-fns with a fixed time (12:00) to prevent date shifting
- * @param dateStr Date string in format YYYY-MM-DD
- * @returns Date object with correct local date at noon (prevents timezone issues)
+ *
+ * CRITICAL: JavaScript Date Parsing Behavior
+ * - new Date('2025-10-12')           → Parses as UTC midnight → Oct 11 21:00 BRT ❌
+ * - new Date('2025-10-12T00:00:00')  → Parses as LOCAL midnight → Oct 12 00:00 BRT ✅
+ *
+ * @param dateStr Date string in format YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+ * @returns Date object with correct local date (prevents timezone issues)
  */
 export function parseScheduleDate(dateStr: string): Date {
-  // Add time component (12:00) to prevent timezone-related date shifting
-  // This ensures the date doesn't change when converted between timezones
-  return parseISO(dateStr + 'T12:00:00');
+  // Remove existing time component if present
+  const datePart = dateStr.split('T')[0];
+
+  // Add time component (00:00:00) to force local timezone parsing
+  // This prevents the date from shifting due to UTC conversion
+  return parseISO(datePart + 'T00:00:00');
 }
 
 /**

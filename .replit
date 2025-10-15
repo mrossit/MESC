@@ -1,10 +1,10 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "postgresql-16", "python-3.11", "web"]
 run = "npm run build && npm run start"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["sqlite", "imagemagick"]
+packages = ["sqlite", "imagemagick", "google-cloud-sdk-gce", "parallel-full"]
 
 [deployment]
 deploymentTarget = "autoscale"

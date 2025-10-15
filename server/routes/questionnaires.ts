@@ -17,6 +17,7 @@ import {
   createDetailedCSV,
   convertResponsesToCSV
 } from '../utils/csvExporter';
+import { QuestionnaireService } from '../services/questionnaireService';
 
 const router = Router();
 
@@ -380,8 +381,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       responses: z.array(z.object({
         questionId: z.string(),
         answer: z.union([
-          z.string(), 
-          z.array(z.string()), 
+          z.string(),
+          z.array(z.string()),
           z.boolean(),
           z.object({
             answer: z.string(),
@@ -390,7 +391,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
         ]),
         metadata: z.any().optional()
       })),
-      sharedWithFamilyIds: z.array(z.string()).optional()
+      sharedWithFamilyIds: z.array(z.string()).optional(),
+      familyServePreference: z.enum(['together', 'separately']).optional()
     });
 
     let data;
@@ -506,9 +508,18 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       .limit(1);
     console.log('[RESPONSES] Resposta existente encontrada?', existingResponse ? 'Sim' : 'Não');
 
-    // Analisar respostas para extrair disponibilidades e campos específicos
-    console.log('[RESPONSES] Analisando respostas');
-    const extractedData = extractQuestionnaireData(data.responses);
+    // CRITICAL: Standardize ALL responses to v2.0 format BEFORE saving
+    console.log('[RESPONSES] Standardizing responses to v2.0 format');
+    const standardizedResponse = QuestionnaireService.standardizeResponse(
+      data.responses,
+      data.month,
+      data.year
+    );
+    console.log('[RESPONSES] Standardized response:', JSON.stringify(standardizedResponse, null, 2));
+
+    // Extract structured data for legacy compatibility
+    console.log('[RESPONSES] Extracting structured data');
+    const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
     console.log('[RESPONSES] Dados extraídos:', extractedData);
 
     let result: { responseData: any; isUpdate: boolean };
@@ -521,7 +532,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .update(questionnaireResponses)
           .set({
             questionnaireId: templateId,
-            responses: JSON.stringify(data.responses),
+            responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
             availableSundays: extractedData.availableSundays,
             preferredMassTimes: extractedData.preferredMassTimes,
             alternativeTimes: extractedData.alternativeTimes,
@@ -560,7 +571,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           .values({
             userId: minister.id,
             questionnaireId: templateId,
-            responses: JSON.stringify(data.responses),
+            responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
             availableSundays: extractedData.availableSundays,
             preferredMassTimes: extractedData.preferredMassTimes,
             alternativeTimes: extractedData.alternativeTimes,
@@ -588,6 +599,20 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       } catch (insertError) {
         console.error('[RESPONSES] Erro ao criar resposta:', insertError);
         throw insertError;
+      }
+    }
+
+    // Salvar preferência de escalação familiar se fornecida
+    if (data.familyServePreference && data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
+      try {
+        console.log('[RESPONSES] Salvando preferência familiar:', data.familyServePreference);
+        const { storage } = await import('../storage');
+        const preferTogether = data.familyServePreference === 'together';
+        await storage.updateFamilyPreference(minister.id, preferTogether);
+        console.log('[RESPONSES] Preferência familiar salva com sucesso');
+      } catch (prefError) {
+        console.error('[RESPONSES] Erro ao salvar preferência familiar:', prefError);
+        // Não bloquear o envio se falhar ao salvar preferência
       }
     }
 
@@ -645,25 +670,39 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
             .limit(1);
 
           if (!existingFamilyResponse) {
-            // Criar resposta compartilhada para o familiar
+            // Criar resposta compartilhada para o familiar (USING STANDARDIZED FORMAT)
             await db
               .insert(questionnaireResponses)
               .values({
                 userId: familyUserId,
                 questionnaireId: templateId,
-                responses: JSON.stringify(data.responses),
+                responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
+                availableSundays: extractedData.availableSundays,
+                preferredMassTimes: extractedData.preferredMassTimes,
+                alternativeTimes: extractedData.alternativeTimes,
+                dailyMassAvailability: extractedData.dailyMassAvailability,
+                specialEvents: extractedData.specialEvents,
+                canSubstitute: extractedData.canSubstitute,
+                notes: extractedData.notes,
                 isSharedResponse: true,
                 sharedFromUserId: minister.id,
                 sharedWithFamilyIds: []
               });
-            
+
             console.log(`[RESPONSES] Resposta compartilhada criada para ${familyMember.name} (${familyUserId})`);
           } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
-            // Atualizar resposta compartilhada existente se foi originalmente criada por este usuário
+            // Atualizar resposta compartilhada existente se foi originalmente criada por este usuário (USING STANDARDIZED FORMAT)
             await db
               .update(questionnaireResponses)
               .set({
-                responses: JSON.stringify(data.responses),
+                responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
+                availableSundays: extractedData.availableSundays,
+                preferredMassTimes: extractedData.preferredMassTimes,
+                alternativeTimes: extractedData.alternativeTimes,
+                dailyMassAvailability: extractedData.dailyMassAvailability,
+                specialEvents: extractedData.specialEvents,
+                canSubstitute: extractedData.canSubstitute,
+                notes: extractedData.notes,
                 submittedAt: new Date()
               })
               .where(eq(questionnaireResponses.id, existingFamilyResponse.id));
@@ -1343,12 +1382,25 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
     for (const response of allResponses) {
       try {
         // Parse responses se for string
-        const responsesArray = typeof response.responses === 'string' 
-          ? JSON.parse(response.responses) 
+        const responsesArray = typeof response.responses === 'string'
+          ? JSON.parse(response.responses)
           : response.responses;
 
-        // Extrair dados estruturados
-        const extractedData = extractQuestionnaireData(responsesArray);
+        // Get questionnaire to extract month/year
+        const [questionnaire] = await db.select()
+          .from(questionnaires)
+          .where(eq(questionnaires.id, response.questionnaireId))
+          .limit(1);
+
+        // CRITICAL: Standardize response to v2.0 format
+        const standardizedResponse = QuestionnaireService.standardizeResponse(
+          responsesArray,
+          questionnaire?.month,
+          questionnaire?.year
+        );
+
+        // Extract structured data for legacy fields
+        const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
 
         console.log(`[REPROCESS] Resposta ${response.id}:`, {
           availableSundays: extractedData.availableSundays?.length || 0,
@@ -1356,9 +1408,10 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
           specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
         });
 
-        // Atualizar resposta com dados estruturados
+        // Atualizar resposta com formato v2.0 E dados estruturados
         await db.update(questionnaireResponses)
           .set({
+            responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
             availableSundays: extractedData.availableSundays,
             preferredMassTimes: extractedData.preferredMassTimes,
             alternativeTimes: extractedData.alternativeTimes,

@@ -64,7 +64,13 @@
       "Bash(echo:*)",
       "Bash(fi)",
       "Bash(NODE_ENV=development npx tsx:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(timeout:*)",
+      "Bash(journalctl:*)",
+      "Bash(npm start)",
+      "Bash(python3:*)",
+      "Bash(NODE_ENV=production npx tsx:*)",
+      "Bash(NODE_ENV=development PRODUCTION_DATABASE_URL=\"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)"
     ],
     "deny": [],
     "ask": []
