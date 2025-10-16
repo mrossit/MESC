@@ -36,7 +36,7 @@ export function ScheduleCard({
   const borderColor = confidence >= 0.8 ? '#22c55e' : confidence >= 0.6 ? '#f59e0b' : '#ef4444';
 
   return (
-    <Card className="border-l-4" style={{ borderLeftColor }}>
+    <Card className="border-l-4" style={{ borderLeftColor: borderColor }}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">

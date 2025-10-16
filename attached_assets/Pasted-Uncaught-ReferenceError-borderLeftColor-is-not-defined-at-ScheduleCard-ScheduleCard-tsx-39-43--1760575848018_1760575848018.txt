@@ -1,0 +1,65 @@
+Uncaught ReferenceError: borderLeftColor is not defined
+    at ScheduleCard (ScheduleCard.tsx:39:43)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=24e4eeaa:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=24e4eeaa:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=24e4eeaa:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-RPCDYKBN.js?v=24e4eeaa:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-RPCDYKBN.js?v=24e4eeaa:3699:24)
+    at invokeGuardedCallback (chunk-RPCDYKBN.js?v=24e4eeaa:3733:39)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=24e4eeaa:19765:15)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=24e4eeaa:19198:20)
+    at workLoopSync (chunk-RPCDYKBN.js?v=24e4eeaa:19137:13)Understand this error
+43chunk-RPCDYKBN.js?v=24e4eeaa:14032 The above error occurred in the <ScheduleCard> component:
+
+    at ScheduleCard (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/schedule-generation/ScheduleCard.tsx:29:3)
+    at div
+    at div
+    at _c9 (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at main
+    at main
+    at _c9 (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/ui/sidebar.tsx:441:48)
+    at div
+    at div
+    at Provider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=24e4eeaa:38:15)
+    at TooltipProvider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=24e4eeaa:868:5)
+    at https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/ui/sidebar.tsx:60:7
+    at Layout (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/layout.tsx:33:26)
+    at AutoScheduleGeneration (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/pages/AutoScheduleGeneration.tsx:44:45)
+    at CachedAuthGuard (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/cached-auth-guard.tsx:23:35)
+    at Route (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=24e4eeaa:191:16)
+    at Switch (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=24e4eeaa:247:17)
+    at Suspense
+    at RouterWithHooks (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/App.tsx?v=OFOkNpHRifZrHxEI7fI_t:86:3)
+    at Provider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=24e4eeaa:38:15)
+    at TooltipProvider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=24e4eeaa:868:5)
+    at ThemeProvider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/components/theme-provider.tsx:25:3)
+    at QueryClientProvider (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=24e4eeaa:2805:3)
+    at App (https://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/src/App.tsx?v=OFOkNpHRifZrHxEI7fI_t:372:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-RPCDYKBN.js?v=24e4eeaa:14032Understand this error
+chunk-RPCDYKBN.js?v=24e4eeaa:19413 Uncaught ReferenceError: borderLeftColor is not defined
+    at ScheduleCard (ScheduleCard.tsx:39:43)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=24e4eeaa:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=24e4eeaa:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=24e4eeaa:15914:22)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=24e4eeaa:19753:22)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=24e4eeaa:19198:20)
+    at workLoopSync (chunk-RPCDYKBN.js?v=24e4eeaa:19137:13)
+    at renderRootSync (chunk-RPCDYKBN.js?v=24e4eeaa:19116:15)
+    at recoverFromConcurrentError (chunk-RPCDYKBN.js?v=24e4eeaa:18736:28)
+    at performConcurrentWorkOnRoot (chunk-RPCDYKBN.js?v=24e4eeaa:18684:30)Understand this error
+useWebSocket.ts:148 [WS] Reconnecting in 300s (attempt 1/3)
+sw.js:123 Refused to connect to 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap' because it violates the following Content Security Policy directive: "connect-src 'self' ws: wss:".
+
+(anonymous) @ sw.js:123Understand this error
+sw.js:123 Fetch API cannot load https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap. Refused to connect because it violates the document's Content Security Policy.
+(anonymous) @ sw.js:123Understand this error
+The FetchEvent for "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" resulted in a network error response: the promise was rejected.Understand this warning
+sw.js:123 Uncaught (in promise) TypeError: Failed to fetch. Refused to connect because it violates the document's Content Security Policy.
+    at sw.js:123:16Understand this error
+2VM10:33 
