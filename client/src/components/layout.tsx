@@ -8,13 +8,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { DebugPanel } from "@/components/debug-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
-import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface LayoutProps {
   children: ReactNode;
@@ -24,7 +22,6 @@ interface LayoutProps {
 
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const isMobile = useIsMobile();
-  const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
 
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -34,11 +31,6 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
   });
 
   const user = authData?.user;
-
-  // WebSocket connection for debug panel
-  const { isConnected } = useWebSocket({
-    enabled: user?.role === "coordenador" || user?.role === "gestor",
-  });
 
   return (
     <SidebarProvider>
@@ -119,9 +111,6 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
 
       {/* Floating Notification Bell for Mobile - removed since we have bottom nav */}
       {!isMobile && <FloatingNotificationBell />}
-
-      {/* Debug Panel - Only in development */}
-      {isDev && <DebugPanel isConnected={isConnected} />}
     </SidebarProvider>
   );
 }

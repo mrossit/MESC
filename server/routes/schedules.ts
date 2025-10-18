@@ -148,29 +148,67 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
 
-      const schedulesList = await db
-        .select()
-        .from(schedules)
-        .where(
-          and(
-            gte(schedules.date, startDateStr),
-            lte(schedules.date, endDateStr)
-          )
-        );
+      let schedulesList: any[] = [];
+      try {
+        schedulesList = await db
+          .select()
+          .from(schedules)
+          .where(
+            and(
+              gte(schedules.date, startDateStr),
+              lte(schedules.date, endDateStr)
+            )
+          );
+      } catch (error) {
+        console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", (error as Error)?.message);
+        res.json({
+          schedules: [],
+          assignments: [],
+          substitutions: []
+        });
+        return;
+      }
 
       // Note: scheduleAssignments table doesn't exist - returning schedule data directly
-      const assignmentsList = schedulesList.length > 0
-        ? schedulesList.map((schedule: any) => ({
-            id: schedule.id,
-            scheduleId: schedule.id,
-            ministerId: schedule.ministerId,
-            date: schedule.date,
-            massTime: schedule.time,
-            position: schedule.position || 0,
-            confirmed: true,
-            ministerName: null // Would need join with users table
-          }))
-        : [];
+      let assignmentsList: Array<{
+        id: string;
+        scheduleId: string;
+        ministerId: string | null;
+        date: string;
+        massTime: string;
+        position: number;
+        confirmed: boolean;
+        ministerName: string | null;
+        photoUrl: string | null;
+        notes: string | null;
+        status: string;
+      }> = [];
+
+      if (schedulesList.length > 0) {
+        assignmentsList = await db
+          .select({
+            id: schedules.id,
+            scheduleId: schedules.id,
+            ministerId: schedules.ministerId,
+            date: schedules.date,
+            massTime: schedules.time,
+            position: sql`COALESCE(${schedules.position}, 0)`.as('position'),
+            confirmed: sql`true`.as('confirmed'),
+            ministerName: users.name,
+            photoUrl: users.photoUrl,
+            notes: schedules.notes,
+            status: schedules.status
+          })
+          .from(schedules)
+          .leftJoin(users, eq(schedules.ministerId, users.id))
+          .where(
+            and(
+              gte(schedules.date, startDateStr),
+              lte(schedules.date, endDateStr)
+            )
+          )
+          .orderBy(schedules.date, schedules.time, schedules.position);
+      }
 
       // Get substitution requests for these schedules
       const substitutionsList = schedulesList.length > 0

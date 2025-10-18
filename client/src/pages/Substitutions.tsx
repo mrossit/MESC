@@ -75,7 +75,7 @@ interface SubstitutionRequest {
     requestingMinisterId: string;
     substituteMinisterId: string | null;
     reason: string;
-    status: "pending" | "approved" | "rejected" | "cancelled" | "auto_approved";
+    status: "available" | "pending" | "approved" | "rejected" | "cancelled" | "auto_approved";
     urgency: "low" | "medium" | "high" | "critical";
     createdAt: string;
     updatedAt: string;
@@ -182,19 +182,6 @@ export default function Substitutions() {
       return data.assignments || [];
     },
     enabled: !!user && !isCoordinator,
-  });
-
-  // Fetch all ministers for selection
-  const { data: allMinisters = [] } = useQuery({
-    queryKey: ["/api/ministers"],
-    queryFn: async () => {
-      const response = await fetch("/api/ministers", {
-        credentials: "include"
-      });
-      if (!response.ok) throw new Error("Failed to fetch ministers");
-      return response.json();
-    },
-    enabled: !!user,
   });
 
   // Fetch available substitutes for selected schedule
@@ -343,6 +330,7 @@ export default function Substitutions() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "available": return "secondary";
       case "pending": return "default";
       case "approved": return "default";
       case "auto_approved": return "default";
@@ -354,9 +342,10 @@ export default function Substitutions() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case "available": return "Aguardando voluntário";
       case "pending": return "Pendente";
       case "approved": return "Aprovado";
-      case "auto_approved": return "Auto-aprovado";
+      case "auto_approved": return "Aprovado automaticamente";
       case "rejected": return "Rejeitado";
       case "cancelled": return "Cancelado";
       default: return status;
@@ -765,7 +754,7 @@ export default function Substitutions() {
                       ? new Date(item.assignment.date)
                       : new Date();
                     const isDirected = item.request.substituteMinisterId !== null;
-                    const isForMe = isDirected && allMinisters.find((m: any) => m.id === item.request.substituteMinisterId)?.userId === user?.id;
+                    const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
                     const isMyRequest = item.requestingUser.id === user?.id;
                     
                     return (
@@ -1353,10 +1342,7 @@ export default function Substitutions() {
                     <p className="font-medium mb-1">Informações importantes:</p>
                     <ul className="space-y-1 text-xs">
                       <li>
-                        • Solicitações com mais de 12 horas de antecedência são aprovadas automaticamente
-                      </li>
-                      <li>
-                        • Solicitações com menos de 12 horas precisam de aprovação do coordenador
+                        • Assim que um ministro aceitar seu pedido, a substituição é confirmada automaticamente
                       </li>
                       <li>
                         • Você receberá uma notificação quando a substituição for confirmada

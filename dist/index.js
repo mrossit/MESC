@@ -2226,18 +2226,20 @@ ${"=".repeat(60)}`);
           const bugsFound = [];
           const ministersOver4 = this.ministers.filter((m) => (m.monthlyAssignmentCount || 0) > 4);
           if (ministersOver4.length > 0) {
-            bugsFound.push(`\u274C ${ministersOver4.length} ministers served MORE than 4 times!`);
+            console.log(`
+  \u{1F4CA} Ministers with 5+ assignments (mostly daily masses):`);
+            console.log(`    \u2139\uFE0F  ${ministersOver4.length} ministers served 5+ times (expected for daily mass volunteers)`);
           }
           if (unused.length > this.ministers.length * 0.5) {
             bugsFound.push(`\u274C More than 50% unused (${unused.length}/${this.ministers.length})`);
           }
           if (bugsFound.length > 0) {
             console.log(`
-  \u{1F6A8} BUGS DETECTED:`);
+  \u{1F6A8} POTENTIAL ISSUES:`);
             bugsFound.forEach((bug) => console.log(`    ${bug}`));
           } else {
             console.log(`
-  \u2705 NO CRITICAL BUGS DETECTED!`);
+  \u2705 NO CRITICAL ISSUES DETECTED!`);
           }
           console.log(`${"=".repeat(60)}
 `);
@@ -2395,163 +2397,238 @@ ${"!".repeat(60)}`);
         let dailyMassAvailability = [];
         let canSubstitute = false;
         let specialEvents = {};
-        if (questionnaireMonth === 10 && questionnaireYear === 2025) {
-          console.log(`[COMPATIBILITY_LAYER] \u2705 Detected October 2025 format - using array parser`);
+        const weekdayMasses = [];
+        let responsesData = response.responses;
+        if (typeof responsesData === "string") {
           try {
-            let responsesArray = response.responses;
-            if (typeof responsesArray === "string") {
-              responsesArray = JSON.parse(responsesArray);
-            }
-            if (Array.isArray(responsesArray)) {
-              responsesArray.forEach((item) => {
-                switch (item.questionId) {
-                  case "available_sundays":
-                    availableSundays = Array.isArray(item.answer) ? item.answer : [];
-                    break;
-                  case "main_service_time":
-                    preferredMassTimes = item.answer ? [item.answer] : [];
-                    break;
-                  case "other_times_available":
-                    if (item.answer && item.answer !== "N\xE3o") {
-                      if (typeof item.answer === "object" && item.answer.selectedOptions) {
-                        alternativeTimes = item.answer.selectedOptions;
-                      } else if (Array.isArray(item.answer)) {
-                        alternativeTimes = item.answer;
-                      } else if (typeof item.answer === "string") {
-                        alternativeTimes = [item.answer];
-                      }
-                    }
-                    break;
-                  case "can_substitute":
-                    canSubstitute = item.answer === "Sim" || item.answer === true;
-                    break;
-                  case "daily_mass_availability":
-                    if (item.answer && item.answer !== "N\xE3o posso" && item.answer !== "N\xE3o") {
-                      if (typeof item.answer === "object" && item.answer.selectedOptions) {
-                        dailyMassAvailability = item.answer.selectedOptions;
-                      } else if (item.answer === "Sim") {
-                        dailyMassAvailability = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
-                      } else if (Array.isArray(item.answer)) {
-                        dailyMassAvailability = item.answer;
-                      } else if (typeof item.answer === "string") {
-                        dailyMassAvailability = [item.answer];
-                      }
-                    }
-                    break;
-                  // Novena de São Judas
-                  case "saint_judas_novena":
-                    if (Array.isArray(item.answer)) {
-                      specialEvents[item.questionId] = item.answer;
-                    } else if (item.answer === "Nenhum dia") {
-                      specialEvents[item.questionId] = [];
-                    } else {
-                      specialEvents[item.questionId] = item.answer ? [item.answer] : [];
-                    }
-                    break;
-                  // Special event masses
-                  case "healing_liberation_mass":
-                  case "sacred_heart_mass":
-                  case "immaculate_heart_mass":
-                  case "saint_judas_feast_7h":
-                  case "saint_judas_feast_10h":
-                  case "saint_judas_feast_12h":
-                  case "saint_judas_feast_15h":
-                  case "saint_judas_feast_17h":
-                  case "saint_judas_feast_evening":
-                  case "adoration_monday":
-                    specialEvents[item.questionId] = item.answer;
-                    break;
-                }
-              });
-              console.log(`[COMPATIBILITY_LAYER] \u2705 October 2025 format parsed successfully`);
-              console.log(`[COMPATIBILITY_LAYER]    - Sundays: ${availableSundays.length}`);
-              console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
-              console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
-            }
-          } catch (error) {
-            console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing October 2025 format:`, error);
+            responsesData = JSON.parse(responsesData);
+          } catch (parseError) {
+            console.error(`[COMPATIBILITY_LAYER] \u274C Failed to parse responses JSON for user ${response.userId}:`, parseError);
+            responsesData = null;
           }
-        } else if (questionnaireMonth >= 11 && questionnaireYear >= 2025) {
-          console.log(`[COMPATIBILITY_LAYER] \u2705 Detected v2.0 format (Nov 2025+)`);
+        }
+        const isV2Format = responsesData && typeof responsesData === "object" && responsesData.format_version === "2.0";
+        if (isV2Format) {
+          console.log(`[COMPATIBILITY_LAYER] \u{1F3AF} Processing v2.0 STANDARDIZED format for ${questionnaireMonth}/${questionnaireYear}`);
           try {
-            let data = response.responses;
-            if (typeof data === "string") {
-              data = JSON.parse(data);
-            }
-            if (data && typeof data === "object" && data.version === "2.0") {
-              console.log(`[COMPATIBILITY_LAYER] \u{1F3AF} Parsing v2.0 format with explicit dates`);
-              const availability = data.availability || {};
-              const preferences = data.preferences || {};
-              const substitute = data.substitute || {};
-              const sundayDates = [];
-              Object.keys(availability).forEach((key) => {
-                if (key.match(/^\d{4}-\d{2}-\d{2}_/) && availability[key] === true) {
-                  const [datePart, timePart] = key.split("_");
-                  sundayDates.push(`${datePart} ${timePart}`);
-                }
-              });
-              availableSundays = sundayDates;
-              preferredMassTimes = preferences.preferred_times || [];
-              const dailyAvail = [];
-              Object.keys(availability).forEach((key) => {
-                if (key.startsWith("weekday_") && Array.isArray(availability[key])) {
-                  const days = availability[key];
-                  const dayMap = {
-                    "mon": "Segunda",
-                    "tue": "Ter\xE7a",
-                    "wed": "Quarta",
-                    "thu": "Quinta",
-                    "fri": "Sexta",
-                    "sat": "S\xE1bado"
-                  };
-                  days.forEach((day) => {
-                    const ptDay = dayMap[day];
-                    if (ptDay && !dailyAvail.includes(ptDay)) {
-                      dailyAvail.push(ptDay);
-                    }
-                  });
-                }
-              });
-              dailyMassAvailability = dailyAvail;
-              if (availability.first_thursday_healing) {
-                specialEvents["healing_liberation_mass"] = "Sim";
+            const data = responsesData;
+            const sundayDates = [];
+            const masses = data.masses || {};
+            const normalizeTimeValue = (time2) => {
+              if (!time2) return time2;
+              if (/^\d{1,2}:\d{2}$/.test(time2)) {
+                const [hours, minutes] = time2.split(":");
+                return `${hours.padStart(2, "0")}:${minutes}`;
               }
-              if (availability.first_friday_sacred) {
-                specialEvents["sacred_heart_mass"] = "Sim";
+              if (/^\d{1,2}h/.test(time2)) {
+                const [hours, minutesPart] = time2.split("h");
+                const hoursPad = hours.padStart(2, "0");
+                const minutes = minutesPart ? minutesPart.padStart(2, "0") : "00";
+                return `${hoursPad}:${minutes}`;
               }
-              if (availability.first_saturday_immaculate) {
-                specialEvents["immaculate_heart_mass"] = "Sim";
-              }
-              const specialEventsData = data.special_events || {};
-              if (Array.isArray(specialEventsData.saint_judas_novena)) {
-                specialEvents["saint_judas_novena"] = specialEventsData.saint_judas_novena;
-                console.log(`[COMPATIBILITY_LAYER] \u2705 Parsed novena dates for v2.0: ${specialEventsData.saint_judas_novena.length} days`);
-              }
-              canSubstitute = substitute.available || false;
-              console.log(`[COMPATIBILITY_LAYER] \u2705 v2.0 format parsed successfully`);
-              console.log(`[COMPATIBILITY_LAYER]    - Available dates: ${availableSundays.length}`);
-              console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
-              console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
-            } else {
-              console.log(`[COMPATIBILITY_LAYER] \u2139\uFE0F No version field, trying October format as fallback`);
-              if (Array.isArray(data)) {
-                data.forEach((item) => {
-                  switch (item.questionId) {
-                    case "available_sundays":
-                      availableSundays = Array.isArray(item.answer) ? item.answer : [];
-                      break;
-                    case "main_service_time":
-                      preferredMassTimes = item.answer ? [item.answer] : [];
-                      break;
-                    case "can_substitute":
-                      canSubstitute = item.answer === "Sim" || item.answer === true;
-                      break;
+              return time2;
+            };
+            Object.entries(masses).forEach(([date2, times]) => {
+              if (times && typeof times === "object") {
+                Object.entries(times).forEach(([time2, available]) => {
+                  const isAvailable = available === true || available === "Sim" || available === "sim" || available === "true" || available === 1;
+                  if (!isAvailable) return;
+                  const normalizedTime = normalizeTimeValue(time2);
+                  const dateTimeKey = `${date2} ${normalizedTime}`;
+                  const dayOfWeek = (/* @__PURE__ */ new Date(`${date2}T00:00:00`)).getDay();
+                  if (dayOfWeek === 0) {
+                    sundayDates.push(dateTimeKey);
+                  } else {
+                    weekdayMasses.push(dateTimeKey);
                   }
                 });
               }
+            });
+            availableSundays = sundayDates;
+            const timeCount = {};
+            Object.values(masses).forEach((timesForDate) => {
+              if (timesForDate && typeof timesForDate === "object") {
+                Object.entries(timesForDate).forEach(([time2, available]) => {
+                  if (available === true || available === "Sim" || available === "sim" || available === "true" || available === 1) {
+                    timeCount[time2] = (timeCount[time2] || 0) + 1;
+                  }
+                });
+              }
+            });
+            preferredMassTimes = Object.keys(timeCount).sort((a, b) => timeCount[b] - timeCount[a]);
+            const weekdayAvailabilitySet = /* @__PURE__ */ new Set();
+            const addWeekdayAvailability = (identifier) => {
+              if (!identifier) return;
+              const normalized = identifier.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              const map = {
+                "mon": "Segunda",
+                "monday": "Segunda",
+                "segunda": "Segunda",
+                "segunda-feira": "Segunda",
+                "seg": "Segunda",
+                "tue": "Ter\xE7a",
+                "tuesday": "Ter\xE7a",
+                "terca": "Ter\xE7a",
+                "ter\xE7a": "Ter\xE7a",
+                "terca-feira": "Ter\xE7a",
+                "ter\xE7a-feira": "Ter\xE7a",
+                "ter": "Ter\xE7a",
+                "wed": "Quarta",
+                "wednesday": "Quarta",
+                "quarta": "Quarta",
+                "quarta-feira": "Quarta",
+                "qua": "Quarta",
+                "thu": "Quinta",
+                "thursday": "Quinta",
+                "quinta": "Quinta",
+                "quinta-feira": "Quinta",
+                "qui": "Quinta",
+                "fri": "Sexta",
+                "friday": "Sexta",
+                "sexta": "Sexta",
+                "sexta-feira": "Sexta",
+                "sex": "Sexta",
+                "sat": "S\xE1bado",
+                "saturday": "S\xE1bado",
+                "sabado": "S\xE1bado",
+                "s\xE1bado": "S\xE1bado",
+                "sab": "S\xE1bado"
+              };
+              if (map[normalized]) {
+                weekdayAvailabilitySet.add(map[normalized]);
+                return;
+              }
+              if (["all", "todos", "todas", "weekdays", "all_weekdays", "todos_os_dias"].includes(normalized)) {
+                ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"].forEach((label) => weekdayAvailabilitySet.add(label));
+              }
+            };
+            const processWeekdayStructure = (value, keyHint) => {
+              if (Array.isArray(value)) {
+                value.forEach((entry) => addWeekdayAvailability(entry));
+                return;
+              }
+              if (typeof value === "boolean") {
+                if (value === true && keyHint) addWeekdayAvailability(keyHint);
+                return;
+              }
+              if (typeof value === "string") {
+                const normalizedValue = value.trim().toLowerCase();
+                if (["true", "sim", "yes", "1"].includes(normalizedValue)) {
+                  if (keyHint) {
+                    addWeekdayAvailability(keyHint);
+                  }
+                } else {
+                  addWeekdayAvailability(value);
+                }
+                return;
+              }
+              if (value && typeof value === "object") {
+                if (Array.isArray(value.selectedOptions)) {
+                  value.selectedOptions.forEach((entry) => addWeekdayAvailability(entry));
+                }
+                if (Array.isArray(value.options)) {
+                  value.options.forEach((entry) => addWeekdayAvailability(entry));
+                }
+                Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+                  processWeekdayStructure(nestedValue, nestedKey);
+                });
+              }
+            };
+            const weekdaysData = data.weekdays;
+            if (weekdaysData !== void 0 && weekdaysData !== null) {
+              processWeekdayStructure(weekdaysData);
             }
+            const legacyWeekdayKeys = [
+              "weekday_06:30",
+              "weekday_6:30",
+              "weekday_0630",
+              "weekday0630"
+            ];
+            legacyWeekdayKeys.forEach((key) => {
+              const value = data?.[key] ?? data?.availability?.[key];
+              if (value !== void 0) {
+                processWeekdayStructure(value);
+              }
+            });
+            const orderedWeekdayLabels = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+            dailyMassAvailability = orderedWeekdayLabels.filter((label) => weekdayAvailabilitySet.has(label));
+            const specialEventsData = data.special_events || {};
+            Object.assign(specialEvents, specialEventsData);
+            canSubstitute = data.can_substitute === true;
+            console.log(`[COMPATIBILITY_LAYER] \u2705 v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events`);
           } catch (error) {
-            console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing v2.0 format:`, error);
+            console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing v2.0:`, error);
+          }
+        } else if (questionnaireMonth === 10 && questionnaireYear === 2025 && Array.isArray(responsesData)) {
+          try {
+            console.log(`[COMPATIBILITY_LAYER] \u2705 October 2025 using LEGACY array format`);
+            const responsesArray = responsesData;
+            responsesArray.forEach((item) => {
+              switch (item.questionId) {
+                case "available_sundays":
+                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                  break;
+                case "main_service_time":
+                  preferredMassTimes = item.answer ? [item.answer] : [];
+                  break;
+                case "other_times_available":
+                  if (item.answer && item.answer !== "N\xE3o") {
+                    if (typeof item.answer === "object" && item.answer.selectedOptions) {
+                      alternativeTimes = item.answer.selectedOptions;
+                    } else if (Array.isArray(item.answer)) {
+                      alternativeTimes = item.answer;
+                    } else if (typeof item.answer === "string") {
+                      alternativeTimes = [item.answer];
+                    }
+                  }
+                  break;
+                case "can_substitute":
+                  canSubstitute = item.answer === "Sim" || item.answer === true;
+                  break;
+                case "daily_mass_availability":
+                  if (item.answer && item.answer !== "N\xE3o posso" && item.answer !== "N\xE3o") {
+                    if (typeof item.answer === "object" && item.answer.selectedOptions) {
+                      dailyMassAvailability = item.answer.selectedOptions;
+                    } else if (item.answer === "Sim") {
+                      dailyMassAvailability = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+                    } else if (Array.isArray(item.answer)) {
+                      dailyMassAvailability = item.answer;
+                    } else if (typeof item.answer === "string") {
+                      dailyMassAvailability = [item.answer];
+                    }
+                  }
+                  break;
+                // Novena de São Judas
+                case "saint_judas_novena":
+                  if (Array.isArray(item.answer)) {
+                    specialEvents[item.questionId] = item.answer;
+                  } else if (item.answer === "Nenhum dia") {
+                    specialEvents[item.questionId] = [];
+                  } else {
+                    specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                  }
+                  break;
+                // Special event masses
+                case "healing_liberation_mass":
+                case "sacred_heart_mass":
+                case "immaculate_heart_mass":
+                case "saint_judas_feast_7h":
+                case "saint_judas_feast_10h":
+                case "saint_judas_feast_12h":
+                case "saint_judas_feast_15h":
+                case "saint_judas_feast_17h":
+                case "saint_judas_feast_evening":
+                case "adoration_monday":
+                  specialEvents[item.questionId] = item.answer;
+                  break;
+              }
+            });
+            console.log(`[COMPATIBILITY_LAYER] \u2705 October 2025 format parsed successfully`);
+            console.log(`[COMPATIBILITY_LAYER]    - Sundays: ${availableSundays.length}`);
+            console.log(`[COMPATIBILITY_LAYER]    - Preferred times: ${preferredMassTimes.length}`);
+            console.log(`[COMPATIBILITY_LAYER]    - Can substitute: ${canSubstitute}`);
+          } catch (error) {
+            console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing October 2025 format:`, error);
           }
         } else {
           console.log(`[COMPATIBILITY_LAYER] \u26A0\uFE0F Unknown format for ${questionnaireMonth}/${questionnaireYear}`);
@@ -2571,7 +2648,8 @@ ${"!".repeat(60)}`);
           alternativeTimes,
           dailyMassAvailability,
           canSubstitute,
-          specialEvents
+          specialEvents,
+          weekdayMasses
         };
       }
       /**
@@ -2591,7 +2669,8 @@ ${"!".repeat(60)}`);
             preferredMassTimes: ["10:00"],
             alternativeTimes: ["08:00", "19:00"],
             canSubstitute: true,
-            dailyMassAvailability: []
+            dailyMassAvailability: [],
+            weekdayMasses: []
           });
           this.availabilityData.set("2", {
             ministerId: "2",
@@ -2599,7 +2678,8 @@ ${"!".repeat(60)}`);
             preferredMassTimes: ["08:00"],
             alternativeTimes: ["10:00"],
             canSubstitute: true,
-            dailyMassAvailability: []
+            dailyMassAvailability: [],
+            weekdayMasses: []
           });
           this.availabilityData.set("3", {
             ministerId: "3",
@@ -2607,7 +2687,8 @@ ${"!".repeat(60)}`);
             preferredMassTimes: ["19:00"],
             alternativeTimes: ["10:00"],
             canSubstitute: false,
-            dailyMassAvailability: []
+            dailyMassAvailability: [],
+            weekdayMasses: []
           });
           this.availabilityData.set("4", {
             ministerId: "4",
@@ -2615,7 +2696,8 @@ ${"!".repeat(60)}`);
             preferredMassTimes: ["10:00"],
             alternativeTimes: ["08:00", "19:00"],
             canSubstitute: true,
-            dailyMassAvailability: []
+            dailyMassAvailability: [],
+            weekdayMasses: []
           });
           this.availabilityData.set("5", {
             ministerId: "5",
@@ -2623,7 +2705,8 @@ ${"!".repeat(60)}`);
             preferredMassTimes: ["08:00", "10:00"],
             alternativeTimes: ["19:00"],
             canSubstitute: true,
-            dailyMassAvailability: []
+            dailyMassAvailability: [],
+            weekdayMasses: []
           });
           return;
         }
@@ -2668,10 +2751,17 @@ ${"!".repeat(60)}`);
             alternativeTimes: normalizedAlternativeTimes,
             canSubstitute,
             dailyMassAvailability,
-            specialEvents: normalizedSpecialEvents
+            specialEvents: normalizedSpecialEvents,
+            weekdayMasses: adapted.weekdayMasses
           };
           console.log(`[SCHEDULE_GEN] \u{1F4BE} DADOS PROCESSADOS para ${r.userId}:`, processedData);
           this.availabilityData.set(r.userId, processedData);
+          const minister = this.ministers.find((m) => m.id === r.userId);
+          if (minister) {
+            minister.questionnaireResponse = {
+              responses: r.responses
+            };
+          }
         });
         console.log(`[SCHEDULE_GEN] \u2705 Carregadas respostas de ${responses.length} ministros no availabilityData`);
         console.log(`[SCHEDULE_GEN] \u{1F4CA} AvailabilityData size: ${this.availabilityData.size}`);
@@ -2904,22 +2994,26 @@ ${"!".repeat(60)}`);
           }
           if (month === 10 && dayOfMonth >= 19 && dayOfMonth <= 27) {
             const novenaDayNumber = dayOfMonth - 18;
-            let novenaTime = "19:30";
-            if (dayOfWeek === 6) {
-              novenaTime = "19:00";
-            }
-            monthlyTimes.push({
-              id: `novena-sao-judas-${dateStr}`,
-              dayOfWeek,
-              time: novenaTime,
-              date: dateStr,
-              minMinisters: 26,
-              maxMinisters: 26,
-              type: "missa_sao_judas"
-            });
-            console.log(`[SCHEDULE_GEN] \u{1F64F} Novena S\xE3o Judas (${novenaDayNumber}\xBA dia): ${dateStr} ${novenaTime} (26 ministros)`);
-            if (dayOfWeek === 6) {
-              console.log(`[SCHEDULE_GEN] \u{1F6AB} S\xE1bado ${dateStr} est\xE1 na novena - apenas missa \xE0s ${novenaTime}!`);
+            if (dayOfWeek === 0) {
+              console.log(`[SCHEDULE_GEN] \u{1F64F} Novena S\xE3o Judas (${novenaDayNumber}\xBA dia): ${dateStr} - UNIFICADA com missa dominical \xE0s 19:00`);
+            } else {
+              let novenaTime = "19:30";
+              if (dayOfWeek === 6) {
+                novenaTime = "19:00";
+              }
+              monthlyTimes.push({
+                id: `novena-sao-judas-${dateStr}`,
+                dayOfWeek,
+                time: novenaTime,
+                date: dateStr,
+                minMinisters: 26,
+                maxMinisters: 26,
+                type: "missa_sao_judas"
+              });
+              console.log(`[SCHEDULE_GEN] \u{1F64F} Novena S\xE3o Judas (${novenaDayNumber}\xBA dia): ${dateStr} ${novenaTime} (26 ministros)`);
+              if (dayOfWeek === 6) {
+                console.log(`[SCHEDULE_GEN] \u{1F6AB} S\xE1bado ${dateStr} est\xE1 na novena - apenas missa \xE0s ${novenaTime}!`);
+              }
             }
           }
           if (dayOfMonth === 28) {
@@ -3178,45 +3272,63 @@ ${"!".repeat(60)}`);
             return false;
           }
           if (massTime.dayOfWeek === 0) {
-            const date2 = new Date(massTime.date);
-            const dayOfMonth = date2.getDate();
-            const sundayOfMonth = Math.ceil(dayOfMonth / 7);
-            console.log(`[AVAILABILITY_CHECK] Domingo ${sundayOfMonth} do m\xEAs (${massTime.date})`);
+            console.log(`[AVAILABILITY_CHECK] Verificando domingo ${massTime.date} ${massTime.time}`);
+            const dateTimeKey = `${massTime.date} ${massTime.time}`;
+            const dateOnlyKey = massTime.date;
             if (availability.availableSundays?.includes("Nenhum domingo")) {
               logger.debug(`${minister.name} marcou "Nenhum domingo" - excluindo`);
               return false;
             }
             let availableForSunday = false;
             if (availability.availableSundays && availability.availableSundays.length > 0) {
-              availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
-              console.log(`[AVAILABILITY_CHECK] ${minister.name} dispon\xEDvel nos domingos: ${availability.availableSundays.join(", ")}`);
-              console.log(`[AVAILABILITY_CHECK] Verificando domingo ${sundayOfMonth}: ${availableForSunday ? "\u2705 SIM" : "\u274C N\xC3O"}`);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} dispon\xEDvel em: ${availability.availableSundays.join(", ")}`);
+              availableForSunday = availability.availableSundays.some((entry) => {
+                if (entry.includes(" ")) {
+                  return entry === dateTimeKey;
+                }
+                if (entry === dateOnlyKey) {
+                  return true;
+                }
+                if (entry.includes(dateStr)) {
+                  return true;
+                }
+                return false;
+              });
+              console.log(`[AVAILABILITY_CHECK] Verificando ${dateTimeKey}: ${availableForSunday ? "\u2705 SIM" : "\u274C N\xC3O"}`);
               if (!availableForSunday) {
-                const possibleFormats = [
-                  `Domingo ${dateStr}`,
-                  // "Domingo 05/10"
-                  dateStr,
-                  // "05/10"
-                  `${dateStr.split("/")[0]}/10`,
-                  // "05/10" para outubro
-                  parseInt(dateStr.split("/")[0]).toString()
-                  // "5" ao invés de "05"
-                ];
-                for (const format10 of possibleFormats) {
-                  if (availability.availableSundays.some(
-                    (sunday) => sunday.includes(format10) || sunday === format10
-                  )) {
-                    availableForSunday = true;
-                    break;
+                const date2 = new Date(massTime.date);
+                const dayOfMonth = date2.getDate();
+                const sundayOfMonth = Math.ceil(dayOfMonth / 7);
+                availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+                if (!availableForSunday) {
+                  const possibleFormats = [
+                    `Domingo ${dateStr}`,
+                    // "Domingo 05/10"
+                    dateStr,
+                    // "05/10"
+                    `${dateStr.split("/")[0]}/10`,
+                    // "05/10" para outubro
+                    parseInt(dateStr.split("/")[0]).toString()
+                    // "5" ao invés de "05"
+                  ];
+                  for (const format10 of possibleFormats) {
+                    if (availability.availableSundays.some(
+                      (sunday) => sunday.includes(format10) || sunday === format10
+                    )) {
+                      availableForSunday = true;
+                      console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format10}`);
+                      break;
+                    }
                   }
                 }
               }
             }
             if (!availableForSunday) {
-              if (availability.preferredMassTimes?.includes(timeStr)) {
+              if (availability.preferredMassTimes?.includes(timeStr) || availability.preferredMassTimes?.includes(massTime.time)) {
                 logger.debug(`${minister.name} tem prefer\xEAncia pelo hor\xE1rio ${timeStr}, considerando dispon\xEDvel`);
                 return true;
               }
+              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} N\xC3O dispon\xEDvel para ${dateTimeKey}`);
               return false;
             }
             if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
@@ -3224,35 +3336,46 @@ ${"!".repeat(60)}`);
                 const timeValue = String(time2);
                 return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
               });
-              const hasAlternativeTime = availability.alternativeTimes?.some((time2) => {
-                const timeValue = String(time2);
-                return timeValue === massTime.time || timeValue === timeStr || timeValue.includes(hour.toString());
-              });
               console.log(`[AVAILABILITY_CHECK] ${minister.name} - Hor\xE1rios preferidos: ${availability.preferredMassTimes.join(", ")}`);
-              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Hor\xE1rios alternativos: ${availability.alternativeTimes?.join(", ") || "nenhum"}`);
-              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time} (${timeStr}): preferido=${hasPreferredTime}, alternativo=${hasAlternativeTime}`);
-              if (!hasPreferredTime && !hasAlternativeTime) {
-                logger.debug(`${minister.name} dispon\xEDvel mas sem prefer\xEAncia para ${timeStr}`);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name} - Verificando ${massTime.time}: preferido=${hasPreferredTime}`);
+              if (!hasPreferredTime) {
+                logger.debug(`${minister.name} dispon\xEDvel mas sem prefer\xEAncia forte para ${timeStr}`);
               }
             }
             console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} DISPON\xCDVEL para domingo ${massTime.date} ${massTime.time}`);
             return true;
           }
           if (massTime.dayOfWeek >= 1 && massTime.dayOfWeek <= 6) {
-            console.log(`[AVAILABILITY_CHECK] Verificando dia espec\xEDfico para ${minister.name}`);
-            console.log(`[AVAILABILITY_CHECK]   dailyMassAvailability: ${JSON.stringify(availability.dailyMassAvailability)}`);
-            console.log(`[AVAILABILITY_CHECK]   Procurando por: "${dayName}"`);
-            if (availability.dailyMassAvailability?.includes("N\xE3o posso")) {
-              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} marcou "N\xE3o posso"`);
+            if (massTime.type && massTime.type !== "missa_diaria") {
+              console.log(`[AVAILABILITY_CHECK] \u23ED\uFE0F  ${minister.name}: Missa especial em dia de semana (${massTime.type}), pulando verifica\xE7\xE3o de dailyMassAvailability`);
+              return true;
+            }
+            console.log(`[AVAILABILITY_CHECK] Verificando disponibilidade di\xE1ria para ${minister.name}`);
+            const weekdayDateTimeKey = `${massTime.date} ${massTime.time}`;
+            if (availability.weekdayMasses && availability.weekdayMasses.length > 0) {
+              const hasSpecificAvailability = availability.weekdayMasses.includes(weekdayDateTimeKey);
+              console.log(`[AVAILABILITY_CHECK] ${minister.name}: weekdayMasses entries = ${availability.weekdayMasses.length}, procurando ${weekdayDateTimeKey} -> ${hasSpecificAvailability}`);
+              if (hasSpecificAvailability) {
+                console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} possui disponibilidade espec\xEDfica para ${weekdayDateTimeKey}`);
+                return true;
+              }
+            }
+            if (!availability.dailyMassAvailability || availability.dailyMassAvailability.length === 0) {
+              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} n\xE3o tem dailyMassAvailability`);
               return false;
             }
-            if (availability.dailyMassAvailability && availability.dailyMassAvailability.length > 0) {
-              const isAvailable = availability.dailyMassAvailability.includes(dayName);
-              console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailable ? "\u2705 DISPON\xCDVEL" : "\u274C N\xC3O dispon\xEDvel"} para ${dayName}`);
-              return isAvailable;
-            }
-            console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} sem dados de disponibilidade di\xE1ria`);
-            return false;
+            const weekdayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+            const weekdayNamesAlt = ["Domingo", "Segunda-feira", "Ter\xE7a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S\xE1bado"];
+            const currentDayName = weekdayNames[massTime.dayOfWeek];
+            const currentDayNameAlt = weekdayNamesAlt[massTime.dayOfWeek];
+            const isAvailableForDay = availability.dailyMassAvailability.some((day) => {
+              const dayLower = day.toLowerCase();
+              return dayLower === currentDayName.toLowerCase() || dayLower === currentDayNameAlt.toLowerCase() || dayLower.includes(currentDayName.toLowerCase());
+            });
+            console.log(`[AVAILABILITY_CHECK] ${minister.name}: dailyMassAvailability = ${availability.dailyMassAvailability.join(", ")}`);
+            console.log(`[AVAILABILITY_CHECK] ${minister.name}: Procurando por "${currentDayName}" ou "${currentDayNameAlt}"`);
+            console.log(`[AVAILABILITY_CHECK] ${minister.name} ${isAvailableForDay ? "\u2705 DISPON\xCDVEL" : "\u274C N\xC3O dispon\xEDvel"} para ${dayName} (${massTime.date})`);
+            return isAvailableForDay;
           }
           console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} dispon\xEDvel (outros casos)`);
           return true;
@@ -3272,7 +3395,13 @@ ${"!".repeat(60)}`);
        */
       isAvailableForSpecialMass(ministerId, massType, massTime, massDate) {
         const availability = this.availabilityData.get(ministerId);
-        if (!availability) return false;
+        if (!availability) {
+          console.log(`[SPECIAL_MASS] \u274C ${ministerId}: No availability data for ${massType}`);
+          return false;
+        }
+        if (massType === "missa_sao_judas_festa") {
+          console.log(`[SPECIAL_MASS] \u{1F50D} Checking ${ministerId} for ${massType} at ${massDate} ${massTime}`);
+        }
         if (massType === "missa_diaria") {
           if (availability.dailyMassAvailability?.includes("N\xE3o posso")) {
             console.log(`[SCHEDULE_GEN] ${ministerId} marcou "N\xE3o posso" para missas di\xE1rias`);
@@ -3283,27 +3412,50 @@ ${"!".repeat(60)}`);
           return hasAnyDailyAvailability;
         }
         const massTypeMapping = {
-          "missa_cura_libertacao": "healing_liberation_mass",
-          "missa_sagrado_coracao": "sacred_heart_mass",
-          "missa_imaculado_coracao": "immaculate_heart_mass",
+          "missa_cura_libertacao": "healing_liberation",
+          // v2.0: healing_liberation (não healing_liberation_mass!)
+          "missa_sagrado_coracao": "first_friday",
+          // v2.0: first_friday (não sacred_heart_mass!)
+          "missa_imaculado_coracao": "first_saturday",
+          // v2.0: first_saturday (não immaculate_heart_mass!)
           "missa_sao_judas": "saint_judas_novena"
         };
-        if (massType === "missa_sao_judas_festa" && massTime) {
-          const timeToQuestionKey = {
-            "07:00": "saint_judas_feast_7h",
-            "10:00": "saint_judas_feast_10h",
-            "12:00": "saint_judas_feast_12h",
-            "15:00": "saint_judas_feast_15h",
-            "17:00": "saint_judas_feast_17h",
-            "19:30": "saint_judas_feast_evening"
-          };
-          const questionKey2 = timeToQuestionKey[massTime];
-          if (questionKey2) {
-            const specialEvents2 = availability.specialEvents;
-            if (specialEvents2 && typeof specialEvents2 === "object") {
+        if (massType === "missa_sao_judas_festa" && massTime && massDate) {
+          const specialEvents2 = availability.specialEvents;
+          console.log(`[SPECIAL_MASS] \u{1F4E6} Special events for ${ministerId}:`, typeof specialEvents2, specialEvents2 ? Object.keys(specialEvents2) : "null");
+          if (specialEvents2 && typeof specialEvents2 === "object") {
+            console.log(`[SPECIAL_MASS] \u{1F511} saint_judas_feast exists:`, !!specialEvents2.saint_judas_feast, typeof specialEvents2.saint_judas_feast);
+            if (specialEvents2.saint_judas_feast && typeof specialEvents2.saint_judas_feast === "object") {
+              const datetimeKey = `${massDate}_${massTime}`;
+              console.log(`[SPECIAL_MASS] \u2705 Checking key: ${datetimeKey}`);
+              let response = specialEvents2.saint_judas_feast[datetimeKey];
+              if (response === void 0) {
+                const nestedByDate = specialEvents2.saint_judas_feast[massDate];
+                if (nestedByDate && typeof nestedByDate === "object") {
+                  const normalizedTime = massTime.padStart(5, "0");
+                  response = nestedByDate[massTime] ?? nestedByDate[normalizedTime];
+                }
+              }
+              console.log(`[SPECIAL_MASS] \u{1F4CD} Response value:`, response, typeof response);
+              const isAvailable = response === true || response === "Sim" || response === "sim" || response === "true" || response === 1;
+              console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (${datetimeKey}): ${response} = ${isAvailable}`);
+              if (isAvailable) {
+                return true;
+              }
+            }
+            const timeToQuestionKey = {
+              "07:00": "saint_judas_feast_7h",
+              "10:00": "saint_judas_feast_10h",
+              "12:00": "saint_judas_feast_12h",
+              "15:00": "saint_judas_feast_15h",
+              "17:00": "saint_judas_feast_17h",
+              "19:30": "saint_judas_feast_evening"
+            };
+            const questionKey2 = timeToQuestionKey[massTime];
+            if (questionKey2) {
               const response = specialEvents2[questionKey2];
-              const isAvailable = response === "Sim" || response === true;
-              console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (${questionKey2}): ${response} = ${isAvailable}`);
+              const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
+              console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (legacy ${questionKey2}): ${response} = ${isAvailable}`);
               return isAvailable;
             }
           }
@@ -3342,7 +3494,7 @@ ${"!".repeat(60)}`);
             }
             return response.length > 0 && !response.includes("Nenhum dia");
           }
-          const isAvailable = response === "Sim" || response === true;
+          const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
           console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
           return isAvailable;
         }
@@ -3360,16 +3512,18 @@ ${"!".repeat(60)}`);
       selectOptimalMinisters(available, massTime) {
         const targetCount = massTime.minMinisters;
         const MAX_MONTHLY_ASSIGNMENTS = 4;
+        const isDailyMass = massTime.type === "missa_diaria";
         console.log(`
 [FAIR_ALGORITHM] ========================================`);
         console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
         console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
         console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
+        console.log(`[FAIR_ALGORITHM] Is daily mass (no monthly limit): ${isDailyMass}`);
         const eligible = available.filter((minister) => {
           if (!minister.id) return false;
           const assignmentCount = minister.monthlyAssignmentCount || 0;
           const alreadyServedToday = minister.lastAssignedDate === massTime.date;
-          if (assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+          if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
             console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
             return false;
           }
@@ -3377,7 +3531,11 @@ ${"!".repeat(60)}`);
             console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: ALREADY SERVED TODAY (${massTime.date})`);
             return false;
           }
-          console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+          if (isDailyMass) {
+            console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible for DAILY MASS (${assignmentCount} total assignments)`);
+          } else {
+            console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
+          }
           return true;
         });
         console.log(`[FAIR_ALGORITHM] Eligible after filters: ${eligible.length}/${available.length}`);
@@ -8215,6 +8373,341 @@ async function getMonthlyResponsesForExport(month, year) {
   return getQuestionnaireResponsesForExport(questionnaire.id);
 }
 
+// server/services/questionnaireService.ts
+var QuestionnaireService = class {
+  /**
+   * Standardize ALL responses to v2.0 format before saving
+   */
+  static standardizeResponse(rawResponse, month, year) {
+    if (rawResponse.format_version === "2.0") {
+      return this.validateV2Format(rawResponse);
+    }
+    const standardized = {
+      format_version: "2.0",
+      masses: {},
+      special_events: {},
+      weekdays: {
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false
+      },
+      family: {},
+      can_substitute: false
+    };
+    if (Array.isArray(rawResponse)) {
+      this.parseLegacyArrayFormat(rawResponse, standardized, month, year);
+    } else if (typeof rawResponse === "object") {
+      if (rawResponse.responses && Array.isArray(rawResponse.responses)) {
+        this.parseLegacyArrayFormat(rawResponse.responses, standardized, month, year);
+      } else {
+        Object.assign(standardized, rawResponse);
+      }
+    }
+    return standardized;
+  }
+  /**
+   * Parse legacy array format: [{questionId, answer}, ...]
+   */
+  static parseLegacyArrayFormat(responses, standardized, month, year) {
+    const currentYear = year || (/* @__PURE__ */ new Date()).getFullYear();
+    const currentMonth = month || (/* @__PURE__ */ new Date()).getMonth() + 1;
+    for (const item of responses) {
+      const { questionId, answer } = item;
+      if (questionId === "available_sundays" && Array.isArray(answer)) {
+        this.parseAvailableSundays(answer, standardized, currentYear, currentMonth);
+      }
+      if (questionId === "main_service_time" || questionId === "primary_mass_time") {
+        standardized._preferredTime = this.normalizeTime(answer);
+      }
+      if (questionId.startsWith("saint_judas_feast_")) {
+        const feastDate = this.getSaintJudasFeastDate(currentYear, currentMonth);
+        const time2 = this.extractTimeFromQuestionId(questionId);
+        const value = this.normalizeValue(answer);
+        if (!standardized.special_events.saint_judas_feast) {
+          standardized.special_events.saint_judas_feast = {};
+        }
+        standardized.special_events.saint_judas_feast[`${feastDate}_${time2}`] = value;
+      }
+      if (questionId === "saint_judas_novena") {
+        standardized.special_events.saint_judas_novena = this.parseNovenaArray(answer);
+      }
+      if (questionId === "healing_liberation_mass") {
+        standardized.special_events.healing_liberation = this.normalizeValue(answer);
+      }
+      if (questionId === "sacred_heart_mass") {
+        standardized.special_events.first_friday = this.normalizeValue(answer);
+      }
+      if (questionId === "immaculate_heart_mass") {
+        standardized.special_events.first_saturday = this.normalizeValue(answer);
+      }
+      if (questionId === "daily_mass_availability" || questionId === "daily_mass") {
+        this.parseDailyMassAvailability(answer, standardized);
+      }
+      if (questionId === "daily_mass_days" && Array.isArray(answer)) {
+        this.parseDailyMassDays(answer, standardized);
+      }
+      if (questionId === "can_substitute") {
+        standardized.can_substitute = this.normalizeValue(answer);
+      }
+      if ((questionId === "notes" || questionId === "observations") && typeof answer === "string") {
+        standardized.notes = answer;
+      }
+      if (questionId === "family_serve_preference") {
+        if (!standardized.family) standardized.family = {};
+        standardized.family.serve_preference = this.normalizeFamilyPreference(answer);
+      }
+    }
+    if (standardized._preferredTime) {
+      const preferredTime = standardized._preferredTime;
+      for (const date2 in standardized.masses) {
+        if (!standardized.masses[date2][preferredTime]) {
+          const hasAnyTime = Object.values(standardized.masses[date2]).some((v) => v === true);
+          if (!hasAnyTime) {
+            standardized.masses[date2][preferredTime] = true;
+          }
+        }
+      }
+      delete standardized._preferredTime;
+    }
+  }
+  /**
+   * Parse available_sundays array like ["Domingo 05/10", "Domingo 12/10"]
+   */
+  static parseAvailableSundays(sundays, standardized, year, month) {
+    for (const sunday of sundays) {
+      const dayMatch = sunday.match(/(\d{1,2})\/(\d{1,2})/);
+      if (dayMatch) {
+        const day = dayMatch[1].padStart(2, "0");
+        const monthNum = dayMatch[2].padStart(2, "0");
+        const isoDate = `${year}-${monthNum}-${day}`;
+        if (!standardized.masses[isoDate]) {
+          standardized.masses[isoDate] = {};
+        }
+        standardized.masses[isoDate]["08:00"] = false;
+        standardized.masses[isoDate]["10:00"] = false;
+        standardized.masses[isoDate]["19:00"] = false;
+        standardized.masses[isoDate]["19:30"] = false;
+      }
+    }
+  }
+  /**
+   * Parse novena array like ["Terça 20/10 às 19h30", "Quinta 22/10 às 19h30"]
+   */
+  static parseNovenaArray(novenaAnswers) {
+    if (!Array.isArray(novenaAnswers)) {
+      return [];
+    }
+    const validDays = novenaAnswers.filter(
+      (day) => typeof day === "string" && !day.includes("Nenhum dia") && day.trim() !== ""
+    );
+    return validDays.map((day) => {
+      const dateMatch = day.match(/(\d{1,2})\/(\d{1,2})/);
+      const timeMatch = day.match(/(\d{1,2})h(\d{2})?/);
+      if (dateMatch && timeMatch) {
+        const dayNum = dateMatch[1].padStart(2, "0");
+        const monthNum = dateMatch[2].padStart(2, "0");
+        const hour = timeMatch[1].padStart(2, "0");
+        const minute = timeMatch[2] || "00";
+        const year = (/* @__PURE__ */ new Date()).getFullYear();
+        return `${year}-${monthNum}-${dayNum}_${hour}:${minute}`;
+      }
+      return day;
+    });
+  }
+  /**
+   * Parse daily mass availability
+   */
+  static parseDailyMassAvailability(answer, standardized) {
+    if (!standardized.weekdays) {
+      standardized.weekdays = {
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false
+      };
+    }
+    if (answer === "Sim" || answer === true) {
+      standardized.weekdays.monday = true;
+      standardized.weekdays.tuesday = true;
+      standardized.weekdays.wednesday = true;
+      standardized.weekdays.thursday = true;
+      standardized.weekdays.friday = true;
+    } else if (answer === "Apenas em alguns dias") {
+    }
+  }
+  /**
+   * Parse specific daily mass days
+   */
+  static parseDailyMassDays(days, standardized) {
+    if (!standardized.weekdays) {
+      standardized.weekdays = {
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false
+      };
+    }
+    const dayMapping = {
+      "Segunda": "monday",
+      "Segunda-feira": "monday",
+      "Ter\xE7a": "tuesday",
+      "Ter\xE7a-feira": "tuesday",
+      "Quarta": "wednesday",
+      "Quarta-feira": "wednesday",
+      "Quinta": "thursday",
+      "Quinta-feira": "thursday",
+      "Sexta": "friday",
+      "Sexta-feira": "friday"
+    };
+    for (const day of days) {
+      const normalizedDay = dayMapping[day];
+      if (normalizedDay) {
+        standardized.weekdays[normalizedDay] = true;
+      }
+    }
+  }
+  /**
+   * Get Saint Judas feast date (October 28)
+   */
+  static getSaintJudasFeastDate(year, month) {
+    return `${year}-10-28`;
+  }
+  /**
+   * Extract time from questionId
+   */
+  static extractTimeFromQuestionId(questionId) {
+    const timeMapping = {
+      "saint_judas_feast_7h": "07:00",
+      "saint_judas_feast_10h": "10:00",
+      "saint_judas_feast_12h": "12:00",
+      "saint_judas_feast_15h": "15:00",
+      "saint_judas_feast_17h": "17:00",
+      "saint_judas_feast_evening": "19:30"
+    };
+    return timeMapping[questionId] || "06:30";
+  }
+  /**
+   * Normalize time format to 24h HH:MM
+   */
+  static normalizeTime(time2) {
+    if (typeof time2 !== "string") {
+      return "10:00";
+    }
+    const match = time2.match(/(\d{1,2})(?:h|:)?(\d{2})?/);
+    if (match) {
+      const hour = match[1].padStart(2, "0");
+      const minute = match[2] || "00";
+      return `${hour}:${minute}`;
+    }
+    return time2;
+  }
+  /**
+   * Normalize all values to boolean
+   */
+  static normalizeValue(value) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "string") {
+      const normalized = value.toLowerCase().trim();
+      return normalized === "sim" || normalized === "yes" || normalized === "true" || normalized === "s";
+    }
+    if (Array.isArray(value)) {
+      return value.length > 0 && !value.some(
+        (v) => typeof v === "string" && (v.includes("Nenhum") || v.includes("N\xE3o posso"))
+      );
+    }
+    return false;
+  }
+  /**
+   * Normalize family serve preference
+   */
+  static normalizeFamilyPreference(value) {
+    if (typeof value === "string") {
+      const normalized = value.toLowerCase();
+      if (normalized.includes("juntos") || normalized === "together") {
+        return "together";
+      }
+      if (normalized.includes("separado") || normalized === "separately") {
+        return "separately";
+      }
+    }
+    return "flexible";
+  }
+  /**
+   * Validate v2.0 format structure
+   */
+  static validateV2Format(response) {
+    if (!response.masses) response.masses = {};
+    if (!response.special_events) response.special_events = {};
+    if (!response.weekdays) {
+      response.weekdays = {
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false
+      };
+    }
+    if (typeof response.can_substitute !== "boolean") {
+      response.can_substitute = false;
+    }
+    return response;
+  }
+  /**
+   * Extract legacy structured data for backward compatibility
+   * This maintains compatibility with existing extractQuestionnaireData() expectations
+   */
+  static extractStructuredData(standardized) {
+    const availableSundays = [];
+    Object.entries(standardized.masses).forEach(([date2, times]) => {
+      Object.entries(times).forEach(([time2, available]) => {
+        if (available === true) {
+          availableSundays.push(`${date2} ${time2}`);
+        }
+      });
+    });
+    const timeCounts = {};
+    Object.values(standardized.masses).forEach((massDay) => {
+      Object.entries(massDay).forEach(([time2, available]) => {
+        if (available) {
+          timeCounts[time2] = (timeCounts[time2] || 0) + 1;
+        }
+      });
+    });
+    const preferredMassTimes = Object.keys(timeCounts).sort((a, b) => timeCounts[b] - timeCounts[a]);
+    const dailyMassAvailability = [];
+    if (standardized.weekdays) {
+      const dayMap = {
+        monday: "Segunda-feira",
+        tuesday: "Ter\xE7a-feira",
+        wednesday: "Quarta-feira",
+        thursday: "Quinta-feira",
+        friday: "Sexta-feira"
+      };
+      Object.entries(standardized.weekdays).forEach(([day, available]) => {
+        if (available) {
+          dailyMassAvailability.push(dayMap[day]);
+        }
+      });
+    }
+    return {
+      availableSundays: availableSundays.length > 0 ? availableSundays : null,
+      preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
+      alternativeTimes: null,
+      // Not used in v2.0
+      dailyMassAvailability: dailyMassAvailability.length > 0 ? dailyMassAvailability : null,
+      specialEvents: standardized.special_events,
+      canSubstitute: standardized.can_substitute,
+      notes: standardized.notes || null
+    };
+  }
+};
+
 // server/routes/questionnaires.ts
 var router5 = Router5();
 var monthNames = [
@@ -8231,109 +8724,6 @@ var monthNames = [
   "Novembro",
   "Dezembro"
 ];
-function extractQuestionnaireData(responses) {
-  const data = {
-    availableSundays: null,
-    preferredMassTimes: null,
-    alternativeTimes: null,
-    dailyMassAvailability: null,
-    specialEvents: null,
-    canSubstitute: null,
-    notes: null
-  };
-  responses.forEach((r) => {
-    const { questionId, answer } = r;
-    switch (questionId) {
-      case "available_sundays":
-        if (Array.isArray(answer)) {
-          data.availableSundays = answer;
-        }
-        break;
-      case "main_service_time":
-      case "preferred_mass_times":
-        if (answer) {
-          if (!data.preferredMassTimes) data.preferredMassTimes = [];
-          if (Array.isArray(answer)) {
-            data.preferredMassTimes.push(...answer);
-          } else {
-            data.preferredMassTimes.push(String(answer));
-          }
-        }
-        break;
-      case "other_times_available":
-      case "alternative_times":
-        if (typeof answer === "object" && answer.answer === "Sim" && answer.selectedOptions) {
-          data.alternativeTimes = answer.selectedOptions;
-        } else if (Array.isArray(answer)) {
-          data.alternativeTimes = answer;
-        } else if (answer === "Sim") {
-          data.alternativeTimes = [];
-        }
-        break;
-      case "daily_mass_availability":
-      case "daily_mass":
-      case "daily_mass_days":
-        if (answer === "Sim" || answer === true) {
-          data.dailyMassAvailability = ["Segunda-feira", "Ter\xE7a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S\xE1bado"];
-        } else if (answer === "N\xE3o" || answer === false) {
-          data.dailyMassAvailability = ["N\xE3o posso"];
-        } else if (typeof answer === "object" && answer.selectedOptions) {
-          data.dailyMassAvailability = answer.selectedOptions;
-        } else if (Array.isArray(answer)) {
-          data.dailyMassAvailability = answer;
-        }
-        break;
-      case "can_substitute":
-        if (answer === "Sim" || answer === true) {
-          data.canSubstitute = true;
-        } else if (answer === "N\xE3o" || answer === false) {
-          data.canSubstitute = false;
-        }
-        break;
-      case "notes":
-      case "observations":
-        if (answer && typeof answer === "string") {
-          data.notes = answer;
-        }
-        break;
-      case "special_events":
-        if (answer) {
-          data.specialEvents = answer;
-        }
-        break;
-    }
-    const specialEventMappings = {
-      "healing_liberation_mass": "healing_liberation",
-      "sacred_heart_mass": "sacred_heart",
-      "immaculate_heart_mass": "immaculate_heart",
-      "saint_judas_feast_7h": "saint_judas_feast_7h",
-      "saint_judas_feast_10h": "saint_judas_feast_10h",
-      "saint_judas_feast_12h": "saint_judas_feast_12h",
-      "saint_judas_feast_15h": "saint_judas_feast_15h",
-      "saint_judas_feast_17h": "saint_judas_feast_17h",
-      "saint_judas_feast_evening": "saint_judas_feast_evening",
-      "saint_judas_novena": "saint_judas_novena",
-      "adoration_monday": "adoration_monday"
-    };
-    if (specialEventMappings[questionId]) {
-      if (!data.specialEvents) data.specialEvents = {};
-      if (answer === "Sim" || answer === true) {
-        data.specialEvents[specialEventMappings[questionId]] = true;
-      } else if (answer === "N\xE3o" || answer === false) {
-        data.specialEvents[specialEventMappings[questionId]] = false;
-      } else if (Array.isArray(answer)) {
-        data.specialEvents[specialEventMappings[questionId]] = answer;
-      } else if (answer) {
-        data.specialEvents[specialEventMappings[questionId]] = answer;
-      }
-    }
-    if (questionId.includes("special_event_") && answer === "Sim") {
-      if (!data.specialEvents) data.specialEvents = {};
-      data.specialEvents[questionId.replace("special_event_", "")] = true;
-    }
-  });
-  return data;
-}
 router5.post("/templates", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const schema = z3.object({
@@ -8547,8 +8937,15 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       eq8(questionnaireResponses.questionnaireId, templateId)
     )).limit(1);
     console.log("[RESPONSES] Resposta existente encontrada?", existingResponse ? "Sim" : "N\xE3o");
-    console.log("[RESPONSES] Analisando respostas");
-    const extractedData = extractQuestionnaireData(data.responses);
+    console.log("[RESPONSES] Standardizing responses to v2.0 format");
+    const standardizedResponse = QuestionnaireService.standardizeResponse(
+      data.responses,
+      data.month,
+      data.year
+    );
+    console.log("[RESPONSES] Standardized response:", JSON.stringify(standardizedResponse, null, 2));
+    console.log("[RESPONSES] Extracting structured data");
+    const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
     console.log("[RESPONSES] Dados extra\xEDdos:", extractedData);
     let result;
     if (existingResponse) {
@@ -8556,7 +8953,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       try {
         const [updated] = await db.update(questionnaireResponses).set({
           questionnaireId: templateId,
-          responses: JSON.stringify(data.responses),
+          responses: JSON.stringify(standardizedResponse),
+          // SAVE STANDARDIZED V2.0 FORMAT
           availableSundays: extractedData.availableSundays,
           preferredMassTimes: extractedData.preferredMassTimes,
           alternativeTimes: extractedData.alternativeTimes,
@@ -8583,7 +8981,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
         const [created] = await db.insert(questionnaireResponses).values({
           userId: minister.id,
           questionnaireId: templateId,
-          responses: JSON.stringify(data.responses),
+          responses: JSON.stringify(standardizedResponse),
+          // SAVE STANDARDIZED V2.0 FORMAT
           availableSundays: extractedData.availableSundays,
           preferredMassTimes: extractedData.preferredMassTimes,
           alternativeTimes: extractedData.alternativeTimes,
@@ -8650,7 +9049,15 @@ router5.post("/responses", authenticateToken, async (req, res) => {
             await db.insert(questionnaireResponses).values({
               userId: familyUserId,
               questionnaireId: templateId,
-              responses: JSON.stringify(data.responses),
+              responses: JSON.stringify(standardizedResponse),
+              // SAVE STANDARDIZED V2.0 FORMAT
+              availableSundays: extractedData.availableSundays,
+              preferredMassTimes: extractedData.preferredMassTimes,
+              alternativeTimes: extractedData.alternativeTimes,
+              dailyMassAvailability: extractedData.dailyMassAvailability,
+              specialEvents: extractedData.specialEvents,
+              canSubstitute: extractedData.canSubstitute,
+              notes: extractedData.notes,
               isSharedResponse: true,
               sharedFromUserId: minister.id,
               sharedWithFamilyIds: []
@@ -8658,7 +9065,15 @@ router5.post("/responses", authenticateToken, async (req, res) => {
             console.log(`[RESPONSES] Resposta compartilhada criada para ${familyMember.name} (${familyUserId})`);
           } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
             await db.update(questionnaireResponses).set({
-              responses: JSON.stringify(data.responses),
+              responses: JSON.stringify(standardizedResponse),
+              // SAVE STANDARDIZED V2.0 FORMAT
+              availableSundays: extractedData.availableSundays,
+              preferredMassTimes: extractedData.preferredMassTimes,
+              alternativeTimes: extractedData.alternativeTimes,
+              dailyMassAvailability: extractedData.dailyMassAvailability,
+              specialEvents: extractedData.specialEvents,
+              canSubstitute: extractedData.canSubstitute,
+              notes: extractedData.notes,
               submittedAt: /* @__PURE__ */ new Date()
             }).where(eq8(questionnaireResponses.id, existingFamilyResponse.id));
             console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
@@ -9103,13 +9518,21 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     for (const response of allResponses) {
       try {
         const responsesArray = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
-        const extractedData = extractQuestionnaireData(responsesArray);
+        const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, response.questionnaireId)).limit(1);
+        const standardizedResponse = QuestionnaireService.standardizeResponse(
+          responsesArray,
+          questionnaire?.month,
+          questionnaire?.year
+        );
+        const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
         console.log(`[REPROCESS] Resposta ${response.id}:`, {
           availableSundays: extractedData.availableSundays?.length || 0,
           dailyMass: extractedData.dailyMassAvailability?.length || 0,
           specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
         });
         await db.update(questionnaireResponses).set({
+          responses: JSON.stringify(standardizedResponse),
+          // SAVE STANDARDIZED V2.0 FORMAT
           availableSundays: extractedData.availableSundays,
           preferredMassTimes: extractedData.preferredMassTimes,
           alternativeTimes: extractedData.alternativeTimes,
@@ -9247,6 +9670,13 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
       }
     };
     logger.info(`Gera\xE7\xE3o conclu\xEDda: ${generatedSchedules.length} escalas, confidence m\xE9dia: ${response.data.averageConfidence}`);
+    console.log("[RESPONSE_DEBUG] Estrutura da resposta:", {
+      success: response.success,
+      totalSchedules: response.data.totalSchedules,
+      schedulesCount: response.data.schedules?.length,
+      hasQualityMetrics: !!response.data.qualityMetrics,
+      qualityMetricsKeys: response.data.qualityMetrics ? Object.keys(response.data.qualityMetrics) : []
+    });
     res.json(response);
   } catch (error) {
     console.error("\u274C [ROUTE] ERRO DETALHADO NO GENERATE:", error);
@@ -11108,23 +11538,44 @@ router9.get("/", authenticateToken, async (req, res) => {
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-01`;
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
-      const schedulesList = await db.select().from(schedules).where(
-        and10(
-          gte5(schedules.date, startDateStr),
-          lte5(schedules.date, endDateStr)
-        )
-      );
-      const assignmentsList = schedulesList.length > 0 ? schedulesList.map((schedule) => ({
-        id: schedule.id,
-        scheduleId: schedule.id,
-        ministerId: schedule.ministerId,
-        date: schedule.date,
-        massTime: schedule.time,
-        position: schedule.position || 0,
-        confirmed: true,
-        ministerName: null
-        // Would need join with users table
-      })) : [];
+      let schedulesList = [];
+      try {
+        schedulesList = await db.select().from(schedules).where(
+          and10(
+            gte5(schedules.date, startDateStr),
+            lte5(schedules.date, endDateStr)
+          )
+        );
+      } catch (error) {
+        console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", error?.message);
+        res.json({
+          schedules: [],
+          assignments: [],
+          substitutions: []
+        });
+        return;
+      }
+      let assignmentsList = [];
+      if (schedulesList.length > 0) {
+        assignmentsList = await db.select({
+          id: schedules.id,
+          scheduleId: schedules.id,
+          ministerId: schedules.ministerId,
+          date: schedules.date,
+          massTime: schedules.time,
+          position: sql7`COALESCE(${schedules.position}, 0)`.as("position"),
+          confirmed: sql7`true`.as("confirmed"),
+          ministerName: users.name,
+          photoUrl: users.photoUrl,
+          notes: schedules.notes,
+          status: schedules.status
+        }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
+          and10(
+            gte5(schedules.date, startDateStr),
+            lte5(schedules.date, endDateStr)
+          )
+        ).orderBy(schedules.date, schedules.time, schedules.position);
+      }
       const substitutionsList = schedulesList.length > 0 ? await db.select({
         id: substitutionRequests.id,
         scheduleId: substitutionRequests.scheduleId,
@@ -12618,7 +13069,7 @@ var ministers_default = router14;
 await init_db();
 init_schema();
 import { Router as Router15 } from "express";
-import { eq as eq20, and as and16, sql as sql12, gte as gte9, desc as desc7, count as count5, notInArray } from "drizzle-orm";
+import { eq as eq20, and as and16, sql as sql12, gte as gte9, desc as desc7, count as count5, notInArray, inArray as inArray4 } from "drizzle-orm";
 var router15 = Router15();
 function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
@@ -12688,7 +13139,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     const [existingRequest] = await db.select().from(substitutionRequests).where(
       and16(
         eq20(substitutionRequests.scheduleId, scheduleId),
-        eq20(substitutionRequests.status, "pending")
+        inArray4(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
     if (existingRequest) {
