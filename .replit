@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["sqlite", "imagemagick", "google-cloud-sdk-gce", "parallel-full"]
+packages = ["sqlite", "imagemagick", "google-cloud-sdk-gce", "parallel-full", "openssh", "gh"]
 
 [deployment]
 deploymentTarget = "autoscale"

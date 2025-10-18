@@ -39,6 +39,7 @@ export interface AvailabilityData {
   alternativeTimes: string[];
   canSubstitute: boolean;
   dailyMassAvailability: string[];
+  weekdayMasses?: string[];
 }
 
 export interface MassTime {
@@ -531,6 +532,7 @@ export class ScheduleGenerator {
     dailyMassAvailability: any[];
     canSubstitute: boolean;
     specialEvents: Record<string, any>;
+    weekdayMasses: string[];
   } {
     console.log(`[COMPATIBILITY_LAYER] Adapting response for ${questionnaireMonth}/${questionnaireYear}`);
 
@@ -541,17 +543,23 @@ export class ScheduleGenerator {
     let dailyMassAvailability: any[] = [];
     let canSubstitute = false;
     let specialEvents: Record<string, any> = {};
+    const weekdayMasses: string[] = [];
 
     // 🎯 VERSION DETECTION: Check for v2.0 format FIRST (works for Oct 2025 onwards)
     let responsesData = response.responses;
     if (typeof responsesData === 'string') {
-      responsesData = JSON.parse(responsesData);
+      try {
+        responsesData = JSON.parse(responsesData);
+      } catch (parseError) {
+        console.error(`[COMPATIBILITY_LAYER] ❌ Failed to parse responses JSON for user ${response.userId}:`, parseError);
+        responsesData = null;
+      }
     }
 
     const isV2Format = responsesData && typeof responsesData === 'object' && responsesData.format_version === '2.0';
 
-    // Handle v2.0 format (Oct 2025+)
-    if (isV2Format && questionnaireMonth >= 10 && questionnaireYear >= 2025) {
+    // Handle v2.0 format (available from Oct/2025 onwards, but may appear in later months/years)
+    if (isV2Format) {
       console.log(`[COMPATIBILITY_LAYER] 🎯 Processing v2.0 STANDARDIZED format for ${questionnaireMonth}/${questionnaireYear}`);
 
       try {
@@ -560,12 +568,35 @@ export class ScheduleGenerator {
         // Parse Sunday masses from masses object: { '2025-10-05': { '10:00': true } }
         const sundayDates: string[] = [];
         const masses = data.masses || {};
-        Object.keys(masses).forEach(date => {
-          const timesForDate = masses[date];
-          if (timesForDate && typeof timesForDate === 'object') {
-            Object.keys(timesForDate).forEach(time => {
-              if (timesForDate[time] === true) {
-                sundayDates.push(`${date} ${time}`);
+        const normalizeTimeValue = (time: string): string => {
+          if (!time) return time;
+          if (/^\d{1,2}:\d{2}$/.test(time)) {
+            const [hours, minutes] = time.split(':');
+            return `${hours.padStart(2, '0')}:${minutes}`;
+          }
+          if (/^\d{1,2}h/.test(time)) {
+            const [hours, minutesPart] = time.split('h');
+            const hoursPad = hours.padStart(2, '0');
+            const minutes = minutesPart ? minutesPart.padStart(2, '0') : '00';
+            return `${hoursPad}:${minutes}`;
+          }
+          return time;
+        };
+
+        Object.entries(masses).forEach(([date, times]) => {
+          if (times && typeof times === 'object') {
+            Object.entries(times as Record<string, any>).forEach(([time, available]) => {
+              const isAvailable = available === true || available === 'Sim' || available === 'sim' || available === 'true' || available === 1;
+              if (!isAvailable) return;
+
+              const normalizedTime = normalizeTimeValue(time);
+              const dateTimeKey = `${date} ${normalizedTime}`;
+              const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+
+              if (dayOfWeek === 0) {
+                sundayDates.push(dateTimeKey);
+              } else {
+                weekdayMasses.push(dateTimeKey);
               }
             });
           }
@@ -577,7 +608,7 @@ export class ScheduleGenerator {
         Object.values(masses).forEach((timesForDate: any) => {
           if (timesForDate && typeof timesForDate === 'object') {
             Object.entries(timesForDate).forEach(([time, available]) => {
-              if (available === true) {
+              if (available === true || available === 'Sim' || available === 'sim' || available === 'true' || available === 1) {
                 timeCount[time] = (timeCount[time] || 0) + 1;
               }
             });
@@ -586,21 +617,118 @@ export class ScheduleGenerator {
         preferredMassTimes = Object.keys(timeCount).sort((a, b) => timeCount[b] - timeCount[a]);
 
         // Parse weekday availability
-        const weekdaysData = data.weekdays || {};
-        const dailyAvail: string[] = [];
-        const dayMap: Record<string, string> = {
-          'monday': 'Segunda',
-          'tuesday': 'Terça',
-          'wednesday': 'Quarta',
-          'thursday': 'Quinta',
-          'friday': 'Sexta'
+        const weekdayAvailabilitySet = new Set<string>();
+        const addWeekdayAvailability = (identifier: string | null | undefined) => {
+          if (!identifier) return;
+          const normalized = identifier
+            .toString()
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+          const map: Record<string, string> = {
+            'mon': 'Segunda',
+            'monday': 'Segunda',
+            'segunda': 'Segunda',
+            'segunda-feira': 'Segunda',
+            'seg': 'Segunda',
+            'tue': 'Terça',
+            'tuesday': 'Terça',
+            'terca': 'Terça',
+            'terça': 'Terça',
+            'terca-feira': 'Terça',
+            'terça-feira': 'Terça',
+            'ter': 'Terça',
+            'wed': 'Quarta',
+            'wednesday': 'Quarta',
+            'quarta': 'Quarta',
+            'quarta-feira': 'Quarta',
+            'qua': 'Quarta',
+            'thu': 'Quinta',
+            'thursday': 'Quinta',
+            'quinta': 'Quinta',
+            'quinta-feira': 'Quinta',
+            'qui': 'Quinta',
+            'fri': 'Sexta',
+            'friday': 'Sexta',
+            'sexta': 'Sexta',
+            'sexta-feira': 'Sexta',
+            'sex': 'Sexta',
+            'sat': 'Sábado',
+            'saturday': 'Sábado',
+            'sabado': 'Sábado',
+            'sábado': 'Sábado',
+            'sab': 'Sábado'
+          };
+
+          if (map[normalized]) {
+            weekdayAvailabilitySet.add(map[normalized]);
+            return;
+          }
+
+          // Identificadores como "all", "todos", etc.
+          if (['all', 'todos', 'todas', 'weekdays', 'all_weekdays', 'todos_os_dias'].includes(normalized)) {
+            ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].forEach(label => weekdayAvailabilitySet.add(label));
+          }
         };
-        Object.entries(weekdaysData).forEach(([day, available]) => {
-          if (available === true && dayMap[day]) {
-            dailyAvail.push(dayMap[day]);
+
+        const processWeekdayStructure = (value: any, keyHint?: string) => {
+          if (Array.isArray(value)) {
+            value.forEach(entry => addWeekdayAvailability(entry));
+            return;
+          }
+
+          if (typeof value === 'boolean') {
+            if (value === true && keyHint) addWeekdayAvailability(keyHint);
+            return;
+          }
+
+          if (typeof value === 'string') {
+            const normalizedValue = value.trim().toLowerCase();
+            if (['true', 'sim', 'yes', '1'].includes(normalizedValue)) {
+              if (keyHint) {
+                addWeekdayAvailability(keyHint);
+              }
+            } else {
+              addWeekdayAvailability(value);
+            }
+            return;
+          }
+
+          if (value && typeof value === 'object') {
+            if (Array.isArray((value as any).selectedOptions)) {
+              (value as any).selectedOptions.forEach((entry: any) => addWeekdayAvailability(entry));
+            }
+            if (Array.isArray((value as any).options)) {
+              (value as any).options.forEach((entry: any) => addWeekdayAvailability(entry));
+            }
+            Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+              processWeekdayStructure(nestedValue, nestedKey);
+            });
+          }
+        };
+
+        const weekdaysData = data.weekdays;
+        if (weekdaysData !== undefined && weekdaysData !== null) {
+          processWeekdayStructure(weekdaysData);
+        }
+
+        const legacyWeekdayKeys = [
+          'weekday_06:30',
+          'weekday_6:30',
+          'weekday_0630',
+          'weekday0630'
+        ];
+        legacyWeekdayKeys.forEach(key => {
+          const value = data?.[key] ?? data?.availability?.[key];
+          if (value !== undefined) {
+            processWeekdayStructure(value);
           }
         });
-        dailyMassAvailability = dailyAvail;
+
+        const orderedWeekdayLabels = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        dailyMassAvailability = orderedWeekdayLabels.filter(label => weekdayAvailabilitySet.has(label));
 
         // 🔥 CRITICAL: Parse special events (including saint_judas_feast!)
         const specialEventsData = data.special_events || {};
@@ -611,7 +739,7 @@ export class ScheduleGenerator {
         // Parse substitution
         canSubstitute = data.can_substitute === true;
 
-        console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sundays, ${Object.keys(specialEvents).length} special events`);
+        console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events`);
       } catch (error) {
         console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing v2.0:`, error);
       }
@@ -719,7 +847,8 @@ export class ScheduleGenerator {
       alternativeTimes,
       dailyMassAvailability,
       canSubstitute,
-      specialEvents
+      specialEvents,
+      weekdayMasses
     };
   }
 
@@ -746,7 +875,8 @@ export class ScheduleGenerator {
         preferredMassTimes: ['10:00'],
         alternativeTimes: ['08:00', '19:00'],
         canSubstitute: true,
-        dailyMassAvailability: []
+        dailyMassAvailability: [],
+        weekdayMasses: []
       });
 
       this.availabilityData.set('2', {
@@ -755,7 +885,8 @@ export class ScheduleGenerator {
         preferredMassTimes: ['08:00'],
         alternativeTimes: ['10:00'],
         canSubstitute: true,
-        dailyMassAvailability: []
+        dailyMassAvailability: [],
+        weekdayMasses: []
       });
 
       this.availabilityData.set('3', {
@@ -764,7 +895,8 @@ export class ScheduleGenerator {
         preferredMassTimes: ['19:00'],
         alternativeTimes: ['10:00'],
         canSubstitute: false,
-        dailyMassAvailability: []
+        dailyMassAvailability: [],
+        weekdayMasses: []
       });
 
       this.availabilityData.set('4', {
@@ -773,7 +905,8 @@ export class ScheduleGenerator {
         preferredMassTimes: ['10:00'],
         alternativeTimes: ['08:00', '19:00'],
         canSubstitute: true,
-        dailyMassAvailability: []
+        dailyMassAvailability: [],
+        weekdayMasses: []
       });
 
       this.availabilityData.set('5', {
@@ -782,7 +915,8 @@ export class ScheduleGenerator {
         preferredMassTimes: ['08:00', '10:00'],
         alternativeTimes: ['19:00'],
         canSubstitute: true,
-        dailyMassAvailability: []
+        dailyMassAvailability: [],
+        weekdayMasses: []
       });
 
       return;
@@ -856,7 +990,8 @@ export class ScheduleGenerator {
         alternativeTimes: normalizedAlternativeTimes,
         canSubstitute,
         dailyMassAvailability,
-        specialEvents: normalizedSpecialEvents
+        specialEvents: normalizedSpecialEvents,
+        weekdayMasses: adapted.weekdayMasses
       };
 
       console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.userId}:`, processedData);
@@ -1664,6 +1799,16 @@ export class ScheduleGenerator {
         // Para MISSAS DIÁRIAS REGULARES (06:30), verificar disponibilidade do dia da semana
         console.log(`[AVAILABILITY_CHECK] Verificando disponibilidade diária para ${minister.name}`);
 
+        const weekdayDateTimeKey = `${massTime.date} ${massTime.time}`;
+        if (availability.weekdayMasses && availability.weekdayMasses.length > 0) {
+          const hasSpecificAvailability = availability.weekdayMasses.includes(weekdayDateTimeKey);
+          console.log(`[AVAILABILITY_CHECK] ${minister.name}: weekdayMasses entries = ${availability.weekdayMasses.length}, procurando ${weekdayDateTimeKey} -> ${hasSpecificAvailability}`);
+          if (hasSpecificAvailability) {
+            console.log(`[AVAILABILITY_CHECK] ✅ ${minister.name} possui disponibilidade específica para ${weekdayDateTimeKey}`);
+            return true;
+          }
+        }
+
         // 🔧 FIX: Usar dados JÁ PROCESSADOS em availabilityData ao invés de reprocessar JSON
         // Os dados corretos já estão em availability.dailyMassAvailability
         if (!availability.dailyMassAvailability || availability.dailyMassAvailability.length === 0) {
@@ -1756,11 +1901,23 @@ export class ScheduleGenerator {
         if (specialEvents.saint_judas_feast && typeof specialEvents.saint_judas_feast === 'object') {
           const datetimeKey = `${massDate}_${massTime}`; // e.g., "2025-10-28_10:00"
           console.log(`[SPECIAL_MASS] ✅ Checking key: ${datetimeKey}`);
-          const response = specialEvents.saint_judas_feast[datetimeKey];
+          let response = specialEvents.saint_judas_feast[datetimeKey];
+
+          // Também suportar estrutura aninhada { '2025-10-28': { '12:00': true } }
+          if (response === undefined) {
+            const nestedByDate = specialEvents.saint_judas_feast[massDate];
+            if (nestedByDate && typeof nestedByDate === 'object') {
+              const normalizedTime = massTime.padStart(5, '0');
+              response = nestedByDate[massTime] ?? nestedByDate[normalizedTime];
+            }
+          }
+
           console.log(`[SPECIAL_MASS] 📍 Response value:`, response, typeof response);
-          const isAvailable = response === true;
+          const isAvailable = response === true || response === 'Sim' || response === 'sim' || response === 'true' || response === 1;
           console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${datetimeKey}): ${response} = ${isAvailable}`);
-          return isAvailable;
+          if (isAvailable) {
+            return true;
+          }
         }
 
         // 🔄 FALLBACK: Para formato legacy, procurar por questionKey
@@ -1776,7 +1933,7 @@ export class ScheduleGenerator {
         const questionKey = timeToQuestionKey[massTime];
         if (questionKey) {
           const response = specialEvents[questionKey];
-          const isAvailable = response === 'Sim' || response === true;
+          const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
           console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (legacy ${questionKey}): ${response} = ${isAvailable}`);
           return isAvailable;
         }
@@ -1832,7 +1989,7 @@ export class ScheduleGenerator {
       }
 
       // 🔧 CORREÇÃO: Aceitar tanto strings quanto booleanos para outros eventos
-      const isAvailable = response === 'Sim' || response === true;
+      const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
       // "Não", false, null, undefined = não disponível
       console.log(`[SCHEDULE_GEN] 🔍 ${ministerId} para ${massType} (${questionKey}): ${response} = ${isAvailable}`);
       return isAvailable;

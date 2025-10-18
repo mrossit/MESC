@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db";
 import { substitutionRequests, schedules, users, questionnaireResponses, questionnaires } from "@shared/schema";
-import { eq, and, sql, gte, desc, count, notInArray } from "drizzle-orm";
+import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 
 const router = Router();
@@ -236,7 +236,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       .where(
         and(
           eq(substitutionRequests.scheduleId, scheduleId),
-          eq(substitutionRequests.status, 'pending')
+          inArray(substitutionRequests.status, ['pending', 'available'])
         )
       )
       .limit(1);

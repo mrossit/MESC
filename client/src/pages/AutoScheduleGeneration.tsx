@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,9 @@ export default function AutoScheduleGeneration() {
 
   const handleGenerate = (preview: boolean = false) => {
     setIsGenerating(true);
+    setEditingSchedule(null);
+    setShowTestResults(false);
+    setTestResults(null);
     generateMutation.mutate({ 
       month: selectedMonth, 
       year: selectedYear, 
@@ -249,6 +252,7 @@ export default function AutoScheduleGeneration() {
                   onClick={() => handleGenerate(true)}
                   variant="outline"
                   size="sm"
+                  disabled={isGenerating}
                   data-testid="button-regenerate"
                 >
                   <Shuffle className="h-4 w-4 mr-2" />
@@ -440,7 +444,7 @@ export default function AutoScheduleGeneration() {
                   <Eye className="h-4 w-4 mr-2" />
                   Fazer Preview
                 </Button>
-                <Button onClick={() => handleGenerate(true)}>
+                <Button onClick={() => handleGenerate(false)}>
                   <Zap className="h-4 w-4 mr-2" />
                   Gerar Escalas
                 </Button>

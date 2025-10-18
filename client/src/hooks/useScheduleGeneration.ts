@@ -19,7 +19,8 @@ export function useScheduleGeneration() {
         const response = await apiRequest('POST', '/api/schedules/generate', {
           year,
           month,
-          saveToDatabase: false
+          saveToDatabase: false,
+          replaceExisting: true
         });
         return response.json();
       }
