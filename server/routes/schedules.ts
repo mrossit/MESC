@@ -9,6 +9,15 @@ const logActivity = async (userId: string, action: string, description: string, 
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
 
+const isMissingSchedulesDateColumnError = (error: unknown) => {
+  const message = (error as Error)?.message?.toLowerCase() ?? "";
+  return (
+    (message.includes("does not exist") && message.includes('"date"')) ||
+    message.includes("no such column: schedules.date") ||
+    message.includes("no such column: date")
+  );
+};
+
 const router = Router();
 
 // Get upcoming schedules for a minister
@@ -160,13 +169,16 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             )
           );
       } catch (error) {
-        console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", (error as Error)?.message);
-        res.json({
-          schedules: [],
-          assignments: [],
-          substitutions: []
-        });
-        return;
+        if (isMissingSchedulesDateColumnError(error)) {
+          console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", (error as Error)?.message);
+          res.json({
+            schedules: [],
+            assignments: [],
+            substitutions: []
+          });
+          return;
+        }
+        throw error;
       }
 
       // Note: scheduleAssignments table doesn't exist - returning schedule data directly
@@ -230,7 +242,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
                   schedulesList.map((s: any) => sql`${s.id}`),
                   sql`, `
                 )})`,
-                sql`${substitutionRequests.status} IN ('pending', 'approved', 'auto_approved')`
+                sql`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
               )
             )
         : [];
