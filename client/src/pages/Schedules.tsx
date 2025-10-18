@@ -53,6 +53,7 @@ import {
   Send,
   Download,
   FileSpreadsheet,
+  List,
   MessageSquare,
   Save
 } from "lucide-react";
@@ -96,6 +97,69 @@ const normalizeMassTime = (time: string): string => {
   return time;
 };
 
+interface PositionGroup {
+  name: string;
+  positions: number[];
+}
+
+const POSITION_GROUPS: PositionGroup[] = [
+  { name: "AUXILIAR", positions: [1, 2] },
+  { name: "RECOLHER", positions: [3, 4] },
+  { name: "VELAS", positions: [5, 6] },
+  { name: "ADORAÇÃO/FILA", positions: [7, 8] },
+  { name: "PURIFICAR/EXPOR", positions: [9, 10, 11, 12] },
+  { name: "MEZANINO", positions: [13, 14, 15] },
+  { name: "CORREDOR AMBÃO", positions: [16] },
+  { name: "CORREDOR CAPELA", positions: [17] },
+  { name: "CORREDOR CADEIRAS", positions: [18] },
+  { name: "NAVE CENTRAL PE PIO", positions: [19] },
+  { name: "NAVE CENTRAL LADO MÚSICOS", positions: [20, 21] },
+  { name: "NAVE CENTRAL AMBÃO", positions: [22] },
+  { name: "NAVE CENTRAL CAPELA", positions: [23] },
+  { name: "ÁTRIO EXTERNO", positions: [24, 25, 26, 27, 28] }
+];
+
+const SCHEDULE_LEGEND_ITEMS = [
+  { label: "Missa Diária", color: "#c5c6c8", textColor: "#2C2C2C" },
+  { label: "Dominical", color: "#ffda9e", textColor: "#8B5A00" },
+  { label: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" },
+  { label: "Sagrado Coração", color: "#fabfb7", textColor: "#8B3A3A" },
+  { label: "Imaculado Coração", color: "#e3b1c8", textColor: "#6B2D5C" },
+  { label: "Novena Out", color: "#fdf9c4", textColor: "#8B7500" }
+];
+
+const getMassTypeAndColor = (date: Date, massTime: string) => {
+  const dayOfWeek = date.getDay();
+  const dayOfMonth = date.getDate();
+  const month = date.getMonth() + 1;
+  const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
+  const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+
+  if (isNovena) {
+    return { type: "Novena de Outubro", color: "#fdf9c4", textColor: "#8B7500" };
+  }
+
+  if (dayOfWeek === 0) {
+    return { type: "Missa Dominical", color: "#ffda9e", textColor: "#8B5A00" };
+  }
+
+  if (dayOfWeek === 4 && isFirstWeek && massTime === "19:30:00") {
+    return { type: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" };
+  }
+
+  if (dayOfWeek === 5 && isFirstWeek) {
+    return { type: "Sagrado Coração de Jesus", color: "#fabfb7", textColor: "#8B3A3A" };
+  }
+
+  if (dayOfWeek === 6 && isFirstWeek) {
+    return { type: "Imaculado Coração de Maria", color: "#e3b1c8", textColor: "#6B2D5C" };
+  }
+
+  return { type: "Missa Diária", color: "#c5c6c8", textColor: "#2C2C2C" };
+};
+
+const TOTAL_POSITIONS = Object.keys(LITURGICAL_POSITIONS).length;
+
 interface Schedule {
   id: string;
   title: string;
@@ -128,6 +192,16 @@ interface SubstitutionRequest {
   status: "pending" | "approved" | "auto_approved";
   reason: string;
 }
+
+type ListViewRow = {
+  key: string;
+  dayNumber: number;
+  dayName: string;
+  time: string;
+  color: string;
+  textColor: string;
+  assignmentsByPosition: Map<number, ScheduleAssignment>;
+};
 
 // Constantes importadas do arquivo centralizado
 
@@ -588,63 +662,9 @@ export default function Schedules() {
         reader.readAsDataURL(blob);
       })));
 
-      const positionGroups = [
-        { name: "AUXILIAR", positions: [1, 2] },
-        { name: "RECOLHER", positions: [3, 4] },
-        { name: "VELAS", positions: [5, 6] },
-        { name: "ADORAÇÃO/FILA", positions: [7, 8] },
-        { name: "PURIFICAR/EXPOR", positions: [9, 10, 11, 12] },
-        { name: "MEZANINO", positions: [13, 14, 15] },
-        { name: "CORREDOR AMBÃO", positions: [16] },
-        { name: "CORREDOR CAPELA", positions: [17] },
-        { name: "CORREDOR CADEIRAS", positions: [18] },
-        { name: "NAVE CENTRAL PE PIO", positions: [19] },
-        { name: "NAVE CENTRAL LADO MÚSICOS", positions: [20, 21] },
-        { name: "NAVE CENTRAL AMBÃO", positions: [22] },
-        { name: "NAVE CENTRAL CAPELA", positions: [23] },
-        { name: "ÁTRIO EXTERNO", positions: [24, 25, 26, 27, 28] }
-      ];
-
-      // Função para determinar o tipo e cor da missa
-      // Paleta de cores: #fabfb7, #fdf9c4, #ffda9e, #c5c6c8, #b2e2f2, #e3b1c8
-      const getMassTypeAndColor = (date: Date, massTime: string) => {
-        const dayOfWeek = date.getDay();
-        const dayOfMonth = date.getDate();
-        const month = date.getMonth() + 1;
-        const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
-        const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
-
-        // Novena de Outubro (dias 20-27) - Amarelo claro
-        if (isNovena) {
-          return { type: 'Novena de Outubro', color: '#fdf9c4', textColor: '#8B7500' };
-        }
-
-        // Domingo - Pêssego/Laranja claro
-        if (dayOfWeek === 0) {
-          return { type: 'Missa Dominical', color: '#ffda9e', textColor: '#8B5A00' };
-        }
-
-        // 1ª Quinta - Cura e Libertação - Azul claro
-        if (dayOfWeek === 4 && isFirstWeek && massTime === '19:30:00') {
-          return { type: 'Cura e Libertação', color: '#b2e2f2', textColor: '#0D5F7F' };
-        }
-
-        // 1ª Sexta - Sagrado Coração - Rosa salmão
-        if (dayOfWeek === 5 && isFirstWeek) {
-          return { type: 'Sagrado Coração de Jesus', color: '#fabfb7', textColor: '#8B3A3A' };
-        }
-
-        // 1º Sábado - Imaculado Coração - Rosa claro
-        if (dayOfWeek === 6 && isFirstWeek) {
-          return { type: 'Imaculado Coração de Maria', color: '#e3b1c8', textColor: '#6B2D5C' };
-        }
-
-        // Missa diária padrão - Cinza claro
-        return { type: 'Missa Diária', color: '#c5c6c8', textColor: '#2C2C2C' };
-      };
-
-      // Converter LITURGICAL_POSITIONS de objeto para array (posições 1-28)
-      const totalPositions = Object.keys(LITURGICAL_POSITIONS).length;
+      const positionGroups = POSITION_GROUPS;
+      const legendItems = SCHEDULE_LEGEND_ITEMS;
+      const totalPositions = TOTAL_POSITIONS;
       const positionsArray = Array.from({ length: totalPositions }, (_, i) => {
         const positionKey = i + 1;
         const name = LITURGICAL_POSITIONS[positionKey] || `Posição ${positionKey}`;
@@ -657,6 +677,10 @@ export default function Schedules() {
           htmlNumberAndName: `${name}<br>${positionKey}` // Para HTML/PDF: nome na linha 1, número na linha 2
         };
       });
+
+      const legendHtml = legendItems.map(item =>
+        `<div class="legend-item" style="color: ${item.textColor};"><div class="legend-color" style="background: ${item.color};"></div>${item.label}</div>`
+      ).join('');
 
       // Obter todas as missas do mês
       const start = startOfMonth(currentMonth);
@@ -699,14 +723,7 @@ export default function Schedules() {
               <img src="${logoBase64}" alt="Logo" class="logo">
               <h1>SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}</h1>
             </div>
-            <div class="legend">
-              <div class="legend-item"><div class="legend-color" style="background: #c5c6c8;"></div>Missa Diária</div>
-              <div class="legend-item"><div class="legend-color" style="background: #ffda9e;"></div>Dominical</div>
-              <div class="legend-item"><div class="legend-color" style="background: #b2e2f2;"></div>Cura e Libertação</div>
-              <div class="legend-item"><div class="legend-color" style="background: #fabfb7;"></div>Sagrado Coração</div>
-              <div class="legend-item"><div class="legend-color" style="background: #e3b1c8;"></div>Imaculado Coração</div>
-              <div class="legend-item"><div class="legend-color" style="background: #fdf9c4;"></div>Novena Out</div>
-            </div>
+            <div class="legend">${legendHtml}</div>
             <table>
               <thead>
                 <!-- Linha 1: Grupos de posições com células mescladas -->
@@ -824,14 +841,7 @@ export default function Schedules() {
               <img src="${logoBase64}" alt="Logo" class="logo">
               <h1>SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}</h1>
             </div>
-            <div class="legend">
-              <div class="legend-item"><div class="legend-color" style="background: #c5c6c8;"></div>Missa Diária</div>
-              <div class="legend-item"><div class="legend-color" style="background: #ffda9e;"></div>Dominical</div>
-              <div class="legend-item"><div class="legend-color" style="background: #b2e2f2;"></div>Cura e Libertação</div>
-              <div class="legend-item"><div class="legend-color" style="background: #fabfb7;"></div>Sagrado Coração</div>
-              <div class="legend-item"><div class="legend-color" style="background: #e3b1c8;"></div>Imaculado Coração</div>
-              <div class="legend-item"><div class="legend-color" style="background: #fdf9c4;"></div>Novena de Outubro</div>
-            </div>
+            <div class="legend">${legendHtml}</div>
             <table>
               <thead>
                 <!-- Linha 1: Grupos de posições com células mescladas -->
@@ -1309,6 +1319,44 @@ export default function Schedules() {
     s.year === currentMonth.getFullYear()
   );
 
+  const allMonthDays = eachDayOfInterval({
+    start: startOfMonth(currentMonth),
+    end: endOfMonth(currentMonth)
+  });
+
+  const listViewRows: ListViewRow[] = allMonthDays.flatMap((day) => {
+    const massTimes = getMassTimesForDate(day);
+    if (massTimes.length === 0) {
+      return [];
+    }
+
+    return massTimes.map((massTime) => {
+      const normalizedMassTime = normalizeMassTime(massTime);
+      const dateStr = format(day, "yyyy-MM-dd");
+      const assignmentsForMass = assignments.filter(
+        (assignment) =>
+          assignment.date === dateStr &&
+          normalizeMassTime(assignment.massTime) === normalizedMassTime
+      );
+      const assignmentsByPosition = new Map<number, ScheduleAssignment>();
+      assignmentsForMass.forEach((assignment) => {
+        assignmentsByPosition.set(assignment.position, assignment);
+      });
+
+      const massInfo = getMassTypeAndColor(day, normalizedMassTime);
+
+      return {
+        key: `${dateStr}-${normalizedMassTime}`,
+        dayNumber: day.getDate(),
+        dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
+        time: formatMassTime(normalizedMassTime),
+        color: massInfo.color,
+        textColor: massInfo.textColor,
+        assignmentsByPosition
+      };
+    });
+  });
+
   console.log('[SCHEDULES_PAGE] Current month:', currentMonth.getMonth() + 1, 'year:', currentMonth.getFullYear());
   console.log('[SCHEDULES_PAGE] Available schedules:', schedules);
   console.log('[SCHEDULES_PAGE] Current schedule found:', currentSchedule);
@@ -1428,6 +1476,11 @@ export default function Schedules() {
             <CalendarIcon className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
             <span className="hidden sm:inline">Visualização Mensal</span>
             <span className="sm:hidden">Mensal</span>
+          </TabsTrigger>
+          <TabsTrigger value="list" className="text-xs sm:text-sm px-2 sm:px-3">
+            <List className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
+            <span className="hidden sm:inline">Visualização Lista</span>
+            <span className="sm:hidden">Lista</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1897,6 +1950,143 @@ export default function Schedules() {
                   </CardContent>
                 </Card>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-4 sm:mt-6">
+          <Card>
+            <CardHeader className="p-3 pb-2 sm:p-6 sm:pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-10 sm:w-10"
+                    onClick={() => navigateMonth("prev")}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                  <h2 className="text-sm font-semibold capitalize sm:text-lg md:text-xl flex-1 text-center sm:text-left">
+                    <span className="sm:hidden">
+                      {format(currentMonth, "MMM yyyy", { locale: ptBR })}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {capitalizeFirst(format(currentMonth, "MMMM yyyy", { locale: ptBR }))}
+                    </span>
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-10 sm:w-10"
+                    onClick={() => navigateMonth("next")}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground sm:text-xs text-center sm:text-right">
+                  Visualização em tabela reproduzindo o layout de exportação.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-2 sm:p-6 space-y-4">
+              <div className="rounded-lg border bg-muted/10 p-3 sm:p-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Legenda de tipos de celebração
+                </p>
+                <div className="flex flex-wrap gap-3 sm:gap-4 text-[11px] sm:text-xs">
+                  {SCHEDULE_LEGEND_ITEMS.map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center gap-2 rounded-full border border-border/50 px-3 py-1"
+                      style={{ color: item.textColor }}
+                    >
+                      <span
+                        className="h-3 w-3 rounded-sm border border-border/70"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {listViewRows.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    Nenhuma celebração configurada para este mês.
+                  </div>
+                ) : (
+                  <table className="w-full border border-border text-[11px] sm:text-xs">
+                    <thead>
+                      <tr className="bg-muted/60 text-muted-foreground">
+                        <th className="border border-border px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                          Data
+                        </th>
+                        <th className="border border-border px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                          Dia
+                        </th>
+                        <th className="border border-border px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                          Hora
+                        </th>
+                        {POSITION_GROUPS.map((group) => (
+                          <th
+                            key={group.name}
+                            className="border border-border px-2 py-2 text-center font-semibold uppercase"
+                            colSpan={group.positions.length}
+                          >
+                            {group.name}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="bg-muted/60 text-muted-foreground">
+                        {POSITION_GROUPS.map((group) =>
+                          group.positions.map((position) => (
+                            <th
+                              key={`${group.name}-${position}`}
+                              className="border border-border px-2 py-1 text-center font-semibold uppercase"
+                            >
+                              {position}
+                            </th>
+                          ))
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listViewRows.map((row) => (
+                        <tr
+                          key={row.key}
+                          style={{ backgroundColor: row.color, color: row.textColor }}
+                          className="border border-border"
+                        >
+                          <td className="border border-border px-2 py-1 text-center font-semibold">
+                            {row.dayNumber}
+                          </td>
+                          <td className="border border-border px-2 py-1 capitalize text-center font-medium">
+                            {row.dayName}
+                          </td>
+                          <td className="border border-border px-2 py-1 text-center font-medium">
+                            {row.time}
+                          </td>
+                          {Array.from({ length: TOTAL_POSITIONS }, (_, index) => {
+                            const position = index + 1;
+                            const assignment = row.assignmentsByPosition.get(position);
+                            const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || "";
+                            return (
+                              <td
+                                key={`${row.key}-${position}`}
+                                className="border border-border px-2 py-1 text-left align-middle"
+                              >
+                                {displayName}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

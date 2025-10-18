@@ -19,98 +19,357 @@ import {
   ZoomOut,
   RotateCcw,
   Info,
-  MapPin,
   Cross,
   Heart,
-  Church,
-  Star,
-  Calendar,
-  BookMarked,
   Shield,
   Sparkles,
-  Settings
+  Settings,
+  ArrowLeft,
+  Circle,
+  AlertCircle
 } from "lucide-react";
-import { useParams, useLocation, Link } from "wouter";
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useParams, useLocation } from "wouter";
+import { useState, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import type { FormationTrack, FormationLesson, FormationLessonSection, FormationLessonProgress } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
+import { useCsrfToken, addCsrfHeader } from "@/hooks/useCsrfToken";
 import FormationAdmin from "@/pages/FormationAdmin";
+import type {
+  FormationTrack,
+  FormationModule,
+  FormationLesson,
+  FormationLessonProgress
+} from "@shared/schema";
 
-// Component to handle lesson content with API data
-function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; moduleId: string; lessonNumber: string }) {
-  const { toast } = useToast();
-  const [location, navigate] = useLocation();
-  
-  const { data: lessonData, isLoading, error } = useQuery({
+type LessonWithProgress = FormationLesson & {
+  progress: FormationLessonProgress | null;
+};
+
+type ModuleWithStats = FormationModule & {
+  lessons: LessonWithProgress[];
+  stats: {
+    totalLessons: number;
+    completedLessons: number;
+    inProgressLessons: number;
+    progressPercentage: number;
+  };
+};
+
+type TrackOverview = FormationTrack & {
+  modules: ModuleWithStats[];
+  stats: {
+    totalModules: number;
+    totalLessons: number;
+    completedLessons: number;
+    inProgressLessons: number;
+    progressPercentage: number;
+  };
+  nextLesson: LessonWithProgress | null;
+};
+
+type FormationOverview = {
+  tracks: TrackOverview[];
+  summary: {
+    totalTracks: number;
+    totalModules: number;
+    totalLessons: number;
+    completedLessons: number;
+    inProgressLessons: number;
+    percentageCompleted: number;
+    lastUpdated: string;
+  };
+};
+
+type LessonDetailResponse = {
+  lesson: FormationLesson;
+  sections: Array<{
+    id: string;
+    title: string;
+    content: string;
+    estimatedMinutes?: number | null;
+    orderIndex: number;
+  }>;
+  progress: FormationLessonProgress | null;
+};
+
+type CategoryMeta = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  button: string;
+  pill: string;
+};
+
+const CATEGORY_META: Record<FormationTrack["category"], CategoryMeta> = {
+  liturgia: {
+    label: "Liturgia",
+    icon: Cross,
+    accent: "text-amber-600",
+    button: "bg-amber-600 hover:bg-amber-700",
+    pill: "bg-amber-100 text-amber-700 border-amber-300"
+  },
+  espiritualidade: {
+    label: "Espiritualidade",
+    icon: Heart,
+    accent: "text-red-600",
+    button: "bg-red-600 hover:bg-red-700",
+    pill: "bg-red-100 text-red-700 border-red-300"
+  },
+  pratica: {
+    label: "Prática Pastoral",
+    icon: Users,
+    accent: "text-blue-600",
+    button: "bg-blue-600 hover:bg-blue-700",
+    pill: "bg-blue-100 text-blue-700 border-blue-300"
+  }
+};
+
+function getCategoryMeta(track: FormationTrack): CategoryMeta {
+  return CATEGORY_META[track.category] ?? {
+    label: track.category,
+    icon: BookOpen,
+    accent: "text-green-600",
+    button: "bg-green-600 hover:bg-green-700",
+    pill: "bg-green-100 text-green-700 border-green-300"
+  };
+}
+
+function formatPercentage(value: number | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "0%";
+  return `${Math.min(Math.max(Math.round(value), 0), 100)}%`;
+}
+
+interface ModuleDetailProps {
+  track: TrackOverview;
+  module: ModuleWithStats;
+  onBack: () => void;
+  onSelectLesson: (lesson: LessonWithProgress) => void;
+}
+
+function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailProps) {
+  const category = getCategoryMeta(track);
+  const hasLessons = module.lessons.length > 0;
+
+  return (
+    <Layout
+      title={module.title}
+      subtitle={`Trilha: ${track.title}`}
+    >
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para Formação
+          </Button>
+          <Badge variant="outline" className={category.pill}>
+            {category.label}
+          </Badge>
+          <Badge variant="outline" className="border-green-300 text-green-700">
+            {formatPercentage(module.stats.progressPercentage)} concluído
+          </Badge>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <category.icon className={`h-5 w-5 ${category.accent}`} />
+              {module.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{module.description}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Aulas concluídas</span>
+                  <span className="text-muted-foreground">
+                    {module.stats.completedLessons}/{module.stats.totalLessons}
+                  </span>
+                </div>
+                <Progress value={module.stats.progressPercentage} className="h-2" />
+              </div>
+              {module.estimatedDuration ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Duração estimada</span>
+                    <span className="text-muted-foreground">{module.estimatedDuration} min</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Lições em andamento</span>
+                    <span className="text-muted-foreground">
+                      {module.stats.inProgressLessons}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <BookOpen className="h-5 w-5" />
+              Aulas do módulo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {hasLessons ? (
+              module.lessons.map((lesson) => {
+                const status = lesson.progress?.status ?? "not_started";
+                const percentage = lesson.progress?.progressPercentage ?? 0;
+                const statusBadge =
+                  status === "completed"
+                    ? { label: "Concluída", variant: "outline", className: "border-green-300 text-green-700 bg-green-50" }
+                    : status === "in_progress"
+                    ? { label: "Em andamento", variant: "outline", className: "border-amber-300 text-amber-700 bg-amber-50" }
+                    : { label: "Não iniciada", variant: "outline", className: "border-slate-300 text-slate-600 bg-slate-50" };
+
+                return (
+                  <Card key={lesson.id} className="border-dashed">
+                    <CardContent className="p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={statusBadge.variant as any} className={statusBadge.className}>
+                            {status === "not_started" ? <Circle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {statusBadge.label}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Aula {lesson.lessonNumber}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-semibold">{lesson.title}</h3>
+                        {lesson.description && (
+                          <p className="text-sm text-muted-foreground">{lesson.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {lesson.durationMinutes ? `${lesson.durationMinutes} min` : "Duração variável"}
+                          </div>
+                          <div>{formatPercentage(percentage)} concluído</div>
+                        </div>
+                      </div>
+                      <Button
+                        className={`w-full md:w-auto ${category.button}`}
+                        onClick={() => onSelectLesson(lesson)}
+                        data-testid={`button-open-lesson-${lesson.id}`}
+                      >
+                        <PlayCircle className="h-4 w-4 mr-2" />
+                        Acessar conteúdo
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Este módulo ainda não possui aulas cadastradas.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+}
+
+interface LessonContentProps {
+  trackId: string;
+  moduleId: string;
+  lessonNumber: string;
+  lessons: LessonWithProgress[];
+  trackTitle: string;
+  moduleTitle: string;
+}
+
+function LessonContent({
+  trackId,
+  moduleId,
+  lessonNumber,
+  lessons,
+  trackTitle,
+  moduleTitle
+}: LessonContentProps) {
+  const toast = useToast();
+  const [, navigate] = useLocation();
+  const queryClientInstance = useQueryClient();
+  const { csrfToken, isLoading: csrfLoading } = useCsrfToken();
+
+  const lessonNumberInt = Number(lessonNumber);
+  const sortedLessons = useMemo(
+    () => [...lessons].sort((a, b) => a.lessonNumber - b.lessonNumber),
+    [lessons]
+  );
+
+  const { data: lessonData, isLoading, error } = useQuery<LessonDetailResponse>({
     queryKey: ['/api/formation', trackId, moduleId, lessonNumber],
   });
 
-  // Fetch all lessons for navigation
-  const { data: allLessons = [] } = useQuery<FormationLesson[]>({
-    queryKey: ['/api/formation/lessons', trackId],
-    enabled: !!trackId,
-  });
-
-  // Mutation to mark lesson as completed
   const markCompletedMutation = useMutation({
-    mutationFn: (lessonId: string) => 
-      apiRequest(`/api/formation/progress/${lessonId}`, {
+    mutationFn: async (lessonId: string) => {
+      if (!csrfToken) {
+        throw new Error("Token CSRF indisponível. Atualize a página e tente novamente.");
+      }
+
+      const response = await fetch(`/api/formation/lessons/${lessonId}/complete`, {
         method: 'POST',
-        body: JSON.stringify({ completed: true, progressPercentage: 100 }),
-      }),
-    onSuccess: () => {
-      toast({
-        title: "Aula concluída!",
-        description: "Seu progresso foi registrado com sucesso.",
+        headers: addCsrfHeader({ 'Content-Type': 'application/json' }, csrfToken),
+        credentials: 'include'
       });
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/formation'] });
+
+      if (!response.ok) {
+        const message = (await response.text()) || 'Não foi possível registrar o progresso.';
+        throw new Error(message);
+      }
+
+      return response.json();
     },
-    onError: (error: any) => {
-      const isAuthError = error?.status === 401 || error?.message?.includes('401');
-      toast({
-        title: isAuthError ? "Sessão expirada" : "Erro",
-        description: isAuthError 
-          ? "Faça login novamente para continuar." 
-          : "Não foi possível registrar o progresso. Tente novamente.",
-        variant: "destructive",
+    onSuccess: () => {
+      toast.toast({
+        title: "Aula concluída!",
+        description: "Seu progresso foi registrado com sucesso."
       });
-      
-      if (isAuthError) {
-        // Redirect to login after a short delay
+      queryClientInstance.invalidateQueries({ queryKey: ['/api/formation/overview'] });
+      queryClientInstance.invalidateQueries({ queryKey: ['/api/formation', trackId, moduleId, lessonNumber] });
+    },
+    onError: (err: any) => {
+      const message = err?.message || "Não foi possível registrar o progresso. Tente novamente.";
+      toast.toast({
+        title: "Erro",
+        description: message,
+        variant: "destructive"
+      });
+      if (message.includes("401")) {
         setTimeout(() => navigate('/login'), 2000);
       }
-    },
+    }
   });
 
-  // Helper to find adjacent lessons
-  const getAdjacentLessons = () => {
-    if (!allLessons || !lessonData?.lesson) return { prev: null, next: null };
-    
-    const currentIndex = allLessons.findIndex((l: FormationLesson) => 
-      l.lessonNumber === parseInt(lessonNumber)
+  const navigationHelpers = useMemo(() => {
+    const currentIndex = sortedLessons.findIndex(
+      (lesson) => lesson.lessonNumber === lessonNumberInt
     );
-    
     return {
-      prev: currentIndex > 0 ? allLessons[currentIndex - 1] : null,
-      next: currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null,
+      prev: currentIndex > 0 ? sortedLessons[currentIndex - 1] : null,
+      next: currentIndex >= 0 && currentIndex < sortedLessons.length - 1
+        ? sortedLessons[currentIndex + 1]
+        : null
     };
-  };
-
-  const { prev: prevLesson, next: nextLesson } = getAdjacentLessons();
+  }, [sortedLessons, lessonNumberInt]);
 
   if (isLoading) {
     return (
       <Layout title="Carregando..." subtitle="Aguarde">
         <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-              <p>Carregando conteúdo da aula...</p>
-            </div>
+          <CardContent className="p-6 text-center">
+            <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p>Carregando conteúdo da aula...</p>
           </CardContent>
         </Card>
       </Layout>
@@ -119,22 +378,17 @@ function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; m
 
   if (error || !lessonData?.lesson) {
     return (
-      <Layout title="Erro" subtitle="Não foi possível carregar a aula">
+      <Layout title="Aula não encontrada" subtitle={`Trilha: ${trackTitle}`}>
         <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-4">Aula não encontrada</h2>
-              <p className="text-muted-foreground mb-4">
-                Não foi possível carregar o conteúdo desta aula.
-              </p>
-              <Button 
-                onClick={() => window.history.back()} 
-                className="mt-4"
-                data-testid="button-back"
-              >
-                Voltar
-              </Button>
-            </div>
+          <CardContent className="p-6 text-center space-y-4">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
+            <h2 className="text-xl font-semibold">Conteúdo indisponível</h2>
+            <p className="text-sm text-muted-foreground">
+              Não foi possível carregar esta aula. Tente novamente mais tarde ou retorne ao módulo.
+            </p>
+            <Button onClick={() => navigate(`/formation/${trackId}/${moduleId}`)}>
+              Voltar ao módulo
+            </Button>
           </CardContent>
         </Card>
       </Layout>
@@ -144,163 +398,161 @@ function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; m
   const { lesson, sections, progress } = lessonData;
 
   return (
-    <Layout title={lesson.title} subtitle={`Módulo: ${lesson.moduleId}`}>
+    <Layout
+      title={lesson.title}
+      subtitle={`Trilha: ${trackTitle} • Módulo: ${moduleTitle}`}
+    >
       <div className="space-y-6">
-        {/* Lesson Header */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <CardTitle className="text-2xl font-bold">{lesson.title}</CardTitle>
-                <p className="text-muted-foreground mt-2">{lesson.description}</p>
+                {lesson.description && (
+                  <p className="text-muted-foreground mt-2">{lesson.description}</p>
+                )}
               </div>
-              <Badge variant="outline">
-                Aula {lesson.lessonNumber}
-              </Badge>
+              <div className="flex gap-2">
+                <Badge variant="outline">Aula {lesson.lessonNumber}</Badge>
+                <Badge variant="outline">
+                  {lesson.durationMinutes ? `${lesson.durationMinutes} min` : "Duração variável"}
+                </Badge>
+              </div>
             </div>
             {lesson.objectives && lesson.objectives.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-semibold mb-2">Objetivos da Aula:</h4>
+                <h4 className="font-semibold mb-2">Objetivos da Aula</h4>
                 <ul className="text-sm space-y-1 text-muted-foreground">
-                  {lesson.objectives.map((objective: string, index: number) => (
+                  {lesson.objectives.map((objective, index) => (
                     <li key={index}>• {objective}</li>
                   ))}
                 </ul>
               </div>
             )}
-            <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
+            {progress && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
                 <Clock className="h-4 w-4" />
-                {lesson.durationMinutes} min
+                Progresso: {formatPercentage(progress.progressPercentage)}
               </div>
-              {progress && (
-                <div className="flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" />
-                  {progress.progressPercentage}% concluído
-                </div>
-              )}
-            </div>
+            )}
           </CardHeader>
         </Card>
 
-        {/* Lesson Sections */}
-        {sections && sections.length > 0 ? (
-          <div className="space-y-4">
-            {sections.map((section: FormationLessonSection, index: number) => (
+        <div className="space-y-4">
+          {sections && sections.length > 0 ? (
+            sections.map((section) => (
               <Card key={section.id}>
                 <CardHeader>
                   <CardTitle className="text-lg">{section.title}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none">
-                    <p className="whitespace-pre-wrap">{section.content}</p>
+                <CardContent className="space-y-4">
+                  <div className="prose max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                    {section.content}
                   </div>
                   {section.estimatedMinutes && (
-                    <div className="flex items-center gap-1 mt-4 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
                       ~{section.estimatedMinutes} min
                     </div>
                   )}
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <p className="text-muted-foreground">Conteúdo da aula em desenvolvimento.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            ))
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                Conteúdo desta aula em desenvolvimento.
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-        {/* Navigation and Progress */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Lesson Navigation */}
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Navegação</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                {prevLesson ? (
-                  <Button 
+            <CardContent className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2">
+                {navigationHelpers.prev ? (
+                  <Button
                     variant="outline"
-                    onClick={() => navigate(`/formation/${trackId}/${prevLesson.moduleId}/${prevLesson.lessonNumber}`)}
-                    data-testid="button-prev-lesson"
-                    className="flex-1 mr-2"
+                    className="flex-1"
+                    onClick={() =>
+                      navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.prev!.lessonNumber}`)
+                    }
                   >
-                    ← {prevLesson.title}
+                    ← {navigationHelpers.prev.title}
                   </Button>
                 ) : (
-                  <Button 
+                  <Button
                     variant="outline"
-                    onClick={() => window.history.back()}
-                    data-testid="button-back"
-                    className="flex-1 mr-2"
+                    className="flex-1"
+                    onClick={() => navigate(`/formation/${trackId}/${moduleId}`)}
                   >
-                    ← Voltar à Trilha
+                    ← Voltar ao módulo
                   </Button>
                 )}
-                
-                {nextLesson && (
-                  <Button 
+                {navigationHelpers.next && (
+                  <Button
                     variant="outline"
-                    onClick={() => navigate(`/formation/${trackId}/${nextLesson.moduleId}/${nextLesson.lessonNumber}`)}
-                    data-testid="button-next-lesson"
-                    className="flex-1 ml-2"
+                    className="flex-1"
+                    onClick={() =>
+                      navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.next!.lessonNumber}`)
+                    }
                   >
-                    {nextLesson.title} →
+                    {navigationHelpers.next.title} →
                   </Button>
                 )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {sortedLessons.length} aulas neste módulo
               </div>
             </CardContent>
           </Card>
 
-          {/* Progress Actions */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Progresso</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {progress && progress.completed ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <span className="font-medium">Aula Concluída</span>
-                  </div>
-                ) : (
-                  <Button 
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={() => markCompletedMutation.mutate(lesson.id)}
-                    disabled={markCompletedMutation.isPending}
-                    data-testid="button-complete-lesson"
-                  >
-                    {markCompletedMutation.isPending ? (
-                      <>
-                        <div className="animate-spin h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Salvando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Marcar como Concluída
-                      </>
-                    )}
-                  </Button>
-                )}
-                
-                {nextLesson && progress?.completed && (
-                  <Button 
-                    className="w-full"
-                    onClick={() => navigate(`/formation/${trackId}/${nextLesson.moduleId}/${nextLesson.lessonNumber}`)}
-                    data-testid="button-continue-next"
-                  >
-                    Continuar para Próxima Aula →
-                  </Button>
-                )}
-              </div>
+            <CardContent className="space-y-4">
+              {progress?.status === "completed" ? (
+                <div className="flex items-center gap-2 text-green-600 font-medium">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Aula concluída com sucesso
+                </div>
+              ) : (
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => markCompletedMutation.mutate(lesson.id)}
+                  disabled={markCompletedMutation.isPending || csrfLoading || !csrfToken}
+                  data-testid="button-complete-lesson"
+                >
+                  {markCompletedMutation.isPending ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marcar como concluída
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {navigationHelpers.next && progress?.status === "completed" && (
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() =>
+                    navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.next!.lessonNumber}`)
+                  }
+                >
+                  Continuar para próxima aula →
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -310,218 +562,117 @@ function LessonContent({ trackId, moduleId, lessonNumber }: { trackId: string; m
 }
 
 export default function Formation() {
-  const { track, module, lesson } = useParams();
-  const [location, navigate] = useLocation();
+  const { track: trackParam, module: moduleParam, lesson: lessonParam } = useParams();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [mapZoom, setMapZoom] = useState(1);
   const [showMapInfo, setShowMapInfo] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
 
-  // Get current user to check if they're a coordinator/gestor
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
-    queryFn: () => authAPI.getMe(),
+    queryFn: () => authAPI.getMe()
   });
 
   const user = authData?.user;
   const isAdmin = user?.role === "coordenador" || user?.role === "gestor";
 
-  // Fetch formation tracks
-  const { data: tracks = [], isLoading: tracksLoading } = useQuery<FormationTrack[]>({
-    queryKey: ['/api/formation/tracks'],
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    error: overviewError
+  } = useQuery<FormationOverview>({
+    queryKey: ['/api/formation/overview']
   });
 
-  // Fetch modules for specific track if viewing track modules
-  const { data: modules = [], isLoading: modulesLoading } = useQuery<FormationModule[]>({
-    queryKey: ['/api/formation/modules', track],
-    enabled: !!track && track !== 'library',
-  });
+  const tracks = overview?.tracks ?? [];
+  const summary = overview?.summary;
 
-  // Fetch lessons for specific module if viewing module lessons
-  const { data: lessons = [], isLoading: lessonsLoading } = useQuery<FormationLesson[]>({
-    queryKey: ['/api/formation/lessons', track, module],
-    enabled: !!track && !!module && track !== 'library',
-  });
+  const selectedTrack = trackParam ? tracks.find((t) => t.id === trackParam) : undefined;
+  const selectedModule = selectedTrack && moduleParam
+    ? selectedTrack.modules.find((m) => m.id === moduleParam)
+    : undefined;
 
-  // Se está visualizando uma aula específica
-  if (lesson && track && module) {
-    return <LessonContent trackId={track} moduleId={module} lessonNumber={lesson} />;
-  }
-
-  // Se está em modo admin, mostrar interface administrativa
-  if (adminMode && isAdmin) {
-    return <FormationAdmin />;
-  }
-
-  if (track === 'library') {
+  if (overviewLoading) {
     return (
-      <Layout 
-        title="Biblioteca de Formação" 
-        subtitle="Recursos e materiais de apoio para ministros"
-      >
-        <div className="space-y-6">
-          {/* Mapa do Santuário */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Map className="h-5 w-5 text-neutral-accentWarm dark:text-text-gold" />
-                Mapa do Santuário São Judas Tadeu
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Planta baixa para orientação dos ministros durante a distribuição da Sagrada Comunhão
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Controles do Mapa */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMapZoom(prev => Math.min(prev + 0.2, 2))}
-                      data-testid="button-zoom-in"
-                    >
-                      <ZoomIn className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMapZoom(prev => Math.max(prev - 0.2, 0.5))}
-                      data-testid="button-zoom-out"
-                    >
-                      <ZoomOut className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMapZoom(1)}
-                      data-testid="button-zoom-reset"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowMapInfo(!showMapInfo)}
-                    data-testid="button-toggle-info"
-                  >
-                    <Info className="h-4 w-4" />
-                    {showMapInfo ? 'Ocultar' : 'Mostrar'} Orientações
-                  </Button>
-                </div>
-
-                {/* Informações do Mapa */}
-                {showMapInfo && (
-                  <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <h4 className="font-semibold mb-2 flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            Posicionamento dos Ministros
-                          </h4>
-                          <ul className="space-y-1 text-muted-foreground">
-                            <li>• <strong>Corredores A:</strong> Ministros nas laterais dos bancos</li>
-                            <li>• <strong>Corredor Central (D/P):</strong> Ministros no corredor principal</li>
-                            <li>• <strong>Presbitério:</strong> Coordenação e distribuição inicial</li>
-                            <li>• <strong>Capela do Santíssimo:</strong> Área reservada</li>
-                          </ul>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">Numeração dos Bancos</h4>
-                          <ul className="space-y-1 text-muted-foreground">
-                            <li>• <strong>Bancos 1-3:</strong> Lado esquerdo (frente)</li>
-                            <li>• <strong>Bancos 16-18:</strong> Lado direito (frente)</li>
-                            <li>• <strong>Bancos 4-12:</strong> Numeração sequencial</li>
-                            <li>• <strong>Bancos 13-14:</strong> Mezanino</li>
-                            <li>• <strong>Cadeiras 24-26:</strong> Área posterior</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Mapa SVG */}
-                <div className="border rounded-lg bg-white dark:bg-gray-900 p-4 overflow-auto">
-                  <div 
-                    className="flex justify-center"
-                    style={{ transform: `scale(${mapZoom})`, transformOrigin: 'center top' }}
-                  >
-                    <div 
-                      className="w-full max-w-2xl h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600"
-                      data-testid="placeholder-church-map"
-                    >
-                      <div className="text-center">
-                        <Map className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-500 dark:text-gray-400 font-medium">Mapa do Santuário</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500">Em desenvolvimento</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Outros Recursos da Biblioteca */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  Documentos Litúrgicos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-3">
-                    <FileText className="h-8 w-8 text-green-600/70 dark:text-green-400/70" />
-                  </div>
-                  <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
-                  <p className="text-xs text-muted-foreground/70 max-w-xs">
-                    Instruções, rubricas e orientações litúrgicas
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <PlayCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Vídeos Formativos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                    <PlayCircle className="h-8 w-8 text-blue-600/70 dark:text-blue-400/70" />
-                  </div>
-                  <p className="text-muted-foreground font-medium mb-1">Em desenvolvimento</p>
-                  <p className="text-xs text-muted-foreground/70 max-w-xs">
-                    Tutoriais e orientações em vídeo
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+      <Layout title="Formação" subtitle="Carregando trilhas...">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p>Carregando conteúdo de formação...</p>
+          </CardContent>
+        </Card>
       </Layout>
     );
   }
 
+  if (overviewError || !overview) {
+    return (
+      <Layout title="Formação" subtitle="Não foi possível carregar os dados">
+        <Card>
+          <CardContent className="p-6 text-center space-y-4">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
+            <h2 className="text-xl font-semibold">Erro ao carregar a formação</h2>
+            <p className="text-sm text-muted-foreground">
+              Verifique sua conexão ou tente novamente mais tarde.
+            </p>
+            <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/formation/overview'] })}>
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
+
+  if (lessonParam && selectedTrack && selectedModule) {
+    return (
+      <LessonContent
+        trackId={selectedTrack.id}
+        moduleId={selectedModule.id}
+        lessonNumber={lessonParam}
+        lessons={selectedModule.lessons}
+        trackTitle={selectedTrack.title}
+        moduleTitle={selectedModule.title}
+      />
+    );
+  }
+
+  if (trackParam && moduleParam && selectedTrack && selectedModule) {
+    return (
+      <ModuleDetail
+        track={selectedTrack}
+        module={selectedModule}
+        onBack={() => navigate('/formation')}
+        onSelectLesson={(lesson) =>
+          navigate(`/formation/${selectedTrack.id}/${selectedModule.id}/${lesson.lessonNumber}`)
+        }
+      />
+    );
+  }
+
+  if (adminMode && isAdmin) {
+    return <FormationAdmin />;
+  }
+
+  if (trackParam && !selectedTrack) {
+    toast({
+      title: "Trilha não encontrada",
+      description: "Redirecionamos você para a página principal de formação.",
+      variant: "destructive"
+    });
+    navigate('/formation');
+  }
+
   return (
-    <Layout 
-      title="Formação" 
+    <Layout
+      title="Formação"
       subtitle="Programa de capacitação e desenvolvimento espiritual"
     >
       <div className="space-y-6">
-        {/* Banner de Status */}
         <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-neutral-badgeNeutral dark:bg-dark-5 rounded-full flex items-center justify-center">
                   <Cross className="h-6 w-6 text-neutral-neutral dark:text-text-gold" />
@@ -537,17 +688,17 @@ export default function Formation() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  Disponível
+                  {formatPercentage(summary?.percentageCompleted)} concluído
                 </Badge>
                 {isAdmin && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setAdminMode(!adminMode)}
-                    className="ml-2"
+                    onClick={() => setAdminMode(true)}
+                    data-testid="button-open-admin-mode"
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    Modo Admin
+                    Área Administrativa
                   </Button>
                 )}
               </div>
@@ -555,96 +706,217 @@ export default function Formation() {
           </CardContent>
         </Card>
 
-        {/* Módulos de Formação */}
-        {tracksLoading ? (
+        {/* Painel geral */}
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <div className="animate-spin h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                <p>Carregando trilhas de formação...</p>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <GraduationCap className="h-5 w-5 text-purple-600" />
+                Panorama da Formação
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span>Trilhas ativas</span>
+                  <span className="font-medium">{summary?.totalTracks ?? 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Módulos disponíveis</span>
+                  <span className="font-medium">{summary?.totalModules ?? 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Aulas concluídas</span>
+                  <span className="font-medium">
+                    {summary?.completedLessons ?? 0} / {summary?.totalLessons ?? 0}
+                  </span>
+                </div>
+                <div className="space-y-2 pt-3 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span>Progresso geral</span>
+                    <span className="text-muted-foreground">
+                      {formatPercentage(summary?.percentageCompleted)}
+                    </span>
+                  </div>
+                  <Progress value={summary?.percentageCompleted ?? 0} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Última atualização:{" "}
+                    {summary?.lastUpdated
+                      ? new Date(summary.lastUpdated).toLocaleDateString("pt-BR")
+                      : "—"}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
-        ) : tracks && tracks.length > 0 ? (
-          <Tabs defaultValue={tracks[0]?.id || "liturgia"} className="w-full">
-            <TabsList className="h-auto min-h-[3rem] items-center justify-center rounded-md bg-muted p-2 text-muted-foreground grid w-full grid-cols-3 gap-1">
-              {tracks.map((track: FormationTrack) => (
-                <TabsTrigger 
-                  key={track.id} 
-                  value={track.id} 
-                  className="flex flex-col items-center justify-center text-center min-h-[2.8rem] px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap overflow-hidden"
-                  data-testid={`tab-${track.id}`}
-                >
-                  {track.id === 'liturgia' && <Cross className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
-                  {track.id === 'espiritualidade' && <Heart className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
-                  {track.id === 'pratica' && <Users className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
-                  {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mb-1.5 flex-shrink-0" />}
-                  <span className="text-center leading-tight truncate w-full font-medium">
-                    {/* ✨ V3.0 - CORRIGIDO: textos curtos e responsivos */}
-                    {track.id === 'liturgia' ? 'Básico' :
-                     track.id === 'espiritualidade' ? 'Espiritual' :
-                     track.id === 'pratica' ? 'Práticas' :
-                     track.title}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
 
-            {/* Dynamic Track Content */}
-            {tracks && tracks.map((track: FormationTrack) => (
-              <TabsContent key={track.id} value={track.id}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      {track.id === 'liturgia' && <Cross className="h-5 w-5 text-amber-600" />}
-                      {track.id === 'espiritualidade' && <Heart className="h-5 w-5 text-red-600" />}
-                      {track.id === 'pratica' && <Users className="h-5 w-5 text-blue-600" />}
-                      {!['liturgia', 'espiritualidade', 'pratica'].includes(track.id) && <BookOpen className="h-5 w-5 text-green-600" />}
-                      {track.title}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {track.description}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="p-6 pt-0 pl-[18px] pr-[18px]">
-                    {modulesLoading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin h-6 w-6 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                        <p className="text-sm text-muted-foreground">Carregando aulas...</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <Shield className="h-5 w-5 text-blue-600" />
+                Próximos passos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {tracks.map((track) => {
+                const category = getCategoryMeta(track);
+                const nextLesson = track.nextLesson;
+                return (
+                  <Card key={track.id} className="border-dashed">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <category.icon className={`h-4 w-4 ${category.accent}`} />
+                        {track.title}
                       </div>
-                    ) : modules && modules.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Progresso</span>
+                          <span>{formatPercentage(track.stats.progressPercentage)}</span>
+                        </div>
+                        <Progress value={track.stats.progressPercentage} className="h-1.5" />
+                      </div>
+                      {nextLesson ? (
+                        <Button
+                          size="sm"
+                          className={`${category.button} w-full`}
+                          onClick={() =>
+                            navigate(`/formation/${track.id}/${nextLesson.moduleId}/${nextLesson.lessonNumber}`)
+                          }
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Continuar: {nextLesson.title}
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="justify-center w-full border-green-300 text-green-700">
+                          Trilha concluída
+                        </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <Award className="h-5 w-5 text-amber-600" />
+                Certificação
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p className="text-muted-foreground">
+                Complete todas as trilhas obrigatórias para habilitar a emissão de certificados de formação.
+              </p>
+              <div className="grid gap-3">
+                {tracks.map((track) => (
+                  <div key={track.id} className="flex items-start gap-3">
+                    {track.stats.completedLessons === track.stats.totalLessons && track.stats.totalLessons > 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-amber-500 mt-0.5" />
+                    )}
+                    <div>
+                      <p className="font-medium">{track.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {track.stats.completedLessons}/{track.stats.totalLessons} aulas concluídas
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full" disabled>
+                <Award className="h-4 w-4 mr-2" />
+                Baixar certificados (em breve)
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs com trilhas e módulos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <BookOpen className="h-5 w-5 text-indigo-600" />
+              Trilhas de formação
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {tracks.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                Nenhuma trilha de formação disponível no momento.
+              </div>
+            ) : (
+              <Tabs defaultValue={tracks[0].id} className="w-full">
+                <TabsList className="flex flex-wrap gap-2 bg-muted p-2 justify-center">
+                  {tracks.map((track) => {
+                    const category = getCategoryMeta(track);
+                    return (
+                      <TabsTrigger
+                        key={track.id}
+                        value={track.id}
+                        className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm"
+                      >
+                        <category.icon className={`h-4 w-4 ${category.accent}`} />
+                        <span className="font-medium">{track.title}</span>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+
+                {tracks.map((track) => {
+                  const category = getCategoryMeta(track);
+                  return (
+                    <TabsContent key={track.id} value={track.id} className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={category.pill}>
+                          {category.label}
+                        </Badge>
+                        <Badge variant="outline">
+                          {track.stats.totalModules} módulos • {track.stats.totalLessons} aulas
+                        </Badge>
+                        <Badge variant="outline" className="border-green-300 text-green-700">
+                          {formatPercentage(track.stats.progressPercentage)} concluído
+                        </Badge>
+                      </div>
+
                       <Accordion type="single" collapsible className="w-full">
-                        {modules.map((module: FormationModule, index: number) => (
-                          <AccordionItem key={module.id} value={`item-${module.id}`}>
-                            <AccordionTrigger className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-[12px] pr-[12px] pt-[12px] pb-[12px]">
-                              <div className="flex items-center gap-2">
-                                <BookOpen className="h-4 w-4" />
-                                <span>{index + 1}. {module.title}</span>
-                                {module.estimatedDuration && (
-                                  <Badge variant="outline" className="ml-2">
-                                    {module.estimatedDuration} min
+                        {track.modules.map((module) => (
+                          <AccordionItem key={module.id} value={module.id}>
+                            <AccordionTrigger className="py-4 px-3 text-left">
+                              <div className="flex flex-col gap-1 text-left w-full">
+                                <div className="flex items-center gap-2">
+                                  <BookOpen className="h-4 w-4" />
+                                  <span className="font-medium">{module.title}</span>
+                                  <Badge variant="outline">
+                                    {module.stats.completedLessons}/{module.stats.totalLessons} aulas
                                   </Badge>
+                                </div>
+                                {module.description && (
+                                  <span className="text-xs text-muted-foreground text-left">
+                                    {module.description}
+                                  </span>
                                 )}
                               </div>
                             </AccordionTrigger>
                             <AccordionContent>
-                              <div className="space-y-3 pt-2">
-                                <p className="text-sm text-muted-foreground">
-                                  {module.description}
-                                </p>
-                                <div className="flex gap-2 mt-4">
-                                  <Button 
-                                    size="sm" 
-                                    className={`${
-                                      track.id === 'liturgia' ? 'bg-amber-600 hover:bg-amber-700' :
-                                      track.id === 'espiritualidade' ? 'bg-red-600 hover:bg-red-700' :
-                                      'bg-blue-600 hover:bg-blue-700'
-                                    }`}
+                              <div className="space-y-3 p-3 pt-0">
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Progresso do módulo</span>
+                                    <span>{formatPercentage(module.stats.progressPercentage)}</span>
+                                  </div>
+                                  <Progress value={module.stats.progressPercentage} className="h-1.5" />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    className={`${category.button}`}
                                     onClick={() => navigate(`/formation/${track.id}/${module.id}`)}
-                                    data-testid={`button-start-module-${track.id}-${module.id}`}
+                                    data-testid={`button-open-module-${module.id}`}
                                   >
                                     <PlayCircle className="h-4 w-4 mr-2" />
-                                    Ver Aulas
+                                    Ver aulas do módulo
                                   </Button>
                                 </div>
                               </div>
@@ -652,187 +924,131 @@ export default function Formation() {
                           </AccordionItem>
                         ))}
                       </Accordion>
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">Nenhuma aula encontrada para esta trilha.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            ))}
-        </Tabs>
-        ) : (
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <p className="text-muted-foreground">Nenhuma trilha de formação encontrada.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Recursos de Formação */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">
-              Recursos de Formação
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Videoaulas */}
-              <div className="border border-border rounded-lg p-4">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-3">
-                    <PlayCircle className="h-6 w-6 text-red-500" />
-                  </div>
-                  <h3 className="font-medium text-foreground mb-1">Videoaulas</h3>
-                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-                </div>
-              </div>
-
-              {/* Material de Apoio */}
-              <div className="border border-border rounded-lg p-4">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-3">
-                    <FileText className="h-6 w-6 text-green-500" />
-                  </div>
-                  <h3 className="font-medium text-foreground mb-1">Material de Apoio</h3>
-                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-                </div>
-              </div>
-
-              {/* Encontros Presenciais */}
-              <div className="border border-border rounded-lg p-4">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                    <Users className="h-6 w-6 text-blue-500" />
-                  </div>
-                  <h3 className="font-medium text-foreground mb-1">Encontros</h3>
-                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-                </div>
-              </div>
-            </div>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            )}
           </CardContent>
         </Card>
 
-        {/* Progresso e Avaliação */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Meu Progresso */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Clock className="h-5 w-5 text-orange-600" />
-                Progresso Geral
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Liturgia</span>
-                  <span className="text-muted-foreground">75%</span>
-                </div>
-                <Progress value={75} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Espiritualidade</span>
-                  <span className="text-muted-foreground">50%</span>
-                </div>
-                <Progress value={50} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Prática</span>
-                  <span className="text-muted-foreground">25%</span>
-                </div>
-                <Progress value={25} className="h-2" />
-              </div>
-              <div className="pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total Concluído</span>
-                  <Badge variant="outline">50%</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Certificação */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Award className="h-5 w-5 text-amber-600" />
-                Certificação
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-sm">Formação Básica</p>
-                    <p className="text-xs text-muted-foreground">Concluída em 15/03/2024</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="font-medium text-sm">Formação Avançada</p>
-                    <p className="text-xs text-muted-foreground">Em andamento</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Award className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium text-sm text-muted-foreground">Certificação Final</p>
-                    <p className="text-xs text-muted-foreground">Disponível após conclusão</p>
-                  </div>
-                </div>
-              </div>
-              <Button className="w-full mt-4" variant="outline">
-                <Award className="h-4 w-4 mr-2" />
-                Baixar Certificados
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Informações Importantes */}
-        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
+        {/* Biblioteca */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-              Orientações Gerais
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Map className="h-5 w-5 text-neutral-accentWarm dark:text-text-gold" />
+              Biblioteca de Formação
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Recursos e materiais de apoio para ministros
+            </p>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Requisitos Básicos</h4>
-                  <ul className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
-                    <li>• Ser católico praticante</li>
-                    <li>• Idade mínima de 16 anos</li>
-                    <li>• Participar da Missa dominical</li>
-                    <li>• Estar em estado de graça</li>
-                  </ul>
-                </div>
-                <div className="space-y-3">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Compromissos</h4>
-                  <ul className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
-                    <li>• Pontualidade nos horários</li>
-                    <li>• Participação ativa na formação</li>
-                    <li>• Discrição e reverência</li>
-                    <li>• Formação contínua</li>
-                  </ul>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMapZoom((prev) => Math.min(prev + 0.2, 2))}
+                  data-testid="button-zoom-in"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMapZoom((prev) => Math.max(prev - 0.2, 0.5))}
+                  data-testid="button-zoom-out"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMapZoom(1)}
+                  data-testid="button-zoom-reset"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMapInfo((prev) => !prev)}
+                data-testid="button-toggle-info"
+              >
+                <Info className="h-4 w-4 mr-2" />
+                {showMapInfo ? "Ocultar orientações" : "Mostrar orientações"}
+              </Button>
+            </div>
+
+            {showMapInfo && (
+              <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
+                <CardContent className="p-4 space-y-3 text-sm">
+                  <div>
+                    <h4 className="font-semibold">Posicionamento dos ministros</h4>
+                    <ul className="space-y-1 text-muted-foreground">
+                      <li>• Corredores laterais: distribuição principal da comunhão</li>
+                      <li>• Corredor central: apoio e fluidez das filas</li>
+                      <li>• Presbitério: início da distribuição e reposição de âmbulas</li>
+                      <li>• Capela do Santíssimo: atendimento especial</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mt-2">Numeração dos bancos</h4>
+                    <ul className="space-y-1 text-muted-foreground">
+                      <li>• Bancos 1-3: região frontal esquerda</li>
+                      <li>• Bancos 16-18: região frontal direita</li>
+                      <li>• Bancos 4-12: nave central</li>
+                      <li>• Bancos 13-14: mezanino</li>
+                      <li>• Cadeiras 24-26: área posterior</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="border rounded-lg bg-white dark:bg-gray-900 p-4 overflow-auto">
+              <div
+                className="flex justify-center"
+                style={{ transform: `scale(${mapZoom})`, transformOrigin: "center top" }}
+              >
+                <div
+                  className="w-full max-w-2xl h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600"
+                  data-testid="placeholder-church-map"
+                >
+                  <div className="text-center">
+                    <Map className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">Mapa do Santuário</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">Em desenvolvimento</p>
+                  </div>
                 </div>
               </div>
-              <div className="pt-3 border-t border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Importante:</strong> A conclusão desta formação é obrigatória para todos os ministros extraordinários 
-                  do Santuário São Judas Tadeu. O conteúdo está baseado nas diretrizes da CNBB e do Vaticano.
-                </p>
-              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <FileText className="h-5 w-5 text-green-600" />
+                    Documentos litúrgicos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                  Conteúdo em curadoria. Em breve disponibilizaremos materiais oficiais da CNBB e orientações paroquiais.
+                </CardContent>
+              </Card>
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <PlayCircle className="h-5 w-5 text-blue-600" />
+                    Vídeos formativos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                  Estamos produzindo novos conteúdos audiovisuais para complementar a formação teórica.
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
@@ -840,3 +1056,4 @@ export default function Formation() {
     </Layout>
   );
 }
+

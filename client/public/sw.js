@@ -190,7 +190,14 @@ self.addEventListener('activate', (event) => {
 // Handle push notifications
 self.addEventListener('push', (event) => {
   if (event.data) {
-    const data = event.data.json();
+    let data;
+    try {
+      data = event.data.json();
+    } catch (error) {
+      console.warn('[SW] Push payload is not JSON:', error);
+      data = { title: event.data.text(), body: event.data.text() };
+    }
+
     const options = {
       body: data.body,
       icon: '/images/icon-192.png',
@@ -198,7 +205,9 @@ self.addEventListener('push', (event) => {
       vibrate: [100, 50, 100],
       data: {
         dateOfArrival: Date.now(),
-        primaryKey: data.primaryKey || 1
+        primaryKey: data.primaryKey || 1,
+        url: data.url || '/communication',
+        ...data.data
       },
       actions: [
         {
@@ -223,12 +232,25 @@ self.addEventListener('push', (event) => {
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
+  const targetUrl = event.notification?.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'PUSH_NAVIGATION', url: targetUrl });
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.log('[SW] pushsubscriptionchange event', event);
 });
 
 // Handle app update available and force refresh

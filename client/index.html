@@ -80,6 +80,9 @@
               console.log('[SW] Force reloading page...');
               window.location.reload(true);
             }
+          } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
+            console.log('[SW] Navigating to push target:', event.data.url);
+            window.location.href = event.data.url;
           }
         });
 

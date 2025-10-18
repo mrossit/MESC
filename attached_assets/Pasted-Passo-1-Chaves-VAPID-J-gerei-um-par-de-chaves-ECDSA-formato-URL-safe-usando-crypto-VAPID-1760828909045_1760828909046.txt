@@ -1,0 +1,55 @@
+Passo 1 – Chaves VAPID
+
+  Já gerei um par de chaves ECDSA (formato URL-safe) usando crypto:
+
+  VAPID_PUBLIC_KEY=MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZpSC4iJkdDENrCaUJgWX35jGf2Bnp2lORV-X6WQQXl9AYth9Sf472LL-esSP9gK1IY2HT17iKcnGVq0E-REqjg
+  VAPID_PRIVATE_KEY=MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgphMnMpmIZicLzZtJ__CdJAm_HO07q1c4nG1I8oGu3z6hRANCAARmlILiImR0MQ2sJpQmBZffmMZ_
+  YGenaU5FX5fpZBBeX0Bi2H1J_jvYsv56xI_2ArUhjYdPXuIpycZWrQT5ESqO
+
+  Defina-as (junto com VAPID_SUBJECT, ex. mailto:contato@sua-paroquia.com) no ambiente do servidor antes de subir.
+
+  ———
+
+  Passo 2 – Instalar web-push
+
+  O sandbox sem acesso externo bloqueou npm install web-push (EAI_AGAIN). No ambiente de build/produção execute manualmente:
+
+  npm install web-push
+
+  Verifique se package-lock.json é atualizado e faça commit para manter a dependência.
+
+  ———
+
+  Passo 3 – Criar a tabela push_subscriptions
+
+  A estrutura já está pronta no schema; em Postgres rode a migração equivalente (exemplo em SQL):
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint text NOT NULL UNIQUE,
+    p256dh_key text NOT NULL,
+    auth_key text NOT NULL,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx
+    ON push_subscriptions(endpoint);
+
+  Se estiver usando Drizzle, pode adicionar essa migração e drizzle-kit push. Para o SQLite local o código de fallback já cria a tabela
+  automaticamente.
+
+  ———
+
+  Passo 4 – Testar inscrição e envio
+
+  1. Inicie o app, abra o popover de notificações e clique em “Ativar” (só funciona em HTTPS/localhost com SW).
+  2. Confirme a permissão do navegador. O endpoint deve aparecer no backend (tabela push_subscriptions).
+  3. Faça um POST para /api/notifications ou /api/notifications/mass-invite (logado como coordenador/gestor) para disparar uma notificação.
+  4. Verifique se a notificação push chega (mesmo com a aba em segundo plano) e, ao clicar, o app abre na rota indicada.
+
+  Se algo falhar (p.ex. permissão negada ou chaves ausentes), a UI agora mostra o estado e você pode reativar/desativar pelo mesmo painel.
+
+  Com esses passos, o sistema de notificações push fica operacional: ao criar notificações internas, elas são gravadas no banco e, se houver
+  inscrições válidas, o servidor envia via Web Push para todos os dispositivos do usuário.

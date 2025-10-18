@@ -1,6 +1,7 @@
 import { sql, relations } from 'drizzle-orm';
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -316,6 +317,19 @@ export const notifications = pgTable('notifications', {
   expiresAt: timestamp('expires_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
+
+// Push notification subscriptions
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dhKey: text('p256dh_key').notNull(),
+  authKey: text('auth_key').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  uniqueIndex('push_subscriptions_endpoint_idx').on(table.endpoint)
+]);
 
 // Formation tracks (tracks like liturgia, espiritualidade, pratica)
 export const formationTracks = pgTable('formation_tracks', {
@@ -877,6 +891,8 @@ export type QuestionnaireResponse = typeof questionnaireResponses.$inferSelect;
 export type Schedule = typeof schedules.$inferSelect;
 export type SubstitutionRequest = typeof substitutionRequests.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
 export type FormationModule = typeof formationModules.$inferSelect;
 export type FormationProgress = typeof formationProgress.$inferSelect;
 export type MassTimeConfig = typeof massTimesConfig.$inferSelect;
