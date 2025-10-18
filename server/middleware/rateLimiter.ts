@@ -56,6 +56,14 @@ export const authRateLimiter = rateLimit({
 export const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
   max: 100, // Máximo 100 requests por minuto por IP
+  
+  // Desabilita validações pois usamos trust proxy no Replit
+  validate: false,
+  keyGenerator: (req: Request) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return `api:${ip}`;
+  },
+  
   message: {
     error: 'Muitas requisições. Tente novamente em breve.'
   },
