@@ -56,11 +56,14 @@ export function usePushNotifications() {
 
     async function loadConfig() {
       try {
-        const response = await apiRequest("GET", "/api/notifications/push/config");
-        const data: PushConfig = await response.json();
+        const response = await apiRequest("GET", "/api/push-subscriptions/vapid-public-key");
+        const data: { publicKey: string } = await response.json();
         if (cancelled) return;
-        setConfig(data);
-        if (!data.enabled || !data.publicKey) {
+        setConfig({
+          enabled: !!data.publicKey,
+          publicKey: data.publicKey || null
+        });
+        if (!data.publicKey) {
           setStatus("missing-key");
         } else {
           setStatus("ready");
@@ -98,9 +101,7 @@ export function usePushNotifications() {
 
         if (subscription) {
           try {
-            await apiRequest("POST", "/api/notifications/push/subscribe", {
-              subscription: subscription.toJSON()
-            });
+            await apiRequest("POST", "/api/push-subscriptions/subscribe", subscription.toJSON());
             hasSyncedRef.current = true;
           } catch (err) {
             console.warn("[Push] Failed to sync existing subscription:", err);
@@ -156,9 +157,7 @@ export function usePushNotifications() {
         });
       }
 
-      await apiRequest("POST", "/api/notifications/push/subscribe", {
-        subscription: subscription.toJSON()
-      });
+      await apiRequest("POST", "/api/push-subscriptions/subscribe", subscription.toJSON());
 
       setPermission("granted");
       setIsSubscribed(true);
@@ -189,7 +188,7 @@ export function usePushNotifications() {
       }
 
       await subscription.unsubscribe();
-      await apiRequest("POST", "/api/notifications/push/unsubscribe", {
+      await apiRequest("POST", "/api/push-subscriptions/unsubscribe", {
         endpoint: subscription.endpoint
       });
 

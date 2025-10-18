@@ -146,20 +146,33 @@ async function fetchJson<T>(url: string, errorFallback: string): Promise<T> {
     credentials: "include"
   });
 
-  if (!response.ok) {
+  const raw = await response.text();
+  let parsed: unknown = undefined;
+
+  if (raw) {
     try {
-      const data = await response.json();
-      const message = typeof data === "object" && data && "message" in data
-        ? (data.message as string)
-        : errorFallback;
-      throw new Error(message);
+      parsed = JSON.parse(raw);
     } catch {
-      const text = await response.text().catch(() => null);
-      throw new Error(text || errorFallback);
+      parsed = raw;
     }
   }
 
-  return response.json() as Promise<T>;
+  if (!response.ok) {
+    const message =
+      (parsed && typeof parsed === "object" && "message" in parsed && parsed.message) ||
+      (typeof parsed === "string" ? parsed : null) ||
+      errorFallback;
+    throw new Error(String(message));
+  }
+
+  if (parsed === undefined) {
+    if (!response.ok) {
+      throw new Error(errorFallback);
+    }
+    return {} as T;
+  }
+
+  return parsed as T;
 }
 
 const fetchFormationOverview = () =>
