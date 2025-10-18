@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "@/hooks/use-navigate";
@@ -46,6 +47,16 @@ export function NotificationBell({ compact = false, showLabel = false, className
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [lastCount, setLastCount] = useState(0);
+  const {
+    isSupported: pushSupported,
+    status: pushStatus,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    subscribe: enablePushNotifications,
+    unsubscribe: disablePushNotifications,
+    isBusy: pushBusy,
+    error: pushError
+  } = usePushNotifications();
 
   // Fetch notifications
   const { data: notifications = [], refetch: refetchNotifications } = useQuery<Notification[]>({
@@ -199,6 +210,42 @@ export function NotificationBell({ compact = false, showLabel = false, className
             </div>
           </div>
         </div>
+
+        {pushSupported && (
+          <div className="px-4 py-3 border-b bg-muted/40 dark:bg-dark-6/70 text-xs text-muted-foreground space-y-2">
+            {pushStatus === "missing-key" ? (
+              <p>Notificações push indisponíveis neste ambiente.</p>
+            ) : pushStatus === "errored" ? (
+              <p className="text-red-500">Não foi possível inicializar as notificações push. Tente novamente mais tarde.</p>
+            ) : pushPermission === "denied" ? (
+              <p className="text-red-500">As notificações push estão bloqueadas nas configurações do navegador. Altere as permissões para habilitar os alertas.</p>
+            ) : pushSubscribed ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Notificações push ativas neste dispositivo.</span>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => disablePushNotifications()}
+                  disabled={pushBusy}
+                >
+                  {pushBusy ? "Aguarde..." : "Desativar"}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Ative alertas push para receber avisos mesmo fora do app.</span>
+                <Button
+                  size="xs"
+                  onClick={() => enablePushNotifications()}
+                  disabled={pushBusy || pushStatus === "errored"}
+                >
+                  {pushBusy ? "Ativando..." : "Ativar"}
+                </Button>
+              </div>
+            )}
+            {pushError && <p className="text-[10px] text-red-500">{pushError}</p>}
+          </div>
+        )}
 
         {/* Notifications List */}
         <ScrollArea className="h-[400px]">

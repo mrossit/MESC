@@ -5,6 +5,7 @@ import {
   schedules,
   substitutionRequests,
   notifications,
+  pushSubscriptions,
   massTimesConfig,
   families,
   familyRelationships,
@@ -22,6 +23,7 @@ import {
   type Schedule,
   type SubstitutionRequest,
   type Notification,
+  type PushSubscription,
   type MassTimeConfig,
   type InsertMassTime,
   type FamilyRelationship,
@@ -37,7 +39,7 @@ import {
   type InsertFormationLessonProgress,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, count, sql, gte, lte, or } from "drizzle-orm";
+import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
 import Database from 'better-sqlite3';
 
 // SOLUÇÃO DEFINITIVA: Fallback SQLite quando Drizzle falha
@@ -157,6 +159,10 @@ export interface IStorage {
   createNotification(notification: any): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
   markNotificationAsRead(id: string): Promise<void>;
+  upsertPushSubscription(userId: string, subscription: { endpoint: string; keys: { auth: string; p256dh: string } }): Promise<PushSubscription>;
+  removePushSubscription(userId: string, endpoint: string): Promise<void>;
+  removePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  getPushSubscriptionsByUserIds(userIds: string[]): Promise<PushSubscription[]>;
   
   // Dashboard statistics
   getDashboardStats(): Promise<{
@@ -212,6 +218,42 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private pushSubscriptionsEnsured = false;
+
+  private async ensurePushSubscriptionTable() {
+    if (this.pushSubscriptionsEnsured || process.env.DATABASE_URL) {
+      this.pushSubscriptionsEnsured = true;
+      return;
+    }
+
+    try {
+      // Attempt to query table; if it fails we create it via SQLite fallback
+      await (db as any).all?.('SELECT 1 FROM push_subscriptions LIMIT 1');
+    } catch (error) {
+      try {
+        const sqlite = DrizzleSQLiteFallback.getSQLiteDB();
+        sqlite
+          .prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+            user_id TEXT NOT NULL,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh_key TEXT NOT NULL,
+            auth_key TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )`)
+          .run();
+        sqlite
+          .prepare(`CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint)`)
+          .run();
+      } catch (sqliteError) {
+        console.error('[SQLite] Failed to ensure push_subscriptions table:', sqliteError);
+      }
+    }
+
+    this.pushSubscriptionsEnsured = true;
+  }
   // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -613,6 +655,65 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ read: true, readAt: new Date() })
       .where(eq(notifications.id, id));
+  }
+
+  async upsertPushSubscription(userId: string, subscription: { endpoint: string; keys: { auth: string; p256dh: string } }): Promise<PushSubscription> {
+    await this.ensurePushSubscriptionTable();
+
+    const existing = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(pushSubscriptions)
+        .set({
+          userId,
+          authKey: subscription.keys.auth,
+          p256dhKey: subscription.keys.p256dh,
+          updatedAt: new Date()
+        })
+        .where(eq(pushSubscriptions.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(pushSubscriptions)
+      .values({
+        userId,
+        endpoint: subscription.endpoint,
+        authKey: subscription.keys.auth,
+        p256dhKey: subscription.keys.p256dh
+      })
+      .returning();
+    return created;
+  }
+
+  async removePushSubscription(userId: string, endpoint: string): Promise<void> {
+    await this.ensurePushSubscriptionTable();
+    await db
+      .delete(pushSubscriptions)
+      .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
+  }
+
+  async removePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await this.ensurePushSubscriptionTable();
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  async getPushSubscriptionsByUserIds(userIds: string[]): Promise<PushSubscription[]> {
+    await this.ensurePushSubscriptionTable();
+    if (!userIds || userIds.length === 0) {
+      return [];
+    }
+    const uniqueIds = Array.from(new Set(userIds));
+    return await db
+      .select()
+      .from(pushSubscriptions)
+      .where(inArray(pushSubscriptions.userId, uniqueIds));
   }
 
   // Dashboard statistics
@@ -1195,6 +1296,141 @@ export class DatabaseStorage implements IStorage {
       completedSections: sectionIds,
       timeSpentMinutes: 0 // Will be preserved from existing record
     });
+  }
+
+  async getFormationOverview(userId?: string) {
+    const [tracks, modules, lessons] = await Promise.all([
+      db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title),
+      db.select().from(formationModules).orderBy(formationModules.trackId, formationModules.orderIndex),
+      db.select().from(formationLessons).orderBy(formationLessons.trackId, formationLessons.moduleId, formationLessons.lessonNumber)
+    ]);
+
+    const progressRecords = userId
+      ? await db
+          .select()
+          .from(formationLessonProgress)
+          .where(eq(formationLessonProgress.userId, userId))
+      : [];
+
+    const progressMap = new Map<string, FormationLessonProgress>(
+      progressRecords.map((record) => [record.lessonId, record])
+    );
+
+    const lessonsByModule = new Map<string, Array<FormationLesson & { progress: FormationLessonProgress | null }>>();
+    for (const lesson of lessons) {
+      const lessonWithProgress = {
+        ...lesson,
+        progress: progressMap.get(lesson.id) ?? null
+      };
+      if (!lessonsByModule.has(lesson.moduleId)) {
+        lessonsByModule.set(lesson.moduleId, []);
+      }
+      lessonsByModule.get(lesson.moduleId)!.push(lessonWithProgress);
+    }
+
+    const modulesByTrack = new Map<string, Array<FormationModule & {
+      lessons: Array<FormationLesson & { progress: FormationLessonProgress | null }>;
+      stats: {
+        totalLessons: number;
+        completedLessons: number;
+        inProgressLessons: number;
+        progressPercentage: number;
+      };
+    }>>();
+
+    for (const module of modules) {
+      const moduleLessons = [...(lessonsByModule.get(module.id) ?? [])].sort(
+        (a, b) => a.lessonNumber - b.lessonNumber
+      );
+      const completedLessons = moduleLessons.filter(
+        (lesson) => lesson.progress?.status === 'completed'
+      ).length;
+      const inProgressLessons = moduleLessons.filter(
+        (lesson) => lesson.progress?.status === 'in_progress'
+      ).length;
+      const totalLessons = moduleLessons.length;
+      const progressPercentage =
+        totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+      const moduleEntry = {
+        ...module,
+        lessons: moduleLessons,
+        stats: {
+          totalLessons,
+          completedLessons,
+          inProgressLessons,
+          progressPercentage
+        }
+      };
+
+      if (!modulesByTrack.has(module.trackId)) {
+        modulesByTrack.set(module.trackId, []);
+      }
+      modulesByTrack.get(module.trackId)!.push(moduleEntry);
+    }
+
+    const trackOverviews = tracks.map((track) => {
+      const trackModules = modulesByTrack.get(track.id) ?? [];
+      const totalModules = trackModules.length;
+      const totalLessons = trackModules.reduce((acc, module) => acc + module.stats.totalLessons, 0);
+      const completedLessons = trackModules.reduce(
+        (acc, module) => acc + module.stats.completedLessons,
+        0
+      );
+      const inProgressLessons = trackModules.reduce(
+        (acc, module) => acc + module.stats.inProgressLessons,
+        0
+      );
+      const progressPercentage =
+        totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+      const nextLesson =
+        trackModules
+          .flatMap((module) => module.lessons)
+          .find((lesson) => lesson.progress?.status !== 'completed') ?? null;
+
+      return {
+        ...track,
+        modules: trackModules,
+        stats: {
+          totalModules,
+          totalLessons,
+          completedLessons,
+          inProgressLessons,
+          progressPercentage
+        },
+        nextLesson
+      };
+    });
+
+    const totals = trackOverviews.reduce(
+      (acc, track) => {
+        acc.totalModules += track.stats.totalModules;
+        acc.totalLessons += track.stats.totalLessons;
+        acc.completedLessons += track.stats.completedLessons;
+        acc.inProgressLessons += track.stats.inProgressLessons;
+        return acc;
+      },
+      {
+        totalModules: 0,
+        totalLessons: 0,
+        completedLessons: 0,
+        inProgressLessons: 0
+      }
+    );
+
+    const percentageCompleted =
+      totals.totalLessons > 0 ? Math.round((totals.completedLessons / totals.totalLessons) * 100) : 0;
+
+    return {
+      tracks: trackOverviews,
+      summary: {
+        totalTracks: trackOverviews.length,
+        ...totals,
+        percentageCompleted,
+        lastUpdated: new Date().toISOString()
+      }
+    };
   }
 }
 

@@ -60,15 +60,15 @@
     <!-- Security -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="format-detection" content="telephone=no">
-    <script type="module" crossorigin src="/js/index-DyVz_3LQ.js"></script>
+    <script type="module" crossorigin src="/js/index-WCjtLsge.js"></script>
     <link rel="modulepreload" crossorigin href="/js/vendor-react-BSOTRkRF.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-router-D488sAzk.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-query-CwzRqKiB.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-ui-BUyKyyYL.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-charts-DSHTQCfj.js">
-    <link rel="modulepreload" crossorigin href="/js/vendor-date-imD4d7vK.js">
-    <link rel="modulepreload" crossorigin href="/js/vendor-icons-BatFPVOE.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DOmk03FS.css">
+    <link rel="modulepreload" crossorigin href="/js/vendor-date-D2IZz3oM.js">
+    <link rel="modulepreload" crossorigin href="/js/vendor-icons-B-fTmu61.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BVsAHRBs.css">
   </head>
   <body>
     <div id="root"></div>
@@ -88,6 +88,9 @@
               console.log('[SW] Force reloading page...');
               window.location.reload(true);
             }
+          } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
+            console.log('[SW] Navigating to push target:', event.data.url);
+            window.location.href = event.data.url;
           }
         });
 

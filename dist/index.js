@@ -62,6 +62,7 @@ __export(schema_exports, {
   notifications: () => notifications,
   notificationsRelations: () => notificationsRelations,
   passwordResetRequests: () => passwordResetRequests,
+  pushSubscriptions: () => pushSubscriptions,
   questionnaireResponses: () => questionnaireResponses,
   questionnaireResponsesRelations: () => questionnaireResponsesRelations,
   questionnaires: () => questionnaires,
@@ -86,6 +87,7 @@ __export(schema_exports, {
 import { sql, relations } from "drizzle-orm";
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -99,7 +101,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -344,6 +346,17 @@ var init_schema = __esm({
       expiresAt: timestamp("expires_at"),
       createdAt: timestamp("created_at").defaultNow()
     });
+    pushSubscriptions = pgTable("push_subscriptions", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      endpoint: text("endpoint").notNull(),
+      p256dhKey: text("p256dh_key").notNull(),
+      authKey: text("auth_key").notNull(),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      uniqueIndex("push_subscriptions_endpoint_idx").on(table.endpoint)
+    ]);
     formationTracks = pgTable("formation_tracks", {
       id: varchar("id").primaryKey(),
       // liturgia, espiritualidade, pratica
@@ -900,7 +913,7 @@ __export(storage_exports, {
   DatabaseStorage: () => DatabaseStorage,
   storage: () => storage
 });
-import { eq, and, desc, count, sql as sql2, gte, lte, or } from "drizzle-orm";
+import { eq, and, desc, count, sql as sql2, gte, lte, or, inArray } from "drizzle-orm";
 import Database from "better-sqlite3";
 var DrizzleSQLiteFallback, DatabaseStorage, storage;
 var init_storage = __esm({
@@ -953,6 +966,34 @@ var init_storage = __esm({
       }
     };
     DatabaseStorage = class {
+      pushSubscriptionsEnsured = false;
+      async ensurePushSubscriptionTable() {
+        if (this.pushSubscriptionsEnsured || process.env.DATABASE_URL) {
+          this.pushSubscriptionsEnsured = true;
+          return;
+        }
+        try {
+          await db.all?.("SELECT 1 FROM push_subscriptions LIMIT 1");
+        } catch (error) {
+          try {
+            const sqlite = DrizzleSQLiteFallback.getSQLiteDB();
+            sqlite.prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+            user_id TEXT NOT NULL,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh_key TEXT NOT NULL,
+            auth_key TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )`).run();
+            sqlite.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint)`).run();
+          } catch (sqliteError) {
+            console.error("[SQLite] Failed to ensure push_subscriptions table:", sqliteError);
+          }
+        }
+        this.pushSubscriptionsEnsured = true;
+      }
       // User operations (mandatory for Replit Auth)
       async getUser(id) {
         const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1229,6 +1270,42 @@ var init_storage = __esm({
       }
       async markNotificationAsRead(id) {
         await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq(notifications.id, id));
+      }
+      async upsertPushSubscription(userId, subscription) {
+        await this.ensurePushSubscriptionTable();
+        const existing = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
+        if (existing.length > 0) {
+          const [updated] = await db.update(pushSubscriptions).set({
+            userId,
+            authKey: subscription.keys.auth,
+            p256dhKey: subscription.keys.p256dh,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq(pushSubscriptions.id, existing[0].id)).returning();
+          return updated;
+        }
+        const [created] = await db.insert(pushSubscriptions).values({
+          userId,
+          endpoint: subscription.endpoint,
+          authKey: subscription.keys.auth,
+          p256dhKey: subscription.keys.p256dh
+        }).returning();
+        return created;
+      }
+      async removePushSubscription(userId, endpoint) {
+        await this.ensurePushSubscriptionTable();
+        await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
+      }
+      async removePushSubscriptionByEndpoint(endpoint) {
+        await this.ensurePushSubscriptionTable();
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+      }
+      async getPushSubscriptionsByUserIds(userIds) {
+        await this.ensurePushSubscriptionTable();
+        if (!userIds || userIds.length === 0) {
+          return [];
+        }
+        const uniqueIds = Array.from(new Set(userIds));
+        return await db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.userId, uniqueIds));
       }
       // Dashboard statistics
       async getDashboardStats() {
@@ -1578,6 +1655,108 @@ var init_storage = __esm({
           timeSpentMinutes: 0
           // Will be preserved from existing record
         });
+      }
+      async getFormationOverview(userId) {
+        const [tracks, modules, lessons] = await Promise.all([
+          db.select().from(formationTracks).orderBy(formationTracks.orderIndex, formationTracks.title),
+          db.select().from(formationModules).orderBy(formationModules.trackId, formationModules.orderIndex),
+          db.select().from(formationLessons).orderBy(formationLessons.trackId, formationLessons.moduleId, formationLessons.lessonNumber)
+        ]);
+        const progressRecords = userId ? await db.select().from(formationLessonProgress).where(eq(formationLessonProgress.userId, userId)) : [];
+        const progressMap = new Map(
+          progressRecords.map((record) => [record.lessonId, record])
+        );
+        const lessonsByModule = /* @__PURE__ */ new Map();
+        for (const lesson of lessons) {
+          const lessonWithProgress = {
+            ...lesson,
+            progress: progressMap.get(lesson.id) ?? null
+          };
+          if (!lessonsByModule.has(lesson.moduleId)) {
+            lessonsByModule.set(lesson.moduleId, []);
+          }
+          lessonsByModule.get(lesson.moduleId).push(lessonWithProgress);
+        }
+        const modulesByTrack = /* @__PURE__ */ new Map();
+        for (const module of modules) {
+          const moduleLessons = [...lessonsByModule.get(module.id) ?? []].sort(
+            (a, b) => a.lessonNumber - b.lessonNumber
+          );
+          const completedLessons = moduleLessons.filter(
+            (lesson) => lesson.progress?.status === "completed"
+          ).length;
+          const inProgressLessons = moduleLessons.filter(
+            (lesson) => lesson.progress?.status === "in_progress"
+          ).length;
+          const totalLessons = moduleLessons.length;
+          const progressPercentage = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
+          const moduleEntry = {
+            ...module,
+            lessons: moduleLessons,
+            stats: {
+              totalLessons,
+              completedLessons,
+              inProgressLessons,
+              progressPercentage
+            }
+          };
+          if (!modulesByTrack.has(module.trackId)) {
+            modulesByTrack.set(module.trackId, []);
+          }
+          modulesByTrack.get(module.trackId).push(moduleEntry);
+        }
+        const trackOverviews = tracks.map((track) => {
+          const trackModules = modulesByTrack.get(track.id) ?? [];
+          const totalModules = trackModules.length;
+          const totalLessons = trackModules.reduce((acc, module) => acc + module.stats.totalLessons, 0);
+          const completedLessons = trackModules.reduce(
+            (acc, module) => acc + module.stats.completedLessons,
+            0
+          );
+          const inProgressLessons = trackModules.reduce(
+            (acc, module) => acc + module.stats.inProgressLessons,
+            0
+          );
+          const progressPercentage = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
+          const nextLesson = trackModules.flatMap((module) => module.lessons).find((lesson) => lesson.progress?.status !== "completed") ?? null;
+          return {
+            ...track,
+            modules: trackModules,
+            stats: {
+              totalModules,
+              totalLessons,
+              completedLessons,
+              inProgressLessons,
+              progressPercentage
+            },
+            nextLesson
+          };
+        });
+        const totals = trackOverviews.reduce(
+          (acc, track) => {
+            acc.totalModules += track.stats.totalModules;
+            acc.totalLessons += track.stats.totalLessons;
+            acc.completedLessons += track.stats.completedLessons;
+            acc.inProgressLessons += track.stats.inProgressLessons;
+            return acc;
+          },
+          {
+            totalModules: 0,
+            totalLessons: 0,
+            completedLessons: 0,
+            inProgressLessons: 0
+          }
+        );
+        const percentageCompleted = totals.totalLessons > 0 ? Math.round(totals.completedLessons / totals.totalLessons * 100) : 0;
+        return {
+          tracks: trackOverviews,
+          summary: {
+            totalTracks: trackOverviews.length,
+            ...totals,
+            percentageCompleted,
+            lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+          }
+        };
       }
     };
     storage = new DatabaseStorage();
@@ -9580,7 +9759,7 @@ await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and8, gte as gte3, lte as lte3, eq as eq11, sql as sql5, ne as ne3, desc as desc4, inArray } from "drizzle-orm";
+import { and as and8, gte as gte3, lte as lte3, eq as eq11, sql as sql5, ne as ne3, desc as desc4, inArray as inArray2 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
 var router6 = Router6();
@@ -9740,7 +9919,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
           const deletedSubstitutions = await db.delete(substitutionRequests).where(
-            inArray(substitutionRequests.scheduleId, scheduleIds)
+            inArray2(substitutionRequests.scheduleId, scheduleIds)
           );
           console.log(`Deleted substitution requests`);
           const deletedSchedules = await db.delete(schedules).where(
@@ -9872,7 +10051,7 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
       }
     };
     if (db && analysis.ministerIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray(users.id, analysis.ministerIds.slice(0, 50)));
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray2(users.id, analysis.ministerIds.slice(0, 50)));
       analysis.ministerIdsInDb = existingMinisters.length;
       analysis.ministerIdsRequested = analysis.ministerIds.length;
       const existingIds = new Set(existingMinisters.map((m) => m.id));
@@ -9922,7 +10101,7 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         const scheduleIds = existingSchedules.map((s) => s.id);
         console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), "...");
         const deletedSubstitutions = await db.delete(substitutionRequests).where(
-          inArray(substitutionRequests.scheduleId, scheduleIds)
+          inArray2(substitutionRequests.scheduleId, scheduleIds)
         );
         console.log(`Deleted substitution requests:`, deletedSubstitutions);
         logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
@@ -10166,7 +10345,7 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
       if (existingSchedules.length > 0) {
         const scheduleIds = existingSchedules.map((s) => s.id);
         await db.delete(substitutionRequests).where(
-          inArray(substitutionRequests.scheduleId, scheduleIds)
+          inArray2(substitutionRequests.scheduleId, scheduleIds)
         );
       }
       await db.delete(schedules).where(
@@ -11513,10 +11692,8 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       confirmed: sql7`true`,
       status: schedules.status
     }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
-      and10(
-        eq13(schedules.date, targetDateStr),
-        eq13(schedules.status, "scheduled")
-      )
+      eq13(schedules.date, targetDateStr)
+      // Aceitar qualquer status (scheduled ou published)
     ).orderBy(schedules.time, schedules.position);
     if (allAssignments.length === 0) {
       return res.json({
@@ -11903,7 +12080,7 @@ var schedules_default = router9;
 await init_db();
 init_schema();
 import { Router as Router10 } from "express";
-import { eq as eq14, and as and11, inArray as inArray3, sql as sql8 } from "drizzle-orm";
+import { eq as eq14, and as and11, inArray as inArray4, sql as sql8 } from "drizzle-orm";
 import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
 var router10 = Router10();
 async function isAuxiliaryForMass(userId, scheduleId) {
@@ -11911,7 +12088,7 @@ async function isAuxiliaryForMass(userId, scheduleId) {
     and11(
       eq14(schedules.id, scheduleId),
       eq14(schedules.ministerId, userId),
-      inArray3(schedules.position, [1, 2])
+      inArray4(schedules.position, [1, 2])
     )
   ).limit(1);
   return assignment.length > 0;
@@ -12302,7 +12479,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
     if (incidents && incidents.length > 0) {
       const coordinators = await db.select().from(users).where(
         and11(
-          inArray3(users.role, ["coordenador", "gestor"]),
+          inArray4(users.role, ["coordenador", "gestor"]),
           eq14(users.status, "active")
         )
       );
@@ -12454,6 +12631,70 @@ await init_db();
 await init_storage();
 init_schema();
 import { eq as eq16, and as and12 } from "drizzle-orm";
+
+// server/utils/pushNotifications.ts
+await init_storage();
+var webpush = null;
+try {
+  const module = await import("web-push");
+  webpush = module.default ?? module;
+} catch (error) {
+  console.warn("[PUSH] web-push module not available. Push notifications disabled.", error);
+}
+var VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
+var VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
+var VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
+var pushConfig = {
+  enabled: Boolean(webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
+  publicKey: VAPID_PUBLIC_KEY || null
+};
+async function sendPushNotificationToUsers(userIds, payload) {
+  if (!pushConfig.enabled || !webpush) {
+    return;
+  }
+  if (!userIds || userIds.length === 0) {
+    return;
+  }
+  const uniqueUserIds = Array.from(new Set(userIds));
+  const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  if (subscriptions.length === 0) {
+    return;
+  }
+  const notificationPayload = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url ?? payload.data?.url ?? "/communication",
+    tag: payload.tag,
+    data: payload.data ?? {}
+  });
+  await Promise.all(
+    subscriptions.map(async (subscription) => {
+      const pushSubscription = {
+        endpoint: subscription.endpoint,
+        keys: {
+          auth: subscription.authKey,
+          p256dh: subscription.p256dhKey
+        }
+      };
+      try {
+        await webpush.sendNotification(pushSubscription, notificationPayload);
+      } catch (error) {
+        const statusCode = error?.statusCode ?? error?.code;
+        if (statusCode === 404 || statusCode === 410) {
+          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint);
+          await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
+        } else {
+          console.error("[PUSH] Failed to send notification:", error);
+        }
+      }
+    })
+  );
+}
+
+// server/routes/notifications.ts
 var router12 = Router12();
 var createNotificationSchema = z5.object({
   title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
@@ -12461,7 +12702,22 @@ var createNotificationSchema = z5.object({
   type: z5.enum(["info", "warning", "success", "error"]).default("info"),
   recipientIds: z5.array(z5.string()).optional(),
   // IDs específicos ou vazio para todos
-  recipientRole: z5.enum(["ministro", "coordenador", "gestor", "all"]).optional()
+  recipientRole: z5.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
+  actionUrl: z5.string().url().optional()
+});
+var rawPushSubscriptionSchema = z5.object({
+  endpoint: z5.string().url(),
+  keys: z5.object({
+    p256dh: z5.string(),
+    auth: z5.string()
+  })
+});
+var pushSubscriptionSchema = z5.union([
+  z5.object({ subscription: rawPushSubscriptionSchema }),
+  rawPushSubscriptionSchema
+]);
+var unsubscribeSchema = z5.object({
+  endpoint: z5.string().url()
 });
 function mapNotificationType(frontendType) {
   switch (frontendType) {
@@ -12477,6 +12733,47 @@ function mapNotificationType(frontendType) {
       return "announcement";
   }
 }
+router12.get("/push/config", authenticateToken, (req, res) => {
+  res.json({
+    enabled: pushConfig.enabled,
+    publicKey: pushConfig.publicKey
+  });
+});
+router12.post("/push/subscribe", authenticateToken, async (req, res) => {
+  try {
+    if (!pushConfig.enabled) {
+      return res.status(503).json({ error: "Notifica\xE7\xF5es push n\xE3o est\xE3o configuradas no servidor" });
+    }
+    const parsed = pushSubscriptionSchema.parse(req.body);
+    const subscription = "subscription" in parsed ? parsed.subscription : parsed;
+    await storage.upsertPushSubscription(req.user.id, {
+      endpoint: subscription.endpoint,
+      keys: subscription.keys
+    });
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z5.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else {
+      console.error("Erro ao registrar push subscription:", error);
+      res.status(500).json({ error: "Erro ao registrar subscription push" });
+    }
+  }
+});
+router12.post("/push/unsubscribe", authenticateToken, async (req, res) => {
+  try {
+    const { endpoint } = unsubscribeSchema.parse(req.body);
+    await storage.removePushSubscription(req.user.id, endpoint);
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z5.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else {
+      console.error("Erro ao remover push subscription:", error);
+      res.status(500).json({ error: "Erro ao remover subscription push" });
+    }
+  }
+});
 router12.get("/", authenticateToken, async (req, res) => {
   try {
     const notifications2 = await storage.getUserNotifications(req.user.id);
@@ -12545,11 +12842,26 @@ router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
         title,
         message: message || `Precisamos de ministros para a missa de ${date2} \xE0s ${time2} na ${location}. Por favor, confirme sua disponibilidade.`,
         type: mappedType,
-        read: false
+        read: false,
+        actionUrl: "/schedules"
       })
     );
     const results = await Promise.all(notificationPromises);
     console.log(`Criadas ${results.length} notifica\xE7\xF5es`);
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(
+        ministers.map((minister) => minister.id),
+        {
+          title,
+          body: message || `Precisamos de ministros para a missa de ${date2} \xE0s ${time2} na ${location}. Por favor, confirme sua disponibilidade.`,
+          url: "/schedules",
+          data: {
+            massId,
+            urgencyLevel
+          }
+        }
+      );
+    }
     console.log(`[Activity Log] mass_invite_sent: Enviou convite para missa de ${date2} \xE0s ${time2}`, {
       userId: req.user.id,
       massId,
@@ -12595,6 +12907,7 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     if (!recipientUserIds.includes(req.user.id)) {
       recipientUserIds.push(req.user.id);
     }
+    recipientUserIds = Array.from(new Set(recipientUserIds));
     const mappedType = mapNotificationType(data.type);
     const notificationPromises = recipientUserIds.map(
       (userId) => storage.createNotification({
@@ -12602,10 +12915,18 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
         title: data.title,
         message: data.message,
         type: mappedType,
-        read: false
+        read: false,
+        actionUrl: data.actionUrl ?? null
       })
     );
     await Promise.all(notificationPromises);
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(recipientUserIds, {
+        title: data.title,
+        body: data.message,
+        url: data.actionUrl ?? "/communication"
+      });
+    }
     console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {
       userId: req.user.id,
       recipientCount: recipientUserIds.length,
@@ -13082,7 +13403,7 @@ var ministers_default = router14;
 await init_db();
 init_schema();
 import { Router as Router15 } from "express";
-import { eq as eq20, and as and16, sql as sql12, gte as gte9, desc as desc7, count as count5, notInArray, inArray as inArray4 } from "drizzle-orm";
+import { eq as eq20, and as and16, sql as sql12, gte as gte9, desc as desc7, count as count5, notInArray, inArray as inArray5 } from "drizzle-orm";
 var router15 = Router15();
 function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
@@ -13152,7 +13473,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     const [existingRequest] = await db.select().from(substitutionRequests).where(
       and16(
         eq20(substitutionRequests.scheduleId, scheduleId),
-        inArray4(substitutionRequests.status, ["pending", "available"])
+        inArray5(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -16121,6 +16442,15 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to delete mass time" });
     }
   });
+  app2.get("/api/formation/overview", authenticateToken, async (req, res) => {
+    try {
+      const overview = await storage.getFormationOverview(req.user?.id);
+      res.json(overview);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar vis\xE3o geral da forma\xE7\xE3o");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
   app2.get("/api/formation/tracks", authenticateToken, async (req, res) => {
     try {
       const tracks = await storage.getFormationTracks();
@@ -16171,18 +16501,6 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
-    try {
-      const lesson = await storage.getFormationLessonById(req.params.id);
-      if (!lesson) {
-        return res.status(404).json({ message: "Aula n\xE3o encontrada" });
-      }
-      res.json(lesson);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
   app2.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId } = req.params;
@@ -16196,6 +16514,18 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error(`[DEBUG ROUTE ERROR]`, error);
       const errorResponse = handleApiError(error, "buscar aulas do m\xF3dulo");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+  app2.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
+    try {
+      const lesson = await storage.getFormationLessonById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: "Aula n\xE3o encontrada" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aula");
       res.status(errorResponse.status).json(errorResponse);
     }
   });

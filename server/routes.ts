@@ -1058,6 +1058,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Formation routes
+  app.get('/api/formation/overview', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const overview = await storage.getFormationOverview(req.user?.id);
+      res.json(overview);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar visão geral da formação");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
   // Formation tracks
   app.get('/api/formation/tracks', authenticateToken, async (req, res) => {
     try {
@@ -1117,20 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/formation/lessons/:id', authenticateToken, async (req, res) => {
-    try {
-      const lesson = await storage.getFormationLessonById(req.params.id);
-      if (!lesson) {
-        return res.status(404).json({ message: "Aula não encontrada" });
-      }
-      res.json(lesson);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-
-  // Get lesson by track, module and lesson number - also support legacy URLs
+  // More specific route must come before single-parameter route
   app.get('/api/formation/lessons/:trackId/:moduleId', authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId } = req.params;
@@ -1144,6 +1141,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error(`[DEBUG ROUTE ERROR]`, error);
       const errorResponse = handleApiError(error, "buscar aulas do módulo");
+      res.status(errorResponse.status).json(errorResponse);
+    }
+  });
+
+  app.get('/api/formation/lessons/:id', authenticateToken, async (req, res) => {
+    try {
+      const lesson = await storage.getFormationLessonById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: "Aula não encontrada" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      const errorResponse = handleApiError(error, "buscar aula");
       res.status(errorResponse.status).json(errorResponse);
     }
   });

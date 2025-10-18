@@ -5,6 +5,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { notifications, users } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { pushConfig, sendPushNotificationToUsers } from "../utils/pushNotifications";
 
 const router = Router();
 
@@ -15,6 +16,24 @@ const createNotificationSchema = z.object({
   type: z.enum(["info", "warning", "success", "error"]).default("info"),
   recipientIds: z.array(z.string()).optional(), // IDs específicos ou vazio para todos
   recipientRole: z.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
+  actionUrl: z.string().url().optional(),
+});
+
+const rawPushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string(),
+    auth: z.string()
+  })
+});
+
+const pushSubscriptionSchema = z.union([
+  z.object({ subscription: rawPushSubscriptionSchema }),
+  rawPushSubscriptionSchema
+]);
+
+const unsubscribeSchema = z.object({
+  endpoint: z.string().url()
 });
 
 // Mapeamento dos tipos do frontend para o banco
@@ -32,6 +51,56 @@ function mapNotificationType(frontendType: "info" | "warning" | "success" | "err
       return "announcement";
   }
 }
+
+// Configuração de push
+router.get("/push/config", requireAuth, (req: AuthRequest, res: Response) => {
+  res.json({
+    enabled: pushConfig.enabled,
+    publicKey: pushConfig.publicKey
+  });
+});
+
+// Registrar subscription push
+router.post("/push/subscribe", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!pushConfig.enabled) {
+      return res.status(503).json({ error: "Notificações push não estão configuradas no servidor" });
+    }
+
+    const parsed = pushSubscriptionSchema.parse(req.body);
+    const subscription = "subscription" in parsed ? parsed.subscription : parsed;
+
+    await storage.upsertPushSubscription(req.user!.id, {
+      endpoint: subscription.endpoint,
+      keys: subscription.keys
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else {
+      console.error("Erro ao registrar push subscription:", error);
+      res.status(500).json({ error: "Erro ao registrar subscription push" });
+    }
+  }
+});
+
+// Remover subscription push
+router.post("/push/unsubscribe", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { endpoint } = unsubscribeSchema.parse(req.body);
+    await storage.removePushSubscription(req.user!.id, endpoint);
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else {
+      console.error("Erro ao remover push subscription:", error);
+      res.status(500).json({ error: "Erro ao remover subscription push" });
+    }
+  }
+});
 
 // Listar notificações do usuário
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -147,11 +216,27 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
         message: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
         type: mappedType,
         read: false,
+        actionUrl: '/schedules'
       })
     );
     
     const results = await Promise.all(notificationPromises);
     console.log(`Criadas ${results.length} notificações`);
+
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(
+        ministers.map((minister) => minister.id),
+        {
+          title,
+          body: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
+          url: '/schedules',
+          data: {
+            massId,
+            urgencyLevel
+          }
+        }
+      );
+    }
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
     console.log(`[Activity Log] mass_invite_sent: Enviou convite para missa de ${date} às ${time}`, {
@@ -220,6 +305,8 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
     if (!recipientUserIds.includes(req.user!.id)) {
       recipientUserIds.push(req.user!.id);
     }
+
+    recipientUserIds = Array.from(new Set(recipientUserIds));
     
     // Criar notificações para cada destinatário
     const mappedType = mapNotificationType(data.type);
@@ -231,10 +318,19 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
         message: data.message,
         type: mappedType,
         read: false,
+        actionUrl: data.actionUrl ?? null
       })
     );
     
     await Promise.all(notificationPromises);
+
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(recipientUserIds, {
+        title: data.title,
+        body: data.message,
+        url: data.actionUrl ?? '/communication'
+      });
+    }
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
     console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {
