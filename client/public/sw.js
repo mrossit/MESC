@@ -177,7 +177,7 @@ self.addEventListener('activate', (event) => {
           client.postMessage({
             type: 'SW_UPDATED',
             version: VERSION,
-            buildNumber: BUILD_NUMBER,
+            buildTime: BUILD_TIME,
             cacheCleared: true,
             forceReload: RELOAD_ON_UPDATE
           });
