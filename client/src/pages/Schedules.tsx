@@ -260,16 +260,22 @@ export default function Schedules() {
     try {
       // Format date as YYYY-MM-DD to avoid timezone issues
       const dateStr = format(date, 'yyyy-MM-dd');
+      console.log('[DEBUG] Fetching schedule for date:', dateStr);
       const response = await fetch(`/api/schedules/by-date/${dateStr}`, {
         credentials: "include"
       });
 
+      console.log('[DEBUG] Response status:', response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log('[DEBUG] Received data:', data);
+        console.log('[DEBUG] Assignments count:', data.assignments?.length || 0);
 
         if (data.assignments && data.assignments.length > 0) {
+          console.log('[DEBUG] Setting assignments:', data.assignments);
           setSelectedDateAssignments(data.assignments);
         } else {
+          console.log('[DEBUG] No assignments found, setting empty array');
           // Keep dialog open but show empty state with message
           setSelectedDateAssignments([]);
         }

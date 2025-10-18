@@ -6498,6 +6498,12 @@ var apiRateLimiter = rateLimit({
   // 1 minuto
   max: 100,
   // Máximo 100 requests por minuto por IP
+  // Desabilita validações pois usamos trust proxy no Replit
+  validate: false,
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    return `api:${ip}`;
+  },
   message: {
     error: "Muitas requisi\xE7\xF5es. Tente novamente em breve."
   },
@@ -11443,6 +11449,10 @@ import { eq as eq13, and as and10, sql as sql7, gte as gte5, lte as lte5 } from 
 var logActivity = async (userId, action, description, metadata) => {
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
+var isMissingSchedulesDateColumnError = (error) => {
+  const message = error?.message?.toLowerCase() ?? "";
+  return message.includes("does not exist") && message.includes('"date"') || message.includes("no such column: schedules.date") || message.includes("no such column: date");
+};
 var router9 = Router9();
 router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
   try {
@@ -11547,13 +11557,16 @@ router9.get("/", authenticateToken, async (req, res) => {
           )
         );
       } catch (error) {
-        console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", error?.message);
-        res.json({
-          schedules: [],
-          assignments: [],
-          substitutions: []
-        });
-        return;
+        if (isMissingSchedulesDateColumnError(error)) {
+          console.warn("[Schedules Route] Falling back to empty response (schedules.date column missing?):", error?.message);
+          res.json({
+            schedules: [],
+            assignments: [],
+            substitutions: []
+          });
+          return;
+        }
+        throw error;
       }
       let assignmentsList = [];
       if (schedulesList.length > 0) {
@@ -11593,7 +11606,7 @@ router9.get("/", authenticateToken, async (req, res) => {
             schedulesList.map((s) => sql7`${s.id}`),
             sql7`, `
           )})`,
-          sql7`${substitutionRequests.status} IN ('pending', 'approved', 'auto_approved')`
+          sql7`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
         )
       ) : [];
       const hasPublishedSchedules = schedulesList.some((s) => s.status === "published");
