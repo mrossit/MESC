@@ -1,0 +1,13 @@
+SW] Checking for updates...
+Schedules.tsx:263 [DEBUG] Fetching schedule for date: 2025-10-28
+Schedules.tsx:1312 [SCHEDULES_PAGE] Current month: 10 year: 2025
+Schedules.tsx:1313 [SCHEDULES_PAGE] Available schedules: [{…}]
+Schedules.tsx:1314 [SCHEDULES_PAGE] Current schedule found: {id: 'schedule-2025-10', title: 'Escala 10/2025', month: 10, year: 2025, status: 'published', …}createdAt: "2025-10-18T21:58:04.697Z"createdBy: "5ca1f243-65bb-4c27-b6fd-d2835e401686"id: "schedule-2025-10"month: 10publishedAt: "2025-10-18T22:13:44.499Z"status: "published"title: "Escala 10/2025"year: 2025[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+Schedules.tsx:268 [DEBUG] Response status: 200
+Schedules.tsx:271 [DEBUG] Received data: {schedule: null, assignments: Array(0), message: 'Nenhuma escala encontrada para esta data'}assignments: Array(0)length: 0[[Prototype]]: Array(0)message: "Nenhuma escala encontrada para esta data"schedule: null[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+Schedules.tsx:272 [DEBUG] Assignments count: 0
+Schedules.tsx:278 [DEBUG] No assignments found, setting empty array
+Schedules.tsx:1312 [SCHEDULES_PAGE] Current month: 10 year: 2025
+Schedules.tsx:1313 [SCHEDULES_PAGE] Available schedules: [{…}]
+Schedules.tsx:1314 [SCHEDULES_PAGE] Current schedule found: {id: 'schedule-2025-10', title: 'Escala 10/2025', month: 10, year: 2025, status: 'published', …}createdAt: "2025-10-18T21:58:04.697Z"createdBy: "5ca1f243-65bb-4c27-b6fd-d2835e401686"id: "schedule-2025-10"month: 10publishedAt: "2025-10-18T22:13:44.499Z"status: "published"title: "Escala 10/2025"year: 2025[[Prototype]]: Object
+VM10:33 [SW] Checking for updates...

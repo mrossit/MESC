@@ -109,10 +109,8 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(
-        and(
-          eq(schedules.date, targetDateStr),
-          eq(schedules.status, "scheduled")
-        )
+        eq(schedules.date, targetDateStr)
+        // Aceitar qualquer status (scheduled ou published)
       )
       .orderBy(schedules.time, schedules.position);
     
