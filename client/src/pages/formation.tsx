@@ -141,6 +141,36 @@ function formatPercentage(value: number | undefined) {
   return `${Math.min(Math.max(Math.round(value), 0), 100)}%`;
 }
 
+async function fetchJson<T>(url: string, errorFallback: string): Promise<T> {
+  const response = await fetch(url, {
+    credentials: "include"
+  });
+
+  if (!response.ok) {
+    try {
+      const data = await response.json();
+      const message = typeof data === "object" && data && "message" in data
+        ? (data.message as string)
+        : errorFallback;
+      throw new Error(message);
+    } catch {
+      const text = await response.text().catch(() => null);
+      throw new Error(text || errorFallback);
+    }
+  }
+
+  return response.json() as Promise<T>;
+}
+
+const fetchFormationOverview = () =>
+  fetchJson<FormationOverview>("/api/formation/overview", "Não foi possível carregar a formação.");
+
+const fetchLessonDetail = (trackId: string, moduleId: string, lessonNumber: string) =>
+  fetchJson<LessonDetailResponse>(
+    `/api/formation/${encodeURIComponent(trackId)}/${encodeURIComponent(moduleId)}/${encodeURIComponent(lessonNumber)}`,
+    "Não foi possível carregar os detalhes da aula."
+  );
+
 interface ModuleDetailProps {
   track: TrackOverview;
   module: ModuleWithStats;
@@ -190,11 +220,11 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
                 </div>
                 <Progress value={module.stats.progressPercentage} className="h-2" />
               </div>
-              {module.estimatedDuration ? (
+              {module.durationMinutes ? (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Duração estimada</span>
-                    <span className="text-muted-foreground">{module.estimatedDuration} min</span>
+                    <span className="text-muted-foreground">{module.durationMinutes} min</span>
                   </div>
                 </div>
               ) : (
@@ -250,7 +280,7 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {lesson.durationMinutes ? `${lesson.durationMinutes} min` : "Duração variável"}
+                            {lesson.estimatedDuration ? `${lesson.estimatedDuration} min` : "Duração variável"}
                           </div>
                           <div>{formatPercentage(percentage)} concluído</div>
                         </div>
@@ -296,7 +326,7 @@ function LessonContent({
   trackTitle,
   moduleTitle
 }: LessonContentProps) {
-  const toast = useToast();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClientInstance = useQueryClient();
   const { csrfToken, isLoading: csrfLoading } = useCsrfToken();
@@ -309,6 +339,8 @@ function LessonContent({
 
   const { data: lessonData, isLoading, error } = useQuery<LessonDetailResponse>({
     queryKey: ['/api/formation', trackId, moduleId, lessonNumber],
+    queryFn: () => fetchLessonDetail(trackId, moduleId, lessonNumber),
+    enabled: Boolean(trackId && moduleId && lessonNumber)
   });
 
   const markCompletedMutation = useMutation({
@@ -331,7 +363,7 @@ function LessonContent({
       return response.json();
     },
     onSuccess: () => {
-      toast.toast({
+      toast({
         title: "Aula concluída!",
         description: "Seu progresso foi registrado com sucesso."
       });
@@ -340,7 +372,7 @@ function LessonContent({
     },
     onError: (err: any) => {
       const message = err?.message || "Não foi possível registrar o progresso. Tente novamente.";
-      toast.toast({
+      toast({
         title: "Erro",
         description: message,
         variant: "destructive"
@@ -415,20 +447,10 @@ function LessonContent({
               <div className="flex gap-2">
                 <Badge variant="outline">Aula {lesson.lessonNumber}</Badge>
                 <Badge variant="outline">
-                  {lesson.durationMinutes ? `${lesson.durationMinutes} min` : "Duração variável"}
+                  {lesson.estimatedDuration ? `${lesson.estimatedDuration} min` : "Duração variável"}
                 </Badge>
               </div>
             </div>
-            {lesson.objectives && lesson.objectives.length > 0 && (
-              <div className="mt-4">
-                <h4 className="font-semibold mb-2">Objetivos da Aula</h4>
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  {lesson.objectives.map((objective, index) => (
-                    <li key={index}>• {objective}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
             {progress && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
                 <Clock className="h-4 w-4" />
@@ -582,7 +604,8 @@ export default function Formation() {
     isLoading: overviewLoading,
     error: overviewError
   } = useQuery<FormationOverview>({
-    queryKey: ['/api/formation/overview']
+    queryKey: ['/api/formation/overview'],
+    queryFn: fetchFormationOverview
   });
 
   const tracks = overview?.tracks ?? [];
@@ -1056,4 +1079,3 @@ export default function Formation() {
     </Layout>
   );
 }
-
