@@ -29,6 +29,7 @@ import versionRoutes from "./routes/version";
 import liturgicalRoutes from "./routes/liturgical";
 import saintsRoutes from "./routes/saints";
 import dashboardRoutes from "./routes/dashboard";
+import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -157,6 +158,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard routes (mix of read and incomplete schedules)
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/schedules/incomplete', dashboardRoutes);
+
+  // Push notification subscription routes (read endpoints sem CSRF, write endpoints com CSRF)
+  app.use('/api/push-subscriptions', pushSubscriptionsRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

@@ -24,6 +24,7 @@ import {
   type SubstitutionRequest,
   type Notification,
   type PushSubscription,
+  type InsertPushSubscription,
   type MassTimeConfig,
   type InsertMassTime,
   type FamilyRelationship,
@@ -159,6 +160,8 @@ export interface IStorage {
   createNotification(notification: any): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
   markNotificationAsRead(id: string): Promise<void>;
+  createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
+  getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined>;
   upsertPushSubscription(userId: string, subscription: { endpoint: string; keys: { auth: string; p256dh: string } }): Promise<PushSubscription>;
   removePushSubscription(userId: string, endpoint: string): Promise<void>;
   removePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
@@ -655,6 +658,25 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ read: true, readAt: new Date() })
       .where(eq(notifications.id, id));
+  }
+
+  async createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {
+    await this.ensurePushSubscriptionTable();
+    const [created] = await db
+      .insert(pushSubscriptions)
+      .values(subscription)
+      .returning();
+    return created;
+  }
+
+  async getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined> {
+    await this.ensurePushSubscriptionTable();
+    const result = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, endpoint))
+      .limit(1);
+    return result[0];
   }
 
   async upsertPushSubscription(userId: string, subscription: { endpoint: string; keys: { auth: string; p256dh: string } }): Promise<PushSubscription> {
