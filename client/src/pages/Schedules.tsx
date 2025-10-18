@@ -2755,31 +2755,41 @@ export default function Schedules() {
                             <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                             <span className="hidden sm:inline">Ver</span>
                           </Button>
-                          {isCoordinator && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => {
-                                // Preparar dados para edição
-                                const ministersForEdit = assignments
-                                  .sort((a, b) => a.position - b.position)
-                                  .map(a => ({
-                                    id: a.ministerId,
-                                    name: formatMinisterName(a.ministerName) || 'VACANTE'
-                                  }));
+                          {(() => {
+                            // Verificar se o usuário é auxiliar 1 ou 2 nesta missa
+                            const isUserAuxiliar1or2InThisMass = userAssignment && 
+                              (userAssignment.position === 1 || userAssignment.position === 2);
+                            
+                            // Mostrar botão de editar para coordenador OU auxiliar 1/2
+                            if (isCoordinator || isUserAuxiliar1or2InThisMass) {
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => {
+                                    // Preparar dados para edição
+                                    const ministersForEdit = assignments
+                                      .sort((a, b) => a.position - b.position)
+                                      .map(a => ({
+                                        id: a.ministerId,
+                                        name: formatMinisterName(a.ministerName) || 'VACANTE'
+                                      }));
 
-                                setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
-                                setEditDialogTime(massTime);
-                                setEditDialogMinisters(ministersForEdit);
-                                setIsTimeSelectionDialogOpen(false);
-                                setIsEditDialogOpen(true);
-                              }}
-                              className="h-8 px-2 sm:px-3 text-xs"
-                            >
-                              <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                              <span className="hidden sm:inline">Editar</span>
-                            </Button>
-                          )}
+                                    setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
+                                    setEditDialogTime(massTime);
+                                    setEditDialogMinisters(ministersForEdit);
+                                    setIsTimeSelectionDialogOpen(false);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                  className="h-8 px-2 sm:px-3 text-xs"
+                                >
+                                  <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Editar</span>
+                                </Button>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
 
