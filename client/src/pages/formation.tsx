@@ -37,17 +37,43 @@ import { queryClient } from "@/lib/queryClient";
 import { useCsrfToken, addCsrfHeader } from "@/hooks/useCsrfToken";
 import FormationAdmin from "@/pages/FormationAdmin";
 import type {
-  FormationTrack,
-  FormationModule,
-  FormationLesson,
-  FormationLessonProgress
+  FormationTrack
 } from "@shared/schema";
 
-type LessonWithProgress = FormationLesson & {
-  progress: FormationLessonProgress | null;
+type LessonProgress = {
+  status: "not_started" | "in_progress" | "completed";
+  progressPercentage: number;
+  timeSpent: number;
+  completedSections: string[];
 };
 
-type ModuleWithStats = FormationModule & {
+type LessonWithProgress = {
+  id: string;
+  moduleId: string;
+  trackId: string | null;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  lessonNumber: number;
+  estimatedDuration: number | null;
+  contentType: string | null;
+  contentUrl: string | null;
+  videoUrl: string | null;
+  documentUrl: string | null;
+  progress: LessonProgress;
+};
+
+type ModuleWithStats = {
+  id: string;
+  trackId: string;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  estimatedDuration: number | null;
+  durationMinutes: number | null;
+  content: string | null;
+  videoUrl: string | null;
+  isActive?: boolean;
   lessons: LessonWithProgress[];
   stats: {
     totalLessons: number;
@@ -57,7 +83,16 @@ type ModuleWithStats = FormationModule & {
   };
 };
 
-type TrackOverview = FormationTrack & {
+type TrackOverview = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: FormationTrack["category"];
+  orderIndex: number;
+  isRequired: boolean;
+  estimatedDuration: number | null;
+  icon: string | null;
+  isActive: boolean;
   modules: ModuleWithStats[];
   stats: {
     totalModules: number;
@@ -83,15 +118,31 @@ type FormationOverview = {
 };
 
 type LessonDetailResponse = {
-  lesson: FormationLesson;
+  lesson: {
+    id: string;
+    moduleId: string;
+    trackId: string | null;
+    title: string;
+    description: string | null;
+    lessonNumber: number;
+    estimatedDuration: number | null;
+    contentType: string | null;
+    contentUrl: string | null;
+    videoUrl: string | null;
+    documentUrl: string | null;
+  };
   sections: Array<{
     id: string;
     title: string;
-    content: string;
-    estimatedMinutes?: number | null;
+    content: string | null;
+    contentType: string | null;
+    estimatedMinutes: number | null;
+    videoUrl: string | null;
+    audioUrl: string | null;
+    documentUrl: string | null;
     orderIndex: number;
   }>;
-  progress: FormationLessonProgress | null;
+  progress: LessonProgress;
 };
 
 type CategoryMeta = {
@@ -126,7 +177,7 @@ const CATEGORY_META: Record<FormationTrack["category"], CategoryMeta> = {
   }
 };
 
-function getCategoryMeta(track: FormationTrack): CategoryMeta {
+function getCategoryMeta(track: { category: FormationTrack["category"] }): CategoryMeta {
   return CATEGORY_META[track.category] ?? {
     label: track.category,
     icon: BookOpen,
@@ -264,8 +315,8 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
           <CardContent className="space-y-4">
             {hasLessons ? (
               module.lessons.map((lesson) => {
-                const status = lesson.progress?.status ?? "not_started";
-                const percentage = lesson.progress?.progressPercentage ?? 0;
+                const status = lesson.progress.status;
+                const percentage = lesson.progress.progressPercentage;
                 const statusBadge =
                   status === "completed"
                     ? { label: "Concluída", variant: "outline", className: "border-green-300 text-green-700 bg-green-50" }
@@ -464,12 +515,10 @@ function LessonContent({
                 </Badge>
               </div>
             </div>
-            {progress && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
-                <Clock className="h-4 w-4" />
-                Progresso: {formatPercentage(progress.progressPercentage)}
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
+              <Clock className="h-4 w-4" />
+              Progresso: {formatPercentage(progress.progressPercentage)}
+            </div>
           </CardHeader>
         </Card>
 
@@ -551,7 +600,7 @@ function LessonContent({
               <CardTitle className="text-lg">Progresso</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {progress?.status === "completed" ? (
+              {progress.status === "completed" ? (
                 <div className="flex items-center gap-2 text-green-600 font-medium">
                   <CheckCircle2 className="h-5 w-5" />
                   Aula concluída com sucesso
@@ -577,7 +626,7 @@ function LessonContent({
                 </Button>
               )}
 
-              {navigationHelpers.next && progress?.status === "completed" && (
+              {navigationHelpers.next && progress.status === "completed" && (
                 <Button
                   className="w-full"
                   variant="outline"
