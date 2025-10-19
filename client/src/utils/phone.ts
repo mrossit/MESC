@@ -44,3 +44,17 @@ export const formatPhoneForCall = (phone: string): string => {
   // Adiciona o 0 no início para operadoras brasileiras
   return `0${numbers}`;
 };
+
+// Função para formatar número para WhatsApp (com código do país +55)
+export const formatPhoneForWhatsApp = (phone: string): string => {
+  const onlyNumbers = unformatPhoneNumber(phone);
+
+  // Se tem 9 dígitos, adiciona código de área 15 (Sorocaba)
+  let numbers = onlyNumbers;
+  if (numbers.length === 9) {
+    numbers = '15' + numbers;
+  }
+
+  // Adiciona o código do país +55 para WhatsApp
+  return `+55${numbers}`;
+};

@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { formatPhoneNumber, formatPhoneForCall } from '../utils/phone';
+import { formatPhoneNumber, formatPhoneForCall, formatPhoneForWhatsApp } from '../utils/phone';
 import { ImageZoomModal } from '../components/ImageZoomModal';
 
 type Minister = {
@@ -563,7 +563,7 @@ export default function MinistersDirectory() {
                         variant="outline"
                         className="bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-200 dark:bg-green-950 dark:hover:bg-green-900 dark:text-green-400 dark:border-green-800"
                         onClick={() => {
-                          const phoneNumber = formatPhoneForCall(selectedMinister.phone!);
+                          const phoneNumber = formatPhoneForWhatsApp(selectedMinister.phone!);
                           window.open(`https://wa.me/${phoneNumber}`, '_blank');
                         }}
                       >
