@@ -200,6 +200,8 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers();
       toast({
         title: "Senha resetada com sucesso",
         description: "O usuário receberá uma notificação e precisará criar uma nova senha no próximo login.",

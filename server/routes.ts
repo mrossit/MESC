@@ -30,11 +30,29 @@ import liturgicalRoutes from "./routes/liturgical";
 import saintsRoutes from "./routes/saints";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
-import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
+import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
 import { db } from './db';
 import { eq, count, or } from 'drizzle-orm';
+import {
+  getFormationOverview as buildFormationOverview,
+  getLessonDetail as fetchFormationLessonDetail,
+  markLessonCompleted as markFormationLessonCompleted,
+  markLessonSectionCompleted as markFormationSectionCompleted,
+  upsertLessonProgressEntry as upsertFormationLessonProgress,
+  listLessonProgressEntries as listFormationProgressEntries
+} from "./services/formationService";
+
+const formationProgressUpdateSchema = z.object({
+  lessonId: z.string(),
+  isCompleted: z.boolean().optional(),
+  timeSpent: z.number().int().min(0).optional(),
+  progressPercentage: z.number().min(0).max(100).optional(),
+  completedSections: z.array(z.string()).optional(),
+  quizScore: z.number().optional(),
+  notes: z.string().optional()
+});
 
 // Função utilitária para tratamento de erro centralizado
 function handleApiError(error: any, operation: string) {
@@ -1064,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Formation routes
   app.get('/api/formation/overview', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const overview = await storage.getFormationOverview(req.user?.id);
+      const overview = await buildFormationOverview(req.user?.id);
       res.json(overview);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar visão geral da formação");
@@ -1166,28 +1184,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/formation/:trackId/:moduleId/:lessonNumber', authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId, lessonNumber } = req.params;
-      const lesson = await storage.getFormationLessonByNumber(trackId, moduleId, parseInt(lessonNumber));
-      
-      if (!lesson) {
+      const detail = await fetchFormationLessonDetail({
+        userId: (req as AuthRequest).user?.id,
+        trackId,
+        moduleId,
+        lessonNumber: parseInt(lessonNumber, 10)
+      });
+
+      if (!detail) {
         return res.status(404).json({ message: "Aula não encontrada" });
       }
 
-      // Get lesson sections
-      const sections = await storage.getFormationLessonSections(lesson.id);
-      
-      // Get user progress if available
-      const userId = (req as AuthRequest).user?.id;
-      let progress = null;
-      if (userId) {
-        const progressData = await storage.getFormationLessonProgress(userId, lesson.id);
-        progress = progressData[0] || null;
-      }
-
-      res.json({
-        lesson,
-        sections,
-        progress
-      });
+      res.json(detail);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar aula completa");
       res.status(errorResponse.status).json(errorResponse);
@@ -1214,7 +1222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { trackId } = req.query;
-      const progress = await storage.getUserFormationProgress(userId, trackId as string);
+      const progress = await listFormationProgressEntries({
+        userId,
+        trackId: trackId ? String(trackId) : undefined
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar progresso de formação");
@@ -1229,12 +1240,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Usuário não autenticado" });
       }
 
-      const progressData = insertFormationLessonProgressSchema.parse({
-        ...req.body,
-        userId
-      });
+      const progressData = formationProgressUpdateSchema.parse(req.body);
 
-      const progress = await storage.createOrUpdateFormationLessonProgress(progressData);
+      const progress = await upsertFormationLessonProgress({
+        userId,
+        lessonId: progressData.lessonId,
+        isCompleted: progressData.isCompleted,
+        timeSpent: progressData.timeSpent,
+        progressPercentage: progressData.progressPercentage,
+        completedSections: progressData.completedSections,
+        quizScore: progressData.quizScore,
+        notes: progressData.notes
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "atualizar progresso de formação");
@@ -1251,7 +1268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { lessonId, sectionId } = req.params;
-      const progress = await storage.markLessonSectionCompleted(userId, lessonId, sectionId);
+      const progress = await markFormationSectionCompleted({
+        userId,
+        lessonId,
+        sectionId
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "marcar seção como completa");
@@ -1268,7 +1289,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { lessonId } = req.params;
-      const progress = await storage.markLessonCompleted(userId, lessonId);
+      const progress = await markFormationLessonCompleted({
+        userId,
+        lessonId
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "marcar aula como completa");
