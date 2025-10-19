@@ -8,15 +8,13 @@ const ChangePassword = lazy(() => import('@/pages/change-password'));
 const ChangePasswordRequired = lazy(() => import('@/pages/change-password-required'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
-const Ministers = lazy(() => import('@/pages/Ministers'));
 const MinistersDirectory = lazy(() => import('@/pages/MinistersDirectory'));
 const Approvals = lazy(() => import('@/pages/approvals'));
-const ScheduleCalendar = lazy(() => import('@/pages/ScheduleCalendar'));
+const Schedules = lazy(() => import('@/pages/Schedules'));
 const Formation = lazy(() => import('@/pages/formation'));
 const FormationAdmin = lazy(() => import('@/pages/FormationAdmin'));
 const QuestionnaireUnified = lazy(() => import('@/pages/QuestionnaireUnified'));
 const QuestionnaireResponses = lazy(() => import('@/pages/QuestionnaireResponses'));
-const ScheduleVisualization = lazy(() => import('@/pages/ScheduleVisualization'));
 const AutoScheduleGeneration = lazy(() => import('@/pages/AutoScheduleGeneration'));
 const ScheduleEditorDnD = lazy(() => import('@/pages/ScheduleEditorDnD'));
 const MassTimeSelector = lazy(() => import('@/pages/MassTimeSelector'));
@@ -24,6 +22,7 @@ const QRCodeShare = lazy(() => import('@/pages/QRCodeShare'));
 const Communication = lazy(() => import('@/pages/communication'));
 const Install = lazy(() => import('@/pages/install'));
 const NotFound = lazy(() => import('@/pages/not-found'));
+const UserManagement = lazy(() => import('@/pages/UserManagement'));
 
 export type RouteRole = 'gestor' | 'coordenador' | 'ministro';
 
@@ -117,7 +116,7 @@ export const routes: RouteConfig[] = [
   },
   {
     path: '/schedule',
-    component: ScheduleCalendar,
+    component: Schedules,
     requiresAuth: true,
     title: 'Escala de Missas',
     showInMenu: true,
@@ -160,7 +159,7 @@ export const routes: RouteConfig[] = [
   // Rotas restritas - Gestores e Coordenadores
   {
     path: '/ministers',
-    component: Ministers,
+    component: UserManagement,
     requiresAuth: true,
     allowedRoles: ['gestor', 'coordenador'],
     title: 'Gestão de Ministros',
@@ -178,7 +177,7 @@ export const routes: RouteConfig[] = [
   },
   {
     path: '/schedule-visualization',
-    component: ScheduleVisualization,
+    component: Schedules,
     requiresAuth: true,
     allowedRoles: ['gestor', 'coordenador'],
     title: 'Visualizar Escalas',

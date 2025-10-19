@@ -63,6 +63,7 @@ import { cn, formatMinisterName, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
+import { ImageZoomModal } from "@/components/ImageZoomModal";
 import * as XLSX from 'xlsx';
 
 // Helper function to capitalize first letter of a string
@@ -2201,10 +2202,16 @@ export default function Schedules() {
                                     const initials = ministerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
                                     return (
-                                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
-                                        <AvatarImage src={ministerPhotoUrl} alt={ministerName} />
-                                        <AvatarFallback>{initials}</AvatarFallback>
-                                      </Avatar>
+                                      <ImageZoomModal
+                                        imageUrl={ministerPhotoUrl}
+                                        fallbackText={initials}
+                                        alt={ministerName}
+                                      >
+                                        <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
+                                          <AvatarImage src={ministerPhotoUrl} alt={ministerName} />
+                                          <AvatarFallback>{initials}</AvatarFallback>
+                                        </Avatar>
+                                      </ImageZoomModal>
                                     );
                                   })()}
                                 </div>

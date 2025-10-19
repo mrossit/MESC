@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { formatPhoneNumber, formatPhoneForCall } from '../utils/phone';
+import { ImageZoomModal } from '../components/ImageZoomModal';
 
 type Minister = {
   id: string;
@@ -357,15 +358,22 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center">
-                        <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
-                          <AvatarImage 
-                            src={minister.photoUrl} 
-                            className="object-cover"
-                          />
-                          <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                            {getInitials(minister.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ImageZoomModal
+                          imageUrl={minister.photoUrl}
+                          fallbackText={getInitials(minister.name)}
+                          alt={minister.name}
+                          stopPropagation
+                        >
+                          <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
+                            <AvatarImage 
+                              src={minister.photoUrl} 
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                              {getInitials(minister.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </ImageZoomModal>
                         <h3 className="font-semibold text-sm sm:text-base truncate w-full">
                           {minister.name}
                         </h3>
@@ -408,15 +416,22 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
-                        <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
-                          <AvatarImage 
-                            src={minister.photoUrl} 
-                            className="object-cover"
-                          />
-                          <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                            {getInitials(minister.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ImageZoomModal
+                          imageUrl={minister.photoUrl}
+                          fallbackText={getInitials(minister.name)}
+                          alt={minister.name}
+                          stopPropagation
+                        >
+                          <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
+                            <AvatarImage 
+                              src={minister.photoUrl} 
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                              {getInitials(minister.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </ImageZoomModal>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm sm:text-base truncate">
@@ -467,15 +482,21 @@ export default function MinistersDirectory() {
             <div className="space-y-4">
               {/* Foto e Nome */}
               <div className="flex flex-col items-center text-center">
-                <Avatar className="h-28 w-28 mb-3 border-2 border-gray-200 shadow-lg">
-                  <AvatarImage 
-                    src={selectedMinister.photoUrl} 
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                    {getInitials(selectedMinister.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <ImageZoomModal
+                  imageUrl={selectedMinister.photoUrl}
+                  fallbackText={getInitials(selectedMinister.name)}
+                  alt={selectedMinister.name}
+                >
+                  <Avatar className="h-28 w-28 mb-3 border-2 border-gray-200 shadow-lg">
+                    <AvatarImage 
+                      src={selectedMinister.photoUrl} 
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                      {getInitials(selectedMinister.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                </ImageZoomModal>
                 <h3 className="text-xl font-semibold">{selectedMinister.name}</h3>
                 <Badge variant={getRoleBadgeVariant(selectedMinister.role)} className="mt-2">
                   {getRoleLabel(selectedMinister.role)}

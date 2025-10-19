@@ -1271,6 +1271,16 @@ var init_storage = __esm({
       async markNotificationAsRead(id) {
         await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq(notifications.id, id));
       }
+      async createPushSubscription(subscription) {
+        await this.ensurePushSubscriptionTable();
+        const [created] = await db.insert(pushSubscriptions).values(subscription).returning();
+        return created;
+      }
+      async getPushSubscriptionByEndpoint(endpoint) {
+        await this.ensurePushSubscriptionTable();
+        const result = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).limit(1);
+        return result[0];
+      }
       async upsertPushSubscription(userId, subscription) {
         await this.ensurePushSubscriptionTable();
         const existing = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
@@ -15680,14 +15690,97 @@ router21.get("/incomplete", async (req, res) => {
 });
 var dashboard_default = router21;
 
+// server/routes/pushSubscriptions.ts
+await init_storage();
+import { Router as Router22 } from "express";
+import { z as z6 } from "zod";
+var router22 = Router22();
+var pushSubscriptionSchema2 = z6.object({
+  endpoint: z6.string().url(),
+  keys: z6.object({
+    p256dh: z6.string(),
+    auth: z6.string()
+  })
+});
+router22.get("/vapid-public-key", (req, res) => {
+  if (!pushConfig.enabled || !pushConfig.publicKey) {
+    return res.status(503).json({ error: "Push notifications not configured" });
+  }
+  res.json({ publicKey: pushConfig.publicKey });
+});
+router22.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
+  try {
+    if (!pushConfig.enabled) {
+      return res.status(503).json({ error: "Push notifications not available" });
+    }
+    const validatedData = pushSubscriptionSchema2.parse(req.body);
+    const userId = req.user.id;
+    const existing = await storage.getPushSubscriptionByEndpoint(validatedData.endpoint);
+    if (existing) {
+      if (existing.userId !== userId) {
+        await storage.removePushSubscriptionByEndpoint(validatedData.endpoint);
+        await storage.createPushSubscription({
+          userId,
+          endpoint: validatedData.endpoint,
+          p256dhKey: validatedData.keys.p256dh,
+          authKey: validatedData.keys.auth
+        });
+      }
+      return res.json({ success: true, message: "Subscription updated" });
+    }
+    await storage.createPushSubscription({
+      userId,
+      endpoint: validatedData.endpoint,
+      p256dhKey: validatedData.keys.p256dh,
+      authKey: validatedData.keys.auth
+    });
+    res.json({ success: true, message: "Subscribed to push notifications" });
+  } catch (error) {
+    console.error("[PUSH API] Subscribe error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ error: "Invalid subscription data" });
+    }
+    res.status(500).json({ error: "Failed to subscribe" });
+  }
+});
+router22.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({ error: "Endpoint required" });
+    }
+    await storage.removePushSubscriptionByEndpoint(endpoint);
+    res.json({ success: true, message: "Unsubscribed from push notifications" });
+  } catch (error) {
+    console.error("[PUSH API] Unsubscribe error:", error);
+    res.status(500).json({ error: "Failed to unsubscribe" });
+  }
+});
+router22.get("/subscriptions", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const subscriptions = await storage.getPushSubscriptionsByUserIds([userId]);
+    res.json({
+      subscriptions: subscriptions.map((sub) => ({
+        endpoint: sub.endpoint,
+        createdAt: sub.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error("[PUSH API] Get subscriptions error:", error);
+    res.status(500).json({ error: "Failed to get subscriptions" });
+  }
+});
+var pushSubscriptions_default = router22;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
-import { z as z6 } from "zod";
+import { z as z7 } from "zod";
 import { eq as eq27, count as count7, or as or10 } from "drizzle-orm";
 function handleApiError(error, operation) {
-  if (error instanceof z6.ZodError) {
+  if (error instanceof z7.ZodError) {
     return {
       status: 400,
       message: `Dados inv\xE1lidos para ${operation}`,
@@ -15751,6 +15844,7 @@ async function registerRoutes(app2) {
   app2.use("/api/saints", saints_default);
   app2.use("/api/dashboard", dashboard_default);
   app2.use("/api/schedules/incomplete", dashboard_default);
+  app2.use("/api/push-subscriptions", pushSubscriptions_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -15998,8 +16092,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const statusUpdateSchema = z6.object({
-        status: z6.enum(["active", "inactive", "pending"], {
+      const statusUpdateSchema = z7.object({
+        status: z7.enum(["active", "inactive", "pending"], {
           errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
         })
       });
@@ -16023,7 +16117,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z6.ZodError) {
+      if (error instanceof z7.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -16035,8 +16129,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const roleUpdateSchema = z6.object({
-        role: z6.enum(["gestor", "coordenador", "ministro"], {
+      const roleUpdateSchema = z7.object({
+        role: z7.enum(["gestor", "coordenador", "ministro"], {
           errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
         })
       });
@@ -16067,7 +16161,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z6.ZodError) {
+      if (error instanceof z7.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -16326,7 +16420,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z6.ZodError) {
+      if (error instanceof z7.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -16414,7 +16508,7 @@ async function registerRoutes(app2) {
       res.status(201).json(massTime);
     } catch (error) {
       console.error("Error creating mass time:", error);
-      if (error instanceof z6.ZodError) {
+      if (error instanceof z7.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create mass time" });
@@ -16427,7 +16521,7 @@ async function registerRoutes(app2) {
       res.json(massTime);
     } catch (error) {
       console.error("Error updating mass time:", error);
-      if (error instanceof z6.ZodError) {
+      if (error instanceof z7.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update mass time" });
