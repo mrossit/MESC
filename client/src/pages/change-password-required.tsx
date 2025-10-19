@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Lock } from "lucide-react";
+import { AlertCircle, Lock, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -13,6 +13,7 @@ export default function ChangePasswordRequired() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -33,19 +34,18 @@ export default function ChangePasswordRequired() {
       
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Senha alterada com sucesso",
-        description: "Sua senha foi alterada. Você será redirecionado para o dashboard.",
+    onSuccess: async () => {
+      // Fazer logout para limpar a sessão
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
       
-      // Invalidate auth query to refresh user data
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Limpar cache de autenticação
+      queryClient.clear();
       
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1500);
+      // Mostrar tela de sucesso
+      setShowSuccess(true);
     },
     onError: (error: Error) => {
       toast({
@@ -80,6 +80,46 @@ export default function ChangePasswordRequired() {
     changePasswordMutation.mutate({ currentPassword, newPassword });
   };
 
+  // Tela de sucesso
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <div className="flex items-center justify-center mb-4">
+              <div className="p-3 bg-green-100 rounded-full">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-center text-green-700">
+              Senha Alterada com Sucesso!
+            </CardTitle>
+            <CardDescription className="text-center">
+              Sua nova senha foi salva com segurança. Agora você pode fazer login com ela.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                Por segurança, você foi desconectado do sistema. Use sua nova senha para fazer login novamente.
+              </AlertDescription>
+            </Alert>
+            
+            <Button
+              className="w-full"
+              onClick={() => navigate("/login")}
+              data-testid="button-go-to-login"
+            >
+              Ir para o Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Tela de troca de senha
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
