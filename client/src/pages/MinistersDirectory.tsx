@@ -358,22 +358,15 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center">
-                        <ImageZoomModal
-                          imageUrl={minister.photoUrl}
-                          fallbackText={getInitials(minister.name)}
-                          alt={minister.name}
-                          stopPropagation
-                        >
-                          <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
-                            <AvatarImage 
-                              src={minister.photoUrl} 
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                              {getInitials(minister.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </ImageZoomModal>
+                        <Avatar className="h-24 w-24 mb-3 border-2 border-gray-200 shadow-md">
+                          <AvatarImage 
+                            src={minister.photoUrl} 
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                            {getInitials(minister.name)}
+                          </AvatarFallback>
+                        </Avatar>
                         <h3 className="font-semibold text-sm sm:text-base truncate w-full">
                           {minister.name}
                         </h3>
@@ -416,22 +409,15 @@ export default function MinistersDirectory() {
                         onClick={() => handleViewDetails(minister)}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
-                        <ImageZoomModal
-                          imageUrl={minister.photoUrl}
-                          fallbackText={getInitials(minister.name)}
-                          alt={minister.name}
-                          stopPropagation
-                        >
-                          <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
-                            <AvatarImage 
-                              src={minister.photoUrl} 
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                              {getInitials(minister.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </ImageZoomModal>
+                        <Avatar className="h-16 w-16 sm:h-18 sm:w-18 border-2 border-gray-200 shadow-md flex-shrink-0">
+                          <AvatarImage 
+                            src={minister.photoUrl} 
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                            {getInitials(minister.name)}
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm sm:text-base truncate">
