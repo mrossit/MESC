@@ -31,19 +31,21 @@ export function ImageZoomModal({ imageUrl, fallbackText, alt, children, stopProp
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl p-4">
+        <DialogContent className="max-w-md p-6 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-center">
             {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={alt || "Foto ampliada"}
-                className="max-w-full max-h-[80vh] object-contain rounded-lg"
-                data-testid="zoomed-image"
-              />
+              <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
+                <img
+                  src={imageUrl}
+                  alt={alt || "Foto ampliada"}
+                  className="w-full h-full object-cover rounded-full shadow-2xl border-4 border-gray-200 dark:border-gray-700"
+                  data-testid="zoomed-image"
+                />
+              </div>
             ) : (
-              <Avatar className="h-64 w-64">
+              <Avatar className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 shadow-2xl border-4 border-gray-200 dark:border-gray-700">
                 <AvatarImage src={imageUrl} />
-                <AvatarFallback className="text-6xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                <AvatarFallback className="text-6xl sm:text-7xl md:text-8xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                   {fallbackText}
                 </AvatarFallback>
               </Avatar>
