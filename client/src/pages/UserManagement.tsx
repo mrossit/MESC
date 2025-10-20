@@ -318,7 +318,25 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
 
   const handleView = (selectedUser: User) => {
     setSelectedUser(selectedUser);
-    setFormData(selectedUser);
+
+    // Normalize array fields that might come as strings or null from the database
+    const normalizedData = {
+      ...selectedUser,
+      preferredTimes: Array.isArray(selectedUser.preferredTimes)
+        ? selectedUser.preferredTimes
+        : [],
+      specialSkills: Array.isArray(selectedUser.specialSkills)
+        ? selectedUser.specialSkills
+        : [],
+      liturgicalTraining: Array.isArray(selectedUser.liturgicalTraining)
+        ? selectedUser.liturgicalTraining
+        : [],
+      formationCompleted: Array.isArray(selectedUser.formationCompleted)
+        ? selectedUser.formationCompleted
+        : [],
+    };
+
+    setFormData(normalizedData);
     setIsEditMode(false);
     setIsDialogOpen(true);
     if (selectedUser.birthDate) {
@@ -335,10 +353,25 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
 
   const handleEdit = (selectedUser: User) => {
     setSelectedUser(selectedUser);
-    setFormData({
+
+    // Normalize array fields that might come as strings or null from the database
+    const normalizedData = {
       ...selectedUser,
-      preferredTimes: selectedUser.preferredTimes || []
-    });
+      preferredTimes: Array.isArray(selectedUser.preferredTimes)
+        ? selectedUser.preferredTimes
+        : [],
+      specialSkills: Array.isArray(selectedUser.specialSkills)
+        ? selectedUser.specialSkills
+        : [],
+      liturgicalTraining: Array.isArray(selectedUser.liturgicalTraining)
+        ? selectedUser.liturgicalTraining
+        : [],
+      formationCompleted: Array.isArray(selectedUser.formationCompleted)
+        ? selectedUser.formationCompleted
+        : [],
+    };
+
+    setFormData(normalizedData);
     setBirthDate(selectedUser.birthDate ? new Date(selectedUser.birthDate) : undefined);
     setIsEditMode(true);
     setIsDialogOpen(true);
@@ -1002,7 +1035,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                     </div>
                   ) : (
                     <div className="flex gap-2 mt-2">
-                      {formData.preferredTimes?.length ? (
+                      {Array.isArray(formData.preferredTimes) && formData.preferredTimes.length > 0 ? (
                         formData.preferredTimes.map((time) => (
                           <Badge key={time} variant="secondary">{time}</Badge>
                         ))
@@ -1041,7 +1074,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                     </div>
                   ) : (
                     <div className="flex gap-2 mt-2">
-                      {formData.specialSkills?.length ? (
+                      {Array.isArray(formData.specialSkills) && formData.specialSkills.length > 0 ? (
                         formData.specialSkills.map((skill) => (
                           <Badge key={skill} variant="outline">{skill}</Badge>
                         ))
