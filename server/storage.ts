@@ -42,6 +42,7 @@ import {
 import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
 import Database from 'better-sqlite3';
+import { formatName } from "./utils/nameFormatter";
 
 // SOLUÇÃO DEFINITIVA: Fallback SQLite quando Drizzle falha
 class DrizzleSQLiteFallback {
@@ -285,13 +286,17 @@ export class DatabaseStorage implements IStorage {
     const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12) + '!Aa1';
     const bcrypt = await import('bcrypt');
     const passwordHash = await bcrypt.hash(tempPassword, 10);
-    
+
+    // Format name with proper capitalization
+    const rawName = userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Usuário';
+    const formattedName = formatName(rawName);
+
     const [user] = await db
       .insert(users)
       .values({
         email: userData.email,
         passwordHash,
-        name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Usuário',
+        name: formattedName,
         firstName: userData.firstName || null,
         lastName: userData.lastName || null,
         phone: userData.phone || null,
@@ -314,9 +319,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, userData: Partial<InsertUser>): Promise<User> {
+    // Format name if it's being updated
+    const updateData = { ...userData };
+    if (updateData.name) {
+      updateData.name = formatName(updateData.name);
+    }
+
     const [user] = await db
       .update(users)
-      .set({ ...userData, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;
