@@ -2,6 +2,16 @@
 
 This is a comprehensive church management system called MESC (Ministros Extraordinários da Sagrada Comunhão) for the Santuário São Judas Tadeu in Sorocaba, Brazil. The system manages extraordinary ministers of Holy Communion, handling scheduling, availability tracking, formation courses, and communication between coordinators and ministers. It serves approximately 150 active ministers with different user roles (gestor, coordenador, ministro) and provides features like automated schedule generation, questionnaire-based availability collection, and ministry management.
 
+# Recent Critical Fixes
+
+## Email Authentication Fix (October 20, 2025)
+Fixed critical authentication issue where users couldn't login after name formatting updates:
+- **Problem**: Email lookup was case-sensitive, causing login failures when users entered emails in different case formats
+- **Solution**: All emails now normalized to lowercase in login, registration, and password reset
+- **Migration**: Run `tsx scripts/normalize-emails.ts` in production to normalize existing emails
+- **Files changed**: `server/auth.ts` (login, register, resetPassword functions)
+- **Impact**: All existing and new users can now login with any email case variation
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.

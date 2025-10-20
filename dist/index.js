@@ -5809,7 +5809,8 @@ function requireRole(roles) {
 }
 async function login(email, password) {
   try {
-    const [user] = await db.select().from(users).where(eq2(users.email, email)).limit(1);
+    const normalizedEmail = email.trim().toLowerCase();
+    const [user] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
     if (!user) {
       throw new Error("Usu\xE1rio ou senha errados, revise os dados e tente novamente.");
     }
@@ -5840,14 +5841,15 @@ async function login(email, password) {
 }
 async function register(userData) {
   try {
-    const [existingUser] = await db.select().from(users).where(eq2(users.email, userData.email)).limit(1);
+    const normalizedEmail = userData.email.trim().toLowerCase();
+    const [existingUser] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
     if (existingUser) {
       throw new Error("Este email j\xE1 est\xE1 cadastrado");
     }
     const passwordHash = await hashPassword(userData.password);
     const formattedName = formatName(userData.name);
     const [newUser] = await db.insert(users).values({
-      email: userData.email,
+      email: normalizedEmail,
       passwordHash,
       name: formattedName,
       phone: userData.phone || null,
@@ -5885,7 +5887,8 @@ async function changePassword(userId, currentPassword, newPassword) {
 }
 async function resetPassword(email) {
   try {
-    const [user] = await db.select().from(users).where(eq2(users.email, email)).limit(1);
+    const normalizedEmail = email.trim().toLowerCase();
+    const [user] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
     if (!user) {
       return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
     }
