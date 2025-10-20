@@ -18,7 +18,6 @@ const QuestionnaireResponses = lazy(() => import('@/pages/QuestionnaireResponses
 const AutoScheduleGeneration = lazy(() => import('@/pages/AutoScheduleGeneration'));
 const ScheduleEditorDnD = lazy(() => import('@/pages/ScheduleEditorDnD'));
 const MassTimeSelector = lazy(() => import('@/pages/MassTimeSelector'));
-const QRCodeShare = lazy(() => import('@/pages/QRCodeShare'));
 const Communication = lazy(() => import('@/pages/communication'));
 const Install = lazy(() => import('@/pages/install'));
 const NotFound = lazy(() => import('@/pages/not-found'));
@@ -218,15 +217,6 @@ export const routes: RouteConfig[] = [
     title: 'Respostas dos Questionários',
     showInMenu: true,
     icon: 'FileText'
-  },
-  {
-    path: '/qrcode',
-    component: QRCodeShare,
-    requiresAuth: true,
-    allowedRoles: ['gestor', 'coordenador'],
-    title: 'QR Code',
-    showInMenu: true,
-    icon: 'QrCode'
   },
 
   // Fallback

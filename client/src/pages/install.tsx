@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Smartphone, 
-  Download, 
-  CheckCircle, 
+import {
+  Smartphone,
+  Download,
+  CheckCircle,
   Share,
-  QrCode,
+  BookOpen,
   ArrowRight,
   Monitor,
   Wifi,
@@ -268,7 +268,7 @@ export default function InstallPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5" />
+                <BookOpen className="h-5 w-5" />
                 Instruções Manuais
               </CardTitle>
             </CardHeader>

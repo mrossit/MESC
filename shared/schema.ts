@@ -83,6 +83,8 @@ export const users = pgTable("users", {
   
   // Ministry preferences
   preferredPosition: integer('preferred_position'),
+  preferredPositions: jsonb('preferred_positions').$type<number[]>().default([]),
+  avoidPositions: jsonb('avoid_positions').$type<number[]>().default([]),
   preferredTimes: jsonb('preferred_times').$type<string[]>(),
   availableForSpecialEvents: boolean('available_for_special_events').default(true),
   canServeAsCouple: boolean('can_serve_as_couple').default(false),

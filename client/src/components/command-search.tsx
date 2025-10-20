@@ -29,7 +29,6 @@ import {
   LogOut,
   ChevronRight,
   Home,
-  QrCode,
   UserCog
 } from "lucide-react";
 
@@ -120,15 +119,6 @@ export function CommandSearch() {
       href: "/user-management",
       icon: Settings,
       group: "Gestão",
-      roles: ["gestor", "coordenador"]
-    },
-    {
-      id: "qrcode",
-      title: "QR Code",
-      description: "Gerar e compartilhar QR Code de acesso",
-      href: "/qrcode",
-      icon: QrCode,
-      group: "Ferramentas",
       roles: ["gestor", "coordenador"]
     },
     {

@@ -19,6 +19,8 @@ interface MinisterWithAvailability {
   id: string;
   name: string;
   preferredPosition?: number;
+  preferredPositions?: number[];
+  avoidPositions?: number[];
   availability: ParsedAvailability;
   assignmentCount: number;
   familyId?: string;
@@ -117,6 +119,12 @@ export class IntelligentScheduleGenerator {
           id: minister.id,
           name: minister.name,
           preferredPosition: minister.preferredPosition || minister.preferred_position,
+          preferredPositions: Array.isArray(minister.preferredPositions || minister.preferred_positions)
+            ? (minister.preferredPositions || minister.preferred_positions)
+            : [],
+          avoidPositions: Array.isArray(minister.avoidPositions || minister.avoid_positions)
+            ? (minister.avoidPositions || minister.avoid_positions)
+            : [],
           availability,
           assignmentCount: 0,
           familyId: minister.familyId || minister.family_id
@@ -190,18 +198,28 @@ export class IntelligentScheduleGenerator {
 
     // Sort by preferred position and assignment count
     availableMinisters.sort((a, b) => {
-      // First priority: ministers with preferred positions matching needed positions
+      // First priority: ministers with preferred positions array matching needed positions
+      const aHasNewPreferred = requiredPositions.some(pos =>
+        Array.isArray(a.preferredPositions) && a.preferredPositions.includes(pos)
+      );
+      const bHasNewPreferred = requiredPositions.some(pos =>
+        Array.isArray(b.preferredPositions) && b.preferredPositions.includes(pos)
+      );
+      if (aHasNewPreferred && !bHasNewPreferred) return -1;
+      if (!aHasNewPreferred && bHasNewPreferred) return 1;
+
+      // Second priority: ministers with preferred positions matching needed positions (legacy field)
       const aHasPreferred = requiredPositions.includes(a.preferredPosition || 0);
       const bHasPreferred = requiredPositions.includes(b.preferredPosition || 0);
       if (aHasPreferred && !bHasPreferred) return -1;
       if (!aHasPreferred && bHasPreferred) return 1;
 
-      // Second priority: fewer assignments (fairness)
+      // Third priority: fewer assignments (fairness)
       if (a.assignmentCount !== b.assignmentCount) {
         return a.assignmentCount - b.assignmentCount;
       }
 
-      // Third priority: by preferred position number
+      // Fourth priority: by preferred position number
       return (a.preferredPosition || 999) - (b.preferredPosition || 999);
     });
 
@@ -211,22 +229,55 @@ export class IntelligentScheduleGenerator {
 
     for (const position of requiredPositions) {
       // Find best minister for this position
-      const minister = availableMinisters.find(m => {
-        // Skip if already assigned
+      // Try 1: Find minister with this position in preferredPositions (highest priority)
+      let minister = availableMinisters.find(m => {
         if (assignedMinisters.has(m.id)) return false;
-
-        // Skip if family already assigned (unless they prefer to serve together)
         if (m.familyId && familiesAssigned.has(m.familyId)) {
           const familyPreference = this.getFamilyPreference(m.familyId);
           if (!familyPreference.preferServeTogether) return false;
         }
-
-        // Prefer ministers with matching preferred position
-        if (m.preferredPosition === position) return true;
-
-        // Otherwise, any available minister
-        return true;
+        return Array.isArray(m.preferredPositions) && m.preferredPositions.includes(position);
       });
+
+      // Try 2: Find minister with matching preferred position (legacy field)
+      if (!minister) {
+        minister = availableMinisters.find(m => {
+          if (assignedMinisters.has(m.id)) return false;
+          if (m.familyId && familiesAssigned.has(m.familyId)) {
+            const familyPreference = this.getFamilyPreference(m.familyId);
+            if (!familyPreference.preferServeTogether) return false;
+          }
+          return m.preferredPosition === position;
+        });
+      }
+
+      // Try 3: Find any available minister WITHOUT this position in avoidPositions
+      if (!minister) {
+        minister = availableMinisters.find(m => {
+          if (assignedMinisters.has(m.id)) return false;
+          if (m.familyId && familiesAssigned.has(m.familyId)) {
+            const familyPreference = this.getFamilyPreference(m.familyId);
+            if (!familyPreference.preferServeTogether) return false;
+          }
+          // Skip if minister has this position in avoidPositions
+          if (Array.isArray(m.avoidPositions) && m.avoidPositions.includes(position)) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Try 4: Last resort - even if position is in avoidPositions
+      if (!minister) {
+        minister = availableMinisters.find(m => {
+          if (assignedMinisters.has(m.id)) return false;
+          if (m.familyId && familiesAssigned.has(m.familyId)) {
+            const familyPreference = this.getFamilyPreference(m.familyId);
+            if (!familyPreference.preferServeTogether) return false;
+          }
+          return true;
+        });
+      }
 
       if (minister) {
         assignments.push({

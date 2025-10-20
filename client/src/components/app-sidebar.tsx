@@ -17,7 +17,6 @@ import {
   LogOut,
   User,
   HelpCircle,
-  QrCode,
   ChartBar,
   Move
 } from "lucide-react";
@@ -176,12 +175,6 @@ export function AppSidebar() {
       title: "Relatórios",
       href: "/reports",
       icon: ChartBar,
-      roles: ["gestor", "coordenador"]
-    },
-    {
-      title: "QR Code",
-      href: "/qrcode",
-      icon: QrCode,
       roles: ["gestor", "coordenador"]
     },
   ];

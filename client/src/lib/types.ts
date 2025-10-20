@@ -19,7 +19,6 @@ export interface Minister {
   address?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
-  preferredTimes: string[];
   experience: string;
   specialSkills: string[];
   lastService?: string;

@@ -45,7 +45,6 @@ const Formation = lazy(() => import("@/pages/formation"));
 const Communication = lazy(() => import("@/pages/communication"));
 const Install = lazy(() => import("@/pages/install"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
-const QRCodeShare = lazy(() => import("@/pages/QRCodeShare"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Reports = lazy(() => import("@/pages/Reports"));
 
@@ -151,12 +150,6 @@ function RouterWithHooks() {
         <Route path="/user-management">
           <AuthGuard allowedRoles={["gestor", "coordenador"]}>
             <UserManagement />
-          </AuthGuard>
-        </Route>
-
-        <Route path="/qrcode">
-          <AuthGuard allowedRoles={["gestor", "coordenador"]}>
-            <QRCodeShare />
           </AuthGuard>
         </Route>
 
