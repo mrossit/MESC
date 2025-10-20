@@ -31,10 +31,12 @@ Configured as a Progressive Web App with service worker for offline functionalit
 Implemented automatic cache invalidation and version control to ensure users always see the latest changes without manual intervention:
 
 ### Service Worker (v5.4.0+)
+- **DISABLED in Replit Preview**: Service Worker is completely disabled in Replit preview environment to prevent cache-related connection issues. Automatically unregisters any existing service workers.
+- **ENABLED in Production/External Browsers**: Full PWA functionality with offline support
 - **Network-First Strategy for Critical APIs**: Schedule and minister data always fetched fresh from server (never cached)
 - **Cache-First for Static Assets**: Images, fonts, and icons cached for offline access
 - **Automatic Cache Cleanup**: Old cache versions deleted automatically on activation
-- Location: `client/public/sw.js`
+- Location: `client/public/sw.js`, detection logic in `client/index.html`
 
 ### Version Detection
 - **Endpoint**: `/api/version` returns current system version (5.4.0) and build timestamp
