@@ -141,6 +141,7 @@ type LessonDetailResponse = {
     videoUrl: string | null;
     audioUrl: string | null;
     documentUrl: string | null;
+    quizData: string | null;
     orderIndex: number;
   }>;
   progress: LessonProgress;
