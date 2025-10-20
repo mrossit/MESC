@@ -64,7 +64,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
     const allowedFields = [
       'birthDate', 'address', 'city', 'zipCode',
       'emergencyContact', 'emergencyPhone',
-      'preferredPosition', 'preferredTimes',
+      'preferredPosition',
       'availableForSpecialEvents', 'canServeAsCouple', 'spouseUserId',
       'experience', 'specialSkills', 'liturgicalTraining',
       'observations', 'active', 'scheduleDisplayName'
@@ -74,10 +74,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         // Handle different field types correctly
-        if (field === 'preferredTimes') {
-          // JSONB field - store as raw array/object
-          updateData[field] = req.body[field];
-        } else if (field === 'specialSkills') {
+        if (field === 'specialSkills') {
           // TEXT field - can be stringified if needed for complex data
           updateData[field] = typeof req.body[field] === 'string' ? req.body[field] : JSON.stringify(req.body[field]);
         } else if (['liturgicalTraining', 'formationCompleted'].includes(field)) {

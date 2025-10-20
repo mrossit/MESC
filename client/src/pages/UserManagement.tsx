@@ -92,7 +92,8 @@ interface User {
   emergencyContact?: string;
   emergencyPhone?: string;
   preferredPosition?: number;
-  preferredTimes?: string[];
+  preferredPositions?: number[];
+  avoidPositions?: number[];
   availableForSpecialEvents?: boolean;
   canServeAsCouple?: boolean;
   spouseUserId?: string;
@@ -107,8 +108,6 @@ interface User {
   createdAt: string;
   active?: boolean;
 }
-
-const MASS_TIMES = ["7h", "9h", "11h", "12h", "17h", "19h"];
 
 const SPECIAL_SKILLS = [
   "Liturgia",
@@ -322,9 +321,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     // Normalize array fields that might come as strings or null from the database
     const normalizedData = {
       ...selectedUser,
-      preferredTimes: Array.isArray(selectedUser.preferredTimes)
-        ? selectedUser.preferredTimes
-        : [],
       specialSkills: Array.isArray(selectedUser.specialSkills)
         ? selectedUser.specialSkills
         : [],
@@ -357,8 +353,11 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     // Normalize array fields that might come as strings or null from the database
     const normalizedData = {
       ...selectedUser,
-      preferredTimes: Array.isArray(selectedUser.preferredTimes)
-        ? selectedUser.preferredTimes
+      preferredPositions: Array.isArray(selectedUser.preferredPositions)
+        ? selectedUser.preferredPositions
+        : [],
+      avoidPositions: Array.isArray(selectedUser.avoidPositions)
+        ? selectedUser.avoidPositions
         : [],
       specialSkills: Array.isArray(selectedUser.specialSkills)
         ? selectedUser.specialSkills
@@ -1007,44 +1006,131 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                   </div>
                 </div>
 
+                {/* Posições Preferenciais - Apenas para Coordenadores */}
+                {isCoordinator && (
                 <div>
-                  <Label>Horários de Missa Preferidos</Label>
+                  <Label>Posições Preferenciais (até 5)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Selecione até 5 posições litúrgicas preferenciais para este ministro
+                  </p>
                   {isEditMode ? (
-                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                      {MASS_TIMES.map((time) => (
-                        <div key={time} className="flex items-center space-x-2">
-                          <Checkbox
-                            checked={formData.preferredTimes?.includes(time) || false}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setFormData({
-                                  ...formData,
-                                  preferredTimes: [...(formData.preferredTimes || []), time]
-                                });
-                              } else {
-                                setFormData({
-                                  ...formData,
-                                  preferredTimes: formData.preferredTimes?.filter(t => t !== time) || []
-                                });
-                              }
-                            }}
-                          />
-                          <Label>{time}</Label>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => {
+                        const positionNumber = parseInt(key);
+                        const isChecked = Array.isArray(formData.preferredPositions) &&
+                          formData.preferredPositions.includes(positionNumber);
+                        const isDisabled = !isChecked &&
+                          Array.isArray(formData.preferredPositions) &&
+                          formData.preferredPositions.length >= 5;
+
+                        return (
+                          <div key={key} className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onCheckedChange={(checked) => {
+                                const currentPositions = Array.isArray(formData.preferredPositions)
+                                  ? formData.preferredPositions
+                                  : [];
+
+                                if (checked) {
+                                  if (currentPositions.length < 5) {
+                                    setFormData({
+                                      ...formData,
+                                      preferredPositions: [...currentPositions, positionNumber]
+                                    });
+                                  }
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    preferredPositions: currentPositions.filter(p => p !== positionNumber)
+                                  });
+                                }
+                              }}
+                            />
+                            <Label className={isDisabled ? "text-muted-foreground" : ""}>{value}</Label>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="flex gap-2 mt-2">
-                      {Array.isArray(formData.preferredTimes) && formData.preferredTimes.length > 0 ? (
-                        formData.preferredTimes.map((time) => (
-                          <Badge key={time} variant="secondary">{time}</Badge>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {Array.isArray(formData.preferredPositions) && formData.preferredPositions.length > 0 ? (
+                        formData.preferredPositions.map((position) => (
+                          <Badge key={position} variant="secondary" className="bg-green-100 text-green-700">
+                            {LITURGICAL_POSITIONS[position as keyof typeof LITURGICAL_POSITIONS] || `Posição ${position}`}
+                          </Badge>
                         ))
                       ) : (
-                        <span className="text-muted-foreground">Nenhum horário selecionado</span>
+                        <span className="text-muted-foreground">Nenhuma posição preferencial selecionada</span>
                       )}
                     </div>
                   )}
                 </div>
+                )}
+
+                {/* Posições a Evitar - Apenas para Coordenadores */}
+                {isCoordinator && (
+                <div>
+                  <Label>Posições a Evitar (até 5)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Selecione até 5 posições litúrgicas a evitar para este ministro
+                  </p>
+                  {isEditMode ? (
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(LITURGICAL_POSITIONS).map(([key, value]) => {
+                        const positionNumber = parseInt(key);
+                        const isChecked = Array.isArray(formData.avoidPositions) &&
+                          formData.avoidPositions.includes(positionNumber);
+                        const isDisabled = !isChecked &&
+                          Array.isArray(formData.avoidPositions) &&
+                          formData.avoidPositions.length >= 5;
+
+                        return (
+                          <div key={key} className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onCheckedChange={(checked) => {
+                                const currentPositions = Array.isArray(formData.avoidPositions)
+                                  ? formData.avoidPositions
+                                  : [];
+
+                                if (checked) {
+                                  if (currentPositions.length < 5) {
+                                    setFormData({
+                                      ...formData,
+                                      avoidPositions: [...currentPositions, positionNumber]
+                                    });
+                                  }
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    avoidPositions: currentPositions.filter(p => p !== positionNumber)
+                                  });
+                                }
+                              }}
+                            />
+                            <Label className={isDisabled ? "text-muted-foreground" : ""}>{value}</Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {Array.isArray(formData.avoidPositions) && formData.avoidPositions.length > 0 ? (
+                        formData.avoidPositions.map((position) => (
+                          <Badge key={position} variant="secondary" className="bg-red-100 text-red-700">
+                            {LITURGICAL_POSITIONS[position as keyof typeof LITURGICAL_POSITIONS] || `Posição ${position}`}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Nenhuma posição a evitar selecionada</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                )}
 
                 <div>
                   <Label>Habilidades Especiais</Label>
