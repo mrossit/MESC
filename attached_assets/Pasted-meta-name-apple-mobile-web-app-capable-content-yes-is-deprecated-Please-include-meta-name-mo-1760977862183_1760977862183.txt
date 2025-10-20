@@ -1,0 +1,17 @@
+meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
+Navigated to https://saojudastadeu.replit.app/
+(index):63  GET https://saojudastadeu.replit.app/js/index-aReNC5nm.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):66  GET https://saojudastadeu.replit.app/js/vendor-query-CwzRqKiB.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):1 Refused to apply style from 'https://saojudastadeu.replit.app/assets/index-CYnN3_Si.css' because its MIME type ('application/json') is not a supported stylesheet MIME type, and strict MIME checking is enabled.Understand this error
+(index):101 [SW] Service Worker enabled (production/external browser)
+(index):1 Refused to load the script 'https://replit.com/public/js/replit-dev-banner.js' because it violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+Understand this error
+(index):124 [Init] Found 1 service worker registrations
+(index):70  GET https://saojudastadeu.replit.app/js/vendor-icons-CUrm0803.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):129 [SW] Registration successful: https://saojudastadeu.replit.app/
+(index):69  GET https://saojudastadeu.replit.app/js/vendor-date-D2IZz3oM.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):68  GET https://saojudastadeu.replit.app/js/vendor-charts-DSHTQCfj.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):65  GET https://saojudastadeu.replit.app/js/vendor-router-D488sAzk.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):64  GET https://saojudastadeu.replit.app/js/vendor-react-BSOTRkRF.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):67  GET https://saojudastadeu.replit.app/js/vendor-ui-qq8OA6G7.js net::ERR_ABORTED 500 (Internal Server Error)Understand this error
+(index):1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
