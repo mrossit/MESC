@@ -141,11 +141,14 @@ export function requireRole(roles: string[]) {
 // Login
 export async function login(email: string, password: string) {
   try {
-    // Busca usuário por email
+    // Normaliza o email para busca case-insensitive
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Busca usuário por email (case-insensitive usando SQL lower)
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (!user) {
@@ -205,11 +208,14 @@ export async function register(userData: {
   observations?: string;
 }) {
   try {
-    // Verifica se o email já existe
+    // Normaliza o email para lowercase
+    const normalizedEmail = userData.email.trim().toLowerCase();
+    
+    // Verifica se o email já existe (case-insensitive)
     const [existingUser] = await db
       .select()
       .from(users)
-      .where(eq(users.email, userData.email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (existingUser) {
@@ -226,7 +232,7 @@ export async function register(userData: {
     const [newUser] = await db
       .insert(users)
       .values({
-        email: userData.email,
+        email: normalizedEmail,
         passwordHash,
         name: formattedName,
         phone: userData.phone || null,
@@ -289,11 +295,14 @@ export async function changePassword(userId: string, currentPassword: string, ne
 // Resetar senha (gera uma senha temporária)
 export async function resetPassword(email: string) {
   try {
+    // Normaliza o email para busca case-insensitive
+    const normalizedEmail = email.trim().toLowerCase();
+    
     // Busca usuário
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (!user) {
