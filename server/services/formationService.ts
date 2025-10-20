@@ -249,61 +249,61 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
         title,
         description,
         category,
-        COALESCE("orderIndex", 0) AS "orderIndex",
-        COALESCE("isRequired", 1) AS "isRequired",
-        "estimatedDuration",
+        COALESCE(order_index, 0) AS "orderIndex",
+        1 AS "isRequired",
+        0 AS "estimatedDuration",
         icon,
-        COALESCE("isActive", 1) AS "isActive",
-        "createdAt",
-        "updatedAt"
+        COALESCE(is_active, true) AS "isActive",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
       FROM formation_tracks
-      ORDER BY COALESCE("orderIndex", 0), title
+      ORDER BY COALESCE(order_index, 0), title
     `),
     db.execute<ModuleRow>(sql`
       SELECT
         id,
-        "trackId" AS "trackId",
+        track_id AS "trackId",
         title,
         description,
-        COALESCE("orderIndex", 0) AS "orderIndex",
-        "estimatedDuration",
-        "durationMinutes",
+        COALESCE(order_index, 0) AS "orderIndex",
+        0 AS "estimatedDuration",
+        duration_minutes AS "durationMinutes",
         content,
-        "videoUrl",
-        COALESCE("isActive", 1) AS "isActive"
+        video_url AS "videoUrl",
+        1 AS "isActive"
       FROM formation_modules
-      ORDER BY "trackId", COALESCE("orderIndex", 0), title
+      ORDER BY track_id, COALESCE(order_index, 0), title
     `),
     db.execute<LessonRow>(sql`
       SELECT
         id,
-        "moduleId" AS "moduleId",
-        "trackId" AS "trackId",
+        module_id AS "moduleId",
+        track_id AS "trackId",
         title,
         description,
-        COALESCE("orderIndex", 0) AS "orderIndex",
-        "lessonNumber",
-        "estimatedDuration",
-        "contentType",
-        "contentUrl",
-        "videoUrl",
-        "documentUrl"
+        COALESCE(order_index, 0) AS "orderIndex",
+        lesson_number AS "lessonNumber",
+        duration_minutes AS "estimatedDuration",
+        'text' AS "contentType",
+        '' AS "contentUrl",
+        '' AS "videoUrl",
+        '' AS "documentUrl"
       FROM formation_lessons
-      ORDER BY "moduleId", "lessonNumber"
+      ORDER BY module_id, lesson_number
     `),
     userId
       ? db.execute<ProgressRow>(sql`
           SELECT
             id,
-            "userId" AS "userId",
-            "lessonId" AS "lessonId",
-            "isCompleted",
-            "completedAt",
-            "timeSpent",
-            "quizScore",
-            notes
+            user_id AS "userId",
+            lesson_id AS "lessonId",
+            CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+            completed_at AS "completedAt",
+            time_spent_minutes AS "timeSpent",
+            0 AS "quizScore",
+            '' AS notes
           FROM formation_lesson_progress
-          WHERE "userId" = ${userId}
+          WHERE user_id = ${userId}
         `)
       : Promise.resolve(undefined)
   ]);
