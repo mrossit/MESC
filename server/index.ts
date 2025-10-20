@@ -122,8 +122,8 @@ app.use(cors({
       // Permitir match exato
       if (origin === allowedOrigin) return true;
 
-      // Permitir subdomínios .replit.dev e .replit.com (em dev e prod)
-      if (origin.includes('.replit.dev') || origin.includes('.replit.com')) {
+      // Permitir subdomínios .replit.dev, .replit.com e .replit.app (em dev e prod)
+      if (origin.includes('.replit.dev') || origin.includes('.replit.com') || origin.includes('.replit.app')) {
         return true;
       }
 

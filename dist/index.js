@@ -17812,7 +17812,7 @@ app.use(cors({
     }
     const isAllowed = allowedOrigins.some((allowedOrigin) => {
       if (origin === allowedOrigin) return true;
-      if (origin.includes(".replit.dev") || origin.includes(".replit.com")) {
+      if (origin.includes(".replit.dev") || origin.includes(".replit.com") || origin.includes(".replit.app")) {
         return true;
       }
       return false;

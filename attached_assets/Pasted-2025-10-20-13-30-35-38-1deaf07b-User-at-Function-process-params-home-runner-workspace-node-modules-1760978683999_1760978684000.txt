@@ -1,0 +1,160 @@
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at internalNext (file:///home/runner/workspace/node_modules/helmet/index.mjs:527:6)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+🚨 [CRITICAL ERROR] Stack: Error: Origin not allowed by CORS
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at origin (file:///home/runner/workspace/dist/index.js:17824:16)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at /home/runner/workspace/node_modules/cors/lib/index.js:219:13
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at optionsCallback (/home/runner/workspace/node_modules/cors/lib/index.js:199:9)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at corsMiddleware (/home/runner/workspace/node_modules/cors/lib/index.js:204:7)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+at internalNext (file:///home/runner/workspace/node_modules/helmet/index.mjs:527:6)
+2025-10-20 13:30:35.38
+1deaf07b
+User
+🚨 [CRITICAL ERROR] Request: { method: 'GET', url: '/js/vendor-router-D488sAzk.js' }
+2025-10-20 13:30:35.42
+1deaf07b
+User
+🔴 CORS: Origem não permitida bloqueada: https://saojudastadeu.replit.app
+2025-10-20 13:30:35.42
+1deaf07b
+User
+🚨 [CRITICAL ERROR] Uncaught error in route: Error: Origin not allowed by CORS
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at origin (file:///home/runner/workspace/dist/index.js:17824:16)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at /home/runner/workspace/node_modules/cors/lib/index.js:219:13
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at optionsCallback (/home/runner/workspace/node_modules/cors/lib/index.js:199:9)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at corsMiddleware (/home/runner/workspace/node_modules/cors/lib/index.js:204:7)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at internalNext (file:///home/runner/workspace/node_modules/helmet/index.mjs:527:6)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+🚨 [CRITICAL ERROR] Stack: Error: Origin not allowed by CORS
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at origin (file:///home/runner/workspace/dist/index.js:17824:16)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at /home/runner/workspace/node_modules/cors/lib/index.js:219:13
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at optionsCallback (/home/runner/workspace/node_modules/cors/lib/index.js:199:9)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at corsMiddleware (/home/runner/workspace/node_modules/cors/lib/index.js:204:7)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+at internalNext (file:///home/runner/workspace/node_modules/helmet/index.mjs:527:6)
+2025-10-20 13:30:35.42
+1deaf07b
+User
+🚨 [CRITICAL ERROR] Request: { method: 'GET', url: '/js/vendor-ui-qq8OA6G7.js' }
+2025-10-20 13:42:44.18
+1deaf07b
+System
+system: received signal terminated
