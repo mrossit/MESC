@@ -1,6 +1,6 @@
 // FIXED VERSION: Use static version from package.json, not runtime timestamp
-const VERSION = '5.4.2'; // Update this when deploying new versions
-const BUILD_TIME = '2025-10-11'; // Update at build time, not runtime
+const VERSION = '5.4.3'; // Update this when deploying new versions
+const BUILD_TIME = '2025-10-20'; // Update at build time, not runtime
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIME}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
