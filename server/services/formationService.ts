@@ -423,19 +423,19 @@ export async function getLessonDetail(params: {
   const lessonResult = await db.execute(sql`
     SELECT
       id,
-      "moduleId" AS "moduleId",
-      "trackId" AS "trackId",
+      module_id AS "moduleId",
+      track_id AS "trackId",
       title,
       description,
-      COALESCE("orderIndex", 0) AS "orderIndex",
-      "lessonNumber",
-      "estimatedDuration",
-      "contentType",
-      "contentUrl",
-      "videoUrl",
-      "documentUrl"
+      COALESCE(order_index, 0) AS "orderIndex",
+      lesson_number AS "lessonNumber",
+      duration_minutes AS "estimatedDuration",
+      'text' AS "contentType",
+      '' AS "contentUrl",
+      '' AS "videoUrl",
+      '' AS "documentUrl"
     FROM formation_lessons
-    WHERE "moduleId" = ${moduleId} AND "lessonNumber" = ${lessonNumber}
+    WHERE module_id = ${moduleId} AND lesson_number = ${lessonNumber}
     LIMIT 1
   `);
 
@@ -447,19 +447,19 @@ export async function getLessonDetail(params: {
   const sectionsResult = await db.execute(sql`
     SELECT
       id,
-      "lessonId" AS "lessonId",
+      lesson_id AS "lessonId",
       title,
       content,
-      COALESCE("orderIndex", 0) AS "orderIndex",
-      "contentType",
-      "videoUrl",
-      "audioUrl",
-      "documentUrl",
-      "quizData",
-      "interactiveData"
+      COALESCE(order_index, 0) AS "orderIndex",
+      type AS "contentType",
+      video_url AS "videoUrl",
+      audio_url AS "audioUrl",
+      document_url AS "documentUrl",
+      quiz_data AS "quizData",
+      '' AS "interactiveData"
     FROM formation_lesson_sections
-    WHERE "lessonId" = ${lessonRow.id}
-    ORDER BY COALESCE("orderIndex", 0), title
+    WHERE lesson_id = ${lessonRow.id}
+    ORDER BY COALESCE(order_index, 0), title
   `);
 
   const sections = parseRows<SectionRow>(sectionsResult);
@@ -492,15 +492,15 @@ export async function getLessonDetail(params: {
     const progressResult = await db.execute(sql`
       SELECT
         id,
-        "userId" AS "userId",
-        "lessonId" AS "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes
+        user_id AS "userId",
+        lesson_id AS "lessonId",
+        CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+        completed_at AS "completedAt",
+        time_spent_minutes AS "timeSpent",
+        0 AS "quizScore",
+        '' AS notes
       FROM formation_lesson_progress
-      WHERE "userId" = ${userId} AND "lessonId" = ${lessonRow.id}
+      WHERE user_id = ${userId} AND lesson_id = ${lessonRow.id}
       LIMIT 1
     `);
     const progressRow = parseRows<ProgressRow>(progressResult)[0];
@@ -530,15 +530,15 @@ async function ensureLessonProgressRecord(userId: string, lessonId: string): Pro
   const result = await db.execute(sql`
     SELECT
       id,
-      "userId" AS "userId",
-      "lessonId" AS "lessonId",
-      "isCompleted",
-      "completedAt",
-      "timeSpent",
-      "quizScore",
-      notes
+      user_id AS "userId",
+      lesson_id AS "lessonId",
+      CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+      completed_at AS "completedAt",
+      time_spent_minutes AS "timeSpent",
+      0 AS "quizScore",
+      '' AS notes
     FROM formation_lesson_progress
-    WHERE "userId" = ${userId} AND "lessonId" = ${lessonId}
+    WHERE user_id = ${userId} AND lesson_id = ${lessonId}
     LIMIT 1
   `);
   return parseRows<ProgressRow>(result)[0] ?? null;
@@ -548,7 +548,7 @@ async function countLessonSections(lessonId: string): Promise<number> {
   const result = await db.execute<{ count: number }>(sql`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
-    WHERE "lessonId" = ${lessonId}
+    WHERE lesson_id = ${lessonId}
   `);
   const row = parseRows<{ count: number }>(result)[0];
   return row?.count ?? 0;
@@ -846,40 +846,40 @@ export async function listLessonProgressEntries(params: {
     ? sql<ProgressWithLessonRow>`
         SELECT
           p.id,
-          p."userId" AS "userId",
-          p."lessonId" AS "lessonId",
-          p."isCompleted",
-          p."completedAt",
-          p."timeSpent",
-          p."quizScore",
-          p.notes,
-          l."estimatedDuration" AS "lessonEstimatedDuration",
-          l."moduleId" AS "lessonModuleId",
-          l."lessonNumber" AS "lessonNumber",
-          l."trackId" AS "lessonTrackId"
+          p.user_id AS "userId",
+          p.lesson_id AS "lessonId",
+          CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+          p.completed_at AS "completedAt",
+          p.time_spent_minutes AS "timeSpent",
+          0 AS "quizScore",
+          '' AS notes,
+          l.duration_minutes AS "lessonEstimatedDuration",
+          l.module_id AS "lessonModuleId",
+          l.lesson_number AS "lessonNumber",
+          l.track_id AS "lessonTrackId"
         FROM formation_lesson_progress p
-        INNER JOIN formation_lessons l ON l.id = p."lessonId"
-        WHERE p."userId" = ${userId} AND l."trackId" = ${trackId}
-        ORDER BY p."updatedAt" DESC
+        INNER JOIN formation_lessons l ON l.id = p.lesson_id
+        WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
+        ORDER BY p.updated_at DESC
       `
     : sql<ProgressWithLessonRow>`
         SELECT
           p.id,
-          p."userId" AS "userId",
-          p."lessonId" AS "lessonId",
-          p."isCompleted",
-          p."completedAt",
-          p."timeSpent",
-          p."quizScore",
-          p.notes,
-          l."estimatedDuration" AS "lessonEstimatedDuration",
-          l."moduleId" AS "lessonModuleId",
-          l."lessonNumber" AS "lessonNumber",
-          l."trackId" AS "lessonTrackId"
+          p.user_id AS "userId",
+          p.lesson_id AS "lessonId",
+          CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+          p.completed_at AS "completedAt",
+          p.time_spent_minutes AS "timeSpent",
+          0 AS "quizScore",
+          '' AS notes,
+          l.duration_minutes AS "lessonEstimatedDuration",
+          l.module_id AS "lessonModuleId",
+          l.lesson_number AS "lessonNumber",
+          l.track_id AS "lessonTrackId"
         FROM formation_lesson_progress p
-        INNER JOIN formation_lessons l ON l.id = p."lessonId"
-        WHERE p."userId" = ${userId}
-        ORDER BY p."updatedAt" DESC
+        INNER JOIN formation_lessons l ON l.id = p.lesson_id
+        WHERE p.user_id = ${userId}
+        ORDER BY p.updated_at DESC
       `;
 
   const result = await db.execute(query);
