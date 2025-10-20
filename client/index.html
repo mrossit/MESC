@@ -68,6 +68,14 @@
     <!-- PWA Update Prompt -->
     <script>
       if ('serviceWorker' in navigator) {
+        // Detecta se está no preview do Replit
+        const isReplitPreview = window.location.hostname.includes('replit.dev') || 
+                                window.location.hostname.includes('repl.co');
+        
+        if (isReplitPreview) {
+          console.log('[SW] Running in Replit preview - auto-reload disabled');
+        }
+
         // Listener para mensagens do service worker
         navigator.serviceWorker.addEventListener('message', (event) => {
           console.log('[SW Message]', event.data);
@@ -76,9 +84,12 @@
             console.log('[SW] New version detected:', event.data.version);
 
             // Se forceReload for true, recarrega automaticamente
-            if (event.data.forceReload) {
+            // EXCETO no preview do Replit para evitar loop de reload
+            if (event.data.forceReload && !isReplitPreview) {
               console.log('[SW] Force reloading page...');
               window.location.reload(true);
+            } else if (event.data.forceReload && isReplitPreview) {
+              console.log('[SW] Skipping auto-reload in Replit preview - please refresh manually if needed');
             }
           } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
             console.log('[SW] Navigating to push target:', event.data.url);
