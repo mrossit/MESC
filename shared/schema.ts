@@ -333,78 +333,75 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
 
 // Formation tracks (tracks like liturgia, espiritualidade, pratica)
 export const formationTracks = pgTable('formation_tracks', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: varchar('id').primaryKey(),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
   category: formationCategoryEnum('category').notNull(),
-  orderIndex: integer('orderIndex').default(0),
-  isRequired: boolean('isRequired').default(true),
-  estimatedDuration: integer('estimatedDuration'),
+  orderIndex: integer('order_index').default(0),
   icon: varchar('icon', { length: 128 }),
-  isActive: boolean('isActive').default(true),
-  createdAt: timestamp('createdAt').defaultNow(),
-  updatedAt: timestamp('updatedAt').defaultNow()
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Formation modules
 export const formationModules = pgTable('formation_modules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  trackId: varchar('trackId').notNull().references(() => formationTracks.id),
+  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
+  category: formationCategoryEnum('category'),
   content: text('content'),
-  videoUrl: varchar('videoUrl', { length: 512 }),
-  durationMinutes: integer('durationMinutes'),
-  estimatedDuration: integer('estimatedDuration'),
-  orderIndex: integer('orderIndex').default(0),
-  createdAt: timestamp('createdAt').defaultNow(),
-  updatedAt: timestamp('updatedAt').defaultNow(),
-  isActive: boolean('isActive').default(true)
+  videoUrl: varchar('video_url', { length: 512 }),
+  durationMinutes: integer('duration_minutes'),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Formation progress
 export const formationProgress = pgTable('formation_progress', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id').notNull().references(() => users.id),
-  trackId: varchar('track_id').notNull().references(() => formationTracks.id),
+  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
   status: formationStatusEnum('status').notNull().default('not_started'),
-  startedAt: timestamp('started_at'),
-  completedAt: timestamp('completed_at')
+  progressPercentage: integer('progress_percentage').default(0),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Formation lessons (individual lessons within modules)
 export const formationLessons = pgTable('formation_lessons', {
   id: uuid('id').primaryKey().defaultRandom(),
-  moduleId: uuid('moduleId').notNull().references(() => formationModules.id),
+  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
+  trackId: varchar('track_id'),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
-  orderIndex: integer('orderIndex').default(0),
-  lessonNumber: integer('lessonNumber').notNull(),
-  estimatedDuration: integer('estimatedDuration'),
-  contentType: lessonContentTypeEnum('contentType').default('text'),
-  contentUrl: varchar('contentUrl', { length: 512 }),
-  videoUrl: varchar('videoUrl', { length: 512 }),
-  documentUrl: varchar('documentUrl', { length: 512 }),
-  trackId: varchar('trackId'),
-  createdAt: timestamp('createdAt').defaultNow(),
-  updatedAt: timestamp('updatedAt').defaultNow()
+  lessonNumber: integer('lesson_number').notNull(),
+  durationMinutes: integer('duration_minutes'),
+  objectives: jsonb('objectives'),
+  isActive: boolean('is_active').default(true),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Formation lesson content sections (text, video, etc. within a lesson)
 export const formationLessonSections = pgTable('formation_lesson_sections', {
   id: uuid('id').primaryKey().defaultRandom(),
   lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id),
+  type: lessonContentTypeEnum('type').default('text'),
   title: varchar('title', { length: 255 }).notNull(),
-  content: text('content'), // Text content, video embed code, etc.
-  orderIndex: integer('orderIndex').default(0),
-  contentType: lessonContentTypeEnum('contentType').default('text'),
-  videoUrl: varchar('videoUrl', { length: 512 }),
-  audioUrl: varchar('audioUrl', { length: 512 }),
-  documentUrl: varchar('documentUrl', { length: 512 }),
-  quizData: jsonb('quizData'),
-  interactiveData: jsonb('interactiveData'),
-  createdAt: timestamp('createdAt').defaultNow(),
-  updatedAt: timestamp('updatedAt').defaultNow()
+  content: text('content'),
+  videoUrl: varchar('video_url', { length: 512 }),
+  audioUrl: varchar('audio_url', { length: 512 }),
+  documentUrl: varchar('document_url', { length: 512 }),
+  imageUrl: varchar('image_url', { length: 512 }),
+  quizData: jsonb('quiz_data'),
+  orderIndex: integer('order_index').default(0),
+  isRequired: boolean('is_required').default(true),
+  estimatedMinutes: integer('estimated_minutes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Formation lesson progress (track user progress through individual lessons)
@@ -412,13 +409,14 @@ export const formationLessonProgress = pgTable('formation_lesson_progress', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id').notNull().references(() => users.id),
   lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id),
-  isCompleted: boolean('isCompleted').default(false),
-  completedAt: timestamp('completedAt'),
-  timeSpent: integer('timeSpent').default(0),
-  quizScore: integer('quizScore'),
-  notes: text('notes'),
-  createdAt: timestamp('createdAt').defaultNow(),
-  updatedAt: timestamp('updatedAt').defaultNow()
+  status: formationStatusEnum('status').notNull().default('not_started'),
+  progressPercentage: integer('progress_percentage').default(0),
+  timeSpentMinutes: integer('time_spent_minutes').default(0),
+  completedSections: jsonb('completed_sections'),
+  lastAccessedAt: timestamp('last_accessed_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Mass times configuration
@@ -743,9 +741,9 @@ export const formationProgressRelations = relations(formationProgress, ({ one })
     fields: [formationProgress.userId],
     references: [users.id]
   }),
-  track: one(formationTracks, {
-    fields: [formationProgress.trackId],
-    references: [formationTracks.id]
+  module: one(formationModules, {
+    fields: [formationProgress.moduleId],
+    references: [formationModules.id]
   })
 }));
 
@@ -840,9 +838,7 @@ export const insertFormationTrackSchema = createInsertSchema(formationTracks).pi
   category: true,
   icon: true,
   orderIndex: true,
-  isActive: true,
-  isRequired: true,
-  estimatedDuration: true
+  isActive: true
 });
 
 export const insertFormationLessonSchema = createInsertSchema(formationLessons).pick({
@@ -851,34 +847,35 @@ export const insertFormationLessonSchema = createInsertSchema(formationLessons).
   title: true,
   description: true,
   lessonNumber: true,
-  orderIndex: true,
-  estimatedDuration: true,
-  contentType: true,
-  contentUrl: true,
-  videoUrl: true,
-  documentUrl: true
+  durationMinutes: true,
+  objectives: true,
+  isActive: true,
+  orderIndex: true
 });
 
 export const insertFormationLessonSectionSchema = createInsertSchema(formationLessonSections).pick({
   lessonId: true,
+  type: true,
   title: true,
   content: true,
-  orderIndex: true,
-  contentType: true,
   videoUrl: true,
   audioUrl: true,
   documentUrl: true,
+  imageUrl: true,
   quizData: true,
-  interactiveData: true
+  orderIndex: true,
+  isRequired: true,
+  estimatedMinutes: true
 });
 
 export const insertFormationLessonProgressSchema = createInsertSchema(formationLessonProgress).pick({
   userId: true,
   lessonId: true,
-  isCompleted: true,
-  timeSpent: true,
-  quizScore: true,
-  notes: true
+  status: true,
+  progressPercentage: true,
+  timeSpentMinutes: true,
+  completedSections: true,
+  lastAccessedAt: true
 });
 
 // Type exports
