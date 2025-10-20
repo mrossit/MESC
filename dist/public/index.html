@@ -60,15 +60,15 @@
     <!-- Security -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="format-detection" content="telephone=no">
-    <script type="module" crossorigin src="/js/index-BM0fSJ7v.js"></script>
+    <script type="module" crossorigin src="/js/index-DwQ6QyZo.js"></script>
     <link rel="modulepreload" crossorigin href="/js/vendor-react-BSOTRkRF.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-router-D488sAzk.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-query-CwzRqKiB.js">
-    <link rel="modulepreload" crossorigin href="/js/vendor-ui-BUyKyyYL.js">
+    <link rel="modulepreload" crossorigin href="/js/vendor-ui-qq8OA6G7.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-charts-DSHTQCfj.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-date-D2IZz3oM.js">
-    <link rel="modulepreload" crossorigin href="/js/vendor-icons-B-fTmu61.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-CYJ9f9RU.css">
+    <link rel="modulepreload" crossorigin href="/js/vendor-icons-CUrm0803.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CYnN3_Si.css">
   </head>
   <body>
     <div id="root"></div>
@@ -76,72 +76,97 @@
     <!-- PWA Update Prompt -->
     <script>
       if ('serviceWorker' in navigator) {
-        // Listener para mensagens do service worker
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          console.log('[SW Message]', event.data);
-
-          if (event.data && event.data.type === 'SW_UPDATED') {
-            console.log('[SW] New version detected:', event.data.version);
-
-            // Se forceReload for true, recarrega automaticamente
-            if (event.data.forceReload) {
-              console.log('[SW] Force reloading page...');
-              window.location.reload(true);
-            }
-          } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
-            console.log('[SW] Navigating to push target:', event.data.url);
-            window.location.href = event.data.url;
-          }
-        });
-
-        window.addEventListener('load', () => {
-          // Desregistra service workers antigos ANTES de registrar novo
-          navigator.serviceWorker.getRegistrations().then(registrations => {
-            console.log('[Init] Found', registrations.length, 'service worker registrations');
-
-            // Registra novo service worker
-            navigator.serviceWorker.register('/sw.js').then(
-              (registration) => {
-                console.log('[SW] Registration successful:', registration.scope);
-
-                // Verifica atualizações imediatamente
-                registration.update();
-
-                // Verifica atualizações periodicamente (a cada 30 segundos)
-                setInterval(() => {
-                  console.log('[SW] Checking for updates...');
-                  registration.update();
-                }, 30000);
-
-                // Listener para novas versões
-                registration.addEventListener('updatefound', () => {
-                  const newWorker = registration.installing;
-                  console.log('[SW] Update found, installing new version...');
-
-                  if (newWorker) {
-                    newWorker.addEventListener('statechange', () => {
-                      if (newWorker.state === 'installed') {
-                        console.log('[SW] New version installed');
-
-                        // Se há um controller ativo, significa que há uma atualização
-                        if (navigator.serviceWorker.controller) {
-                          console.log('[SW] Waiting for activation...');
-                          // Envia mensagem para ativar imediatamente
-                          newWorker.postMessage({ type: 'SKIP_WAITING' });
-                        }
-                      } else if (newWorker.state === 'activated') {
-                        console.log('[SW] New version activated');
-                      }
-                    });
-                  }
+        // Detecta se está no preview do Replit
+        const isReplitPreview = window.location.hostname.includes('replit.dev') || 
+                                window.location.hostname.includes('repl.co');
+        
+        if (isReplitPreview) {
+          console.log('[SW] Running in Replit preview - Service Worker DISABLED to prevent cache issues');
+          
+          // Desregistra todos os service workers existentes no preview
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              if (registrations.length > 0) {
+                console.log('[SW] Unregistering', registrations.length, 'service workers in Replit preview');
+                registrations.forEach(registration => {
+                  registration.unregister().then(() => {
+                    console.log('[SW] Unregistered service worker:', registration.scope);
+                  });
                 });
-              },
-              (err) => {
-                console.error('[SW] Registration failed:', err);
               }
-            );
+            });
           });
-        });
+        } else {
+          // Service Worker habilitado apenas em produção e navegadores externos
+          console.log('[SW] Service Worker enabled (production/external browser)');
+
+          // Listener para mensagens do service worker
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            console.log('[SW Message]', event.data);
+
+            if (event.data && event.data.type === 'SW_UPDATED') {
+              console.log('[SW] New version detected:', event.data.version);
+
+              // Se forceReload for true, recarrega automaticamente
+              if (event.data.forceReload) {
+                console.log('[SW] Force reloading page...');
+                window.location.reload(true);
+              }
+            } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
+              console.log('[SW] Navigating to push target:', event.data.url);
+              window.location.href = event.data.url;
+            }
+          });
+
+          window.addEventListener('load', () => {
+            // Desregistra service workers antigos ANTES de registrar novo
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              console.log('[Init] Found', registrations.length, 'service worker registrations');
+
+              // Registra novo service worker
+              navigator.serviceWorker.register('/sw.js').then(
+                (registration) => {
+                  console.log('[SW] Registration successful:', registration.scope);
+
+                  // Verifica atualizações imediatamente
+                  registration.update();
+
+                  // Verifica atualizações periodicamente (a cada 30 segundos)
+                  setInterval(() => {
+                    console.log('[SW] Checking for updates...');
+                    registration.update();
+                  }, 30000);
+
+                  // Listener para novas versões
+                  registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    console.log('[SW] Update found, installing new version...');
+
+                    if (newWorker) {
+                      newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed') {
+                          console.log('[SW] New version installed');
+
+                          // Se há um controller ativo, significa que há uma atualização
+                          if (navigator.serviceWorker.controller) {
+                            console.log('[SW] Waiting for activation...');
+                            // Envia mensagem para ativar imediatamente
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                          }
+                        } else if (newWorker.state === 'activated') {
+                          console.log('[SW] New version activated');
+                        }
+                      });
+                    }
+                  });
+                },
+                (err) => {
+                  console.error('[SW] Registration failed:', err);
+                }
+              );
+            });
+          });
+        }
       }
     </script>
     
