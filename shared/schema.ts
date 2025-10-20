@@ -733,7 +733,8 @@ export const formationModulesRelations = relations(formationModules, ({ one, man
     fields: [formationModules.trackId],
     references: [formationTracks.id]
   }),
-  lessons: many(formationLessons)
+  lessons: many(formationLessons),
+  progress: many(formationProgress)
 }));
 
 export const formationProgressRelations = relations(formationProgress, ({ one }) => ({

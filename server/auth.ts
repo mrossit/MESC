@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { formatName } from './utils/nameFormatter';
 
 // JWT secret - SEMPRE deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -218,13 +219,16 @@ export async function register(userData: {
     // Hash da senha
     const passwordHash = await hashPassword(userData.password);
 
+    // Format name with proper capitalization
+    const formattedName = formatName(userData.name);
+
     // Cria o usuário
     const [newUser] = await db
       .insert(users)
       .values({
         email: userData.email,
         passwordHash,
-        name: userData.name,
+        name: formattedName,
         phone: userData.phone || null,
         role: userData.role as any || 'ministro',
         status: userData.status as any || 'pending',
