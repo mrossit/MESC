@@ -164,6 +164,8 @@ var init_schema = __esm({
       marriageParish: varchar("marriage_parish", { length: 255 }),
       // Ministry preferences
       preferredPosition: integer("preferred_position"),
+      preferredPositions: jsonb("preferred_positions").$type().default([]),
+      avoidPositions: jsonb("avoid_positions").$type().default([]),
       preferredTimes: jsonb("preferred_times").$type(),
       availableForSpecialEvents: boolean("available_for_special_events").default(true),
       canServeAsCouple: boolean("can_serve_as_couple").default(false),
@@ -359,32 +361,31 @@ var init_schema = __esm({
     ]);
     formationTracks = pgTable("formation_tracks", {
       id: varchar("id").primaryKey(),
-      // liturgia, espiritualidade, pratica
       title: varchar("title", { length: 255 }).notNull(),
       description: text("description"),
       category: formationCategoryEnum("category").notNull(),
-      icon: varchar("icon", { length: 50 }),
       orderIndex: integer("order_index").default(0),
+      icon: varchar("icon", { length: 128 }),
       isActive: boolean("is_active").default(true),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
     formationModules = pgTable("formation_modules", {
       id: uuid("id").primaryKey().defaultRandom(),
-      trackId: varchar("trackId").notNull().references(() => formationTracks.id),
+      trackId: varchar("track_id").notNull().references(() => formationTracks.id),
       title: varchar("title", { length: 255 }).notNull(),
       description: text("description"),
-      category: formationCategoryEnum("category").notNull(),
+      category: formationCategoryEnum("category"),
       content: text("content"),
-      videoUrl: varchar("video_url", { length: 255 }),
-      durationMinutes: integer("durationMinutes"),
-      orderIndex: integer("order_index"),
+      videoUrl: varchar("video_url", { length: 512 }),
+      durationMinutes: integer("duration_minutes"),
+      orderIndex: integer("order_index").default(0),
       createdAt: timestamp("created_at").defaultNow()
     });
     formationProgress = pgTable("formation_progress", {
       id: uuid("id").primaryKey().defaultRandom(),
       userId: varchar("user_id").notNull().references(() => users.id),
-      moduleId: uuid("moduleId").notNull().references(() => formationModules.id),
+      moduleId: uuid("module_id").notNull().references(() => formationModules.id),
       status: formationStatusEnum("status").notNull().default("not_started"),
       progressPercentage: integer("progress_percentage").default(0),
       completedAt: timestamp("completed_at"),
@@ -392,13 +393,13 @@ var init_schema = __esm({
     });
     formationLessons = pgTable("formation_lessons", {
       id: uuid("id").primaryKey().defaultRandom(),
-      moduleId: uuid("moduleId").notNull().references(() => formationModules.id),
-      trackId: varchar("trackId").notNull().references(() => formationTracks.id),
+      moduleId: uuid("module_id").notNull().references(() => formationModules.id),
+      trackId: varchar("track_id"),
       title: varchar("title", { length: 255 }).notNull(),
       description: text("description"),
-      lessonNumber: integer("lessonNumber").notNull(),
-      estimatedDuration: integer("estimatedDuration").default(30),
-      // objectives: jsonb('objectives').$type<string[]>(), // Not in SQLite local
+      lessonNumber: integer("lesson_number").notNull(),
+      durationMinutes: integer("duration_minutes"),
+      objectives: jsonb("objectives"),
       isActive: boolean("is_active").default(true),
       orderIndex: integer("order_index").default(0),
       createdAt: timestamp("created_at").defaultNow(),
@@ -407,19 +408,17 @@ var init_schema = __esm({
     formationLessonSections = pgTable("formation_lesson_sections", {
       id: uuid("id").primaryKey().defaultRandom(),
       lessonId: uuid("lesson_id").notNull().references(() => formationLessons.id),
-      type: lessonContentTypeEnum("type").notNull(),
-      title: varchar("title", { length: 255 }),
+      type: lessonContentTypeEnum("type").default("text"),
+      title: varchar("title", { length: 255 }).notNull(),
       content: text("content"),
-      // Text content, video embed code, etc.
-      videoUrl: varchar("video_url", { length: 500 }),
-      audioUrl: varchar("audio_url", { length: 500 }),
-      documentUrl: varchar("document_url", { length: 500 }),
-      imageUrl: varchar("image_url", { length: 500 }),
+      videoUrl: varchar("video_url", { length: 512 }),
+      audioUrl: varchar("audio_url", { length: 512 }),
+      documentUrl: varchar("document_url", { length: 512 }),
+      imageUrl: varchar("image_url", { length: 512 }),
       quizData: jsonb("quiz_data"),
-      // For interactive quizzes
       orderIndex: integer("order_index").default(0),
       isRequired: boolean("is_required").default(true),
-      estimatedMinutes: integer("estimated_minutes").default(5),
+      estimatedMinutes: integer("estimated_minutes"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
@@ -430,7 +429,7 @@ var init_schema = __esm({
       status: formationStatusEnum("status").notNull().default("not_started"),
       progressPercentage: integer("progress_percentage").default(0),
       timeSpentMinutes: integer("time_spent_minutes").default(0),
-      completedSections: jsonb("completed_sections").$type().default([]),
+      completedSections: jsonb("completed_sections"),
       lastAccessedAt: timestamp("last_accessed_at"),
       completedAt: timestamp("completed_at"),
       createdAt: timestamp("created_at").defaultNow(),
@@ -720,8 +719,8 @@ var init_schema = __esm({
         fields: [formationModules.trackId],
         references: [formationTracks.id]
       }),
-      progress: many(formationProgress),
-      lessons: many(formationLessons)
+      lessons: many(formationLessons),
+      progress: many(formationProgress)
     }));
     formationProgressRelations = relations(formationProgress, ({ one }) => ({
       user: one(users, {
@@ -823,8 +822,10 @@ var init_schema = __esm({
       title: true,
       description: true,
       lessonNumber: true,
-      orderIndex: true,
-      isActive: true
+      durationMinutes: true,
+      objectives: true,
+      isActive: true,
+      orderIndex: true
     });
     insertFormationLessonSectionSchema = createInsertSchema(formationLessonSections).pick({
       lessonId: true,
@@ -846,7 +847,8 @@ var init_schema = __esm({
       status: true,
       progressPercentage: true,
       timeSpentMinutes: true,
-      completedSections: true
+      completedSections: true,
+      lastAccessedAt: true
     });
   }
 });
@@ -907,6 +909,54 @@ var init_db = __esm({
   }
 });
 
+// server/utils/nameFormatter.ts
+function formatName(name) {
+  if (!name) return "";
+  const normalized = name.trim().replace(/\s+/g, " ");
+  const words = normalized.toLowerCase().split(" ");
+  const formattedWords = words.map((word, index2) => {
+    if (!word) return "";
+    if (index2 === 0) {
+      return capitalizeWord(word);
+    }
+    if (LOWERCASE_PREFIXES.includes(word.toLowerCase())) {
+      return word.toLowerCase();
+    }
+    return capitalizeWord(word);
+  });
+  return formattedWords.join(" ");
+}
+function capitalizeWord(word) {
+  if (!word) return "";
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+var LOWERCASE_PREFIXES;
+var init_nameFormatter = __esm({
+  "server/utils/nameFormatter.ts"() {
+    "use strict";
+    LOWERCASE_PREFIXES = [
+      "da",
+      "de",
+      "do",
+      "das",
+      "dos",
+      "e",
+      "a",
+      "o",
+      "as",
+      "os",
+      "em",
+      "na",
+      "no",
+      "nas",
+      "nos",
+      "com",
+      "para",
+      "por"
+    ];
+  }
+});
+
 // server/storage.ts
 var storage_exports = {};
 __export(storage_exports, {
@@ -921,6 +971,7 @@ var init_storage = __esm({
     "use strict";
     init_schema();
     await init_db();
+    init_nameFormatter();
     DrizzleSQLiteFallback = class {
       static sqliteDb = null;
       static getSQLiteDB() {
@@ -1015,10 +1066,12 @@ var init_storage = __esm({
         const tempPassword = crypto3.randomBytes(12).toString("base64").slice(0, 12) + "!Aa1";
         const bcrypt2 = await import("bcrypt");
         const passwordHash = await bcrypt2.hash(tempPassword, 10);
+        const rawName = userData.name || `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "Usu\xE1rio";
+        const formattedName = formatName(rawName);
         const [user] = await db.insert(users).values({
           email: userData.email,
           passwordHash,
-          name: userData.name || `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "Usu\xE1rio",
+          name: formattedName,
           firstName: userData.firstName || null,
           lastName: userData.lastName || null,
           phone: userData.phone || null,
@@ -1040,7 +1093,11 @@ var init_storage = __esm({
         return user;
       }
       async updateUser(id, userData) {
-        const [user] = await db.update(users).set({ ...userData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
+        const updateData = { ...userData };
+        if (updateData.name) {
+          updateData.name = formatName(updateData.name);
+        }
+        const [user] = await db.update(users).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
         return user;
       }
       async deleteUser(id) {
@@ -5661,6 +5718,7 @@ import crypto2 from "crypto";
 // server/auth.ts
 await init_db();
 init_schema();
+init_nameFormatter();
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { eq as eq2 } from "drizzle-orm";
@@ -5787,10 +5845,11 @@ async function register(userData) {
       throw new Error("Este email j\xE1 est\xE1 cadastrado");
     }
     const passwordHash = await hashPassword(userData.password);
+    const formattedName = formatName(userData.name);
     const [newUser] = await db.insert(users).values({
       email: userData.email,
       passwordHash,
-      name: userData.name,
+      name: formattedName,
       phone: userData.phone || null,
       role: userData.role || "ministro",
       status: userData.status || "pending",
@@ -6145,7 +6204,7 @@ router2.post("/register", async (req, res) => {
 router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const userData = registerSchema.parse(req.body);
-    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor") {
+    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor" && req.user?.role !== "reitor") {
       return res.status(403).json({
         success: false,
         message: "Apenas gestores podem criar coordenadores ou outros gestores"
@@ -13333,7 +13392,6 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
       "emergencyContact",
       "emergencyPhone",
       "preferredPosition",
-      "preferredTimes",
       "availableForSpecialEvents",
       "canServeAsCouple",
       "spouseUserId",
@@ -13347,9 +13405,7 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
     const updateData = {};
     for (const field of allowedFields) {
       if (req.body[field] !== void 0) {
-        if (field === "preferredTimes") {
-          updateData[field] = req.body[field];
-        } else if (field === "specialSkills") {
+        if (field === "specialSkills") {
           updateData[field] = typeof req.body[field] === "string" ? req.body[field] : JSON.stringify(req.body[field]);
         } else if (["liturgicalTraining", "formationCompleted"].includes(field)) {
           updateData[field] = Boolean(req.body[field]);
@@ -15779,6 +15835,675 @@ init_logger();
 await init_db();
 import { z as z7 } from "zod";
 import { eq as eq27, count as count7, or as or10 } from "drizzle-orm";
+
+// server/services/formationService.ts
+await init_db();
+import { randomUUID } from "node:crypto";
+import { sql as sql17 } from "drizzle-orm";
+var parseRows = (result) => {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.rows)) return result.rows;
+  return [];
+};
+var parseProgressNotes = (notes) => {
+  if (!notes) {
+    return { completedSections: [], progressPercentage: 0 };
+  }
+  try {
+    const parsed = JSON.parse(notes);
+    return {
+      completedSections: Array.isArray(parsed?.completedSections) ? parsed.completedSections : [],
+      progressPercentage: typeof parsed?.progressPercentage === "number" ? parsed.progressPercentage : 0
+    };
+  } catch {
+    return { completedSections: [], progressPercentage: 0 };
+  }
+};
+var serializeProgressNotes = (data) => JSON.stringify({
+  completedSections: data.completedSections,
+  progressPercentage: data.progressPercentage
+});
+var buildLessonProgressView = (lesson, progressRow, totalSections) => {
+  if (!progressRow) {
+    return {
+      status: "not_started",
+      progressPercentage: 0,
+      timeSpent: 0,
+      completedSections: []
+    };
+  }
+  const meta = parseProgressNotes(progressRow.notes);
+  const isCompleted = Boolean(progressRow.isCompleted);
+  const timeSpent = progressRow.timeSpent ?? 0;
+  let progressPercentage = meta.progressPercentage ?? 0;
+  if (!progressPercentage && !isCompleted) {
+    const estimated = lesson.estimatedDuration ?? 0;
+    if (estimated > 0 && timeSpent > 0) {
+      progressPercentage = Math.min(99, Math.round(timeSpent / estimated * 100));
+    }
+  }
+  if (isCompleted) {
+    progressPercentage = 100;
+  } else if (totalSections && totalSections > 0) {
+    progressPercentage = Math.max(
+      progressPercentage,
+      Math.min(99, Math.round(meta.completedSections.length / totalSections * 100))
+    );
+  }
+  const status = isCompleted ? "completed" : progressPercentage > 0 ? "in_progress" : "not_started";
+  return {
+    status,
+    progressPercentage,
+    timeSpent,
+    completedSections: meta.completedSections
+  };
+};
+var groupBy = (items, extractKey) => {
+  return items.reduce((acc, item) => {
+    const key = extractKey(item);
+    if (!key) {
+      return acc;
+    }
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(item);
+    return acc;
+  }, {});
+};
+async function getFormationOverview(userId) {
+  const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
+    db.execute(sql17`
+      SELECT
+        id,
+        title,
+        description,
+        category,
+        COALESCE(order_index, 0) AS "orderIndex",
+        1 AS "isRequired",
+        0 AS "estimatedDuration",
+        icon,
+        COALESCE(is_active, true) AS "isActive",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM formation_tracks
+      ORDER BY COALESCE(order_index, 0), title
+    `),
+    db.execute(sql17`
+      SELECT
+        id,
+        track_id AS "trackId",
+        title,
+        description,
+        COALESCE(order_index, 0) AS "orderIndex",
+        0 AS "estimatedDuration",
+        duration_minutes AS "durationMinutes",
+        content,
+        video_url AS "videoUrl",
+        1 AS "isActive"
+      FROM formation_modules
+      ORDER BY track_id, COALESCE(order_index, 0), title
+    `),
+    db.execute(sql17`
+      SELECT
+        id,
+        module_id AS "moduleId",
+        track_id AS "trackId",
+        title,
+        description,
+        COALESCE(order_index, 0) AS "orderIndex",
+        lesson_number AS "lessonNumber",
+        duration_minutes AS "estimatedDuration",
+        'text' AS "contentType",
+        '' AS "contentUrl",
+        '' AS "videoUrl",
+        '' AS "documentUrl"
+      FROM formation_lessons
+      ORDER BY module_id, lesson_number
+    `),
+    userId ? db.execute(sql17`
+          SELECT
+            id,
+            user_id AS "userId",
+            lesson_id AS "lessonId",
+            CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+            completed_at AS "completedAt",
+            time_spent_minutes AS "timeSpent",
+            0 AS "quizScore",
+            '' AS notes
+          FROM formation_lesson_progress
+          WHERE user_id = ${userId}
+        `) : Promise.resolve(void 0)
+  ]);
+  const tracks = parseRows(tracksResult);
+  const modules = parseRows(modulesResult);
+  const lessons = parseRows(lessonsResult);
+  const progressRows = parseRows(progressResult);
+  const progressByLesson = new Map(progressRows.map((row) => [row.lessonId, row]));
+  const lessonsGroupedByModule = groupBy(lessons, (lesson) => lesson.moduleId);
+  const moduleViews = {};
+  modules.forEach((module) => {
+    const lessonList = [...lessonsGroupedByModule[module.id] ?? []].sort((a, b) => a.lessonNumber - b.lessonNumber);
+    const lessonsWithProgress = lessonList.map((lesson) => {
+      const progressRow = progressByLesson.get(lesson.id);
+      const progressView = buildLessonProgressView(lesson, progressRow);
+      return {
+        ...lesson,
+        progress: progressView
+      };
+    });
+    const completedLessons = lessonsWithProgress.filter((lesson) => lesson.progress.status === "completed").length;
+    const inProgressLessons = lessonsWithProgress.filter((lesson) => lesson.progress.status === "in_progress").length;
+    const totalLessons = lessonsWithProgress.length;
+    const progressPercentage = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
+    const moduleView = {
+      ...module,
+      lessons: lessonsWithProgress,
+      stats: {
+        totalLessons,
+        completedLessons,
+        inProgressLessons,
+        progressPercentage
+      }
+    };
+    if (!moduleViews[module.trackId]) {
+      moduleViews[module.trackId] = [];
+    }
+    moduleViews[module.trackId].push(moduleView);
+  });
+  const trackOverviews = tracks.map((track) => {
+    const modulesForTrack = moduleViews[track.id] ?? [];
+    const totalModules = modulesForTrack.length;
+    const totalLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.totalLessons, 0);
+    const completedLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.completedLessons, 0);
+    const inProgressLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.inProgressLessons, 0);
+    const progressPercentage = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
+    const nextLesson = modulesForTrack.flatMap((module) => module.lessons).find((lesson) => lesson.progress.status !== "completed") ?? null;
+    return {
+      ...track,
+      orderIndex: track.orderIndex ?? 0,
+      isActive: Boolean(track.isActive ?? true),
+      isRequired: Boolean(track.isRequired ?? true),
+      modules: modulesForTrack,
+      stats: {
+        totalModules,
+        totalLessons,
+        completedLessons,
+        inProgressLessons,
+        progressPercentage
+      },
+      nextLesson
+    };
+  });
+  const totals = trackOverviews.reduce(
+    (acc, track) => {
+      acc.totalModules += track.stats.totalModules;
+      acc.totalLessons += track.stats.totalLessons;
+      acc.completedLessons += track.stats.completedLessons;
+      acc.inProgressLessons += track.stats.inProgressLessons;
+      return acc;
+    },
+    {
+      totalModules: 0,
+      totalLessons: 0,
+      completedLessons: 0,
+      inProgressLessons: 0
+    }
+  );
+  const percentageCompleted = totals.totalLessons > 0 ? Math.round(totals.completedLessons / totals.totalLessons * 100) : 0;
+  return {
+    tracks: trackOverviews,
+    summary: {
+      totalTracks: trackOverviews.length,
+      ...totals,
+      percentageCompleted,
+      lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  };
+}
+async function getLessonDetail(params) {
+  const { userId, trackId, moduleId, lessonNumber } = params;
+  const lessonResult = await db.execute(sql17`
+    SELECT
+      id,
+      module_id AS "moduleId",
+      track_id AS "trackId",
+      title,
+      description,
+      COALESCE(order_index, 0) AS "orderIndex",
+      lesson_number AS "lessonNumber",
+      duration_minutes AS "estimatedDuration",
+      'text' AS "contentType",
+      '' AS "contentUrl",
+      '' AS "videoUrl",
+      '' AS "documentUrl"
+    FROM formation_lessons
+    WHERE module_id = ${moduleId} AND lesson_number = ${lessonNumber}
+    LIMIT 1
+  `);
+  const lessonRow = parseRows(lessonResult)[0];
+  if (!lessonRow) {
+    return null;
+  }
+  const sectionsResult = await db.execute(sql17`
+    SELECT
+      id,
+      lesson_id AS "lessonId",
+      title,
+      content,
+      COALESCE(order_index, 0) AS "orderIndex",
+      type AS "contentType",
+      video_url AS "videoUrl",
+      audio_url AS "audioUrl",
+      document_url AS "documentUrl",
+      quiz_data AS "quizData",
+      '' AS "interactiveData"
+    FROM formation_lesson_sections
+    WHERE lesson_id = ${lessonRow.id}
+    ORDER BY COALESCE(order_index, 0), title
+  `);
+  const sections = parseRows(sectionsResult);
+  const sectionsCount = sections.length || 1;
+  const sectionViews = sections.map((section) => ({
+    id: section.id,
+    title: section.title,
+    content: section.content,
+    contentType: section.contentType,
+    orderIndex: section.orderIndex ?? 0,
+    videoUrl: section.videoUrl,
+    audioUrl: section.audioUrl,
+    documentUrl: section.documentUrl,
+    estimatedMinutes: lessonRow.estimatedDuration ? Math.max(1, Math.round(lessonRow.estimatedDuration / sectionsCount)) : null,
+    quizData: section.quizData ? JSON.parse(section.quizData) : void 0,
+    interactiveData: section.interactiveData ? JSON.parse(section.interactiveData) : void 0
+  }));
+  let progressView = {
+    status: "not_started",
+    progressPercentage: 0,
+    timeSpent: 0,
+    completedSections: []
+  };
+  if (userId) {
+    const progressResult = await db.execute(sql17`
+      SELECT
+        id,
+        user_id AS "userId",
+        lesson_id AS "lessonId",
+        CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+        completed_at AS "completedAt",
+        time_spent_minutes AS "timeSpent",
+        0 AS "quizScore",
+        '' AS notes
+      FROM formation_lesson_progress
+      WHERE user_id = ${userId} AND lesson_id = ${lessonRow.id}
+      LIMIT 1
+    `);
+    const progressRow = parseRows(progressResult)[0];
+    progressView = buildLessonProgressView(lessonRow, progressRow, sections.length);
+  }
+  return {
+    lesson: {
+      id: lessonRow.id,
+      moduleId: lessonRow.moduleId,
+      trackId: lessonRow.trackId,
+      title: lessonRow.title,
+      description: lessonRow.description,
+      lessonNumber: lessonRow.lessonNumber,
+      estimatedDuration: lessonRow.estimatedDuration,
+      contentType: lessonRow.contentType,
+      contentUrl: lessonRow.contentUrl,
+      videoUrl: lessonRow.videoUrl,
+      documentUrl: lessonRow.documentUrl
+    },
+    sections: sectionViews,
+    progress: progressView
+  };
+}
+async function ensureLessonProgressRecord(userId, lessonId) {
+  const result = await db.execute(sql17`
+    SELECT
+      id,
+      user_id AS "userId",
+      lesson_id AS "lessonId",
+      CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+      completed_at AS "completedAt",
+      time_spent_minutes AS "timeSpent",
+      0 AS "quizScore",
+      '' AS notes
+    FROM formation_lesson_progress
+    WHERE user_id = ${userId} AND lesson_id = ${lessonId}
+    LIMIT 1
+  `);
+  return parseRows(result)[0] ?? null;
+}
+async function countLessonSections(lessonId) {
+  const result = await db.execute(sql17`
+    SELECT COUNT(*)::integer AS count
+    FROM formation_lesson_sections
+    WHERE lesson_id = ${lessonId}
+  `);
+  const row = parseRows(result)[0];
+  return row?.count ?? 0;
+}
+async function markLessonSectionCompleted(params) {
+  const { userId, lessonId, sectionId } = params;
+  const existing = await ensureLessonProgressRecord(userId, lessonId);
+  const meta = parseProgressNotes(existing?.notes);
+  if (!meta.completedSections.includes(sectionId)) {
+    meta.completedSections.push(sectionId);
+  }
+  const totalSections = await countLessonSections(lessonId);
+  if (totalSections > 0) {
+    meta.progressPercentage = Math.min(99, Math.round(meta.completedSections.length / totalSections * 100));
+  }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  if (existing) {
+    await db.execute(sql17`
+      UPDATE formation_lesson_progress
+      SET
+        "isCompleted" = ${existing.isCompleted},
+        "completedAt" = ${existing.completedAt},
+        "timeSpent" = COALESCE("timeSpent", 0) + 1,
+        "quizScore" = "quizScore",
+        notes = ${serializeProgressNotes(meta)},
+        "updatedAt" = ${now}
+      WHERE id = ${existing.id}
+    `);
+  } else {
+    await db.execute(sql17`
+      INSERT INTO formation_lesson_progress (
+        id,
+        "userId",
+        "lessonId",
+        "isCompleted",
+        "completedAt",
+        "timeSpent",
+        "quizScore",
+        notes,
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        ${randomUUID()},
+        ${userId},
+        ${lessonId},
+        ${false},
+        ${null},
+        ${1},
+        ${null},
+        ${serializeProgressNotes(meta)},
+        ${now},
+        ${now}
+      )
+    `);
+  }
+  if (meta.progressPercentage >= 100) {
+    return await markLessonCompleted({ userId, lessonId });
+  }
+  return buildLessonProgressView(
+    {
+      id: lessonId,
+      moduleId: "",
+      title: "",
+      description: null,
+      orderIndex: 0,
+      lessonNumber: 0,
+      estimatedDuration: null,
+      contentType: null,
+      contentUrl: null,
+      videoUrl: null,
+      documentUrl: null,
+      trackId: null
+    },
+    {
+      id: existing?.id ?? "",
+      userId,
+      lessonId,
+      isCompleted: false,
+      completedAt: null,
+      timeSpent: (existing?.timeSpent ?? 0) + 1,
+      quizScore: existing?.quizScore ?? null,
+      notes: serializeProgressNotes(meta)
+    },
+    totalSections
+  );
+}
+async function markLessonCompleted(params) {
+  const { userId, lessonId } = params;
+  const existing = await ensureLessonProgressRecord(userId, lessonId);
+  const totalSections = await countLessonSections(lessonId);
+  const meta = {
+    completedSections: Array.from(
+      /* @__PURE__ */ new Set([
+        ...existing ? parseProgressNotes(existing.notes).completedSections : [],
+        ...totalSections > 0 ? (await db.execute(sql17`
+                SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
+              `)).rows.map((row) => row.id) : []
+      ])
+    ),
+    progressPercentage: 100
+  };
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  if (existing) {
+    await db.execute(sql17`
+      UPDATE formation_lesson_progress
+      SET
+        "isCompleted" = ${true},
+        "completedAt" = ${now},
+        "timeSpent" = COALESCE("timeSpent", 0),
+        "quizScore" = "quizScore",
+        notes = ${serializeProgressNotes(meta)},
+        "updatedAt" = ${now}
+      WHERE id = ${existing.id}
+    `);
+  } else {
+    await db.execute(sql17`
+      INSERT INTO formation_lesson_progress (
+        id,
+        "userId",
+        "lessonId",
+        "isCompleted",
+        "completedAt",
+        "timeSpent",
+        "quizScore",
+        notes,
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        ${randomUUID()},
+        ${userId},
+        ${lessonId},
+        ${true},
+        ${now},
+        ${0},
+        ${null},
+        ${serializeProgressNotes(meta)},
+        ${now},
+        ${now}
+      )
+    `);
+  }
+  return {
+    status: "completed",
+    progressPercentage: 100,
+    timeSpent: existing?.timeSpent ?? 0,
+    completedSections: meta.completedSections
+  };
+}
+async function upsertLessonProgressEntry(params) {
+  const { userId, lessonId, isCompleted, timeSpent, progressPercentage, completedSections, quizScore, notes } = params;
+  const existing = await ensureLessonProgressRecord(userId, lessonId);
+  const meta = parseProgressNotes(existing?.notes);
+  if (Array.isArray(completedSections)) {
+    meta.completedSections = Array.from(new Set(completedSections));
+  }
+  if (typeof progressPercentage === "number") {
+    meta.progressPercentage = progressPercentage;
+  }
+  if (notes) {
+    try {
+      const parsed = JSON.parse(notes);
+      if (Array.isArray(parsed?.completedSections)) {
+        meta.completedSections = parsed.completedSections;
+      }
+      if (typeof parsed?.progressPercentage === "number") {
+        meta.progressPercentage = parsed.progressPercentage;
+      }
+    } catch {
+    }
+  }
+  const finalIsCompleted = isCompleted ?? existing?.isCompleted ?? false;
+  if (finalIsCompleted) {
+    meta.progressPercentage = 100;
+  }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const payload = {
+    isCompleted: finalIsCompleted,
+    completedAt: finalIsCompleted ? now : existing?.completedAt ?? null,
+    timeSpent: timeSpent ?? existing?.timeSpent ?? 0,
+    quizScore: quizScore ?? existing?.quizScore ?? null,
+    notes: serializeProgressNotes(meta),
+    updatedAt: now
+  };
+  if (existing) {
+    await db.execute(sql17`
+      UPDATE formation_lesson_progress
+      SET
+        "isCompleted" = ${payload.isCompleted},
+        "completedAt" = ${payload.completedAt},
+        "timeSpent" = ${payload.timeSpent},
+        "quizScore" = ${payload.quizScore},
+        notes = ${payload.notes},
+        "updatedAt" = ${payload.updatedAt}
+      WHERE id = ${existing.id}
+    `);
+  } else {
+    await db.execute(sql17`
+      INSERT INTO formation_lesson_progress (
+        id,
+        "userId",
+        "lessonId",
+        "isCompleted",
+        "completedAt",
+        "timeSpent",
+        "quizScore",
+        notes,
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        ${randomUUID()},
+        ${userId},
+        ${lessonId},
+        ${payload.isCompleted},
+        ${payload.completedAt},
+        ${payload.timeSpent},
+        ${payload.quizScore},
+        ${payload.notes},
+        ${now},
+        ${now}
+      )
+    `);
+  }
+  return buildLessonProgressView(
+    {
+      id: lessonId,
+      moduleId: "",
+      title: "",
+      description: null,
+      orderIndex: 0,
+      lessonNumber: 0,
+      estimatedDuration: null,
+      contentType: null,
+      contentUrl: null,
+      videoUrl: null,
+      documentUrl: null,
+      trackId: null
+    },
+    {
+      id: existing?.id ?? "",
+      userId,
+      lessonId,
+      isCompleted: payload.isCompleted ? 1 : 0,
+      completedAt: payload.completedAt,
+      timeSpent: payload.timeSpent,
+      quizScore: payload.quizScore,
+      notes: payload.notes
+    }
+  );
+}
+async function listLessonProgressEntries(params) {
+  const { userId, trackId } = params;
+  const query = trackId ? sql17`
+        SELECT
+          p.id,
+          p.user_id AS "userId",
+          p.lesson_id AS "lessonId",
+          CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+          p.completed_at AS "completedAt",
+          p.time_spent_minutes AS "timeSpent",
+          0 AS "quizScore",
+          '' AS notes,
+          l.duration_minutes AS "lessonEstimatedDuration",
+          l.module_id AS "lessonModuleId",
+          l.lesson_number AS "lessonNumber",
+          l.track_id AS "lessonTrackId"
+        FROM formation_lesson_progress p
+        INNER JOIN formation_lessons l ON l.id = p.lesson_id
+        WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
+        ORDER BY p.updated_at DESC
+      ` : sql17`
+        SELECT
+          p.id,
+          p.user_id AS "userId",
+          p.lesson_id AS "lessonId",
+          CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+          p.completed_at AS "completedAt",
+          p.time_spent_minutes AS "timeSpent",
+          0 AS "quizScore",
+          '' AS notes,
+          l.duration_minutes AS "lessonEstimatedDuration",
+          l.module_id AS "lessonModuleId",
+          l.lesson_number AS "lessonNumber",
+          l.track_id AS "lessonTrackId"
+        FROM formation_lesson_progress p
+        INNER JOIN formation_lessons l ON l.id = p.lesson_id
+        WHERE p.user_id = ${userId}
+        ORDER BY p.updated_at DESC
+      `;
+  const result = await db.execute(query);
+  const rows = parseRows(result);
+  return rows.map((row) => ({
+    lessonId: row.lessonId,
+    progress: buildLessonProgressView(
+      {
+        id: row.lessonId,
+        moduleId: row.lessonModuleId,
+        title: "",
+        description: null,
+        orderIndex: 0,
+        lessonNumber: row.lessonNumber,
+        estimatedDuration: row.lessonEstimatedDuration,
+        contentType: null,
+        contentUrl: null,
+        videoUrl: null,
+        documentUrl: null,
+        trackId: row.lessonTrackId
+      },
+      row
+    )
+  }));
+}
+
+// server/routes.ts
+var formationProgressUpdateSchema = z7.object({
+  lessonId: z7.string(),
+  isCompleted: z7.boolean().optional(),
+  timeSpent: z7.number().int().min(0).optional(),
+  progressPercentage: z7.number().min(0).max(100).optional(),
+  completedSections: z7.array(z7.string()).optional(),
+  quizScore: z7.number().optional(),
+  notes: z7.string().optional()
+});
 function handleApiError(error, operation) {
   if (error instanceof z7.ZodError) {
     return {
@@ -16538,7 +17263,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/formation/overview", authenticateToken, async (req, res) => {
     try {
-      const overview = await storage.getFormationOverview(req.user?.id);
+      const overview = await getFormationOverview(req.user?.id);
       res.json(overview);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar vis\xE3o geral da forma\xE7\xE3o");
@@ -16626,22 +17351,16 @@ async function registerRoutes(app2) {
   app2.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId, lessonNumber } = req.params;
-      const lesson = await storage.getFormationLessonByNumber(trackId, moduleId, parseInt(lessonNumber));
-      if (!lesson) {
+      const detail = await getLessonDetail({
+        userId: req.user?.id,
+        trackId,
+        moduleId,
+        lessonNumber: parseInt(lessonNumber, 10)
+      });
+      if (!detail) {
         return res.status(404).json({ message: "Aula n\xE3o encontrada" });
       }
-      const sections = await storage.getFormationLessonSections(lesson.id);
-      const userId = req.user?.id;
-      let progress = null;
-      if (userId) {
-        const progressData = await storage.getFormationLessonProgress(userId, lesson.id);
-        progress = progressData[0] || null;
-      }
-      res.json({
-        lesson,
-        sections,
-        progress
-      });
+      res.json(detail);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar aula completa");
       res.status(errorResponse.status).json(errorResponse);
@@ -16663,7 +17382,10 @@ async function registerRoutes(app2) {
         return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
       }
       const { trackId } = req.query;
-      const progress = await storage.getUserFormationProgress(userId, trackId);
+      const progress = await listLessonProgressEntries({
+        userId,
+        trackId: trackId ? String(trackId) : void 0
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar progresso de forma\xE7\xE3o");
@@ -16676,11 +17398,17 @@ async function registerRoutes(app2) {
       if (!userId) {
         return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
       }
-      const progressData = insertFormationLessonProgressSchema.parse({
-        ...req.body,
-        userId
+      const progressData = formationProgressUpdateSchema.parse(req.body);
+      const progress = await upsertLessonProgressEntry({
+        userId,
+        lessonId: progressData.lessonId,
+        isCompleted: progressData.isCompleted,
+        timeSpent: progressData.timeSpent,
+        progressPercentage: progressData.progressPercentage,
+        completedSections: progressData.completedSections,
+        quizScore: progressData.quizScore,
+        notes: progressData.notes
       });
-      const progress = await storage.createOrUpdateFormationLessonProgress(progressData);
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "atualizar progresso de forma\xE7\xE3o");
@@ -16694,7 +17422,11 @@ async function registerRoutes(app2) {
         return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
       }
       const { lessonId, sectionId } = req.params;
-      const progress = await storage.markLessonSectionCompleted(userId, lessonId, sectionId);
+      const progress = await markLessonSectionCompleted({
+        userId,
+        lessonId,
+        sectionId
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "marcar se\xE7\xE3o como completa");
@@ -16708,7 +17440,10 @@ async function registerRoutes(app2) {
         return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
       }
       const { lessonId } = req.params;
-      const progress = await storage.markLessonCompleted(userId, lessonId);
+      const progress = await markLessonCompleted({
+        userId,
+        lessonId
+      });
       res.json(progress);
     } catch (error) {
       const errorResponse = handleApiError(error, "marcar aula como completa");

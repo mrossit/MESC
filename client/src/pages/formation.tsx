@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FormationQuiz } from "@/components/formation-quiz";
 import {
   BookOpen,
   GraduationCap,
@@ -394,6 +395,8 @@ function LessonContent({
   const [, navigate] = useLocation();
   const queryClientInstance = useQueryClient();
   const { csrfToken, isLoading: csrfLoading } = useCsrfToken();
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [quizScore, setQuizScore] = useState<number | null>(null);
 
   const lessonNumberInt = Number(lessonNumber);
   const sortedLessons = useMemo(
@@ -458,6 +461,19 @@ function LessonContent({
         : null
     };
   }, [sortedLessons, lessonNumberInt]);
+
+  const handleQuizComplete = (score: number, passed: boolean) => {
+    setQuizScore(score);
+    setQuizCompleted(true);
+
+    toast({
+      title: passed ? "Quiz concluído!" : "Quiz concluído",
+      description: passed
+        ? `Parabéns! Você obteve ${score}% de acerto.`
+        : `Você obteve ${score}%. Revise o conteúdo e tente novamente.`,
+      variant: passed ? "default" : "destructive"
+    });
+  };
 
   if (isLoading) {
     return (
@@ -551,6 +567,28 @@ function LessonContent({
           )}
         </div>
 
+        {/* Quiz Section */}
+        {sections && sections.some(s => s.quizData) && !quizCompleted && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Avaliação de Conhecimento</h2>
+            <FormationQuiz
+              quizData={sections.find(s => s.quizData)?.quizData as any}
+              onComplete={handleQuizComplete}
+              onSkip={() => setQuizCompleted(true)}
+            />
+          </div>
+        )}
+
+        {quizCompleted && quizScore !== null && (
+          <Card className="border-green-200 bg-green-50 dark:bg-green-900/20">
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                ✅ Quiz concluído com {quizScore}% de acerto
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -606,24 +644,38 @@ function LessonContent({
                   Aula concluída com sucesso
                 </div>
               ) : (
-                <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={() => markCompletedMutation.mutate(lesson.id)}
-                  disabled={markCompletedMutation.isPending || csrfLoading || !csrfToken}
-                  data-testid="button-complete-lesson"
-                >
-                  {markCompletedMutation.isPending ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Marcar como concluída
-                    </>
+                <>
+                  {sections && sections.some(s => s.quizData) && !quizCompleted && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Complete o quiz de avaliação para marcar esta aula como concluída.
+                      </p>
+                    </div>
                   )}
-                </Button>
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={() => markCompletedMutation.mutate(lesson.id)}
+                    disabled={
+                      markCompletedMutation.isPending ||
+                      csrfLoading ||
+                      !csrfToken ||
+                      (sections && sections.some(s => s.quizData) && !quizCompleted)
+                    }
+                    data-testid="button-complete-lesson"
+                  >
+                    {markCompletedMutation.isPending ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Marcar como concluída
+                      </>
+                    )}
+                  </Button>
+                </>
               )}
 
               {navigationHelpers.next && progress.status === "completed" && (
@@ -677,6 +729,23 @@ export default function Formation() {
   const selectedModule = selectedTrack && moduleParam
     ? selectedTrack.modules.find((m) => m.id === moduleParam)
     : undefined;
+
+  // Handle invalid track redirect (must be in useEffect to avoid render loop)
+  useEffect(() => {
+    if (trackParam && !selectedTrack) {
+      const tracksToShowError = ['spirituality', 'library'];
+
+      if (tracksToShowError.includes(trackParam)) {
+        toast({
+          title: "Trilha não encontrada",
+          description: "Redirecionamos você para a página principal de formação.",
+          variant: "destructive"
+        });
+      }
+
+      navigate('/formation');
+    }
+  }, [trackParam, selectedTrack, toast, navigate]);
 
   if (overviewLoading) {
     return (
@@ -735,23 +804,6 @@ export default function Formation() {
       />
     );
   }
-
-  // Handle invalid track redirect (must be in useEffect to avoid render loop)
-  useEffect(() => {
-    if (trackParam && !selectedTrack) {
-      const tracksToShowError = ['spirituality', 'library'];
-
-      if (tracksToShowError.includes(trackParam)) {
-        toast({
-          title: "Trilha não encontrada",
-          description: "Redirecionamos você para a página principal de formação.",
-          variant: "destructive"
-        });
-      }
-
-      navigate('/formation');
-    }
-  }, [trackParam, selectedTrack, toast, navigate]);
 
   if (adminMode && isAdmin) {
     return <FormationAdmin />;

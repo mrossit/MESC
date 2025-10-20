@@ -545,7 +545,7 @@ async function ensureLessonProgressRecord(userId: string, lessonId: string): Pro
 }
 
 async function countLessonSections(lessonId: string): Promise<number> {
-  const result = await db.execute<{ count: number }>(sql`
+  const result = await db.execute(sql`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -660,10 +660,10 @@ export async function markLessonCompleted(params: {
         ...(existing ? parseProgressNotes(existing.notes).completedSections : []),
         ...(totalSections > 0
           ? (
-              await db.execute<{ id: string }>(sql`
-                SELECT id FROM formation_lesson_sections WHERE "lessonId" = ${lessonId}
+              await db.execute(sql`
+                SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)
-            ).rows.map((row) => row.id)
+            ).rows.map((row: any) => row.id)
           : []),
       ])
     ),
