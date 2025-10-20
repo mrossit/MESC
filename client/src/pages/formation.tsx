@@ -29,7 +29,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useParams, useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -736,24 +736,25 @@ export default function Formation() {
     );
   }
 
+  // Handle invalid track redirect (must be in useEffect to avoid render loop)
+  useEffect(() => {
+    if (trackParam && !selectedTrack) {
+      const tracksToShowError = ['spirituality', 'library'];
+
+      if (tracksToShowError.includes(trackParam)) {
+        toast({
+          title: "Trilha não encontrada",
+          description: "Redirecionamos você para a página principal de formação.",
+          variant: "destructive"
+        });
+      }
+
+      navigate('/formation');
+    }
+  }, [trackParam, selectedTrack, toast, navigate]);
+
   if (adminMode && isAdmin) {
     return <FormationAdmin />;
-  }
-
-  // Show error toast only for spirituality and library (tracks in development)
-  // Redirect silently for liturgy and other tracks
-  if (trackParam && !selectedTrack) {
-    const tracksToShowError = ['spirituality', 'library'];
-
-    if (tracksToShowError.includes(trackParam)) {
-      toast({
-        title: "Trilha não encontrada",
-        description: "Redirecionamos você para a página principal de formação.",
-        variant: "destructive"
-      });
-    }
-
-    navigate('/formation');
   }
 
   return (
