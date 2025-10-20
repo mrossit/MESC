@@ -322,7 +322,14 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     setIsEditMode(false);
     setIsDialogOpen(true);
     if (selectedUser.birthDate) {
-      setBirthDate(new Date(selectedUser.birthDate));
+      try {
+        setBirthDate(new Date(selectedUser.birthDate));
+      } catch (error) {
+        console.error("Invalid birthDate:", selectedUser.birthDate);
+        setBirthDate(undefined);
+      }
+    } else {
+      setBirthDate(undefined);
     }
   };
 
@@ -896,7 +903,14 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                       </Popover>
                     ) : (
                       <Input
-                        value={birthDate ? format(birthDate, "dd/MM/yyyy") : "-"}
+                        value={(() => {
+                          try {
+                            return birthDate ? format(birthDate, "dd/MM/yyyy") : "-";
+                          } catch (error) {
+                            console.error("Invalid birthDate for formatting:", birthDate);
+                            return "-";
+                          }
+                        })()}
                         disabled
                       />
                     )}
@@ -928,7 +942,9 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                       </Select>
                     ) : (
                       <Input
-                        value={formData.preferredPosition ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS] : "-"}
+                        value={formData.preferredPosition && LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS]
+                          ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS]
+                          : "-"}
                         disabled
                       />
                     )}
@@ -1109,10 +1125,16 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-2xl font-bold">
-                        {formData.lastService ?
-                          format(new Date(formData.lastService), "dd/MM", { locale: ptBR }) :
-                          "-"
-                        }
+                        {(() => {
+                          try {
+                            return formData.lastService ?
+                              format(new Date(formData.lastService), "dd/MM", { locale: ptBR }) :
+                              "-";
+                          } catch (error) {
+                            console.error("Invalid lastService date:", formData.lastService);
+                            return "-";
+                          }
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground">Último Serviço</p>
                     </CardContent>
