@@ -73,7 +73,8 @@
       "Bash(NODE_ENV=development PRODUCTION_DATABASE_URL=\"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
       "Bash(PGPASSWORD=\"$DATABASE_URL#*://*/\" psql \"$DATABASE_URL\" -f migrations/add-position-preferences.sql)",
       "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_positions jsonb DEFAULT ''[]''::jsonb, ADD COLUMN IF NOT EXISTS avoid_positions jsonb DEFAULT ''[]''::jsonb;\")",
-      "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"COMMENT ON COLUMN users.preferred_positions IS ''Array of up to 5 preferred liturgical positions for this minister''; COMMENT ON COLUMN users.avoid_positions IS ''Array of up to 5 liturgical positions to avoid for this minister'';\")"
+      "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"COMMENT ON COLUMN users.preferred_positions IS ''Array of up to 5 preferred liturgical positions for this minister''; COMMENT ON COLUMN users.avoid_positions IS ''Array of up to 5 liturgical positions to avoid for this minister'';\")",
+      "WebFetch(domain:www.vatican.va)"
     ],
     "deny": [],
     "ask": []
