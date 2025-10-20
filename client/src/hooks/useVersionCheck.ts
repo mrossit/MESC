@@ -15,11 +15,14 @@ export function useVersionCheck() {
   useEffect(() => {
     const checkVersion = async () => {
       try {
+        // Detecta se está no preview do Replit
+        const isReplitPreview = window.location.hostname.includes('replit.dev') || 
+                                window.location.hostname.includes('repl.co');
+        
         const storedVersion = localStorage.getItem('app_version');
 
         if (storedVersion && storedVersion !== APP_VERSION) {
-          console.warn(`🔄 Version changed from ${storedVersion} to ${APP_VERSION}`);
-          console.warn('🧹 Clearing all caches and reloading...');
+          console.warn(`Version changed from ${storedVersion} to ${APP_VERSION} - clearing caches`);
 
           // 1. Clear React Query cache
           queryClient.clear();
@@ -28,7 +31,6 @@ export function useVersionCheck() {
           if ('caches' in window) {
             const cacheNames = await caches.keys();
             await Promise.all(cacheNames.map(name => caches.delete(name)));
-            console.warn('✅ Service Worker caches cleared');
           }
 
           // 3. Clear localStorage (preserve auth token)
@@ -41,23 +43,27 @@ export function useVersionCheck() {
           // 4. Update version
           localStorage.setItem('app_version', APP_VERSION);
 
-          // 5. Unregister Service Worker and reload
+          // 5. Unregister Service Worker
           if ('serviceWorker' in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
             await Promise.all(registrations.map(reg => reg.unregister()));
-            console.warn('✅ Service Worker unregistered');
           }
 
-          // 6. Force hard reload (bypass cache)
-          console.warn('🔄 Reloading page...');
-          window.location.reload();
+          // 6. Force hard reload ONLY if NOT in Replit preview
+          // This prevents reload loops in the Replit preview environment
+          if (!isReplitPreview) {
+            console.warn('Reloading page to apply updates...');
+            window.location.reload();
+          } else {
+            console.warn('Running in Replit preview - skipping auto-reload to prevent connection errors');
+            console.warn('Please refresh manually if you experience issues');
+          }
         } else if (!storedVersion) {
           // First time - just set version
           localStorage.setItem('app_version', APP_VERSION);
-          console.log(`✅ App version set: ${APP_VERSION}`);
         }
       } catch (error) {
-        console.error('❌ Error checking version:', error);
+        console.error('Error checking version:', error);
         // Even on error, set version to prevent infinite loops
         localStorage.setItem('app_version', APP_VERSION);
       }
