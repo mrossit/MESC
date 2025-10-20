@@ -152,7 +152,7 @@ router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coorde
     const userData = registerSchema.parse(req.body);
 
     // Apenas gestor pode criar outros coordenadores ou gestor
-    if ((userData.role === 'gestor' || userData.role === 'coordenador') && req.user?.role !== 'gestor') {
+    if ((userData.role === 'gestor' || userData.role === 'coordenador') && req.user?.role !== 'gestor' && req.user?.role !== 'reitor') {
       return res.status(403).json({
         success: false,
         message: 'Apenas gestores podem criar coordenadores ou outros gestores'

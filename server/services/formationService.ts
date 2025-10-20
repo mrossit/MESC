@@ -243,7 +243,7 @@ const groupBy = <T>(items: T[], extractKey: (item: T) => string | null | undefin
 
 export async function getFormationOverview(userId?: string): Promise<FormationOverviewResponse> {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute<TrackRow>(sql`
+    db.execute(sql`
       SELECT
         id,
         title,
@@ -259,7 +259,7 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute<ModuleRow>(sql`
+    db.execute(sql`
       SELECT
         id,
         track_id AS "trackId",
@@ -274,7 +274,7 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute<LessonRow>(sql`
+    db.execute(sql`
       SELECT
         id,
         module_id AS "moduleId",
@@ -292,7 +292,7 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
       ORDER BY module_id, lesson_number
     `),
     userId
-      ? db.execute<ProgressRow>(sql`
+      ? db.execute(sql`
           SELECT
             id,
             user_id AS "userId",
@@ -420,7 +420,7 @@ export async function getLessonDetail(params: {
 }): Promise<LessonDetailView | null> {
   const { userId, trackId, moduleId, lessonNumber } = params;
 
-  const lessonResult = await db.execute<LessonRow>(sql`
+  const lessonResult = await db.execute(sql`
     SELECT
       id,
       "moduleId" AS "moduleId",
@@ -444,7 +444,7 @@ export async function getLessonDetail(params: {
     return null;
   }
 
-  const sectionsResult = await db.execute<SectionRow>(sql`
+  const sectionsResult = await db.execute(sql`
     SELECT
       id,
       "lessonId" AS "lessonId",
@@ -489,7 +489,7 @@ export async function getLessonDetail(params: {
   };
 
   if (userId) {
-    const progressResult = await db.execute<ProgressRow>(sql`
+    const progressResult = await db.execute(sql`
       SELECT
         id,
         "userId" AS "userId",
@@ -527,7 +527,7 @@ export async function getLessonDetail(params: {
 }
 
 async function ensureLessonProgressRecord(userId: string, lessonId: string): Promise<ProgressRow | null> {
-  const result = await db.execute<ProgressRow>(sql`
+  const result = await db.execute(sql`
     SELECT
       id,
       "userId" AS "userId",
