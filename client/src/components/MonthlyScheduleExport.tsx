@@ -12,6 +12,7 @@ interface ScheduleAssignment {
   scheduleId: string;
   ministerId: string;
   ministerName: string;
+  scheduleDisplayName?: string;
   date: string;
   massTime: string;
   position: number;
@@ -155,7 +156,7 @@ export function MonthlyScheduleExport({
           // Criar mapa de ministros por posição
           const ministersByPosition: Record<number, string> = {};
           ministersForThisMass.forEach(assignment => {
-            ministersByPosition[assignment.position + 1] = assignment.ministerName;
+            ministersByPosition[assignment.position + 1] = assignment.scheduleDisplayName || assignment.ministerName;
           });
 
           // Linha principal: Posições 1-15
