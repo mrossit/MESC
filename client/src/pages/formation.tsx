@@ -740,12 +740,19 @@ export default function Formation() {
     return <FormationAdmin />;
   }
 
+  // Show error toast only for spirituality and library (tracks in development)
+  // Redirect silently for liturgy and other tracks
   if (trackParam && !selectedTrack) {
-    toast({
-      title: "Trilha não encontrada",
-      description: "Redirecionamos você para a página principal de formação.",
-      variant: "destructive"
-    });
+    const tracksToShowError = ['spirituality', 'library'];
+
+    if (tracksToShowError.includes(trackParam)) {
+      toast({
+        title: "Trilha não encontrada",
+        description: "Redirecionamos você para a página principal de formação.",
+        variant: "destructive"
+      });
+    }
+
     navigate('/formation');
   }
 
@@ -934,21 +941,23 @@ export default function Formation() {
               </div>
             ) : (
               <Tabs defaultValue={tracks[0].id} className="w-full">
-                <TabsList className="flex flex-wrap gap-2 bg-muted p-2 justify-center">
-                  {tracks.map((track) => {
-                    const category = getCategoryMeta(track);
-                    return (
-                      <TabsTrigger
-                        key={track.id}
-                        value={track.id}
-                        className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm"
-                      >
-                        <category.icon className={`h-4 w-4 ${category.accent}`} />
-                        <span className="font-medium">{track.title}</span>
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
+                <div className="overflow-x-auto pb-2">
+                  <TabsList className="inline-flex w-auto min-w-full bg-muted p-2 gap-2">
+                    {tracks.map((track) => {
+                      const category = getCategoryMeta(track);
+                      return (
+                        <TabsTrigger
+                          key={track.id}
+                          value={track.id}
+                          className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
+                        >
+                          <category.icon className={`h-4 w-4 ${category.accent}`} />
+                          <span className="font-medium">{track.title}</span>
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </div>
 
                 {tracks.map((track) => {
                   const category = getCategoryMeta(track);
