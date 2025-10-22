@@ -53,19 +53,20 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
         type: schedules.type,
         location: schedules.location,
         notes: schedules.notes,
-        position: schedules.position
+        position: schedules.position,
+        status: schedules.status
       })
       .from(schedules)
       .where(
         and(
           eq(schedules.ministerId, ministerId),
-          gte(schedules.date, today.toISOString().split('T')[0]),
-          eq(schedules.status, "scheduled")
+          gte(schedules.date, today.toISOString().split('T')[0])
+          // Aceitar qualquer status (scheduled ou published)
         )
       )
       .orderBy(schedules.date)
       .limit(10);
-    
+
     // Transform to match expected format
     const formattedAssignments = upcomingAssignments.map((assignment: any) => ({
       id: assignment.id,
@@ -75,7 +76,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       confirmed: true,
       scheduleId: assignment.id,
       scheduleTitle: assignment.type,
-      scheduleStatus: "scheduled"
+      scheduleStatus: assignment.status || "scheduled"
     }));
     
     res.json({ assignments: formattedAssignments });

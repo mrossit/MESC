@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db";
 import { schedules, users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
 const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
   // Log simples por enquanto - pode ser expandido depois
@@ -35,18 +35,9 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     const threeHoursAfterMass = new Date(massDateTime.getTime() + 3 * 60 * 60 * 1000);
     const now = new Date();
 
-    if (now > threeHoursAfterMass && userRole !== 'gestor') {
-      return res.status(403).json({
-        message: "Não é possível editar esta escalação. O prazo de edição expirou (3 horas após a missa)."
-      });
-    }
-
-    // Check if user has permission to edit
-    const isCoordOrGestor = userRole === 'coordenador' || userRole === 'gestor';
-
-    // Check if user is Auxiliar 1 or 2 for this mass (same date and time)
+    // Check if user is Auxiliar 1 or 2 for THIS mass before blocking
     let isAuxiliar1or2ForThisMass = false;
-    if (!isCoordOrGestor) {
+    if (userRole !== 'gestor' && userRole !== 'coordenador') {
       const userAssignmentsForThisMass = await db
         .select()
         .from(schedules)
@@ -58,11 +49,25 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
           )
         );
 
-      // Check if user is Auxiliar 1 or 2 in any assignment for this mass
       isAuxiliar1or2ForThisMass = userAssignmentsForThisMass.some(
         a => a.position === 1 || a.position === 2
       );
     }
+
+    // Allow gestor, coordenador, and auxiliares 1 and 2 to edit even after deadline
+    const canEditAfterDeadline = 
+      userRole === 'gestor' || 
+      userRole === 'coordenador' || 
+      isAuxiliar1or2ForThisMass;
+
+    if (now > threeHoursAfterMass && !canEditAfterDeadline) {
+      return res.status(403).json({
+        message: "Não é possível editar esta escalação. O prazo de edição expirou (3 horas após a missa)."
+      });
+    }
+
+    // Check if user has permission to edit
+    const isCoordOrGestor = userRole === 'coordenador' || userRole === 'gestor';
 
     if (!isCoordOrGestor && !isAuxiliar1or2ForThisMass) {
       return res.status(403).json({

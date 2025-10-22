@@ -751,7 +751,7 @@ export default function Substitutions() {
                   {substitutionRequests.map((item: SubstitutionRequest) => {
                     // Parse date correctly to avoid timezone issues
                     const assignmentDate = item.assignment?.date
-                      ? new Date(item.assignment.date)
+                      ? parseScheduleDate(item.assignment.date)
                       : new Date();
                     const isDirected = item.request.substituteMinisterId !== null;
                     const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
