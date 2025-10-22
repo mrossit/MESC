@@ -11,7 +11,11 @@ export function cn(...inputs: ClassValue[]) {
  *
  * CRITICAL: JavaScript Date Parsing Behavior
  * - new Date('2025-10-12')           → Parses as UTC midnight → Oct 11 21:00 BRT ❌
- * - new Date('2025-10-12T00:00:00')  → Parses as LOCAL midnight → Oct 12 00:00 BRT ✅
+ * - new Date('2025-10-12T00:00:00')  → Parses as LOCAL midnight → Can shift to previous day ❌
+ * - new Date('2025-10-12T12:00:00')  → Parses as LOCAL noon → Oct 12 12:00 BRT ✅
+ *
+ * Using noon (12:00:00) instead of midnight (00:00:00) prevents date shifting issues
+ * when dates are converted between timezones.
  *
  * @param dateStr Date string in format YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
  * @returns Date object with correct local date (prevents timezone issues)
@@ -20,9 +24,9 @@ export function parseScheduleDate(dateStr: string): Date {
   // Remove existing time component if present
   const datePart = dateStr.split('T')[0];
 
-  // Add time component (00:00:00) to force local timezone parsing
+  // Add noon time component (12:00:00) to force local timezone parsing
   // This prevents the date from shifting due to UTC conversion
-  return parseISO(datePart + 'T00:00:00');
+  return parseISO(datePart + 'T12:00:00');
 }
 
 /**

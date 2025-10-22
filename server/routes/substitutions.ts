@@ -11,7 +11,9 @@ function calculateUrgency(massDateStr: string, massTime: string): "low" | "mediu
   const now = new Date();
   const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  // Use Date.UTC to create a UTC date, then convert to local Date object
+  // This ensures consistent timezone handling
+  const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -26,7 +28,9 @@ function shouldAutoApprove(massDateStr: string, massTime: string): boolean {
   const now = new Date();
   const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  // Use Date.UTC to create a UTC date, then convert to local Date object
+  // This ensures consistent timezone handling
+  const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -203,7 +207,9 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     // Usar UTC para evitar problemas de timezone
     const [year, month, day] = schedule.date.split('-').map(Number);
     const [hours, minutes] = schedule.time.split(':').map(Number);
-    const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    // Use Date.UTC to create a UTC date, then convert to local Date object
+    // This ensures consistent timezone handling across the application
+    const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
 
     const now = new Date();
     console.log('[Substitutions] Verificando data:', {

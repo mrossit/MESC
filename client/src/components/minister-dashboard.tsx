@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
 import { useLocation } from "wouter";
 import { useDebugRender } from "@/lib/debug";
+import { parseScheduleDate } from "@/lib/utils";
 
 interface ScheduleAssignment {
   id: string;
@@ -158,7 +159,7 @@ export function MinisterDashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-semibold text-foreground">
-                        {format(new Date(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
+                        {format(parseScheduleDate(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
                       </p>
                       <Badge variant="secondary" className="text-xs">
                         {getPositionLabel(schedule.position)}

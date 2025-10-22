@@ -215,42 +215,42 @@ export default function Dashboard() {
               {alerts?.criticalMasses?.map((mass: any) => (
                 <div
                   key={mass.scheduleId}
-                  className="flex items-center justify-between p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
                   onClick={() => setLocation(`/schedules?date=${mass.date}`)}
                 >
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm break-words">
                         {format(parseScheduleDate(mass.date), "dd/MM - EEEE", { locale: ptBR })} às {mass.massTime}
                       </p>
-                      <p className="text-sm opacity-90">
+                      <p className="text-xs opacity-90">
                         {mass.vacancies} vagas vazias • {mass.hoursUntil}h até a missa
                       </p>
                     </div>
                   </div>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-5 w-5 flex-shrink-0 self-end sm:self-center" />
                 </div>
               ))}
 
               {alerts?.urgentSubstitutions?.map((sub: any) => (
                 <div
                   key={sub.id}
-                  className="flex items-center justify-between p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
                   onClick={() => setLocation('/substitutions')}
                 >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm break-words">
                         Substituição pendente - {sub.requesterName}
                       </p>
-                      <p className="text-sm opacity-90">
+                      <p className="text-xs opacity-90">
                         {format(parseScheduleDate(sub.massDate), "dd/MM", { locale: ptBR })} • {sub.hoursUntil}h restantes
                       </p>
                     </div>
                   </div>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-5 w-5 flex-shrink-0 self-end sm:self-center" />
                 </div>
               ))}
             </AlertDescription>
@@ -313,16 +313,16 @@ export default function Dashboard() {
         </div>
 
         {/* QUICK ACTIONS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Button
             variant="outline"
-            className="h-auto py-6 flex-col items-start gap-2"
+            className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
             onClick={() => setLocation('/schedules?filter=incomplete')}
           >
-            <Calendar className="h-6 w-6 text-orange-500" />
-            <div className="text-left">
-              <p className="font-semibold">Corrigir Escalas</p>
-              <p className="text-xs text-muted-foreground">
+            <Calendar className="h-5 w-5 text-orange-500 flex-shrink-0" />
+            <div className="text-left w-full">
+              <p className="font-semibold text-sm truncate">Corrigir Escalas</p>
+              <p className="text-xs text-muted-foreground truncate">
                 {(alerts?.incompleteMasses?.length || 0) + (alerts?.criticalMasses?.length || 0)} incompletas
               </p>
             </div>
@@ -331,26 +331,26 @@ export default function Dashboard() {
           {stats?.questionnaireStatus === 'closed' && (
             <Button
               variant="outline"
-              className="h-auto py-6 flex-col items-start gap-2"
+              className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
               onClick={() => setLocation('/questionnaires/admin')}
             >
-              <FileQuestion className="h-6 w-6 text-blue-500" />
-              <div className="text-left">
-                <p className="font-semibold">Abrir Questionário</p>
-                <p className="text-xs text-muted-foreground">Coletar disponibilidade</p>
+              <FileQuestion className="h-5 w-5 text-blue-500 flex-shrink-0" />
+              <div className="text-left w-full">
+                <p className="font-semibold text-sm truncate">Abrir Questionário</p>
+                <p className="text-xs text-muted-foreground truncate">Coletar disponibilidade</p>
               </div>
             </Button>
           )}
 
           <Button
             variant="outline"
-            className="h-auto py-6 flex-col items-start gap-2"
+            className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
             onClick={() => setLocation('/substitutions')}
           >
-            <UserCheck className="h-6 w-6 text-purple-500" />
-            <div className="text-left">
-              <p className="font-semibold">Substituições</p>
-              <p className="text-xs text-muted-foreground">
+            <UserCheck className="h-5 w-5 text-purple-500 flex-shrink-0" />
+            <div className="text-left w-full">
+              <p className="font-semibold text-sm truncate">Substituições</p>
+              <p className="text-xs text-muted-foreground truncate">
                 {(alerts?.pendingSubstitutions?.length || 0) + (alerts?.urgentSubstitutions?.length || 0)} pendentes
               </p>
             </div>
@@ -358,13 +358,13 @@ export default function Dashboard() {
 
           <Button
             variant="outline"
-            className="h-auto py-6 flex-col items-start gap-2"
+            className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
             onClick={() => setLocation('/ministers?status=pending')}
           >
-            <Users className="h-6 w-6 text-green-500" />
-            <div className="text-left">
-              <p className="font-semibold">Aprovar Ministros</p>
-              <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
+            <Users className="h-5 w-5 text-green-500 flex-shrink-0" />
+            <div className="text-left w-full">
+              <p className="font-semibold text-sm truncate">Aprovar Ministros</p>
+              <p className="text-xs text-muted-foreground truncate">Aguardando aprovação</p>
             </div>
           </Button>
         </div>
@@ -372,11 +372,11 @@ export default function Dashboard() {
         {/* NEXT 7 DAYS MASSES TABLE */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarClock className="h-5 w-5" />
-              Próximas Missas (7 dias)
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <CalendarClock className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+              <span>Próximas Missas (7 dias)</span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Clique em uma linha para gerenciar a escala
             </CardDescription>
           </CardHeader>
@@ -390,49 +390,55 @@ export default function Dashboard() {
                 nextWeek.map((mass: any) => (
                   <div
                     key={mass.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-accent/50 transition-colors ${
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border cursor-pointer hover:bg-accent/50 transition-colors gap-3 ${
                       mass.status === 'critical' ? 'border-red-500 bg-red-50 dark:bg-red-950/20' :
                       mass.status === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' :
                       'border-green-500 bg-green-50 dark:bg-green-950/20'
                     }`}
                     onClick={() => setLocation(`/schedules?date=${mass.date}`)}
                   >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="min-w-[100px]">
-                        <p className="font-semibold">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0">
+                        <p className="font-semibold text-sm">
                           {format(parseScheduleDate(mass.date), "dd/MM - EEE", { locale: ptBR })}
                         </p>
-                        <p className="text-sm text-muted-foreground">{mass.massTime}</p>
+                        <p className="text-xs text-muted-foreground">{mass.massTime}</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <CheckCircle2 className={`h-4 w-4 ${
                           mass.status === 'full' ? 'text-green-600' : 'text-gray-400'
                         }`} />
-                        <span className="text-sm">
+                        <span className="text-xs sm:text-sm whitespace-nowrap">
                           {mass.totalAssigned}/{mass.requiredMinisters} confirmados
                         </span>
                       </div>
 
-                      {mass.totalVacancies > 0 && (
-                        <Badge variant="destructive">
-                          {mass.totalVacancies} vagas
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {mass.totalVacancies > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {mass.totalVacancies} vagas
+                          </Badge>
+                        )}
 
-                      {mass.hasPendingSubstitutions && (
-                        <Badge variant="outline" className="border-orange-500 text-orange-600">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Substituição pendente
-                        </Badge>
-                      )}
+                        {mass.hasPendingSubstitutions && (
+                          <Badge variant="outline" className="border-orange-500 text-orange-600 text-xs">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            <span className="hidden sm:inline">Substituição pendente</span>
+                            <span className="sm:hidden">Subst. pend.</span>
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
-                    <Badge variant={
-                      mass.status === 'critical' ? 'destructive' :
-                      mass.status === 'warning' ? 'outline' :
-                      'default'
-                    }>
+                    <Badge
+                      className="self-start sm:self-center flex-shrink-0 text-xs"
+                      variant={
+                        mass.status === 'critical' ? 'destructive' :
+                        mass.status === 'warning' ? 'outline' :
+                        'default'
+                      }
+                    >
                       {mass.staffingRate}%
                     </Badge>
                   </div>
@@ -446,9 +452,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-orange-500" />
-                Ministros Inativos (30+ dias)
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
+                <span className="break-words">Ministros Inativos (30+ dias)</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -461,11 +467,11 @@ export default function Dashboard() {
                   {stats?.inactiveMinisters?.slice(0, 5).map((minister: any) => (
                     <div
                       key={minister.id}
-                      className="flex items-center justify-between p-2 rounded border cursor-pointer hover:bg-accent/50"
+                      className="flex items-center justify-between gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50"
                       onClick={() => setLocation(`/ministers/${minister.id}`)}
                     >
-                      <span className="text-sm">{minister.name}</span>
-                      <Badge variant="outline">
+                      <span className="text-sm truncate flex-1">{minister.name}</span>
+                      <Badge variant="outline" className="flex-shrink-0 text-xs whitespace-nowrap">
                         {minister.daysSinceService ? `${Math.floor(minister.daysSinceService)} dias` : 'Nunca serviu'}
                       </Badge>
                     </div>
@@ -473,7 +479,7 @@ export default function Dashboard() {
                   {(stats?.inactiveMinisters?.length || 0) > 5 && (
                     <Button
                       variant="link"
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
                       onClick={() => setLocation('/ministers?filter=inactive')}
                     >
                       Ver todos ({stats?.inactiveMinisters?.length})
@@ -486,9 +492,9 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                Alertas de Atenção
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 flex-shrink-0" />
+                <span>Alertas de Atenção</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -497,8 +503,8 @@ export default function Dashboard() {
                   className="cursor-pointer hover:bg-accent/50"
                   onClick={() => setLocation('/schedules?filter=incomplete')}
                 >
-                  <Calendar className="h-4 w-4" />
-                  <AlertDescription>
+                  <Calendar className="h-4 w-4 flex-shrink-0" />
+                  <AlertDescription className="text-xs sm:text-sm break-words">
                     <span className="font-semibold">{alerts?.incompleteMasses?.length}</span> missas incompletas nos próximos 7 dias
                   </AlertDescription>
                 </Alert>
@@ -509,8 +515,8 @@ export default function Dashboard() {
                   className="cursor-pointer hover:bg-accent/50"
                   onClick={() => setLocation('/substitutions')}
                 >
-                  <UserCheck className="h-4 w-4" />
-                  <AlertDescription>
+                  <UserCheck className="h-4 w-4 flex-shrink-0" />
+                  <AlertDescription className="text-xs sm:text-sm break-words">
                     <span className="font-semibold">{alerts?.pendingSubstitutions?.length}</span> substituições aguardando aceite
                   </AlertDescription>
                 </Alert>
@@ -518,8 +524,8 @@ export default function Dashboard() {
 
               {stats?.responseRate < 80 && stats?.questionnaireStatus !== 'closed' && (
                 <Alert className="cursor-pointer hover:bg-accent/50" onClick={() => setLocation('/questionnaires')}>
-                  <FileQuestion className="h-4 w-4" />
-                  <AlertDescription>
+                  <FileQuestion className="h-4 w-4 flex-shrink-0" />
+                  <AlertDescription className="text-xs sm:text-sm break-words">
                     Taxa de resposta baixa: <span className="font-semibold">{stats?.responseRate}%</span>
                   </AlertDescription>
                 </Alert>
