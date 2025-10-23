@@ -4,6 +4,21 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 
 # Recent Critical Fixes
 
+## Version 5.4.2 - Force Cache Clear (October 23, 2025)
+Fixed blank screen (tela preta) issue reported by multiple users:
+- **Problem**: Users seeing blank screen due to stale browser cache
+- **Solution**: Incremented version from 5.4.1 to 5.4.2 to trigger automatic cache clear
+- **Files changed**: `server/routes/version.ts`
+- **Impact**: All users will see update notification and be prompted to refresh, clearing cache automatically
+- **Mechanism**: `useVersionCheck` hook detects version change every 2 minutes, shows update banner, clears all caches on user confirmation
+
+## Schedule Editing Permissions Fix (October 23, 2025)
+Extended editing permissions for coordinators and auxiliary ministers:
+- **Problem**: Only gestores could edit schedules after 3 hours post-mass
+- **Solution**: Coordinators and Auxiliares 1 & 2 can now edit anytime
+- **Files changed**: `server/routes/schedule-assignments.ts`
+- **Impact**: Coordinators and auxiliary ministers can now edit published schedules without time restrictions
+
 ## Email Authentication Fix (October 20, 2025)
 Fixed critical authentication issue where users couldn't login after name formatting updates:
 - **Problem**: Email lookup was case-sensitive, causing login failures when users entered emails in different case formats
@@ -49,7 +64,7 @@ Implemented automatic cache invalidation and version control to ensure users alw
 - Location: `client/public/sw.js`, detection logic in `client/index.html`
 
 ### Version Detection
-- **Endpoint**: `/api/version` returns current system version (5.4.0) and build timestamp
+- **Endpoint**: `/api/version` returns current system version (5.4.2) and build timestamp
 - **Auto-Check Hook**: `useVersionCheck` hook checks version every 2 minutes in production
 - **Automatic Update**: When new version detected:
   1. Clears all browser caches (Cache API and Service Worker)

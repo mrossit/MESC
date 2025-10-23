@@ -14510,7 +14510,7 @@ var formationAdmin_default = router17;
 // server/routes/version.ts
 import { Router as Router18 } from "express";
 var router18 = Router18();
-var SYSTEM_VERSION = "5.4.1";
+var SYSTEM_VERSION = "5.4.2";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
 router18.get("/", (req, res) => {
   res.json({

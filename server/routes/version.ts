@@ -3,7 +3,7 @@ import { Router } from 'express';
 const router = Router();
 
 // Versão do sistema - IMPORTANTE: Sincronizar com client/src/lib/version.ts
-const SYSTEM_VERSION = '5.4.1';
+const SYSTEM_VERSION = '5.4.2';
 const BUILD_TIME = new Date().toISOString();
 
 // GET /api/version - Retorna versão atual do sistema
