@@ -61,7 +61,7 @@ export function LessonNavigation({
     <div
       className={cn(
         "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border rounded-lg",
-        isFixed && "fixed bottom-4 left-4 right-4 z-50 shadow-lg max-w-4xl mx-auto",
+        isFixed && "fixed bottom-4 left-4 right-4 z-50 shadow-lg max-w-4xl mx-auto md:bottom-4 bottom-20",
         className
       )}
     >

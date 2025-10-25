@@ -83,15 +83,15 @@ export default function ChangePasswordRequired() {
   // Tela de sucesso
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-dark-8 dark:to-dark-6 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center mb-4">
-              <div className="p-3 bg-green-100 rounded-full">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-center text-green-700">
+            <CardTitle className="text-2xl font-bold text-center text-green-700 dark:text-green-400">
               Senha Alterada com Sucesso!
             </CardTitle>
             <CardDescription className="text-center">
@@ -99,9 +99,9 @@ export default function ChangePasswordRequired() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert className="bg-green-50 border-green-200">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+            <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-300">
                 Por segurança, você foi desconectado do sistema. Use sua nova senha para fazer login novamente.
               </AlertDescription>
             </Alert>
@@ -121,12 +121,12 @@ export default function ChangePasswordRequired() {
 
   // Tela de troca de senha
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-dark-8 dark:to-dark-6 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-yellow-100 rounded-full">
-              <Lock className="h-8 w-8 text-yellow-600" />
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+              <Lock className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
