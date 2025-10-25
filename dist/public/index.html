@@ -10,8 +10,21 @@
       // Detect and apply theme before React loads to prevent flash
       (function() {
         const theme = localStorage.getItem('mesc-ui-theme') || 'system';
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const lightQuery = window.matchMedia('(prefers-color-scheme: light)');
+        const prefersDark = darkQuery.matches;
+        const prefersLight = lightQuery.matches;
+        
+        console.log('[INDEX.HTML] Theme Detection:');
+        console.log('  - Stored theme:', theme);
+        console.log('  - prefers-color-scheme: dark =', prefersDark);
+        console.log('  - prefers-color-scheme: light =', prefersLight);
+        console.log('  - User Agent:', navigator.userAgent);
+        console.log('  - Platform:', navigator.platform);
+        console.log('  - Hostname:', window.location.hostname);
+        
         const shouldUseDark = theme === 'dark' || (theme === 'system' && prefersDark);
+        console.log('  - Will apply dark mode:', shouldUseDark);
         
         if (shouldUseDark) {
           document.documentElement.classList.add('dark');
