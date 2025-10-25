@@ -41,7 +41,6 @@ export function ScheduleEditDialog({
   const [insertPosition, setInsertPosition] = useState<string>('end');
   const [editingPositionIndex, setEditingPositionIndex] = useState<number | null>(null);
   const [newPositionValue, setNewPositionValue] = useState<string>('');
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   // Ref para o container de ministros para scroll automático
@@ -182,22 +181,6 @@ export function ScheduleEditDialog({
     });
   };
 
-  // Handlers para long press
-  const handleTouchStart = (index: number) => {
-    const timer = setTimeout(() => {
-      setEditingPositionIndex(index);
-      setNewPositionValue(String(index + 1));
-    }, 500); // 500ms para ativar long press
-    setLongPressTimer(timer);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-  };
-
   // Filtrar ministros baseado na busca
   const filteredMinisters = Array.isArray(allMinisters)
     ? allMinisters.filter((m: any) =>
@@ -245,7 +228,7 @@ export function ScheduleEditDialog({
           <DialogHeader>
             <DialogTitle>Editar Escala</DialogTitle>
             <DialogDescription>
-              {date} às {time} - Use drag & drop, botões ↑↓ ou toque longo para reordenar
+              {date} às {time} - Use drag & drop, botões ↑↓ ou ícone de lápis para reordenar
             </DialogDescription>
           </DialogHeader>
 
@@ -266,11 +249,6 @@ export function ScheduleEditDialog({
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDragEnd={handleDragEnd}
-                      onTouchStart={() => handleTouchStart(index)}
-                      onTouchEnd={handleTouchEnd}
-                      onMouseDown={() => handleTouchStart(index)}
-                      onMouseUp={handleTouchEnd}
-                      onMouseLeave={handleTouchEnd}
                       className={`
                         flex items-center justify-between p-3 rounded-md border bg-card
                         cursor-move hover:bg-accent transition-colors
