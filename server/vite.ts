@@ -102,6 +102,13 @@ export function serveStatic(app: Express) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        res.setHeader('Service-Worker-Allowed', '/');
+      }
+      // version.json sem cache (sempre buscar versão mais recente)
+      else if (filepath.endsWith('version.json')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
       }
     }
   }));

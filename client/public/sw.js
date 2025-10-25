@@ -1,18 +1,21 @@
-// FIXED VERSION: Use static version from package.json, not runtime timestamp
-const VERSION = '5.4.3'; // Update this when deploying new versions
-const BUILD_TIME = '2025-10-20'; // Update at build time, not runtime
-const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIME}`;
+// AUTO-INJECTED: These values are automatically updated during build by scripts/inject-version.js
+const VERSION = '5.4.2'; // Injected from package.json
+const BUILD_TIME = '2025-10-25T13:37:18.584Z'; // Injected at build time
+const BUILD_TIMESTAMP = 1761399438584; // Injected at build time (used for cache busting)
+const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
 const urlsToCache = [
   '/manifest.json',
-  '/sjtlogo.png'
+  '/sjtlogo.png',
+  '/version.json'
 ];
 
 // Build info for debugging
 const BUILD_INFO = {
   version: VERSION,
   buildTime: BUILD_TIME,
+  buildTimestamp: BUILD_TIMESTAMP,
   cacheName: CACHE_NAME
 };
 
