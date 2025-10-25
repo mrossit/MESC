@@ -1364,6 +1364,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // TEMPORARY MIGRATION: Fix inconsistent substitution request status
+  // This endpoint can be called once to fix old "pending" requests without substituteId
+  app.post('/api/admin/migrate-substitution-status', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+    try {
+      const { sql: sqlHelper, isNull, and } = await import('drizzle-orm');
+
+      // Find affected requests
+      const affectedRequests = await db
+        .select({
+          id: substitutionRequests.id,
+          requesterId: substitutionRequests.requesterId,
+          substituteId: substitutionRequests.substituteId,
+          status: substitutionRequests.status,
+          createdAt: substitutionRequests.createdAt,
+        })
+        .from(substitutionRequests)
+        .where(
+          and(
+            eq(substitutionRequests.status, 'pending'),
+            isNull(substitutionRequests.substituteId)
+          )
+        );
+
+      if (affectedRequests.length === 0) {
+        return res.json({
+          success: true,
+          message: 'Nenhum registro inconsistente encontrado. Base de dados está limpa!',
+          affectedCount: 0
+        });
+      }
+
+      // Update the status
+      await db
+        .update(substitutionRequests)
+        .set({ status: 'available' })
+        .where(
+          and(
+            eq(substitutionRequests.status, 'pending'),
+            isNull(substitutionRequests.substituteId)
+          )
+        );
+
+      logger.info('Migration: Fixed substitution status', {
+        affectedCount: affectedRequests.length,
+        userId: req.user?.id
+      });
+
+      res.json({
+        success: true,
+        message: `Migração concluída com sucesso! ${affectedRequests.length} registro(s) atualizado(s).`,
+        affectedCount: affectedRequests.length,
+        affectedRequests: affectedRequests.map(r => ({
+          id: r.id,
+          createdAt: r.createdAt
+        }))
+      });
+    } catch (error) {
+      console.error('Migration error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao executar migração',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Global error handler for uncaught route errors
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('🚨 Route error:', err.message);
