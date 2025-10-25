@@ -12,10 +12,77 @@ const router = Router();
 
 /**
  * GET /api/saints/today
- * Returns saint(s) of the day
+ * Returns saint(s) of the day from Canção Nova website
  */
 router.get('/today', async (req, res) => {
   try {
+    // Tentar buscar do site Canção Nova primeiro
+    try {
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+
+      // URL do Canção Nova para o santo do dia
+      const cancaoNovaUrl = `https://santo.cancaonova.com/`;
+
+      const response = await fetch(cancaoNovaUrl);
+      const html = await response.text();
+
+      // Parse básico do HTML para extrair informações do santo
+      // O site usa uma estrutura específica que precisamos adaptar
+      const saintNameMatch = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i);
+      const contentMatch = html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+
+      if (saintNameMatch) {
+        const saintName = saintNameMatch[1].trim();
+        let biography = '';
+
+        if (contentMatch) {
+          // Extrair os primeiros parágrafos como biografia
+          const paragraphs = contentMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+          if (paragraphs && paragraphs.length > 0) {
+            // Pegar os primeiros 3 parágrafos e limpar HTML tags
+            biography = paragraphs
+              .slice(0, 3)
+              .map(p => p.replace(/<[^>]+>/g, '').trim())
+              .filter(p => p.length > 0)
+              .join('\n\n');
+          }
+        }
+
+        const cancaoNovaSaint = {
+          id: `cancao-nova-${day}-${month}`,
+          name: saintName,
+          feastDay: `${month}-${day}`,
+          biography: biography || 'Informações disponíveis em santo.cancaonova.com',
+          isBrazilian: false,
+          rank: 'MEMORIAL' as const,
+          liturgicalColor: 'white' as const,
+          title: undefined,
+          patronOf: undefined,
+          collectPrayer: undefined,
+          firstReading: undefined,
+          responsorialPsalm: undefined,
+          gospel: undefined,
+          attributes: undefined,
+          quotes: undefined,
+        };
+
+        return res.json({
+          success: true,
+          data: {
+            date: today.toISOString().split('T')[0],
+            feastDay: `${month}-${day}`,
+            saints: [cancaoNovaSaint],
+            source: 'cancaonova'
+          },
+        });
+      }
+    } catch (cancaoNovaError) {
+      console.log('Erro ao buscar do Canção Nova, usando banco de dados local:', cancaoNovaError);
+    }
+
+    // Fallback: buscar do banco de dados local
     const today = new Date();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -33,6 +100,7 @@ router.get('/today', async (req, res) => {
         date: today.toISOString().split('T')[0],
         feastDay,
         saints: saintsToday,
+        source: 'database'
       },
     });
   } catch (error) {
