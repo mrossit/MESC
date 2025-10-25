@@ -1153,15 +1153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/formation/lessons/:trackId/:moduleId', authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId } = req.params;
-      console.log(`[DEBUG ROUTE] trackId: ${trackId}, moduleId: ${moduleId}`);
       const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
-      console.log(`[DEBUG ROUTE] lessons result:`, lessons);
       if (!lessons || lessons.length === 0) {
         return res.status(404).json({ message: "Aulas não encontradas para este módulo" });
       }
       res.json(lessons);
     } catch (error) {
-      console.error(`[DEBUG ROUTE ERROR]`, error);
       const errorResponse = handleApiError(error, "buscar aulas do módulo");
       res.status(errorResponse.status).json(errorResponse);
     }
@@ -1356,7 +1353,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update user role in database
         await storage.updateUser(userId, { role });
 
-        // Clear any cached user data
         res.json({
           message: `Role alterado para ${role} com sucesso`,
           role
@@ -1366,17 +1362,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: 'Erro ao alterar role' });
       }
     });
-
-    console.log('[DEV MODE] Role switcher endpoint enabled at /api/dev/switch-role');
   }
-
-  // 🔥 EMERGENCY ERROR HANDLERS - Must be added AFTER all routes
 
   // Global error handler for uncaught route errors
   app.use((err: any, req: any, res: any, next: any) => {
-    console.error('🚨 [CRITICAL ERROR] Uncaught error in route:', err);
-    console.error('🚨 [CRITICAL ERROR] Stack:', err.stack);
-    console.error('🚨 [CRITICAL ERROR] Request:', { method: req.method, url: req.url });
+    console.error('🚨 Route error:', err.message);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.error(err.stack);
+    }
 
     // Always return 500 with safe error message
     if (!res.headersSent) {
@@ -1393,21 +1387,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize WebSocket server for real-time notifications
   const { initializeWebSocket } = await import('./websocket');
   initializeWebSocket(httpServer);
-
-  // 🔥 EMERGENCY: Process-level error handlers
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-    console.error('🚨 [UNHANDLED REJECTION]', reason);
-    console.error('🚨 [UNHANDLED REJECTION] Stack:', reason?.stack);
-    // Don't exit - log and continue
-  });
-
-  process.on('uncaughtException', (error: Error) => {
-    console.error('🚨 [UNCAUGHT EXCEPTION]', error);
-    console.error('🚨 [UNCAUGHT EXCEPTION] Stack:', error.stack);
-    // Don't exit - log and continue (only for non-fatal errors)
-  });
-
-  console.log('✅ [EMERGENCY] Error handlers installed');
 
   return httpServer;
 }

@@ -100,9 +100,7 @@ class DrizzleSQLiteFallback {
       return await drizzleQuery();
     } catch (drizzleError: any) {
       if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
-        console.warn('[FALLBACK] Drizzle failed, using SQLite directly:', drizzleError.message);
-        
-        // Usar SQLite direto como fallback
+        // Fallback silencioso para SQLite em desenvolvimento
         const sqlite = this.getSQLiteDB();
         const result = sqlite.prepare(fallbackSQL).get();
         return (result ? fallbackMapper(result) : undefined) as T;

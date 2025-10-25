@@ -35,8 +35,6 @@ export function initializeWebSocket(httpServer: Server): WebSocketServer {
   });
 
   wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
-    console.log('[WS] New WebSocket connection');
-
     ws.isAlive = true;
     clients.add(ws);
 
@@ -53,7 +51,6 @@ export function initializeWebSocket(httpServer: Server): WebSocketServer {
         if (data.type === 'AUTH') {
           ws.userId = data.userId;
           ws.userRole = data.userRole;
-          console.log(`[WS] Client authenticated: ${ws.userId} (${ws.userRole})`);
 
           // Send initial alerts to newly connected coordinator
           if (ws.userRole === 'coordenador' || ws.userRole === 'gestor') {
@@ -71,7 +68,6 @@ export function initializeWebSocket(httpServer: Server): WebSocketServer {
     });
 
     ws.on('close', () => {
-      console.log('[WS] Client disconnected');
       clients.delete(ws);
     });
 
@@ -104,7 +100,9 @@ export function initializeWebSocket(httpServer: Server): WebSocketServer {
     await broadcastCriticalAlerts();
   }, 30000);
 
-  console.log('[WS] WebSocket server initialized on /ws');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔌 WebSocket server initialized');
+  }
   return wss;
 }
 
@@ -218,8 +216,6 @@ export function notifySubstitutionRequest(substitutionData: any) {
       client.send(JSON.stringify(message));
     }
   });
-
-  console.log('[WS] Notified coordinators about new substitution request');
 }
 
 /**
@@ -240,8 +236,6 @@ export function notifyCriticalMass(massData: any) {
       client.send(JSON.stringify(message));
     }
   });
-
-  console.log('[WS] Notified coordinators about critical mass');
 }
 
 /**
