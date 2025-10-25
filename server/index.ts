@@ -8,15 +8,11 @@ import path from "path";
 
 // Global error handlers to prevent server crashes
 process.on('uncaughtException', (error) => {
-  log(`Uncaught Exception: ${error.message}`);
-  console.error('Uncaught Exception:', error);
-  // Don't exit the process, just log the error
+  console.error('🚨 Uncaught Exception:', error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  log(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit the process, just log the error
+  console.error('🚨 Unhandled Rejection:', reason);
 });
 
 const app = express();
@@ -112,28 +108,25 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({
   origin: (origin, callback) => {
     // Permitir requests sem origin (arquivos estáticos, navegação direta, Postman, cURL, etc)
-    // Isso é seguro porque requests sem origin não podem acessar cookies/credentials
     if (!origin) {
       return callback(null, true);
     }
 
     // Verificar se a origem está na whitelist
     const isAllowed = allowedOrigins.some(allowedOrigin => {
-      // Permitir match exato
       if (origin === allowedOrigin) return true;
-
-      // Permitir subdomínios .replit.dev, .replit.com e .replit.app (em dev e prod)
       if (origin.includes('.replit.dev') || origin.includes('.replit.com') || origin.includes('.replit.app')) {
         return true;
       }
-
       return false;
     });
 
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`🔴 CORS: Origem não permitida bloqueada: ${origin}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`🔴 CORS blocked: ${origin}`);
+      }
       callback(new Error('Origin not allowed by CORS'));
     }
   },
@@ -179,38 +172,30 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    // Log the error instead of throwing it
-    log(`Error ${status} on ${req.method} ${req.path}: ${message}`);
-    console.error('Request error:', {
-      method: req.method,
-      path: req.path,
-      status,
-      message,
-      stack: err.stack
-    });
+    // Log errors only
+    console.error(`❌ ${status} ${req.method} ${req.path}: ${message}`);
+
+    // Log stack trace only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(err.stack);
+    }
 
     // Send error response to client
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
-    
-    // Do NOT throw the error - this was causing server crashes
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Setup vite in development, serve static files in production
   const isDevelopment = process.env.NODE_ENV === "development";
-  console.log(`Environment: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
-  
+
   if (isDevelopment) {
     await setupVite(app, server);
   } else {
     try {
       serveStatic(app);
-      console.log("Static file serving configured for production");
     } catch (error) {
-      console.error("Failed to configure static file serving:", error);
+      console.error("❌ Failed to configure static file serving:", error);
       process.exit(1);
     }
   }
@@ -222,16 +207,14 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || '5000', 10);
   
   server.on('error', (error: any) => {
-    console.error('Server error:', error);
+    console.error('❌ Server error:', error);
     if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use`);
+      console.error(`❌ Port ${port} is already in use`);
     }
     process.exit(1);
   });
-  
+
   server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
-    console.log(`Server successfully started on http://0.0.0.0:${port}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`✅ Server started on port ${port} (${process.env.NODE_ENV})`);
   });
 })();
