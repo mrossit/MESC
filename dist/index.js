@@ -859,25 +859,17 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-var db, pool, isProduction, isDevelopment, forceProduction;
+var db, pool, isProduction, isDevelopment;
 var init_db = __esm({
   async "server/db.ts"() {
     "use strict";
     init_schema();
     isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1" || !!process.env.REPL_SLUG && !process.env.DATABASE_URL;
     isDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev";
-    forceProduction = !!process.env.DATABASE_URL;
-    console.log(`\u{1F50D} Environment check:`, {
-      NODE_ENV: process.env.NODE_ENV,
-      REPLIT_DEPLOYMENT: process.env.REPLIT_DEPLOYMENT,
-      REPL_SLUG: !!process.env.REPL_SLUG,
-      DATABASE_URL: !!process.env.DATABASE_URL,
-      isProduction,
-      isDevelopment
-    });
     if (process.env.DATABASE_URL) {
-      console.log("\u{1F680} DATABASE_URL configured, using PostgreSQL database");
-      console.log("\u{1F4C4} Environment:", { NODE_ENV: process.env.NODE_ENV, isProduction, isDevelopment });
+      if (isDevelopment) {
+        console.log("\u{1F680} Using PostgreSQL database");
+      }
       try {
         const { Pool, neonConfig } = await import("@neondatabase/serverless");
         const { drizzle } = await import("drizzle-orm/neon-serverless");
@@ -885,22 +877,23 @@ var init_db = __esm({
         neonConfig.webSocketConstructor = ws.default;
         pool = new Pool({ connectionString: process.env.DATABASE_URL });
         db = drizzle({ client: pool, schema: schema_exports });
-        console.log("\u2705 PostgreSQL connection established successfully");
+        if (isDevelopment) {
+          console.log("\u2705 PostgreSQL connected");
+        }
       } catch (error) {
         console.error("\u274C Failed to connect to PostgreSQL:", error);
         throw error;
       }
     } else if (isDevelopment && !isProduction) {
-      console.log("\u{1F527} Development mode detected, using local SQLite database");
+      if (isDevelopment) {
+        console.log("\u{1F527} Using local SQLite database");
+      }
       const Database2 = await import("better-sqlite3");
       const { drizzle } = await import("drizzle-orm/better-sqlite3");
       const sqlite = new Database2.default("local.db");
       db = drizzle(sqlite, { schema: schema_exports });
-    } else if (false) {
-      console.log("\u26A0\uFE0F This code path should not be reached");
     } else {
-      console.log("\u26A0\uFE0F No DATABASE_URL found and not in development mode");
-      console.log("\u{1F4DD} Using SQLite fallback for compatibility");
+      console.warn("\u26A0\uFE0F No DATABASE_URL found - using SQLite fallback");
       const Database2 = await import("better-sqlite3");
       const { drizzle } = await import("drizzle-orm/better-sqlite3");
       const sqlite = new Database2.default("local.db");
@@ -1007,7 +1000,6 @@ var init_storage = __esm({
           return await drizzleQuery();
         } catch (drizzleError) {
           if (drizzleError.code === "SQLITE_ERROR" || drizzleError.message?.includes("SQLITE")) {
-            console.warn("[FALLBACK] Drizzle failed, using SQLite directly:", drizzleError.message);
             const sqlite = this.getSQLiteDB();
             const result = sqlite.prepare(fallbackSQL).get();
             return result ? fallbackMapper(result) : void 0;
@@ -4015,7 +4007,6 @@ function initializeWebSocket(httpServer) {
     path: "/ws"
   });
   wss.on("connection", (ws, req) => {
-    console.log("[WS] New WebSocket connection");
     ws.isAlive = true;
     clients.add(ws);
     ws.on("pong", () => {
@@ -4027,7 +4018,6 @@ function initializeWebSocket(httpServer) {
         if (data.type === "AUTH") {
           ws.userId = data.userId;
           ws.userRole = data.userRole;
-          console.log(`[WS] Client authenticated: ${ws.userId} (${ws.userRole})`);
           if (ws.userRole === "coordenador" || ws.userRole === "gestor") {
             const alerts = await getCriticalAlerts();
             ws.send(JSON.stringify({
@@ -4042,7 +4032,6 @@ function initializeWebSocket(httpServer) {
       }
     });
     ws.on("close", () => {
-      console.log("[WS] Client disconnected");
       clients.delete(ws);
     });
     ws.on("error", (error) => {
@@ -4067,7 +4056,9 @@ function initializeWebSocket(httpServer) {
   setInterval(async () => {
     await broadcastCriticalAlerts();
   }, 3e4);
-  console.log("[WS] WebSocket server initialized on /ws");
+  if (process.env.NODE_ENV === "development") {
+    console.log("\u{1F50C} WebSocket server initialized");
+  }
   return wss;
 }
 async function getCriticalAlerts() {
@@ -4144,7 +4135,6 @@ function notifySubstitutionRequest(substitutionData) {
       client.send(JSON.stringify(message));
     }
   });
-  console.log("[WS] Notified coordinators about new substitution request");
 }
 function notifyCriticalMass(massData) {
   const message = {
@@ -4157,7 +4147,6 @@ function notifyCriticalMass(massData) {
       client.send(JSON.stringify(message));
     }
   });
-  console.log("[WS] Notified coordinators about critical mass");
 }
 function getWebSocketServer() {
   return wss;
@@ -5761,11 +5750,8 @@ function authenticateToken(req, res, next) {
   const secret = JWT_SECRET;
   const verifyAndCheckStatus = async (user) => {
     try {
-      console.log("[AUTH] Verifying user:", user.id, user.email);
       const [currentUser] = await db.select().from(users).where(eq2(users.id, user.id)).limit(1);
-      console.log("[AUTH] User from DB:", currentUser?.id, currentUser?.status);
       if (!currentUser || currentUser.status !== "active") {
-        console.log("[AUTH] User blocked - Status:", currentUser?.status);
         return res.status(403).json({ message: "Conta inativa ou pendente. Entre em contato com a coordena\xE7\xE3o." });
       }
       req.user = user;
@@ -5892,7 +5878,7 @@ async function resetPassword(email) {
     if (!user) {
       return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
     }
-    const crypto3 = __require("crypto");
+    const crypto3 = await import("crypto");
     const tempPassword = crypto3.randomBytes(12).toString("base64").slice(0, 12) + "!Aa1";
     const passwordHash = await hashPassword(tempPassword);
     await db.update(users).set({
@@ -5900,6 +5886,9 @@ async function resetPassword(email) {
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq2(users.id, user.id));
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV ONLY] Senha tempor\xE1ria para ${email}: ${tempPassword}`);
+    }
     return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
   } catch (error) {
     throw error;
@@ -13787,7 +13776,8 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Solicita\xE7\xE3o n\xE3o encontrada"
       });
     }
-    if (request.status !== "available") {
+    const isAvailable = request.status === "available" || request.status === "pending" && !request.substituteId;
+    if (!isAvailable) {
       return res.status(400).json({
         success: false,
         message: "Esta solicita\xE7\xE3o n\xE3o est\xE1 mais dispon\xEDvel"
@@ -17327,15 +17317,12 @@ async function registerRoutes(app2) {
   app2.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
     try {
       const { trackId, moduleId } = req.params;
-      console.log(`[DEBUG ROUTE] trackId: ${trackId}, moduleId: ${moduleId}`);
       const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
-      console.log(`[DEBUG ROUTE] lessons result:`, lessons);
       if (!lessons || lessons.length === 0) {
         return res.status(404).json({ message: "Aulas n\xE3o encontradas para este m\xF3dulo" });
       }
       res.json(lessons);
     } catch (error) {
-      console.error(`[DEBUG ROUTE ERROR]`, error);
       const errorResponse = handleApiError(error, "buscar aulas do m\xF3dulo");
       res.status(errorResponse.status).json(errorResponse);
     }
@@ -17508,12 +17495,62 @@ async function registerRoutes(app2) {
         res.status(500).json({ message: "Erro ao alterar role" });
       }
     });
-    console.log("[DEV MODE] Role switcher endpoint enabled at /api/dev/switch-role");
   }
+  app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+    try {
+      const { sql: sqlHelper, isNull: isNull2, and: and20 } = await import("drizzle-orm");
+      const affectedRequests = await db.select({
+        id: substitutionRequests.id,
+        requesterId: substitutionRequests.requesterId,
+        substituteId: substitutionRequests.substituteId,
+        status: substitutionRequests.status,
+        createdAt: substitutionRequests.createdAt
+      }).from(substitutionRequests).where(
+        and20(
+          eq27(substitutionRequests.status, "pending"),
+          isNull2(substitutionRequests.substituteId)
+        )
+      );
+      if (affectedRequests.length === 0) {
+        return res.json({
+          success: true,
+          message: "Nenhum registro inconsistente encontrado. Base de dados est\xE1 limpa!",
+          affectedCount: 0
+        });
+      }
+      await db.update(substitutionRequests).set({ status: "available" }).where(
+        and20(
+          eq27(substitutionRequests.status, "pending"),
+          isNull2(substitutionRequests.substituteId)
+        )
+      );
+      logger.info("Migration: Fixed substitution status", {
+        affectedCount: affectedRequests.length,
+        userId: req.user?.id
+      });
+      res.json({
+        success: true,
+        message: `Migra\xE7\xE3o conclu\xEDda com sucesso! ${affectedRequests.length} registro(s) atualizado(s).`,
+        affectedCount: affectedRequests.length,
+        affectedRequests: affectedRequests.map((r) => ({
+          id: r.id,
+          createdAt: r.createdAt
+        }))
+      });
+    } catch (error) {
+      console.error("Migration error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Erro ao executar migra\xE7\xE3o",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
   app2.use((err, req, res, next) => {
-    console.error("\u{1F6A8} [CRITICAL ERROR] Uncaught error in route:", err);
-    console.error("\u{1F6A8} [CRITICAL ERROR] Stack:", err.stack);
-    console.error("\u{1F6A8} [CRITICAL ERROR] Request:", { method: req.method, url: req.url });
+    console.error("\u{1F6A8} Route error:", err.message);
+    if (process.env.NODE_ENV === "development") {
+      console.error(err.stack);
+    }
     if (!res.headersSent) {
       res.status(500).json({
         error: "Internal server error",
@@ -17525,15 +17562,6 @@ async function registerRoutes(app2) {
   const httpServer = createServer(app2);
   const { initializeWebSocket: initializeWebSocket2 } = await init_websocket().then(() => websocket_exports);
   initializeWebSocket2(httpServer);
-  process.on("unhandledRejection", (reason, promise) => {
-    console.error("\u{1F6A8} [UNHANDLED REJECTION]", reason);
-    console.error("\u{1F6A8} [UNHANDLED REJECTION] Stack:", reason?.stack);
-  });
-  process.on("uncaughtException", (error) => {
-    console.error("\u{1F6A8} [UNCAUGHT EXCEPTION]", error);
-    console.error("\u{1F6A8} [UNCAUGHT EXCEPTION] Stack:", error.stack);
-  });
-  console.log("\u2705 [EMERGENCY] Error handlers installed");
   return httpServer;
 }
 
@@ -17707,6 +17735,11 @@ function serveStatic(app2) {
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
+        res.setHeader("Service-Worker-Allowed", "/");
+      } else if (filepath.endsWith("version.json")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
       }
     }
   }));
@@ -17724,12 +17757,10 @@ function serveStatic(app2) {
 // server/index.ts
 import path3 from "path";
 process.on("uncaughtException", (error) => {
-  log(`Uncaught Exception: ${error.message}`);
-  console.error("Uncaught Exception:", error);
+  console.error("\u{1F6A8} Uncaught Exception:", error);
 });
 process.on("unhandledRejection", (reason, promise) => {
-  log(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  console.error("\u{1F6A8} Unhandled Rejection:", reason);
 });
 var app = express2();
 app.set("trust proxy", true);
@@ -17821,7 +17852,9 @@ app.use(cors({
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`\u{1F534} CORS: Origem n\xE3o permitida bloqueada: ${origin}`);
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`\u{1F534} CORS blocked: ${origin}`);
+      }
       callback(new Error("Origin not allowed by CORS"));
     }
   },
@@ -17853,42 +17886,34 @@ app.use((req, res, next) => {
   app.use((err, req, res, _next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    log(`Error ${status} on ${req.method} ${req.path}: ${message}`);
-    console.error("Request error:", {
-      method: req.method,
-      path: req.path,
-      status,
-      message,
-      stack: err.stack
-    });
+    console.error(`\u274C ${status} ${req.method} ${req.path}: ${message}`);
+    if (process.env.NODE_ENV === "development") {
+      console.error(err.stack);
+    }
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
   });
   const isDevelopment2 = process.env.NODE_ENV === "development";
-  console.log(`Environment: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment2}`);
   if (isDevelopment2) {
     await setupVite(app, server);
   } else {
     try {
       serveStatic(app);
-      console.log("Static file serving configured for production");
     } catch (error) {
-      console.error("Failed to configure static file serving:", error);
+      console.error("\u274C Failed to configure static file serving:", error);
       process.exit(1);
     }
   }
   const port = parseInt(process.env.PORT || "5000", 10);
   server.on("error", (error) => {
-    console.error("Server error:", error);
+    console.error("\u274C Server error:", error);
     if (error.code === "EADDRINUSE") {
-      console.error(`Port ${port} is already in use`);
+      console.error(`\u274C Port ${port} is already in use`);
     }
     process.exit(1);
   });
   server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
-    console.log(`Server successfully started on http://0.0.0.0:${port}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`\u2705 Server started on port ${port} (${process.env.NODE_ENV})`);
   });
 })();
