@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 import { FloatingNotificationBell } from "@/components/floating-notification-bell";
@@ -13,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
+import { Settings } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -93,8 +95,14 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 {/* Notificações (sino) */}
                 <NotificationBell compact className="h-9 w-9" />
 
-                {/* MOBILE: Hamburguer menu no canto superior direito */}
-                {isMobile && <SidebarTrigger />}
+                {/* MOBILE: Botão Settings no canto superior direito */}
+                {isMobile && (
+                  <Link href="/settings">
+                    <Button variant="ghost" size="icon" className="h-9 w-9">
+                      <Settings className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </header>
