@@ -157,7 +157,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      fetchUsers();
       toast({
         title: "Sucesso",
         description: "Perfil do usuário atualizado com sucesso.",
@@ -178,7 +177,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      fetchUsers();
       toast({
         title: "Sucesso",
         description: "Status do usuário atualizado com sucesso.",
@@ -200,7 +198,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      fetchUsers();
       toast({
         title: "Senha resetada com sucesso",
         description: "O usuário receberá uma notificação e precisará criar uma nova senha no próximo login.",
@@ -225,7 +222,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      fetchUsers();
       toast({
         title: "Usuário excluído",
         description: "O usuário foi excluído permanentemente do sistema.",
@@ -254,7 +250,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      fetchUsers();
       toast({
         title: "Usuário bloqueado",
         description: "O usuário foi bloqueado e não poderá mais acessar o sistema.",
