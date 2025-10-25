@@ -614,8 +614,12 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Verificar se a solicitação está aberta (available)
-    if (request.status !== 'available') {
+    // Verificar se a solicitação está aberta (available ou pending sem substituteId)
+    // pending sem substituteId = edge case de dados antigos que devem ser tratados como available
+    const isAvailable = request.status === 'available' ||
+                        (request.status === 'pending' && !request.substituteId);
+
+    if (!isAvailable) {
       return res.status(400).json({
         success: false,
         message: "Esta solicitação não está mais disponível"

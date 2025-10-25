@@ -842,8 +842,8 @@ export default function Substitutions() {
                         
                         {/* Botões de ação */}
                         <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
-                          {/* Botão para aceitar solicitação direcionada (pending) */}
-                          {item.request.status === "pending" && !isMyRequest && isForMe && (
+                          {/* Botão para aceitar solicitação direcionada (pending com substituteId) */}
+                          {item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
                             <Button
                               size="sm"
                               onClick={() => handleRespondToRequest(item)}
@@ -854,8 +854,8 @@ export default function Substitutions() {
                             </Button>
                           )}
 
-                          {/* Botão para reivindicar solicitação aberta (available) */}
-                          {item.request.status === "available" && !isMyRequest && (
+                          {/* Botão para reivindicar solicitação aberta (available OU pending sem substituteId) */}
+                          {(item.request.status === "available" || (item.request.status === "pending" && !isDirected)) && !isMyRequest && (
                             <Button
                               size="sm"
                               variant="default"
