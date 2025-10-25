@@ -19,11 +19,7 @@
       })();
     </script>
     
-    <!-- Cache bust: Updated dynamically -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <meta name="cache-version" content="v<?= time() ?>">
+    <!-- IMPORTANT: index.html cache control is set via HTTP headers in server (see server/index.ts) -->
     <meta name="description" content="Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu - Sorocaba">
     
     <!-- PWA Meta Tags -->
@@ -60,15 +56,15 @@
     <!-- Security -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="format-detection" content="telephone=no">
-    <script type="module" crossorigin src="/js/index-CJO7x2rD.js"></script>
+    <script type="module" crossorigin src="/js/index-BXUtxSgy.js"></script>
     <link rel="modulepreload" crossorigin href="/js/vendor-react-BSOTRkRF.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-router-D488sAzk.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-query-CwzRqKiB.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-ui-qq8OA6G7.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-charts-DSHTQCfj.js">
     <link rel="modulepreload" crossorigin href="/js/vendor-date-D2IZz3oM.js">
-    <link rel="modulepreload" crossorigin href="/js/vendor-icons-CUrm0803.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DyWQ5qJr.css">
+    <link rel="modulepreload" crossorigin href="/js/vendor-icons-thXCmFLx.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-LFaGeVMc.css">
   </head>
   <body>
     <div id="root"></div>
@@ -109,8 +105,11 @@
 
               // Se forceReload for true, recarrega automaticamente
               if (event.data.forceReload) {
-                console.log('[SW] Force reloading page...');
-                window.location.reload(true);
+                console.log('[SW] Force reloading page to load new version...');
+                // Clear sessionStorage to force fresh state
+                sessionStorage.clear();
+                // Reload without cache (hard reload)
+                window.location.reload();
               }
             } else if (event.data && event.data.type === 'PUSH_NAVIGATION' && event.data.url) {
               console.log('[SW] Navigating to push target:', event.data.url);
