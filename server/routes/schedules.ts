@@ -23,23 +23,26 @@ const router = Router();
 // Get upcoming schedules for a minister
 router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    // Get the minister ID from the logged-in user
+    // Get the minister ID from the logged-in user or from query parameter
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Não autenticado" });
     }
-    
+
+    // Allow filtering by ministerId (for family members view)
+    const targetMinisterId = req.query.ministerId as string || userId;
+
     // Note: ministers table doesn't exist in schema - ministers are users with role 'ministro'
     const minister = await db
       .select()
       .from(users)
-      .where(eq(users.id, userId))
+      .where(eq(users.id, targetMinisterId))
       .limit(1);
-    
+
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
-    
+
     const ministerId = minister[0].id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);

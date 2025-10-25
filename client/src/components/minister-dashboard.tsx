@@ -21,12 +21,45 @@ interface ScheduleAssignment {
   scheduleTitle: string;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: string;
+  actionUrl?: string;
+}
+
+interface FamilyMember {
+  id: string;
+  relationshipType: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    photoUrl?: string;
+  };
+}
+
+interface FamilySchedule {
+  memberName: string;
+  relationshipType: string;
+  date: string;
+  massTime: string;
+  position: number;
+}
+
 export function MinisterDashboard() {
   // Track renders in debug panel (development only)
   useDebugRender('MinisterDashboard');
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [familySchedules, setFamilySchedules] = useState<FamilySchedule[]>([]);
+  const [loadingFamily, setLoadingFamily] = useState(true);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
 
@@ -38,6 +71,8 @@ export function MinisterDashboard() {
 
   useEffect(() => {
     fetchUpcomingSchedules();
+    fetchNotifications();
+    fetchFamilySchedules();
   }, []);
 
   const fetchUpcomingSchedules = async () => {
@@ -51,6 +86,71 @@ export function MinisterDashboard() {
       console.error("Error fetching upcoming schedules:", error);
     } finally {
       setLoadingSchedules(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch("/api/notifications");
+      if (response.ok) {
+        const data = await response.json();
+        // Pegar as 3 notificações mais recentes
+        setNotifications(data.slice(0, 3));
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const fetchFamilySchedules = async () => {
+    try {
+      // Primeiro, buscar familiares
+      const familyResponse = await fetch("/api/profile/family");
+      if (!familyResponse.ok) {
+        setLoadingFamily(false);
+        return;
+      }
+
+      const familyMembers: FamilyMember[] = await familyResponse.json();
+
+      if (familyMembers.length === 0) {
+        setLoadingFamily(false);
+        return;
+      }
+
+      // Para cada familiar, buscar suas próximas escalas
+      const schedules: FamilySchedule[] = [];
+
+      for (const member of familyMembers) {
+        try {
+          const schedulesResponse = await fetch(`/api/schedules/minister/upcoming?ministerId=${member.user.id}`);
+          if (schedulesResponse.ok) {
+            const data = await schedulesResponse.json();
+            const memberSchedules = data.assignments || [];
+
+            // Adicionar as próximas 2 escalas de cada familiar
+            memberSchedules.slice(0, 2).forEach((schedule: ScheduleAssignment) => {
+              schedules.push({
+                memberName: member.user.name,
+                relationshipType: member.relationshipType,
+                date: schedule.date,
+                massTime: schedule.massTime,
+                position: schedule.position
+              });
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching schedules for family member ${member.user.name}:`, error);
+        }
+      }
+
+      setFamilySchedules(schedules);
+    } catch (error) {
+      console.error("Error fetching family schedules:", error);
+    } finally {
+      setLoadingFamily(false);
     }
   };
 
@@ -70,7 +170,21 @@ export function MinisterDashboard() {
   };
 
   const getPositionLabel = (position: number) => {
-    return LITURGICAL_POSITIONS[position] || `Posição ${position}`;
+    const liturgicalName = LITURGICAL_POSITIONS[position];
+    if (liturgicalName) {
+      return `Posição ${position} (${liturgicalName})`;
+    }
+    return `Posição ${position}`;
+  };
+
+  const getRelationshipLabel = (relationshipType: string) => {
+    const relationships: Record<string, string> = {
+      "spouse": "Cônjuge",
+      "parent": "Pai/Mãe",
+      "child": "Filho(a)",
+      "sibling": "Irmão/Irmã"
+    };
+    return relationships[relationshipType] || relationshipType;
   };
 
   return (
@@ -219,7 +333,7 @@ export function MinisterDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Notificações */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
+        <Card className="border border-neutral-border/30 dark:border-border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
               <Bell className="h-4 w-4 text-orange-500" />
@@ -227,32 +341,127 @@ export function MinisterDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
-                <Bell className="h-6 w-6 text-orange-500/70" />
+            {loadingNotifications ? (
+              <div className="flex flex-col items-center justify-center py-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2 animate-pulse">
+                  <Bell className="h-6 w-6 text-orange-500/70" />
+                </div>
+                <p className="text-sm text-muted-foreground">Carregando...</p>
               </div>
-              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-            </div>
+            ) : notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
+                  <Bell className="h-6 w-6 text-orange-500/70" />
+                </div>
+                <p className="text-sm text-muted-foreground">Nenhuma notificação</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`p-2 rounded-lg border cursor-pointer transition-colors ${
+                      notification.read
+                        ? "bg-background border-neutral-border/20 dark:border-gray-700"
+                        : "bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800"
+                    }`}
+                    onClick={() => {
+                      if (notification.actionUrl) {
+                        setLocation(notification.actionUrl);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {notification.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {notification.message}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {notifications.length > 0 && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => setLocation('/communication')}
+                  >
+                    Ver todas
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Família MESC */}
-        <Card className="  border border-neutral-border/30 dark:border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
-              <Users className="h-4 w-4 text-purple-500" />
-              Família MESC
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-2">
-                <Users className="h-6 w-6 text-purple-500/70" />
+        {loadingFamily ? (
+          <Card className="border border-neutral-border/30 dark:border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <Users className="h-4 w-4 text-purple-500" />
+                Família MESC
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center justify-center py-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-2 animate-pulse">
+                  <Users className="h-6 w-6 text-purple-500/70" />
+                </div>
+                <p className="text-sm text-muted-foreground">Carregando...</p>
               </div>
-              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : familySchedules.length > 0 ? (
+          <Card className="border border-neutral-border/30 dark:border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <Users className="h-4 w-4 text-purple-500" />
+                Família MESC
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {familySchedules.map((schedule, index) => (
+                  <div
+                    key={index}
+                    className="p-2 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-200 dark:border-purple-800"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {schedule.memberName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {getRelationshipLabel(schedule.relationshipType)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {format(parseScheduleDate(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
+                          </p>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
+                            {getMassTimeLabel(schedule.massTime)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs mt-2">
+                      {getPositionLabel(schedule.position)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Estatísticas Pessoais */}
         <Card className="  border border-neutral-border/30 dark:border-border">
