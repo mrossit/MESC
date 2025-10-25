@@ -1,0 +1,43 @@
+Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+injected.js:27 [INDEX.HTML] Theme Detection:
+injected.js:27   - Stored theme: system
+injected.js:27   - prefers-color-scheme: dark = true
+injected.js:27   - prefers-color-scheme: light = false
+injected.js:27   - User Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36
+injected.js:27   - Platform: MacIntel
+injected.js:27   - Hostname: 6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev
+injected.js:27   - Will apply dark mode: true
+injected.js:27 [SW] Running in Replit preview - Service Worker DISABLED to prevent cache issues
+6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/:1 Refused to load the script 'https://replit.com/public/js/replit-dev-banner.js' because it violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+Understand this error
+client:536 WebSocket connection to 'wss://6fa988f9-01a7-4aa6-ac2a-e71463a2ebd3-00-3gdoavbtxrm8c.spock.replit.dev/?token=pIT_FU5vdlw3' failed: 
+setupWebSocket @ client:536
+(anonymous) @ client:531Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=pIT_FU5vdlw3' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+setupWebSocket @ client:536
+fallback @ client:509
+(anonymous) @ client:555Understand this error
+injected.js:27 Version changed from null to 5.4.2 - clearing caches
+(anonymous) @ injected.js:27
+(anonymous) @ queryClient.ts:115Understand this warning
+injected.js:27 [THEME] System preference: dark
+injected.js:27 [THEME] Stored theme: null
+injected.js:27 [THEME] No valid stored theme, using defaultTheme: system
+injected.js:27 [THEME] Applying system theme: dark
+workspace_iframe.html?initialPath=%2F&id=%3Ar3fo%3A:142 Refused to load the script 'https://replit.com/public/js/beacon.js' because it violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
