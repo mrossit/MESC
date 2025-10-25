@@ -2351,66 +2351,6 @@ export default function Schedules() {
                                       <span className="sm:hidden">Solicitar Substituto</span>
                                     </Button>
                                   )}
-                                  {(isCoordinator || isUserAuxiliar1or2) && (
-                                    <>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className={cn("text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
-                                        onClick={() => {
-                                          // Salvar o ID do assignment que está sendo editado
-                                          setEditingAssignmentId(assignment.id);
-
-                                          // Preencher o modal com os dados atuais
-                                          setSelectedMassTime(assignment.massTime);
-                                          setSelectedPosition(assignment.position);
-                                          setSelectedMinisterId(assignment.ministerId || "");
-
-                                          // Fechar dialog de visualização e abrir dialog de edição
-                                          setIsViewScheduleDialogOpen(false);
-                                          setIsAssignmentDialogOpen(true);
-                                        }}
-                                      >
-                                        <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
-                                        <span className="hidden sm:inline">Editar</span>
-                                        <span className="sm:hidden">✎</span>
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className={cn("text-destructive hover:text-destructive text-[11px] sm:text-sm h-8 sm:h-9", isCurrentUser ? "flex-shrink-0" : "")}
-                                        onClick={async () => {
-                                          try {
-                                            const response = await fetch(`/api/schedules/${assignment.id}`, {
-                                              method: "DELETE",
-                                              credentials: "include"
-                                            });
-
-                                            if (response.ok) {
-                                              toast({
-                                                title: "Sucesso",
-                                                description: "Ministro removido da escala"
-                                              });
-                                              await fetchScheduleForDate(selectedDate);
-                                              await fetchSchedules();
-                                            } else {
-                                              throw new Error("Erro ao remover");
-                                            }
-                                          } catch (error) {
-                                            toast({
-                                              title: "Erro",
-                                              description: "Erro ao remover ministro da escala",
-                                              variant: "destructive"
-                                            });
-                                          }
-                                        }}
-                                      >
-                                        <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
-                                        <span className="hidden sm:inline">Remover</span>
-                                        <span className="sm:hidden">✕</span>
-                                      </Button>
-                                    </>
-                                  )}
                                 </div>
                               </div>
                             );
