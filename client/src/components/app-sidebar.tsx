@@ -366,7 +366,7 @@ export function AppSidebar() {
                   Configurações
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-56">
+              <DropdownMenuContent align="start" side="top" className="w-56 mb-2">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
