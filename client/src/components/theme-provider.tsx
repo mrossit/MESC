@@ -28,11 +28,20 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem(storageKey) as Theme
-    // Valida se o valor armazenado é válido
-    if (stored && ["dark", "light", "system"].includes(stored)) {
-      return stored
+    
+    // Debug: verificar tema do sistema
+    const systemPreference = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+    console.log('[THEME] System preference:', systemPreference)
+    console.log('[THEME] Stored theme:', stored)
+    
+    // Se não há valor armazenado, usa "system" (que detectará automaticamente)
+    if (!stored || !["dark", "light", "system"].includes(stored)) {
+      console.log('[THEME] No valid stored theme, using defaultTheme:', defaultTheme)
+      return defaultTheme
     }
-    return defaultTheme
+    
+    console.log('[THEME] Using stored theme:', stored)
+    return stored
   })
 
   useEffect(() => {
@@ -46,10 +55,12 @@ export function ThemeProvider({
         ? "dark"
         : "light"
 
+      console.log('[THEME] Applying system theme:', systemTheme)
       root.classList.add(systemTheme)
       return
     }
 
+    console.log('[THEME] Applying fixed theme:', theme)
     root.classList.add(theme)
   }, [theme])
 
