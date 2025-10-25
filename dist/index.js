@@ -11700,7 +11700,8 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const minister = await db.select().from(users).where(eq13(users.id, userId)).limit(1);
+    const targetMinisterId = req.query.ministerId || userId;
+    const minister = await db.select().from(users).where(eq13(users.id, targetMinisterId)).limit(1);
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
@@ -15247,6 +15248,54 @@ import { eq as eq25, sql as sql15, like, or as or8 } from "drizzle-orm";
 var router20 = Router20();
 router20.get("/today", async (req, res) => {
   try {
+    try {
+      const today2 = /* @__PURE__ */ new Date();
+      const day2 = String(today2.getDate()).padStart(2, "0");
+      const month2 = String(today2.getMonth() + 1).padStart(2, "0");
+      const cancaoNovaUrl = `https://santo.cancaonova.com/`;
+      const response = await fetch(cancaoNovaUrl);
+      const html = await response.text();
+      const saintNameMatch = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i);
+      const contentMatch = html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      if (saintNameMatch) {
+        const saintName = saintNameMatch[1].trim();
+        let biography = "";
+        if (contentMatch) {
+          const paragraphs = contentMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+          if (paragraphs && paragraphs.length > 0) {
+            biography = paragraphs.slice(0, 3).map((p) => p.replace(/<[^>]+>/g, "").trim()).filter((p) => p.length > 0).join("\n\n");
+          }
+        }
+        const cancaoNovaSaint = {
+          id: `cancao-nova-${day2}-${month2}`,
+          name: saintName,
+          feastDay: `${month2}-${day2}`,
+          biography: biography || "Informa\xE7\xF5es dispon\xEDveis em santo.cancaonova.com",
+          isBrazilian: false,
+          rank: "MEMORIAL",
+          liturgicalColor: "white",
+          title: void 0,
+          patronOf: void 0,
+          collectPrayer: void 0,
+          firstReading: void 0,
+          responsorialPsalm: void 0,
+          gospel: void 0,
+          attributes: void 0,
+          quotes: void 0
+        };
+        return res.json({
+          success: true,
+          data: {
+            date: today2.toISOString().split("T")[0],
+            feastDay: `${month2}-${day2}`,
+            saints: [cancaoNovaSaint],
+            source: "cancaonova"
+          }
+        });
+      }
+    } catch (cancaoNovaError) {
+      console.log("Erro ao buscar do Can\xE7\xE3o Nova, usando banco de dados local:", cancaoNovaError);
+    }
     const today = /* @__PURE__ */ new Date();
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const day = String(today.getDate()).padStart(2, "0");
@@ -15257,7 +15306,8 @@ router20.get("/today", async (req, res) => {
       data: {
         date: today.toISOString().split("T")[0],
         feastDay,
-        saints: saintsToday
+        saints: saintsToday,
+        source: "database"
       }
     });
   } catch (error) {
