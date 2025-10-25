@@ -6,6 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FormationQuiz } from "@/components/formation-quiz";
+import { VideoPlayer } from "@/components/VideoPlayer";
+import { LessonNavigation } from "@/components/LessonNavigation";
 import {
   BookOpen,
   GraduationCap,
@@ -27,7 +29,8 @@ import {
   Settings,
   ArrowLeft,
   Circle,
-  AlertCircle
+  AlertCircle,
+  Video
 } from "lucide-react";
 import { useParams, useLocation } from "wouter";
 import { useState, useMemo, useEffect } from "react";
@@ -327,11 +330,11 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
                     : { label: "Não iniciada", variant: "outline", className: "border-slate-300 text-slate-600 bg-slate-50" };
 
                 return (
-                  <Card key={lesson.id} className="border-dashed">
-                    <CardContent className="p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={statusBadge.variant as any} className={statusBadge.className}>
+                  <Card key={lesson.id} className="border-dashed hover:border-solid transition-all">
+                    <CardContent className="p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="space-y-2 flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={statusBadge.variant as any} className={`${statusBadge.className} text-xs`}>
                             {status === "not_started" ? <Circle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
                             {statusBadge.label}
                           </Badge>
@@ -339,25 +342,31 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
                             Aula {lesson.lessonNumber}
                           </span>
                         </div>
-                        <h3 className="text-base font-semibold">{lesson.title}</h3>
+                        <h3 className="text-sm md:text-base font-semibold truncate">{lesson.title}</h3>
                         {lesson.description && (
-                          <p className="text-sm text-muted-foreground">{lesson.description}</p>
+                          <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{lesson.description}</p>
                         )}
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {lesson.estimatedDuration ? `${lesson.estimatedDuration} min` : "Duração variável"}
+                            <Clock className="h-3 w-3 flex-shrink-0" />
+                            <span className="whitespace-nowrap">
+                              {lesson.estimatedDuration ? `${lesson.estimatedDuration} min` : "Variável"}
+                            </span>
                           </div>
-                          <div>{formatPercentage(percentage)} concluído</div>
+                          <div className="flex items-center gap-2">
+                            <Progress value={percentage} className="w-16 h-1.5" />
+                            <span className="whitespace-nowrap">{formatPercentage(percentage)}</span>
+                          </div>
                         </div>
                       </div>
                       <Button
-                        className={`w-full md:w-auto ${category.button}`}
+                        className={`w-full lg:w-auto ${category.button} flex-shrink-0`}
                         onClick={() => onSelectLesson(lesson)}
                         data-testid={`button-open-lesson-${lesson.id}`}
                       >
                         <PlayCircle className="h-4 w-4 mr-2" />
-                        Acessar conteúdo
+                        <span className="hidden sm:inline">Acessar conteúdo</span>
+                        <span className="sm:hidden">Acessar</span>
                       </Button>
                     </CardContent>
                   </Card>
@@ -515,7 +524,7 @@ function LessonContent({
       title={lesson.title}
       subtitle={`Trilha: ${trackTitle} • Módulo: ${moduleTitle}`}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 pb-24 md:pb-28">
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -539,6 +548,17 @@ function LessonContent({
           </CardHeader>
         </Card>
 
+        {/* Vídeo da Aula */}
+        {lesson.videoUrl && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Video className="h-4 w-4 text-blue-600" />
+              Vídeo da Aula
+            </div>
+            <VideoPlayer url={lesson.videoUrl} title={lesson.title} />
+          </div>
+        )}
+
         <div className="space-y-4">
           {sections && sections.length > 0 ? (
             sections.map((section) => (
@@ -547,9 +567,16 @@ function LessonContent({
                   <CardTitle className="text-lg">{section.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="prose max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                    {section.content}
-                  </div>
+                  {/* Vídeo da Seção */}
+                  {section.videoUrl && (
+                    <VideoPlayer url={section.videoUrl} />
+                  )}
+
+                  {section.content && (
+                    <div className="prose prose-sm md:prose-base max-w-none dark:prose-invert whitespace-pre-wrap leading-relaxed">
+                      {section.content}
+                    </div>
+                  )}
                   {section.estimatedMinutes && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
@@ -591,49 +618,6 @@ function LessonContent({
         )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Navegação</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2">
-                {navigationHelpers.prev ? (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() =>
-                      navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.prev!.lessonNumber}`)
-                    }
-                  >
-                    ← {navigationHelpers.prev.title}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => navigate(`/formation/${trackId}/${moduleId}`)}
-                  >
-                    ← Voltar ao módulo
-                  </Button>
-                )}
-                {navigationHelpers.next && (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() =>
-                      navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.next!.lessonNumber}`)
-                    }
-                  >
-                    {navigationHelpers.next.title} →
-                  </Button>
-                )}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {sortedLessons.length} aulas neste módulo
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Progresso</CardTitle>
@@ -693,6 +677,22 @@ function LessonContent({
             </CardContent>
           </Card>
         </div>
+
+        {/* Navegação Flutuante */}
+        <LessonNavigation
+          prevLesson={navigationHelpers.prev}
+          nextLesson={navigationHelpers.next}
+          onPrev={navigationHelpers.prev ? () =>
+            navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.prev!.lessonNumber}`)
+            : undefined
+          }
+          onNext={navigationHelpers.next ? () =>
+            navigate(`/formation/${trackId}/${moduleId}/${navigationHelpers.next!.lessonNumber}`)
+            : undefined
+          }
+          onBackToModule={() => navigate(`/formation/${trackId}/${moduleId}`)}
+          position="fixed"
+        />
       </div>
     </Layout>
   );
