@@ -67,8 +67,6 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   const verifyAndCheckStatus = async (user: any) => {
     try {
-      console.log('[AUTH] Verifying user:', user.id, user.email);
-
       // Use Drizzle ORM for database access (works with both SQLite and PostgreSQL)
       const [currentUser] = await db
         .select()
@@ -76,10 +74,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
         .where(eq(users.id, user.id))
         .limit(1);
 
-      console.log('[AUTH] User from DB:', currentUser?.id, currentUser?.status);
-
       if (!currentUser || currentUser.status !== 'active') {
-        console.log('[AUTH] User blocked - Status:', currentUser?.status);
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
       }
 
@@ -297,7 +292,7 @@ export async function resetPassword(email: string) {
   try {
     // Normaliza o email para busca case-insensitive
     const normalizedEmail = email.trim().toLowerCase();
-    
+
     // Busca usuário
     const [user] = await db
       .select()
@@ -311,7 +306,7 @@ export async function resetPassword(email: string) {
     }
 
     // Gera senha temporária segura usando crypto
-    const crypto = require('crypto');
+    const crypto = await import('crypto');
     const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12) + '!Aa1';
     const passwordHash = await hashPassword(tempPassword);
 
@@ -325,9 +320,11 @@ export async function resetPassword(email: string) {
       })
       .where(eq(users.id, user.id));
 
-    // TODO: Enviar email com a senha temporária
-    // NOTA: Senha temporária NÃO deve ser logada por segurança
-    // Deve ser enviada apenas via email ou canal seguro
+    // TODO: Implementar envio de email com a senha temporária
+    // Por enquanto, retorna a senha temporária apenas em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV ONLY] Senha temporária para ${email}: ${tempPassword}`);
+    }
 
     return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
   } catch (error) {
