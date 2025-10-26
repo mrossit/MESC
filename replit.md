@@ -4,9 +4,23 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 
 # Recent Changes
 
+## WhatsApp API Extension - Substitutions (October 26, 2025)
+Extended WhatsApp API with substitution management:
+- **New Endpoints**: 7 total endpoints (3 new for substitutions)
+- **Routes**: `/api/whatsapp/substituicoes-abertas`, `/api/whatsapp/aceitar-substituicao`, `/api/whatsapp/minhas-substituicoes`
+- **Features**: List open substitutions, accept substitutions via WhatsApp, view minister's substitution history
+- **Documentation**: Updated `docs/WHATSAPP_API.md` with full examples
+
+## Schedule Calendar Fix (October 26, 2025)
+Fixed calendar day click behavior:
+- **Problem**: Clicking calendar days opened insertion dialog instead of view/edit
+- **Solution**: Changed onClick handler to always call fetchScheduleForDate() for both published and draft schedules
+- **Impact**: Coordinators can now properly view/edit existing schedules by clicking days
+- **File**: `client/src/pages/Schedules.tsx`
+
 ## WhatsApp API Integration (October 26, 2025)
 Added REST API for WhatsApp integration via Make (Integromat) + OpenAI:
-- **Feature**: 3 endpoints for schedule queries using phone number as identifier
+- **Feature**: Schedule query endpoints using phone number as identifier
 - **Routes**: `/api/whatsapp/escala`, `/api/whatsapp/proximas`, `/api/whatsapp/colegas`
 - **Security**: API key authentication (no CSRF needed, stateless)
 - **Files**: `server/routes/whatsapp-api.ts`, `docs/WHATSAPP_API.md`
