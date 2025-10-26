@@ -16153,7 +16153,7 @@ var pushSubscriptions_default = router22;
 await init_db();
 init_schema();
 import { Router as Router23 } from "express";
-import { eq as eq27, and as and20, gte as gte13, asc as asc3 } from "drizzle-orm";
+import { eq as eq27, and as and20, gte as gte13, desc as desc10, asc as asc3 } from "drizzle-orm";
 import { sql as sql17 } from "drizzle-orm";
 var router23 = Router23();
 var authenticateAPIKey = (req, res, next) => {
@@ -16351,6 +16351,193 @@ router23.post("/colegas", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /colegas:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.get("/substituicoes-abertas", async (req, res) => {
+  try {
+    const limite = Math.min(parseInt(req.query.limite) || 5, 20);
+    const openSubstitutions = await db.select({
+      substitutionId: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      date: schedules.date,
+      time: schedules.time,
+      position: schedules.position,
+      location: schedules.location,
+      requesterName: users.name,
+      requesterPhone: users.phone,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      createdAt: substitutionRequests.createdAt
+    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(eq27(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(limite);
+    if (!openSubstitutions || openSubstitutions.length === 0) {
+      return res.json({
+        encontrado: false,
+        totalVagas: 0,
+        vagas: [],
+        mensagem: "N\xE3o h\xE1 substitui\xE7\xF5es dispon\xEDveis no momento."
+      });
+    }
+    const vagas = openSubstitutions.map((s) => ({
+      id: s.substitutionId,
+      data: formatDateBR(s.date),
+      diaSemana: getDayOfWeek(s.date),
+      horario: formatTime(s.time),
+      funcao: getPositionName(s.position || 0),
+      local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+      ministroOriginal: s.requesterName,
+      telefoneOriginal: s.requesterPhone,
+      motivo: s.reason || "N\xE3o informado",
+      urgencia: s.urgency === "high" ? "Alta" : s.urgency === "critical" ? "Cr\xEDtica" : s.urgency === "low" ? "Baixa" : "M\xE9dia",
+      dataPublicacao: s.createdAt ? new Date(s.createdAt).toLocaleDateString("pt-BR") : null
+    }));
+    return res.json({
+      encontrado: true,
+      totalVagas: vagas.length,
+      vagas
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /substituicoes-abertas:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/aceitar-substituicao", async (req, res) => {
+  try {
+    const { telefone, id_substituicao, mensagem } = req.body;
+    if (!telefone || !id_substituicao) {
+      return res.status(400).json({
+        erro: "Campos obrigat\xF3rios: telefone e id_substituicao"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    const substitute = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    if (!substitute || substitute.length === 0) {
+      return res.json({
+        sucesso: false,
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}. Verifique se est\xE1 cadastrado.`
+      });
+    }
+    const substitution = await db.select({
+      substitutionId: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      status: substitutionRequests.status,
+      date: schedules.date,
+      time: schedules.time,
+      position: schedules.position,
+      requesterName: users.name
+    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(eq27(substitutionRequests.id, id_substituicao)).limit(1);
+    if (!substitution || substitution.length === 0) {
+      return res.json({
+        sucesso: false,
+        mensagem: "Substitui\xE7\xE3o n\xE3o encontrada. Verifique o ID."
+      });
+    }
+    const sub = substitution[0];
+    if (sub.status !== "available") {
+      return res.json({
+        sucesso: false,
+        mensagem: `Esta substitui\xE7\xE3o j\xE1 foi ${sub.status === "approved" ? "aprovada" : sub.status === "pending" ? "aceita e aguarda aprova\xE7\xE3o" : "cancelada"}.`
+      });
+    }
+    if (sub.requesterId === substitute[0].id) {
+      return res.json({
+        sucesso: false,
+        mensagem: "Voc\xEA n\xE3o pode aceitar sua pr\xF3pria substitui\xE7\xE3o."
+      });
+    }
+    await db.update(substitutionRequests).set({
+      substituteId: substitute[0].id,
+      status: "pending",
+      responseMessage: mensagem || `Aceito via WhatsApp por ${substitute[0].name}`
+    }).where(eq27(substitutionRequests.id, id_substituicao));
+    return res.json({
+      sucesso: true,
+      substituto: substitute[0].name,
+      data: formatDateBR(sub.date),
+      diaSemana: getDayOfWeek(sub.date),
+      horario: formatTime(sub.time),
+      funcao: getPositionName(sub.position || 0),
+      ministroOriginal: sub.requesterName,
+      mensagem: `Substitui\xE7\xE3o aceita com sucesso! Aguarde a aprova\xE7\xE3o do coordenador.`,
+      proximoPasso: "O coordenador ser\xE1 notificado e aprovar\xE1 sua substitui\xE7\xE3o em breve."
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /aceitar-substituicao:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/minhas-substituicoes", async (req, res) => {
+  try {
+    const { telefone, tipo = "todas" } = req.body;
+    if (!telefone) {
+      return res.status(400).json({
+        erro: "Campo obrigat\xF3rio: telefone"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    if (!minister || minister.length === 0) {
+      return res.json({
+        encontrado: false,
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}.`
+      });
+    }
+    let whereCondition;
+    if (tipo === "solicitadas") {
+      whereCondition = eq27(substitutionRequests.requesterId, minister[0].id);
+    } else if (tipo === "aceitas") {
+      whereCondition = eq27(substitutionRequests.substituteId, minister[0].id);
+    } else {
+      whereCondition = sql17`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
+    }
+    const mySubstitutions = await db.select({
+      substitutionId: substitutionRequests.id,
+      date: schedules.date,
+      time: schedules.time,
+      position: schedules.position,
+      location: schedules.location,
+      requesterName: users.name,
+      status: substitutionRequests.status,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      responseMessage: substitutionRequests.responseMessage
+    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc10(schedules.date), desc10(schedules.time)).limit(10);
+    if (!mySubstitutions || mySubstitutions.length === 0) {
+      return res.json({
+        encontrado: false,
+        ministro: minister[0].name,
+        substituicoes: [],
+        mensagem: `Voc\xEA n\xE3o tem substitui\xE7\xF5es ${tipo === "solicitadas" ? "solicitadas" : tipo === "aceitas" ? "aceitas" : "registradas"}.`
+      });
+    }
+    const substituicoes = mySubstitutions.map((s) => ({
+      id: s.substitutionId,
+      data: formatDateBR(s.date),
+      diaSemana: getDayOfWeek(s.date),
+      horario: formatTime(s.time),
+      funcao: getPositionName(s.position || 0),
+      local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+      ministroOriginal: s.requesterName,
+      status: s.status === "available" ? "Dispon\xEDvel" : s.status === "pending" ? "Aguardando Aprova\xE7\xE3o" : s.status === "approved" ? "Aprovada" : s.status === "rejected" ? "Rejeitada" : s.status === "cancelled" ? "Cancelada" : "Auto-aprovada",
+      motivo: s.reason || "N\xE3o informado",
+      urgencia: s.urgency === "high" ? "Alta" : s.urgency === "critical" ? "Cr\xEDtica" : s.urgency === "low" ? "Baixa" : "M\xE9dia",
+      mensagem: s.responseMessage || null
+    }));
+    return res.json({
+      encontrado: true,
+      ministro: minister[0].name,
+      totalSubstituicoes: substituicoes.length,
+      substituicoes
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /minhas-substituicoes:", err);
     return res.status(500).json({ erro: err.message });
   }
 });
