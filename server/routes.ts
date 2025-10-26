@@ -30,6 +30,7 @@ import liturgicalRoutes from "./routes/liturgical";
 import saintsRoutes from "./routes/saints";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
+import whatsappApiRoutes from "./routes/whatsapp-api";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -118,6 +119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Password reset routes com rate limiting muito restritivo
   app.use('/api/password-reset', passwordResetRateLimiter, passwordResetRoutes);
+  
+  // WhatsApp API routes (sem CSRF, autenticado por API key)
+  app.use('/api/whatsapp', whatsappApiRoutes);
   
   // Questionnaire routes (IMPORTANTE: registrar as rotas regulares ANTES das admin)
   app.use('/api/questionnaires', csrfProtection, questionnaireRoutes);

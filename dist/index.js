@@ -16149,17 +16149,231 @@ router22.get("/subscriptions", authenticateToken, async (req, res) => {
 });
 var pushSubscriptions_default = router22;
 
+// server/routes/whatsapp-api.ts
+await init_db();
+init_schema();
+import { Router as Router23 } from "express";
+import { eq as eq27, and as and20, gte as gte13, asc as asc3 } from "drizzle-orm";
+import { sql as sql17 } from "drizzle-orm";
+var router23 = Router23();
+var authenticateAPIKey = (req, res, next) => {
+  const apiKey = req.headers["x-api-key"] || req.query.api_key;
+  const validApiKey = process.env.WHATSAPP_API_KEY;
+  if (!validApiKey) {
+    return res.status(500).json({
+      erro: "API key n\xE3o configurada no servidor"
+    });
+  }
+  if (!apiKey || apiKey !== validApiKey) {
+    return res.status(401).json({
+      erro: "API key inv\xE1lida ou ausente. Envie via header 'X-API-Key' ou query parameter 'api_key'"
+    });
+  }
+  next();
+};
+router23.use(authenticateAPIKey);
+function normalizePhone(phone) {
+  return phone.replace(/[\s\-\(\)]/g, "");
+}
+function getPositionName(position) {
+  const positions = {
+    1: "Auxiliar 1",
+    2: "Auxiliar 2",
+    3: "Auxiliar 3",
+    4: "Auxiliar 4",
+    5: "Auxiliar 5",
+    6: "Auxiliar 6",
+    7: "Auxiliar 7",
+    8: "Auxiliar 8"
+  };
+  return positions[position] || `Posi\xE7\xE3o ${position}`;
+}
+function formatDateBR(dateStr) {
+  const date2 = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+  return date2.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+function formatTime(timeStr) {
+  return timeStr.substring(0, 5);
+}
+function getDayOfWeek(dateStr) {
+  const date2 = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+  const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+  return days[date2.getDay()];
+}
+router23.post("/escala", async (req, res) => {
+  try {
+    const { telefone, data } = req.body;
+    if (!telefone || !data) {
+      return res.status(400).json({
+        erro: "Campos obrigat\xF3rios: telefone e data (formato YYYY-MM-DD)"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    if (!minister || minister.length === 0) {
+      return res.json({
+        encontrado: false,
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}. Verifique se o n\xFAmero est\xE1 cadastrado.`
+      });
+    }
+    const schedule = await db.select().from(schedules).where(
+      and20(
+        eq27(schedules.ministerId, minister[0].id),
+        eq27(schedules.date, data)
+      )
+    ).limit(1);
+    if (!schedule || schedule.length === 0) {
+      return res.json({
+        encontrado: false,
+        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR(data)}.`
+      });
+    }
+    const s = schedule[0];
+    return res.json({
+      encontrado: true,
+      ministro: minister[0].name,
+      data: formatDateBR(s.date),
+      diaSemana: getDayOfWeek(s.date),
+      horario: formatTime(s.time),
+      funcao: getPositionName(s.position || 0),
+      local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+      tipo: s.type === "missa" ? "Missa" : s.type,
+      observacoes: s.notes || null
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /escala:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/proximas", async (req, res) => {
+  try {
+    const { telefone } = req.body;
+    if (!telefone) {
+      return res.status(400).json({
+        erro: "Campo obrigat\xF3rio: telefone"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    if (!minister || minister.length === 0) {
+      return res.json({
+        encontrado: false,
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}.`
+      });
+    }
+    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const upcomingSchedules = await db.select().from(schedules).where(
+      and20(
+        eq27(schedules.ministerId, minister[0].id),
+        gte13(schedules.date, today)
+      )
+    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(3);
+    if (!upcomingSchedules || upcomingSchedules.length === 0) {
+      return res.json({
+        encontrado: true,
+        ministro: minister[0].name,
+        proximasMissas: [],
+        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o tem escalas futuras no momento.`
+      });
+    }
+    const missas = upcomingSchedules.map((s) => ({
+      data: formatDateBR(s.date),
+      diaSemana: getDayOfWeek(s.date),
+      horario: formatTime(s.time),
+      funcao: getPositionName(s.position || 0),
+      local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+      tipo: s.type === "missa" ? "Missa" : s.type,
+      observacoes: s.notes || null
+    }));
+    return res.json({
+      encontrado: true,
+      ministro: minister[0].name,
+      totalProximas: missas.length,
+      proximasMissas: missas
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /proximas:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/colegas", async (req, res) => {
+  try {
+    const { data, horario } = req.body;
+    if (!data || !horario) {
+      return res.status(400).json({
+        erro: "Campos obrigat\xF3rios: data (YYYY-MM-DD) e horario (HH:MM ou HH:MM:SS)"
+      });
+    }
+    const normalizedTime = horario.length === 5 ? `${horario}:00` : horario;
+    const ministersInMass = await db.select({
+      scheduleId: schedules.id,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      notes: schedules.notes,
+      ministerName: users.name,
+      ministerPhone: users.phone,
+      ministerWhatsapp: users.whatsapp
+    }).from(schedules).innerJoin(users, eq27(schedules.ministerId, users.id)).where(
+      and20(
+        eq27(schedules.date, data),
+        eq27(schedules.time, normalizedTime)
+      )
+    ).orderBy(asc3(schedules.position));
+    if (!ministersInMass || ministersInMass.length === 0) {
+      return res.json({
+        encontrado: false,
+        mensagem: `Nenhum ministro escalado para ${formatDateBR(data)} \xE0s ${formatTime(normalizedTime)}.`
+      });
+    }
+    const colegas = ministersInMass.map((m) => ({
+      nome: m.ministerName,
+      funcao: getPositionName(m.position || 0),
+      telefone: m.ministerPhone || m.ministerWhatsapp || null,
+      observacoes: m.notes || null
+    }));
+    return res.json({
+      encontrado: true,
+      data: formatDateBR(data),
+      diaSemana: getDayOfWeek(data),
+      horario: formatTime(normalizedTime),
+      totalMinistros: colegas.length,
+      ministros: colegas
+    });
+  } catch (err) {
+    console.error("[WHATSAPP_API] Erro em /colegas:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "MESC WhatsApp API",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
+});
+var whatsapp_api_default = router23;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z7 } from "zod";
-import { eq as eq27, count as count7, or as or10 } from "drizzle-orm";
+import { eq as eq28, count as count7, or as or10 } from "drizzle-orm";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql17 } from "drizzle-orm";
+import { sql as sql18 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -16234,7 +16448,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         title,
@@ -16250,7 +16464,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         track_id AS "trackId",
@@ -16265,7 +16479,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         module_id AS "moduleId",
@@ -16282,7 +16496,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql17`
+    userId ? db.execute(sql18`
           SELECT
             id,
             user_id AS "userId",
@@ -16384,7 +16598,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql17`
+  const lessonResult = await db.execute(sql18`
     SELECT
       id,
       module_id AS "moduleId",
@@ -16406,7 +16620,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql17`
+  const sectionsResult = await db.execute(sql18`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -16445,7 +16659,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql17`
+    const progressResult = await db.execute(sql18`
       SELECT
         id,
         user_id AS "userId",
@@ -16481,7 +16695,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql17`
+  const result = await db.execute(sql18`
     SELECT
       id,
       user_id AS "userId",
@@ -16498,7 +16712,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql17`
+  const result = await db.execute(sql18`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -16519,7 +16733,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -16531,7 +16745,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16596,7 +16810,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql17`
+        ...totalSections > 0 ? (await db.execute(sql18`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -16605,7 +16819,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -16617,7 +16831,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16686,7 +16900,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -16698,7 +16912,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16753,7 +16967,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql17`
+  const query = trackId ? sql18`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16771,7 +16985,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql17`
+      ` : sql18`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16869,6 +17083,7 @@ async function registerRoutes(app2) {
   app2.get("/api/csrf-token", getCsrfToken);
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
   app2.use("/api/password-reset", passwordResetRateLimiter, router3);
+  app2.use("/api/whatsapp", whatsapp_api_default);
   app2.use("/api/questionnaires", csrfProtection, questionnaires_default);
   app2.use("/api/questionnaires/admin", csrfProtection, questionnaireAdmin_default);
   app2.use("/api/schedules", csrfProtection, schedules_default);
@@ -17085,7 +17300,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq27(users.id, userId));
+      }).from(users).where(eq28(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -17284,25 +17499,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq27(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
         const [substitutionCheck] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-          eq27(substitutionRequests.requesterId, userId),
-          eq27(substitutionRequests.substituteId, userId)
+          eq28(substitutionRequests.requesterId, userId),
+          eq28(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -17339,12 +17554,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq27(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-            eq27(substitutionRequests.requesterId, userId),
-            eq27(substitutionRequests.substituteId, userId)
+            eq28(substitutionRequests.requesterId, userId),
+            eq28(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17373,12 +17588,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq27(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-            eq27(substitutionRequests.requesterId, userId),
-            eq27(substitutionRequests.substituteId, userId)
+            eq28(substitutionRequests.requesterId, userId),
+            eq28(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17824,7 +18039,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull2, and: and20 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull2, and: and21 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -17832,8 +18047,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and20(
-          eq27(substitutionRequests.status, "pending"),
+        and21(
+          eq28(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -17845,8 +18060,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and20(
-          eq27(substitutionRequests.status, "pending"),
+        and21(
+          eq28(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );

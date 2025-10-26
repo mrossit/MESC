@@ -2,6 +2,17 @@
 
 This is a comprehensive church management system called MESC (Ministros Extraordinários da Sagrada Comunhão) for the Santuário São Judas Tadeu in Sorocaba, Brazil. The system manages extraordinary ministers of Holy Communion, handling scheduling, availability tracking, formation courses, and communication between coordinators and ministers. It serves approximately 150 active ministers with different user roles (gestor, coordenador, ministro) and provides features like automated schedule generation, questionnaire-based availability collection, and ministry management.
 
+# Recent Changes
+
+## WhatsApp API Integration (October 26, 2025)
+Added REST API for WhatsApp integration via Make (Integromat) + OpenAI:
+- **Feature**: 3 endpoints for schedule queries using phone number as identifier
+- **Routes**: `/api/whatsapp/escala`, `/api/whatsapp/proximas`, `/api/whatsapp/colegas`
+- **Security**: API key authentication (no CSRF needed, stateless)
+- **Files**: `server/routes/whatsapp-api.ts`, `docs/WHATSAPP_API.md`
+- **Environment**: Requires `WHATSAPP_API_KEY` secret to be configured
+- **Use Case**: Allows ministers to query schedules via WhatsApp chatbot
+
 # Recent Critical Fixes
 
 ## Version 5.4.2 - Force Cache Clear (October 23, 2025)
