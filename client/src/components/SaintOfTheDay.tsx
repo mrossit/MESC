@@ -1,6 +1,6 @@
 /**
- * Saint of the Day Component
- * Displays the saint(s) being celebrated today with their feast day information
+ * Daily Liturgy Component
+ * Displays the daily liturgy from Padre Paulo Ricardo website
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -74,8 +74,8 @@ export function SaintOfTheDay() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Santo do Dia
+            <BookOpen className="h-5 w-5" />
+            Liturgia do Dia
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -90,17 +90,17 @@ export function SaintOfTheDay() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Santo do Dia
+            <BookOpen className="h-5 w-5" />
+            Liturgia do Dia
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-4 text-center">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
-              <Sparkles className="h-6 w-6 text-orange-500/70" />
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-2">
+              <BookOpen className="h-6 w-6 text-blue-500/70" />
             </div>
             <p className="text-sm text-muted-foreground">
-              {error ? 'Erro ao carregar santo do dia' : 'Carregando santo do dia...'}
+              {error ? 'Erro ao carregar liturgia' : 'Carregando liturgia...'}
             </p>
             {error && (
               <p className="text-xs text-red-500 mt-2">
@@ -120,8 +120,8 @@ export function SaintOfTheDay() {
     <Card className="overflow-hidden">
       <CardHeader className={`pb-3 ${colorStyles[primarySaint.liturgicalColor]}`}>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5" />
-          Santo do Dia
+          <BookOpen className="h-5 w-5" />
+          Liturgia do Dia
         </CardTitle>
         <CardDescription className={primarySaint.liturgicalColor === 'black' || primarySaint.liturgicalColor === 'purple' ? 'text-gray-200' : 'text-gray-600'}>
           {new Date().toLocaleDateString('pt-BR', {
