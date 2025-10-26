@@ -16,46 +16,106 @@ const router = Router();
  */
 router.get('/today', async (req, res) => {
   try {
-    // Tentar buscar do site Canção Nova primeiro
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const feastDay = `${month}-${day}`;
+
+    console.log(`[SAINTS API] Buscando santo do dia: ${day}/${month}`);
+
+    // Primeiro: tentar buscar do banco de dados local
+    const saintsToday = await db
+      .select()
+      .from(saints)
+      .where(eq(saints.feastDay, feastDay))
+      .orderBy(saints.rank);
+
+    if (saintsToday.length > 0) {
+      console.log(`[SAINTS API] Encontrados ${saintsToday.length} santos no banco local`);
+      return res.json({
+        success: true,
+        data: {
+          date: today.toISOString().split('T')[0],
+          feastDay,
+          saints: saintsToday,
+          source: 'database'
+        },
+      });
+    }
+
+    console.log('[SAINTS API] Nenhum santo encontrado no banco, tentando Canção Nova...');
+
+    // Segundo: tentar buscar do site Canção Nova
     try {
-      const today = new Date();
-      const day = String(today.getDate()).padStart(2, '0');
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-
-      // URL do Canção Nova para o santo do dia
       const cancaoNovaUrl = `https://santo.cancaonova.com/`;
+      console.log(`[SAINTS API] Fazendo fetch de ${cancaoNovaUrl}`);
 
-      const response = await fetch(cancaoNovaUrl);
-      const html = await response.text();
-
-      // Parse básico do HTML para extrair informações do santo
-      // O site usa uma estrutura específica que precisamos adaptar
-      const saintNameMatch = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i);
-      const contentMatch = html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-
-      if (saintNameMatch) {
-        const saintName = saintNameMatch[1].trim();
-        let biography = '';
-
-        if (contentMatch) {
-          // Extrair os primeiros parágrafos como biografia
-          const paragraphs = contentMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
-          if (paragraphs && paragraphs.length > 0) {
-            // Pegar os primeiros 3 parágrafos e limpar HTML tags
-            biography = paragraphs
-              .slice(0, 3)
-              .map(p => p.replace(/<[^>]+>/g, '').trim())
-              .filter(p => p.length > 0)
-              .join('\n\n');
-          }
+      const response = await fetch(cancaoNovaUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const html = await response.text();
+      console.log(`[SAINTS API] HTML recebido, tamanho: ${html.length} caracteres`);
+
+      // Tentar múltiplos padrões de parsing
+      let saintName = null;
+      let biography = '';
+
+      // Padrão 1: h1 com class entry-title
+      let match = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i);
+      if (match) {
+        saintName = match[1].trim();
+        console.log(`[SAINTS API] Santo encontrado (padrão 1): ${saintName}`);
+      }
+
+      // Padrão 2: h1 com itemprop="headline"
+      if (!saintName) {
+        match = html.match(/<h1[^>]*itemprop="headline"[^>]*>([^<]+)<\/h1>/i);
+        if (match) {
+          saintName = match[1].trim();
+          console.log(`[SAINTS API] Santo encontrado (padrão 2): ${saintName}`);
+        }
+      }
+
+      // Padrão 3: qualquer h1
+      if (!saintName) {
+        match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+        if (match) {
+          saintName = match[1].trim();
+          console.log(`[SAINTS API] Santo encontrado (padrão 3): ${saintName}`);
+        }
+      }
+
+      // Extrair biografia
+      const contentMatch = html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]{0,5000})<\/div>/i);
+      if (contentMatch) {
+        const paragraphs = contentMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+        if (paragraphs && paragraphs.length > 0) {
+          biography = paragraphs
+            .slice(0, 3)
+            .map(p => p.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim())
+            .filter(p => p.length > 20) // Filtrar parágrafos muito curtos
+            .join('\n\n');
+        }
+      }
+
+      if (saintName) {
+        // Limpar o nome (remover possíveis tags HTML residuais)
+        saintName = saintName.replace(/<[^>]+>/g, '').trim();
 
         const cancaoNovaSaint = {
           id: `cancao-nova-${day}-${month}`,
           name: saintName,
           feastDay: `${month}-${day}`,
-          biography: biography || 'Informações disponíveis em santo.cancaonova.com',
-          isBrazilian: false,
+          biography: biography || `Celebração do dia ${day}/${month}. Mais informações em santo.cancaonova.com`,
+          isBrazilian: saintName.toLowerCase().includes('frei galvão') ||
+                       saintName.toLowerCase().includes('santo antônio de santana galvão'),
           rank: 'MEMORIAL' as const,
           liturgicalColor: 'white' as const,
           title: undefined,
@@ -68,6 +128,7 @@ router.get('/today', async (req, res) => {
           quotes: undefined,
         };
 
+        console.log(`[SAINTS API] Retornando santo do Canção Nova: ${saintName}`);
         return res.json({
           success: true,
           data: {
@@ -77,34 +138,56 @@ router.get('/today', async (req, res) => {
             source: 'cancaonova'
           },
         });
+      } else {
+        console.log('[SAINTS API] Nenhum santo encontrado no HTML do Canção Nova');
       }
     } catch (cancaoNovaError) {
-      console.log('Erro ao buscar do Canção Nova, usando banco de dados local:', cancaoNovaError);
+      console.error('[SAINTS API] Erro ao buscar do Canção Nova:', cancaoNovaError);
     }
 
-    // Fallback: buscar do banco de dados local
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const feastDay = `${month}-${day}`;
+    // Terceiro: fallback para santo padrão baseado na data
+    // 25 de outubro = Frei Galvão
+    const defaultSaints: Record<string, any> = {
+      '10-25': {
+        id: 'default-10-25',
+        name: 'Santo Antônio de Santana Galvão (Frei Galvão)',
+        feastDay: '10-25',
+        biography: 'Frei Galvão (1739-1822) foi o primeiro santo brasileiro canonizado pela Igreja Católica. Nascido em Guaratinguetá, São Paulo, foi ordenado sacerdote franciscano e fundou o Recolhimento de Santa Clara. É conhecido por sua humildade, caridade e pelos milagres atribuídos a ele, especialmente relacionados às "pílulas de Frei Galvão", que ajudavam mulheres em trabalho de parto.',
+        isBrazilian: true,
+        rank: 'MEMORIAL' as const,
+        liturgicalColor: 'white' as const,
+        title: 'Sacerdote Franciscano',
+        patronOf: 'Arquidiocese de Aparecida, mulheres grávidas',
+      }
+    };
 
-    const saintsToday = await db
-      .select()
-      .from(saints)
-      .where(eq(saints.feastDay, feastDay))
-      .orderBy(saints.rank); // SOLEMNITY first, then FEAST, etc.
+    const defaultSaint = defaultSaints[feastDay];
+    if (defaultSaint) {
+      console.log(`[SAINTS API] Usando santo padrão: ${defaultSaint.name}`);
+      return res.json({
+        success: true,
+        data: {
+          date: today.toISOString().split('T')[0],
+          feastDay,
+          saints: [defaultSaint],
+          source: 'default'
+        },
+      });
+    }
 
+    // Último recurso: retornar vazio
+    console.log('[SAINTS API] Nenhum santo encontrado em nenhuma fonte');
     res.json({
       success: true,
       data: {
         date: today.toISOString().split('T')[0],
         feastDay,
-        saints: saintsToday,
-        source: 'database'
+        saints: [],
+        source: 'none'
       },
     });
   } catch (error) {
-    console.error('Error fetching saints of the day:', error);
+    console.error('[SAINTS API] Error fetching saints of the day:', error);
     res.status(500).json({
       success: false,
       message: 'Erro ao buscar santos do dia',
