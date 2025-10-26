@@ -13,6 +13,7 @@ const Approvals = lazy(() => import('@/pages/approvals'));
 const Schedules = lazy(() => import('@/pages/Schedules'));
 const Formation = lazy(() => import('@/pages/formation'));
 const FormationAdmin = lazy(() => import('@/pages/FormationAdmin'));
+const Liturgy = lazy(() => import('@/pages/liturgy'));
 const QuestionnaireUnified = lazy(() => import('@/pages/QuestionnaireUnified'));
 const QuestionnaireResponses = lazy(() => import('@/pages/QuestionnaireResponses'));
 const AutoScheduleGeneration = lazy(() => import('@/pages/AutoScheduleGeneration'));
@@ -128,6 +129,13 @@ export const routes: RouteConfig[] = [
     title: 'Formação',
     showInMenu: true,
     icon: 'GraduationCap'
+  },
+  {
+    path: '/liturgia',
+    component: Liturgy,
+    requiresAuth: true,
+    title: 'Liturgia do Dia',
+    showInMenu: false
   },
   {
     path: '/formation-admin',
