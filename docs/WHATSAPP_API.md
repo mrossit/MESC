@@ -31,6 +31,8 @@ X-API-Key: sua-chave-super-segura-aqui
 
 ## 📡 Endpoints
 
+Total de **7 endpoints** disponíveis para consulta e gestão de escalas e substituições.
+
 ### Base URL
 - **Desenvolvimento**: `http://localhost:5000/api/whatsapp`
 - **Produção**: `https://saojudastadeu.replit.app/api/whatsapp`
@@ -209,7 +211,184 @@ Retorna todos os ministros escalados em uma missa específica.
 
 ---
 
-### 4️⃣ Health Check
+### 4️⃣ Substituições em Aberto
+
+Retorna lista de substituições disponíveis para aceite.
+
+**Endpoint:** `GET /api/whatsapp/substituicoes-abertas`
+
+**Query Parameters (opcionais):**
+- `limite`: número de resultados (padrão 5, máximo 20)
+
+**Exemplo de URL:**
+```
+/api/whatsapp/substituicoes-abertas?limite=10
+```
+
+**Resposta (Com Vagas):**
+```json
+{
+  "encontrado": true,
+  "totalVagas": 3,
+  "vagas": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "data": "27/10/2025",
+      "diaSemana": "Domingo",
+      "horario": "09:00",
+      "funcao": "Auxiliar 3",
+      "local": "Santuário São Judas Tadeu",
+      "ministroOriginal": "João da Silva",
+      "telefoneOriginal": "19998887766",
+      "motivo": "Viagem",
+      "urgencia": "Média",
+      "dataPublicacao": "25/10/2025"
+    },
+    {
+      "id": "b2c3d4e5-f6g7-8901-bcde-f12345678901",
+      "data": "03/11/2025",
+      "diaSemana": "Domingo",
+      "horario": "19:00",
+      "funcao": "Auxiliar 2",
+      "local": "Santuário São Judas Tadeu",
+      "ministroOriginal": "Maria Santos",
+      "telefoneOriginal": "19997776655",
+      "motivo": "Compromisso familiar",
+      "urgencia": "Alta",
+      "dataPublicacao": "26/10/2025"
+    }
+  ]
+}
+```
+
+**Resposta (Sem Vagas):**
+```json
+{
+  "encontrado": false,
+  "totalVagas": 0,
+  "vagas": [],
+  "mensagem": "Não há substituições disponíveis no momento."
+}
+```
+
+---
+
+### 5️⃣ Aceitar Substituição
+
+Permite que um ministro aceite uma substituição via WhatsApp. A substituição fica com status "pending" aguardando aprovação do coordenador.
+
+**Endpoint:** `POST /api/whatsapp/aceitar-substituicao`
+
+**Body:**
+```json
+{
+  "telefone": "19998887766",
+  "id_substituicao": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "mensagem": "Posso substituir, sem problemas!"
+}
+```
+
+**Observações:**
+- `mensagem`: Campo opcional para o substituto enviar uma mensagem ao coordenador
+
+**Resposta (Sucesso):**
+```json
+{
+  "sucesso": true,
+  "substituto": "Pedro Oliveira",
+  "data": "27/10/2025",
+  "diaSemana": "Domingo",
+  "horario": "09:00",
+  "funcao": "Auxiliar 3",
+  "ministroOriginal": "João da Silva",
+  "mensagem": "Substituição aceita com sucesso! Aguarde a aprovação do coordenador.",
+  "proximoPasso": "O coordenador será notificado e aprovará sua substituição em breve."
+}
+```
+
+**Resposta (Substituição Já Preenchida):**
+```json
+{
+  "sucesso": false,
+  "mensagem": "Esta substituição já foi aceita e aguarda aprovação."
+}
+```
+
+**Resposta (Tentando Substituir a Si Mesmo):**
+```json
+{
+  "sucesso": false,
+  "mensagem": "Você não pode aceitar sua própria substituição."
+}
+```
+
+---
+
+### 6️⃣ Minhas Substituições
+
+Retorna as substituições solicitadas ou aceitas pelo ministro.
+
+**Endpoint:** `POST /api/whatsapp/minhas-substituicoes`
+
+**Body:**
+```json
+{
+  "telefone": "19998887766",
+  "tipo": "todas"
+}
+```
+
+**Observações:**
+- `tipo`: Pode ser `"solicitadas"`, `"aceitas"` ou `"todas"` (padrão)
+
+**Resposta (Com Substituições):**
+```json
+{
+  "encontrado": true,
+  "ministro": "João da Silva",
+  "totalSubstituicoes": 2,
+  "substituicoes": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "data": "27/10/2025",
+      "diaSemana": "Domingo",
+      "horario": "09:00",
+      "funcao": "Auxiliar 3",
+      "local": "Santuário São Judas Tadeu",
+      "ministroOriginal": "João da Silva",
+      "status": "Aguardando Aprovação",
+      "motivo": "Viagem",
+      "urgencia": "Média",
+      "mensagem": "Pedro aceitou substituir"
+    },
+    {
+      "id": "b2c3d4e5-f6g7-8901-bcde-f12345678901",
+      "data": "20/10/2025",
+      "diaSemana": "Domingo",
+      "horario": "19:00",
+      "funcao": "Auxiliar 1",
+      "local": "Santuário São Judas Tadeu",
+      "ministroOriginal": "Maria Santos",
+      "status": "Aprovada",
+      "motivo": "Doença",
+      "urgencia": "Crítica",
+      "mensagem": "Substituição emergencial"
+    }
+  ]
+}
+```
+
+**Status Possíveis:**
+- `Disponível` - Aguardando substituto
+- `Aguardando Aprovação` - Substituto aceito, aguarda coordenador
+- `Aprovada` - Coordenador aprovou
+- `Rejeitada` - Coordenador rejeitou
+- `Cancelada` - Ministro cancelou a solicitação
+- `Auto-aprovada` - Aprovação automática pelo sistema
+
+---
+
+### 7️⃣ Health Check
 
 Verifica se a API está funcionando.
 
@@ -332,6 +511,22 @@ Identifique a intenção:
 
 ---
 
+## 🔄 Fluxo Completo de Substituição via WhatsApp
+
+### Cenário: Ministro Pede Substituição
+
+1. **Ministro solicita substituição** no sistema web
+2. **Sistema cria substituição** com status `available`
+3. **Chatbot WhatsApp consulta vagas** via `/substituicoes-abertas`
+4. **OpenAI formata lista** de vagas disponíveis
+5. **Ministro substituto aceita** via `/aceitar-substituicao`
+6. **Status muda para `pending`** (aguardando coordenador)
+7. **Coordenador aprova** no sistema web
+8. **Status muda para `approved`** (confirmado)
+9. **Substituto recebe confirmação** via WhatsApp
+
+---
+
 ## 📊 Testando a API
 
 ### Com cURL:
@@ -357,6 +552,22 @@ curl -X POST https://saojudastadeu.replit.app/api/whatsapp/colegas \
   -H "X-API-Key: sua-chave-aqui" \
   -H "Content-Type: application/json" \
   -d '{"data":"2025-10-27","horario":"09:00"}'
+
+# Listar substituições abertas
+curl -X GET 'https://saojudastadeu.replit.app/api/whatsapp/substituicoes-abertas?limite=5' \
+  -H "X-API-Key: sua-chave-aqui"
+
+# Aceitar uma substituição
+curl -X POST https://saojudastadeu.replit.app/api/whatsapp/aceitar-substituicao \
+  -H "X-API-Key: sua-chave-aqui" \
+  -H "Content-Type: application/json" \
+  -d '{"telefone":"19998887766","id_substituicao":"a1b2c3d4-1234-5678-90ab-cdef12345678","mensagem":"Posso substituir!"}'
+
+# Consultar minhas substituições
+curl -X POST https://saojudastadeu.replit.app/api/whatsapp/minhas-substituicoes \
+  -H "X-API-Key: sua-chave-aqui" \
+  -H "Content-Type: application/json" \
+  -d '{"telefone":"19998887766","tipo":"todas"}'
 ```
 
 ### Com Postman:
