@@ -85,7 +85,7 @@ export function SaintOfTheDay() {
     );
   }
 
-  if (error || !data?.success || data.data.saints.length === 0) {
+  if (error || !data?.success || !data?.data?.saints || data.data.saints.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -95,9 +95,19 @@ export function SaintOfTheDay() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Nenhum santo encontrado para hoje.
-          </p>
+          <div className="flex flex-col items-center justify-center py-4 text-center">
+            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
+              <Sparkles className="h-6 w-6 text-orange-500/70" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {error ? 'Erro ao carregar santo do dia' : 'Carregando santo do dia...'}
+            </p>
+            {error && (
+              <p className="text-xs text-red-500 mt-2">
+                Tente novamente mais tarde
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
