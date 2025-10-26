@@ -148,20 +148,32 @@ router.get('/today', async (req, res) => {
         }
       }
 
-      // Extrair texto da primeira leitura
+      // Extrair texto COMPLETO da primeira leitura (sem limite)
       if (firstReading.reference) {
-        const firstTextMatch = html.match(new RegExp(
-          firstReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-          '[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,2000}?)(?:<\\/[pdiv]|<h[2-4]|1[ªa°]?\\s*Leitura)',
-          'i'
-        ));
-        if (firstTextMatch) {
-          firstReading.text = firstTextMatch[1]
-            .replace(/<[^>]+>/g, '')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 1500);
+        const escapedRef = firstReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Tenta múltiplos padrões para pegar o texto completo
+        const firstTextPatterns = [
+          new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Salmo|2[ªa°]?\\s*Leitura|Evangelho)', 'i'),
+          new RegExp('Primeira\\s+Leitura[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Salmo)', 'i'),
+          new RegExp('<div[^>]*primeira[^>]*leitura[^>]*>([\\s\\S]{100,15000}?)(?:<\\/div>.*?<h[2-4]|Salmo)', 'i')
+        ];
+
+        for (const pattern of firstTextPatterns) {
+          const match = html.match(pattern);
+          if (match && match[1].length > 50) {
+            firstReading.text = match[1]
+              .replace(/<[^>]+>/g, '')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/&quot;/g, '"')
+              .replace(/&ldquo;/g, '"')
+              .replace(/&rdquo;/g, '"')
+              .replace(/&mdash;/g, '—')
+              .replace(/&ndash;/g, '–')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (firstReading.text.length > 100) break;
+          }
         }
       }
 
@@ -176,19 +188,28 @@ router.get('/today', async (req, res) => {
         if (match && match[1].length > 3) {
           secondReading.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
 
-          // Extrair texto da segunda leitura
-          const secondTextMatch = html.match(new RegExp(
-            secondReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-            '[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,2000}?)(?:<\\/[pdiv]|<h[2-4]|Evangelho)',
-            'i'
-          ));
-          if (secondTextMatch) {
-            secondReading.text = secondTextMatch[1]
-              .replace(/<[^>]+>/g, '')
-              .replace(/&nbsp;/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .substring(0, 1500);
+          // Extrair texto COMPLETO da segunda leitura
+          const escapedRef = secondReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const secondTextPatterns = [
+            new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Evangelho|Salmo)', 'i'),
+            new RegExp('Segunda\\s+Leitura[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Evangelho)', 'i')
+          ];
+
+          for (const pattern of secondTextPatterns) {
+            const match = html.match(pattern);
+            if (match && match[1].length > 50) {
+              secondReading.text = match[1]
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&quot;/g, '"')
+                .replace(/&ldquo;/g, '"')
+                .replace(/&rdquo;/g, '"')
+                .replace(/&mdash;/g, '—')
+                .replace(/&ndash;/g, '–')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (secondReading.text.length > 100) break;
+            }
           }
           break;
         }
@@ -213,7 +234,8 @@ router.get('/today', async (req, res) => {
       const psalmResponsePatterns = [
         /(?:Respons[oó]rio|Refr[ãa]o)[:\s]*[–—-]?\s*([^<\n.]+)/i,
         /<[^>]*class="[^"]*respons[^"]*"[^>]*>([^<]+)/i,
-        /<em>([^<]{10,100})<\/em>/i  // Muitas vezes o refrão vem em itálico
+        /<em>([^<]{10,200})<\/em>/i,
+        /R\.\s*([^<\n]{10,200})/i
       ];
 
       for (const pattern of psalmResponsePatterns) {
@@ -221,6 +243,37 @@ router.get('/today', async (req, res) => {
         if (match && match[1].length > 8) {
           psalm.response = match[1].trim().replace(/\s+/g, ' ').replace(/[."]/g, '');
           break;
+        }
+      }
+
+      // Extrair texto COMPLETO do salmo
+      if (psalm.reference) {
+        const escapedRef = psalm.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const psalmTextPatterns = [
+          new RegExp(escapedRef + '[\\s\\S]{0,200}?(?:Respons|Refr)[\\s\\S]{0,150}?<[^>]*>([\\s\\S]{100,10000}?)(?:<h[2-4]|Evangelho|2[ªa°]?\\s*Leitura)', 'i'),
+          new RegExp('Salmo[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,200}?<[^>]*>([\\s\\S]{100,10000}?)(?:<h[2-4]|Evangelho)', 'i'),
+          new RegExp('<div[^>]*salmo[^>]*>([\\s\\S]{100,10000}?)(?:<\\/div>.*?<h[2-4]|Evangelho)', 'i')
+        ];
+
+        for (const pattern of psalmTextPatterns) {
+          const match = html.match(pattern);
+          if (match && match[1].length > 50) {
+            const psalmText = match[1]
+              .replace(/<[^>]+>/g, '')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/&quot;/g, '"')
+              .replace(/&ldquo;/g, '"')
+              .replace(/&rdquo;/g, '"')
+              .replace(/&mdash;/g, '—')
+              .replace(/&ndash;/g, '–')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+            if (psalmText.length > 100) {
+              psalm.text = psalmText;
+              break;
+            }
+          }
         }
       }
 
@@ -236,44 +289,61 @@ router.get('/today', async (req, res) => {
         if (match && match[1].length > 3) {
           gospel.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
 
-          // Extrair texto do evangelho
-          const gospelTextMatch = html.match(new RegExp(
-            gospel.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-            '[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,3000}?)(?:<\\/[pdiv]|<h[2-4]|Medita)',
-            'i'
-          ));
-          if (gospelTextMatch) {
-            gospel.text = gospelTextMatch[1]
-              .replace(/<[^>]+>/g, '')
-              .replace(/&nbsp;/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .substring(0, 2000);
+          // Extrair texto COMPLETO do evangelho
+          const escapedRef = gospel.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const gospelTextPatterns = [
+            new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,20000}?)(?:<h[2-4]|Medita|Reflex|Ora[çc][ãa]o)', 'i'),
+            new RegExp('Evangelho[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,20000}?)(?:<h[2-4]|Medita)', 'i'),
+            new RegExp('<div[^>]*evangelho[^>]*>([\\s\\S]{100,20000}?)(?:<\\/div>.*?<h[2-4]|Medita)', 'i')
+          ];
+
+          for (const pattern of gospelTextPatterns) {
+            const match = html.match(pattern);
+            if (match && match[1].length > 50) {
+              gospel.text = match[1]
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&quot;/g, '"')
+                .replace(/&ldquo;/g, '"')
+                .replace(/&rdquo;/g, '"')
+                .replace(/&mdash;/g, '—')
+                .replace(/&ndash;/g, '–')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (gospel.text.length > 100) break;
+            }
           }
           break;
         }
       }
 
-      // Extrair meditação/reflexão (preview)
+      // Extrair meditação/reflexão COMPLETA (sem limites)
       const meditationPatterns = [
-        /<div[^>]*class="[^"]*medita[çc][ãa]o[^"]*"[^>]*>([\s\S]{100,800}?)<\/div>/i,
-        /<div[^>]*class="[^"]*reflex[ãa]o[^"]*"[^>]*>([\s\S]{100,800}?)<\/div>/i,
-        /<article[^>]*class="[^"]*contempla[^"]*"[^>]*>([\s\S]{100,800}?)<\/article>/i,
-        /<p[^>]*class="[^"]*medita[^"]*"[^>]*>([^<]{100,500})<\/p>/i,
-        /(?:Medita[çc][ãa]o|Reflex[ãa]o)[:\s]*<[^>]*>([\s\S]{100,600}?)(?:<\/[pdiv]|<h[2-4])/i
+        /<div[^>]*class="[^"]*medita[çc][ãa]o[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
+        /<div[^>]*class="[^"]*reflex[ãa]o[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
+        /<article[^>]*class="[^"]*contempla[^"]*"[^>]*>([\s\S]{100,50000}?)<\/article>/i,
+        /<div[^>]*class="[^"]*texto[^"]*medita[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
+        /(?:Medita[çc][ãa]o|Reflex[ãa]o|Ora[çc][ãa]o)[:\s]*<[^>]*>([\s\S]{100,50000}?)(?:<\/article>|<\/section>|<div[^>]*class="[^"]*rodape)/i,
+        /<h[2-4][^>]*>(?:Medita[çc][ãa]o|Reflex[ãa]o)<\/h[2-4]>([\s\S]{100,50000}?)(?:<h[2-4]|<\/article>|<\/section>|<footer)/i
       ];
 
       for (const pattern of meditationPatterns) {
         const match = html.match(pattern);
-        if (match) {
+        if (match && match[1].length > 50) {
           homily = match[1]
             .replace(/<[^>]+>/g, '')
             .replace(/&nbsp;/g, ' ')
+            .replace(/&quot;/g, '"')
+            .replace(/&ldquo;/g, '"')
+            .replace(/&rdquo;/g, '"')
+            .replace(/&mdash;/g, '—')
+            .replace(/&ndash;/g, '–')
+            .replace(/&rsquo;/g, "'")
+            .replace(/&lsquo;/g, "'")
             .replace(/&[a-z]+;/g, ' ')
             .replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 500);
-          if (homily.length > 80) break;
+            .trim();
+          if (homily.length > 100) break;
         }
       }
 
@@ -301,11 +371,20 @@ router.get('/today', async (req, res) => {
           responsorialPsalm: psalm.reference ? psalm : undefined,
           gospel: gospel.reference ? gospel : undefined,
           attributes: undefined,
-          quotes: homily ? [homily.substring(0, 200) + '...'] : undefined,
+          quotes: homily ? [homily.substring(0, 250)] : undefined,
         };
 
         console.log(`[LITURGY API] Liturgia encontrada: ${liturgyData.name}`);
-        console.log(`[LITURGY API] Leituras: 1ª=${firstReading.reference}, 2ª=${secondReading.reference || 'N/A'}, Salmo=${psalm.reference}, Ev=${gospel.reference}`);
+        console.log(`[LITURGY API] Leituras extraídas:`);
+        console.log(`  - 1ª Leitura: ${firstReading.reference} (${firstReading.text ? firstReading.text.length + ' chars' : 'sem texto'})`);
+        if (secondReading.reference) {
+          console.log(`  - 2ª Leitura: ${secondReading.reference} (${secondReading.text ? secondReading.text.length + ' chars' : 'sem texto'})`);
+        }
+        console.log(`  - Salmo: ${psalm.reference} (${psalm.text ? psalm.text.length + ' chars' : 'sem texto'})`);
+        console.log(`  - Evangelho: ${gospel.reference} (${gospel.text ? gospel.text.length + ' chars' : 'sem texto'})`);
+        if (homily) {
+          console.log(`  - Meditação: ${homily.length} chars`);
+        }
 
         return res.json({
           success: true,
@@ -386,7 +465,7 @@ function getRankLabel(rank: string): string {
 function createRichLiturgyDescription(
   firstReading: { reference: string; text?: string },
   secondReading: { reference: string; text?: string },
-  psalm: { reference: string; response?: string },
+  psalm: { reference: string; response?: string; text?: string },
   gospel: { reference: string; text?: string },
   meditation?: string
 ): string {
@@ -413,6 +492,9 @@ function createRichLiturgyDescription(
     if (psalm.response) {
       psalmText += `\n\n_Refrão: "${psalm.response}"_`;
     }
+    if (psalm.text) {
+      psalmText += `\n\n${psalm.text}`;
+    }
     parts.push(psalmText);
   }
 
@@ -425,15 +507,14 @@ function createRichLiturgyDescription(
   }
 
   if (meditation) {
-    parts.push(`\n💬 **Meditação**\n${meditation}...`);
+    parts.push(`\n💬 **Meditação**\n${meditation}`);
   }
 
   if (parts.length > 0) {
-    parts.push(`\n🔗 **Acesse o conteúdo completo:**\nhttps://www.paulus.com.br/portal/liturgia-diaria/`);
     return parts.join('\n\n');
   }
 
-  return 'Consulte www.paulus.com.br/portal/liturgia-diaria/ para as leituras completas e reflexões do dia.';
+  return 'Liturgia do dia. Para mais informações, visite: https://www.paulus.com.br/portal/liturgia-diaria/';
 }
 
 /**
