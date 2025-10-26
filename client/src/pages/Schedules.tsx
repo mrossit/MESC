@@ -1604,13 +1604,9 @@ export default function Schedules() {
                       onClick={() => {
                         setSelectedDate(day);
                         
-                        // Se a escala está publicada, abre modal de visualização
-                        if (currentSchedule?.status === "published") {
+                        // Para escalas publicadas ou rascunho, sempre abre visualização/edição das escalas do dia
+                        if (currentSchedule?.status === "published" || (isCoordinator && currentSchedule?.status === "draft")) {
                           fetchScheduleForDate(day);
-                        } 
-                        // Se é coordenador e escala está em rascunho, abre modal de edição
-                        else if (isCoordinator && currentSchedule && currentSchedule.status === "draft") {
-                          setIsAssignmentDialogOpen(true);
                         }
                       }}>
                       {/* Badge especial quando usuário está escalado */}
