@@ -15265,178 +15265,142 @@ function getMonthName2(month) {
 }
 router20.get("/today", async (req, res) => {
   try {
-    const today = /* @__PURE__ */ new Date();
-    const day = String(today.getDate()).padStart(2, "0");
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const feastDay = `${month}-${day}`;
-    console.log(`[SAINTS API] Buscando santo do dia: ${day}/${month}`);
-    const saintsToday = await db.select().from(saints).where(eq25(saints.feastDay, feastDay)).orderBy(saints.rank);
-    if (saintsToday.length > 0) {
-      console.log(`[SAINTS API] Encontrados ${saintsToday.length} santos no banco local`);
-      return res.json({
-        success: true,
-        data: {
-          date: today.toISOString().split("T")[0],
-          feastDay,
-          saints: saintsToday,
-          source: "database"
-        }
-      });
-    }
-    console.log("[SAINTS API] Nenhum santo encontrado no banco, tentando Can\xE7\xE3o Nova...");
+    console.log("[LITURGY API] Buscando liturgia do dia...");
     try {
-      const cancaoNovaUrl = `https://santo.cancaonova.com/`;
-      console.log(`[SAINTS API] Fazendo fetch de ${cancaoNovaUrl}`);
-      const response = await fetch(cancaoNovaUrl, {
+      const liturgyUrl = "https://padrepauloricardo.org/liturgia";
+      console.log(`[LITURGY API] Fazendo fetch de ${liturgyUrl}`);
+      const response = await fetch(liturgyUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const html = await response.text();
-      console.log(`[SAINTS API] HTML recebido, tamanho: ${html.length} caracteres`);
-      let saintName = null;
-      let biography = "";
-      let match = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i);
-      if (match) {
-        saintName = match[1].trim();
-        console.log(`[SAINTS API] Santo encontrado (padr\xE3o 1): ${saintName}`);
+      console.log(`[LITURGY API] HTML recebido, tamanho: ${html.length} caracteres`);
+      let liturgyTitle = null;
+      let liturgyColor = "white";
+      let firstReading = null;
+      let gospel = null;
+      let psalm = null;
+      const titleMatch = html.match(/<h1[^>]*class="[^"]*liturgy-title[^"]*"[^>]*>([^<]+)<\/h1>/i) || html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      if (titleMatch) {
+        liturgyTitle = titleMatch[1].trim().replace(/&nbsp;/g, " ").replace(/<[^>]+>/g, "");
       }
-      if (!saintName) {
-        match = html.match(/<h1[^>]*itemprop="headline"[^>]*>([^<]+)<\/h1>/i);
-        if (match) {
-          saintName = match[1].trim();
-          console.log(`[SAINTS API] Santo encontrado (padr\xE3o 2): ${saintName}`);
-        }
+      const colorMatch = html.match(/cor[^>]*litúrgica[^>]*:\s*([a-záéíóúâêôãõç]+)/i);
+      if (colorMatch) {
+        const colorMap = {
+          "verde": "green",
+          "branco": "white",
+          "vermelho": "red",
+          "roxo": "purple",
+          "rosa": "rose"
+        };
+        liturgyColor = colorMap[colorMatch[1].toLowerCase()] || "white";
       }
-      if (!saintName) {
-        match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-        if (match) {
-          saintName = match[1].trim();
-          console.log(`[SAINTS API] Santo encontrado (padr\xE3o 3): ${saintName}`);
-        }
+      const firstReadingMatch = html.match(/1[ªa]?\s*Leitura[^<]*<[^>]*>([^<]+)/i);
+      if (firstReadingMatch) {
+        firstReading = firstReadingMatch[1].trim();
       }
-      const contentMatch = html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]{0,5000})<\/div>/i);
-      if (contentMatch) {
-        const paragraphs = contentMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
-        if (paragraphs && paragraphs.length > 0) {
-          biography = paragraphs.slice(0, 3).map((p) => p.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim()).filter((p) => p.length > 20).join("\n\n");
-        }
+      const gospelMatch = html.match(/Evangelho[^<]*<[^>]*>([^<]+)/i);
+      if (gospelMatch) {
+        gospel = gospelMatch[1].trim();
       }
-      if (saintName) {
-        saintName = saintName.replace(/<[^>]+>/g, "").trim();
-        const cancaoNovaSaint = {
-          id: `cancao-nova-${day}-${month}`,
-          name: saintName,
-          feastDay: `${month}-${day}`,
-          biography: biography || `Celebra\xE7\xE3o do dia ${day}/${month}. Mais informa\xE7\xF5es em santo.cancaonova.com`,
-          isBrazilian: saintName.toLowerCase().includes("frei galv\xE3o") || saintName.toLowerCase().includes("santo ant\xF4nio de santana galv\xE3o"),
+      const psalmMatch = html.match(/Salmo[^<]*<[^>]*>([^<]+)/i);
+      if (psalmMatch) {
+        psalm = psalmMatch[1].trim();
+      }
+      if (liturgyTitle || firstReading || gospel) {
+        const today2 = /* @__PURE__ */ new Date();
+        const day2 = String(today2.getDate()).padStart(2, "0");
+        const month2 = String(today2.getMonth() + 1).padStart(2, "0");
+        const liturgyData = {
+          id: `liturgy-${day2}-${month2}`,
+          name: liturgyTitle || `Liturgia do dia ${day2}/${month2}`,
+          feastDay: `${month2}-${day2}`,
+          biography: createLiturgyDescription(firstReading, psalm, gospel),
+          isBrazilian: false,
           rank: "MEMORIAL",
-          liturgicalColor: "white",
-          title: void 0,
+          liturgicalColor: liturgyColor,
+          title: "Liturgia Di\xE1ria",
           patronOf: void 0,
           collectPrayer: void 0,
-          firstReading: void 0,
-          responsorialPsalm: void 0,
-          gospel: void 0,
+          firstReading: firstReading ? { reference: firstReading } : void 0,
+          responsorialPsalm: psalm ? { reference: psalm } : void 0,
+          gospel: gospel ? { reference: gospel } : void 0,
           attributes: void 0,
           quotes: void 0
         };
-        console.log(`[SAINTS API] Retornando santo do Can\xE7\xE3o Nova: ${saintName}`);
+        console.log(`[LITURGY API] Liturgia encontrada: ${liturgyData.name}`);
         return res.json({
           success: true,
           data: {
-            date: today.toISOString().split("T")[0],
-            feastDay: `${month}-${day}`,
-            saints: [cancaoNovaSaint],
-            source: "cancaonova"
+            date: today2.toISOString().split("T")[0],
+            feastDay: `${month2}-${day2}`,
+            saints: [liturgyData],
+            source: "padrepauloricardo"
           }
         });
-      } else {
-        console.log("[SAINTS API] Nenhum santo encontrado no HTML do Can\xE7\xE3o Nova");
       }
-    } catch (cancaoNovaError) {
-      console.error("[SAINTS API] Erro ao buscar do Can\xE7\xE3o Nova:", cancaoNovaError);
+    } catch (liturgyError) {
+      console.error("[LITURGY API] Erro ao buscar liturgia do Padre Paulo Ricardo:", liturgyError);
     }
-    const defaultSaints = {
-      "10-25": {
-        id: "default-10-25",
-        name: "Santo Ant\xF4nio de Santana Galv\xE3o (Frei Galv\xE3o)",
-        feastDay: "10-25",
-        biography: 'Frei Galv\xE3o (1739-1822) foi o primeiro santo brasileiro canonizado pela Igreja Cat\xF3lica. Nascido em Guaratinguet\xE1, S\xE3o Paulo, foi ordenado sacerdote franciscano e fundou o Recolhimento de Santa Clara. \xC9 conhecido por sua humildade, caridade e pelos milagres atribu\xEDdos a ele, especialmente relacionados \xE0s "p\xEDlulas de Frei Galv\xE3o", que ajudavam mulheres em trabalho de parto.',
-        isBrazilian: true,
-        rank: "MEMORIAL",
-        liturgicalColor: "white",
-        title: "Sacerdote Franciscano",
-        patronOf: "Arquidiocese de Aparecida, mulheres gr\xE1vidas"
-      },
-      "10-26": {
-        id: "default-10-26",
-        name: "Santo Evaristo",
-        feastDay: "10-26",
-        biography: "Santo Evaristo foi Papa e m\xE1rtir da Igreja Cat\xF3lica. Governou a Igreja de Roma durante o per\xEDodo de persegui\xE7\xF5es, aproximadamente entre os anos 97 e 105. \xC9 venerado como santo e m\xE1rtir pela Igreja Cat\xF3lica.",
-        isBrazilian: false,
-        rank: "OPTIONAL_MEMORIAL",
-        liturgicalColor: "red",
-        title: "Papa e M\xE1rtir",
-        patronOf: void 0
-      },
-      "10-12": {
-        id: "default-10-12",
-        name: "Nossa Senhora Aparecida",
-        feastDay: "10-12",
-        biography: "Nossa Senhora Aparecida \xE9 a padroeira do Brasil. Sua imagem foi encontrada por pescadores no Rio Para\xEDba do Sul em 1717. \xC9 venerada no Santu\xE1rio Nacional de Aparecida, um dos maiores santu\xE1rios marianos do mundo.",
-        isBrazilian: true,
-        rank: "SOLEMNITY",
-        liturgicalColor: "white",
-        title: "Padroeira do Brasil",
-        patronOf: "Brasil"
-      }
-    };
-    const defaultSaint = defaultSaints[feastDay];
-    if (defaultSaint) {
-      console.log(`[SAINTS API] Usando santo padr\xE3o: ${defaultSaint.name}`);
-      return res.json({
-        success: true,
-        data: {
-          date: today.toISOString().split("T")[0],
-          feastDay,
-          saints: [defaultSaint],
-          source: "default"
-        }
-      });
-    }
-    console.log("[SAINTS API] Usando santo gen\xE9rico");
-    const genericSaint = {
+    const today = /* @__PURE__ */ new Date();
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const feastDay = `${month}-${day}`;
+    console.log("[LITURGY API] Usando liturgia gen\xE9rica");
+    const genericLiturgy = {
       id: `generic-${feastDay}`,
-      name: `Santo do Dia ${day}/${month}`,
+      name: `Liturgia do Dia ${day}/${month}`,
       feastDay,
-      biography: `Hoje, dia ${day} de ${getMonthName2(parseInt(month))}, a Igreja celebra a mem\xF3ria dos santos e santas deste dia. Consulte o calend\xE1rio lit\xFArgico ou visite santo.cancaonova.com para mais informa\xE7\xF5es sobre as celebra\xE7\xF5es lit\xFArgicas de hoje.`,
+      biography: `Liturgia do dia ${day} de ${getMonthName2(parseInt(month))}. Visite padrepauloricardo.org/liturgia para ler as leituras completas e reflex\xF5es do dia.`,
       isBrazilian: false,
-      rank: "OPTIONAL_MEMORIAL",
-      liturgicalColor: "white",
-      title: void 0,
-      patronOf: void 0
+      rank: "MEMORIAL",
+      liturgicalColor: "green",
+      title: "Liturgia Di\xE1ria",
+      patronOf: void 0,
+      collectPrayer: void 0,
+      firstReading: void 0,
+      responsorialPsalm: void 0,
+      gospel: void 0,
+      attributes: void 0,
+      quotes: void 0
     };
     res.json({
       success: true,
       data: {
         date: today.toISOString().split("T")[0],
         feastDay,
-        saints: [genericSaint],
+        saints: [genericLiturgy],
         source: "generic"
       }
     });
   } catch (error) {
-    console.error("[SAINTS API] Error fetching saints of the day:", error);
+    console.error("[LITURGY API] Error fetching liturgy:", error);
     res.status(500).json({
       success: false,
-      message: "Erro ao buscar santos do dia"
+      message: "Erro ao buscar liturgia do dia"
     });
   }
 });
+function createLiturgyDescription(firstReading, psalm, gospel) {
+  const parts = [];
+  if (firstReading) {
+    parts.push(`\u{1F4D6} Primeira Leitura: ${firstReading}`);
+  }
+  if (psalm) {
+    parts.push(`\u{1F3B5} Salmo: ${psalm}`);
+  }
+  if (gospel) {
+    parts.push(`\u271D\uFE0F Evangelho: ${gospel}`);
+  }
+  if (parts.length > 0) {
+    return parts.join("\n\n") + "\n\nVisite padrepauloricardo.org/liturgia para ler as leituras completas e reflex\xF5es.";
+  }
+  return "Consulte padrepauloricardo.org/liturgia para as leituras do dia.";
+}
 router20.get("/date/:date", async (req, res) => {
   try {
     const dateStr = req.params.date;
