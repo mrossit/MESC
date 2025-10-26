@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sparkles, BookOpen, Heart, Calendar } from 'lucide-react';
+import { useLocation } from 'wouter';
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,8 @@ const colorStyles: Record<Saint['liturgicalColor'], string> = {
 };
 
 export function SaintOfTheDay() {
+  const [, setLocation] = useLocation();
+
   const { data, isLoading, error } = useQuery<SaintsOfDayResponse>({
     queryKey: ['/api/saints/today'],
     refetchOnWindowFocus: false,
@@ -117,13 +120,16 @@ export function SaintOfTheDay() {
   const primarySaint = saints[0];
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className={`pb-3 ${colorStyles[primarySaint.liturgicalColor]}`}>
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
+    <Card
+      className="overflow-hidden cursor-pointer hover:bg-accent/50 transition-colors border border-neutral-border/30 dark:border-border"
+      onClick={() => setLocation('/liturgia')}
+    >
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <BookOpen className="h-5 w-5 text-blue-500" />
           Liturgia do Dia
         </CardTitle>
-        <CardDescription className={primarySaint.liturgicalColor === 'black' || primarySaint.liturgicalColor === 'purple' ? 'text-gray-200' : 'text-gray-600'}>
+        <CardDescription>
           {new Date().toLocaleDateString('pt-BR', {
             weekday: 'long',
             day: 'numeric',

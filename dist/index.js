@@ -15266,12 +15266,18 @@ function getMonthName2(month) {
 router20.get("/today", async (req, res) => {
   try {
     console.log("[LITURGY API] Buscando liturgia do dia...");
+    const today = /* @__PURE__ */ new Date();
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const feastDay = `${month}-${day}`;
     try {
       const liturgyUrl = "https://padrepauloricardo.org/liturgia";
       console.log(`[LITURGY API] Fazendo fetch de ${liturgyUrl}`);
       const response = await fetch(liturgyUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
         }
       });
       if (!response.ok) {
@@ -15279,65 +15285,121 @@ router20.get("/today", async (req, res) => {
       }
       const html = await response.text();
       console.log(`[LITURGY API] HTML recebido, tamanho: ${html.length} caracteres`);
-      let liturgyTitle = null;
-      let liturgyColor = "white";
-      let firstReading = null;
-      let gospel = null;
-      let psalm = null;
-      const titleMatch = html.match(/<h1[^>]*class="[^"]*liturgy-title[^"]*"[^>]*>([^<]+)<\/h1>/i) || html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-      if (titleMatch) {
-        liturgyTitle = titleMatch[1].trim().replace(/&nbsp;/g, " ").replace(/<[^>]+>/g, "");
+      let liturgyTitle = "Liturgia do Dia";
+      let liturgyColor = "green";
+      let liturgyRank = "MEMORIAL";
+      let firstReading = { reference: "", text: "" };
+      let secondReading = { reference: "", text: "" };
+      let gospel = { reference: "", text: "" };
+      let psalm = { reference: "", response: "" };
+      let homily = "";
+      const titleMatches = [
+        html.match(/<h1[^>]*class="[^"]*celebration-title[^"]*"[^>]*>([^<]+)<\/h1>/i),
+        html.match(/<h2[^>]*class="[^"]*liturgy-title[^"]*"[^>]*>([^<]+)<\/h2>/i),
+        html.match(/<title>([^<]+Liturgia[^<]*)<\/title>/i)
+      ];
+      for (const match of titleMatches) {
+        if (match) {
+          liturgyTitle = match[1].trim().replace(/&nbsp;/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").replace(/Liturgia Diária - /i, "").replace(/Padre Paulo Ricardo/i, "").trim();
+          if (liturgyTitle.length > 10) break;
+        }
       }
-      const colorMatch = html.match(/cor[^>]*litúrgica[^>]*:\s*([a-záéíóúâêôãõç]+)/i);
-      if (colorMatch) {
-        const colorMap = {
-          "verde": "green",
-          "branco": "white",
-          "vermelho": "red",
-          "roxo": "purple",
-          "rosa": "rose"
-        };
-        liturgyColor = colorMap[colorMatch[1].toLowerCase()] || "white";
+      const colorPatterns = [
+        /cor\s+lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
+        /lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
+        /color[^>]*>([a-záéíóúâêôãõç]+)</i
+      ];
+      for (const pattern of colorPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const colorMap = {
+            "verde": "green",
+            "branco": "white",
+            "branca": "white",
+            "vermelho": "red",
+            "vermelha": "red",
+            "roxo": "purple",
+            "roxa": "purple",
+            "violeta": "purple",
+            "rosa": "rose"
+          };
+          liturgyColor = colorMap[match[1].toLowerCase()] || "green";
+          break;
+        }
       }
-      const firstReadingMatch = html.match(/1[ªa]?\s*Leitura[^<]*<[^>]*>([^<]+)/i);
+      if (html.match(/solenidade/i)) {
+        liturgyRank = "SOLEMNITY";
+      } else if (html.match(/festa/i)) {
+        liturgyRank = "FEAST";
+      } else if (html.match(/mem[oó]ria\s+obrigat[oó]ria/i)) {
+        liturgyRank = "MEMORIAL";
+      } else if (html.match(/mem[oó]ria/i)) {
+        liturgyRank = "OPTIONAL_MEMORIAL";
+      } else {
+        liturgyRank = "FERIAL";
+      }
+      const firstReadingMatch = html.match(/(?:1[ªa°]?\s*Leitura|Primeira\s+Leitura)[^<]*<[^>]*>([^<]+)/i);
       if (firstReadingMatch) {
-        firstReading = firstReadingMatch[1].trim();
+        firstReading.reference = firstReadingMatch[1].trim().replace(/\s+/g, " ");
+      }
+      const secondReadingMatch = html.match(/(?:2[ªa°]?\s*Leitura|Segunda\s+Leitura)[^<]*<[^>]*>([^<]+)/i);
+      if (secondReadingMatch) {
+        secondReading.reference = secondReadingMatch[1].trim().replace(/\s+/g, " ");
+      }
+      const psalmRefMatch = html.match(/(?:Salmo\s+Responsorial|Salmo)[^<]*<[^>]*>([^<]+)/i);
+      if (psalmRefMatch) {
+        psalm.reference = psalmRefMatch[1].trim().replace(/\s+/g, " ");
+      }
+      const psalmResponseMatch = html.match(/(?:Respons[oó]rio|Refrão)[^<]*<[^>]*>([^<]+)/i);
+      if (psalmResponseMatch) {
+        psalm.response = psalmResponseMatch[1].trim().replace(/\s+/g, " ").replace(/\.$/, "");
       }
       const gospelMatch = html.match(/Evangelho[^<]*<[^>]*>([^<]+)/i);
       if (gospelMatch) {
-        gospel = gospelMatch[1].trim();
+        gospel.reference = gospelMatch[1].trim().replace(/\s+/g, " ");
       }
-      const psalmMatch = html.match(/Salmo[^<]*<[^>]*>([^<]+)/i);
-      if (psalmMatch) {
-        psalm = psalmMatch[1].trim();
+      const homilyMatches = [
+        html.match(/<div[^>]*class="[^"]*homily[^"]*"[^>]*>([\s\S]{0,500})<\/div>/i),
+        html.match(/<article[^>]*class="[^"]*reflection[^"]*"[^>]*>([\s\S]{0,500})<\/article>/i),
+        html.match(/<p[^>]*class="[^"]*commentary[^"]*"[^>]*>([^<]{50,300})<\/p>/i)
+      ];
+      for (const match of homilyMatches) {
+        if (match) {
+          homily = match[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().substring(0, 300);
+          if (homily.length > 50) break;
+        }
       }
-      if (liturgyTitle || firstReading || gospel) {
-        const today2 = /* @__PURE__ */ new Date();
-        const day2 = String(today2.getDate()).padStart(2, "0");
-        const month2 = String(today2.getMonth() + 1).padStart(2, "0");
+      if (liturgyTitle.length > 10 || firstReading.reference || gospel.reference) {
         const liturgyData = {
-          id: `liturgy-${day2}-${month2}`,
-          name: liturgyTitle || `Liturgia do dia ${day2}/${month2}`,
-          feastDay: `${month2}-${day2}`,
-          biography: createLiturgyDescription(firstReading, psalm, gospel),
+          id: `liturgy-${day}-${month}`,
+          name: liturgyTitle,
+          feastDay,
+          biography: createRichLiturgyDescription(
+            firstReading,
+            secondReading,
+            psalm,
+            gospel,
+            homily
+          ),
           isBrazilian: false,
-          rank: "MEMORIAL",
+          rank: liturgyRank,
           liturgicalColor: liturgyColor,
-          title: "Liturgia Di\xE1ria",
+          title: getRankLabel(liturgyRank),
           patronOf: void 0,
-          collectPrayer: void 0,
-          firstReading: firstReading ? { reference: firstReading } : void 0,
-          responsorialPsalm: psalm ? { reference: psalm } : void 0,
-          gospel: gospel ? { reference: gospel } : void 0,
+          collectPrayer: homily || void 0,
+          firstReading: firstReading.reference ? firstReading : void 0,
+          responsorialPsalm: psalm.reference ? psalm : void 0,
+          gospel: gospel.reference ? gospel : void 0,
           attributes: void 0,
-          quotes: void 0
+          quotes: homily ? [homily.substring(0, 200) + "..."] : void 0
         };
         console.log(`[LITURGY API] Liturgia encontrada: ${liturgyData.name}`);
+        console.log(`[LITURGY API] Leituras: 1\xAA=${firstReading.reference}, Salmo=${psalm.reference}, Ev=${gospel.reference}`);
         return res.json({
           success: true,
           data: {
-            date: today2.toISOString().split("T")[0],
-            feastDay: `${month2}-${day2}`,
+            date: today.toISOString().split("T")[0],
+            feastDay,
             saints: [liturgyData],
             source: "padrepauloricardo"
           }
@@ -15346,18 +15408,25 @@ router20.get("/today", async (req, res) => {
     } catch (liturgyError) {
       console.error("[LITURGY API] Erro ao buscar liturgia do Padre Paulo Ricardo:", liturgyError);
     }
-    const today = /* @__PURE__ */ new Date();
-    const day = String(today.getDate()).padStart(2, "0");
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const feastDay = `${month}-${day}`;
     console.log("[LITURGY API] Usando liturgia gen\xE9rica");
+    const weekday = today.toLocaleDateString("pt-BR", { weekday: "long" });
+    const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
     const genericLiturgy = {
       id: `generic-${feastDay}`,
-      name: `Liturgia do Dia ${day}/${month}`,
+      name: `${weekdayCapitalized}, ${day} de ${getMonthName2(parseInt(month))}`,
       feastDay,
-      biography: `Liturgia do dia ${day} de ${getMonthName2(parseInt(month))}. Visite padrepauloricardo.org/liturgia para ler as leituras completas e reflex\xF5es do dia.`,
+      biography: `\u{1F4D6} Liturgia do dia ${day} de ${getMonthName2(parseInt(month))} de ${today.getFullYear()}.
+
+Para acessar as leituras completas, reflex\xF5es e homilia do dia, visite: https://padrepauloricardo.org/liturgia
+
+L\xE1 voc\xEA encontrar\xE1:
+\u2022 Primeira e Segunda Leituras
+\u2022 Salmo Responsorial
+\u2022 Evangelho do dia
+\u2022 Reflex\xE3o e coment\xE1rios
+\u2022 Homilia em \xE1udio e v\xEDdeo`,
       isBrazilian: false,
-      rank: "MEMORIAL",
+      rank: "FERIAL",
       liturgicalColor: "green",
       title: "Liturgia Di\xE1ria",
       patronOf: void 0,
@@ -15365,7 +15434,7 @@ router20.get("/today", async (req, res) => {
       firstReading: void 0,
       responsorialPsalm: void 0,
       gospel: void 0,
-      attributes: void 0,
+      attributes: ["Liturgia Di\xE1ria", "Padre Paulo Ricardo"],
       quotes: void 0
     };
     res.json({
@@ -15385,21 +15454,51 @@ router20.get("/today", async (req, res) => {
     });
   }
 });
-function createLiturgyDescription(firstReading, psalm, gospel) {
+function getRankLabel(rank) {
+  const labels = {
+    "SOLEMNITY": "Solenidade",
+    "FEAST": "Festa",
+    "MEMORIAL": "Mem\xF3ria",
+    "OPTIONAL_MEMORIAL": "Mem\xF3ria Facultativa",
+    "FERIAL": "Feria do Tempo Comum"
+  };
+  return labels[rank] || "Liturgia Di\xE1ria";
+}
+function createRichLiturgyDescription(firstReading, secondReading, psalm, gospel, homily) {
   const parts = [];
-  if (firstReading) {
-    parts.push(`\u{1F4D6} Primeira Leitura: ${firstReading}`);
+  if (firstReading.reference) {
+    parts.push(`\u{1F4D6} **Primeira Leitura**
+${firstReading.reference}`);
   }
-  if (psalm) {
-    parts.push(`\u{1F3B5} Salmo: ${psalm}`);
+  if (secondReading.reference) {
+    parts.push(`\u{1F4D6} **Segunda Leitura**
+${secondReading.reference}`);
   }
-  if (gospel) {
-    parts.push(`\u271D\uFE0F Evangelho: ${gospel}`);
+  if (psalm.reference) {
+    let psalmText = `\u{1F3B5} **Salmo Responsorial**
+${psalm.reference}`;
+    if (psalm.response) {
+      psalmText += `
+_"${psalm.response}"_`;
+    }
+    parts.push(psalmText);
+  }
+  if (gospel.reference) {
+    parts.push(`\u271D\uFE0F **Evangelho**
+${gospel.reference}`);
+  }
+  if (homily) {
+    parts.push(`
+\u{1F4AC} **Reflex\xE3o**
+${homily}...`);
   }
   if (parts.length > 0) {
-    return parts.join("\n\n") + "\n\nVisite padrepauloricardo.org/liturgia para ler as leituras completas e reflex\xF5es.";
+    parts.push(`
+\u{1F517} **Acesse o conte\xFAdo completo:**
+https://padrepauloricardo.org/liturgia`);
+    return parts.join("\n\n");
   }
-  return "Consulte padrepauloricardo.org/liturgia para as leituras do dia.";
+  return "Consulte padrepauloricardo.org/liturgia para as leituras completas e reflex\xF5es do dia.";
 }
 router20.get("/date/:date", async (req, res) => {
   try {
