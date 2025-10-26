@@ -15246,6 +15246,23 @@ init_schema();
 import { Router as Router20 } from "express";
 import { eq as eq25, sql as sql15, like, or as or8 } from "drizzle-orm";
 var router20 = Router20();
+function getMonthName2(month) {
+  const monthNames2 = [
+    "janeiro",
+    "fevereiro",
+    "mar\xE7o",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro"
+  ];
+  return monthNames2[month - 1] || "desconhecido";
+}
 router20.get("/today", async (req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
@@ -15354,6 +15371,28 @@ router20.get("/today", async (req, res) => {
         liturgicalColor: "white",
         title: "Sacerdote Franciscano",
         patronOf: "Arquidiocese de Aparecida, mulheres gr\xE1vidas"
+      },
+      "10-26": {
+        id: "default-10-26",
+        name: "Santo Evaristo",
+        feastDay: "10-26",
+        biography: "Santo Evaristo foi Papa e m\xE1rtir da Igreja Cat\xF3lica. Governou a Igreja de Roma durante o per\xEDodo de persegui\xE7\xF5es, aproximadamente entre os anos 97 e 105. \xC9 venerado como santo e m\xE1rtir pela Igreja Cat\xF3lica.",
+        isBrazilian: false,
+        rank: "OPTIONAL_MEMORIAL",
+        liturgicalColor: "red",
+        title: "Papa e M\xE1rtir",
+        patronOf: void 0
+      },
+      "10-12": {
+        id: "default-10-12",
+        name: "Nossa Senhora Aparecida",
+        feastDay: "10-12",
+        biography: "Nossa Senhora Aparecida \xE9 a padroeira do Brasil. Sua imagem foi encontrada por pescadores no Rio Para\xEDba do Sul em 1717. \xC9 venerada no Santu\xE1rio Nacional de Aparecida, um dos maiores santu\xE1rios marianos do mundo.",
+        isBrazilian: true,
+        rank: "SOLEMNITY",
+        liturgicalColor: "white",
+        title: "Padroeira do Brasil",
+        patronOf: "Brasil"
       }
     };
     const defaultSaint = defaultSaints[feastDay];
@@ -15369,14 +15408,25 @@ router20.get("/today", async (req, res) => {
         }
       });
     }
-    console.log("[SAINTS API] Nenhum santo encontrado em nenhuma fonte");
+    console.log("[SAINTS API] Usando santo gen\xE9rico");
+    const genericSaint = {
+      id: `generic-${feastDay}`,
+      name: `Santo do Dia ${day}/${month}`,
+      feastDay,
+      biography: `Hoje, dia ${day} de ${getMonthName2(parseInt(month))}, a Igreja celebra a mem\xF3ria dos santos e santas deste dia. Consulte o calend\xE1rio lit\xFArgico ou visite santo.cancaonova.com para mais informa\xE7\xF5es sobre as celebra\xE7\xF5es lit\xFArgicas de hoje.`,
+      isBrazilian: false,
+      rank: "OPTIONAL_MEMORIAL",
+      liturgicalColor: "white",
+      title: void 0,
+      patronOf: void 0
+    };
     res.json({
       success: true,
       data: {
         date: today.toISOString().split("T")[0],
         feastDay,
-        saints: [],
-        source: "none"
+        saints: [genericSaint],
+        source: "generic"
       }
     });
   } catch (error) {
