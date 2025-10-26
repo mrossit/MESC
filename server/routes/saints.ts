@@ -10,6 +10,15 @@ import { eq, sql, like, or } from 'drizzle-orm';
 
 const router = Router();
 
+// Helper function to get month name in Portuguese
+function getMonthName(month: number): string {
+  const monthNames = [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ];
+  return monthNames[month - 1] || 'desconhecido';
+}
+
 /**
  * GET /api/saints/today
  * Returns saint(s) of the day from Canção Nova website
@@ -145,8 +154,7 @@ router.get('/today', async (req, res) => {
       console.error('[SAINTS API] Erro ao buscar do Canção Nova:', cancaoNovaError);
     }
 
-    // Terceiro: fallback para santo padrão baseado na data
-    // 25 de outubro = Frei Galvão
+    // Terceiro: fallback para santos padrão baseados na data
     const defaultSaints: Record<string, any> = {
       '10-25': {
         id: 'default-10-25',
@@ -158,6 +166,28 @@ router.get('/today', async (req, res) => {
         liturgicalColor: 'white' as const,
         title: 'Sacerdote Franciscano',
         patronOf: 'Arquidiocese de Aparecida, mulheres grávidas',
+      },
+      '10-26': {
+        id: 'default-10-26',
+        name: 'Santo Evaristo',
+        feastDay: '10-26',
+        biography: 'Santo Evaristo foi Papa e mártir da Igreja Católica. Governou a Igreja de Roma durante o período de perseguições, aproximadamente entre os anos 97 e 105. É venerado como santo e mártir pela Igreja Católica.',
+        isBrazilian: false,
+        rank: 'OPTIONAL_MEMORIAL' as const,
+        liturgicalColor: 'red' as const,
+        title: 'Papa e Mártir',
+        patronOf: undefined,
+      },
+      '10-12': {
+        id: 'default-10-12',
+        name: 'Nossa Senhora Aparecida',
+        feastDay: '10-12',
+        biography: 'Nossa Senhora Aparecida é a padroeira do Brasil. Sua imagem foi encontrada por pescadores no Rio Paraíba do Sul em 1717. É venerada no Santuário Nacional de Aparecida, um dos maiores santuários marianos do mundo.',
+        isBrazilian: true,
+        rank: 'SOLEMNITY' as const,
+        liturgicalColor: 'white' as const,
+        title: 'Padroeira do Brasil',
+        patronOf: 'Brasil',
       }
     };
 
@@ -175,15 +205,27 @@ router.get('/today', async (req, res) => {
       });
     }
 
-    // Último recurso: retornar vazio
-    console.log('[SAINTS API] Nenhum santo encontrado em nenhuma fonte');
+    // Último recurso: santo genérico para o dia
+    console.log('[SAINTS API] Usando santo genérico');
+    const genericSaint = {
+      id: `generic-${feastDay}`,
+      name: `Santo do Dia ${day}/${month}`,
+      feastDay,
+      biography: `Hoje, dia ${day} de ${getMonthName(parseInt(month))}, a Igreja celebra a memória dos santos e santas deste dia. Consulte o calendário litúrgico ou visite santo.cancaonova.com para mais informações sobre as celebrações litúrgicas de hoje.`,
+      isBrazilian: false,
+      rank: 'OPTIONAL_MEMORIAL' as const,
+      liturgicalColor: 'white' as const,
+      title: undefined,
+      patronOf: undefined,
+    };
+
     res.json({
       success: true,
       data: {
         date: today.toISOString().split('T')[0],
         feastDay,
-        saints: [],
-        source: 'none'
+        saints: [genericSaint],
+        source: 'generic'
       },
     });
   } catch (error) {
