@@ -16,6 +16,15 @@ Fixed critical issues preventing push notifications from working:
 - **Impact**: Users can now properly enable/disable push notifications via bell icon or settings, and state persists correctly
 - **Features**: Full push notification support with VAPID keys, Service Worker integration, and automatic cleanup of expired subscriptions
 
+## Substitution History Fix - Show Who Accepted (October 27, 2025)
+Fixed missing substitute information in substitution history:
+- **Problem**: Old substitutions (approved/auto_approved) showed requester but not who accepted the substitution
+- **Root Cause**: Backend endpoint `/api/substitutions` was not populating `substituteUser` field despite data existing in database
+- **Solution**: Enhanced API endpoint to fetch and include substitute minister details for all approved substitutions
+- **Files changed**: `server/routes/substitutions.ts` (GET endpoint enrichment logic)
+- **Impact**: Historical substitutions now retroactively display who accepted each request without database changes
+- **Technical Note**: Uses Promise.all for efficient parallel lookups of substitute information
+
 ## Substitution System Enhancement (October 27, 2025)
 Improved substitution workflow and user experience:
 - **Position Display**: Changed format from "Velas 1 (Posição 5)" to "Posição 5 (Velas 1)" for clarity
