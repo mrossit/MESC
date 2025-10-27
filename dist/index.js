@@ -16171,6 +16171,15 @@ var authenticateAPIKey = (req, res, next) => {
   }
   next();
 };
+router23.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "MESC WhatsApp API",
+    version: "1.0.0",
+    endpoints: 7,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
+});
 router23.use(authenticateAPIKey);
 function normalizePhone(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
@@ -16540,13 +16549,6 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     console.error("[WHATSAPP_API] Erro em /minhas-substituicoes:", err);
     return res.status(500).json({ erro: err.message });
   }
-});
-router23.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "MESC WhatsApp API",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString()
-  });
 });
 var whatsapp_api_default = router23;
 

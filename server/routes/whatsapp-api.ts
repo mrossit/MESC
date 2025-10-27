@@ -28,7 +28,21 @@ const authenticateAPIKey = (req: any, res: any, next: any) => {
   next();
 };
 
-// Aplica autenticação em todas as rotas deste router
+/**
+ * GET /api/whatsapp/health
+ * Endpoint de health check (não requer autenticação)
+ */
+router.get("/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    service: "MESC WhatsApp API",
+    version: "1.0.0",
+    endpoints: 7,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Aplica autenticação em todas as rotas APÓS o health check
 router.use(authenticateAPIKey);
 
 // Função auxiliar para formatar número de telefone (remove espaços, traços, parênteses)
@@ -591,18 +605,6 @@ router.post("/minhas-substituicoes", async (req, res) => {
     console.error('[WHATSAPP_API] Erro em /minhas-substituicoes:', err);
     return res.status(500).json({ erro: err.message });
   }
-});
-
-/**
- * GET /api/whatsapp/health
- * Endpoint de health check (não requer autenticação)
- */
-router.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    service: "MESC WhatsApp API",
-    timestamp: new Date().toISOString()
-  });
 });
 
 export default router;
