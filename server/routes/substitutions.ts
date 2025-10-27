@@ -418,8 +418,36 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
         .orderBy(desc(substitutionRequests.createdAt));
     }
 
+    // Enriquecer com dados dos substitutos
+    const enrichedRequests = await Promise.all(
+      requests.map(async (req: any) => {
+        let substituteUser = null;
+        
+        // Se há um substituto, buscar os dados dele
+        if (req.request.substituteId) {
+          const [substitute] = await db
+            .select({
+              id: users.id,
+              name: users.name
+            })
+            .from(users)
+            .where(eq(users.id, req.request.substituteId))
+            .limit(1);
+          
+          if (substitute) {
+            substituteUser = substitute;
+          }
+        }
+
+        return {
+          ...req,
+          substituteUser
+        };
+      })
+    );
+
     // Mapear 'time' para 'massTime' para compatibilidade com o frontend
-    const mappedRequests = requests.map((req: any) => ({
+    const mappedRequests = enrichedRequests.map((req: any) => ({
       ...req,
       assignment: {
         ...req.assignment,
