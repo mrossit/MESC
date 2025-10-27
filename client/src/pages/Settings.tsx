@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
 import { APP_VERSION } from '@/lib/queryClient';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 type UserSettings = {
   pushNotifications: boolean;
@@ -68,6 +69,18 @@ export default function Settings() {
   const { isConnected } = useWebSocket({
     enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
   });
+
+  // Push Notifications hook
+  const {
+    isSupported: pushSupported,
+    status: pushStatus,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    subscribe: enablePushNotifications,
+    unsubscribe: disablePushNotifications,
+    isBusy: pushBusy,
+    error: pushError
+  } = usePushNotifications();
 
   // Buscar configurações do usuário
   const { data: settingsData, isLoading } = useQuery({
@@ -211,34 +224,45 @@ export default function Settings() {
   }, [extraActivities, hasUserInteracted]);
 
   const handlePushNotificationToggle = async (checked: boolean) => {
-    // Se está ativando as notificações push
-    if (checked && 'Notification' in window) {
-      // Verificar o status atual da permissão
-      if (Notification.permission === 'default') {
-        // Solicitar permissão se ainda não foi decidido
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          setSettings(prev => ({ ...prev, pushNotifications: true }));
-          setSuccess('Notificações push ativadas com sucesso!');
-        } else {
-          setError('É necessário permitir as notificações para ativar este recurso.');
-          setSettings(prev => ({ ...prev, pushNotifications: false }));
-        }
-      } else if (Notification.permission === 'granted') {
-        // Se já tem permissão, apenas ativa
-        setSettings(prev => ({ ...prev, pushNotifications: true }));
-      } else {
-        // Se foi negado anteriormente
-        setError('As notificações foram bloqueadas. Para reativar, acesse as configurações do seu navegador.');
-        setSettings(prev => ({ ...prev, pushNotifications: false }));
-      }
-    } else if (!checked) {
-      // Se está desativando
-      setSettings(prev => ({ ...prev, pushNotifications: false }));
-    } else {
-      // Se o navegador não suporta notificações
+    setError(null);
+    setSuccess(null);
+
+    if (!pushSupported) {
       setError('Seu navegador não suporta notificações push.');
-      setSettings(prev => ({ ...prev, pushNotifications: false }));
+      return;
+    }
+
+    if (pushStatus === 'missing-key') {
+      setError('Notificações push não estão configuradas neste ambiente.');
+      return;
+    }
+
+    if (pushStatus === 'errored') {
+      setError('Erro ao inicializar notificações push. Tente recarregar a página.');
+      return;
+    }
+
+    if (checked) {
+      // Ativando notificações
+      if (pushPermission === 'denied') {
+        setError('As notificações foram bloqueadas. Para reativar, acesse as configurações do seu navegador.');
+        return;
+      }
+
+      try {
+        await enablePushNotifications();
+        setSuccess('Notificações push ativadas com sucesso!');
+      } catch (err) {
+        setError(pushError || 'Erro ao ativar notificações push.');
+      }
+    } else {
+      // Desativando notificações
+      try {
+        await disablePushNotifications();
+        setSuccess('Notificações push desativadas.');
+      } catch (err) {
+        setError(pushError || 'Erro ao desativar notificações push.');
+      }
     }
   };
 
@@ -401,11 +425,22 @@ export default function Settings() {
                             <p className="text-xs sm:text-sm text-gray-500">
                               Receba notificações no navegador sobre suas escalas
                             </p>
+                            {pushStatus === 'missing-key' && (
+                              <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                                Notificações push indisponíveis neste ambiente
+                              </p>
+                            )}
+                            {pushPermission === 'denied' && (
+                              <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+                                Bloqueado no navegador - altere as permissões
+                              </p>
+                            )}
                           </div>
                           <Switch
                             id="push"
-                            checked={settings.pushNotifications}
+                            checked={pushSubscribed}
                             onCheckedChange={handlePushNotificationToggle}
+                            disabled={pushBusy || pushStatus === 'missing-key' || pushStatus === 'errored'}
                           />
                         </div>
 
