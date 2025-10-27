@@ -31,7 +31,7 @@ X-API-Key: sua-chave-super-segura-aqui
 
 ## 📡 Endpoints
 
-Total de **7 endpoints** disponíveis para consulta e gestão de escalas e substituições.
+Total de **9 endpoints** disponíveis para consulta e gestão de escalas e substituições.
 
 ### Base URL
 - **Desenvolvimento**: `http://localhost:5000/api/whatsapp`
@@ -153,7 +153,157 @@ Retorna as 3 próximas missas escaladas para o ministro.
 
 ---
 
-### 3️⃣ Colegas da Mesma Missa
+### 3️⃣ Próxima Escala do Ministro
+
+Retorna apenas a **próxima escala** do ministro (a partir de hoje). Ideal para respostas rápidas no chatbot.
+
+**Endpoint:** `POST /api/whatsapp/proxima-escala`
+
+**Body:**
+```json
+{
+  "telefone": "19998887766"
+}
+```
+
+**Resposta (Escala Encontrada):**
+```json
+{
+  "status": "ok",
+  "encontrado": true,
+  "ministro": "João da Silva",
+  "escala": {
+    "date": "2025-11-03",
+    "data": "03/11/2025",
+    "diaSemana": "Domingo",
+    "horario": "09:00",
+    "posicao": 1,
+    "funcao": "Auxiliar 1",
+    "celebracao": "Missa",
+    "local": "Santuário São Judas Tadeu",
+    "observacoes": null
+  }
+}
+```
+
+**Resposta (Sem Escalas Futuras):**
+```json
+{
+  "status": "ok",
+  "encontrado": false,
+  "escala": null,
+  "mensagem": "Olá João da Silva! Você não tem escalas futuras no momento."
+}
+```
+
+**Diferença entre `/proximas` e `/proxima-escala`:**
+- `/proximas`: Retorna até 3 missas futuras (mais completo)
+- `/proxima-escala`: Retorna apenas a próxima (mais simples e direto)
+
+---
+
+### 4️⃣ Escalas do Mês
+
+Retorna **todas as escalas** de um ministro em um mês específico.
+
+**Endpoint:** `POST /api/whatsapp/escala-mes`
+
+**Body:**
+```json
+{
+  "telefone": "19998887766",
+  "mes": 11,
+  "ano": 2025
+}
+```
+
+**Observações:**
+- `mes`: Número de 1 a 12 (Janeiro = 1, Dezembro = 12)
+- `ano`: Ano com 4 dígitos (ex: 2025)
+
+**Resposta (Com Escalas):**
+```json
+{
+  "status": "ok",
+  "encontrado": true,
+  "ministro": "João da Silva",
+  "mes": "Novembro",
+  "ano": 2025,
+  "totalEscalas": 4,
+  "escalas": [
+    {
+      "date": "2025-11-03",
+      "data": "03/11/2025",
+      "diaSemana": "Domingo",
+      "horario": "09:00",
+      "posicao": 1,
+      "funcao": "Auxiliar 1",
+      "celebracao": "Missa",
+      "local": "Santuário São Judas Tadeu",
+      "observacoes": null
+    },
+    {
+      "date": "2025-11-10",
+      "data": "10/11/2025",
+      "diaSemana": "Domingo",
+      "horario": "10:30",
+      "posicao": 2,
+      "funcao": "Auxiliar 2",
+      "celebracao": "Missa",
+      "local": "Santuário São Judas Tadeu",
+      "observacoes": null
+    },
+    {
+      "date": "2025-11-17",
+      "data": "17/11/2025",
+      "diaSemana": "Domingo",
+      "horario": "19:00",
+      "posicao": 3,
+      "funcao": "Auxiliar 3",
+      "celebracao": "Missa",
+      "local": "Santuário São Judas Tadeu",
+      "observacoes": null
+    },
+    {
+      "date": "2025-11-24",
+      "data": "24/11/2025",
+      "diaSemana": "Domingo",
+      "horario": "09:00",
+      "posicao": 1,
+      "funcao": "Auxiliar 1",
+      "celebracao": "Missa",
+      "local": "Capela Santo Antônio",
+      "observacoes": "Festa do padroeiro"
+    }
+  ],
+  "mensagem": null
+}
+```
+
+**Resposta (Sem Escalas no Mês):**
+```json
+{
+  "status": "ok",
+  "encontrado": true,
+  "ministro": "João da Silva",
+  "mes": "Dezembro",
+  "ano": 2025,
+  "totalEscalas": 0,
+  "escalas": [],
+  "mensagem": "Você não tem escalas em Dezembro de 2025."
+}
+```
+
+**Resposta (Mês Inválido):**
+```json
+{
+  "erro": "Mês deve estar entre 1 e 12"
+}
+```
+
+---
+
+### 5️⃣ Colegas da Mesma Missa
 
 Retorna todos os ministros escalados em uma missa específica.
 
@@ -211,7 +361,7 @@ Retorna todos os ministros escalados em uma missa específica.
 
 ---
 
-### 4️⃣ Substituições em Aberto
+### 6️⃣ Substituições em Aberto
 
 Retorna lista de substituições disponíveis para aceite.
 
@@ -273,7 +423,7 @@ Retorna lista de substituições disponíveis para aceite.
 
 ---
 
-### 5️⃣ Aceitar Substituição
+### 7️⃣ Aceitar Substituição
 
 Permite que um ministro aceite uma substituição via WhatsApp. A substituição fica com status "pending" aguardando aprovação do coordenador.
 
@@ -324,7 +474,7 @@ Permite que um ministro aceite uma substituição via WhatsApp. A substituição
 
 ---
 
-### 6️⃣ Minhas Substituições
+### 8️⃣ Minhas Substituições
 
 Retorna as substituições solicitadas ou aceitas pelo ministro.
 
@@ -388,7 +538,7 @@ Retorna as substituições solicitadas ou aceitas pelo ministro.
 
 ---
 
-### 7️⃣ Health Check
+### 9️⃣ Health Check
 
 Verifica se a API está funcionando.
 
@@ -401,6 +551,8 @@ Verifica se a API está funcionando.
 {
   "status": "ok",
   "service": "MESC WhatsApp API",
+  "version": "1.0.0",
+  "endpoints": 9,
   "timestamp": "2025-10-26T20:00:00.000Z"
 }
 ```

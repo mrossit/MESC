@@ -16176,7 +16176,7 @@ router23.get("/health", (req, res) => {
     status: "ok",
     service: "MESC WhatsApp API",
     version: "1.0.0",
-    endpoints: 7,
+    endpoints: 9,
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
@@ -16558,6 +16558,159 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /minhas-substituicoes:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/proxima-escala", async (req, res) => {
+  console.log("\u{1F4E9} [WHATSAPP_API /proxima-escala] Requisi\xE7\xE3o recebida:", req.body);
+  try {
+    const { telefone } = req.body;
+    if (!telefone) {
+      console.log("\u274C [WHATSAPP_API /proxima-escala] Campo obrigat\xF3rio ausente");
+      return res.status(400).json({
+        erro: "Campo obrigat\xF3rio: telefone"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    console.log("\u{1F50D} [WHATSAPP_API /proxima-escala] Telefone normalizado:", normalizedPhone);
+    console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando ministro no banco de dados...");
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
+    if (!minister || minister.length === 0) {
+      console.log("\u26A0\uFE0F [WHATSAPP_API /proxima-escala] Ministro n\xE3o encontrado");
+      return res.json({
+        status: "ok",
+        encontrado: false,
+        escala: null,
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}.`
+      });
+    }
+    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
+    const nextSchedule = await db.select().from(schedules).where(
+      and20(
+        eq27(schedules.ministerId, minister[0].id),
+        gte13(schedules.date, today)
+      )
+    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
+    if (!nextSchedule || nextSchedule.length === 0) {
+      console.log("\u26A0\uFE0F [WHATSAPP_API /proxima-escala] Nenhuma escala futura encontrada");
+      return res.json({
+        status: "ok",
+        encontrado: false,
+        escala: null,
+        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o tem escalas futuras no momento.`
+      });
+    }
+    const s = nextSchedule[0];
+    const responseData = {
+      status: "ok",
+      encontrado: true,
+      ministro: minister[0].name,
+      escala: {
+        date: s.date,
+        data: formatDateBR(s.date),
+        diaSemana: getDayOfWeek(s.date),
+        horario: formatTime(s.time),
+        posicao: s.position || 0,
+        funcao: getPositionName(s.position || 0),
+        celebracao: s.type === "missa" ? "Missa" : s.type,
+        local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+        observacoes: s.notes || null
+      }
+    };
+    console.log("\u2705 [WHATSAPP_API /proxima-escala] Resposta enviada:", responseData);
+    return res.json(responseData);
+  } catch (err) {
+    console.error("\u274C [WHATSAPP_API /proxima-escala] Erro interno:", err);
+    return res.status(500).json({ erro: err.message });
+  }
+});
+router23.post("/escala-mes", async (req, res) => {
+  console.log("\u{1F4E9} [WHATSAPP_API /escala-mes] Requisi\xE7\xE3o recebida:", req.body);
+  try {
+    const { telefone, mes, ano } = req.body;
+    if (!telefone || !mes || !ano) {
+      console.log("\u274C [WHATSAPP_API /escala-mes] Campos obrigat\xF3rios ausentes");
+      return res.status(400).json({
+        erro: "Campos obrigat\xF3rios: telefone, mes (1-12), ano (ex: 2025)"
+      });
+    }
+    if (mes < 1 || mes > 12) {
+      console.log("\u274C [WHATSAPP_API /escala-mes] M\xEAs inv\xE1lido:", mes);
+      return res.status(400).json({
+        erro: "M\xEAs deve estar entre 1 e 12"
+      });
+    }
+    const normalizedPhone = normalizePhone(telefone);
+    console.log("\u{1F50D} [WHATSAPP_API /escala-mes] Telefone normalizado:", normalizedPhone, "| M\xEAs:", mes, "| Ano:", ano);
+    console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando ministro no banco de dados...");
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
+    ).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
+    if (!minister || minister.length === 0) {
+      console.log("\u26A0\uFE0F [WHATSAPP_API /escala-mes] Ministro n\xE3o encontrado");
+      return res.json({
+        status: "ok",
+        encontrado: false,
+        escalas: [],
+        mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}.`
+      });
+    }
+    console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
+    const monthSchedules = await db.select().from(schedules).where(
+      and20(
+        eq27(schedules.ministerId, minister[0].id),
+        sql17`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
+        sql17`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
+      )
+    ).orderBy(asc3(schedules.date), asc3(schedules.time));
+    console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
+    const escalas = monthSchedules.map((s) => ({
+      date: s.date,
+      data: formatDateBR(s.date),
+      diaSemana: getDayOfWeek(s.date),
+      horario: formatTime(s.time),
+      posicao: s.position || 0,
+      funcao: getPositionName(s.position || 0),
+      celebracao: s.type === "missa" ? "Missa" : s.type,
+      local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
+      observacoes: s.notes || null
+    }));
+    const nomeMes = [
+      "Janeiro",
+      "Fevereiro",
+      "Mar\xE7o",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro"
+    ][mes - 1];
+    const responseData = {
+      status: "ok",
+      encontrado: true,
+      ministro: minister[0].name,
+      mes: nomeMes,
+      ano,
+      totalEscalas: escalas.length,
+      escalas,
+      mensagem: escalas.length === 0 ? `Voc\xEA n\xE3o tem escalas em ${nomeMes} de ${ano}.` : null
+    };
+    console.log("\u2705 [WHATSAPP_API /escala-mes] Resposta enviada:", escalas.length, "escalas");
+    return res.json(responseData);
+  } catch (err) {
+    console.error("\u274C [WHATSAPP_API /escala-mes] Erro interno:", err);
     return res.status(500).json({ erro: err.message });
   }
 });
