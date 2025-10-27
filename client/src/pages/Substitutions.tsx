@@ -751,7 +751,9 @@ export default function Substitutions() {
                   {substitutionRequests.map((item: SubstitutionRequest) => {
                     // Parse date correctly to avoid timezone issues
                     const assignmentDate = item.assignment?.date
-                      ? parseScheduleDate(item.assignment.date)
+                      ? (typeof item.assignment.date === 'string' 
+                          ? parseScheduleDate(item.assignment.date) 
+                          : new Date(item.assignment.date))
                       : new Date();
                     const isDirected = item.request.substituteMinisterId !== null;
                     const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
@@ -823,7 +825,7 @@ export default function Substitutions() {
                                   <span className="font-medium whitespace-nowrap">Posição:</span>
                                 </div>
                                 <Badge variant="secondary" className="text-xs ml-6 sm:ml-0 self-start sm:self-auto">
-                                  {LITURGICAL_POSITIONS[item.assignment?.position || 1]}
+                                  {LITURGICAL_POSITIONS[item.assignment?.position || 1]} (Posição {item.assignment?.position || 1})
                                 </Badge>
                               </div>
                             </div>
@@ -838,6 +840,33 @@ export default function Substitutions() {
                               {item.request.reason}
                             </p>
                           </div>
+
+                          {/* Substituto (se existir) */}
+                          {item.substituteUser && item.request.status !== "available" && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Ministro Substituto
+                              </h4>
+                              <div className="bg-green-50 dark:bg-green-900/20 rounded-md p-3">
+                                <div className="flex items-center gap-2">
+                                  <UserPlus className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                                    {item.substituteUser.name}
+                                  </span>
+                                </div>
+                                {item.request.status === "pending" && (
+                                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
+                                    Aguardando aprovação do coordenador
+                                  </p>
+                                )}
+                                {item.request.status === "approved" && (
+                                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
+                                    Substituição aprovada
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Botões de ação */}
@@ -1078,7 +1107,7 @@ export default function Substitutions() {
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Posição:</span>{" "}
-                  {LITURGICAL_POSITIONS[selectedRequest.assignment.position]}
+                  {LITURGICAL_POSITIONS[selectedRequest.assignment.position]} (Posição {selectedRequest.assignment.position})
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Motivo:</span> {selectedRequest.request.reason}
@@ -1235,7 +1264,7 @@ export default function Substitutions() {
                     upcomingAssignments.map((assignment) => (
                       <SelectItem key={assignment.id} value={assignment.id}>
                         {format(new Date(assignment.date), "dd/MM/yyyy")} às{" "}
-                        {assignment.massTime} - {LITURGICAL_POSITIONS[assignment.position]}
+                        {assignment.massTime} - {LITURGICAL_POSITIONS[assignment.position]} (Posição {assignment.position})
                       </SelectItem>
                     ))
                   )}
