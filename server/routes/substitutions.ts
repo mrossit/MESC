@@ -533,11 +533,10 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Verificar se o usuário tem permissão para responder
+    // Verificar se o usuário é o substituto indicado
     const isSubstitute = request.substituteId === userId;
-    const isCoordinator = req.user!.role === 'coordenador' || req.user!.role === 'gestor';
 
-    if (!isSubstitute && !isCoordinator) {
+    if (!isSubstitute) {
       return res.status(403).json({
         success: false,
         message: "Você não tem permissão para responder esta solicitação"
