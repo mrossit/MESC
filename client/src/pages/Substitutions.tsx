@@ -825,7 +825,7 @@ export default function Substitutions() {
                                   <span className="font-medium whitespace-nowrap">Posição:</span>
                                 </div>
                                 <Badge variant="secondary" className="text-xs ml-6 sm:ml-0 self-start sm:self-auto">
-                                  {LITURGICAL_POSITIONS[item.assignment?.position || 1]} (Posição {item.assignment?.position || 1})
+                                  Posição {item.assignment?.position || 1} ({LITURGICAL_POSITIONS[item.assignment?.position || 1]})
                                 </Badge>
                               </div>
                             </div>
@@ -854,14 +854,9 @@ export default function Substitutions() {
                                     {item.substituteUser.name}
                                   </span>
                                 </div>
-                                {item.request.status === "pending" && (
-                                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
-                                    Aguardando aprovação do coordenador
-                                  </p>
-                                )}
                                 {item.request.status === "approved" && (
                                   <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
-                                    Substituição aprovada
+                                    Substituição confirmada
                                   </p>
                                 )}
                               </div>
@@ -1107,7 +1102,7 @@ export default function Substitutions() {
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Posição:</span>{" "}
-                  {LITURGICAL_POSITIONS[selectedRequest.assignment.position]} (Posição {selectedRequest.assignment.position})
+                  Posição {selectedRequest.assignment.position} ({LITURGICAL_POSITIONS[selectedRequest.assignment.position]})
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Motivo:</span> {selectedRequest.request.reason}
@@ -1264,7 +1259,7 @@ export default function Substitutions() {
                     upcomingAssignments.map((assignment) => (
                       <SelectItem key={assignment.id} value={assignment.id}>
                         {format(new Date(assignment.date), "dd/MM/yyyy")} às{" "}
-                        {assignment.massTime} - {LITURGICAL_POSITIONS[assignment.position]} (Posição {assignment.position})
+                        {assignment.massTime} - Posição {assignment.position} ({LITURGICAL_POSITIONS[assignment.position]})
                       </SelectItem>
                     ))
                   )}
