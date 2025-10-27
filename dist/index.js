@@ -16214,38 +16214,47 @@ function getDayOfWeek(dateStr) {
   return days[date2.getDay()];
 }
 router23.post("/escala", async (req, res) => {
+  console.log("\u{1F4E9} [WHATSAPP_API /escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, data } = req.body;
     if (!telefone || !data) {
+      console.log("\u274C [WHATSAPP_API /escala] Campos obrigat\xF3rios ausentes");
       return res.status(400).json({
         erro: "Campos obrigat\xF3rios: telefone e data (formato YYYY-MM-DD)"
       });
     }
     const normalizedPhone = normalizePhone(telefone);
+    console.log("\u{1F50D} [WHATSAPP_API /escala] Telefone normalizado:", normalizedPhone, "| Data:", data);
+    console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
       sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
     if (!minister || minister.length === 0) {
+      console.log("\u26A0\uFE0F [WHATSAPP_API /escala] Ministro n\xE3o encontrado");
       return res.json({
         encontrado: false,
         mensagem: `Ministro n\xE3o encontrado com o telefone ${telefone}. Verifique se o n\xFAmero est\xE1 cadastrado.`
       });
     }
+    console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
       and20(
         eq27(schedules.ministerId, minister[0].id),
         eq27(schedules.date, data)
       )
     ).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
     if (!schedule || schedule.length === 0) {
+      console.log("\u26A0\uFE0F [WHATSAPP_API /escala] Nenhuma escala encontrada para esta data");
       return res.json({
         encontrado: false,
         mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR(data)}.`
       });
     }
     const s = schedule[0];
-    return res.json({
+    const responseData = {
       encontrado: true,
       ministro: minister[0].name,
       data: formatDateBR(s.date),
@@ -16255,9 +16264,11 @@ router23.post("/escala", async (req, res) => {
       local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
       tipo: s.type === "missa" ? "Missa" : s.type,
       observacoes: s.notes || null
-    });
+    };
+    console.log("\u2705 [WHATSAPP_API /escala] Resposta enviada:", responseData);
+    return res.json(responseData);
   } catch (err) {
-    console.error("[WHATSAPP_API] Erro em /escala:", err);
+    console.error("\u274C [WHATSAPP_API /escala] Erro interno:", err);
     return res.status(500).json({ erro: err.message });
   }
 });
