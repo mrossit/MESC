@@ -4,6 +4,27 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 
 # Recent Changes
 
+## Push Notifications System Fix (October 27, 2025)
+Fixed critical issues preventing push notifications from working:
+- **Problem 1**: Table `push_subscriptions` did not exist in database, causing 500 errors on unsubscribe
+- **Problem 2**: Settings page not using `usePushNotifications` hook, causing state persistence issues
+- **Solution 1**: Created `push_subscriptions` table with proper schema and indexes
+- **Solution 2**: Integrated `usePushNotifications` hook into Settings page for proper state management
+- **Files changed**: 
+  - Database: Created `push_subscriptions` table via SQL
+  - `client/src/pages/Settings.tsx`: Integrated push notifications hook
+- **Impact**: Users can now properly enable/disable push notifications via bell icon or settings, and state persists correctly
+- **Features**: Full push notification support with VAPID keys, Service Worker integration, and automatic cleanup of expired subscriptions
+
+## Substitution System Enhancement (October 27, 2025)
+Improved substitution workflow and user experience:
+- **Position Display**: Changed format from "Velas 1 (Posição 5)" to "Posição 5 (Velas 1)" for clarity
+- **Autonomous Substitutions**: Removed coordinator approval requirement - ministers can accept substitutions directly
+- **Files changed**: 
+  - `client/src/pages/Substitutions.tsx`: Updated UI format and removed approval messages
+  - `server/routes/substitutions.ts`: Removed coordinator authorization check
+- **Impact**: Faster, more autonomous substitution process without coordinator bottleneck
+
 ## WhatsApp API Extension - Substitutions (October 26, 2025)
 Extended WhatsApp API with substitution management:
 - **New Endpoints**: 7 total endpoints (3 new for substitutions)
