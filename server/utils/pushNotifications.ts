@@ -30,18 +30,28 @@ export const pushConfig = {
 };
 
 export async function sendPushNotificationToUsers(userIds: string[], payload: PushPayload) {
+  console.log('[PUSH] Iniciando envio para', userIds.length, 'userIds');
+
   if (!pushConfig.enabled || !webpush) {
+    console.warn('[PUSH] Push desabilitado ou web-push não disponível');
     return;
   }
 
   if (!userIds || userIds.length === 0) {
+    console.warn('[PUSH] Nenhum userIds fornecido');
     return;
   }
 
   const uniqueUserIds = Array.from(new Set(userIds));
+  console.log('[PUSH] UserIds únicos:', uniqueUserIds.length);
+  console.log('[PUSH] Lista de UserIds:', uniqueUserIds);
+
   const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  console.log('[PUSH] Subscriptions encontradas:', subscriptions.length);
+  console.log('[PUSH] Subscriptions por userId:', subscriptions.map(s => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + '...' })));
 
   if (subscriptions.length === 0) {
+    console.warn('[PUSH] Nenhuma subscription encontrada para os userIds fornecidos');
     return;
   }
 
@@ -53,7 +63,7 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
     data: payload.data ?? {}
   });
 
-  await Promise.all(
+  const results = await Promise.all(
     subscriptions.map(async (subscription) => {
       const pushSubscription = {
         endpoint: subscription.endpoint,
@@ -65,15 +75,22 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
 
       try {
         await webpush.sendNotification(pushSubscription, notificationPayload);
+        console.log('[PUSH] Notificação enviada com sucesso para userId:', subscription.userId);
+        return { success: true, userId: subscription.userId };
       } catch (error: any) {
         const statusCode = error?.statusCode ?? error?.code;
         if (statusCode === 404 || statusCode === 410) {
-          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint);
+          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, 'userId:', subscription.userId);
           await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
         } else {
-          console.error("[PUSH] Failed to send notification:", error);
+          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
         }
+        return { success: false, userId: subscription.userId, error: statusCode };
       }
     })
   );
+
+  const successCount = results.filter(r => r.success).length;
+  const failCount = results.filter(r => !r.success).length;
+  console.log('[PUSH] Resumo: Sucesso:', successCount, '| Falha:', failCount);
 }
