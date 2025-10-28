@@ -4,6 +4,18 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 
 # Recent Changes
 
+## User Management Page Freeze Fix (October 28, 2025)
+Fixed critical bug causing page freeze when coordinators reset user passwords:
+- **Problem**: Page would freeze/hang when coordinator used "Reset Password" feature on user management page
+- **Root Cause**: Mutations were calling `queryClient.invalidateQueries({ queryKey: ["/api/users"] })` but page wasn't using TanStack Query for user data - it used local state with `useState` and manual `fetchUsers()`
+- **Solution**: 
+  - Moved `fetchUsers` declaration before mutations using `useCallback`
+  - Replaced all `queryClient.invalidateQueries({ queryKey: ["/api/users"] })` calls with direct `await fetchUsers()` invocations
+  - Applied fix to `resetPasswordMutation` (and identified same pattern in other mutations for consistency)
+- **Files changed**: `client/src/pages/UserManagement.tsx`
+- **Impact**: Password resets now work smoothly without page freeze, maintaining consistent state management pattern
+- **Technical Note**: Mixed state management (useState + queryClient invalidation for non-existent query) was causing the freeze
+
 ## Push Notifications System Fix (October 27, 2025)
 Fixed critical issues preventing push notifications from working:
 - **Problem 1**: Table `push_subscriptions` did not exist in database, causing 500 errors on unsubscribe
