@@ -263,22 +263,32 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
 router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     const data = createNotificationSchema.parse(req.body);
-    
+
+    console.log('[NOTIFICAÇÕES] Dados recebidos:', {
+      title: data.title,
+      type: data.type,
+      recipientIds: data.recipientIds,
+      recipientRole: data.recipientRole,
+      senderId: req.user!.id
+    });
+
     let recipientUserIds: string[] = [];
-    
+
     // Determinar destinatários
     if (data.recipientIds && data.recipientIds.length > 0) {
       // IDs específicos fornecidos
       recipientUserIds = data.recipientIds;
+      console.log('[NOTIFICAÇÕES] Usando IDs específicos:', recipientUserIds.length, 'destinatários');
     } else if (data.recipientRole) {
       // Buscar usuários por role
       let recipients;
-      
+
       if (data.recipientRole === "all") {
         // Todos os usuários ativos
         recipients = await db.select({ id: users.id })
           .from(users)
           .where(eq(users.status, "active"));
+        console.log('[NOTIFICAÇÕES] Buscou TODOS os usuários ativos:', recipients.length);
       } else {
         // Role específica
         recipients = await db.select({ id: users.id })
@@ -287,9 +297,11 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
             eq(users.role, data.recipientRole),
             eq(users.status, "active")
           ));
+        console.log('[NOTIFICAÇÕES] Buscou usuários com role', data.recipientRole, ':', recipients.length);
       }
-      
+
       recipientUserIds = recipients.map((r: any) => r.id);
+      console.log('[NOTIFICAÇÕES] IDs dos destinatários:', recipientUserIds);
     } else {
       // Por padrão, enviar para todos os ministros ativos
       const recipients = await db.select({ id: users.id })
@@ -299,18 +311,26 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
           eq(users.status, "active")
         ));
       recipientUserIds = recipients.map((r: any) => r.id);
+      console.log('[NOTIFICAÇÕES] Sem filtro, usando ministros ativos por padrão:', recipientUserIds.length);
     }
-    
+
+    console.log('[NOTIFICAÇÕES] Destinatários antes de adicionar remetente:', recipientUserIds.length);
+
     // Adicionar o remetente à lista de destinatários para que receba uma cópia
     if (!recipientUserIds.includes(req.user!.id)) {
       recipientUserIds.push(req.user!.id);
+      console.log('[NOTIFICAÇÕES] Remetente adicionado à lista');
+    } else {
+      console.log('[NOTIFICAÇÕES] Remetente já estava na lista');
     }
 
     recipientUserIds = Array.from(new Set(recipientUserIds));
+    console.log('[NOTIFICAÇÕES] Total de destinatários únicos:', recipientUserIds.length);
     
     // Criar notificações para cada destinatário
     const mappedType = mapNotificationType(data.type);
-    
+
+    console.log('[NOTIFICAÇÕES] Criando notificações no banco para', recipientUserIds.length, 'destinatários');
     const notificationPromises = recipientUserIds.map(userId =>
       storage.createNotification({
         userId,
@@ -321,15 +341,20 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
         actionUrl: data.actionUrl ?? null
       })
     );
-    
-    await Promise.all(notificationPromises);
+
+    const createdNotifications = await Promise.all(notificationPromises);
+    console.log('[NOTIFICAÇÕES] Notificações criadas no banco:', createdNotifications.length);
 
     if (pushConfig.enabled) {
+      console.log('[NOTIFICAÇÕES] Push notifications habilitado, enviando para', recipientUserIds.length, 'destinatários');
       await sendPushNotificationToUsers(recipientUserIds, {
         title: data.title,
         body: data.message,
         url: data.actionUrl ?? '/communication'
       });
+      console.log('[NOTIFICAÇÕES] Envio de push notifications concluído');
+    } else {
+      console.log('[NOTIFICAÇÕES] Push notifications DESABILITADO (VAPID keys não configuradas)');
     }
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
