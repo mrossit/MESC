@@ -32,6 +32,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const isConnectingRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
 
@@ -48,8 +49,21 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }, []);
 
   const connect = useCallback(() => {
-    if (!user || !enabled) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (!user || !enabled) {
+      console.log('[WS] Connection skipped: user or enabled not ready');
+      return;
+    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Already connected');
+      return;
+    }
+
+    // Prevent multiple simultaneous connection attempts
+    if (isConnectingRef.current) {
+      console.log('[WS] Already connecting, skipping');
+      return;
+    }
 
     // Max 3 reconnection attempts
     if (reconnectAttemptsRef.current >= 3) {
@@ -62,14 +76,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     const host = window.location.host;
     const wsUrl = `${protocol}//${host}/ws`;
 
+    console.log('[WS] Attempting to connect to:', wsUrl);
+    isConnectingRef.current = true;
 
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        console.log('[WS] Connected successfully');
         // Reset reconnection attempts on successful connection
         reconnectAttemptsRef.current = 0;
+        isConnectingRef.current = false;
         setIsConnectedDebounced(true);
 
         // Authenticate with user info
@@ -132,13 +150,22 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       };
 
       ws.onerror = (error) => {
-        console.error('[WS] Error:', error);
+        console.error('[WS] WebSocket error:', error);
+        isConnectingRef.current = false;
         setIsConnectedDebounced(false);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        console.log('[WS] Connection closed:', event.code, event.reason);
+        isConnectingRef.current = false;
         setIsConnectedDebounced(false);
         wsRef.current = null;
+
+        // Don't reconnect if closure was intentional (code 1000)
+        if (event.code === 1000) {
+          console.log('[WS] Normal closure, not reconnecting');
+          return;
+        }
 
         // Exponential backoff: 5min, 10min, 15min (300000ms, 600000ms, 900000ms)
         if (enabled && reconnectAttemptsRef.current < 3) {
@@ -156,11 +183,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       };
     } catch (error) {
       console.error('[WS] Connection error:', error);
+      isConnectingRef.current = false;
       setIsConnectedDebounced(false);
     }
   }, [user, enabled, onSubstitutionRequest, onCriticalMass, onAlertUpdate, toast, setIsConnectedDebounced]);
 
   const disconnect = useCallback(() => {
+    console.log('[WS] Disconnecting...');
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
@@ -168,10 +197,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       clearTimeout(debounceTimeoutRef.current);
     }
     if (wsRef.current) {
-      wsRef.current.close();
+      wsRef.current.close(1000, 'Manual disconnect'); // 1000 = normal closure
       wsRef.current = null;
     }
     setIsConnected(false);
+    isConnectingRef.current = false;
     reconnectAttemptsRef.current = 0; // Reset attempts on manual disconnect
   }, []);
 
