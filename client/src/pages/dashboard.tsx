@@ -121,29 +121,37 @@ export default function Dashboard() {
     }
   }, [soundEnabled]);
 
+  // WebSocket callbacks - wrapped in useCallback to prevent reconnection loops
+  const handleSubstitutionRequest = useCallback(() => {
+    console.log('[WS CALLBACK] Substitution request received');
+    refetchAlerts();
+    setUnreadAlerts(prev => prev + 1);
+  }, [refetchAlerts]);
+
+  const handleCriticalMass = useCallback(() => {
+    console.log('[WS CALLBACK] Critical mass received');
+    playSoundAlert();
+    refetchAlerts();
+    setUnreadAlerts(prev => prev + 1);
+  }, [playSoundAlert, refetchAlerts]);
+
+  const handleAlertUpdate = useCallback((data: any) => {
+    console.log('[WS CALLBACK] Alert update received');
+    // Check for critical masses (< 12h)
+    if (data.criticalMasses?.length > 0) {
+      const hasCriticalMass = data.criticalMasses.some((mass: any) => mass.hoursUntil < 12);
+      if (hasCriticalMass) {
+        playSoundAlert();
+      }
+    }
+  }, [playSoundAlert]);
+
   // WebSocket connection for real-time notifications
   const { isConnected } = useWebSocket({
     enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
-    onSubstitutionRequest: (data) => {
-      // Refetch alerts when new substitution request
-      refetchAlerts();
-      setUnreadAlerts(prev => prev + 1);
-    },
-    onCriticalMass: (data) => {
-      // Play sound for critical mass
-      playSoundAlert();
-      refetchAlerts();
-      setUnreadAlerts(prev => prev + 1);
-    },
-    onAlertUpdate: (data) => {
-      // Check for critical masses (< 12h)
-      if (data.criticalMasses?.length > 0) {
-        const hasCriticalMass = data.criticalMasses.some((mass: any) => mass.hoursUntil < 12);
-        if (hasCriticalMass) {
-          playSoundAlert();
-        }
-      }
-    }
+    onSubstitutionRequest: handleSubstitutionRequest,
+    onCriticalMass: handleCriticalMass,
+    onAlertUpdate: handleAlertUpdate
   });
 
   // Fetch next week masses
@@ -220,9 +228,9 @@ export default function Dashboard() {
     );
   }
 
-  const alerts = alertsData?.data;
-  const nextWeek = nextWeekData?.data || [];
-  const stats = statsData?.data;
+  const alerts = (alertsData as any)?.data;
+  const nextWeek = (nextWeekData as any)?.data || [];
+  const stats = (statsData as any)?.data;
 
   const hasCriticalAlerts = (alerts?.criticalMasses?.length || 0) > 0 || (alerts?.urgentSubstitutions?.length || 0) > 0;
 
