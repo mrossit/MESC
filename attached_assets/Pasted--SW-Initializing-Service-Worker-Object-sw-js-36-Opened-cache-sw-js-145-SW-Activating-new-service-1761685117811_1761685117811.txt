@@ -1,0 +1,702 @@
+[SW] Initializing Service Worker: Object
+sw.js:36 Opened cache
+sw.js:145 [SW] Activating new service worker, version: 5.4.2
+sw.js:153 [SW] Deleting old cache: mesc-v5.4.2-1761655710366
+sw.js:172 [SW] All old caches cleared, claiming clients
+sw.js:178 [SW] Notifying 1 clients about update
+sw.js:126 Refused to connect to 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap' because it violates the following Content Security Policy directive: "connect-src 'self'".
+
+(anonymous) @ sw.js:126Understand this error
+sw.js:126 Fetch API cannot load https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap. Refused to connect because it violates the document's Content Security Policy.
+(anonymous) @ sw.js:126Understand this error
+The FetchEvent for "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" resulted in a network error response: the promise was rejected.Understand this warning
+css2:1  Failed to load resource: net::ERR_FAILEDUnderstand this error
+sw.js:126 Uncaught (in promise) TypeError: Failed to fetch. Refused to connect because it violates the document's Content Security Policy.
+    at sw.js:126:16Understand this error
+(index):97 [SW] Service Worker enabled (production/external browser)
+(index):1 Refused to load the script 'https://replit.com/public/js/replit-dev-banner.js' because it violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+Understand this error
+index-H4KKMlgG.js:2 Version changed from null to 5.4.2 - clearing caches
+(anonymous) @ index-H4KKMlgG.js:2Understand this warning
+(index):123 [Init] Found 1 service worker registrations
+(index):128 [SW] Registration successful: https://saojudastadeu.replit.app/
+(index):1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
+sw.js:126 Refused to connect to 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap' because it violates the following Content Security Policy directive: "connect-src 'self'".
+
+(anonymous) @ sw.js:126
+Promise.then
+(anonymous) @ sw.js:122Understand this error
+sw.js:126 Fetch API cannot load https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap. Refused to connect because it violates the document's Content Security Policy.
+(anonymous) @ sw.js:126
+Promise.then
+(anonymous) @ sw.js:122Understand this error
+The FetchEvent for "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" resulted in a network error response: the promise was rejected.
+Promise.then
+(anonymous) @ sw.js:120Understand this warning
+sw.js:126 Uncaught (in promise) TypeError: Failed to fetch. Refused to connect because it violates the document's Content Security Policy.
+    at sw.js:126:16
+(anonymous) @ sw.js:126
+Promise.then
+(anonymous) @ sw.js:122Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+12WebSocket connection to '<URL>' failed: WebSocket is closed before the connection is established.Understand this warning
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] AudioContext created
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}isTrusted: truebubbles: falsecancelBubble: falsecancelable: falsecomposed: falsecurrentTarget: WebSocket {url: 'wss://saojudastadeu.replit.app/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}defaultPrevented: falseeventPhase: 0returnValue: truesrcElement: WebSocket {url: 'wss://saojudastadeu.replit.app/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}target: WebSocket {url: 'wss://saojudastadeu.replit.app/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}timeStamp: 16965.69999998808type: "error"[[Prototype]]: Event
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+(index):135 [SW] Checking for updates...
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+19dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+3dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+2dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+5dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+2useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+(index):135 [SW] Checking for updates...
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1000 Manual disconnect
+useWebSocket-EAq0GWwk.js:1 [WS] Normal closure, not reconnecting
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Connected successfully
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound played
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+2dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+6dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+4dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+3dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+3dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+3dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+5dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+2dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+2dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+3dashboard-9fv_skUk.js:1 [AUDIO] Alert sound debounced (too soon)
+2dashboard-9fv_skUk.js:1 [AUDIO] Sound disabled, skipping alert
+useWebSocket-EAq0GWwk.js:1 [WS] Disconnecting...
+useWebSocket-EAq0GWwk.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-EAq0GWwk.js:1 [WS] WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+e.onerror @ useWebSocket-EAq0GWwk.js:1Understand this error
+useWebSocket-EAq0GWwk.js:1 [WS] Connection closed: 1006 
+useWebSocket-EAq0GWwk.js:1 [WS] Reconnecting in 300s (attempt 1/3)
