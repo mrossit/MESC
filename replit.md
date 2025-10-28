@@ -5,15 +5,17 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 # Recent Changes
 
 ## AudioContext Loop Prevention (October 28, 2025)
-Improved AudioContext implementation to prevent potential infinite loops:
-- **Problem**: Potential for AudioContext to be called multiple times in quick succession
+Fixed infinite WebSocket reconnection loop causing repeated AudioContext calls:
+- **Problem**: WebSocket continuously disconnecting and reconnecting, triggering AudioContext repeatedly
+- **Root Cause**: WebSocket callbacks (onSubstitutionRequest, onCriticalMass, onAlertUpdate) were inline functions recreated on every render, causing `connect()` function to change reference and trigger useEffect reconnection loop
 - **Solution**: 
+  - Wrapped all WebSocket callbacks in `useCallback` with proper dependencies
   - Wrapped `playSoundAlert` in `useCallback` to prevent unnecessary recreations
   - Changed `forEach` to `some()` in `onAlertUpdate` to prevent multiple simultaneous calls
-  - Added additional logging for sound state tracking
+  - Added logging to track callback and audio state
 - **Files changed**: `client/src/pages/dashboard.tsx`
-- **Impact**: AudioContext now properly memoized and called only once per alert event
-- **Technical Note**: useCallback ensures stable function reference across re-renders
+- **Impact**: WebSocket maintains stable connection without reconnection loops, AudioContext called only when appropriate
+- **Technical Note**: useCallback ensures stable function references preventing dependency changes in useWebSocket hook
 
 ## User Management Page Freeze Fix (October 28, 2025)
 Fixed critical bug causing page freeze when coordinators reset user passwords:
