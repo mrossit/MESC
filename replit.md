@@ -4,6 +4,17 @@ This is a comprehensive church management system called MESC (Ministros Extraord
 
 # Recent Changes
 
+## AudioContext Loop Prevention (October 28, 2025)
+Improved AudioContext implementation to prevent potential infinite loops:
+- **Problem**: Potential for AudioContext to be called multiple times in quick succession
+- **Solution**: 
+  - Wrapped `playSoundAlert` in `useCallback` to prevent unnecessary recreations
+  - Changed `forEach` to `some()` in `onAlertUpdate` to prevent multiple simultaneous calls
+  - Added additional logging for sound state tracking
+- **Files changed**: `client/src/pages/dashboard.tsx`
+- **Impact**: AudioContext now properly memoized and called only once per alert event
+- **Technical Note**: useCallback ensures stable function reference across re-renders
+
 ## User Management Page Freeze Fix (October 28, 2025)
 Fixed critical bug causing page freeze when coordinators reset user passwords:
 - **Problem**: Page would freeze/hang when coordinator used "Reset Password" feature on user management page
