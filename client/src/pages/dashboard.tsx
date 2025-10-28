@@ -50,8 +50,9 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const originalTitleRef = useRef<string>(document.title);
+  const lastAlertTimeRef = useRef<number>(0);
 
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -68,13 +69,32 @@ export default function Dashboard() {
     refetchInterval: 300000, // Refetch every 5 minutes (300s)
   });
 
-  // Play sound alert for critical masses
+  // Play sound alert for critical masses (with debounce to prevent loop)
   const playSoundAlert = () => {
     if (!soundEnabled) return;
 
-    if (!audioRef.current) {
-      // Create a simple beep sound using Web Audio API
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Debounce: only play sound once every 5 seconds
+    const now = Date.now();
+    if (now - lastAlertTimeRef.current < 5000) {
+      console.log('[AUDIO] Alert sound debounced (too soon)');
+      return;
+    }
+    lastAlertTimeRef.current = now;
+
+    try {
+      // Reuse or create AudioContext
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log('[AUDIO] AudioContext created');
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // Resume context if suspended (browser autoplay policy)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -89,6 +109,12 @@ export default function Dashboard() {
 
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.5);
+
+      console.log('[AUDIO] Alert sound played');
+    } catch (error) {
+      console.error('[AUDIO] Error playing alert sound:', error);
+      // Disable sound on error to prevent infinite loop
+      setSoundEnabled(false);
     }
   };
 
@@ -160,6 +186,16 @@ export default function Dashboard() {
       document.title = originalTitleRef.current;
     };
   }, [unreadAlerts, isCoordinator]);
+
+  // Cleanup AudioContext on unmount
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        console.log('[AUDIO] AudioContext closed');
+      }
+    };
+  }, []);
 
   const getTitle = () => {
     if (user?.role === "coordenador") return "Central de Operações";
