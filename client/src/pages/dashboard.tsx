@@ -24,7 +24,7 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useEffect, useRef, useState, memo } from "react";
+import { useEffect, useRef, useState, memo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { APP_VERSION } from "@/lib/queryClient";
 import { parseScheduleDate } from "@/lib/utils";
@@ -70,8 +70,11 @@ export default function Dashboard() {
   });
 
   // Play sound alert for critical masses (with debounce to prevent loop)
-  const playSoundAlert = () => {
-    if (!soundEnabled) return;
+  const playSoundAlert = useCallback(() => {
+    if (!soundEnabled) {
+      console.log('[AUDIO] Sound disabled, skipping alert');
+      return;
+    }
 
     // Debounce: only play sound once every 5 seconds
     const now = Date.now();
@@ -116,7 +119,7 @@ export default function Dashboard() {
       // Disable sound on error to prevent infinite loop
       setSoundEnabled(false);
     }
-  };
+  }, [soundEnabled]);
 
   // WebSocket connection for real-time notifications
   const { isConnected } = useWebSocket({
@@ -135,11 +138,10 @@ export default function Dashboard() {
     onAlertUpdate: (data) => {
       // Check for critical masses (< 12h)
       if (data.criticalMasses?.length > 0) {
-        data.criticalMasses.forEach((mass: any) => {
-          if (mass.hoursUntil < 12) {
-            playSoundAlert();
-          }
-        });
+        const hasCriticalMass = data.criticalMasses.some((mass: any) => mass.hoursUntil < 12);
+        if (hasCriticalMass) {
+          playSoundAlert();
+        }
       }
     }
   });
