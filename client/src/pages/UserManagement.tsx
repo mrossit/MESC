@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { authAPI } from "@/lib/auth";
@@ -150,6 +150,35 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   const [sortField, setSortField] = useState<keyof User>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // Função para carregar usuários (declarada antes dos mutations)
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch("/api/users", {
+        credentials: "include"
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar usuários",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao conectar com o servidor",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Mutations
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -196,8 +225,9 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       const response = await apiRequest("POST", "/api/auth/admin-reset-password", { userId, newPassword });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    onSuccess: async () => {
+      // Recarregar lista de usuários sem usar query cache (previne loop)
+      await fetchUsers();
       toast({
         title: "Senha resetada com sucesso",
         description: "O usuário receberá uma notificação e precisará criar uma nova senha no próximo login.",
@@ -268,7 +298,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.split('?')[1] || '');
@@ -281,34 +311,6 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       }
     }
   }, [location, users]);
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch("/api/users", {
-        credentials: "include"
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      } else {
-        toast({
-          title: "Erro",
-          description: "Erro ao carregar usuários",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao conectar com o servidor",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleView = (selectedUser: User) => {
     setSelectedUser(selectedUser);
