@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
-import { questionnaires, questionnaireResponses, users, notifications } from '@shared/schema';
-import { eq, and, or, ne } from 'drizzle-orm';
+import { questionnaires, questionnaireResponses, users, notifications, schedules } from '@shared/schema';
+import { eq, and, or, ne, gte, lte } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, requireRole } from '../auth';
 
@@ -641,6 +641,34 @@ router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coord
     
     if (template.status !== 'closed') {
       return res.status(400).json({ error: 'Questionário precisa estar encerrado para ser reaberto' });
+    }
+    
+    // Verificar se há escalas publicadas para o mês/ano deste questionário
+    const { month, year } = template;
+    
+    // Calcular range de datas para o mês
+    const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    // Buscar escalas publicadas neste período
+    const publishedSchedules = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          gte(schedules.date, startDateStr),
+          lte(schedules.date, endDateStr),
+          eq(schedules.status, 'published')
+        )
+      )
+      .limit(1); // Só precisamos saber se existe pelo menos uma
+    
+    if (publishedSchedules.length > 0) {
+      return res.status(400).json({ 
+        error: `Não é possível reabrir o questionário de ${getMonthName(month)}/${year} pois já existem escalas publicadas para este período. Para reabrir o questionário, primeiro é necessário despublicar as escalas.`,
+        hasPublishedSchedules: true
+      });
     }
     
     const [updated] = await db
