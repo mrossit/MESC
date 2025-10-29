@@ -1398,9 +1398,9 @@ export default function QuestionnaireUnified() {
                         {saving ? 'Salvando...' : 'Salvar'}
                       </Button>
                       {template.status === 'closed' ? (
-                        <Button onClick={handleOpenQuestionnaire} disabled={opening} className="flex-1" variant="outline">
+                        <Button onClick={handleReopenQuestionnaire} disabled={reopening} className="flex-1" variant="outline" data-testid="button-reopen-questionnaire">
                           <Unlock className="mr-2 h-4 w-4" />
-                          {opening ? 'Abrindo...' : 'Abrir Questionário'}
+                          {reopening ? 'Reabrindo...' : 'Reabrir Questionário'}
                         </Button>
                       ) : (
                         <Button onClick={handleCloseQuestionnaire} disabled={closing} className="flex-1" variant="outline">
