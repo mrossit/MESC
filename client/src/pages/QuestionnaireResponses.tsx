@@ -285,17 +285,27 @@ export default function QuestionnaireResponses() {
   };
 
   const formatAnswer = (answer: any): string => {
-    if (typeof answer === 'object' && answer.answer) {
+    // Verificar null/undefined primeiro
+    if (answer === null || answer === undefined) {
+      return 'Não respondido';
+    }
+    
+    // Verificar se é objeto (mas não array)
+    if (typeof answer === 'object' && !Array.isArray(answer) && answer.answer) {
       let result = answer.answer;
       if (answer.sub) {
         result += ` (${answer.sub})`;
       }
       return result;
     }
+    
+    // Se for array
     if (Array.isArray(answer)) {
       return answer.join(', ');
     }
-    return answer?.toString() || 'Não respondido';
+    
+    // Qualquer outro tipo
+    return answer.toString();
   };
 
   const renderSummaryChart = (questionId: string, data: Record<string, number>) => {
