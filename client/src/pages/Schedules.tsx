@@ -60,7 +60,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, formatMinisterName, parseScheduleDate } from "@/lib/utils";
-import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
+import { LITURGICAL_POSITIONS, getPositionDisplayName, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
@@ -668,14 +668,15 @@ export default function Schedules() {
       const totalPositions = TOTAL_POSITIONS;
       const positionsArray = Array.from({ length: totalPositions }, (_, i) => {
         const positionKey = i + 1;
-        const name = LITURGICAL_POSITIONS[positionKey] || `Posição ${positionKey}`;
+        const displayName = getPositionDisplayName(positionKey);
+        const shortName = LITURGICAL_POSITIONS[positionKey] || `Posição ${positionKey}`;
         return {
           positionKey: positionKey,
-          name: name,
-          abbreviation: name.split(' ')[0],
-          fullName: `${positionKey} ${name}`, // Ex: "1 Auxiliar 1"
-          numberAndName: `${name}\n${positionKey}`, // Para Excel: nome na linha 1, número na linha 2
-          htmlNumberAndName: `${name}<br>${positionKey}` // Para HTML/PDF: nome na linha 1, número na linha 2
+          name: displayName,
+          abbreviation: shortName.split(' ')[0],
+          fullName: displayName,
+          numberAndName: `${displayName}\n${positionKey}`,
+          htmlNumberAndName: `${displayName}<br>${positionKey}`
         };
       });
 
@@ -2143,7 +2144,7 @@ export default function Schedules() {
                                         )}
                                         style={isCurrentUser ? { backgroundColor: '#959D90' } : {}}
                                       >
-                                        <span className="hidden sm:inline">{assignment.position} - {LITURGICAL_POSITIONS[assignment.position]}</span>
+                                        <span className="hidden sm:inline">{getPositionDisplayName(assignment.position)}</span>
                                         <span className="sm:hidden">{assignment.position}</span>
                                       </Badge>
                                       {assignment.confirmed ? (
@@ -2180,7 +2181,7 @@ export default function Schedules() {
                                         })()}
                                       </div>
                                       <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5 sm:hidden">
-                                        {LITURGICAL_POSITIONS[assignment.position]}
+                                        {getPositionDisplayName(assignment.position)}
                                       </p>
                                       {isCurrentUser && (
                                         <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#959D90' }}>
@@ -2630,7 +2631,7 @@ export default function Schedules() {
                                 variant={minister.preferredPosition === selectedPosition ? "default" : "outline"}
                                 className="text-xs"
                               >
-                                {LITURGICAL_POSITIONS[minister.preferredPosition]}
+                                {getPositionDisplayName(minister.preferredPosition)}
                               </Badge>
                             )}
                           </div>
@@ -2675,7 +2676,7 @@ export default function Schedules() {
                     {format(parseScheduleDate(String(selectedAssignmentForSubstitution.date)), "dd 'de' MMMM", { locale: ptBR })}
                   </strong>{" "}
                   na missa das <strong>{formatMassTime(selectedAssignmentForSubstitution.massTime)}</strong> como{" "}
-                  <strong>{LITURGICAL_POSITIONS[selectedAssignmentForSubstitution.position]}</strong>.
+                  <strong>{getPositionDisplayName(selectedAssignmentForSubstitution.position)}</strong>.
                 </>
               )}
             </DialogDescription>

@@ -43,7 +43,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'dat
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { getMassTimesForDate, LITURGICAL_POSITIONS } from '@shared/constants';
+import { getMassTimesForDate, LITURGICAL_POSITIONS, getPositionDisplayName } from '@shared/constants';
 import * as XLSX from 'xlsx';
 
 interface Minister {
@@ -500,7 +500,7 @@ export default function CompactScheduleEditor() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Editar Posição {editingPosition + 1} - {LITURGICAL_POSITIONS[editingPosition + 1]}
+              Editar {getPositionDisplayName(editingPosition + 1)}
             </DialogTitle>
             <DialogDescription>
               {editingSlot && `${format(editingSlot.dateObj, 'dd/MM/yyyy')} - ${editingSlot.massTime.substring(0, 5)}`}

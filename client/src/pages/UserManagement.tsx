@@ -76,7 +76,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { LITURGICAL_POSITIONS } from "@shared/constants";
+import { LITURGICAL_POSITIONS, getPositionDisplayName } from "@shared/constants";
 
 interface User {
   id: string;
@@ -971,8 +971,8 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                       </Select>
                     ) : (
                       <Input
-                        value={formData.preferredPosition && LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS]
-                          ? LITURGICAL_POSITIONS[formData.preferredPosition as keyof typeof LITURGICAL_POSITIONS]
+                        value={formData.preferredPosition 
+                          ? getPositionDisplayName(formData.preferredPosition)
                           : "-"}
                         disabled
                       />
@@ -1055,7 +1055,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                       {Array.isArray(formData.preferredPositions) && formData.preferredPositions.length > 0 ? (
                         formData.preferredPositions.map((position) => (
                           <Badge key={position} variant="secondary" className="bg-green-100 text-green-700">
-                            {LITURGICAL_POSITIONS[position as keyof typeof LITURGICAL_POSITIONS] || `Posição ${position}`}
+                            {getPositionDisplayName(position)}
                           </Badge>
                         ))
                       ) : (
@@ -1118,7 +1118,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                       {Array.isArray(formData.avoidPositions) && formData.avoidPositions.length > 0 ? (
                         formData.avoidPositions.map((position) => (
                           <Badge key={position} variant="secondary" className="bg-red-100 text-red-700">
-                            {LITURGICAL_POSITIONS[position as keyof typeof LITURGICAL_POSITIONS] || `Posição ${position}`}
+                            {getPositionDisplayName(position)}
                           </Badge>
                         ))
                       ) : (
