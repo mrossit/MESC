@@ -29,6 +29,14 @@ An automatic cache invalidation and version control system ensures users always 
 ## Scheduling System
 The system includes intelligent schedule generation using AI-assisted questionnaire analysis, supporting liturgical positions, mass time management, and automated minister assignment based on availability and experience.
 
+### Special Placeholder Ministers
+The system uses special minister accounts that function as placeholders in schedules:
+- **VACANTE**: Represented by `ministerId = null` in the database. Used for empty positions that need to be filled.
+- **Ministro SM**: A real minister account (ID: `4cf55562-038f-4a0e-a8e4-9b98169f1339`) used as a placeholder for specific purposes. Email: `sm@placeholder.mesc`
+- **Ministro SJME**: A real minister account (ID: `817bf5fd-3df3-412b-acb8-d633927bd308`) used as a placeholder for specific purposes. Email: `sjme@placeholder.mesc`
+
+These special ministers can be assigned to schedule positions like regular ministers but serve as visual markers for positions requiring special attention or coordination.
+
 # External Dependencies
 
 ## Core Infrastructure
