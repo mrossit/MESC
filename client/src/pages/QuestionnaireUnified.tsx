@@ -2085,12 +2085,26 @@ export default function QuestionnaireUnified() {
                     {/* Botão de envio */}
                     <div className="flex justify-center mt-8 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border">
                       {template.status === 'closed' ? (
-                        <Alert variant="destructive">
-                          <Lock className="h-4 w-4" />
-                          <AlertDescription>
-                            Esse questionário não aceita mais respostas
-                          </AlertDescription>
-                        </Alert>
+                        <div className="w-full space-y-3">
+                          <Alert variant="destructive">
+                            <Lock className="h-4 w-4" />
+                            <AlertDescription>
+                              Esse questionário não aceita mais respostas
+                            </AlertDescription>
+                          </Alert>
+                          {isAdmin && (
+                            <Button
+                              onClick={handleReopenQuestionnaire}
+                              disabled={reopening}
+                              className="w-full"
+                              variant="outline"
+                              data-testid="button-reopen-questionnaire-respond"
+                            >
+                              <Unlock className="mr-2 h-4 w-4" />
+                              {reopening ? 'Reabrindo...' : 'Reabrir Questionário'}
+                            </Button>
+                          )}
+                        </div>
                       ) : (
                         <Button
                           onClick={handleSubmitResponse}
@@ -2143,6 +2157,19 @@ export default function QuestionnaireUnified() {
                           : 'Este questionário ainda não está disponível para respostas.'}
                       </AlertDescription>
                     </Alert>
+                    
+                    {isAdmin && template.status === 'closed' && (
+                      <Button
+                        onClick={handleReopenQuestionnaire}
+                        disabled={reopening}
+                        className="w-full"
+                        variant="outline"
+                        data-testid="button-reopen-questionnaire-view"
+                      >
+                        <Unlock className="mr-2 h-4 w-4" />
+                        {reopening ? 'Reabrindo...' : 'Reabrir Questionário'}
+                      </Button>
+                    )}
                     
                     {template.sentAt && (
                       <p className="text-sm text-gray-600">
