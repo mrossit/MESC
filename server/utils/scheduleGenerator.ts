@@ -949,7 +949,7 @@ export class ScheduleGenerator {
     if (!allowedStatuses.includes(targetQuestionnaire.status)) {
       console.log(`[SCHEDULE_GEN] Questionário com status ${targetQuestionnaire.status} não permitido para ${isPreview ? 'preview' : 'geração definitiva'}`);
       if (!isPreview) {
-        throw new Error(`Questionário precisa estar fechado para geração definitiva. Status atual: ${targetQuestionnaire.status}`);
+        throw new Error(`O questionário precisa estar encerrado antes de gerar a escala definitiva. Status atual: "${targetQuestionnaire.status}". Para resolver: acesse "Questionários" no menu, selecione o mês e clique no botão "Encerrar" antes de gerar a escala.`);
       }
       return;
     }
