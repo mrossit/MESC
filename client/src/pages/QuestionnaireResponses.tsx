@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Layout } from '@/components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,9 @@ export default function QuestionnaireResponses() {
   // Summary state
   const [responseSummary, setResponseSummary] = useState<ResponseSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  
+  // Ref para scroll automático
+  const listSectionRef = useRef<HTMLDivElement>(null);
 
   const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -222,70 +225,35 @@ export default function QuestionnaireResponses() {
     return matchesSearch;
   }) || [];
 
+  const scrollToList = () => {
+    // Scroll automático para a lista em modo mobile
+    if (window.innerWidth < 768 && listSectionRef.current) {
+      setTimeout(() => {
+        listSectionRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
+  };
+
   const exportToCSV = async () => {
     if (!status) return;
 
+    // Usar filteredResponses ao invés de status.responses
+    const dataToExport = filteredResponses;
+    
+    const filterDescription = filterTab === 'all' ? 'todos' : 
+                             filterTab === 'responded' ? 'respondidos' :
+                             filterTab === 'pending' ? 'pendentes' :
+                             filterTab === 'available' ? 'disponíveis' :
+                             'indisponíveis';
+
     try {
-      // Use the new API endpoint to export CSV with full questionnaire data
-      const response = await fetch(`/api/questionnaires/export/${selectedYear}/${selectedMonth}/csv?format=detailed`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-
-        // Extract filename from Content-Disposition header or use default
-        const contentDisposition = response.headers.get('Content-Disposition');
-        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-        const filename = filenameMatch ? filenameMatch[1] : `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
-
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        toast({
-          title: 'Exportação completa realizada',
-          description: 'O arquivo CSV com todas as perguntas e respostas foi baixado com sucesso.',
-        });
-      } else {
-        // Fallback to basic export if API fails
-        const csvContent = [
-          ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
-          ...status.responses.map(r => [
-            r.name,
-            r.email,
-            r.phone || '',
-            r.responded ? 'Sim' : 'Não',
-            r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
-            r.availability || ''
-          ])
-        ].map(row => row.join(',')).join('\n');
-
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
-        link.click();
-
-        toast({
-          title: 'Exportação básica realizada',
-          description: 'Foi exportada uma versão simplificada dos dados.',
-        });
-      }
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-
-      // Fallback to basic export on error
+      // Fallback to basic export with filtered data
       const csvContent = [
         ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
-        ...status.responses.map(r => [
+        ...dataToExport.map(r => [
           r.name,
           r.email,
           r.phone || '',
@@ -298,13 +266,20 @@ export default function QuestionnaireResponses() {
       const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `respostas_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
+      link.download = `respostas_${filterDescription}_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
       link.click();
 
       toast({
-        title: 'Exportação básica realizada',
-        description: 'Não foi possível exportar os dados completos, mas uma versão simplificada foi baixada.',
-        variant: 'default',
+        title: 'Exportação realizada',
+        description: `Exportados ${dataToExport.length} ministro(s) com filtro: ${filterDescription}`,
+      });
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+
+      toast({
+        title: 'Erro na exportação',
+        description: 'Não foi possível exportar os dados. Por favor, tente novamente.',
+        variant: 'destructive',
       });
     }
   };
@@ -477,7 +452,9 @@ export default function QuestionnaireResponses() {
                 onClick={() => {
                   setViewMode('list');
                   setFilterTab('all');
+                  scrollToList();
                 }}
+                data-testid="card-total-ministros"
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
                   <CardTitle className="text-sm font-medium">
@@ -498,7 +475,9 @@ export default function QuestionnaireResponses() {
                 onClick={() => {
                   setViewMode('list');
                   setFilterTab('responded');
+                  scrollToList();
                 }}
+                data-testid="card-responderam"
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50">
                   <CardTitle className="text-sm font-medium">
@@ -521,7 +500,9 @@ export default function QuestionnaireResponses() {
                 onClick={() => {
                   setViewMode('list');
                   setFilterTab('pending');
+                  scrollToList();
                 }}
+                data-testid="card-pendentes"
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950 dark:to-orange-900/50">
                   <CardTitle className="text-sm font-medium">
@@ -544,7 +525,9 @@ export default function QuestionnaireResponses() {
                 onClick={() => {
                   setViewMode('list');
                   setFilterTab('all');
+                  scrollToList();
                 }}
+                data-testid="card-taxa-resposta"
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950 dark:to-purple-900/50">
                   <CardTitle className="text-sm font-medium">
@@ -564,7 +547,7 @@ export default function QuestionnaireResponses() {
 
             {/* Content based on view mode */}
             {viewMode === 'list' ? (
-              <Card className="border-opacity-30">
+              <Card className="border-opacity-30" ref={listSectionRef}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -613,121 +596,215 @@ export default function QuestionnaireResponses() {
                     </TabsList>
 
                     <TabsContent value={filterTab} className="mt-4">
-                      <div className="rounded-md border overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-12">Status</TableHead>
-                              <TableHead>Nome</TableHead>
-                              <TableHead className="hidden sm:table-cell">Email</TableHead>
-                              <TableHead className="hidden md:table-cell">Telefone</TableHead>
-                              <TableHead>Disponibilidade</TableHead>
-                              <TableHead className="hidden lg:table-cell">Data Resposta</TableHead>
-                              <TableHead className="w-12">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredResponses.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={7} className="text-center py-8">
-                                  <div className="space-y-2">
-                                    <p className="text-muted-foreground">
-                                      {status.totalMinisters === 0 
-                                        ? "Ainda não há ministros ou coordenadores cadastrados no sistema."
-                                        : searchTerm 
-                                          ? "Nenhum resultado encontrado para sua busca."
-                                          : filterTab !== 'all' 
-                                            ? "Nenhum resultado para o filtro selecionado."
-                                            : "Nenhum ministro ou coordenador encontrado."}
-                                    </p>
-                                    {status.totalMinisters === 0 && (
-                                      <p className="text-sm text-muted-foreground">
-                                        Cadastre os ministros e coordenadores na página "Usuários" para começar.
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredResponses.map((minister) => (
-                                <TableRow key={minister.id}>
-                                  <TableCell>
-                                    {minister.responded ? (
-                                      <CheckCircle className="h-5 w-5 text-green-500" />
-                                    ) : (
-                                      <Clock className="h-5 w-5 text-orange-500" />
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {minister.name}
-                                  </TableCell>
-                                  <TableCell className="hidden sm:table-cell">
-                                    <a 
-                                      href={`mailto:${minister.email}`} 
-                                      className="text-primary hover:underline inline-flex items-center gap-1"
-                                    >
-                                      <Mail className="h-3 w-3" />
-                                      <span className="text-xs">{minister.email}</span>
-                                    </a>
-                                  </TableCell>
-                                  <TableCell className="hidden md:table-cell">
-                                    {minister.phone ? (
+                      {filteredResponses.length === 0 ? (
+                        <div className="text-center py-8 border rounded-md">
+                          <div className="space-y-2">
+                            <p className="text-muted-foreground">
+                              {status.totalMinisters === 0 
+                                ? "Ainda não há ministros ou coordenadores cadastrados no sistema."
+                                : searchTerm 
+                                  ? "Nenhum resultado encontrado para sua busca."
+                                  : filterTab !== 'all' 
+                                    ? "Nenhum resultado para o filtro selecionado."
+                                    : "Nenhum ministro ou coordenador encontrado."}
+                            </p>
+                            {status.totalMinisters === 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                Cadastre os ministros e coordenadores na página "Usuários" para começar.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Desktop: Table view */}
+                          <div className="hidden md:block rounded-md border overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-12">Status</TableHead>
+                                  <TableHead>Nome</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Telefone</TableHead>
+                                  <TableHead>Disponibilidade</TableHead>
+                                  <TableHead className="hidden lg:table-cell">Data Resposta</TableHead>
+                                  <TableHead className="w-12">Ações</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredResponses.map((minister) => (
+                                  <TableRow key={minister.id}>
+                                    <TableCell>
+                                      {minister.responded ? (
+                                        <CheckCircle className="h-5 w-5 text-green-500" />
+                                      ) : (
+                                        <Clock className="h-5 w-5 text-orange-500" />
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      {minister.name}
+                                    </TableCell>
+                                    <TableCell>
                                       <a 
-                                        href={`tel:${minister.phone}`} 
+                                        href={`mailto:${minister.email}`} 
                                         className="text-primary hover:underline inline-flex items-center gap-1"
                                       >
-                                        <Phone className="h-3 w-3" />
-                                        <span className="text-xs">{minister.phone}</span>
+                                        <Mail className="h-3 w-3" />
+                                        <span className="text-xs">{minister.email}</span>
                                       </a>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {minister.availability ? (
-                                      <Badge 
-                                        variant={minister.availability === 'Disponível' ? 'default' : 'secondary'}
-                                        className={cn(
-                                          "cursor-pointer transition-all hover:scale-105",
-                                          minister.availability === 'Disponível' 
-                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100' 
-                                            : 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-100'
+                                    </TableCell>
+                                    <TableCell>
+                                      {minister.phone ? (
+                                        <a 
+                                          href={`tel:${minister.phone}`} 
+                                          className="text-primary hover:underline inline-flex items-center gap-1"
+                                        >
+                                          <Phone className="h-3 w-3" />
+                                          <span className="text-xs">{minister.phone}</span>
+                                        </a>
+                                      ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {minister.availability ? (
+                                        <Badge 
+                                          variant={minister.availability === 'Disponível' ? 'default' : 'secondary'}
+                                          className={cn(
+                                            "cursor-pointer transition-all hover:scale-105",
+                                            minister.availability === 'Disponível' 
+                                              ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100' 
+                                              : 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-100'
+                                          )}
+                                          onClick={() => minister.responded && fetchDetailedResponse(minister)}
+                                        >
+                                          {minister.availability}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="hidden lg:table-cell text-muted-foreground">
+                                      {minister.respondedAt ? (
+                                        <span className="inline-flex items-center gap-1 text-xs">
+                                          <Calendar className="h-3 w-3" />
+                                          {new Date(minister.respondedAt).toLocaleDateString('pt-BR')}
+                                        </span>
+                                      ) : (
+                                        '-'
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {minister.responded && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => fetchDetailedResponse(minister)}
+                                          data-testid={`button-preview-${minister.id}`}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+
+                          {/* Mobile: Card view */}
+                          <div className="md:hidden space-y-3">
+                            {filteredResponses.map((minister) => (
+                              <Card 
+                                key={minister.id} 
+                                className={cn(
+                                  "overflow-hidden transition-all",
+                                  minister.responded && "cursor-pointer hover:shadow-md"
+                                )}
+                                onClick={() => minister.responded && fetchDetailedResponse(minister)}
+                                data-testid={`card-minister-${minister.id}`}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    {/* Header */}
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-center gap-2">
+                                        {minister.responded ? (
+                                          <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                        ) : (
+                                          <Clock className="h-5 w-5 text-orange-500 flex-shrink-0" />
                                         )}
-                                        onClick={() => minister.responded && fetchDetailedResponse(minister)}
+                                        <div className="min-w-0 flex-1">
+                                          <h3 className="font-medium truncate">{minister.name}</h3>
+                                        </div>
+                                      </div>
+                                      {minister.responded && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            fetchDetailedResponse(minister);
+                                          }}
+                                          data-testid={`button-preview-mobile-${minister.id}`}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                    {/* Disponibilidade */}
+                                    {minister.availability && (
+                                      <div>
+                                        <Badge 
+                                          variant={minister.availability === 'Disponível' ? 'default' : 'secondary'}
+                                          className={cn(
+                                            minister.availability === 'Disponível' 
+                                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
+                                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                                          )}
+                                        >
+                                          {minister.availability}
+                                        </Badge>
+                                      </div>
+                                    )}
+
+                                    {/* Contact info */}
+                                    <div className="space-y-2 text-sm">
+                                      <a 
+                                        href={`mailto:${minister.email}`} 
+                                        className="flex items-center gap-2 text-primary hover:underline"
+                                        onClick={(e) => e.stopPropagation()}
                                       >
-                                        {minister.availability}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="hidden lg:table-cell text-muted-foreground">
-                                    {minister.respondedAt ? (
-                                      <span className="inline-flex items-center gap-1 text-xs">
-                                        <Calendar className="h-3 w-3" />
-                                        {new Date(minister.respondedAt).toLocaleDateString('pt-BR')}
-                                      </span>
-                                    ) : (
-                                      '-'
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {minister.responded && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => fetchDetailedResponse(minister)}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                        <Mail className="h-4 w-4 flex-shrink-0" />
+                                        <span className="truncate">{minister.email}</span>
+                                      </a>
+                                      
+                                      {minister.phone && (
+                                        <a 
+                                          href={`tel:${minister.phone}`} 
+                                          className="flex items-center gap-2 text-primary hover:underline"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Phone className="h-4 w-4 flex-shrink-0" />
+                                          <span>{minister.phone}</span>
+                                        </a>
+                                      )}
+
+                                      {minister.respondedAt && (
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                          <Calendar className="h-4 w-4 flex-shrink-0" />
+                                          <span>Respondido em {new Date(minister.respondedAt).toLocaleDateString('pt-BR')}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </CardContent>
