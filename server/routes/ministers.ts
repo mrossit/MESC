@@ -64,7 +64,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
     const allowedFields = [
       'birthDate', 'address', 'city', 'zipCode',
       'emergencyContact', 'emergencyPhone',
-      'preferredPosition',
+      'preferredPosition', 'preferredPositions', 'avoidPositions',
       'availableForSpecialEvents', 'canServeAsCouple', 'spouseUserId',
       'experience', 'specialSkills', 'liturgicalTraining',
       'observations', 'active', 'scheduleDisplayName'
@@ -77,6 +77,9 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
         if (field === 'specialSkills') {
           // TEXT field - can be stringified if needed for complex data
           updateData[field] = typeof req.body[field] === 'string' ? req.body[field] : JSON.stringify(req.body[field]);
+        } else if (['preferredPositions', 'avoidPositions'].includes(field)) {
+          // JSONB array fields - ensure they are arrays
+          updateData[field] = Array.isArray(req.body[field]) ? req.body[field] : [];
         } else if (['liturgicalTraining', 'formationCompleted'].includes(field)) {
           // BOOLEAN fields - store as raw boolean values
           updateData[field] = Boolean(req.body[field]);
