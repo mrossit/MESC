@@ -2008,6 +2008,9 @@ export class ScheduleGenerator {
    * - 👨‍👩‍👧‍👦 GROUPS families together when prefer_serve_together is true
    * - Sorts by assignment count (least assigned first)
    * - Ensures everyone gets at least 1 before anyone gets 3
+   * - ⛪ SUNDAY PRIORITIZATION: For Sunday Masses, prioritizes ministers whose
+   *   preferredTimes matches the Mass time (Tier A) before considering other
+   *   available ministers (Tier B)
    */
   private selectOptimalMinisters(available: Minister[], massTime: MassTime): Minister[] {
     const targetCount = massTime.minMinisters;
@@ -2017,17 +2020,57 @@ export class ScheduleGenerator {
     // Quando um ministro marca disponibilidade para dias da semana, ele está se disponibilizando
     // para TODOS aqueles dias no mês, não apenas para 4 vezes.
     const isDailyMass = massTime.type === 'missa_diaria';
+    
+    // ⛪ SUNDAY PRIORITIZATION: Separate ministers by preferred time match
+    const isSunday = massTime.dayOfWeek === 0;
 
     console.log(`\n[FAIR_ALGORITHM] ========================================`);
     console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
     console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
     console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
     console.log(`[FAIR_ALGORITHM] Is daily mass (no monthly limit): ${isDailyMass}`);
+    console.log(`[FAIR_ALGORITHM] Is Sunday (prioritize preferredTimes): ${isSunday}`);
+
+    // ⛪ SUNDAY PRIORITIZATION: Separate into Tier A (preferred time match) and Tier B (alternatives)
+    let tierA: Minister[] = [];
+    let tierB: Minister[] = [];
+    
+    if (isSunday) {
+      // Helper function to check if mass time matches preferred times
+      const matchesPreferredTime = (minister: Minister): boolean => {
+        if (!minister.preferredTimes || minister.preferredTimes.length === 0) return false;
+        
+        // Check if any preferred time matches this mass time
+        // preferredTimes can be in formats: "08:00", "8:00", "08:00:00"
+        return minister.preferredTimes.some(prefTime => {
+          const normalizedPref = prefTime.trim();
+          const normalizedMass = massTime.time.trim();
+          
+          // Direct match
+          if (normalizedPref === normalizedMass) return true;
+          
+          // Try matching without seconds
+          const prefHM = normalizedPref.substring(0, 5);
+          const massHM = normalizedMass.substring(0, 5);
+          return prefHM === massHM;
+        });
+      };
+      
+      tierA = available.filter(m => matchesPreferredTime(m));
+      tierB = available.filter(m => !matchesPreferredTime(m));
+      
+      console.log(`[SUNDAY_PRIORITY] ⛪ Tier A (preferred time ${massTime.time}): ${tierA.length} ministers`);
+      console.log(`[SUNDAY_PRIORITY] Tier A ministers: ${tierA.map(m => m.name).join(', ')}`);
+      console.log(`[SUNDAY_PRIORITY] ⛪ Tier B (alternatives): ${tierB.length} ministers`);
+    }
+    
+    // For processing, we'll use tiered approach for Sundays, normal flow for other days
+    const poolToProcess = isSunday ? tierA : available;
 
     // 1. Filter out ministers who:
     //    - Already reached monthly limit (4 assignments) - EXCETO para missas diárias
     //    - Already served on this date
-    const eligible = available.filter(minister => {
+    const eligible = poolToProcess.filter(minister => {
       if (!minister.id) return false; // Skip VACANTE
 
       const assignmentCount = minister.monthlyAssignmentCount || 0;
@@ -2179,16 +2222,84 @@ export class ScheduleGenerator {
     // 4. Check if target was met
     if (selected.length < targetCount) {
       const shortage = targetCount - selected.length;
-      logger.warn(`⚠️ [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${shortage})`);
-      console.log(`[FAIR_ALGORITHM] ⚠️ INCOMPLETE: ${selected.length}/${targetCount}`);
-      console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
+      
+      // ⛪ SUNDAY PRIORITIZATION: If we're on Sunday and didn't fill all spots with Tier A,
+      // try to fill remaining spots with Tier B (alternative ministers)
+      if (isSunday && tierB.length > 0) {
+        console.log(`\n[SUNDAY_PRIORITY] ⛪ Tier A incomplete (${selected.length}/${targetCount})`);
+        console.log(`[SUNDAY_PRIORITY] 🔄 Attempting to fill ${shortage} spots with Tier B (alternatives)...`);
+        
+        // Process Tier B using same logic (filter for eligibility, sort, select)
+        const eligibleTierB = tierB.filter(minister => {
+          if (!minister.id) return false;
+          const assignmentCount = minister.monthlyAssignmentCount || 0;
+          const alreadyServedToday = minister.lastAssignedDate === massTime.date;
+          
+          if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
+          if (alreadyServedToday) return false;
+          if (used.has(minister.id)) return false;
+          
+          return true;
+        });
+        
+        const sortedTierB = [...eligibleTierB].sort((a, b) => {
+          const countA = a.monthlyAssignmentCount || 0;
+          const countB = b.monthlyAssignmentCount || 0;
+          if (countA !== countB) return countA - countB;
+          
+          const lastServiceA = a.lastService ? a.lastService.getTime() : 0;
+          const lastServiceB = b.lastService ? b.lastService.getTime() : 0;
+          if (lastServiceA !== lastServiceB) return lastServiceA - lastServiceB;
+          
+          return a.totalServices - b.totalServices;
+        });
+        
+        console.log(`[SUNDAY_PRIORITY] Tier B eligible: ${eligibleTierB.length} ministers`);
+        
+        // Select from Tier B to fill remaining spots
+        for (const minister of sortedTierB) {
+          if (selected.length >= targetCount) break;
+          if (!minister.id || used.has(minister.id)) continue;
+          
+          // Check family constraints
+          if (minister.familyId && this.familyGroups.has(minister.familyId)) {
+            const familyId = minister.familyId;
+            const preferTogether = this.familyPreferences.get(familyId) ?? true;
+            if (preferTogether && !processedFamilies.has(familyId)) {
+              console.log(`[SUNDAY_PRIORITY] ⏭️  Skipping ${minister.name}: Family prefers to serve together`);
+              continue;
+            }
+          }
+          
+          selected.push(minister);
+          used.add(minister.id);
+          minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+          minister.lastAssignedDate = massTime.date;
+          
+          console.log(`[SUNDAY_PRIORITY] ✅ Selected from Tier B: ${minister.name} (alternative time, now ${minister.monthlyAssignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
+        }
+        
+        if (selected.length >= targetCount) {
+          console.log(`[SUNDAY_PRIORITY] ✅ SUCCESS: Filled all ${targetCount} spots (Tier A + Tier B)`);
+        } else {
+          console.log(`[SUNDAY_PRIORITY] ⚠️ Still incomplete: ${selected.length}/${targetCount} after Tier B`);
+        }
+      }
+      
+      // Final check after potential Tier B fill
+      if (selected.length < targetCount) {
+        const finalShortage = targetCount - selected.length;
+        logger.warn(`⚠️ [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${finalShortage})`);
+        console.log(`[FAIR_ALGORITHM] ⚠️ INCOMPLETE: ${selected.length}/${targetCount}`);
+        console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
 
-      // Mark as incomplete
-      selected.forEach(m => {
-        (m as any).scheduleIncomplete = true;
-        (m as any).requiredCount = targetCount;
-        (m as any).actualCount = selected.length;
-      });
+        // Mark as incomplete
+        selected.forEach(m => {
+          (m as any).scheduleIncomplete = true;
+          (m as any).requiredCount = targetCount;
+          (m as any).actualCount = selected.length;
+        });
+      }
     } else {
       console.log(`[FAIR_ALGORITHM] ✅ SUCCESS: Selected ${selected.length}/${targetCount} ministers`);
     }
