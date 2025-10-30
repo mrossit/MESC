@@ -646,10 +646,14 @@ router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coord
     // Verificar se há escalas publicadas para o mês/ano deste questionário
     const { month, year } = template;
     
+    console.log('[REOPEN] Verificando escalas publicadas para:', { month, year });
+    
     // Calcular range de datas para o mês
     const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    console.log('[REOPEN] Range de datas:', { startDateStr, endDateStr });
     
     // Buscar escalas publicadas neste período
     const publishedSchedules = await db
@@ -664,12 +668,17 @@ router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coord
       )
       .limit(1); // Só precisamos saber se existe pelo menos uma
     
+    console.log('[REOPEN] Escalas publicadas encontradas:', publishedSchedules.length);
+    
     if (publishedSchedules.length > 0) {
+      console.log('[REOPEN] BLOQUEADO - Escalas publicadas existem:', publishedSchedules[0]);
       return res.status(400).json({ 
         error: `Não é possível reabrir o questionário de ${getMonthName(month)}/${year} pois já existem escalas publicadas para este período. Para reabrir o questionário, primeiro é necessário despublicar as escalas.`,
         hasPublishedSchedules: true
       });
     }
+    
+    console.log('[REOPEN] Nenhuma escala publicada encontrada - permitindo reabertura');
     
     const [updated] = await db
       .update(questionnaires)
