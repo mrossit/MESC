@@ -50,7 +50,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, parseScheduleDate } from "@/lib/utils";
-import { LITURGICAL_POSITIONS } from "@shared/constants";
+import { LITURGICAL_POSITIONS, getPositionDisplayName } from "@shared/constants";
 
 // Definir mínimos de ministros por horário de missa
 const MINIMUM_MINISTERS: Record<string, number> = {
@@ -825,7 +825,7 @@ export default function Substitutions() {
                                   <span className="font-medium whitespace-nowrap">Posição:</span>
                                 </div>
                                 <Badge variant="secondary" className="text-xs ml-6 sm:ml-0 self-start sm:self-auto">
-                                  Posição {item.assignment?.position || 1} ({LITURGICAL_POSITIONS[item.assignment?.position || 1]})
+                                  {getPositionDisplayName(item.assignment?.position || 1)}
                                 </Badge>
                               </div>
                             </div>
@@ -1102,7 +1102,7 @@ export default function Substitutions() {
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Posição:</span>{" "}
-                  Posição {selectedRequest.assignment.position} ({LITURGICAL_POSITIONS[selectedRequest.assignment.position]})
+                  {getPositionDisplayName(selectedRequest.assignment.position)}
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Motivo:</span> {selectedRequest.request.reason}
@@ -1259,7 +1259,7 @@ export default function Substitutions() {
                     upcomingAssignments.map((assignment) => (
                       <SelectItem key={assignment.id} value={assignment.id}>
                         {format(new Date(assignment.date), "dd/MM/yyyy")} às{" "}
-                        {assignment.massTime} - Posição {assignment.position} ({LITURGICAL_POSITIONS[assignment.position]})
+                        {assignment.massTime} - {getPositionDisplayName(assignment.position)}
                       </SelectItem>
                     ))
                   )}

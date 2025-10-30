@@ -18,7 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { LITURGICAL_POSITIONS, MASS_TIMES_BY_DAY, WEEKDAY_NAMES, getMassTimesForDate } from '@shared/constants';
+import { LITURGICAL_POSITIONS, getPositionDisplayName, MASS_TIMES_BY_DAY, WEEKDAY_NAMES, getMassTimesForDate } from '@shared/constants';
 import { clearEditCache } from '@/lib/cacheManager';
 
 interface ScheduleAssignment {
@@ -528,7 +528,7 @@ export default function ScheduleEditor() {
                   <div className="mt-2 space-y-1">
                     <p>📅 Data: {format(new Date(editingAssignment.date), "dd 'de' MMMM", { locale: ptBR })}</p>
                     <p>⏰ Horário: {editingAssignment.massTime}</p>
-                    <p>📍 Posição: {LITURGICAL_POSITIONS[editingAssignment.position]}</p>
+                    <p>📍 {getPositionDisplayName(editingAssignment.position)}</p>
                   </div>
                 )}
               </DialogDescription>
@@ -658,7 +658,7 @@ export default function ScheduleEditor() {
                                     variant={minister.preferredPosition === editingAssignment.position ? "default" : "outline"}
                                     className="text-xs"
                                   >
-                                    {LITURGICAL_POSITIONS[minister.preferredPosition]}
+                                    {getPositionDisplayName(minister.preferredPosition)}
                                   </Badge>
                                 )}
                               </div>

@@ -30,6 +30,18 @@ export const LITURGICAL_POSITIONS: Record<number, string> = {
   28: "Átrio Externo 5"
 };
 
+/**
+ * Formats position display as "Posição X (Name)"
+ * Example: getPositionDisplayName(1) returns "Posição 1 (Auxiliar 1)"
+ */
+export function getPositionDisplayName(positionNumber: number): string {
+  const name = LITURGICAL_POSITIONS[positionNumber];
+  if (name) {
+    return `Posição ${positionNumber} (${name})`;
+  }
+  return `Posição ${positionNumber}`;
+}
+
 // Mass times by day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
 // Base schedule - special rules applied by getMassTimesForDate function
 export const MASS_TIMES_BY_DAY: string[][] = [
