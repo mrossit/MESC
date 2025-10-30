@@ -284,6 +284,51 @@ export default function QuestionnaireResponses() {
     }
   };
 
+  const exportSpecificList = async (type: 'responded' | 'pending') => {
+    if (!status) return;
+
+    // Filtrar por tipo específico
+    const dataToExport = status.responses.filter(minister => 
+      type === 'responded' ? minister.responded : !minister.responded
+    );
+    
+    const filterDescription = type === 'responded' ? 'respondidos' : 'nao_respondidos';
+    const title = type === 'responded' ? 'Respondidos' : 'Não Respondidos';
+
+    try {
+      const csvContent = [
+        ['Nome', 'Email', 'Telefone', 'Respondido', 'Data Resposta', 'Disponibilidade'],
+        ...dataToExport.map(r => [
+          r.name,
+          r.email,
+          r.phone || '',
+          r.responded ? 'Sim' : 'Não',
+          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
+          r.availability || ''
+        ])
+      ].map(row => row.join(',')).join('\n');
+
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `ministros_${filterDescription}_${monthNames[selectedMonth - 1]}_${selectedYear}.csv`;
+      link.click();
+
+      toast({
+        title: 'Exportação realizada',
+        description: `Exportados ${dataToExport.length} ministro(s) - ${title}`,
+      });
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+
+      toast({
+        title: 'Erro na exportação',
+        description: 'Não foi possível exportar os dados. Por favor, tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatAnswer = (answer: any): string => {
     // Verificar null/undefined primeiro
     if (answer === null || answer === undefined) {
@@ -404,15 +449,44 @@ export default function QuestionnaireResponses() {
                 </SelectContent>
               </Select>
               
-              <div className="flex gap-2 ml-auto">
+              <div className="flex flex-wrap gap-2 ml-auto">
                 <Button 
                   onClick={fetchResponseStatus} 
                   disabled={loading}
                   variant="outline"
                   size="sm"
+                  data-testid="button-refresh"
                 >
                   <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                  Atualizar
+                  <span className="hidden sm:inline">Atualizar</span>
+                </Button>
+                
+                <Button
+                  onClick={() => exportSpecificList('responded')}
+                  disabled={!status || !status.templateExists || status.respondedCount === 0}
+                  variant="outline"
+                  size="sm"
+                  className="bg-green-50 hover:bg-green-100 dark:bg-green-950 dark:hover:bg-green-900 border-green-200 dark:border-green-800"
+                  title="Exportar lista de ministros que responderam"
+                  data-testid="button-export-responded"
+                >
+                  <Download className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                  <span className="hidden sm:inline">Respondidos</span>
+                  <span className="sm:hidden">Resp.</span>
+                </Button>
+
+                <Button
+                  onClick={() => exportSpecificList('pending')}
+                  disabled={!status || !status.templateExists || status.pendingCount === 0}
+                  variant="outline"
+                  size="sm"
+                  className="bg-orange-50 hover:bg-orange-100 dark:bg-orange-950 dark:hover:bg-orange-900 border-orange-200 dark:border-orange-800"
+                  title="Exportar lista de ministros que não responderam"
+                  data-testid="button-export-pending"
+                >
+                  <Download className="h-4 w-4 mr-2 text-orange-600 dark:text-orange-400" />
+                  <span className="hidden sm:inline">Não Resp.</span>
+                  <span className="sm:hidden">Pend.</span>
                 </Button>
                 
                 <Button
@@ -420,10 +494,12 @@ export default function QuestionnaireResponses() {
                   disabled={!status || !status.templateExists}
                   variant="outline"
                   size="sm"
-                  title="Exporta o CSV com todas as perguntas e respostas"
+                  title="Exporta o CSV com todas as perguntas e respostas (respeita o filtro ativo)"
+                  data-testid="button-export-csv"
                 >
                   <FileDown className="h-4 w-4 mr-2" />
-                  Exportar CSV
+                  <span className="hidden sm:inline">Exportar CSV</span>
+                  <span className="sm:hidden">CSV</span>
                 </Button>
               </div>
             </div>
