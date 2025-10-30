@@ -293,6 +293,7 @@ router.post("/colegas", async (req, res) => {
         position: schedules.position,
         notes: schedules.notes,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         ministerPhone: users.phone,
         ministerWhatsapp: users.whatsapp
       })

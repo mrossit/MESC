@@ -102,6 +102,7 @@ router.get("/panel/:scheduleId", requireAuth, async (req: AuthRequest, res: Resp
         ministerId: schedules.ministerId,
         position: schedules.position,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         ministerPhone: users.phone,
         ministerWhatsapp: users.whatsapp,
         onSiteAdjustments: schedules.onSiteAdjustments
@@ -129,6 +130,7 @@ router.get("/panel/:scheduleId", requireAuth, async (req: AuthRequest, res: Resp
         id: standbyMinisters.id,
         ministerId: standbyMinisters.ministerId,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         ministerPhone: users.phone,
         ministerWhatsapp: users.whatsapp,
         confirmedAvailable: standbyMinisters.confirmedAvailable,
@@ -243,6 +245,7 @@ router.get("/standby/:scheduleId", requireAuth, async (req: AuthRequest, res: Re
       .select({
         ministerId: users.id,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         phone: users.phone,
         whatsapp: users.whatsapp,
         totalServices: users.totalServices,

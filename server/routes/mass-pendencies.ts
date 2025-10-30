@@ -61,6 +61,7 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
         location: schedules.location,
         ministerId: schedules.ministerId,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         position: schedules.position,
         status: schedules.status,
         id: schedules.id

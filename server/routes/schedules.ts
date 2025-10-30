@@ -104,6 +104,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         scheduleId: schedules.id,
         ministerId: schedules.ministerId,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         date: schedules.date,
         massTime: schedules.time,
         position: schedules.position,
@@ -193,6 +194,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         position: number;
         confirmed: boolean;
         ministerName: string | null;
+        scheduleDisplayName: string | null;
         photoUrl: string | null;
         notes: string | null;
         status: string;
@@ -209,6 +211,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             position: sql`COALESCE(${schedules.position}, 0)`.as('position'),
             confirmed: sql`true`.as('confirmed'),
             ministerName: users.name,
+            scheduleDisplayName: users.scheduleDisplayName,
             photoUrl: users.photoUrl,
             notes: schedules.notes,
             status: schedules.status

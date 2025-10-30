@@ -993,7 +993,8 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
         position: schedules.position,
         status: schedules.status,
         notes: schedules.notes,
-        ministerName: users.name
+        ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName
       })
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
@@ -1045,6 +1046,7 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
         id: schedules.id,
         ministerId: schedules.ministerId,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         status: schedules.status,
         notes: schedules.notes,
         type: schedules.type,
