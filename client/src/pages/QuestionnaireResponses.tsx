@@ -909,9 +909,9 @@ export default function QuestionnaireResponses() {
                 <div className="space-y-4">
                   {(() => {
                     try {
-
                       // Verificar estrutura dos dados
                       if (!detailedResponse?.template?.questions || !Array.isArray(detailedResponse.template.questions)) {
+                        console.warn('[PREVIEW] No questions in template');
                         return (
                           <div className="text-center py-4 text-muted-foreground">
                             Nenhuma pergunta disponível
@@ -920,60 +920,80 @@ export default function QuestionnaireResponses() {
                       }
 
                       // Converter respostas para formato de objeto se estiverem em array
-                      let responsesObj = {};
+                      let responsesObj: Record<string, any> = {};
                       const rawResponses = detailedResponse?.response?.responses;
+
+                      console.log('[PREVIEW] Raw responses:', rawResponses);
+                      console.log('[PREVIEW] Template questions count:', detailedResponse.template.questions.length);
 
                       if (Array.isArray(rawResponses)) {
                         // Se for array de objetos {questionId, answer}
-                        rawResponses.forEach(r => {
+                        rawResponses.forEach((r: any) => {
                           if (r.questionId) {
                             responsesObj[r.questionId] = r.answer;
                           }
                         });
-                      } else if (typeof rawResponses === 'object') {
+                      } else if (typeof rawResponses === 'object' && rawResponses !== null) {
                         // Se já for objeto
-                        responsesObj = rawResponses || {};
+                        responsesObj = rawResponses;
                       }
 
-                      const questionElements = [];
+                      console.log('[PREVIEW] Processed responses:', responsesObj);
 
-                      for (let i = 0; i < detailedResponse.template.questions.length; i++) {
-                        const question = detailedResponse.template.questions[i];
-                        const answer = responsesObj[question.id];
+                      // Mapear todas as perguntas com suas respostas
+                      const questionElements = detailedResponse.template.questions
+                        .map((question: any, i: number) => {
+                          // Usar question.id para buscar a resposta
+                          const answer = responsesObj[question.id];
 
+                          // Debug
+                          console.log(`[PREVIEW] Question ${i}:`, {
+                            id: question.id,
+                            question: question.text || question.question,
+                            hasAnswer: answer !== undefined && answer !== null && answer !== '',
+                            answer
+                          });
 
-                        // Pular perguntas condicionais não aplicáveis
-                        if (question.conditional) {
-                          const parentAnswer = responsesObj[question.conditional.questionId];
-                          if (parentAnswer !== question.conditional.value) {
-                            continue;
+                          // Pular perguntas condicionais não aplicáveis
+                          if (question.conditional) {
+                            const parentAnswer = responsesObj[question.conditional.questionId];
+                            if (parentAnswer !== question.conditional.value) {
+                              console.log(`[PREVIEW] Skipping conditional question ${i} - condition not met`);
+                              return null;
+                            }
                           }
-                        }
 
-                        // Pular se não houver resposta (mas permitir false e 0)
-                        if (answer === undefined || answer === null || answer === '') {
-                          continue;
-                        }
+                          // Pular se não houver resposta (mas permitir false e 0)
+                          if (answer === undefined || answer === null || answer === '') {
+                            console.log(`[PREVIEW] Skipping question ${i} - no answer`);
+                            return null;
+                          }
 
-                        questionElements.push(
-                          <div key={question.id || `q-${i}`} className="space-y-2">
-                            <div className="font-medium text-sm">
-                              {question.text || question.question || `Pergunta ${i + 1}`}
+                          return (
+                            <div key={question.id || `q-${i}`} className="space-y-2">
+                              <div className="font-medium text-sm">
+                                {question.text || question.question || `Pergunta ${i + 1}`}
+                              </div>
+                              <div className="p-3 bg-muted/30 rounded-md">
+                                <span className="text-sm">{formatAnswer(answer)}</span>
+                              </div>
                             </div>
-                            <div className="p-3 bg-muted/30 rounded-md">
-                              <span className="text-sm">{formatAnswer(answer)}</span>
-                            </div>
-                          </div>
-                        );
-                      }
+                          );
+                        })
+                        .filter((element): element is JSX.Element => element !== null);
+
+                      console.log('[PREVIEW] Final question elements count:', questionElements.length);
 
                       return questionElements.length > 0 ? questionElements : (
                         <div className="text-center py-4 text-muted-foreground">
-                          Nenhuma resposta encontrada
+                          <p>Nenhuma resposta encontrada</p>
+                          <p className="text-xs mt-2">
+                            Total de perguntas: {detailedResponse.template.questions.length}
+                          </p>
                         </div>
                       );
                     } catch (error) {
-                      console.error('Error rendering responses:', error);
+                      console.error('[PREVIEW] Error rendering responses:', error);
                       return (
                         <div className="text-center py-4 text-red-500">
                           Erro ao exibir respostas. Por favor, tente novamente.
