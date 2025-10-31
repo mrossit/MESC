@@ -999,11 +999,27 @@ export class ScheduleGenerator {
       this.availabilityData.set(r.userId, processedData);
 
       // 🆕 ADD RAW QUESTIONNAIRE RESPONSE to minister object for v2.0 availability checking
+      // ⛪ CRITICAL FIX: Also populate preferredTimes from questionnaire for Sunday prioritization
       const minister = this.ministers.find(m => m.id === r.userId);
       if (minister) {
         minister.questionnaireResponse = {
           responses: r.responses
         };
+        
+        // ⛪ SUNDAY PRIORITIZATION: Convert normalized times back to HH:MM format for algorithm
+        // normalized format is "8h", "10h", "19h" -> convert to "08:00", "10:00", "19:00"
+        if (preferredMassTimes && preferredMassTimes.length > 0) {
+          minister.preferredTimes = preferredMassTimes.map(time => {
+            // Extract hour from formats like "08:00", "8:00", "08h", "8h"
+            const hourMatch = time.match(/^(\d{1,2})/);
+            if (hourMatch) {
+              const hour = parseInt(hourMatch[1]);
+              return `${hour.toString().padStart(2, '0')}:00:00`;
+            }
+            return time;
+          });
+          console.log(`[SUNDAY_PRIORITY] ⛪ Populated preferredTimes for ${minister.name}: ${minister.preferredTimes.join(', ')}`);
+        }
       }
     });
 
