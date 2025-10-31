@@ -30,12 +30,26 @@ async function importNovemberSchedule() {
     const userMap = new Map<string, string>();
     
     allUsers.forEach(user => {
-      // Normalizar nome para comparação
+      // Priorizar schedule_display_name (apelido usado nas escalas)
+      if (user.scheduleDisplayName) {
+        const normalizedDisplayName = user.scheduleDisplayName.trim().toLowerCase();
+        userMap.set(normalizedDisplayName, user.id);
+      }
+      
+      // Também adicionar nome completo como alternativa
       const normalizedName = user.name.trim().toLowerCase();
-      userMap.set(normalizedName, user.id);
+      if (!userMap.has(normalizedName)) {
+        userMap.set(normalizedName, user.id);
+      }
+      
+      // Adicionar primeiro nome como última opção
+      const firstName = user.name.split(' ')[0].trim().toLowerCase();
+      if (!userMap.has(firstName)) {
+        userMap.set(firstName, user.id);
+      }
     });
 
-    console.log(`👥 ${userMap.size} ministros carregados do banco\n`);
+    console.log(`👥 ${allUsers.length} ministros carregados do banco (${userMap.size} mapeamentos)\n`);
 
     // 3. Processar linhas do Excel
     const scheduleData: ScheduleRow[] = [];
