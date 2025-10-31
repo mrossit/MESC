@@ -79,6 +79,8 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       questionnaire_id: r.questionnaireId,
       available_sundays: r.availableSundays || [],
       preferred_times: r.preferredMassTimes || [],
+      daily_mass_availability: r.dailyMassAvailability || [],
+      weekdays: r.responses?.weekdays || {},
       responses: r.responses || {}
     }));
 
