@@ -72,6 +72,11 @@ function checkV2Availability(response: any, mass: Mass): boolean {
     return response.special_events?.first_saturday === true;
   }
 
+  // Check Finados (All Souls' Day) - type: 'missa_finados'
+  if (mass.type === 'missa_finados' || mass.eventId === 'finados') {
+    return response.special_events?.finados === true;
+  }
+
   // Check regular Sunday masses
   if (response.masses?.[dateKey]?.[timeKey] === true) {
     return true;
