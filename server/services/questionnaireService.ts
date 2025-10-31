@@ -148,6 +148,19 @@ export class QuestionnaireService {
         standardized.special_events.first_saturday = this.normalizeValue(answer);
       }
 
+      // Map custom special events (special_event_1, special_event_2, etc.)
+      // These are dynamically created events like Finados, Christmas, etc.
+      if (questionId.startsWith('special_event_')) {
+        // Get the event metadata to determine the event name
+        const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
+        const normalizedName = eventName
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')  // Remove accents
+          .replace(/[^a-z0-9]/g, '_');      // Replace special chars with underscore
+        
+        (standardized.special_events as any)[normalizedName] = this.normalizeValue(answer);
+      }
+
       // Map daily mass availability
       if (questionId === 'daily_mass_availability' || questionId === 'daily_mass') {
         this.parseDailyMassAvailability(answer, standardized);
