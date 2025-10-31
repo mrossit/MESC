@@ -1327,14 +1327,29 @@ export default function Schedules() {
   });
 
   const listViewRows: ListViewRow[] = allMonthDays.flatMap((day) => {
-    const massTimes = getMassTimesForDate(day);
-    if (massTimes.length === 0) {
+    const dateStr = format(day, "yyyy-MM-dd");
+    
+    const standardMassTimes = getMassTimesForDate(day);
+    
+    const actualMassTimes = assignments
+      .filter(assignment => assignment.date === dateStr)
+      .map(assignment => assignment.massTime);
+    
+    const uniqueActualTimes = Array.from(new Set(actualMassTimes));
+    
+    const allMassTimes = Array.from(
+      new Set([
+        ...standardMassTimes.map(normalizeMassTime),
+        ...uniqueActualTimes.map(normalizeMassTime)
+      ])
+    ).sort();
+
+    if (allMassTimes.length === 0) {
       return [];
     }
 
-    return massTimes.map((massTime) => {
+    return allMassTimes.map((massTime) => {
       const normalizedMassTime = normalizeMassTime(massTime);
-      const dateStr = format(day, "yyyy-MM-dd");
       const assignmentsForMass = assignments.filter(
         (assignment) =>
           assignment.date === dateStr &&
