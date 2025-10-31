@@ -1728,7 +1728,7 @@ export default function Schedules() {
                       {/* Mini indicadores de missas - desktop completo */}
                       <div className="hidden sm:block space-y-0.5">
                         {currentSchedule?.status === "published" && isSameMonth(day, currentMonth) ? (
-                          // Escala publicada - mostrar clicável
+                          // Escala publicada - mostrar horários e status
                           (<>
                             {isUserScheduled ? (
                               <div className="space-y-0.5">
@@ -1749,42 +1749,32 @@ export default function Schedules() {
                                   </div>
                                 )}
                               </div>
-                            ) : dayAssignments.length > 0 ? (
-                              (() => {
-                                // Total de escalados = todos os assignments (incluindo VACANTES)
-                                const totalAssigned = dayAssignments.length;
-                                // Confirmados = ministros reais (não VACANTES)
-                                const confirmed = dayAssignments.filter(a => a.ministerName !== 'VACANT').length;
-                                // À confirmar = ministros VACANTES
-                                const toConfirm = dayAssignments.filter(a => a.ministerName === 'VACANT').length;
-
-                                return (
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center gap-1 text-primary">
-                                      <Users className="h-3.5 w-3.5 flex-shrink-0" />
-                                      <span className="text-[10px] font-medium truncate">{totalAssigned} escalados</span>
-                                    </div>
-                                    {toConfirm > 0 && (
-                                      <div className="flex items-center gap-1" style={{ color: '#D2691E' }}>
-                                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                        <span className="text-[10px] font-medium truncate">{toConfirm} à confirmar</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()
-                            ) : availableMassTimes.length > 0 ? (
-                              <div className="flex items-center gap-1" style={{ color: '#D2691E' }}>
-                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="text-[10px] font-medium truncate">{availableMassTimes.length * 20} vagas</span>
-                              </div>
                             ) : null}
+                            {availableMassTimes && availableMassTimes.slice(0, 3).map((time) => {
+                              const timeAssignments = dayAssignments.filter(a => formatMassTime(a.massTime) === time);
+                              return (
+                                <div key={time} className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-xs">{time}</span>
+                                  {timeAssignments.length > 0 && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                      {timeAssignments.length}
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {availableMassTimes && availableMassTimes.length > 3 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{availableMassTimes.length - 3} mais
+                              </span>
+                            )}
                           </>)
                         ) : currentSchedule?.status === "draft" && isCoordinator ? (
                           // Rascunho - mostrar horários para coordenador
                           (<>
                             {availableMassTimes && availableMassTimes.slice(0, 3).map((time) => {
-                              const timeAssignments = dayAssignments.filter(a => a.massTime === time);
+                              const timeAssignments = dayAssignments.filter(a => formatMassTime(a.massTime) === time);
                               return (
                                 <div key={time} className="flex items-center gap-1">
                                   <Clock className="h-3 w-3 text-muted-foreground" />
