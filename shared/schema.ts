@@ -180,6 +180,17 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   canSubstitute: boolean('can_substitute').default(false),
   notes: text('notes'),
   
+  // Safety net: Capture responses that weren't mapped to any specific field
+  unmappedResponses: jsonb('unmapped_responses').$type<Array<{
+    questionId: string;
+    question?: string;
+    answer: any;
+    metadata?: any;
+  }>>(),
+  
+  // Processing warnings/info for debugging
+  processingWarnings: jsonb('processing_warnings').$type<string[]>(),
+  
   // Family sharing fields
   sharedWithFamilyIds: jsonb('shared_with_family_ids').$type<string[]>(),
   isSharedResponse: boolean('is_shared_response').default(false),
