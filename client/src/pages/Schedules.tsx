@@ -1592,7 +1592,17 @@ export default function Schedules() {
                   const isSelected = isSameDay(day, selectedDate);
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const substitutionStatus = getUserSubstitutionStatus(day);
-                  const availableMassTimes = getMassTimesForDate(day);
+                  
+                  const standardMassTimes = getMassTimesForDate(day);
+                  const dateStr = format(day, "yyyy-MM-dd");
+                  const actualMassTimes = Array.from(
+                    new Set(
+                      dayAssignments.map(a => formatMassTime(a.massTime))
+                    )
+                  );
+                  const availableMassTimes = Array.from(
+                    new Set([...standardMassTimes, ...actualMassTimes])
+                  ).sort();
                   
                   return (
                     <div
