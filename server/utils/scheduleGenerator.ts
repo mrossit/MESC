@@ -1006,15 +1006,16 @@ export class ScheduleGenerator {
           responses: r.responses
         };
         
-        // ⛪ SUNDAY PRIORITIZATION: Convert normalized times back to HH:MM format for algorithm
+        // ⛪ SUNDAY PRIORITIZATION: Convert normalized times to HH:MM format for algorithm matching
         // normalized format is "8h", "10h", "19h" -> convert to "08:00", "10:00", "19:00"
+        // IMPORTANT: Must match massTime.time format which is "HH:MM" (without seconds)
         if (preferredMassTimes && preferredMassTimes.length > 0) {
           minister.preferredTimes = preferredMassTimes.map(time => {
             // Extract hour from formats like "08:00", "8:00", "08h", "8h"
             const hourMatch = time.match(/^(\d{1,2})/);
             if (hourMatch) {
               const hour = parseInt(hourMatch[1]);
-              return `${hour.toString().padStart(2, '0')}:00:00`;
+              return `${hour.toString().padStart(2, '0')}:00`; // Format: "08:00" without seconds
             }
             return time;
           });
