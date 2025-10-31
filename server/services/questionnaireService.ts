@@ -24,6 +24,7 @@ interface StandardizedResponse {
     first_friday?: boolean;
     first_saturday?: boolean;
     healing_liberation?: boolean;
+    [key: string]: any; // Allow dynamic event names
   };
   weekdays?: {
     monday: boolean;
@@ -43,17 +44,38 @@ interface StandardizedResponse {
 interface LegacyResponseItem {
   questionId: string;
   answer: any;
+  question?: string;
   metadata?: any;
+}
+
+interface ProcessingResult {
+  standardized: StandardizedResponse;
+  unmappedResponses: Array<{
+    questionId: string;
+    question?: string;
+    answer: any;
+    metadata?: any;
+  }>;
+  warnings: string[];
 }
 
 export class QuestionnaireService {
   /**
-   * Standardize ALL responses to v2.0 format before saving
+   * 🛡️ SAFETY NET: Standardize responses WITH tracking of unmapped responses
+   * This ensures NO response is ever lost, even if the code doesn't know how to process it
    */
-  static standardizeResponse(rawResponse: any, month?: number, year?: number): StandardizedResponse {
+  static standardizeResponseWithTracking(rawResponse: any, month?: number, year?: number): ProcessingResult {
+    const unmappedResponses: Array<{questionId: string; question?: string; answer: any; metadata?: any}> = [];
+    const warnings: string[] = [];
+    const processedQuestionIds = new Set<string>();
+
     // If already v2.0 format, validate and return
     if (rawResponse.format_version === '2.0') {
-      return this.validateV2Format(rawResponse);
+      return {
+        standardized: this.validateV2Format(rawResponse),
+        unmappedResponses: [],
+        warnings: []
+      };
     }
 
     // Initialize standardized structure
@@ -74,33 +96,84 @@ export class QuestionnaireService {
 
     // Handle October 2025 legacy format (array)
     if (Array.isArray(rawResponse)) {
-      this.parseLegacyArrayFormat(rawResponse, standardized, month, year);
+      this.parseLegacyArrayFormatWithTracking(rawResponse, standardized, processedQuestionIds, month, year);
+      
+      // Find unmapped responses
+      for (const item of rawResponse) {
+        if (!processedQuestionIds.has(item.questionId)) {
+          unmappedResponses.push({
+            questionId: item.questionId,
+            question: item.question,
+            answer: item.answer,
+            metadata: item.metadata
+          });
+          warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
+        }
+      }
     }
     // Handle possible object format
     else if (typeof rawResponse === 'object') {
       // Check if it's a responses wrapper
       if (rawResponse.responses && Array.isArray(rawResponse.responses)) {
-        this.parseLegacyArrayFormat(rawResponse.responses, standardized, month, year);
+        this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
+        
+        // Find unmapped responses
+        for (const item of rawResponse.responses) {
+          if (!processedQuestionIds.has(item.questionId)) {
+            unmappedResponses.push({
+              questionId: item.questionId,
+              question: item.question,
+              answer: item.answer,
+              metadata: item.metadata
+            });
+            warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
+          }
+        }
       } else {
         // Try to parse as direct v2.0-like structure
         Object.assign(standardized, rawResponse);
       }
     }
 
-    return standardized;
+    return {
+      standardized,
+      unmappedResponses,
+      warnings
+    };
   }
 
   /**
-   * Parse legacy array format: [{questionId, answer}, ...]
+   * Legacy method - kept for backward compatibility
+   * Use standardizeResponseWithTracking for new code
    */
-  private static parseLegacyArrayFormat(
+  static standardizeResponse(rawResponse: any, month?: number, year?: number): StandardizedResponse {
+    return this.standardizeResponseWithTracking(rawResponse, month, year).standardized;
+  }
+
+  /**
+   * 🛡️ Parse legacy array format WITH tracking of processed questionIds
+   * SAFETY NET: All known questionIds are tracked, everything else is flagged as unmapped
+   */
+  private static parseLegacyArrayFormatWithTracking(
     responses: LegacyResponseItem[],
     standardized: StandardizedResponse,
+    processedQuestionIds: Set<string>,
     month?: number,
     year?: number
   ): void {
     const currentYear = year || new Date().getFullYear();
     const currentMonth = month || new Date().getMonth() + 1;
+
+    // Known questionId patterns
+    const knownPatterns = [
+      'available_sundays', 'main_service_time', 'primary_mass_time',
+      /^saint_judas_feast_/, 'saint_judas_novena',
+      'healing_liberation_mass', 'sacred_heart_mass', 'immaculate_heart_mass',
+      /^special_event_/, // Includes Finados, etc
+      'daily_mass_availability', 'daily_mass', 'daily_mass_days',
+      'can_substitute', 'notes', 'observations',
+      'family_serve_preference', 'monthly_availability', 'other_times_available'
+    ];
 
     for (const item of responses) {
       const { questionId, answer } = item;
@@ -108,83 +181,89 @@ export class QuestionnaireService {
       // Map available_sundays to masses object
       if (questionId === 'available_sundays' && Array.isArray(answer)) {
         this.parseAvailableSundays(answer, standardized, currentYear, currentMonth);
+        processedQuestionIds.add(questionId);
       }
-
       // Map main_service_time
-      if (questionId === 'main_service_time' || questionId === 'primary_mass_time') {
-        // Store the preferred time (used when mapping available_sundays)
+      else if (questionId === 'main_service_time' || questionId === 'primary_mass_time') {
         (standardized as any)._preferredTime = this.normalizeTime(answer);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map Saint Judas feast day masses (October 28, 2025)
-      if (questionId.startsWith('saint_judas_feast_')) {
+      // Map Saint Judas feast day masses
+      else if (questionId.startsWith('saint_judas_feast_')) {
         const feastDate = this.getSaintJudasFeastDate(currentYear, currentMonth);
         const time = this.extractTimeFromQuestionId(questionId);
         const value = this.normalizeValue(answer);
-
         if (!standardized.special_events.saint_judas_feast) {
           standardized.special_events.saint_judas_feast = {};
         }
         standardized.special_events.saint_judas_feast[`${feastDate}_${time}`] = value;
+        processedQuestionIds.add(questionId);
       }
-
       // Map Saint Judas novena
-      if (questionId === 'saint_judas_novena') {
+      else if (questionId === 'saint_judas_novena') {
         standardized.special_events.saint_judas_novena = this.parseNovenaArray(answer);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map healing/liberation mass (first Thursday)
-      if (questionId === 'healing_liberation_mass') {
+      // Map healing/liberation mass
+      else if (questionId === 'healing_liberation_mass') {
         standardized.special_events.healing_liberation = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map Sacred Heart mass (first Friday)
-      if (questionId === 'sacred_heart_mass') {
+      // Map Sacred Heart mass
+      else if (questionId === 'sacred_heart_mass') {
         standardized.special_events.first_friday = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map Immaculate Heart mass (first Saturday)
-      if (questionId === 'immaculate_heart_mass') {
+      // Map Immaculate Heart mass
+      else if (questionId === 'immaculate_heart_mass') {
         standardized.special_events.first_saturday = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map custom special events (special_event_1, special_event_2, etc.)
-      // These are dynamically created events like Finados, Christmas, etc.
-      if (questionId.startsWith('special_event_')) {
-        // Get the event metadata to determine the event name
+      // Map custom special events (Finados, etc.)
+      else if (questionId.startsWith('special_event_')) {
         const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
         const normalizedName = eventName
           .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')  // Remove accents
-          .replace(/[^a-z0-9]/g, '_');      // Replace special chars with underscore
-        
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, '_');
         (standardized.special_events as any)[normalizedName] = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
       }
-
       // Map daily mass availability
-      if (questionId === 'daily_mass_availability' || questionId === 'daily_mass') {
+      else if (questionId === 'daily_mass_availability' || questionId === 'daily_mass') {
         this.parseDailyMassAvailability(answer, standardized);
+        processedQuestionIds.add(questionId);
       }
-
-      // Map daily mass days (specific days)
-      if (questionId === 'daily_mass_days' && Array.isArray(answer)) {
+      // Map daily mass days
+      else if (questionId === 'daily_mass_days' && Array.isArray(answer)) {
         this.parseDailyMassDays(answer, standardized);
+        processedQuestionIds.add(questionId);
       }
-
       // Map substitution availability
-      if (questionId === 'can_substitute') {
+      else if (questionId === 'can_substitute') {
         standardized.can_substitute = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
       }
-
       // Map notes/observations
-      if ((questionId === 'notes' || questionId === 'observations') && typeof answer === 'string') {
+      else if ((questionId === 'notes' || questionId === 'observations') && typeof answer === 'string') {
         standardized.notes = answer;
+        processedQuestionIds.add(questionId);
       }
-
       // Map family serve preference
-      if (questionId === 'family_serve_preference') {
+      else if (questionId === 'family_serve_preference') {
         if (!standardized.family) standardized.family = {};
         standardized.family.serve_preference = this.normalizeFamilyPreference(answer);
+        processedQuestionIds.add(questionId);
+      }
+      // Map monthly availability (base question)
+      else if (questionId === 'monthly_availability') {
+        // This is just the yes/no base question, not stored separately
+        processedQuestionIds.add(questionId);
+      }
+      // Map other times available
+      else if (questionId === 'other_times_available') {
+        // Base question, conditional options handled elsewhere
+        processedQuestionIds.add(questionId);
       }
     }
 
@@ -193,7 +272,6 @@ export class QuestionnaireService {
       const preferredTime = (standardized as any)._preferredTime;
       for (const date in standardized.masses) {
         if (!standardized.masses[date][preferredTime]) {
-          // If the Sunday is marked available but no time is set, use preferred time
           const hasAnyTime = Object.values(standardized.masses[date]).some(v => v === true);
           if (!hasAnyTime) {
             standardized.masses[date][preferredTime] = true;
