@@ -31,6 +31,7 @@ import saintsRoutes from "./routes/saints";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import whatsappApiRoutes from "./routes/whatsapp-api";
+import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -122,6 +123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // WhatsApp API routes (sem CSRF, autenticado por API key)
   app.use('/api/whatsapp', whatsappApiRoutes);
+  
+  // Escala Alternativa routes (algoritmo Python para comparação)
+  app.use('/api/escala-alternativa', csrfProtection, escalaAlternativaRoutes);
   
   // Questionnaire routes (IMPORTANTE: registrar as rotas regulares ANTES das admin)
   app.use('/api/questionnaires', csrfProtection, questionnaireRoutes);

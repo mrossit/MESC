@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { pythonScheduleService } from "../services/pythonScheduleService";
+import { pythonScheduleService, PythonScheduleResult } from "../services/pythonScheduleService";
 import { db } from "../../db";
 import { users, questionnaireResponses, questionnaires } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -65,7 +65,7 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
 
     // 4. Formatar dados para o Python
-    const formattedUsers = ministersData.map((m) => ({
+    const formattedUsers = ministersData.map((m: any) => ({
       id: m.id,
       name: m.name,
       email: m.email,
@@ -74,7 +74,7 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       avoid_positions: []
     }));
 
-    const formattedResponses = responses.map((r) => ({
+    const formattedResponses = responses.map((r: any) => ({
       user_id: r.userId,
       questionnaire_id: r.questionnaireId,
       available_sundays: r.availableSundays || [],
@@ -98,8 +98,9 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       });
     }
 
-    // 7. Retornar resultado
-    logger.info(`Escala alternativa gerada com sucesso: ${result.length} atribuições`);
+    // 7. Retornar resultado (já verificamos que não é erro acima)
+    const scheduleData = result as PythonScheduleResult[];
+    logger.info(`Escala alternativa gerada com sucesso: ${scheduleData.length} atribuições`);
 
     return res.json({
       success: true,
@@ -110,11 +111,11 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
         month,
         year
       },
-      data: result,
+      data: scheduleData,
       stats: {
-        total_assignments: result.length,
-        total_ministers: new Set(result.map((r) => r.ministro_id)).size,
-        preferred_assignments: result.filter((r) => r.preferido).length
+        total_assignments: scheduleData.length,
+        total_ministers: new Set(scheduleData.map((r: PythonScheduleResult) => r.ministro_id)).size,
+        preferred_assignments: scheduleData.filter((r: PythonScheduleResult) => r.preferido).length
       }
     });
 
