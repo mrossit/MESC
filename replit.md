@@ -37,6 +37,39 @@ The system uses special minister accounts that function as placeholders in sched
 
 These special ministers can be assigned to schedule positions like regular ministers but serve as visual markers for positions requiring special attention or coordination.
 
+## Questionnaire Safety Net System
+**Implementation Date**: October 31, 2025  
+**Purpose**: Prevent data loss from questionnaire responses that cannot be processed
+
+The system includes a comprehensive safety net that ensures NO questionnaire response is ever lost, even if the code doesn't know how to process it.
+
+### Architecture
+- **Database Fields**: Added `unmappedResponses` (JSONB) and `processingWarnings` (JSONB) to `questionnaire_responses` table
+- **Service Method**: `QuestionnaireService.standardizeResponseWithTracking()` tracks all processed questionIds
+- **Detection**: Any questionId not processed is automatically captured in `unmappedResponses`
+- **Logging**: Console warnings (`⚠️ UNMAPPED RESPONSES DETECTED`) alert administrators to review
+
+### Known Question Patterns
+The system processes these questionId patterns:
+- `available_sundays`, `main_service_time`, `primary_mass_time`
+- `saint_judas_feast_*`, `saint_judas_novena`
+- `healing_liberation_mass`, `sacred_heart_mass`, `immaculate_heart_mass`
+- `special_event_*` (dynamic events like Finados, Natal - normalized with accent removal)
+- `daily_mass_availability`, `daily_mass`, `daily_mass_days`
+- `can_substitute`, `notes`, `observations`
+- `family_serve_preference`, `monthly_availability`, `other_times_available`
+
+### Historical Context
+**November 2025 Data Loss Incident**: Partial weekday availability and Finados special event responses were lost due to bugs in the standardization logic. This incident led to the implementation of the safety net system to prevent future data loss. The lost data was manually restored via CSV import for 17 ministers.
+
+### Testing
+A comprehensive test suite (`scripts/test-safety-net.ts`) validates:
+1. Known questions are processed correctly
+2. Unknown questions are captured in unmappedResponses
+3. Processing warnings are generated
+4. Special events with metadata are handled properly
+5. Backward compatibility with existing code
+
 # External Dependencies
 
 ## Core Infrastructure
