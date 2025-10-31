@@ -1353,10 +1353,24 @@ export class ScheduleGenerator {
         }
       }
 
-      // REGRA 7: Festa de São Judas (dia 28)
-      if (dayOfMonth === 28) {
+      // REGRA 7: Festa de São Judas (dia 28 de outubro)
+      if (month === 10 && dayOfMonth === 28) {
         const stJudeMasses = this.generateStJudeMasses(currentDate);
         monthlyTimes.push(...stJudeMasses);
+      }
+
+      // REGRA 8: Missa de Finados (dia 2 de novembro às 15h30 no Cemitério Memorial)
+      if (month === 11 && dayOfMonth === 2) {
+        monthlyTimes.push({
+          id: `finados-${dateStr}`,
+          dayOfWeek,
+          time: '15:30',
+          date: dateStr,
+          minMinisters: 10,  // 10 ministros para Finados
+          maxMinisters: 10,
+          type: 'missa_finados'
+        });
+        console.log(`[SCHEDULE_GEN] ✅ Missa de Finados (Cemitério Memorial): ${dateStr} 15:30 (10 ministros)`);
       }
 
       currentDate = addDays(currentDate, 1);
