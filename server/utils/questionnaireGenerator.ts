@@ -450,6 +450,11 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
       }
     }
     
+    // Remover Finados genérico (já tem pergunta específica sobre missa do cemitério)
+    if (month === 11 && event.name === 'Finados') {
+      return false;
+    }
+    
     return true;
   });
 
@@ -540,6 +545,14 @@ function getSpecialEvents(month: number, year: number): SpecialEvent[] {
     events.push({
       name: 'Festa de São João',
       date: '24/06'
+    });
+  }
+  
+  // Novembro - Missa de Finados no cemitério
+  if (month === 11) {
+    events.push({
+      name: 'Missa de Finados às 15h30 (Cemitério)',
+      date: '02/11'
     });
   }
   
