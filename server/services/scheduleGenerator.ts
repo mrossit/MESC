@@ -644,20 +644,12 @@ export class IntelligentScheduleGenerator {
       ];
 
       sundays.forEach(sunday => {
-        // Skip regular masses on Nov 2 at 15:30 since we have Finados
-        if (sunday.date !== '2025-11-02') {
-          masses.push(
-            { ...sunday, time: '08:00', isSpecial: false },
-            { ...sunday, time: '10:00', isSpecial: false },
-            { ...sunday, time: '19:00', isSpecial: false }
-          );
-        } else {
-          // Nov 2 has only morning masses (Finados is at 15:30)
-          masses.push(
-            { ...sunday, time: '08:00', isSpecial: false },
-            { ...sunday, time: '10:00', isSpecial: false }
-          );
-        }
+        // All Sundays have regular masses at 08:00, 10:00, and 19:00
+        masses.push(
+          { ...sunday, time: '08:00', isSpecial: false },
+          { ...sunday, time: '10:00', isSpecial: false },
+          { ...sunday, time: '19:00', isSpecial: false }
+        );
       });
 
       // Weekday masses (Monday-Friday at 06:30)
