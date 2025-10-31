@@ -508,14 +508,24 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       .limit(1);
     console.log('[RESPONSES] Resposta existente encontrada?', existingResponse ? 'Sim' : 'Não');
 
-    // CRITICAL: Standardize ALL responses to v2.0 format BEFORE saving
-    console.log('[RESPONSES] Standardizing responses to v2.0 format');
-    const standardizedResponse = QuestionnaireService.standardizeResponse(
+    // 🛡️ CRITICAL: Standardize ALL responses to v2.0 format WITH SAFETY NET
+    console.log('[RESPONSES] Standardizing responses to v2.0 format with tracking');
+    const processingResult = QuestionnaireService.standardizeResponseWithTracking(
       data.responses,
       data.month,
       data.year
     );
+    const standardizedResponse = processingResult.standardized;
+    const unmappedResponses = processingResult.unmappedResponses;
+    const processingWarnings = processingResult.warnings;
+    
     console.log('[RESPONSES] Standardized response:', JSON.stringify(standardizedResponse, null, 2));
+    if (unmappedResponses.length > 0) {
+      console.warn('[RESPONSES] ⚠️ UNMAPPED RESPONSES DETECTED:', unmappedResponses);
+    }
+    if (processingWarnings.length > 0) {
+      console.warn('[RESPONSES] ⚠️ PROCESSING WARNINGS:', processingWarnings);
+    }
 
     // Extract structured data for legacy compatibility
     console.log('[RESPONSES] Extracting structured data');
@@ -540,6 +550,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
             specialEvents: extractedData.specialEvents,
             canSubstitute: extractedData.canSubstitute,
             notes: extractedData.notes,
+            unmappedResponses: unmappedResponses, // 🛡️ SAFETY NET: Save unmapped responses
+            processingWarnings: processingWarnings, // 🛡️ SAFETY NET: Save warnings
             submittedAt: new Date(),
             sharedWithFamilyIds: data.sharedWithFamilyIds || []
           })
@@ -579,6 +591,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
             specialEvents: extractedData.specialEvents,
             canSubstitute: extractedData.canSubstitute,
             notes: extractedData.notes,
+            unmappedResponses: unmappedResponses, // 🛡️ SAFETY NET: Save unmapped responses
+            processingWarnings: processingWarnings, // 🛡️ SAFETY NET: Save warnings
             sharedWithFamilyIds: data.sharedWithFamilyIds || [],
             isSharedResponse: false
           })
@@ -1392,12 +1406,15 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
           .where(eq(questionnaires.id, response.questionnaireId))
           .limit(1);
 
-        // CRITICAL: Standardize response to v2.0 format
-        const standardizedResponse = QuestionnaireService.standardizeResponse(
+        // 🛡️ CRITICAL: Standardize response to v2.0 format WITH SAFETY NET
+        const processingResult = QuestionnaireService.standardizeResponseWithTracking(
           responsesArray,
           questionnaire?.month,
           questionnaire?.year
         );
+        const standardizedResponse = processingResult.standardized;
+        const unmappedResponses = processingResult.unmappedResponses;
+        const processingWarnings = processingResult.warnings;
 
         // Extract structured data for legacy fields
         const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
@@ -1405,10 +1422,16 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
         console.log(`[REPROCESS] Resposta ${response.id}:`, {
           availableSundays: extractedData.availableSundays?.length || 0,
           dailyMass: extractedData.dailyMassAvailability?.length || 0,
-          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
+          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0,
+          unmapped: unmappedResponses.length,
+          warnings: processingWarnings.length
         });
+        
+        if (unmappedResponses.length > 0) {
+          console.warn(`[REPROCESS] ⚠️ Response ${response.id} has unmapped questions:`, unmappedResponses);
+        }
 
-        // Atualizar resposta com formato v2.0 E dados estruturados
+        // Atualizar resposta com formato v2.0 E dados estruturados + safety net
         await db.update(questionnaireResponses)
           .set({
             responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
@@ -1418,7 +1441,9 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
             dailyMassAvailability: extractedData.dailyMassAvailability,
             specialEvents: extractedData.specialEvents,
             canSubstitute: extractedData.canSubstitute,
-            notes: extractedData.notes
+            notes: extractedData.notes,
+            unmappedResponses: unmappedResponses, // 🛡️ SAFETY NET
+            processingWarnings: processingWarnings // 🛡️ SAFETY NET
           })
           .where(eq(questionnaireResponses.id, response.id));
 
