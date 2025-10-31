@@ -500,6 +500,10 @@ export class IntelligentScheduleGenerator {
 
       // Check special events
       if (mass.isSpecial) {
+        if (mass.type === 'finados' && minister.availability.specialEvents.finados) {
+          console.log(`[CHECK] ✅ ${minister.name} available for finados`);
+          return true;
+        }
         if (mass.type === 'first_thursday' && minister.availability.specialEvents.first_thursday) {
           console.log(`[CHECK] ✅ ${minister.name} available for first_thursday`);
           return true;
@@ -579,12 +583,17 @@ export class IntelligentScheduleGenerator {
       'feast_15:00': Array.from({length: 8}, (_, i) => i + 1),
       'feast_17:00': Array.from({length: 8}, (_, i) => i + 1),
       'feast_19:30': Array.from({length: 15}, (_, i) => i + 1),
+
+      // Finados (All Souls' Day)
+      'finados_15:30': Array.from({length: 10}, (_, i) => i + 1),
     };
 
     // Determine key for position lookup
     let key = '';
     if (mass.date === '2025-10-28') {
       key = `feast_${mass.time}`;
+    } else if (mass.date === '2025-11-02' && mass.time === '15:30') {
+      key = 'finados_15:30';
     } else if (mass.dayOfWeek === 0) {
       key = `sunday_${mass.time}`;
     } else if (mass.isSpecial) {
@@ -607,9 +616,64 @@ export class IntelligentScheduleGenerator {
     const masses: MassInfo[] = [];
 
     // TODO: Query from massTimesConfig table
-    // For now, hardcode October 2025 schedule
+    // For now, hardcode October 2025 and November 2025 schedules
 
-    if (this.month === 10 && this.year === 2025) {
+    if (this.month === 11 && this.year === 2025) {
+      // Finados (All Souls' Day) - November 2, 2025 at 15:30 (Cemetery)
+      masses.push({
+        date: '2025-11-02',
+        time: '15:30',
+        dayOfWeek: 0, // Sunday
+        isSpecial: true,
+        type: 'finados'
+      });
+
+      // Sundays
+      const sundays = [
+        { date: '2025-11-02', dayOfWeek: 0 },
+        { date: '2025-11-09', dayOfWeek: 0 },
+        { date: '2025-11-16', dayOfWeek: 0 },
+        { date: '2025-11-23', dayOfWeek: 0 },
+        { date: '2025-11-30', dayOfWeek: 0 }
+      ];
+
+      sundays.forEach(sunday => {
+        // Skip regular masses on Nov 2 at 15:30 since we have Finados
+        if (sunday.date !== '2025-11-02') {
+          masses.push(
+            { ...sunday, time: '08:00', isSpecial: false },
+            { ...sunday, time: '10:00', isSpecial: false },
+            { ...sunday, time: '19:00', isSpecial: false }
+          );
+        } else {
+          // Nov 2 has only morning masses (Finados is at 15:30)
+          masses.push(
+            { ...sunday, time: '08:00', isSpecial: false },
+            { ...sunday, time: '10:00', isSpecial: false }
+          );
+        }
+      });
+
+      // Weekday masses (Monday-Friday at 06:30)
+      for (let day = 1; day <= 30; day++) {
+        const date = new Date(2025, 10, day); // November = month 10
+        const dayOfWeek = date.getDay();
+
+        // Skip Sundays
+        if (dayOfWeek === 0) continue;
+
+        // Monday-Friday
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          const dateStr = `2025-11-${day.toString().padStart(2, '0')}`;
+          masses.push({
+            date: dateStr,
+            time: '06:30',
+            dayOfWeek,
+            isSpecial: false
+          });
+        }
+      }
+    } else if (this.month === 10 && this.year === 2025) {
       // St. Jude feast day (October 28)
       masses.push(
         { date: '2025-10-28', time: '07:00', dayOfWeek: 2, isSpecial: true, type: 'feast' },
