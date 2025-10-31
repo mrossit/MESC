@@ -1,0 +1,154 @@
+mkdir -p server/{controllers,middleware,routes,services,scripts,drizzle}
+cd server
+
+# criar script Python
+cat > scripts/gerar_escala.py <<'PYCODE'
+import json, sys
+from collections import defaultdict
+
+def gerar_escala(users, responses):
+    misseis = [
+        {"id": 1, "descricao": "Sábado 17h", "ministros_necessarios": 4},
+        {"id": 2, "descricao": "Domingo 08h", "ministros_necessarios": 4},
+        {"id": 3, "descricao": "Domingo 10h", "ministros_necessarios": 6},
+        {"id": 4, "descricao": "Domingo 19h", "ministros_necessarios": 6},
+    ]
+    respostas_por_user = defaultdict(list)
+    for r in responses:
+        respostas_por_user[r["user_id"]].append(r)
+    escala = []
+    contagem = defaultdict(int)
+    for missa in misseis:
+        candidatos = []
+        for u in users:
+            respostas = respostas_por_user.get(u["id"], [])
+            disponivel = any(
+                missa["descricao"].split(" ")[1] in s
+                for r in respostas
+                for s in r.get("available_sundays", [])
+            )
+            evita = missa["id"] in u.get("avoid_positions", [])
+            if disponivel and not evita:
+                candidatos.append(u)
+        candidatos.sort(
+            key=lambda u: (
+                missa["id"] not in u.get("preferred_positions", []),
+                contagem[u["id"]],
+            )
+        )
+        for sel in candidatos[: missa["ministros_necessarios"]]:
+            contagem[sel["id"]] += 1
+            escala.append({
+                "missa": missa["descricao"],
+                "ministro": sel["name"],
+                "preferido": missa["id"] in sel.get("preferred_positions", [])
+            })
+    return escala
+
+if __name__ == "__main__":
+    data = json.loads(sys.stdin.read())
+    users = data["users"]
+    responses = data["responses"]
+    resultado = gerar_escala(users, responses)
+    print(json.dumps(resultado, ensure_ascii=False))
+PYCODE
+
+# criar controlador, rota e middleware (versões simplificadas)
+cat > controllers/escalaController.ts <<'TS'
+import { Request, Response } from "express";
+import { spawn } from "child_process";
+import { db, schedules } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+
+export async function gerarEscalaController(req: Request, res: Response) {
+  const { users, responses } = req.body;
+  try {
+    const child = spawn("python3", ["scripts/gerar_escala.py"]);
+    const input = JSON.stringify({ users, responses });
+    let output = "";
+    child.stdin.write(input);
+    child.stdin.end();
+    child.stdout.on("data", (data) => (output += data.toString()));
+    child.on("close", async () => {
+      const result = JSON.parse(output);
+      res.json({ success: true, data: result });
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export async function publicarEscalaController(req: Request, res: Response) {
+  const { data, questionnaire_id } = req.body;
+  try {
+    await db.insert(schedules).values({
+      title: "Escala Automática",
+      description: "Gerada automaticamente pelo sistema",
+      mass_date: new Date().toISOString().slice(0,10),
+      status: "published",
+      algorithm_version: "v1.0-auto",
+      questionnaire_id,
+      data
+    });
+    res.json({ success: true, message: "Escala publicada com sucesso" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+TS
+
+cat > routes/escalaRoutes.ts <<'TS'
+import { Router } from "express";
+import { gerarEscalaController, publicarEscalaController } from "../controllers/escalaController";
+import { ensureCoordinator } from "../middleware/ensureCoordinator";
+const router = Router();
+router.post("/gerar", ensureCoordinator, gerarEscalaController);
+router.post("/publicar", ensureCoordinator, publicarEscalaController);
+export default router;
+TS
+
+cat > middleware/ensureCoordinator.ts <<'TS'
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+export function ensureCoordinator(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Token não fornecido" });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    if ((decoded as any).role !== "coordinator")
+      return res.status(403).json({ message: "Acesso restrito a coordenadores." });
+    next();
+  } catch {
+    res.status(401).json({ message: "Token inválido ou expirado." });
+  }
+}
+TS
+
+cat > drizzle/schema.ts <<'TS'
+import { pgTable, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+export const schedules = pgTable("schedules", {
+  id: text("id").primaryKey().default("gen_random_uuid()"),
+  title: text("title"),
+  description: text("description"),
+  mass_date: text("mass_date"),
+  mass_time: text("mass_time"),
+  status: text("status"),
+  algorithm_version: text("algorithm_version"),
+  questionnaire_id: text("questionnaire_id"),
+  data: jsonb("data"),
+  created_at: timestamp("created_at").defaultNow()
+});
+TS
+
+cat > drizzle/db.ts <<'TS'
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+const pool = new Pool({
+  connectionString: process.env.NODE_ENV === "production"
+    ? process.env.DATABASE_URL_PROD
+    : process.env.DATABASE_URL_DEV,
+});
+export const db = drizzle(pool);
+TS
+
+echo "✅ Todos os arquivos do módulo de escala foram criados!"
