@@ -77,6 +77,25 @@ function checkV2Availability(response: any, mass: Mass): boolean {
     return response.special_events?.finados === true;
   }
 
+  // Check PUC - Consciência Negra (20/11 às 10h)
+  if (mass.eventId === 'puc_consciencia_negra' || mass.type === 'missa_puc') {
+    return response.special_events?.consciencia_negra === true || 
+           response.special_events?.puc_20_11 === true;
+  }
+
+  // Check São Judas Tadeu monthly masses (28th of every month, except October)
+  if (mass.type === 'missa_sao_judas_mensal' || mass.eventId?.includes('saint_judas_monthly')) {
+    if (timeKey === '07:00') {
+      return response.special_events?.saint_judas_monthly_7h === true;
+    }
+    if (timeKey === '15:00') {
+      return response.special_events?.saint_judas_monthly_15h === true;
+    }
+    if (timeKey === '19:30') {
+      return response.special_events?.saint_judas_monthly_19h30 === true;
+    }
+  }
+
   // Check regular Sunday masses
   if (response.masses?.[dateKey]?.[timeKey] === true) {
     return true;
