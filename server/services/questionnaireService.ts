@@ -272,6 +272,7 @@ export class QuestionnaireService {
       };
     }
 
+    // Handle string answer
     if (answer === 'Sim' || answer === true) {
       // Available all weekdays
       standardized.weekdays.monday = true;
@@ -279,7 +280,16 @@ export class QuestionnaireService {
       standardized.weekdays.wednesday = true;
       standardized.weekdays.thursday = true;
       standardized.weekdays.friday = true;
-    } else if (answer === 'Apenas em alguns dias') {
+    } 
+    // 🔥 CRITICAL FIX: Handle yes_no_with_options format
+    else if (typeof answer === 'object' && answer.answer === 'Apenas em alguns dias') {
+      // Process selectedOptions immediately (don't wait for separate daily_mass_days question)
+      if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
+        this.parseDailyMassDays(answer.selectedOptions, standardized);
+      }
+    }
+    // Handle legacy "Apenas em alguns dias" as string (will be filled by daily_mass_days question)
+    else if (answer === 'Apenas em alguns dias') {
       // Will be filled by daily_mass_days question
       // Don't change anything here
     }
