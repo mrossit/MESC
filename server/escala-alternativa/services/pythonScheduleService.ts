@@ -1,6 +1,11 @@
 import { spawn } from "child_process";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { logger } from "../../utils/logger";
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface PythonScheduleInput {
   users: any[];
