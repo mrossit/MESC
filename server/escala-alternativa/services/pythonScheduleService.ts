@@ -14,6 +14,7 @@ export interface PythonScheduleInput {
 
 export interface PythonScheduleResult {
   missa: string;
+  tipo: "fim_de_semana" | "missa_diaria";
   ministro: string;
   ministro_id: string;
   preferido: boolean;
