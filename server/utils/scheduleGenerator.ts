@@ -1373,6 +1373,44 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ✅ Missa de Finados (Cemitério Memorial): ${dateStr} 15:30 (10 ministros)`);
       }
 
+      // REGRA 9: Missa PUC - Consciência Negra (20 de novembro às 10h)
+      if (month === 11 && dayOfMonth === 20) {
+        monthlyTimes.push({
+          id: `puc-consciencia-negra-${dateStr}`,
+          dayOfWeek,
+          time: '10:00',
+          date: dateStr,
+          location: 'PUC Sorocaba',
+          minMinisters: 10,  // Ajustar conforme necessário
+          maxMinisters: 10,
+          type: 'missa_puc'
+        });
+        console.log(`[SCHEDULE_GEN] ✅ Missa PUC - Consciência Negra: ${dateStr} 10:00 (10 ministros)`);
+      }
+
+      // REGRA 10: Missas mensais de São Judas Tadeu (dia 28 de cada mês, EXCETO outubro)
+      // Todo dia 28 (exceto outubro que é a festa) tem 3 missas: 7h, 15h, 19h30
+      if (dayOfMonth === 28 && month !== 10) {
+        const saoJudasMonthlies = [
+          { time: '07:00', ministers: 6 },
+          { time: '15:00', ministers: 4 },
+          { time: '19:30', ministers: 7 }
+        ];
+
+        saoJudasMonthlies.forEach(config => {
+          monthlyTimes.push({
+            id: `sao-judas-mensal-${dateStr}-${config.time}`,
+            dayOfWeek,
+            time: config.time,
+            date: dateStr,
+            minMinisters: config.ministers,
+            maxMinisters: config.ministers,
+            type: 'missa_sao_judas_mensal'
+          });
+          console.log(`[SCHEDULE_GEN] ✅ Missa São Judas Mensal: ${dateStr} ${config.time} (${config.ministers} ministros)`);
+        });
+      }
+
       currentDate = addDays(currentDate, 1);
     }
 
