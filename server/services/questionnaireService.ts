@@ -463,7 +463,11 @@ export class QuestionnaireService {
 
     // Daily mass availability
     const dailyMassAvailability: string[] = [];
+    let hasWeekdayData = false;
+    
     if (standardized.weekdays) {
+      hasWeekdayData = true; // Weekdays data exists (even if all false)
+      
       const dayMap: Record<string, string> = {
         monday: 'Segunda-feira',
         tuesday: 'Terça-feira',
@@ -477,13 +481,21 @@ export class QuestionnaireService {
           dailyMassAvailability.push(dayMap[day as keyof typeof standardized.weekdays]);
         }
       });
+      
+      // 🔥 CRITICAL FIX: If user answered but said NO to all days, save empty array instead of null
+      // This differentiates between:
+      // - null = didn't answer the question
+      // - [] = answered "no" to all days (cannot serve on weekdays)
+      // - ["Segunda-feira", ...] = can serve on specific days
     }
 
     return {
       availableSundays: availableSundays.length > 0 ? availableSundays : null,
       preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
       alternativeTimes: null, // Not used in v2.0
-      dailyMassAvailability: dailyMassAvailability.length > 0 ? dailyMassAvailability : null,
+      dailyMassAvailability: hasWeekdayData 
+        ? (dailyMassAvailability.length > 0 ? dailyMassAvailability : []) 
+        : null, // Empty array if answered NO, null if didn't answer
       specialEvents: standardized.special_events,
       canSubstitute: standardized.can_substitute,
       notes: standardized.notes || null
