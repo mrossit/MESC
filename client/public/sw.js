@@ -68,11 +68,19 @@ self.addEventListener('fetch', (event) => {
 
   // Network-first for other API calls (cache only as fallback)
   if (url.pathname.startsWith('/api')) {
+    const method = (request.method || 'GET').toUpperCase();
+
+    // Bypass the cache layer entirely for non-GET requests to prevent Cache API errors
+    if (method !== 'GET') {
+      event.respondWith(fetch(request));
+      return;
+    }
+
     event.respondWith(
       fetch(request)
         .then((response) => {
           // Cache GET requests only as offline fallback
-          if (request.method === 'GET' && response.status === 200) {
+          if (response.status === 200) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
