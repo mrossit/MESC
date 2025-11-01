@@ -1226,6 +1226,29 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
 
     console.log('[batch-update] Found existing schedules:', existingSchedules.length);
 
+    // SPECIAL CASE: Se todos os ministros foram removidos (lista vazia), deletar a missa inteira
+    if (ministers.length === 0) {
+      console.log('[batch-update] All ministers removed - deleting entire mass and related substitutions');
+      
+      // Primeiro, deletar todas as substituições relacionadas
+      for (const schedule of existingSchedules) {
+        await db
+          .delete(substitutionRequests)
+          .where(eq(substitutionRequests.scheduleId, schedule.id));
+      }
+      
+      // Depois, deletar todas as escalações dessa missa
+      await db
+        .delete(schedules)
+        .where(and(
+          eq(schedules.date, date),
+          eq(schedules.time, time)
+        ));
+      
+      console.log('[batch-update] Mass deleted successfully');
+      return res.json({ success: true, message: 'Missa removida completamente do calendário' });
+    }
+
     // Estratégia: atualizar existentes e adicionar/remover conforme necessário
     // Isso evita deletar registros que podem ter foreign keys
 
