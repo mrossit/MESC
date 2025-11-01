@@ -50,15 +50,21 @@ router.get('/urgent-alerts', async (req, res) => {
 
     // Separate critical (within 48h) from regular incomplete
     const criticalMasses = incompleteMasses
-      .filter(mass => new Date(mass.date) <= next48Hours)
+      .filter(mass => {
+        const massDate = new Date(mass.date + 'T12:00:00');
+        return massDate <= next48Hours;
+      })
       .map(m => ({
         ...m,
-        hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1000 * 60 * 60)),
+        hoursUntil: Math.round((new Date(m.date + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60)),
         massTime: m.time,
       }));
 
     const regularIncomplete = incompleteMasses
-      .filter(mass => new Date(mass.date) > next48Hours)
+      .filter(mass => {
+        const massDate = new Date(mass.date + 'T12:00:00');
+        return massDate > next48Hours;
+      })
       .map(m => ({
         ...m,
         massTime: m.time,
@@ -94,13 +100,19 @@ router.get('/urgent-alerts', async (req, res) => {
 
     // Separate urgent (within 48h) from regular
     const urgentSubstitutions = pendingSubstitutions
-      .filter(sub => new Date(sub.massDate) <= next48Hours)
+      .filter(sub => {
+        const subDate = new Date(sub.massDate + 'T12:00:00');
+        return subDate <= next48Hours;
+      })
       .map(s => ({
         ...s,
-        hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1000 * 60 * 60)),
+        hoursUntil: Math.round((new Date(s.massDate + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60)),
       }));
 
-    const regularSubstitutions = pendingSubstitutions.filter(sub => new Date(sub.massDate) > next48Hours);
+    const regularSubstitutions = pendingSubstitutions.filter(sub => {
+      const subDate = new Date(sub.massDate + 'T12:00:00');
+      return subDate > next48Hours;
+    });
 
     res.json({
       success: true,
