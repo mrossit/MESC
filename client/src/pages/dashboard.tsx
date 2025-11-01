@@ -283,7 +283,7 @@ export default function Dashboard() {
                 <div
                   key={sub.id}
                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
-                  onClick={() => setLocation('/substitutions')}
+                  onClick={() => setLocation('/schedules/substitutions')}
                 >
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -305,7 +305,7 @@ export default function Dashboard() {
 
         {/* REAL METRICS ROW */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation('/ministers')}>
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation('/user-management')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Ministros Ativos</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -316,7 +316,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation('/questionnaires')}>
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation('/questionnaire-responses')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Taxa de Resposta</CardTitle>
               <FileQuestion className="h-4 w-4 text-muted-foreground" />
@@ -378,7 +378,7 @@ export default function Dashboard() {
             <Button
               variant="outline"
               className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
-              onClick={() => setLocation('/questionnaires/admin')}
+              onClick={() => setLocation('/questionnaire-responses')}
             >
               <FileQuestion className="h-5 w-5 text-blue-500 flex-shrink-0" />
               <div className="text-left w-full">
@@ -391,7 +391,7 @@ export default function Dashboard() {
           <Button
             variant="outline"
             className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
-            onClick={() => setLocation('/substitutions')}
+            onClick={() => setLocation('/schedules/substitutions')}
           >
             <UserCheck className="h-5 w-5 text-purple-500 flex-shrink-0" />
             <div className="text-left w-full">
@@ -405,7 +405,7 @@ export default function Dashboard() {
           <Button
             variant="outline"
             className="h-auto py-4 px-4 flex flex-col items-start gap-2 w-full"
-            onClick={() => setLocation('/ministers?status=pending')}
+            onClick={() => setLocation('/approvals')}
           >
             <Users className="h-5 w-5 text-green-500 flex-shrink-0" />
             <div className="text-left w-full">
@@ -514,7 +514,7 @@ export default function Dashboard() {
                     <div
                       key={minister.id}
                       className="flex items-center justify-between gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50"
-                      onClick={() => setLocation(`/ministers/${minister.id}`)}
+                      onClick={() => setLocation('/user-management')}
                     >
                       <span className="text-sm truncate flex-1">{minister.name}</span>
                       <Badge variant="outline" className="flex-shrink-0 text-xs whitespace-nowrap">
@@ -526,7 +526,7 @@ export default function Dashboard() {
                     <Button
                       variant="link"
                       className="w-full text-xs sm:text-sm"
-                      onClick={() => setLocation('/ministers?filter=inactive')}
+                      onClick={() => setLocation('/user-management')}
                     >
                       Ver todos ({stats?.inactiveMinisters?.length})
                     </Button>
@@ -559,7 +559,7 @@ export default function Dashboard() {
               {(alerts?.pendingSubstitutions?.length || 0) > 0 && (
                 <Alert
                   className="cursor-pointer hover:bg-accent/50"
-                  onClick={() => setLocation('/substitutions')}
+                  onClick={() => setLocation('/schedules/substitutions')}
                 >
                   <UserCheck className="h-4 w-4 flex-shrink-0" />
                   <AlertDescription className="text-xs sm:text-sm break-words">
@@ -569,7 +569,7 @@ export default function Dashboard() {
               )}
 
               {stats?.responseRate < 80 && stats?.questionnaireStatus !== 'closed' && (
-                <Alert className="cursor-pointer hover:bg-accent/50" onClick={() => setLocation('/questionnaires')}>
+                <Alert className="cursor-pointer hover:bg-accent/50" onClick={() => setLocation('/questionnaire-responses')}>
                   <FileQuestion className="h-4 w-4 flex-shrink-0" />
                   <AlertDescription className="text-xs sm:text-sm break-words">
                     Taxa de resposta baixa: <span className="font-semibold">{stats?.responseRate}%</span>
