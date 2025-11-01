@@ -109,10 +109,40 @@ async function importProductionData() {
           ? questionnaire.questions
           : JSON.stringify(questionnaire.questions);
         
-        // Extrair mês e ano do título ou usar data de criação
-        const createdAt = new Date(questionnaire.created_at);
-        const month = createdAt.getMonth() + 1; // getMonth() retorna 0-11
-        const year = createdAt.getFullYear();
+        // Extrair mês e ano do título (ex: "Questionário Novembro 2025")
+        const monthNames: { [key: string]: number } = {
+          'janeiro': 1, 'fevereiro': 2, 'março': 3, 'abril': 4,
+          'maio': 5, 'junho': 6, 'julho': 7, 'agosto': 8,
+          'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+        };
+        
+        const titleLower = questionnaire.title.toLowerCase();
+        let month = null;
+        let year = null;
+        
+        // Procurar pelo nome do mês no título
+        for (const [monthName, monthNum] of Object.entries(monthNames)) {
+          if (titleLower.includes(monthName)) {
+            month = monthNum;
+            break;
+          }
+        }
+        
+        // Extrair ano do título (procura por 4 dígitos)
+        const yearMatch = questionnaire.title.match(/\d{4}/);
+        if (yearMatch) {
+          year = parseInt(yearMatch[0]);
+        }
+        
+        // Fallback: usar data de criação se não encontrar no título
+        if (!month || !year) {
+          const createdAt = new Date(questionnaire.created_at);
+          month = month || (createdAt.getMonth() + 1);
+          year = year || createdAt.getFullYear();
+          console.log(`   ⚠️  Usando fallback para "${questionnaire.title}": mês=${month}, ano=${year}`);
+        } else {
+          console.log(`   ✓ "${questionnaire.title}" → mês=${month}, ano=${year}`);
+        }
           
         await devSql`
           INSERT INTO questionnaires (
