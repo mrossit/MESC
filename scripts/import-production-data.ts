@@ -19,6 +19,39 @@ async function importProductionData() {
 
   try {
     // ============================================
+    // 0. LIMPAR TODAS AS TABELAS DEPENDENTES NO DESENVOLVIMENTO
+    // ============================================
+    console.log('🧹 Limpando banco de desenvolvimento...');
+    
+    // Função auxiliar para deletar com segurança (ignora se tabela não existe)
+    const safeDelete = async (tableName: string) => {
+      try {
+        const query = `DELETE FROM ${tableName}`;
+        await devSql(query);
+        console.log(`   ✓ ${tableName} limpa`);
+      } catch (error: any) {
+        if (error.code === '42P01') {
+          console.log(`   ⊘ ${tableName} não existe (ok)`);
+        } else {
+          throw error;
+        }
+      }
+    };
+    
+    // Deletar na ordem correta (respeitando foreign keys)
+    // Primeiro as tabelas que dependem de outras
+    await safeDelete('notifications');
+    await safeDelete('formation_progress');
+    await safeDelete('substitution_requests');
+    await safeDelete('schedule_ministers');
+    await safeDelete('schedules');
+    await safeDelete('questionnaire_responses');
+    await safeDelete('questionnaires');
+    await safeDelete('users');
+    
+    console.log('   ✅ Banco de desenvolvimento limpo\n');
+
+    // ============================================
     // 1. IMPORTAR USERS
     // ============================================
     console.log('📊 Importando tabela USERS...');
@@ -29,38 +62,23 @@ async function importProductionData() {
     `;
     console.log(`   ✓ ${prodUsers.length} usuários encontrados na produção`);
 
-    // Limpar usuários do desenvolvimento (exceto alguns IDs especiais se necessário)
-    await devSql`DELETE FROM questionnaire_responses`; // Limpar dependências primeiro
-    await devSql`DELETE FROM users`;
-    console.log('   ✓ Tabela users limpa no desenvolvimento');
-
-    // Inserir usuários no desenvolvimento
+    // Inserir usuários no desenvolvimento (apenas colunas que existem em ambos os bancos)
     if (prodUsers.length > 0) {
       for (const user of prodUsers) {
         await devSql`
           INSERT INTO users (
             id, name, email, password_hash, phone, role, status, 
-            schedule_display_name, formation_track, address, baptism_date,
-            confirmation_date, has_communion_ministry_certification,
-            ministry_certification_date, ministry_start_date,
-            availability_notes, health_restrictions, preferred_mass_times,
-            can_help_weekdays, serving_frequency_preference, notes,
-            created_at, updated_at, last_login_at, must_change_password,
-            receive_email_notifications, receive_sms_notifications,
-            receive_whatsapp_notifications, receive_push_notifications
+            schedule_display_name, address, baptism_date,
+            confirmation_date, ministry_start_date,
+            observations, created_at, updated_at, last_login,
+            whatsapp, join_date
           ) VALUES (
             ${user.id}, ${user.name}, ${user.email}, ${user.password_hash},
             ${user.phone}, ${user.role}, ${user.status}, ${user.schedule_display_name},
-            ${user.formation_track}, ${user.address}, ${user.baptism_date},
-            ${user.confirmation_date}, ${user.has_communion_ministry_certification},
-            ${user.ministry_certification_date}, ${user.ministry_start_date},
-            ${user.availability_notes}, ${user.health_restrictions},
-            ${user.preferred_mass_times}, ${user.can_help_weekdays},
-            ${user.serving_frequency_preference}, ${user.notes},
-            ${user.created_at}, ${user.updated_at}, ${user.last_login_at},
-            ${user.must_change_password}, ${user.receive_email_notifications},
-            ${user.receive_sms_notifications}, ${user.receive_whatsapp_notifications},
-            ${user.receive_push_notifications}
+            ${user.address}, ${user.baptism_date},
+            ${user.confirmation_date}, ${user.ministry_start_date},
+            ${user.notes || null}, ${user.created_at}, ${user.updated_at}, ${user.last_login_at || null},
+            ${user.phone || null}, ${user.created_at}
           )
         `;
       }
@@ -82,18 +100,33 @@ async function importProductionData() {
     await devSql`DELETE FROM questionnaires`;
     console.log('   ✓ Tabela questionnaires limpa no desenvolvimento');
 
-    // Inserir questionários no desenvolvimento
+    // Inserir questionários no desenvolvimento (apenas colunas que existem em ambos)
     if (prodQuestionnaires.length > 0) {
       for (const questionnaire of prodQuestionnaires) {
+        // O campo questions já vem como objeto JSONB do neon
+        // Vamos inserir diretamente como JSON string
+        const questionsJson = typeof questionnaire.questions === 'string'
+          ? questionnaire.questions
+          : JSON.stringify(questionnaire.questions);
+        
+        // Extrair mês e ano do título ou usar data de criação
+        const createdAt = new Date(questionnaire.created_at);
+        const month = createdAt.getMonth() + 1; // getMonth() retorna 0-11
+        const year = createdAt.getFullYear();
+          
         await devSql`
           INSERT INTO questionnaires (
-            id, title, description, questions, status, period_start,
-            period_end, target_roles, created_by, created_at, updated_at
+            id, title, description, questions, status, month, year, created_at, updated_at
           ) VALUES (
-            ${questionnaire.id}, ${questionnaire.title}, ${questionnaire.description},
-            ${questionnaire.questions}, ${questionnaire.status}, ${questionnaire.period_start},
-            ${questionnaire.period_end}, ${questionnaire.target_roles}, ${questionnaire.created_by},
-            ${questionnaire.created_at}, ${questionnaire.updated_at}
+            ${questionnaire.id}, 
+            ${questionnaire.title}, 
+            ${questionnaire.description},
+            ${questionsJson}::jsonb, 
+            ${questionnaire.status},
+            ${month},
+            ${year},
+            ${questionnaire.created_at}, 
+            ${questionnaire.updated_at}
           )
         `;
       }
