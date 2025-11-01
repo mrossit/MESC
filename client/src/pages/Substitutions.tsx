@@ -748,7 +748,37 @@ export default function Substitutions() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {substitutionRequests.map((item: SubstitutionRequest) => {
+                  {substitutionRequests
+                    // 1. FILTRAR: Remover pedidos cancelados
+                    .filter((item: SubstitutionRequest) => item.request.status !== "cancelled")
+                    // 2. ORDENAR: Ativos (próximos primeiro) → Aceitos (no fim)
+                    .sort((a: SubstitutionRequest, b: SubstitutionRequest) => {
+                      const aDate = a.assignment?.date
+                        ? (typeof a.assignment.date === 'string' 
+                            ? parseScheduleDate(a.assignment.date) 
+                            : new Date(a.assignment.date))
+                        : new Date();
+                      const bDate = b.assignment?.date
+                        ? (typeof b.assignment.date === 'string' 
+                            ? parseScheduleDate(b.assignment.date) 
+                            : new Date(b.assignment.date))
+                        : new Date();
+
+                      const aIsActive = a.request.status === "pending" || a.request.status === "available";
+                      const bIsActive = b.request.status === "pending" || b.request.status === "available";
+                      const aIsAccepted = a.request.status === "approved" || a.request.status === "auto_approved";
+                      const bIsAccepted = b.request.status === "approved" || b.request.status === "auto_approved";
+
+                      // Ativos primeiro, aceitos depois
+                      if (aIsActive && !bIsActive) return -1;
+                      if (!aIsActive && bIsActive) return 1;
+                      if (aIsAccepted && !bIsAccepted) return 1;
+                      if (!aIsAccepted && bIsAccepted) return -1;
+
+                      // Dentro de cada grupo, ordenar por data (mais próximas primeiro)
+                      return aDate.getTime() - bDate.getTime();
+                    })
+                    .map((item: SubstitutionRequest) => {
                     // Parse date correctly to avoid timezone issues
                     const assignmentDate = item.assignment?.date
                       ? (typeof item.assignment.date === 'string' 
