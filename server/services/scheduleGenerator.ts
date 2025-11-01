@@ -70,14 +70,19 @@ export class IntelligentScheduleGenerator {
   private ministerLearningProfiles: Map<string, MinisterLearningProfile> = new Map();
   private historicalAssignmentLookup: Map<string, string> = new Map();
   private lastHistoricalAlignment?: { total: number; matches: number; matchRate: number };
+  private month: number;
+  private year: number;
 
   constructor(
-    private month: number,
-    private year: number,
+    month: number | string,
+    year: number | string,
     private ministersData: any[],
     private responsesData: any[],
     historicalSchedules: HistoricalScheduleSnapshot[] = []
   ) {
+    // Normalize month and year to numbers (handles both string and number inputs)
+    this.month = typeof month === 'string' ? parseInt(month, 10) : month;
+    this.year = typeof year === 'string' ? parseInt(year, 10) : year;
     this.historicalSchedules = (historicalSchedules || []).filter(Boolean);
     this.loadMinisterAvailability();
     this.analyzeHistoricalSchedules();
