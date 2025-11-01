@@ -41,17 +41,46 @@ interface Assignment {
   confirmed: boolean;
 }
 
+interface HistoricalAssignmentSnapshot {
+  date: string;
+  time: string;
+  position: number;
+  ministerId?: string | null;
+}
+
+interface HistoricalScheduleSnapshot {
+  reference?: string;
+  publishedAt?: string;
+  assignments: HistoricalAssignmentSnapshot[];
+}
+
+interface MinisterLearningProfile {
+  weightedAssignments: number;
+  totalAssignments: number;
+  positionWeights: Map<number, number>;
+  massWeights: Map<string, number>;
+  recencyBoost: number;
+  lastDates: string[];
+}
+
 export class IntelligentScheduleGenerator {
   private ministers: MinisterWithAvailability[] = [];
   private maxAssignmentsPerMonth = 25;
+  private historicalSchedules: HistoricalScheduleSnapshot[] = [];
+  private ministerLearningProfiles: Map<string, MinisterLearningProfile> = new Map();
+  private historicalAssignmentLookup: Map<string, string> = new Map();
+  private lastHistoricalAlignment?: { total: number; matches: number; matchRate: number };
 
   constructor(
     private month: number,
     private year: number,
     private ministersData: any[],
-    private responsesData: any[]
+    private responsesData: any[],
+    historicalSchedules: HistoricalScheduleSnapshot[] = []
   ) {
+    this.historicalSchedules = (historicalSchedules || []).filter(Boolean);
     this.loadMinisterAvailability();
+    this.analyzeHistoricalSchedules();
   }
 
   private loadMinisterAvailability() {
@@ -142,6 +171,121 @@ export class IntelligentScheduleGenerator {
     console.log(`  - With weekday availability: ${this.ministers.filter(m => Object.values(m.availability.weekdays).some(v => v)).length}`);
   }
 
+  private analyzeHistoricalSchedules() {
+    if (this.historicalSchedules.length === 0) {
+      console.log('[INTELLIGENT_GENERATOR] ℹ️  No historical schedules provided. Skipping generative learning phase.');
+      return;
+    }
+
+    const sorted = [...this.historicalSchedules].sort((a, b) => {
+      const getComparableDate = (snapshot: HistoricalScheduleSnapshot) => {
+        if (snapshot.publishedAt) return new Date(snapshot.publishedAt).getTime();
+        if (snapshot.assignments.length > 0) {
+          const dates = snapshot.assignments
+            .map(assignment => new Date(`${assignment.date}T00:00:00Z`).getTime())
+            .filter(time => !Number.isNaN(time));
+          return dates.length > 0 ? Math.max(...dates) : 0;
+        }
+        return 0;
+      };
+      return getComparableDate(b) - getComparableDate(a);
+    }).slice(0, 3);
+
+    const recencyWeights = [1, 0.6, 0.3];
+    const recencyBoosts = [0.12, 0.08, 0.04];
+
+    sorted.forEach((snapshot, index) => {
+      const weight = recencyWeights[index] ?? 0.2;
+      const recencyBoost = recencyBoosts[index] ?? 0.02;
+
+      snapshot.assignments.forEach(assignment => {
+        if (!assignment.ministerId || assignment.ministerId === 'VACANT') {
+          return;
+        }
+
+        const ministerId = assignment.ministerId;
+        const profile = this.getOrCreateLearningProfile(ministerId);
+
+        profile.weightedAssignments += weight;
+        profile.totalAssignments += 1;
+        profile.recencyBoost = Math.max(profile.recencyBoost, recencyBoost);
+
+        const massKey = this.getMassKey({
+          date: assignment.date,
+          time: assignment.time
+        });
+
+        const currentPositionWeight = profile.positionWeights.get(assignment.position) ?? 0;
+        profile.positionWeights.set(assignment.position, currentPositionWeight + weight);
+
+        const currentMassWeight = profile.massWeights.get(massKey) ?? 0;
+        profile.massWeights.set(massKey, currentMassWeight + weight);
+
+        if (!profile.lastDates.includes(assignment.date)) {
+          profile.lastDates.push(assignment.date);
+        }
+
+        const lookupKey = `${massKey}|${assignment.position}`;
+        if (!this.historicalAssignmentLookup.has(lookupKey)) {
+          this.historicalAssignmentLookup.set(lookupKey, ministerId);
+        }
+      });
+    });
+
+    console.log(`[INTELLIGENT_GENERATOR] 🧠 Learned historical preferences for ${this.ministerLearningProfiles.size} ministers`);
+  }
+
+  private getOrCreateLearningProfile(ministerId: string): MinisterLearningProfile {
+    if (!this.ministerLearningProfiles.has(ministerId)) {
+      this.ministerLearningProfiles.set(ministerId, {
+        weightedAssignments: 0,
+        totalAssignments: 0,
+        positionWeights: new Map(),
+        massWeights: new Map(),
+        recencyBoost: 0,
+        lastDates: []
+      });
+    }
+
+    return this.ministerLearningProfiles.get(ministerId)!;
+  }
+
+  getLastHistoricalAlignment() {
+    return this.lastHistoricalAlignment;
+  }
+
+  private getMassKey(mass: Pick<MassInfo, 'date' | 'time'>): string {
+    return `${mass.date}_${mass.time}`;
+  }
+
+  private getHistoricalAlignmentScore(minister: MinisterWithAvailability, positions: number[], mass: MassInfo): number {
+    if (!minister.id) {
+      return 0;
+    }
+
+    const profile = this.ministerLearningProfiles.get(minister.id);
+    if (!profile || profile.weightedAssignments === 0) {
+      return 0;
+    }
+
+    const massKey = this.getMassKey(mass);
+    const massWeight = profile.massWeights.get(massKey) ?? 0;
+    let bestPositionWeight = 0;
+
+    positions.forEach(position => {
+      const positionWeight = profile.positionWeights.get(position) ?? 0;
+      if (positionWeight > bestPositionWeight) {
+        bestPositionWeight = positionWeight;
+      }
+    });
+
+    const normalizedPositionScore = bestPositionWeight / profile.weightedAssignments;
+    const normalizedMassScore = massWeight / profile.weightedAssignments;
+
+    const score = (normalizedPositionScore * 0.65) + (normalizedMassScore * 0.25) + profile.recencyBoost;
+    return Number.isFinite(score) ? score : 0;
+  }
+
   generateSchedule(): Map<string, Assignment[]> {
     console.log(`\n[INTELLIGENT_GENERATOR] 🚀 Starting schedule generation for ${this.month}/${this.year}...`);
 
@@ -167,6 +311,8 @@ export class IntelligentScheduleGenerator {
       const assignedCount = assignments.filter(a => a.ministerId !== 'VACANT').length;
       console.log(`[SCHEDULE] ${key}: ${assignedCount}/${assignments.length} positions filled`);
     }
+
+    this.evaluateScheduleAgainstHistory(schedule);
 
     console.log(`\n[INTELLIGENT_GENERATOR] ✅ Schedule generation complete!`);
     return schedule;
@@ -207,6 +353,13 @@ export class IntelligentScheduleGenerator {
       );
       if (aHasNewPreferred && !bHasNewPreferred) return -1;
       if (!aHasNewPreferred && bHasNewPreferred) return 1;
+
+      // Second priority (generative): historical alignment score
+      const aHistoricalScore = this.getHistoricalAlignmentScore(a, requiredPositions, mass);
+      const bHistoricalScore = this.getHistoricalAlignmentScore(b, requiredPositions, mass);
+      if (aHistoricalScore !== bHistoricalScore) {
+        return bHistoricalScore - aHistoricalScore;
+      }
 
       // Second priority: ministers with preferred positions matching needed positions (legacy field)
       const aHasPreferred = requiredPositions.includes(a.preferredPosition || 0);
@@ -360,6 +513,42 @@ export class IntelligentScheduleGenerator {
     });
 
     return available;
+  }
+
+  private evaluateScheduleAgainstHistory(schedule: Map<string, Assignment[]>) {
+    if (this.historicalAssignmentLookup.size === 0) {
+      this.lastHistoricalAlignment = undefined;
+      console.log('[INTELLIGENT_GENERATOR] ℹ️  No overlapping historical data to compare against.');
+      return;
+    }
+
+    let totalComparable = 0;
+    let matches = 0;
+
+    schedule.forEach((assignments, massKey) => {
+      assignments.forEach(assignment => {
+        const lookupKey = `${massKey}|${assignment.position}`;
+        if (this.historicalAssignmentLookup.has(lookupKey)) {
+          totalComparable++;
+          if (this.historicalAssignmentLookup.get(lookupKey) === assignment.ministerId) {
+            matches++;
+          }
+        }
+      });
+    });
+
+    const matchRate = totalComparable > 0 ? matches / totalComparable : 0;
+    this.lastHistoricalAlignment = {
+      total: totalComparable,
+      matches,
+      matchRate
+    };
+
+    if (totalComparable > 0) {
+      console.log(`[INTELLIGENT_GENERATOR] 🤖 Historical alignment rate: ${(matchRate * 100).toFixed(1)}% (${matches}/${totalComparable})`);
+    } else {
+      console.log('[INTELLIGENT_GENERATOR] ℹ️  Historical data provided but none matched current mass/time combinations.');
+    }
   }
 
   private getRequiredPositions(mass: MassInfo): number[] {

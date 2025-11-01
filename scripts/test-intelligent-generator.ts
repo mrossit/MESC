@@ -32,7 +32,8 @@ async function testGenerator() {
       10,  // October
       2025,
       ministers,
-      responses
+      responses,
+      []
     );
 
     // Generate schedule
