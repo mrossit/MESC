@@ -17,6 +17,25 @@ import { format, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 const router = Router();
 
+type IncompleteMass = {
+  date: string;
+  time: string;
+  totalSlots: number;
+  filledSlots: number;
+  vacancies: number;
+};
+
+type PendingSubstitution = {
+  id: string;
+  scheduleId: string;
+  requesterId: string;
+  requesterName: string;
+  reason: string | null;
+  status: string;
+  massDate: string;
+  massTime: string;
+};
+
 /**
  * GET /api/dashboard/urgent-alerts
  * Returns urgent issues requiring immediate coordinator attention
@@ -50,22 +69,22 @@ router.get('/urgent-alerts', async (req, res) => {
 
     // Separate critical (within 48h) from regular incomplete
     const criticalMasses = incompleteMasses
-      .filter(mass => {
+      .filter((mass: IncompleteMass) => {
         const massDate = new Date(mass.date + 'T12:00:00');
         return massDate <= next48Hours;
       })
-      .map(m => ({
+      .map((m: IncompleteMass) => ({
         ...m,
         hoursUntil: Math.round((new Date(m.date + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60)),
         massTime: m.time,
       }));
 
     const regularIncomplete = incompleteMasses
-      .filter(mass => {
+      .filter((mass: IncompleteMass) => {
         const massDate = new Date(mass.date + 'T12:00:00');
         return massDate > next48Hours;
       })
-      .map(m => ({
+      .map((m: IncompleteMass) => ({
         ...m,
         massTime: m.time,
       }));
@@ -100,16 +119,16 @@ router.get('/urgent-alerts', async (req, res) => {
 
     // Separate urgent (within 48h) from regular
     const urgentSubstitutions = pendingSubstitutions
-      .filter(sub => {
+      .filter((sub: PendingSubstitution) => {
         const subDate = new Date(sub.massDate + 'T12:00:00');
         return subDate <= next48Hours;
       })
-      .map(s => ({
+      .map((s: PendingSubstitution) => ({
         ...s,
         hoursUntil: Math.round((new Date(s.massDate + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60)),
       }));
 
-    const regularSubstitutions = pendingSubstitutions.filter(sub => {
+    const regularSubstitutions = pendingSubstitutions.filter((sub: PendingSubstitution) => {
       const subDate = new Date(sub.massDate + 'T12:00:00');
       return subDate > next48Hours;
     });
@@ -168,7 +187,7 @@ router.get('/next-week-masses', async (req, res) => {
       .groupBy(schedules.date, schedules.time)
       .orderBy(schedules.date, schedules.time);
 
-    const massesWithStatus = masses.map(mass => {
+    const massesWithStatus = masses.map((mass: any) => {
       const staffingRate = mass.requiredMinisters > 0
         ? (mass.totalAssigned / mass.requiredMinisters) * 100
         : 0;
@@ -392,7 +411,7 @@ router.get('/incomplete', async (req, res) => {
 
     res.json({
       success: true,
-      data: incomplete.map(item => ({
+      data: incomplete.map((item: any) => ({
         ...item,
         id: `${item.date}-${item.massTime}`,
         title: `Missa ${item.massTime}`,
