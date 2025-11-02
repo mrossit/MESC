@@ -647,6 +647,10 @@ export default function Substitutions() {
       ? formatMassTime(group.massTime)
       : "";
     const isCollapsed = collapsedGroups.has(group.key);
+    
+    const pendingCount = group.items.filter(({ item }) => 
+      item.request.status === "pending" || item.request.status === "available"
+    ).length;
 
     return (
       <div key={group.key} className="space-y-4">
@@ -659,16 +663,21 @@ export default function Substitutions() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="font-semibold text-foreground">{formattedDate}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <Clock className="h-4 w-4" />
             <span className="font-medium">
               {formattedTime
                 ? `Missa das ${formattedTime}`
                 : "Horário não informado"}
             </span>
-            <Badge variant="secondary" className="ml-2">
+            <Badge variant="secondary" className="ml-2" data-testid={`badge-total-${group.key}`}>
               {group.items.length} {group.items.length === 1 ? 'pedido' : 'pedidos'}
             </Badge>
+            {pendingCount > 0 && (
+              <Badge variant="default" className="bg-amber-500 hover:bg-amber-600" data-testid={`badge-pending-${group.key}`}>
+                {pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'}
+              </Badge>
+            )}
           </div>
         </div>
         {!isCollapsed && (
