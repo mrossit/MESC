@@ -16,9 +16,10 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { activityLogs } from '@shared/schema';
+import { activityLogs, users } from '@shared/schema';
 import { AuthRequest } from '../auth';
 import { logger } from '../utils/logger';
+import { eq } from 'drizzle-orm';
 
 /**
  * Tipos de ações auditáveis
@@ -139,9 +140,19 @@ export async function logAudit(
     // Log no console (Winston)
     logger.info(`[AUDIT] ${action}`, sanitizedMetadata);
 
+    const userId = metadata.userId;
+
+    if (!userId) {
+      logger.warn('[AUDIT] Skipping database persistence due to missing userId', {
+        action,
+        metadata: sanitizedMetadata
+      });
+      return;
+    }
+
     // Salvar no banco de dados (activity_logs)
     await db.insert(activityLogs).values({
-      userId: metadata.userId || null,
+      userId,
       action,
       details: JSON.stringify(sanitizedMetadata),
       ipAddress: metadata.ipAddress || null,
@@ -266,12 +277,35 @@ export async function auditLoginAttempt(
   email: string,
   success: boolean,
   req: Request,
-  reason?: string
+  reason?: string,
+  userId?: string
 ): Promise<void> {
+  const normalizedEmail = email.trim().toLowerCase();
+  let resolvedUserId = userId;
+
+  if (!resolvedUserId) {
+    try {
+      const [foundUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, normalizedEmail))
+        .limit(1);
+
+      resolvedUserId = foundUser?.id;
+    } catch (error) {
+      logger.warn('[AUDIT] Failed to resolve userId for login attempt', {
+        email: normalizedEmail,
+        success,
+        error
+      });
+    }
+  }
+
   await logAudit(
     success ? AuditAction.LOGIN : AuditAction.LOGIN_FAILED,
     {
-      email,
+      userId: resolvedUserId,
+      email: normalizedEmail,
       success,
       reason,
       ipAddress: req.ip,
