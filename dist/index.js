@@ -241,6 +241,10 @@ var init_schema = __esm({
       specialEvents: jsonb("special_events"),
       canSubstitute: boolean("can_substitute").default(false),
       notes: text("notes"),
+      // Safety net: Capture responses that weren't mapped to any specific field
+      unmappedResponses: jsonb("unmapped_responses").$type(),
+      // Processing warnings/info for debugging
+      processingWarnings: jsonb("processing_warnings").$type(),
       // Family sharing fields
       sharedWithFamilyIds: jsonb("shared_with_family_ids").$type(),
       isSharedResponse: boolean("is_shared_response").default(false),
@@ -1917,7 +1921,7 @@ var init_logger = __esm({
 });
 
 // server/utils/saintNameMatching.ts
-import { eq as eq9 } from "drizzle-orm";
+import { eq as eq10 } from "drizzle-orm";
 async function loadAllSaintsData() {
   if (saintsCache) {
     return saintsCache;
@@ -2210,7 +2214,7 @@ __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
   generateAutomaticSchedule: () => generateAutomaticSchedule
 });
-import { eq as eq10, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
+import { eq as eq11, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
 import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday } from "date-fns";
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
@@ -2550,7 +2554,7 @@ ${"!".repeat(60)}`);
           }).from(users).where(
             and7(
               or5(
-                eq10(users.status, "active"),
+                eq11(users.status, "active"),
                 sql4`${users.status} IS NULL`
                 // Incluir usuários com status null
               ),
@@ -2951,8 +2955,8 @@ ${"!".repeat(60)}`);
         const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
           and7(
-            eq10(questionnaires.month, month),
-            eq10(questionnaires.year, year)
+            eq11(questionnaires.month, month),
+            eq11(questionnaires.year, year)
           )
         ).limit(1);
         if (!targetQuestionnaire) {
@@ -2963,11 +2967,11 @@ ${"!".repeat(60)}`);
         if (!allowedStatuses.includes(targetQuestionnaire.status)) {
           console.log(`[SCHEDULE_GEN] Question\xE1rio com status ${targetQuestionnaire.status} n\xE3o permitido para ${isPreview ? "preview" : "gera\xE7\xE3o definitiva"}`);
           if (!isPreview) {
-            throw new Error(`Question\xE1rio precisa estar fechado para gera\xE7\xE3o definitiva. Status atual: ${targetQuestionnaire.status}`);
+            throw new Error(`O question\xE1rio precisa estar encerrado antes de gerar a escala definitiva. Status atual: "${targetQuestionnaire.status}". Para resolver: acesse "Question\xE1rios" no menu, selecione o m\xEAs e clique no bot\xE3o "Encerrar" antes de gerar a escala.`);
           }
           return;
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         console.log(`[SCHEDULE_GEN] \u{1F504} Using COMPATIBILITY LAYER for ${year}/${month}`);
         responses.forEach((r, index2) => {
@@ -2999,6 +3003,17 @@ ${"!".repeat(60)}`);
             minister.questionnaireResponse = {
               responses: r.responses
             };
+            if (preferredMassTimes && preferredMassTimes.length > 0) {
+              minister.preferredTimes = preferredMassTimes.map((time2) => {
+                const hourMatch = time2.match(/^(\d{1,2})/);
+                if (hourMatch) {
+                  const hour = parseInt(hourMatch[1]);
+                  return `${hour.toString().padStart(2, "0")}:00`;
+                }
+                return time2;
+              });
+              console.log(`[SUNDAY_PRIORITY] \u26EA Populated preferredTimes for ${minister.name}: ${minister.preferredTimes.join(", ")}`);
+            }
           }
         });
         console.log(`[SCHEDULE_GEN] \u2705 Carregadas respostas de ${responses.length} ministros no availabilityData`);
@@ -3119,7 +3134,7 @@ ${"!".repeat(60)}`);
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq10(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq11(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -3254,9 +3269,55 @@ ${"!".repeat(60)}`);
               }
             }
           }
-          if (dayOfMonth === 28) {
+          if (month === 10 && dayOfMonth === 28) {
             const stJudeMasses = this.generateStJudeMasses(currentDate);
             monthlyTimes.push(...stJudeMasses);
+          }
+          if (month === 11 && dayOfMonth === 2) {
+            monthlyTimes.push({
+              id: `finados-${dateStr}`,
+              dayOfWeek,
+              time: "15:30",
+              date: dateStr,
+              minMinisters: 10,
+              // 10 ministros para Finados
+              maxMinisters: 10,
+              type: "missa_finados"
+            });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa de Finados (Cemit\xE9rio Memorial): ${dateStr} 15:30 (10 ministros)`);
+          }
+          if (month === 11 && dayOfMonth === 20) {
+            monthlyTimes.push({
+              id: `puc-consciencia-negra-${dateStr}`,
+              dayOfWeek,
+              time: "10:00",
+              date: dateStr,
+              location: "PUC Sorocaba",
+              minMinisters: 10,
+              // Ajustar conforme necessário
+              maxMinisters: 10,
+              type: "missa_puc"
+            });
+            console.log(`[SCHEDULE_GEN] \u2705 Missa PUC - Consci\xEAncia Negra: ${dateStr} 10:00 (10 ministros)`);
+          }
+          if (dayOfMonth === 28 && month !== 10) {
+            const saoJudasMonthlies = [
+              { time: "07:00", ministers: 6 },
+              { time: "15:00", ministers: 4 },
+              { time: "19:30", ministers: 7 }
+            ];
+            saoJudasMonthlies.forEach((config) => {
+              monthlyTimes.push({
+                id: `sao-judas-mensal-${dateStr}-${config.time}`,
+                dayOfWeek,
+                time: config.time,
+                date: dateStr,
+                minMinisters: config.ministers,
+                maxMinisters: config.ministers,
+                type: "missa_sao_judas_mensal"
+              });
+              console.log(`[SCHEDULE_GEN] \u2705 Missa S\xE3o Judas Mensal: ${dateStr} ${config.time} (${config.ministers} ministros)`);
+            });
           }
           currentDate = addDays(currentDate, 1);
         }
@@ -3746,18 +3807,44 @@ ${"!".repeat(60)}`);
        * - 👨‍👩‍👧‍👦 GROUPS families together when prefer_serve_together is true
        * - Sorts by assignment count (least assigned first)
        * - Ensures everyone gets at least 1 before anyone gets 3
+       * - ⛪ SUNDAY PRIORITIZATION: For Sunday Masses, prioritizes ministers whose
+       *   preferredTimes matches the Mass time (Tier A) before considering other
+       *   available ministers (Tier B)
        */
       selectOptimalMinisters(available, massTime) {
         const targetCount = massTime.minMinisters;
         const MAX_MONTHLY_ASSIGNMENTS = 4;
         const isDailyMass = massTime.type === "missa_diaria";
+        const isSunday3 = massTime.dayOfWeek === 0;
         console.log(`
 [FAIR_ALGORITHM] ========================================`);
         console.log(`[FAIR_ALGORITHM] Selecting for ${massTime.date} ${massTime.time} (${massTime.type})`);
         console.log(`[FAIR_ALGORITHM] Target: ${targetCount} ministers`);
         console.log(`[FAIR_ALGORITHM] Available pool: ${available.length} ministers`);
         console.log(`[FAIR_ALGORITHM] Is daily mass (no monthly limit): ${isDailyMass}`);
-        const eligible = available.filter((minister) => {
+        console.log(`[FAIR_ALGORITHM] Is Sunday (prioritize preferredTimes): ${isSunday3}`);
+        let tierA = [];
+        let tierB = [];
+        if (isSunday3) {
+          const matchesPreferredTime = (minister) => {
+            if (!minister.preferredTimes || minister.preferredTimes.length === 0) return false;
+            return minister.preferredTimes.some((prefTime) => {
+              const normalizedPref = prefTime.trim();
+              const normalizedMass = massTime.time.trim();
+              if (normalizedPref === normalizedMass) return true;
+              const prefHM = normalizedPref.substring(0, 5);
+              const massHM = normalizedMass.substring(0, 5);
+              return prefHM === massHM;
+            });
+          };
+          tierA = available.filter((m) => matchesPreferredTime(m));
+          tierB = available.filter((m) => !matchesPreferredTime(m));
+          console.log(`[SUNDAY_PRIORITY] \u26EA Tier A (preferred time ${massTime.time}): ${tierA.length} ministers`);
+          console.log(`[SUNDAY_PRIORITY] Tier A ministers: ${tierA.map((m) => m.name).join(", ")}`);
+          console.log(`[SUNDAY_PRIORITY] \u26EA Tier B (alternatives): ${tierB.length} ministers`);
+        }
+        const poolToProcess = isSunday3 ? tierA : available;
+        const eligible = poolToProcess.filter((minister) => {
           if (!minister.id) return false;
           const assignmentCount = minister.monthlyAssignmentCount || 0;
           const alreadyServedToday = minister.lastAssignedDate === massTime.date;
@@ -3858,14 +3945,63 @@ ${"!".repeat(60)}`);
         }
         if (selected.length < targetCount) {
           const shortage = targetCount - selected.length;
-          logger.warn(`\u26A0\uFE0F [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${shortage})`);
-          console.log(`[FAIR_ALGORITHM] \u26A0\uFE0F INCOMPLETE: ${selected.length}/${targetCount}`);
-          console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
-          selected.forEach((m) => {
-            m.scheduleIncomplete = true;
-            m.requiredCount = targetCount;
-            m.actualCount = selected.length;
-          });
+          if (isSunday3 && tierB.length > 0) {
+            console.log(`
+[SUNDAY_PRIORITY] \u26EA Tier A incomplete (${selected.length}/${targetCount})`);
+            console.log(`[SUNDAY_PRIORITY] \u{1F504} Attempting to fill ${shortage} spots with Tier B (alternatives)...`);
+            const eligibleTierB = tierB.filter((minister) => {
+              if (!minister.id) return false;
+              const assignmentCount = minister.monthlyAssignmentCount || 0;
+              const alreadyServedToday = minister.lastAssignedDate === massTime.date;
+              if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
+              if (alreadyServedToday) return false;
+              if (used.has(minister.id)) return false;
+              return true;
+            });
+            const sortedTierB = [...eligibleTierB].sort((a, b) => {
+              const countA = a.monthlyAssignmentCount || 0;
+              const countB = b.monthlyAssignmentCount || 0;
+              if (countA !== countB) return countA - countB;
+              const lastServiceA = a.lastService ? a.lastService.getTime() : 0;
+              const lastServiceB = b.lastService ? b.lastService.getTime() : 0;
+              if (lastServiceA !== lastServiceB) return lastServiceA - lastServiceB;
+              return a.totalServices - b.totalServices;
+            });
+            console.log(`[SUNDAY_PRIORITY] Tier B eligible: ${eligibleTierB.length} ministers`);
+            for (const minister of sortedTierB) {
+              if (selected.length >= targetCount) break;
+              if (!minister.id || used.has(minister.id)) continue;
+              if (minister.familyId && this.familyGroups.has(minister.familyId)) {
+                const familyId = minister.familyId;
+                const preferTogether = this.familyPreferences.get(familyId) ?? true;
+                if (preferTogether && !processedFamilies.has(familyId)) {
+                  console.log(`[SUNDAY_PRIORITY] \u23ED\uFE0F  Skipping ${minister.name}: Family prefers to serve together`);
+                  continue;
+                }
+              }
+              selected.push(minister);
+              used.add(minister.id);
+              minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+              minister.lastAssignedDate = massTime.date;
+              console.log(`[SUNDAY_PRIORITY] \u2705 Selected from Tier B: ${minister.name} (alternative time, now ${minister.monthlyAssignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
+            }
+            if (selected.length >= targetCount) {
+              console.log(`[SUNDAY_PRIORITY] \u2705 SUCCESS: Filled all ${targetCount} spots (Tier A + Tier B)`);
+            } else {
+              console.log(`[SUNDAY_PRIORITY] \u26A0\uFE0F Still incomplete: ${selected.length}/${targetCount} after Tier B`);
+            }
+          }
+          if (selected.length < targetCount) {
+            const finalShortage = targetCount - selected.length;
+            logger.warn(`\u26A0\uFE0F [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${finalShortage})`);
+            console.log(`[FAIR_ALGORITHM] \u26A0\uFE0F INCOMPLETE: ${selected.length}/${targetCount}`);
+            console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
+            selected.forEach((m) => {
+              m.scheduleIncomplete = true;
+              m.requiredCount = targetCount;
+              m.actualCount = selected.length;
+            });
+          }
         } else {
           console.log(`[FAIR_ALGORITHM] \u2705 SUCCESS: Selected ${selected.length}/${targetCount} ministers`);
         }
@@ -3999,7 +4135,7 @@ __export(websocket_exports, {
   notifySubstitutionRequest: () => notifySubstitutionRequest
 });
 import { WebSocketServer, WebSocket } from "ws";
-import { eq as eq19, and as and15, gte as gte8, lte as lte8, sql as sql11, or as or7 } from "drizzle-orm";
+import { eq as eq20, and as and15, gte as gte9, lte as lte9, sql as sql11, or as or7 } from "drizzle-orm";
 import { format as format7, addDays as addDays4 } from "date-fns";
 function initializeWebSocket(httpServer) {
   wss = new WebSocketServer({
@@ -4071,8 +4207,8 @@ async function getCriticalAlerts() {
     vacancies: sql11`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
   }).from(schedules).where(
     and15(
-      gte8(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte8(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
+      gte9(schedules.date, format7(now, "yyyy-MM-dd")),
+      lte9(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
     )
   ).groupBy(schedules.date, schedules.time).having(sql11`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
   const criticalWithHours = criticalMasses.map((m) => ({
@@ -4089,14 +4225,14 @@ async function getCriticalAlerts() {
     status: substitutionRequests.status,
     massDate: schedules.date,
     massTime: schedules.time
-  }).from(substitutionRequests).innerJoin(users, eq19(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq19(substitutionRequests.scheduleId, schedules.id)).where(
+  }).from(substitutionRequests).innerJoin(users, eq20(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq20(substitutionRequests.scheduleId, schedules.id)).where(
     and15(
       or7(
-        eq19(substitutionRequests.status, "pending"),
-        eq19(substitutionRequests.status, "available")
+        eq20(substitutionRequests.status, "pending"),
+        eq20(substitutionRequests.status, "available")
       ),
-      gte8(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte8(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
+      gte9(schedules.date, format7(now, "yyyy-MM-dd")),
+      lte9(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
     )
   ).orderBy(schedules.date);
   return {
@@ -4168,7 +4304,7 @@ __export(formation_seed_exports, {
   default: () => formation_seed_default,
   seedFormation: () => seedFormation
 });
-import { eq as eq22 } from "drizzle-orm";
+import { eq as eq23 } from "drizzle-orm";
 async function seedFormation() {
   console.log("\u{1F331} Starting formation seed...");
   try {
@@ -4198,7 +4334,7 @@ async function seedFormation() {
     ];
     console.log("\u{1F4DA} Inserting tracks...");
     for (const track of tracks) {
-      const existing = await db.select().from(formationTracks).where(eq22(formationTracks.id, track.id)).limit(1);
+      const existing = await db.select().from(formationTracks).where(eq23(formationTracks.id, track.id)).limit(1);
       if (existing.length === 0) {
         await db.insert(formationTracks).values(track);
         console.log(`  \u2713 Created track: ${track.title}`);
@@ -5693,6 +5829,294 @@ var init_formation_seed = __esm({
   }
 });
 
+// server/services/whatsappHandler.ts
+var whatsappHandler_exports = {};
+__export(whatsappHandler_exports, {
+  handleMessage: () => handleMessage
+});
+import OpenAI from "openai";
+import { eq as eq28, and as and20, gte as gte14, asc as asc3, desc as desc10, sql as sql17 } from "drizzle-orm";
+function normalizePhone(phone) {
+  return phone.replace(/[\s\-\(\)+]/g, "");
+}
+function formatDateBR(dateStr) {
+  const date2 = /* @__PURE__ */ new Date(dateStr + "T12:00:00");
+  return date2.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo"
+  });
+}
+function formatTime(timeStr) {
+  return timeStr.substring(0, 5);
+}
+async function sendWhatsAppMessage(phone, message) {
+  try {
+    if (!process.env.ZAPI_INSTANCE || !process.env.ZAPI_TOKEN) {
+      logger.warn("[WhatsApp] Z-API n\xE3o configurado - simulando envio de mensagem");
+      logger.info(`[WhatsApp] Mensagem para ${phone}: ${message}`);
+      return;
+    }
+    const response = await fetch(`${ZAPI_BASE}/send-text`, {
+      method: "POST",
+      headers: ZAPI_HEADERS,
+      body: JSON.stringify({
+        phone,
+        message
+      })
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(`[WhatsApp] Erro ao enviar mensagem: ${error}`);
+    } else {
+      logger.info(`[WhatsApp] \u2705 Mensagem enviada para ${phone}`);
+    }
+  } catch (error) {
+    logger.error("[WhatsApp] Erro ao enviar mensagem via Z-API:", error);
+  }
+}
+async function handleMessage(message) {
+  try {
+    const messageText = message.body || message.message?.conversation || "";
+    if (!messageText) {
+      logger.info("[WhatsApp Handler] Mensagem sem texto, ignorando");
+      return;
+    }
+    const from = normalizePhone(message.from);
+    logger.info(`[WhatsApp Handler] Mensagem de ${from}: "${messageText}"`);
+    const minister = await db.select().from(users).where(
+      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${from}
+         OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${from}`
+    ).limit(1);
+    if (!minister || minister.length === 0) {
+      logger.info("[WhatsApp Handler] Ministro n\xE3o encontrado no sistema");
+      await sendWhatsAppMessage(
+        from,
+        "Ol\xE1! N\xE3o encontrei seu cadastro no sistema MESC. Entre em contato com a coordena\xE7\xE3o para verificar seu registro."
+      );
+      return;
+    }
+    const ministerData = minister[0];
+    logger.info(`[WhatsApp Handler] Ministro identificado: ${ministerData.name}`);
+    const text2 = messageText.trim().toLowerCase();
+    let resposta;
+    if (text2.startsWith("/escala") || text2.startsWith("/proxima") || text2.includes("pr\xF3xima escala") || text2.includes("proxima escala")) {
+      resposta = await handleProximaEscalaCommand(ministerData);
+    } else if (text2.startsWith("/substituicoes") || text2.includes("substitui\xE7") || text2.includes("substituic")) {
+      resposta = await handleSubstituicoesCommand();
+    } else if (text2.startsWith("/aceitar")) {
+      const parts = text2.split(/\s+/);
+      const substitutionId = parts[1];
+      resposta = await handleAceitarSubstituicaoCommand(ministerData.id, substitutionId);
+    } else if (text2.startsWith("/ajuda") || text2.startsWith("/help") || text2 === "menu") {
+      resposta = await handleHelpCommand();
+    } else {
+      resposta = await handleAIResponse(ministerData, messageText);
+    }
+    await sendWhatsAppMessage(from, resposta);
+  } catch (error) {
+    logger.error("[WhatsApp Handler] Erro ao processar mensagem:", error);
+  }
+}
+async function handleProximaEscalaCommand(minister) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const nextSchedule = await db.select().from(schedules).where(
+    and20(
+      eq28(schedules.ministerId, minister.id),
+      gte14(schedules.date, today)
+    )
+  ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
+  if (!nextSchedule || nextSchedule.length === 0) {
+    return `Ol\xE1 ${minister.name}! Voc\xEA n\xE3o tem escalas futuras agendadas no momento. \u{1F4C5}`;
+  }
+  const schedule = nextSchedule[0];
+  const positionNames = {
+    1: "Auxiliar 1",
+    2: "Auxiliar 2",
+    3: "Auxiliar 3",
+    4: "Auxiliar 4",
+    5: "Auxiliar 5",
+    6: "Auxiliar 6",
+    7: "Auxiliar 7",
+    8: "Auxiliar 8"
+  };
+  return `\u{1F4C5} *Sua pr\xF3xima escala*
+
+*Data:* ${formatDateBR(schedule.date)}
+*Hor\xE1rio:* ${formatTime(schedule.time)}
+*Posi\xE7\xE3o:* ${positionNames[schedule.position || 1] || `Posi\xE7\xE3o ${schedule.position}`}
+*Local:* ${schedule.location || "Santu\xE1rio S\xE3o Judas Tadeu"}
+
+Nos vemos l\xE1! \u{1F64F}`;
+}
+async function handleSubstituicoesCommand() {
+  const openSubstitutions = await db.select({
+    id: substitutionRequests.id,
+    date: schedules.date,
+    time: schedules.time,
+    location: schedules.location,
+    position: schedules.position,
+    requesterName: users.name,
+    urgency: substitutionRequests.urgency
+  }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(eq28(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(5);
+  if (!openSubstitutions || openSubstitutions.length === 0) {
+    return `\u{1F4CB} N\xE3o h\xE1 substitui\xE7\xF5es dispon\xEDveis no momento.
+
+Todas as missas est\xE3o com escalas completas! \u2705`;
+  }
+  const positionNames = {
+    1: "Auxiliar 1",
+    2: "Auxiliar 2",
+    3: "Auxiliar 3",
+    4: "Auxiliar 4",
+    5: "Auxiliar 5",
+    6: "Auxiliar 6",
+    7: "Auxiliar 7",
+    8: "Auxiliar 8"
+  };
+  const lista = openSubstitutions.map((sub, index2) => {
+    const urgencyEmoji = sub.urgency === "critical" ? "\u{1F6A8}" : sub.urgency === "high" ? "\u26A0\uFE0F" : "\u{1F4CC}";
+    return `${urgencyEmoji} *${index2 + 1}.* ${formatDateBR(sub.date)} \xE0s ${formatTime(sub.time)}
+   ${positionNames[sub.position || 1]} - ${sub.requesterName}
+   ID: \`${sub.id.substring(0, 8)}\``;
+  }).join("\n\n");
+  return `\u{1F4CB} *Substitui\xE7\xF5es Dispon\xEDveis*
+
+${lista}
+
+Para aceitar, responda:
+/aceitar [ID]
+
+Exemplo: /aceitar ${openSubstitutions[0].id.substring(0, 8)}`;
+}
+async function handleAceitarSubstituicaoCommand(ministerId, substitutionId) {
+  if (!substitutionId) {
+    return `\u274C Por favor, informe o ID da substitui\xE7\xE3o.
+
+Exemplo: /aceitar abc12345
+
+Use /substituicoes para ver as substitui\xE7\xF5es dispon\xEDveis.`;
+  }
+  const substitution = await db.select().from(substitutionRequests).where(sql17`${substitutionRequests.id}::text LIKE ${substitutionId + "%"}`).limit(1);
+  if (!substitution || substitution.length === 0) {
+    return `\u274C Substitui\xE7\xE3o n\xE3o encontrada.
+
+Verifique o ID e tente novamente.
+Use /substituicoes para ver as substitui\xE7\xF5es dispon\xEDveis.`;
+  }
+  const sub = substitution[0];
+  if (sub.status !== "available") {
+    return `\u26A0\uFE0F Esta substitui\xE7\xE3o j\xE1 foi aceita por outro ministro.
+
+Use /substituicoes para ver outras substitui\xE7\xF5es dispon\xEDveis.`;
+  }
+  await db.update(substitutionRequests).set({
+    substituteId: ministerId,
+    status: "pending",
+    responseMessage: "Aceito via WhatsApp"
+  }).where(eq28(substitutionRequests.id, sub.id));
+  logger.info(`[WhatsApp] Substitui\xE7\xE3o ${sub.id} aceita pelo ministro ${ministerId}`);
+  return `\u2705 *Substitui\xE7\xE3o aceita com sucesso!*
+
+Aguarde a aprova\xE7\xE3o do coordenador. Voc\xEA receber\xE1 uma confirma\xE7\xE3o em breve.
+
+Obrigado por sua disponibilidade! \u{1F64F}`;
+}
+async function handleHelpCommand() {
+  return `\u{1F916} *Menu de Comandos MESC*
+
+*Consultas:*
+/escala - Ver sua pr\xF3xima escala
+/substituicoes - Ver substitui\xE7\xF5es dispon\xEDveis
+
+*A\xE7\xF5es:*
+/aceitar [ID] - Aceitar uma substitui\xE7\xE3o
+/ajuda - Mostrar este menu
+
+*Mensagens naturais:*
+Voc\xEA tamb\xE9m pode enviar mensagens normais como:
+\u2022 "Qual minha pr\xF3xima escala?"
+\u2022 "Tem alguma substitui\xE7\xE3o dispon\xEDvel?"
+
+O sistema entender\xE1 sua pergunta! \u{1F60A}`;
+}
+async function handleAIResponse(minister, messageText) {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return await handleHelpCommand();
+    }
+    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const nextSchedule = await db.select().from(schedules).where(
+      and20(
+        eq28(schedules.ministerId, minister.id),
+        gte14(schedules.date, today)
+      )
+    ).orderBy(asc3(schedules.date)).limit(1);
+    const recentSchedules = await db.select().from(schedules).where(eq28(schedules.ministerId, minister.id)).orderBy(desc10(schedules.date)).limit(3);
+    const context = `
+Nome do ministro: ${minister.name}
+Pr\xF3xima escala: ${nextSchedule.length > 0 ? `${formatDateBR(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "Nenhuma escala futura"}
+Total de servi\xE7os realizados: ${minister.totalServices || 0}
+`.trim();
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Voc\xEA \xE9 o assistente virtual do MESC (Ministros Extraordin\xE1rios da Sagrada Comunh\xE3o) do Santu\xE1rio S\xE3o Judas Tadeu de Sorocaba/SP.
+
+Responda de forma acolhedora, objetiva e pastoral. Use emojis apropriados.
+
+Informa\xE7\xF5es do ministro:
+${context}
+
+Comandos dispon\xEDveis:
+- /escala - pr\xF3xima escala
+- /substituicoes - substitui\xE7\xF5es dispon\xEDveis
+- /aceitar [ID] - aceitar substitui\xE7\xE3o
+- /ajuda - menu de ajuda
+
+Se o ministro perguntar sobre escalas, substitui\xE7\xF5es ou informa\xE7\xF5es que voc\xEA tem no contexto, responda diretamente.
+Se for uma pergunta geral sobre o minist\xE9rio, responda de forma pastoral e acolhedora.
+Seja breve e objetivo (m\xE1ximo 3 par\xE1grafos).`
+        },
+        {
+          role: "user",
+          content: messageText
+        }
+      ],
+      max_tokens: 300,
+      temperature: 0.7
+    });
+    const response = completion.choices[0].message?.content || "Desculpe, n\xE3o consegui processar sua mensagem. Use /ajuda para ver os comandos dispon\xEDveis.";
+    return response;
+  } catch (error) {
+    logger.error("[WhatsApp] Erro na resposta IA:", error);
+    return `Ol\xE1 ${minister.name}! No momento estou com dificuldades para processar sua mensagem.
+
+Use os comandos:
+/escala - Ver pr\xF3xima escala
+/substituicoes - Ver substitui\xE7\xF5es
+/ajuda - Menu completo`;
+  }
+}
+var openai, ZAPI_BASE, ZAPI_HEADERS;
+var init_whatsappHandler = __esm({
+  async "server/services/whatsappHandler.ts"() {
+    "use strict";
+    await init_db();
+    init_schema();
+    init_logger();
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    ZAPI_BASE = `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE}`;
+    ZAPI_HEADERS = {
+      "Client-Token": process.env.ZAPI_TOKEN || "",
+      "Content-Type": "application/json"
+    };
+  }
+});
+
 // server/index.ts
 import express2 from "express";
 import cors from "cors";
@@ -5900,7 +6324,7 @@ import { Router as Router2 } from "express";
 await init_db();
 init_schema();
 import { z } from "zod";
-import { eq as eq4 } from "drizzle-orm";
+import { eq as eq5 } from "drizzle-orm";
 
 // server/routes/session.ts
 await init_db();
@@ -5990,6 +6414,7 @@ var session_default = router;
 await init_db();
 init_schema();
 init_logger();
+import { eq as eq4 } from "drizzle-orm";
 function sanitizeAuditData(data) {
   if (!data || typeof data !== "object") {
     return data;
@@ -6021,8 +6446,16 @@ async function logAudit(action, metadata = {}) {
   try {
     const sanitizedMetadata = sanitizeAuditData(metadata);
     logger.info(`[AUDIT] ${action}`, sanitizedMetadata);
+    const userId = metadata.userId;
+    if (!userId) {
+      logger.warn("[AUDIT] Skipping database persistence due to missing userId", {
+        action,
+        metadata: sanitizedMetadata
+      });
+      return;
+    }
     await db.insert(activityLogs).values({
-      userId: metadata.userId || null,
+      userId,
       action,
       details: JSON.stringify(sanitizedMetadata),
       ipAddress: metadata.ipAddress || null,
@@ -6069,11 +6502,26 @@ function auditPersonalDataAccess(dataType) {
     })
   );
 }
-async function auditLoginAttempt(email, success, req, reason) {
+async function auditLoginAttempt(email, success, req, reason, userId) {
+  const normalizedEmail = email.trim().toLowerCase();
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    try {
+      const [foundUser] = await db.select({ id: users.id }).from(users).where(eq4(users.email, normalizedEmail)).limit(1);
+      resolvedUserId = foundUser?.id;
+    } catch (error) {
+      logger.warn("[AUDIT] Failed to resolve userId for login attempt", {
+        email: normalizedEmail,
+        success,
+        error
+      });
+    }
+  }
   await logAudit(
     success ? "LOGIN" /* LOGIN */ : "LOGIN_FAILED" /* LOGIN_FAILED */,
     {
-      email,
+      userId: resolvedUserId,
+      email: normalizedEmail,
       success,
       reason,
       ipAddress: req.ip,
@@ -6110,7 +6558,7 @@ router2.post("/login", async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const result = await login(email, password);
-    await auditLoginAttempt(email, true, req);
+    await auditLoginAttempt(email, true, req, void 0, result.user.id);
     res.cookie("token", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== "development",
@@ -6273,7 +6721,7 @@ router2.get("/me", authenticateToken, async (req, res) => {
       lastName: users.lastName,
       phone: users.phone,
       photoUrl: users.photoUrl
-    }).from(users).where(eq4(users.id, userId)).limit(1);
+    }).from(users).where(eq5(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -6319,7 +6767,7 @@ router2.post("/logout", authenticateToken, async (req, res) => {
   if (sessionToken) {
     try {
       const { activeSessions: activeSessions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.update(activeSessions2).set({ isActive: false }).where(eq4(activeSessions2.sessionToken, sessionToken));
+      await db.update(activeSessions2).set({ isActive: false }).where(eq5(activeSessions2.sessionToken, sessionToken));
       console.log("[AUTH] Sess\xE3o marcada como inativa no logout");
     } catch (error) {
       console.error("[AUTH] Erro ao inativar sess\xE3o:", error);
@@ -6392,7 +6840,7 @@ var emailResetSchema = z.object({
 router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId, newPassword } = adminResetSchema.parse(req.body);
-    const [user] = await db.select().from(users).where(eq4(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq5(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -6411,7 +6859,7 @@ router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", 
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq4(users.id, userId));
+    }).where(eq5(users.id, userId));
     await logAudit("USER_UPDATE" /* USER_UPDATE */, {
       userId: currentUser?.id,
       targetUserId: userId,
@@ -6492,7 +6940,7 @@ var authRoutes_default = router2;
 await init_db();
 init_schema();
 import { Router as Router3 } from "express";
-import { eq as eq5, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
+import { eq as eq6, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
 var router3 = Router3();
 router3.post("/request-reset", async (req, res) => {
   try {
@@ -6503,7 +6951,7 @@ router3.post("/request-reset", async (req, res) => {
         message: "Email \xE9 obrigat\xF3rio"
       });
     }
-    const [user] = await db.select().from(users).where(eq5(users.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq6(users.email, email)).limit(1);
     if (!user) {
       return res.json({
         success: true,
@@ -6512,8 +6960,8 @@ router3.post("/request-reset", async (req, res) => {
     }
     const [existingRequest] = await db.select().from(passwordResetRequests).where(
       and3(
-        eq5(passwordResetRequests.userId, user.id),
-        eq5(passwordResetRequests.status, "pending")
+        eq6(passwordResetRequests.userId, user.id),
+        eq6(passwordResetRequests.status, "pending")
       )
     ).limit(1);
     if (existingRequest) {
@@ -6529,11 +6977,11 @@ router3.post("/request-reset", async (req, res) => {
     });
     const coordinators = await db.select().from(users).where(
       and3(
-        eq5(users.status, "active"),
+        eq6(users.status, "active"),
         // Notifica tanto coordenadores quanto gestores
         or2(
-          eq5(users.role, "coordenador"),
-          eq5(users.role, "gestor")
+          eq6(users.role, "coordenador"),
+          eq6(users.role, "gestor")
         )
       )
     );
@@ -6569,7 +7017,7 @@ router3.get("/pending-requests", async (req, res) => {
       requestedAt: passwordResetRequests.requestedAt,
       reason: passwordResetRequests.reason,
       status: passwordResetRequests.status
-    }).from(passwordResetRequests).leftJoin(users, eq5(passwordResetRequests.userId, users.id)).where(eq5(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
+    }).from(passwordResetRequests).leftJoin(users, eq6(passwordResetRequests.userId, users.id)).where(eq6(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
     res.json({ success: true, requests });
   } catch (error) {
     console.error("Erro ao buscar solicita\xE7\xF5es:", error);
@@ -6583,7 +7031,7 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq5(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq6(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -6597,13 +7045,13 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
       passwordHash: hashedPassword,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(users.id, request.userId));
+    }).where(eq6(users.id, request.userId));
     await db.update(passwordResetRequests).set({
       status: "approved",
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes: adminNotes || "Senha resetada pelo administrador"
-    }).where(eq5(passwordResetRequests.id, requestId));
+    }).where(eq6(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
@@ -6631,7 +7079,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq5(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq6(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -6643,7 +7091,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes
-    }).where(eq5(passwordResetRequests.id, requestId));
+    }).where(eq6(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Solicita\xE7\xE3o de Reset Negada",
@@ -6808,7 +7256,7 @@ await init_db();
 init_schema();
 import { Router as Router4 } from "express";
 import { z as z2 } from "zod";
-import { eq as eq6, and as and4, or as or3, ne } from "drizzle-orm";
+import { eq as eq7, and as and4, or as or3, ne, gte as gte2, lte as lte2 } from "drizzle-orm";
 
 // server/utils/questionnaireGenerator.ts
 init_logger();
@@ -7295,6 +7743,9 @@ function generateQuestionnaireQuestions(month, year) {
         return false;
       }
     }
+    if (month === 11 && event.name === "Finados") {
+      return false;
+    }
     return true;
   });
   filteredEvents.forEach((event, index2) => {
@@ -7366,6 +7817,12 @@ function getSpecialEvents(month, year) {
       date: "24/06"
     });
   }
+  if (month === 11) {
+    events.push({
+      name: "Missa de Finados \xE0s 15h30 (Cemit\xE9rio)",
+      date: "02/11"
+    });
+  }
   return events;
 }
 
@@ -7394,8 +7851,8 @@ router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -7425,8 +7882,8 @@ router4.get("/templates/:year/:month", authenticateToken, requireRole(["gestor",
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -7459,8 +7916,8 @@ router4.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
     const { month, year } = schema.parse(req.body);
     const userId = req.user?.id || req.session?.userId;
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
       // Ignorar templates deletados
     ));
@@ -7537,14 +7994,14 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, data.month),
-      eq6(questionnaires.year, data.year)
+      eq7(questionnaires.month, data.month),
+      eq7(questionnaires.year, data.year)
     ));
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions: data.questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq6(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq7(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -7584,8 +8041,8 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
     });
     const questionData = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7601,7 +8058,7 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, template.id)).returning();
+    }).where(eq7(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7623,8 +8080,8 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     });
     const updates = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7644,7 +8101,7 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, template.id)).returning();
+    }).where(eq7(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7660,8 +8117,8 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     const month = parseInt(req.params.month);
     const questionId = req.params.questionId;
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7676,7 +8133,7 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, template.id)).returning();
+    }).where(eq7(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7703,8 +8160,8 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7735,15 +8192,15 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
     };
-    const [updated] = await db.update(questionnaires).set(updateData).where(eq6(questionnaires.id, template.id)).returning();
+    const [updated] = await db.update(questionnaires).set(updateData).where(eq7(questionnaires.id, template.id)).returning();
     const isResend = template.status === "sent" && resend;
     const allMinisters = await db.select({
       id: users.id,
       name: users.name,
       email: users.email
     }).from(users).where(and4(
-      eq6(users.role, "ministro"),
-      eq6(users.status, "active")
+      eq7(users.role, "ministro"),
+      eq7(users.status, "active")
     ));
     const monthNames2 = [
       "Janeiro",
@@ -7789,14 +8246,14 @@ router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, templateId)).returning();
+    }).where(eq7(questionnaires.id, templateId)).returning();
     res.json({
       message: "Question\xE1rio enviado com sucesso!",
       template: {
@@ -7815,7 +8272,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -7826,7 +8283,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
       status: "closed",
       // closedAt: new Date(), // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, templateId)).returning();
+    }).where(eq7(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7842,18 +8299,40 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     if (template.status !== "closed") {
       return res.status(400).json({ error: "Question\xE1rio precisa estar encerrado para ser reaberto" });
     }
+    const { month, year } = template;
+    console.log("[REOPEN] Verificando escalas publicadas para:", { month, year });
+    const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+    console.log("[REOPEN] Range de datas:", { startDateStr, endDateStr });
+    const publishedSchedules = await db.select().from(schedules).where(
+      and4(
+        gte2(schedules.date, startDateStr),
+        lte2(schedules.date, endDateStr),
+        eq7(schedules.status, "published")
+      )
+    ).limit(1);
+    console.log("[REOPEN] Escalas publicadas encontradas:", publishedSchedules.length);
+    if (publishedSchedules.length > 0) {
+      console.log("[REOPEN] BLOQUEADO - Escalas publicadas existem:", publishedSchedules[0]);
+      return res.status(400).json({
+        error: `N\xE3o \xE9 poss\xEDvel reabrir o question\xE1rio de ${getMonthName(month)}/${year} pois j\xE1 existem escalas publicadas para este per\xEDodo. Para reabrir o question\xE1rio, primeiro \xE9 necess\xE1rio despublicar as escalas.`,
+        hasPublishedSchedules: true
+      });
+    }
+    console.log("[REOPEN] Nenhuma escala publicada encontrada - permitindo reabertura");
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       // closedAt: null, // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, templateId)).returning();
+    }).where(eq7(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7871,8 +8350,8 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7884,12 +8363,12 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
     if (responses.length > 0) {
       const [updated] = await db.update(questionnaires).set({
         status: "deleted",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq6(questionnaires.id, template.id)).returning();
+      }).where(eq7(questionnaires.id, template.id)).returning();
       res.json({
         message: "Template marcado como deletado. Respostas existentes foram preservadas.",
         template: {
@@ -7898,7 +8377,7 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
         }
       });
     } else {
-      await db.delete(questionnaires).where(eq6(questionnaires.id, template.id));
+      await db.delete(questionnaires).where(eq7(questionnaires.id, template.id));
       res.json({
         message: "Template deletado com sucesso!",
         deleted: true
@@ -7917,8 +8396,8 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.json({
@@ -7938,16 +8417,16 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       phone: users.phone
     }).from(users).where(and4(
       or3(
-        eq6(users.role, "ministro"),
-        eq6(users.role, "coordenador")
+        eq7(users.role, "ministro"),
+        eq7(users.role, "coordenador")
       ),
-      eq6(users.status, "active")
+      eq7(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
     const ministersWithResponses = allMinisters.map((minister) => {
       const response = responses.find((r) => r.userId === minister.id);
       if (response) {
@@ -8021,13 +8500,13 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq6(questionnaires.id, templateId)).limit(1);
+    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and4(
-      eq6(questionnaireResponses.questionnaireId, templateId),
-      eq6(questionnaireResponses.userId, ministerId)
+      eq7(questionnaireResponses.questionnaireId, templateId),
+      eq7(questionnaireResponses.userId, ministerId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -8036,7 +8515,7 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq6(users.id, ministerId)).limit(1);
+    }).from(users).where(eq7(users.id, ministerId)).limit(1);
     res.json({
       user,
       response: {
@@ -8063,13 +8542,13 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year)
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, template.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
     const summary = {};
     const questions = template.questions;
     responses.forEach((response) => {
@@ -8130,8 +8609,8 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, month),
-      eq6(questionnaires.year, year),
+      eq7(questionnaires.month, month),
+      eq7(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -8144,7 +8623,7 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       status: "sent",
       // 'sent' is the open status
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(questionnaires.id, questionnaire.id)).returning();
+    }).where(eq7(questionnaires.id, questionnaire.id)).returning();
     res.json({
       message: `Question\xE1rio de ${getMonthName(month)}/${year} aberto com sucesso`,
       questionnaire: {
@@ -8168,8 +8647,8 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, currentMonth),
-      eq6(questionnaires.year, currentYear),
+      eq7(questionnaires.month, currentMonth),
+      eq7(questionnaires.year, currentYear),
       ne(questionnaires.status, "deleted")
     ));
     const shouldAutoClose = currentDay >= 25;
@@ -8179,7 +8658,7 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       const [updated] = await db.update(questionnaires).set({
         status: "closed",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq6(questionnaires.id, questionnaire.id)).returning();
+      }).where(eq7(questionnaires.id, questionnaire.id)).returning();
       autoCloseTriggered = true;
       return res.json({
         currentDay,
@@ -8233,8 +8712,8 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq6(questionnaires.month, monthNum),
-      eq6(questionnaires.year, yearNum),
+      eq7(questionnaires.month, monthNum),
+      eq7(questionnaires.year, yearNum),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -8256,10 +8735,10 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       id: users.id
     }).from(users).where(and4(
       or3(
-        eq6(users.role, "ministro"),
-        eq6(users.role, "coordenador")
+        eq7(users.role, "ministro"),
+        eq7(users.role, "coordenador")
       ),
-      eq6(users.status, "active")
+      eq7(users.status, "active")
     ));
     const totalActiveUsers = activeUsers.length;
     const responses = await db.select({
@@ -8267,7 +8746,7 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq6(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
     const totalResponses = responses.length;
     const responseRate = totalActiveUsers > 0 ? parseFloat((totalResponses / totalActiveUsers * 100).toFixed(2)) : 0;
     const pendingResponses = totalActiveUsers - totalResponses;
@@ -8329,12 +8808,12 @@ await init_db();
 init_schema();
 import { Router as Router5 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq8, and as and6, or as or4 } from "drizzle-orm";
+import { eq as eq9, and as and6, or as or4 } from "drizzle-orm";
 
 // server/utils/csvExporter.ts
 await init_db();
 init_schema();
-import { eq as eq7, and as and5 } from "drizzle-orm";
+import { eq as eq8, and as and5 } from "drizzle-orm";
 function convertResponsesToCSV(data) {
   if (data.length === 0) {
     return "Sem dados para exportar";
@@ -8446,14 +8925,14 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   if (!db) {
     throw new Error("Database not available");
   }
-  const [questionnaire] = await db.select().from(questionnaires).where(eq7(questionnaires.id, questionnaireId)).limit(1);
+  const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
   if (!questionnaire) {
     throw new Error("Questionnaire not found");
   }
   const responsesWithUsers = await db.select({
     response: questionnaireResponses,
     user: users
-  }).from(questionnaireResponses).innerJoin(users, eq7(questionnaireResponses.userId, users.id)).where(eq7(questionnaireResponses.questionnaireId, questionnaireId));
+  }).from(questionnaireResponses).innerJoin(users, eq8(questionnaireResponses.userId, users.id)).where(eq8(questionnaireResponses.questionnaireId, questionnaireId));
   const exportData = responsesWithUsers.map(({ response, user }) => {
     const formattedResponses = [];
     if (response.availableSundays && response.availableSundays.length > 0) {
@@ -8591,7 +9070,7 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   });
   const respondedUserIds = new Set(responsesWithUsers.map((r) => r.user.id));
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
-    const nonRespondents = await db.select().from(users).where(eq7(users.role, "ministro"));
+    const nonRespondents = await db.select().from(users).where(eq8(users.role, "ministro"));
     nonRespondents.filter((user) => !respondedUserIds.has(user.id)).forEach((user) => {
       exportData.push({
         ministerId: user.id,
@@ -8610,8 +9089,8 @@ async function getMonthlyResponsesForExport(month, year) {
     throw new Error("Database not available");
   }
   const [questionnaire] = await db.select().from(questionnaires).where(and5(
-    eq7(questionnaires.month, month),
-    eq7(questionnaires.year, year)
+    eq8(questionnaires.month, month),
+    eq8(questionnaires.year, year)
   )).limit(1);
   if (!questionnaire) {
     throw new Error(`No questionnaire found for ${month}/${year}`);
@@ -8622,11 +9101,19 @@ async function getMonthlyResponsesForExport(month, year) {
 // server/services/questionnaireService.ts
 var QuestionnaireService = class {
   /**
-   * Standardize ALL responses to v2.0 format before saving
+   * 🛡️ SAFETY NET: Standardize responses WITH tracking of unmapped responses
+   * This ensures NO response is ever lost, even if the code doesn't know how to process it
    */
-  static standardizeResponse(rawResponse, month, year) {
+  static standardizeResponseWithTracking(rawResponse, month, year) {
+    const unmappedResponses = [];
+    const warnings = [];
+    const processedQuestionIds = /* @__PURE__ */ new Set();
     if (rawResponse.format_version === "2.0") {
-      return this.validateV2Format(rawResponse);
+      return {
+        standardized: this.validateV2Format(rawResponse),
+        unmappedResponses: [],
+        warnings: []
+      };
     }
     const standardized = {
       format_version: "2.0",
@@ -8643,31 +9130,86 @@ var QuestionnaireService = class {
       can_substitute: false
     };
     if (Array.isArray(rawResponse)) {
-      this.parseLegacyArrayFormat(rawResponse, standardized, month, year);
+      this.parseLegacyArrayFormatWithTracking(rawResponse, standardized, processedQuestionIds, month, year);
+      for (const item of rawResponse) {
+        if (!processedQuestionIds.has(item.questionId)) {
+          unmappedResponses.push({
+            questionId: item.questionId,
+            question: item.question,
+            answer: item.answer,
+            metadata: item.metadata
+          });
+          warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
+        }
+      }
     } else if (typeof rawResponse === "object") {
       if (rawResponse.responses && Array.isArray(rawResponse.responses)) {
-        this.parseLegacyArrayFormat(rawResponse.responses, standardized, month, year);
+        this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
+        for (const item of rawResponse.responses) {
+          if (!processedQuestionIds.has(item.questionId)) {
+            unmappedResponses.push({
+              questionId: item.questionId,
+              question: item.question,
+              answer: item.answer,
+              metadata: item.metadata
+            });
+            warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
+          }
+        }
       } else {
         Object.assign(standardized, rawResponse);
       }
     }
-    return standardized;
+    return {
+      standardized,
+      unmappedResponses,
+      warnings
+    };
   }
   /**
-   * Parse legacy array format: [{questionId, answer}, ...]
+   * Legacy method - kept for backward compatibility
+   * Use standardizeResponseWithTracking for new code
    */
-  static parseLegacyArrayFormat(responses, standardized, month, year) {
+  static standardizeResponse(rawResponse, month, year) {
+    return this.standardizeResponseWithTracking(rawResponse, month, year).standardized;
+  }
+  /**
+   * 🛡️ Parse legacy array format WITH tracking of processed questionIds
+   * SAFETY NET: All known questionIds are tracked, everything else is flagged as unmapped
+   */
+  static parseLegacyArrayFormatWithTracking(responses, standardized, processedQuestionIds, month, year) {
     const currentYear = year || (/* @__PURE__ */ new Date()).getFullYear();
     const currentMonth = month || (/* @__PURE__ */ new Date()).getMonth() + 1;
+    const knownPatterns = [
+      "available_sundays",
+      "main_service_time",
+      "primary_mass_time",
+      /^saint_judas_feast_/,
+      "saint_judas_novena",
+      "healing_liberation_mass",
+      "sacred_heart_mass",
+      "immaculate_heart_mass",
+      /^special_event_/,
+      // Includes Finados, etc
+      "daily_mass_availability",
+      "daily_mass",
+      "daily_mass_days",
+      "can_substitute",
+      "notes",
+      "observations",
+      "family_serve_preference",
+      "monthly_availability",
+      "other_times_available"
+    ];
     for (const item of responses) {
       const { questionId, answer } = item;
       if (questionId === "available_sundays" && Array.isArray(answer)) {
         this.parseAvailableSundays(answer, standardized, currentYear, currentMonth);
-      }
-      if (questionId === "main_service_time" || questionId === "primary_mass_time") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "main_service_time" || questionId === "primary_mass_time") {
         standardized._preferredTime = this.normalizeTime(answer);
-      }
-      if (questionId.startsWith("saint_judas_feast_")) {
+        processedQuestionIds.add(questionId);
+      } else if (questionId.startsWith("saint_judas_feast_")) {
         const feastDate = this.getSaintJudasFeastDate(currentYear, currentMonth);
         const time2 = this.extractTimeFromQuestionId(questionId);
         const value = this.normalizeValue(answer);
@@ -8675,34 +9217,44 @@ var QuestionnaireService = class {
           standardized.special_events.saint_judas_feast = {};
         }
         standardized.special_events.saint_judas_feast[`${feastDate}_${time2}`] = value;
-      }
-      if (questionId === "saint_judas_novena") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "saint_judas_novena") {
         standardized.special_events.saint_judas_novena = this.parseNovenaArray(answer);
-      }
-      if (questionId === "healing_liberation_mass") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "healing_liberation_mass") {
         standardized.special_events.healing_liberation = this.normalizeValue(answer);
-      }
-      if (questionId === "sacred_heart_mass") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "sacred_heart_mass") {
         standardized.special_events.first_friday = this.normalizeValue(answer);
-      }
-      if (questionId === "immaculate_heart_mass") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "immaculate_heart_mass") {
         standardized.special_events.first_saturday = this.normalizeValue(answer);
-      }
-      if (questionId === "daily_mass_availability" || questionId === "daily_mass") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId.startsWith("special_event_")) {
+        const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
+        const normalizedName = eventName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "_");
+        standardized.special_events[normalizedName] = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "daily_mass_availability" || questionId === "daily_mass") {
         this.parseDailyMassAvailability(answer, standardized);
-      }
-      if (questionId === "daily_mass_days" && Array.isArray(answer)) {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "daily_mass_days" && Array.isArray(answer)) {
         this.parseDailyMassDays(answer, standardized);
-      }
-      if (questionId === "can_substitute") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "can_substitute") {
         standardized.can_substitute = this.normalizeValue(answer);
-      }
-      if ((questionId === "notes" || questionId === "observations") && typeof answer === "string") {
+        processedQuestionIds.add(questionId);
+      } else if ((questionId === "notes" || questionId === "observations") && typeof answer === "string") {
         standardized.notes = answer;
-      }
-      if (questionId === "family_serve_preference") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "family_serve_preference") {
         if (!standardized.family) standardized.family = {};
         standardized.family.serve_preference = this.normalizeFamilyPreference(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "monthly_availability") {
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "other_times_available") {
+        processedQuestionIds.add(questionId);
       }
     }
     if (standardized._preferredTime) {
@@ -8781,6 +9333,10 @@ var QuestionnaireService = class {
       standardized.weekdays.wednesday = true;
       standardized.weekdays.thursday = true;
       standardized.weekdays.friday = true;
+    } else if (typeof answer === "object" && answer.answer === "Apenas em alguns dias") {
+      if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
+        this.parseDailyMassDays(answer.selectedOptions, standardized);
+      }
     } else if (answer === "Apenas em alguns dias") {
     }
   }
@@ -8927,7 +9483,9 @@ var QuestionnaireService = class {
     });
     const preferredMassTimes = Object.keys(timeCounts).sort((a, b) => timeCounts[b] - timeCounts[a]);
     const dailyMassAvailability = [];
+    let hasWeekdayData = false;
     if (standardized.weekdays) {
+      hasWeekdayData = true;
       const dayMap = {
         monday: "Segunda-feira",
         tuesday: "Ter\xE7a-feira",
@@ -8946,7 +9504,8 @@ var QuestionnaireService = class {
       preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
       alternativeTimes: null,
       // Not used in v2.0
-      dailyMassAvailability: dailyMassAvailability.length > 0 ? dailyMassAvailability : null,
+      dailyMassAvailability: hasWeekdayData ? dailyMassAvailability.length > 0 ? dailyMassAvailability : [] : null,
+      // Empty array if answered NO, null if didn't answer
       specialEvents: standardized.special_events,
       canSubstitute: standardized.can_substitute,
       notes: standardized.notes || null
@@ -8982,15 +9541,15 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and6(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     )).limit(1);
     const questions = generateQuestionnaireQuestions(month, year);
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq8(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq9(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -9008,8 +9567,8 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
         name: users.name,
         email: users.email
       }).from(users).where(and6(
-        eq8(users.role, "ministro"),
-        eq8(users.status, "active")
+        eq9(users.role, "ministro"),
+        eq9(users.status, "active")
       ));
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -9046,8 +9605,8 @@ router5.get("/templates/:year/:month", authenticateToken, async (req, res) => {
     }
     try {
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq8(questionnaires.month, month),
-        eq8(questionnaires.year, year)
+        eq9(questionnaires.month, month),
+        eq9(questionnaires.year, year)
       )).limit(1);
       if (!template) {
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado para este per\xEDodo" });
@@ -9117,7 +9676,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service temporarily unavailable. Please try again later." });
     }
     if (data.questionnaireId) {
-      const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, data.questionnaireId)).limit(1);
+      const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, data.questionnaireId)).limit(1);
       if (template && template.status === "closed") {
         return res.status(400).json({ error: "Este question\xE1rio foi encerrado e n\xE3o aceita mais respostas" });
       }
@@ -9125,7 +9684,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Buscando usu\xE1rio para userId:", userId);
     let minister = null;
     try {
-      const [foundUser] = await db.select().from(users).where(eq8(users.id, userId)).limit(1);
+      const [foundUser] = await db.select().from(users).where(eq9(users.id, userId)).limit(1);
       console.log("[RESPONSES] Usu\xE1rio encontrado:", foundUser);
       if (foundUser && foundUser.role === "ministro") {
         minister = {
@@ -9156,8 +9715,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     if (!templateId) {
       console.log("[RESPONSES] Buscando template para m\xEAs:", data.month, "ano:", data.year);
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq8(questionnaires.month, data.month),
-        eq8(questionnaires.year, data.year)
+        eq9(questionnaires.month, data.month),
+        eq9(questionnaires.year, data.year)
       )).limit(1);
       if (template) {
         templateId = template.id;
@@ -9179,17 +9738,26 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Template ID final:", templateId);
     console.log("[RESPONSES] Verificando resposta existente para userId:", minister.id, "templateId:", templateId);
     const [existingResponse] = await db.select().from(questionnaireResponses).where(and6(
-      eq8(questionnaireResponses.userId, minister.id),
-      eq8(questionnaireResponses.questionnaireId, templateId)
+      eq9(questionnaireResponses.userId, minister.id),
+      eq9(questionnaireResponses.questionnaireId, templateId)
     )).limit(1);
     console.log("[RESPONSES] Resposta existente encontrada?", existingResponse ? "Sim" : "N\xE3o");
-    console.log("[RESPONSES] Standardizing responses to v2.0 format");
-    const standardizedResponse = QuestionnaireService.standardizeResponse(
+    console.log("[RESPONSES] Standardizing responses to v2.0 format with tracking");
+    const processingResult = QuestionnaireService.standardizeResponseWithTracking(
       data.responses,
       data.month,
       data.year
     );
+    const standardizedResponse = processingResult.standardized;
+    const unmappedResponses = processingResult.unmappedResponses;
+    const processingWarnings = processingResult.warnings;
     console.log("[RESPONSES] Standardized response:", JSON.stringify(standardizedResponse, null, 2));
+    if (unmappedResponses.length > 0) {
+      console.warn("[RESPONSES] \u26A0\uFE0F UNMAPPED RESPONSES DETECTED:", unmappedResponses);
+    }
+    if (processingWarnings.length > 0) {
+      console.warn("[RESPONSES] \u26A0\uFE0F PROCESSING WARNINGS:", processingWarnings);
+    }
     console.log("[RESPONSES] Extracting structured data");
     const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
     console.log("[RESPONSES] Dados extra\xEDdos:", extractedData);
@@ -9208,9 +9776,13 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           specialEvents: extractedData.specialEvents,
           canSubstitute: extractedData.canSubstitute,
           notes: extractedData.notes,
+          unmappedResponses,
+          // 🛡️ SAFETY NET: Save unmapped responses
+          processingWarnings,
+          // 🛡️ SAFETY NET: Save warnings
           submittedAt: /* @__PURE__ */ new Date(),
           sharedWithFamilyIds: data.sharedWithFamilyIds || []
-        }).where(eq8(questionnaireResponses.id, existingResponse.id)).returning();
+        }).where(eq9(questionnaireResponses.id, existingResponse.id)).returning();
         console.log("[RESPONSES] Resposta atualizada com sucesso");
         const responseData = {
           ...updated,
@@ -9236,6 +9808,10 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           specialEvents: extractedData.specialEvents,
           canSubstitute: extractedData.canSubstitute,
           notes: extractedData.notes,
+          unmappedResponses,
+          // 🛡️ SAFETY NET: Save unmapped responses
+          processingWarnings,
+          // 🛡️ SAFETY NET: Save warnings
           sharedWithFamilyIds: data.sharedWithFamilyIds || [],
           isSharedResponse: false
         }).returning();
@@ -9266,8 +9842,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       for (const familyUserId of data.sharedWithFamilyIds) {
         try {
           const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and6(
-            eq8(users.id, familyUserId),
-            eq8(users.status, "active")
+            eq9(users.id, familyUserId),
+            eq9(users.status, "active")
           )).limit(1);
           if (!familyMember) {
             console.warn(`[RESPONSES] Usu\xE1rio n\xE3o encontrado ou inativo: ${familyUserId}`);
@@ -9275,12 +9851,12 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           }
           const [familyRelation] = await db.select().from(familyRelationships).where(or4(
             and6(
-              eq8(familyRelationships.userId, minister.id),
-              eq8(familyRelationships.relatedUserId, familyUserId)
+              eq9(familyRelationships.userId, minister.id),
+              eq9(familyRelationships.relatedUserId, familyUserId)
             ),
             and6(
-              eq8(familyRelationships.userId, familyUserId),
-              eq8(familyRelationships.relatedUserId, minister.id)
+              eq9(familyRelationships.userId, familyUserId),
+              eq9(familyRelationships.relatedUserId, minister.id)
             )
           )).limit(1);
           if (!familyRelation) {
@@ -9288,8 +9864,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
             continue;
           }
           const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and6(
-            eq8(questionnaireResponses.userId, familyUserId),
-            eq8(questionnaireResponses.questionnaireId, templateId)
+            eq9(questionnaireResponses.userId, familyUserId),
+            eq9(questionnaireResponses.questionnaireId, templateId)
           )).limit(1);
           if (!existingFamilyResponse) {
             await db.insert(questionnaireResponses).values({
@@ -9321,7 +9897,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
               canSubstitute: extractedData.canSubstitute,
               notes: extractedData.notes,
               submittedAt: /* @__PURE__ */ new Date()
-            }).where(eq8(questionnaireResponses.id, existingFamilyResponse.id));
+            }).where(eq9(questionnaireResponses.id, existingFamilyResponse.id));
             console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
           } else {
             console.log(`[RESPONSES] ${familyMember.name} j\xE1 possui resposta pr\xF3pria, n\xE3o sobrescrevendo`);
@@ -9362,7 +9938,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       return res.json(null);
     }
     try {
-      const [user] = await db.select().from(users).where(eq8(users.id, userId)).limit(1);
+      const [user] = await db.select().from(users).where(eq9(users.id, userId)).limit(1);
       const minister = user && (user.role === "ministro" || user.role === "coordenador" || user.role === "gestor") ? {
         id: user.id,
         userId: user.id
@@ -9380,7 +9956,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
         questionnaireId: questionnaireResponses.questionnaireId,
         month: questionnaires.month,
         year: questionnaires.year
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq8(questionnaireResponses.userId, minister.id));
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq9(questionnaireResponses.userId, minister.id));
       console.log("[GET /responses] Todas as respostas do usu\xE1rio:", allUserResponses);
       const [response] = await db.select({
         id: questionnaireResponses.id,
@@ -9394,10 +9970,10 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
           questions: questionnaires.questions,
           status: questionnaires.status
         }
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-        eq8(questionnaireResponses.userId, minister.id),
-        eq8(questionnaires.month, month),
-        eq8(questionnaires.year, year)
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+        eq9(questionnaireResponses.userId, minister.id),
+        eq9(questionnaires.month, month),
+        eq9(questionnaires.year, year)
       )).limit(1);
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
@@ -9440,8 +10016,8 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       return res.json([]);
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({
@@ -9461,14 +10037,14 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       email: users.email,
       phone: users.phone
     }).from(users).where(and6(
-      eq8(users.role, "ministro"),
-      eq8(users.status, "active")
+      eq9(users.role, "ministro"),
+      eq9(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaire.id));
     const responseMap = new Map(responses.map((r) => [r.userId, r]));
     const ministerResponses = ministers.map((minister) => {
       const response = responseMap.get(minister.id);
@@ -9515,13 +10091,13 @@ router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaire.id));
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
@@ -9556,7 +10132,7 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     if (!db) {
       return res.status(500).json({ error: "Database not available" });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
@@ -9564,13 +10140,13 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq8(users.id, userId)).limit(1);
+    }).from(users).where(eq9(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and6(
-      eq8(questionnaireResponses.questionnaireId, templateId),
-      eq8(questionnaireResponses.userId, userId)
+      eq9(questionnaireResponses.questionnaireId, templateId),
+      eq9(questionnaireResponses.userId, userId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -9622,9 +10198,9 @@ router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
         month: questionnaires.month,
         year: questionnaires.year
       }
-    }).from(questionnaireResponses).leftJoin(users, eq8(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq8(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+    }).from(questionnaireResponses).leftJoin(users, eq9(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     ));
     res.json(responses);
   } catch (error) {
@@ -9642,7 +10218,7 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -9652,7 +10228,7 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     const [updated] = await db.update(questionnaires).set({
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, templateId)).returning();
+    }).where(eq9(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -9672,7 +10248,7 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -9682,7 +10258,7 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, templateId)).returning();
+    }).where(eq9(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -9710,7 +10286,7 @@ router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coo
     const { format: format10 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
     const csvContent = format10 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
-    const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -9750,32 +10326,40 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     console.log(`[REPROCESS] \u{1F504} Iniciando reprocessamento...`);
     console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
     if (questionnaireId) {
-      const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
+      const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
       if (!questionnaire) {
         console.log(`[REPROCESS] \u274C Question\xE1rio ${questionnaireId} n\xE3o encontrado!`);
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado" });
       }
       console.log(`[REPROCESS] \u2705 Question\xE1rio encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
     }
-    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
+    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
     console.log(`[REPROCESS] \u{1F4DD} Encontradas ${allResponses.length} respostas para reprocessar...`);
     let updated = 0;
     let errors = 0;
     for (const response of allResponses) {
       try {
         const responsesArray = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
-        const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, response.questionnaireId)).limit(1);
-        const standardizedResponse = QuestionnaireService.standardizeResponse(
+        const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, response.questionnaireId)).limit(1);
+        const processingResult = QuestionnaireService.standardizeResponseWithTracking(
           responsesArray,
           questionnaire?.month,
           questionnaire?.year
         );
+        const standardizedResponse = processingResult.standardized;
+        const unmappedResponses = processingResult.unmappedResponses;
+        const processingWarnings = processingResult.warnings;
         const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
         console.log(`[REPROCESS] Resposta ${response.id}:`, {
           availableSundays: extractedData.availableSundays?.length || 0,
           dailyMass: extractedData.dailyMassAvailability?.length || 0,
-          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0
+          specialEvents: extractedData.specialEvents ? Object.keys(extractedData.specialEvents).length : 0,
+          unmapped: unmappedResponses.length,
+          warnings: processingWarnings.length
         });
+        if (unmappedResponses.length > 0) {
+          console.warn(`[REPROCESS] \u26A0\uFE0F Response ${response.id} has unmapped questions:`, unmappedResponses);
+        }
         await db.update(questionnaireResponses).set({
           responses: JSON.stringify(standardizedResponse),
           // SAVE STANDARDIZED V2.0 FORMAT
@@ -9785,8 +10369,12 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
           dailyMassAvailability: extractedData.dailyMassAvailability,
           specialEvents: extractedData.specialEvents,
           canSubstitute: extractedData.canSubstitute,
-          notes: extractedData.notes
-        }).where(eq8(questionnaireResponses.id, response.id));
+          notes: extractedData.notes,
+          unmappedResponses,
+          // 🛡️ SAFETY NET
+          processingWarnings
+          // 🛡️ SAFETY NET
+        }).where(eq9(questionnaireResponses.id, response.id));
         updated++;
       } catch (error) {
         console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
@@ -9820,7 +10408,7 @@ await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and8, gte as gte3, lte as lte3, eq as eq11, sql as sql5, ne as ne3, desc as desc4, inArray as inArray2 } from "drizzle-orm";
+import { and as and8, gte as gte4, lte as lte4, eq as eq12, sql as sql5, ne as ne3, desc as desc4, inArray as inArray2 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
 var router6 = Router6();
@@ -9851,8 +10439,8 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     if (db) {
       const [targetQuestionnaire] = await db.select().from(questionnaires).where(
         and8(
-          eq11(questionnaires.month, month),
-          eq11(questionnaires.year, year)
+          eq12(questionnaires.month, month),
+          eq12(questionnaires.year, year)
         )
       ).limit(1);
       if (!targetQuestionnaire) {
@@ -9863,7 +10451,7 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           errorCode: "NO_QUESTIONNAIRE"
         });
       }
-      const responses = await db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+      const responses = await db.select().from(questionnaireResponses).where(eq12(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
       if (responses.length === 0) {
         logger.warn(`Tentativa de gerar escalas sem respostas: ${month}/${year}`);
         return res.status(400).json({
@@ -9972,8 +10560,8 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         console.log(`Date range: ${startDate} to ${endDate}`);
         const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
           and8(
-            gte3(schedules.date, startDate),
-            lte3(schedules.date, endDate)
+            gte4(schedules.date, startDate),
+            lte4(schedules.date, endDate)
           )
         );
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
@@ -9985,8 +10573,8 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
           console.log(`Deleted substitution requests`);
           const deletedSchedules = await db.delete(schedules).where(
             and8(
-              gte3(schedules.date, startDate),
-              lte3(schedules.date, endDate)
+              gte4(schedules.date, startDate),
+              lte4(schedules.date, endDate)
             )
           );
           console.log(`Deleted ${existingSchedules.length} schedules`);
@@ -10002,7 +10590,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
           throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
         }
         if (schedule.ministerId) {
-          const [ministerExists] = await db.select({ id: users.id }).from(users).where(eq11(users.id, schedule.ministerId)).limit(1);
+          const [ministerExists] = await db.select({ id: users.id }).from(users).where(eq12(users.id, schedule.ministerId)).limit(1);
           if (!ministerExists) {
             throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
           }
@@ -10153,8 +10741,8 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
       console.log(`Date range: ${firstDate} to ${lastDate}`);
       const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
         and8(
-          gte3(schedules.date, firstDate),
-          lte3(schedules.date, lastDate)
+          gte4(schedules.date, firstDate),
+          lte4(schedules.date, lastDate)
         )
       );
       console.log(`Found ${existingSchedules.length} existing schedules to delete`);
@@ -10169,8 +10757,8 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
       }
       const deletedSchedules = await db.delete(schedules).where(
         and8(
-          gte3(schedules.date, firstDate),
-          lte3(schedules.date, lastDate)
+          gte4(schedules.date, firstDate),
+          lte4(schedules.date, lastDate)
         )
       );
       console.log(`Deleted schedules:`, deletedSchedules);
@@ -10308,15 +10896,15 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       totalServices: users.totalServices
     }).from(users).where(
       and8(
-        eq11(users.status, "active"),
+        eq12(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq11(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq11(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    const massTimesData = await db.select().from(massTimesConfig).where(eq12(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq12(questionnaireResponses.questionnaireId, questionnaires.id)).where(
       and8(
-        eq11(questionnaires.month, month),
-        eq11(questionnaires.year, year)
+        eq12(questionnaires.month, month),
+        eq12(questionnaires.year, year)
       )
     );
     res.json({
@@ -10359,7 +10947,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(
       and8(
         sql5`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
         sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
@@ -10399,8 +10987,8 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
     if (replaceExisting) {
       const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
         and8(
-          eq11(schedules.date, schedule.massTime.date),
-          eq11(schedules.time, schedule.massTime.time)
+          eq12(schedules.date, schedule.massTime.date),
+          eq12(schedules.time, schedule.massTime.time)
         )
       );
       if (existingSchedules.length > 0) {
@@ -10411,8 +10999,8 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
       }
       await db.delete(schedules).where(
         and8(
-          eq11(schedules.date, schedule.massTime.date),
-          eq11(schedules.time, schedule.massTime.time)
+          eq12(schedules.date, schedule.massTime.date),
+          eq12(schedules.time, schedule.massTime.time)
         )
       );
     }
@@ -10561,8 +11149,9 @@ router6.get("/by-date/:date", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status,
       notes: schedules.notes,
-      ministerName: users.name
-    }).from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(eq11(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+      ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName
+    }).from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(eq12(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
     const formattedAssignments = assignments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -10599,14 +11188,15 @@ router6.get("/:date/:time", authenticateToken, async (req, res) => {
       id: schedules.id,
       ministerId: schedules.ministerId,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       status: schedules.status,
       notes: schedules.notes,
       type: schedules.type,
       location: schedules.location,
       position: schedules.position
-    }).from(schedules).leftJoin(users, eq11(schedules.ministerId, users.id)).where(and8(
-      eq11(schedules.date, date2),
-      eq11(schedules.time, time2)
+    }).from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(and8(
+      eq12(schedules.date, date2),
+      eq12(schedules.time, time2)
     )).orderBy(schedules.position);
     res.json({
       date: date2,
@@ -10641,9 +11231,9 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     if (!data.skipDuplicateCheck) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
       const [existing] = await db.select().from(schedules).where(and8(
-        eq11(schedules.date, data.date),
-        eq11(schedules.time, data.time),
-        eq11(schedules.ministerId, data.ministerId)
+        eq12(schedules.date, data.date),
+        eq12(schedules.time, data.time),
+        eq12(schedules.ministerId, data.ministerId)
       )).limit(1);
       if (existing) {
         logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
@@ -10659,8 +11249,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
     } else {
       const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and8(
-        eq11(schedules.date, data.date),
-        eq11(schedules.time, data.time)
+        eq12(schedules.date, data.date),
+        eq12(schedules.time, data.time)
       )).orderBy(desc4(schedules.position));
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
       logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
@@ -10689,7 +11279,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(eq11(schedules.id, id));
+    await db.delete(schedules).where(eq12(schedules.id, id));
     res.json({ success: true, message: "Ministro removido da escala" });
   } catch (error) {
     logger.error("Error removing minister from schedule:", error);
@@ -10712,10 +11302,22 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     }
     console.log("[batch-update] Fetching existing schedules for:", { date: date2, time: time2 });
     const existingSchedules = await db.select().from(schedules).where(and8(
-      eq11(schedules.date, date2),
-      eq11(schedules.time, time2)
+      eq12(schedules.date, date2),
+      eq12(schedules.time, time2)
     ));
     console.log("[batch-update] Found existing schedules:", existingSchedules.length);
+    if (ministers.length === 0) {
+      console.log("[batch-update] All ministers removed - deleting entire mass and related substitutions");
+      for (const schedule of existingSchedules) {
+        await db.delete(substitutionRequests).where(eq12(substitutionRequests.scheduleId, schedule.id));
+      }
+      await db.delete(schedules).where(and8(
+        eq12(schedules.date, date2),
+        eq12(schedules.time, time2)
+      ));
+      console.log("[batch-update] Mass deleted successfully");
+      return res.json({ success: true, message: "Missa removida completamente do calend\xE1rio" });
+    }
     for (let i = 0; i < ministers.length; i++) {
       const ministerId = ministers[i];
       const position = i + 1;
@@ -10724,7 +11326,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
         await db.update(schedules).set({
           ministerId,
           position
-        }).where(eq11(schedules.id, existingSchedules[i].id));
+        }).where(eq12(schedules.id, existingSchedules[i].id));
       } else {
         console.log("[batch-update] Creating new schedule at position:", position);
         await db.insert(schedules).values({
@@ -10741,13 +11343,13 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
       const schedulesToDelete = existingSchedules.slice(ministers.length);
       console.log("[batch-update] Removing excess schedules:", schedulesToDelete.length);
       for (const schedule of schedulesToDelete) {
-        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq11(substitutionRequests.scheduleId, schedule.id)).limit(1);
+        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq12(substitutionRequests.scheduleId, schedule.id)).limit(1);
         if (hasSubstitutions.length > 0) {
           console.log("[batch-update] Schedule has substitutions, setting ministerId to null:", schedule.id);
-          await db.update(schedules).set({ ministerId: null }).where(eq11(schedules.id, schedule.id));
+          await db.update(schedules).set({ ministerId: null }).where(eq12(schedules.id, schedule.id));
         } else {
           console.log("[batch-update] Deleting schedule:", schedule.id);
-          await db.delete(schedules).where(eq11(schedules.id, schedule.id));
+          await db.delete(schedules).where(eq12(schedules.id, schedule.id));
         }
       }
     }
@@ -10766,7 +11368,7 @@ await init_db();
 init_schema();
 import { Router as Router7 } from "express";
 await init_scheduleGenerator();
-import { eq as eq12, and as and9, gte as gte4, lte as lte4, ne as ne4 } from "drizzle-orm";
+import { eq as eq13, and as and9, gte as gte5, lte as lte5, ne as ne4 } from "drizzle-orm";
 
 // server/utils/liturgicalCalculations.ts
 function calculateEaster(year) {
@@ -11017,8 +11619,8 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     }
     const existingAssignments = await db.select().from(schedules).where(
       and9(
-        eq12(schedules.date, date2),
-        eq12(schedules.ministerId, ministerId),
+        eq13(schedules.date, date2),
+        eq13(schedules.ministerId, ministerId),
         ne4(schedules.time, time2)
       )
     );
@@ -11031,13 +11633,13 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     }
     const existing = await db.select().from(schedules).where(
       and9(
-        eq12(schedules.date, date2),
-        eq12(schedules.time, time2),
-        eq12(schedules.ministerId, ministerId)
+        eq13(schedules.date, date2),
+        eq13(schedules.time, time2),
+        eq13(schedules.ministerId, ministerId)
       )
     );
     if (existing.length > 0) {
-      await db.update(schedules).set({ position: newPosition }).where(eq12(schedules.id, existing[0].id));
+      await db.update(schedules).set({ position: newPosition }).where(eq13(schedules.id, existing[0].id));
     } else {
       await db.insert(schedules).values({
         date: date2,
@@ -11113,8 +11715,8 @@ router7.get("/validation/:year/:month", authenticateToken, requireRole(["coorden
     const endDate = format4(endOfMonth2(new Date(yearNum, monthNum - 1, 1)), "yyyy-MM-dd");
     const monthSchedules = await db.select().from(schedules).where(
       and9(
-        gte4(schedules.date, startDate),
-        lte4(schedules.date, endDate)
+        gte5(schedules.date, startDate),
+        lte5(schedules.date, endDate)
       )
     );
     const validation = await validateScheduleBeforePublish(monthSchedules, monthNum, yearNum);
@@ -11181,18 +11783,18 @@ function calculateGenerationStatistics(schedules3, options) {
   };
 }
 async function checkMinisterAvailability(ministerId, date2, time2) {
-  const minister = await db.select().from(users).where(eq12(users.id, ministerId)).limit(1);
+  const minister = await db.select().from(users).where(eq13(users.id, ministerId)).limit(1);
   if (minister.length === 0) {
     return { available: false, reason: "Ministro n\xE3o encontrado" };
   }
   const dateObj = new Date(date2);
   const month = dateObj.getMonth() + 1;
   const year = dateObj.getFullYear();
-  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq12(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq13(questionnaireResponses.questionnaireId, questionnaires.id)).where(
     and9(
-      eq12(questionnaireResponses.userId, ministerId),
-      eq12(questionnaires.month, month),
-      eq12(questionnaires.year, year)
+      eq13(questionnaireResponses.userId, ministerId),
+      eq13(questionnaires.month, month),
+      eq13(questionnaires.year, year)
     )
   );
   if (responses.length === 0) {
@@ -11208,8 +11810,8 @@ async function calculateFairnessImpact(ministerId, date2) {
   const endDate = format4(endOfMonth2(dateObj), "yyyy-MM-dd");
   const allAssignments = await db.select().from(schedules).where(
     and9(
-      gte4(schedules.date, startDate),
-      lte4(schedules.date, endDate)
+      gte5(schedules.date, startDate),
+      lte5(schedules.date, endDate)
     )
   );
   const counts = {};
@@ -11310,9 +11912,9 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
       if (!ministerId) continue;
       const existing = await db.select().from(schedules).where(
         and9(
-          eq12(schedules.date, date2),
-          eq12(schedules.time, time2),
-          eq12(schedules.ministerId, ministerId)
+          eq13(schedules.date, date2),
+          eq13(schedules.time, time2),
+          eq13(schedules.ministerId, ministerId)
         )
       );
       if (existing.length === 0) {
@@ -11351,8 +11953,8 @@ async function getLiturgicalInfoForMonth(year, month) {
   const movableFeasts = getMovableFeasts(year);
   const celebrations = await db.select().from(liturgicalCelebrations).where(
     and9(
-      gte4(liturgicalCelebrations.date, format4(startDate, "yyyy-MM-dd")),
-      lte4(liturgicalCelebrations.date, format4(endDate, "yyyy-MM-dd"))
+      gte5(liturgicalCelebrations.date, format4(startDate, "yyyy-MM-dd")),
+      lte5(liturgicalCelebrations.date, format4(endDate, "yyyy-MM-dd"))
     )
   );
   return {
@@ -11685,7 +12287,7 @@ var testScheduleGeneration_default = router8;
 await init_db();
 init_schema();
 import { Router as Router9 } from "express";
-import { eq as eq13, and as and10, sql as sql7, gte as gte5, lte as lte5 } from "drizzle-orm";
+import { eq as eq14, and as and10, sql as sql7, gte as gte6, lte as lte6 } from "drizzle-orm";
 var logActivity = async (userId, action, description, metadata) => {
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
@@ -11701,7 +12303,7 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
     const targetMinisterId = req.query.ministerId || userId;
-    const minister = await db.select().from(users).where(eq13(users.id, targetMinisterId)).limit(1);
+    const minister = await db.select().from(users).where(eq14(users.id, targetMinisterId)).limit(1);
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
@@ -11719,8 +12321,8 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
       status: schedules.status
     }).from(schedules).where(
       and10(
-        eq13(schedules.ministerId, ministerId),
-        gte5(schedules.date, today.toISOString().split("T")[0])
+        eq14(schedules.ministerId, ministerId),
+        gte6(schedules.date, today.toISOString().split("T")[0])
         // Aceitar qualquer status (scheduled ou published)
       )
     ).orderBy(schedules.date).limit(10);
@@ -11749,13 +12351,14 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       scheduleId: schedules.id,
       ministerId: schedules.ministerId,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       date: schedules.date,
       massTime: schedules.time,
       position: schedules.position,
       confirmed: sql7`true`,
       status: schedules.status
-    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
-      eq13(schedules.date, targetDateStr)
+    }).from(schedules).leftJoin(users, eq14(schedules.ministerId, users.id)).where(
+      eq14(schedules.date, targetDateStr)
       // Aceitar qualquer status (scheduled ou published)
     ).orderBy(schedules.time, schedules.position);
     if (allAssignments.length === 0) {
@@ -11792,8 +12395,8 @@ router9.get("/", authenticateToken, async (req, res) => {
       try {
         schedulesList = await db.select().from(schedules).where(
           and10(
-            gte5(schedules.date, startDateStr),
-            lte5(schedules.date, endDateStr)
+            gte6(schedules.date, startDateStr),
+            lte6(schedules.date, endDateStr)
           )
         );
       } catch (error) {
@@ -11819,13 +12422,14 @@ router9.get("/", authenticateToken, async (req, res) => {
           position: sql7`COALESCE(${schedules.position}, 0)`.as("position"),
           confirmed: sql7`true`.as("confirmed"),
           ministerName: users.name,
+          scheduleDisplayName: users.scheduleDisplayName,
           photoUrl: users.photoUrl,
           notes: schedules.notes,
           status: schedules.status
-        }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
+        }).from(schedules).leftJoin(users, eq14(schedules.ministerId, users.id)).where(
           and10(
-            gte5(schedules.date, startDateStr),
-            lte5(schedules.date, endDateStr)
+            gte6(schedules.date, startDateStr),
+            lte6(schedules.date, endDateStr)
           )
         ).orderBy(schedules.date, schedules.time, schedules.position);
       }
@@ -11881,7 +12485,7 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para criar escalas" });
     }
@@ -11894,8 +12498,8 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     }
     const existing = await db.select().from(schedules).where(
       and10(
-        eq13(schedules.date, date2),
-        eq13(schedules.time, time2)
+        eq14(schedules.date, date2),
+        eq14(schedules.time, time2)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -11929,12 +12533,12 @@ router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para editar escalas" });
     }
     const { notes } = req.body;
-    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq13(schedules.id, req.params.id)).returning();
+    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq14(schedules.id, req.params.id)).returning();
     if (updatedSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -11955,7 +12559,7 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para publicar escalas" });
     }
@@ -11972,8 +12576,8 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
       status: "published"
     }).where(
       and10(
-        gte5(schedules.date, startDateStr),
-        lte5(schedules.date, endDateStr)
+        gte6(schedules.date, startDateStr),
+        lte6(schedules.date, endDateStr)
       )
     ).returning();
     if (result.length === 0) {
@@ -12000,20 +12604,20 @@ router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para excluir escalas" });
     }
-    const schedule = await db.select().from(schedules).where(eq13(schedules.id, req.params.id)).limit(1);
+    const schedule = await db.select().from(schedules).where(eq14(schedules.id, req.params.id)).limit(1);
     if (schedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     if (schedule[0].status === "published") {
       return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
     }
-    await db.delete(substitutionRequests).where(eq13(substitutionRequests.scheduleId, req.params.id));
+    await db.delete(substitutionRequests).where(eq14(substitutionRequests.scheduleId, req.params.id));
     console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-    await db.delete(schedules).where(eq13(schedules.id, req.params.id));
+    await db.delete(schedules).where(eq14(schedules.id, req.params.id));
     await logActivity(
       req.user?.id,
       "schedule_deleted",
@@ -12035,7 +12639,7 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       console.log("[UNPUBLISH_API] No user ID found");
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       console.log("[UNPUBLISH_API] User not authorized, role:", user[0]?.role);
       return res.status(403).json({ message: "Sem permiss\xE3o para cancelar publica\xE7\xE3o" });
@@ -12057,8 +12661,8 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       status: "scheduled"
     }).where(
       and10(
-        gte5(schedules.date, startDateStr),
-        lte5(schedules.date, endDateStr)
+        gte6(schedules.date, startDateStr),
+        lte6(schedules.date, endDateStr)
       )
     ).returning();
     console.log("[UNPUBLISH_API] Updated", result.length, "schedules");
@@ -12087,12 +12691,12 @@ router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq13(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para gerar escalas" });
     }
     const scheduleId = req.params.scheduleId;
-    const schedule = await db.select().from(schedules).where(eq13(schedules.id, scheduleId)).limit(1);
+    const schedule = await db.select().from(schedules).where(eq14(schedules.id, scheduleId)).limit(1);
     if (schedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12109,7 +12713,7 @@ router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     await db.update(schedules).set({
       status: "generated",
       notes: `Generated schedule with ${result.stats.totalAssignments} assignments`
-    }).where(eq13(schedules.id, scheduleId));
+    }).where(eq14(schedules.id, scheduleId));
     console.log(`Updated schedule ${scheduleId} to generated status`);
     await logActivity(
       req.user?.id,
@@ -12143,14 +12747,14 @@ var schedules_default = router9;
 await init_db();
 init_schema();
 import { Router as Router10 } from "express";
-import { eq as eq14, and as and11, inArray as inArray4, sql as sql8 } from "drizzle-orm";
+import { eq as eq15, and as and11, inArray as inArray4, sql as sql8 } from "drizzle-orm";
 import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
 var router10 = Router10();
 async function isAuxiliaryForMass(userId, scheduleId) {
   const assignment = await db.select().from(schedules).where(
     and11(
-      eq14(schedules.id, scheduleId),
-      eq14(schedules.ministerId, userId),
+      eq15(schedules.id, scheduleId),
+      eq15(schedules.ministerId, userId),
       inArray4(schedules.position, [1, 2])
     )
   ).limit(1);
@@ -12175,7 +12779,7 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const massSchedule = await db.select().from(schedules).where(eq14(schedules.id, scheduleId)).limit(1);
+    const massSchedule = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
     if (massSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12198,29 +12802,31 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       ministerId: schedules.ministerId,
       position: schedules.position,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp,
       onSiteAdjustments: schedules.onSiteAdjustments
-    }).from(schedules).leftJoin(users, eq14(schedules.ministerId, users.id)).where(
+    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
       and11(
-        eq14(schedules.date, schedule.date),
-        eq14(schedules.time, schedule.time),
-        eq14(schedules.status, "scheduled")
+        eq15(schedules.date, schedule.date),
+        eq15(schedules.time, schedule.time),
+        eq15(schedules.status, "scheduled")
       )
     ).orderBy(schedules.position);
-    const checkIns = await db.select().from(ministerCheckIns).where(eq14(ministerCheckIns.scheduleId, scheduleId));
+    const checkIns = await db.select().from(ministerCheckIns).where(eq15(ministerCheckIns.scheduleId, scheduleId));
     const standbyList = await db.select({
       id: standbyMinisters.id,
       ministerId: standbyMinisters.ministerId,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp,
       confirmedAvailable: standbyMinisters.confirmedAvailable,
       calledAt: standbyMinisters.calledAt,
       response: standbyMinisters.response,
       assignedPosition: standbyMinisters.assignedPosition
-    }).from(standbyMinisters).leftJoin(users, eq14(standbyMinisters.ministerId, users.id)).where(eq14(standbyMinisters.scheduleId, scheduleId));
-    const executionLog = await db.select().from(massExecutionLogs).where(eq14(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    }).from(standbyMinisters).leftJoin(users, eq15(standbyMinisters.ministerId, users.id)).where(eq15(standbyMinisters.scheduleId, scheduleId));
+    const executionLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     const massDateTime = parseISO(`${schedule.date}T${schedule.time}`);
     const now = /* @__PURE__ */ new Date();
     const minutesUntilMass = Math.floor((massDateTime.getTime() - now.getTime()) / (1e3 * 60));
@@ -12284,7 +12890,7 @@ router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq14(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12292,20 +12898,21 @@ router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     const availableStandby = await db.select({
       ministerId: users.id,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       phone: users.phone,
       whatsapp: users.whatsapp,
       totalServices: users.totalServices,
       lastService: users.lastService
     }).from(users).where(
       and11(
-        eq14(users.status, "active"),
-        eq14(users.role, "ministro")
+        eq15(users.status, "active"),
+        eq15(users.role, "ministro")
       )
     ).limit(20);
     const assignedMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
       and11(
-        eq14(schedules.date, date2),
-        eq14(schedules.time, time2)
+        eq15(schedules.date, date2),
+        eq15(schedules.time, time2)
       )
     );
     const assignedIds = new Set(assignedMinisters.map((a) => a.ministerId).filter(Boolean));
@@ -12336,8 +12943,8 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
     }
     const assignment = await db.select().from(schedules).where(
       and11(
-        eq14(schedules.id, scheduleId),
-        eq14(schedules.ministerId, ministerId)
+        eq15(schedules.id, scheduleId),
+        eq15(schedules.ministerId, ministerId)
       )
     ).limit(1);
     if (assignment.length === 0) {
@@ -12346,8 +12953,8 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
     const position = assignment[0].position || 0;
     const existingCheckIn = await db.select().from(ministerCheckIns).where(
       and11(
-        eq14(ministerCheckIns.scheduleId, scheduleId),
-        eq14(ministerCheckIns.ministerId, ministerId)
+        eq15(ministerCheckIns.scheduleId, scheduleId),
+        eq15(ministerCheckIns.ministerId, ministerId)
       )
     ).limit(1);
     if (existingCheckIn.length > 0) {
@@ -12355,7 +12962,7 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
         status,
         notes,
         checkedInAt: /* @__PURE__ */ new Date()
-      }).where(eq14(ministerCheckIns.id, existingCheckIn[0].id));
+      }).where(eq15(ministerCheckIns.id, existingCheckIn[0].id));
     } else {
       await db.insert(ministerCheckIns).values({
         scheduleId,
@@ -12397,9 +13004,9 @@ router10.put("/redistribute", authenticateToken, async (req, res) => {
       const { ministerId, fromPosition, toPosition, reason } = change;
       await db.update(schedules).set({ position: toPosition }).where(
         and11(
-          eq14(schedules.id, scheduleId),
-          eq14(schedules.ministerId, ministerId),
-          eq14(schedules.position, fromPosition)
+          eq15(schedules.id, scheduleId),
+          eq15(schedules.ministerId, ministerId),
+          eq15(schedules.position, fromPosition)
         )
       );
       appliedChanges.push({
@@ -12411,12 +13018,12 @@ router10.put("/redistribute", authenticateToken, async (req, res) => {
         details: reason
       });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq14(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       const currentChanges = existingLog[0].changesMade || [];
       await db.update(massExecutionLogs).set({
         changesMade: [...currentChanges, ...appliedChanges]
-      }).where(eq14(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq15(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -12447,12 +13054,12 @@ router10.post("/call-standby", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq14(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     const { date: date2, time: time2 } = massInfo[0];
-    const auxiliary = await db.select({ name: users.name }).from(users).where(eq14(users.id, userId)).limit(1);
+    const auxiliary = await db.select({ name: users.name }).from(users).where(eq15(users.id, userId)).limit(1);
     const auxiliaryName = auxiliary[0]?.name || "Auxiliar";
     await db.insert(standbyMinisters).values({
       scheduleId,
@@ -12506,7 +13113,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq14(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       await db.update(massExecutionLogs).set({
         attendance,
@@ -12514,7 +13121,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
         comments,
         incidents,
         highlights
-      }).where(eq14(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq15(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -12535,7 +13142,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
           await db.update(users).set({
             lastService: /* @__PURE__ */ new Date(),
             totalServices: sql8`${users.totalServices} + 1`
-          }).where(eq14(users.id, record.ministerId));
+          }).where(eq15(users.id, record.ministerId));
         }
       }
     }
@@ -12543,7 +13150,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
       const coordinators = await db.select().from(users).where(
         and11(
           inArray4(users.role, ["coordenador", "gestor"]),
-          eq14(users.status, "active")
+          eq15(users.status, "active")
         )
       );
       for (const coordinator of coordinators) {
@@ -12576,7 +13183,7 @@ init_schema();
 import { Router as Router11 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq15 } from "drizzle-orm";
+import { eq as eq16 } from "drizzle-orm";
 var router11 = Router11();
 var upload = multer({
   storage: multer.memoryStorage(),
@@ -12643,7 +13250,7 @@ router11.post("/profile-photo", authenticateToken, upload.single("photo"), handl
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq15(users.id, userId));
+    }).where(eq16(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -12675,7 +13282,7 @@ router11.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq15(users.id, userId));
+    }).where(eq16(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -12693,7 +13300,7 @@ import { z as z5 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq16, and as and12 } from "drizzle-orm";
+import { eq as eq17, and as and12 } from "drizzle-orm";
 
 // server/utils/pushNotifications.ts
 await init_storage();
@@ -12715,15 +13322,23 @@ var pushConfig = {
   publicKey: VAPID_PUBLIC_KEY || null
 };
 async function sendPushNotificationToUsers(userIds, payload) {
+  console.log("[PUSH] Iniciando envio para", userIds.length, "userIds");
   if (!pushConfig.enabled || !webpush) {
+    console.warn("[PUSH] Push desabilitado ou web-push n\xE3o dispon\xEDvel");
     return;
   }
   if (!userIds || userIds.length === 0) {
+    console.warn("[PUSH] Nenhum userIds fornecido");
     return;
   }
   const uniqueUserIds = Array.from(new Set(userIds));
+  console.log("[PUSH] UserIds \xFAnicos:", uniqueUserIds.length);
+  console.log("[PUSH] Lista de UserIds:", uniqueUserIds);
   const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  console.log("[PUSH] Subscriptions encontradas:", subscriptions.length);
+  console.log("[PUSH] Subscriptions por userId:", subscriptions.map((s) => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + "..." })));
   if (subscriptions.length === 0) {
+    console.warn("[PUSH] Nenhuma subscription encontrada para os userIds fornecidos");
     return;
   }
   const notificationPayload = JSON.stringify({
@@ -12733,7 +13348,7 @@ async function sendPushNotificationToUsers(userIds, payload) {
     tag: payload.tag,
     data: payload.data ?? {}
   });
-  await Promise.all(
+  const results = await Promise.all(
     subscriptions.map(async (subscription) => {
       const pushSubscription = {
         endpoint: subscription.endpoint,
@@ -12744,17 +13359,23 @@ async function sendPushNotificationToUsers(userIds, payload) {
       };
       try {
         await webpush.sendNotification(pushSubscription, notificationPayload);
+        console.log("[PUSH] Notifica\xE7\xE3o enviada com sucesso para userId:", subscription.userId);
+        return { success: true, userId: subscription.userId };
       } catch (error) {
         const statusCode = error?.statusCode ?? error?.code;
         if (statusCode === 404 || statusCode === 410) {
-          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint);
+          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, "userId:", subscription.userId);
           await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
         } else {
-          console.error("[PUSH] Failed to send notification:", error);
+          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
         }
+        return { success: false, userId: subscription.userId, error: statusCode };
       }
     })
   );
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
+  console.log("[PUSH] Resumo: Sucesso:", successCount, "| Falha:", failCount);
 }
 
 // server/routes/notifications.ts
@@ -12867,8 +13488,8 @@ router12.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const notification = await db.select().from(notifications).where(and12(
-      eq16(notifications.id, id),
-      eq16(notifications.userId, req.user.id)
+      eq17(notifications.id, id),
+      eq17(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -12895,7 +13516,7 @@ router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq16(users.status, "active")
+      eq17(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -12946,32 +13567,50 @@ router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
 router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
+    console.log("[NOTIFICA\xC7\xD5ES] Dados recebidos:", {
+      title: data.title,
+      type: data.type,
+      recipientIds: data.recipientIds,
+      recipientRole: data.recipientRole,
+      senderId: req.user.id
+    });
     let recipientUserIds = [];
     if (data.recipientIds && data.recipientIds.length > 0) {
       recipientUserIds = data.recipientIds;
+      console.log("[NOTIFICA\xC7\xD5ES] Usando IDs espec\xEDficos:", recipientUserIds.length, "destinat\xE1rios");
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq16(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq17(users.status, "active"));
+        console.log("[NOTIFICA\xC7\xD5ES] Buscou TODOS os usu\xE1rios ativos:", recipients.length);
       } else {
         recipients = await db.select({ id: users.id }).from(users).where(and12(
-          eq16(users.role, data.recipientRole),
-          eq16(users.status, "active")
+          eq17(users.role, data.recipientRole),
+          eq17(users.status, "active")
         ));
+        console.log("[NOTIFICA\xC7\xD5ES] Buscou usu\xE1rios com role", data.recipientRole, ":", recipients.length);
       }
       recipientUserIds = recipients.map((r) => r.id);
+      console.log("[NOTIFICA\xC7\xD5ES] IDs dos destinat\xE1rios:", recipientUserIds);
     } else {
       const recipients = await db.select({ id: users.id }).from(users).where(and12(
-        eq16(users.role, "ministro"),
-        eq16(users.status, "active")
+        eq17(users.role, "ministro"),
+        eq17(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
+      console.log("[NOTIFICA\xC7\xD5ES] Sem filtro, usando ministros ativos por padr\xE3o:", recipientUserIds.length);
     }
+    console.log("[NOTIFICA\xC7\xD5ES] Destinat\xE1rios antes de adicionar remetente:", recipientUserIds.length);
     if (!recipientUserIds.includes(req.user.id)) {
       recipientUserIds.push(req.user.id);
+      console.log("[NOTIFICA\xC7\xD5ES] Remetente adicionado \xE0 lista");
+    } else {
+      console.log("[NOTIFICA\xC7\xD5ES] Remetente j\xE1 estava na lista");
     }
     recipientUserIds = Array.from(new Set(recipientUserIds));
+    console.log("[NOTIFICA\xC7\xD5ES] Total de destinat\xE1rios \xFAnicos:", recipientUserIds.length);
     const mappedType = mapNotificationType(data.type);
+    console.log("[NOTIFICA\xC7\xD5ES] Criando notifica\xE7\xF5es no banco para", recipientUserIds.length, "destinat\xE1rios");
     const notificationPromises = recipientUserIds.map(
       (userId) => storage.createNotification({
         userId,
@@ -12982,13 +13621,18 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
         actionUrl: data.actionUrl ?? null
       })
     );
-    await Promise.all(notificationPromises);
+    const createdNotifications = await Promise.all(notificationPromises);
+    console.log("[NOTIFICA\xC7\xD5ES] Notifica\xE7\xF5es criadas no banco:", createdNotifications.length);
     if (pushConfig.enabled) {
+      console.log("[NOTIFICA\xC7\xD5ES] Push notifications habilitado, enviando para", recipientUserIds.length, "destinat\xE1rios");
       await sendPushNotificationToUsers(recipientUserIds, {
         title: data.title,
         body: data.message,
         url: data.actionUrl ?? "/communication"
       });
+      console.log("[NOTIFICA\xC7\xD5ES] Envio de push notifications conclu\xEDdo");
+    } else {
+      console.log("[NOTIFICA\xC7\xD5ES] Push notifications DESABILITADO (VAPID keys n\xE3o configuradas)");
     }
     console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {
       userId: req.user.id,
@@ -13015,17 +13659,17 @@ router12.delete("/:id", authenticateToken, async (req, res) => {
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq16(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq17(notifications.id, id)).limit(1);
     } else {
       notification = await db.select().from(notifications).where(and12(
-        eq16(notifications.id, id),
-        eq16(notifications.userId, req.user.id)
+        eq17(notifications.id, id),
+        eq17(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq16(notifications.id, id));
+    await db.delete(notifications).where(eq17(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -13042,7 +13686,7 @@ var notifications_default = router12;
 await init_db();
 init_schema();
 import { Router as Router13 } from "express";
-import { eq as eq17, sql as sql9, and as and13, gte as gte7, lte as lte7, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
+import { eq as eq18, sql as sql9, and as and13, gte as gte8, lte as lte8, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
 await init_db();
@@ -13094,10 +13738,10 @@ router13.get("/availability", authenticateToken, requireRole(["gestor", "coorden
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq17(users.id, questionnaireResponses.userId)).where(
+    }).from(questionnaireResponses).leftJoin(users, eq18(users.id, questionnaireResponses.userId)).where(
       and13(
-        startDate ? gte7(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
-        endDate ? lte7(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
+        startDate ? gte8(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
+        endDate ? lte8(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
       )
     ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql9`available_days`)).limit(Number(limit));
     res.json({
@@ -13124,10 +13768,10 @@ router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
       pendingRequests: sql9`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq17(users.id, substitutionRequests.requesterId)).where(
+    }).from(substitutionRequests).leftJoin(users, eq18(users.id, substitutionRequests.requesterId)).where(
       and13(
-        startDate ? gte7(substitutionRequests.createdAt, new Date(startDate)) : sql9`true`,
-        endDate ? lte7(substitutionRequests.createdAt, new Date(endDate)) : sql9`true`
+        startDate ? gte8(substitutionRequests.createdAt, new Date(startDate)) : sql9`true`,
+        endDate ? lte8(substitutionRequests.createdAt, new Date(endDate)) : sql9`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc6(count4(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
@@ -13140,11 +13784,11 @@ router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
            ${startDate ? sql9`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql9``}
            ${endDate ? sql9`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql9``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq17(users.id, schedules.ministerId)).where(
+    }).from(schedules).leftJoin(users, eq18(users.id, schedules.ministerId)).where(
       and13(
-        schedules.status ? eq17(schedules.status, "published") : sql9`true`,
-        startDate ? gte7(schedules.createdAt, new Date(startDate)) : sql9`true`,
-        endDate ? lte7(schedules.createdAt, new Date(endDate)) : sql9`true`
+        schedules.status ? eq18(schedules.status, "published") : sql9`true`,
+        startDate ? gte8(schedules.createdAt, new Date(startDate)) : sql9`true`,
+        endDate ? lte8(schedules.createdAt, new Date(endDate)) : sql9`true`
       )
     ).groupBy(schedules.ministerId, users.name).having(sql9`COUNT(${schedules.id}) > 0`).orderBy(asc(sql9`substitution_requests`), desc6(count4(schedules.id))).limit(10);
     res.json({
@@ -13170,10 +13814,10 @@ router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
       uniqueDays: sql9`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq17(users.id, activityLogs.userId)).where(
+    }).from(activityLogs).leftJoin(users, eq18(users.id, activityLogs.userId)).where(
       and13(
-        startDate ? gte7(activityLogs.createdAt, new Date(startDate)) : sql9`true`,
-        endDate ? lte7(activityLogs.createdAt, new Date(endDate)) : sql9`true`
+        startDate ? gte8(activityLogs.createdAt, new Date(startDate)) : sql9`true`,
+        endDate ? lte8(activityLogs.createdAt, new Date(endDate)) : sql9`true`
       )
     ).groupBy(activityLogs.userId, users.name).orderBy(desc6(count4(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
@@ -13191,11 +13835,11 @@ router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
     }).from(users).leftJoin(
       questionnaireResponses,
       and13(
-        eq17(users.id, questionnaireResponses.userId),
-        startDate ? gte7(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
-        endDate ? lte7(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
+        eq18(users.id, questionnaireResponses.userId),
+        startDate ? gte8(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
+        endDate ? lte8(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
       )
-    ).where(eq17(users.status, "active"));
+    ).where(eq18(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -13221,7 +13865,7 @@ router13.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq17(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql9`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq18(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql9`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
       totalModules: sql9`
           (SELECT COUNT(*) FROM formation_modules)
@@ -13252,7 +13896,7 @@ router13.get("/families", authenticateToken, requireRole(["gestor", "coordenador
       totalServices: sql9`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq17(users.familyId, families.id)).groupBy(families.id, families.name).having(sql9`COUNT(${users.id}) > 1`).orderBy(desc6(sql9`active_members`), desc6(sql9`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq18(users.familyId, families.id)).groupBy(families.id, families.name).having(sql9`COUNT(${users.id}) > 1`).orderBy(desc6(sql9`active_members`), desc6(sql9`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -13268,7 +13912,7 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     const now = /* @__PURE__ */ new Date();
     const startOfMonth6 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth6 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq17(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq18(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count4(),
       approved: sql9`
@@ -13276,15 +13920,15 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
         `.as("approved")
     }).from(substitutionRequests).where(
       and13(
-        gte7(substitutionRequests.createdAt, startOfMonth6),
-        lte7(substitutionRequests.createdAt, endOfMonth6)
+        gte8(substitutionRequests.createdAt, startOfMonth6),
+        lte8(substitutionRequests.createdAt, endOfMonth6)
       )
     );
     const formationThisMonth = await db.select({ count: count4() }).from(formationProgress).where(
       and13(
-        eq17(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte7(formationProgress.completedAt, startOfMonth6) : sql9`false`,
-        formationProgress.completedAt ? lte7(formationProgress.completedAt, endOfMonth6) : sql9`false`
+        eq18(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte8(formationProgress.completedAt, startOfMonth6) : sql9`false`,
+        formationProgress.completedAt ? lte8(formationProgress.completedAt, endOfMonth6) : sql9`false`
       )
     );
     const avgAvailability = await db.select({
@@ -13297,8 +13941,8 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
         `.as("avg_days")
     }).from(questionnaireResponses).where(
       and13(
-        gte7(questionnaireResponses.submittedAt, startOfMonth6),
-        lte7(questionnaireResponses.submittedAt, endOfMonth6)
+        gte8(questionnaireResponses.submittedAt, startOfMonth6),
+        lte8(questionnaireResponses.submittedAt, endOfMonth6)
       )
     );
     res.json({
@@ -13325,7 +13969,7 @@ var reports_default = router13;
 await init_db();
 init_schema();
 import { Router as Router14 } from "express";
-import { eq as eq18, and as and14, sql as sql10 } from "drizzle-orm";
+import { eq as eq19, and as and14, sql as sql10 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -13359,8 +14003,8 @@ router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
 router14.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const minister = await db.select().from(users).where(and14(
-      eq18(users.id, req.params.id),
-      eq18(users.role, "ministro")
+      eq19(users.id, req.params.id),
+      eq19(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13386,6 +14030,8 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
       "emergencyContact",
       "emergencyPhone",
       "preferredPosition",
+      "preferredPositions",
+      "avoidPositions",
       "availableForSpecialEvents",
       "canServeAsCouple",
       "spouseUserId",
@@ -13401,6 +14047,8 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
       if (req.body[field] !== void 0) {
         if (field === "specialSkills") {
           updateData[field] = typeof req.body[field] === "string" ? req.body[field] : JSON.stringify(req.body[field]);
+        } else if (["preferredPositions", "avoidPositions"].includes(field)) {
+          updateData[field] = Array.isArray(req.body[field]) ? req.body[field] : [];
         } else if (["liturgicalTraining", "formationCompleted"].includes(field)) {
           updateData[field] = Boolean(req.body[field]);
         } else if (field === "scheduleDisplayName") {
@@ -13415,8 +14063,8 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
     const result = await db.update(users).set(updateData).where(and14(
-      eq18(users.id, userId),
-      eq18(users.role, "ministro")
+      eq19(users.id, userId),
+      eq19(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13439,8 +14087,8 @@ router14.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
     const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and14(
-      eq18(users.id, ministerId),
-      eq18(users.role, "ministro")
+      eq19(users.id, ministerId),
+      eq19(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13463,7 +14111,7 @@ var ministers_default = router14;
 await init_db();
 init_schema();
 import { Router as Router15 } from "express";
-import { eq as eq20, and as and16, sql as sql12, gte as gte9, desc as desc7, count as count5, notInArray, inArray as inArray5 } from "drizzle-orm";
+import { eq as eq21, and as and16, sql as sql12, gte as gte10, desc as desc7, count as count5, notInArray, inArray as inArray5 } from "drizzle-orm";
 var router15 = Router15();
 function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
@@ -13482,8 +14130,8 @@ async function countMonthlySubstitutions(requesterId) {
   const lastDayOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const result = await db.select({ count: count5() }).from(substitutionRequests).where(
     and16(
-      eq20(substitutionRequests.requesterId, requesterId),
-      gte9(substitutionRequests.createdAt, firstDayOfMonth),
+      eq21(substitutionRequests.requesterId, requesterId),
+      gte10(substitutionRequests.createdAt, firstDayOfMonth),
       sql12`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
     )
   );
@@ -13500,7 +14148,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         message: "ID da escala \xE9 obrigat\xF3rio"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq20(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -13532,7 +14180,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
       and16(
-        eq20(substitutionRequests.scheduleId, scheduleId),
+        eq21(substitutionRequests.scheduleId, scheduleId),
         inArray5(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
@@ -13565,7 +14213,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         profilePhoto: users.photoUrl
       }
-    }).from(substitutionRequests).innerJoin(schedules, eq20(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq20(substitutionRequests.requesterId, users.id)).where(eq20(substitutionRequests.id, newRequest.id)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).where(eq21(substitutionRequests.id, newRequest.id)).limit(1);
     const [requestWithDetails] = await requestQuery;
     let substituteUser = null;
     if (finalSubstituteId) {
@@ -13575,7 +14223,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         phone: users.phone,
         whatsapp: users.whatsapp
-      }).from(users).where(eq20(users.id, finalSubstituteId)).limit(1);
+      }).from(users).where(eq21(users.id, finalSubstituteId)).limit(1);
       substituteUser = substitute || null;
     }
     const responseData = {
@@ -13628,7 +14276,7 @@ router15.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq20(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq20(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
+      }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
     } else {
       requests = await db.select({
         request: substitutionRequests,
@@ -13639,13 +14287,31 @@ router15.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq20(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq20(substitutionRequests.requesterId, users.id)).where(
+      }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).where(
         sql12`${substitutionRequests.requesterId} = ${userId}
             OR ${substitutionRequests.substituteId} = ${userId}
             OR ${substitutionRequests.status} = 'available'`
       ).orderBy(desc7(substitutionRequests.createdAt));
     }
-    const mappedRequests = requests.map((req2) => ({
+    const enrichedRequests = await Promise.all(
+      requests.map(async (req2) => {
+        let substituteUser = null;
+        if (req2.request.substituteId) {
+          const [substitute] = await db.select({
+            id: users.id,
+            name: users.name
+          }).from(users).where(eq21(users.id, req2.request.substituteId)).limit(1);
+          if (substitute) {
+            substituteUser = substitute;
+          }
+        }
+        return {
+          ...req2,
+          substituteUser
+        };
+      })
+    );
+    const mappedRequests = enrichedRequests.map((req2) => ({
       ...req2,
       assignment: {
         ...req2.assignment,
@@ -13665,7 +14331,7 @@ router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
-    const [schedule] = await db.select().from(schedules).where(eq20(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       console.log("[Substitutions] Escala n\xE3o encontrada:", scheduleId);
       return res.status(404).json({
@@ -13681,8 +14347,8 @@ router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
       photoUrl: users.photoUrl
     }).from(users).where(
       and16(
-        eq20(users.status, "active"),
-        eq20(users.role, "ministro"),
+        eq21(users.status, "active"),
+        eq21(users.role, "ministro"),
         // Não está escalado no mesmo horário
         sql12`NOT EXISTS (
             SELECT 1 FROM ${schedules} s
@@ -13718,7 +14384,7 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
         message: "Resposta inv\xE1lida. Use 'accepted' ou 'rejected'"
       });
     }
-    const [request] = await db.select().from(substitutionRequests).where(eq20(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -13726,8 +14392,7 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
       });
     }
     const isSubstitute = request.substituteId === userId;
-    const isCoordinator = req.user.role === "coordenador" || req.user.role === "gestor";
-    if (!isSubstitute && !isCoordinator) {
+    if (!isSubstitute) {
       return res.status(403).json({
         success: false,
         message: "Voc\xEA n\xE3o tem permiss\xE3o para responder esta solicita\xE7\xE3o"
@@ -13746,12 +14411,12 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
       approvedAt: /* @__PURE__ */ new Date(),
       responseMessage: responseMessage || null,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq20(substitutionRequests.id, id));
+    }).where(eq21(substitutionRequests.id, id));
     if (newStatus === "approved" && request.substituteId) {
       await db.update(schedules).set({
         ministerId: request.substituteId,
         substituteId: request.requesterId
-      }).where(eq20(schedules.id, request.scheduleId));
+      }).where(eq21(schedules.id, request.scheduleId));
     }
     res.json({
       success: true,
@@ -13770,7 +14435,7 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     const { message } = req.body;
-    const [request] = await db.select().from(substitutionRequests).where(eq20(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -13790,7 +14455,7 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Voc\xEA n\xE3o pode reivindicar sua pr\xF3pria solicita\xE7\xE3o"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq20(schedules.id, request.scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, request.scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -13799,10 +14464,10 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
     }
     const conflictingSchedule = await db.select().from(schedules).where(
       and16(
-        eq20(schedules.ministerId, userId),
-        eq20(schedules.date, schedule.date),
-        eq20(schedules.time, schedule.time),
-        eq20(schedules.status, "scheduled")
+        eq21(schedules.ministerId, userId),
+        eq21(schedules.date, schedule.date),
+        eq21(schedules.time, schedule.time),
+        eq21(schedules.status, "scheduled")
       )
     ).limit(1);
     if (conflictingSchedule.length > 0) {
@@ -13818,11 +14483,11 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
       approvedAt: /* @__PURE__ */ new Date(),
       responseMessage: message || null,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq20(substitutionRequests.id, id));
+    }).where(eq21(substitutionRequests.id, id));
     await db.update(schedules).set({
       ministerId: userId,
       substituteId: request.requesterId
-    }).where(eq20(schedules.id, request.scheduleId));
+    }).where(eq21(schedules.id, request.scheduleId));
     res.json({
       success: true,
       message: "Substitui\xE7\xE3o aceita com sucesso!"
@@ -13839,7 +14504,7 @@ router15.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const [request] = await db.select().from(substitutionRequests).where(eq20(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -13863,7 +14528,7 @@ router15.delete("/:id", authenticateToken, async (req, res) => {
     await db.update(substitutionRequests).set({
       status: "cancelled",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq20(substitutionRequests.id, id));
+    }).where(eq21(substitutionRequests.id, id));
     res.json({
       success: true,
       message: "Solicita\xE7\xE3o cancelada com sucesso"
@@ -13882,7 +14547,7 @@ var substitutions_default = router15;
 await init_db();
 init_schema();
 import { Router as Router16 } from "express";
-import { eq as eq21, and as and17, gte as gte10, lte as lte9, sql as sql13 } from "drizzle-orm";
+import { eq as eq22, and as and17, gte as gte11, lte as lte10, sql as sql13 } from "drizzle-orm";
 var router16 = Router16();
 var MINIMUM_MINISTERS = {
   "08:00:00": 12,
@@ -13912,14 +14577,15 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       location: schedules.location,
       ministerId: schedules.ministerId,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       position: schedules.position,
       status: schedules.status,
       id: schedules.id
-    }).from(schedules).leftJoin(users, eq21(schedules.ministerId, users.id)).where(
+    }).from(schedules).leftJoin(users, eq22(schedules.ministerId, users.id)).where(
       and17(
-        gte10(schedules.date, startDateStr),
-        lte9(schedules.date, endDateStr),
-        eq21(schedules.status, "scheduled")
+        gte11(schedules.date, startDateStr),
+        lte10(schedules.date, endDateStr),
+        eq22(schedules.status, "scheduled")
       )
     ).orderBy(schedules.date, schedules.time);
     const scheduleIds = monthSchedules.map((s) => s.id);
@@ -13955,8 +14621,8 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       lastService: users.lastService
     }).from(users).where(
       and17(
-        eq21(users.status, "active"),
-        eq21(users.role, "ministro")
+        eq22(users.status, "active"),
+        eq22(users.role, "ministro")
       )
     );
     const pendencies = [];
@@ -14049,7 +14715,7 @@ var mass_pendencies_default = router16;
 await init_db();
 init_schema();
 import { Router as Router17 } from "express";
-import { eq as eq23, asc as asc2 } from "drizzle-orm";
+import { eq as eq24, asc as asc2 } from "drizzle-orm";
 var router17 = Router17();
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
@@ -14094,7 +14760,7 @@ router17.get("/tracks", async (req, res) => {
 router17.get("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const track = await db.select().from(formationTracks).where(eq23(formationTracks.id, id)).limit(1);
+    const track = await db.select().from(formationTracks).where(eq24(formationTracks.id, id)).limit(1);
     if (track.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14130,7 +14796,7 @@ router17.patch("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq23(formationTracks.id, id)).returning();
+    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationTracks.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14152,14 +14818,14 @@ router17.patch("/tracks/:id", async (req, res) => {
 router17.delete("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const modules = await db.select().from(formationModules).where(eq23(formationModules.trackId, id));
+    const modules = await db.select().from(formationModules).where(eq24(formationModules.trackId, id));
     if (modules.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta trilha possui m\xF3dulos. Delete os m\xF3dulos primeiro ou desative a trilha."
       });
     }
-    const deleted = await db.delete(formationTracks).where(eq23(formationTracks.id, id)).returning();
+    const deleted = await db.delete(formationTracks).where(eq24(formationTracks.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14181,7 +14847,7 @@ router17.delete("/tracks/:id", async (req, res) => {
 router17.get("/tracks/:trackId/modules", async (req, res) => {
   try {
     const { trackId } = req.params;
-    const modules = await db.select().from(formationModules).where(eq23(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
+    const modules = await db.select().from(formationModules).where(eq24(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
     res.json({ modules });
   } catch (error) {
     console.error("Error fetching formation modules:", error);
@@ -14194,7 +14860,7 @@ router17.get("/tracks/:trackId/modules", async (req, res) => {
 router17.get("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const module = await db.select().from(formationModules).where(eq23(formationModules.id, id)).limit(1);
+    const module = await db.select().from(formationModules).where(eq24(formationModules.id, id)).limit(1);
     if (module.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14230,7 +14896,7 @@ router17.patch("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationModules).set(updates).where(eq23(formationModules.id, id)).returning();
+    const updated = await db.update(formationModules).set(updates).where(eq24(formationModules.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14252,14 +14918,14 @@ router17.patch("/modules/:id", async (req, res) => {
 router17.delete("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq23(formationLessons.moduleId, id));
+    const lessons = await db.select().from(formationLessons).where(eq24(formationLessons.moduleId, id));
     if (lessons.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Este m\xF3dulo possui li\xE7\xF5es. Delete as li\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationModules).where(eq23(formationModules.id, id)).returning();
+    const deleted = await db.delete(formationModules).where(eq24(formationModules.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14281,7 +14947,7 @@ router17.delete("/modules/:id", async (req, res) => {
 router17.get("/modules/:moduleId/lessons", async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq23(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
+    const lessons = await db.select().from(formationLessons).where(eq24(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
     res.json({ lessons });
   } catch (error) {
     console.error("Error fetching formation lessons:", error);
@@ -14294,7 +14960,7 @@ router17.get("/modules/:moduleId/lessons", async (req, res) => {
 router17.get("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lesson = await db.select().from(formationLessons).where(eq23(formationLessons.id, id)).limit(1);
+    const lesson = await db.select().from(formationLessons).where(eq24(formationLessons.id, id)).limit(1);
     if (lesson.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14330,7 +14996,7 @@ router17.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq23(formationLessons.id, id)).returning();
+    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationLessons.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14352,14 +15018,14 @@ router17.patch("/lessons/:id", async (req, res) => {
 router17.delete("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq23(formationLessonSections.lessonId, id));
+    const sections = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.lessonId, id));
     if (sections.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta li\xE7\xE3o possui se\xE7\xF5es. Delete as se\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationLessons).where(eq23(formationLessons.id, id)).returning();
+    const deleted = await db.delete(formationLessons).where(eq24(formationLessons.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14381,7 +15047,7 @@ router17.delete("/lessons/:id", async (req, res) => {
 router17.get("/lessons/:lessonId/sections", async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq23(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
+    const sections = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
     res.json({ sections });
   } catch (error) {
     console.error("Error fetching lesson sections:", error);
@@ -14394,7 +15060,7 @@ router17.get("/lessons/:lessonId/sections", async (req, res) => {
 router17.get("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const section = await db.select().from(formationLessonSections).where(eq23(formationLessonSections.id, id)).limit(1);
+    const section = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.id, id)).limit(1);
     if (section.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14430,7 +15096,7 @@ router17.patch("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq23(formationLessonSections.id, id)).returning();
+    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationLessonSections.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14452,7 +15118,7 @@ router17.patch("/sections/:id", async (req, res) => {
 router17.delete("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.delete(formationLessonSections).where(eq23(formationLessonSections.id, id)).returning();
+    const deleted = await db.delete(formationLessonSections).where(eq24(formationLessonSections.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14482,7 +15148,7 @@ router17.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
       });
     }
     const updates = sectionIds.map(
-      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq23(formationLessonSections.id, id))
+      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq24(formationLessonSections.id, id))
     );
     await Promise.all(updates);
     res.json({
@@ -14516,7 +15182,7 @@ var version_default = router18;
 await init_db();
 init_schema();
 import { Router as Router19 } from "express";
-import { eq as eq24, and as and18, gte as gte11, lte as lte10 } from "drizzle-orm";
+import { eq as eq25, and as and18, gte as gte12, lte as lte11 } from "drizzle-orm";
 
 // shared/constants/massConfig.ts
 var REGULAR_MASS_SCHEDULE = {
@@ -14943,7 +15609,7 @@ router19.get("/current-season", async (req, res) => {
     const currentDate = /* @__PURE__ */ new Date();
     const seasonInfo = getCurrentLiturgicalSeason(currentDate);
     const year = currentDate.getFullYear();
-    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq24(liturgicalYears.year, year)).limit(1);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq25(liturgicalYears.year, year)).limit(1);
     res.json({
       success: true,
       data: {
@@ -14965,14 +15631,14 @@ router19.get("/current-season", async (req, res) => {
 router19.get("/seasons/:year", async (req, res) => {
   try {
     const year = parseInt(req.params.year);
-    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq24(liturgicalYears.year, year)).limit(1);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq25(liturgicalYears.year, year)).limit(1);
     if (!liturgicalYear) {
       return res.status(404).json({
         success: false,
         message: "Ano lit\xFArgico n\xE3o encontrado"
       });
     }
-    const seasons = await db.select().from(liturgicalSeasons).where(eq24(liturgicalSeasons.yearId, liturgicalYear.id));
+    const seasons = await db.select().from(liturgicalSeasons).where(eq25(liturgicalSeasons.yearId, liturgicalYear.id));
     res.json({
       success: true,
       data: {
@@ -14994,7 +15660,7 @@ router19.get("/celebrations/:year/:month", async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq24(liturgicalYears.year, year)).limit(1);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq25(liturgicalYears.year, year)).limit(1);
     if (!liturgicalYear) {
       return res.status(404).json({
         success: false,
@@ -15005,9 +15671,9 @@ router19.get("/celebrations/:year/:month", async (req, res) => {
     const endDate = new Date(year, month, 0);
     const celebrations = await db.select().from(liturgicalCelebrations).where(
       and18(
-        eq24(liturgicalCelebrations.yearId, liturgicalYear.id),
-        gte11(liturgicalCelebrations.date, startDate.toISOString().split("T")[0]),
-        lte10(liturgicalCelebrations.date, endDate.toISOString().split("T")[0])
+        eq25(liturgicalCelebrations.yearId, liturgicalYear.id),
+        gte12(liturgicalCelebrations.date, startDate.toISOString().split("T")[0]),
+        lte11(liturgicalCelebrations.date, endDate.toISOString().split("T")[0])
       )
     ).orderBy(liturgicalCelebrations.date);
     res.json({
@@ -15031,7 +15697,7 @@ router19.get("/celebration/:date", async (req, res) => {
     const dateStr = req.params.date;
     const date2 = new Date(dateStr);
     const year = date2.getFullYear();
-    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq24(liturgicalYears.year, year)).limit(1);
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq25(liturgicalYears.year, year)).limit(1);
     if (!liturgicalYear) {
       return res.json({
         success: true,
@@ -15040,8 +15706,8 @@ router19.get("/celebration/:date", async (req, res) => {
     }
     const [celebration] = await db.select().from(liturgicalCelebrations).where(
       and18(
-        eq24(liturgicalCelebrations.yearId, liturgicalYear.id),
-        eq24(liturgicalCelebrations.date, dateStr)
+        eq25(liturgicalCelebrations.yearId, liturgicalYear.id),
+        eq25(liturgicalCelebrations.date, dateStr)
       )
     ).limit(1);
     res.json({
@@ -15061,8 +15727,8 @@ router19.get("/mass-config/:date", async (req, res) => {
     const dateStr = req.params.date;
     const date2 = new Date(dateStr);
     const year = date2.getFullYear();
-    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq24(liturgicalYears.year, year)).limit(1);
-    const overrides = await db.select().from(liturgicalMassOverrides).where(eq24(liturgicalMassOverrides.date, dateStr));
+    const [liturgicalYear] = await db.select().from(liturgicalYears).where(eq25(liturgicalYears.year, year)).limit(1);
+    const overrides = await db.select().from(liturgicalMassOverrides).where(eq25(liturgicalMassOverrides.date, dateStr));
     if (overrides.length > 0) {
       return res.json({
         success: true,
@@ -15082,8 +15748,8 @@ router19.get("/mass-config/:date", async (req, res) => {
     if (liturgicalYear) {
       const [celebration] = await db.select().from(liturgicalCelebrations).where(
         and18(
-          eq24(liturgicalCelebrations.yearId, liturgicalYear.id),
-          eq24(liturgicalCelebrations.date, dateStr)
+          eq25(liturgicalCelebrations.yearId, liturgicalYear.id),
+          eq25(liturgicalCelebrations.date, dateStr)
         )
       ).limit(1);
       if (celebration?.specialMassConfig) {
@@ -15182,7 +15848,7 @@ router19.post("/overrides", async (req, res) => {
 router19.get("/overrides/:date", async (req, res) => {
   try {
     const { date: date2 } = req.params;
-    const overrides = await db.select().from(liturgicalMassOverrides).where(eq24(liturgicalMassOverrides.date, date2));
+    const overrides = await db.select().from(liturgicalMassOverrides).where(eq25(liturgicalMassOverrides.date, date2));
     res.json({
       success: true,
       data: overrides
@@ -15198,7 +15864,7 @@ router19.get("/overrides/:date", async (req, res) => {
 router19.delete("/overrides/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await db.delete(liturgicalMassOverrides).where(eq24(liturgicalMassOverrides.id, id));
+    await db.delete(liturgicalMassOverrides).where(eq25(liturgicalMassOverrides.id, id));
     res.json({
       success: true,
       message: "Override de missa removido com sucesso"
@@ -15244,7 +15910,7 @@ var liturgical_default = router19;
 await init_db();
 init_schema();
 import { Router as Router20 } from "express";
-import { eq as eq25, sql as sql15, like, or as or8 } from "drizzle-orm";
+import { eq as eq26, sql as sql15, like, or as or8 } from "drizzle-orm";
 var router20 = Router20();
 function getMonthName2(month) {
   const monthNames2 = [
@@ -15265,186 +15931,41 @@ function getMonthName2(month) {
 }
 router20.get("/today", async (req, res) => {
   try {
-    console.log("[LITURGY API] Buscando liturgia do dia...");
+    console.log("[LITURGY API] Buscando liturgia do dia da API oficial da CNBB...");
     const today = /* @__PURE__ */ new Date();
     const day = String(today.getDate()).padStart(2, "0");
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const feastDay = `${month}-${day}`;
     try {
-      const liturgyUrl = "https://www.paulus.com.br/portal/liturgia-diaria/";
+      const liturgyUrl = "https://liturgia.cnbb.org.br/api/liturgia-diaria";
       console.log(`[LITURGY API] Fazendo fetch de ${liturgyUrl}`);
-      const response = await fetch(liturgyUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-          "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Connection": "keep-alive",
-          "Upgrade-Insecure-Requests": "1",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Cache-Control": "max-age=0"
-        }
-      });
+      const response = await fetch(liturgyUrl);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      const html = await response.text();
-      console.log(`[LITURGY API] HTML recebido, tamanho: ${html.length} caracteres`);
-      let liturgyTitle = "Liturgia do Dia";
-      let liturgyColor = "green";
-      let liturgyRank = "MEMORIAL";
-      let firstReading = { reference: "", text: "" };
-      let secondReading = { reference: "", text: "" };
-      let gospel = { reference: "", text: "" };
-      let psalm = { reference: "", response: "" };
-      let homily = "";
-      const titleMatches = [
-        html.match(/<h1[^>]*>([^<]*(?:domingo|segunda|terça|quarta|quinta|sexta|sábado)[^<]*)<\/h1>/i),
-        html.match(/<h2[^>]*class="[^"]*titulo[^"]*"[^>]*>([^<]+)<\/h2>/i),
-        html.match(/<div[^>]*class="[^"]*celebracao[^"]*"[^>]*>([^<]+)<\/div>/i),
-        html.match(/<span[^>]*class="[^"]*celebracao[^"]*"[^>]*>([^<]+)<\/span>/i),
-        html.match(/<title>([^<]*Liturgia[^<]*)<\/title>/i)
-      ];
-      for (const match of titleMatches) {
-        if (match) {
-          liturgyTitle = match[1].trim().replace(/&nbsp;/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").replace(/Liturgia Diária/i, "").replace(/Liturgia de hoje/i, "").replace(/Paulus/i, "").replace(/[-–—]/g, "").trim();
-          if (liturgyTitle.length > 5) break;
-        }
-      }
-      const colorPatterns = [
-        /cor\s+lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
-        /lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
-        /color[^>]*>([a-záéíóúâêôãõç]+)</i
-      ];
-      for (const pattern of colorPatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          const colorMap = {
-            "verde": "green",
-            "branco": "white",
-            "branca": "white",
-            "vermelho": "red",
-            "vermelha": "red",
-            "roxo": "purple",
-            "roxa": "purple",
-            "violeta": "purple",
-            "rosa": "rose"
-          };
-          liturgyColor = colorMap[match[1].toLowerCase()] || "green";
-          break;
-        }
-      }
-      if (html.match(/solenidade/i)) {
-        liturgyRank = "SOLEMNITY";
-      } else if (html.match(/festa/i)) {
-        liturgyRank = "FEAST";
-      } else if (html.match(/mem[oó]ria\s+obrigat[oó]ria/i)) {
-        liturgyRank = "MEMORIAL";
-      } else if (html.match(/mem[oó]ria/i)) {
-        liturgyRank = "OPTIONAL_MEMORIAL";
-      } else {
-        liturgyRank = "FERIAL";
-      }
-      const firstReadingPatterns = [
-        /(?:1[ªa°]?\s*Leitura|Primeira\s+Leitura)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>(?:1[ªa°]?\s*Leitura|Primeira\s+Leitura)<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*primeira[^"]*leitura[^"]*"[^>]*>([^<]+)/i
-      ];
-      for (const pattern of firstReadingPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          firstReading.reference = match[1].trim().replace(/\s+/g, " ").replace(/[()]/g, "");
-          break;
-        }
-      }
-      if (firstReading.reference) {
-        const firstTextMatch = html.match(new RegExp(
-          firstReading.reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,2000}?)(?:<\\/[pdiv]|<h[2-4]|1[\xAAa\xB0]?\\s*Leitura)",
-          "i"
-        ));
-        if (firstTextMatch) {
-          firstReading.text = firstTextMatch[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().substring(0, 1500);
-        }
-      }
-      const secondReadingPatterns = [
-        /(?:2[ªa°]?\s*Leitura|Segunda\s+Leitura)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>(?:2[ªa°]?\s*Leitura|Segunda\s+Leitura)<\/h[2-4]>\s*<[^>]*>([^<]+)/i
-      ];
-      for (const pattern of secondReadingPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          secondReading.reference = match[1].trim().replace(/\s+/g, " ").replace(/[()]/g, "");
-          const secondTextMatch = html.match(new RegExp(
-            secondReading.reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,2000}?)(?:<\\/[pdiv]|<h[2-4]|Evangelho)",
-            "i"
-          ));
-          if (secondTextMatch) {
-            secondReading.text = secondTextMatch[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().substring(0, 1500);
-          }
-          break;
-        }
-      }
-      const psalmPatterns = [
-        /(?:Salmo\s+Responsorial|Salmo)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>Salmo[^<]*<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*salmo[^"]*"[^>]*>([^<]+)/i
-      ];
-      for (const pattern of psalmPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          psalm.reference = match[1].trim().replace(/\s+/g, " ").replace(/[()]/g, "");
-          break;
-        }
-      }
-      const psalmResponsePatterns = [
-        /(?:Respons[oó]rio|Refr[ãa]o)[:\s]*[–—-]?\s*([^<\n.]+)/i,
-        /<[^>]*class="[^"]*respons[^"]*"[^>]*>([^<]+)/i,
-        /<em>([^<]{10,100})<\/em>/i
-        // Muitas vezes o refrão vem em itálico
-      ];
-      for (const pattern of psalmResponsePatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 8) {
-          psalm.response = match[1].trim().replace(/\s+/g, " ").replace(/[."]/g, "");
-          break;
-        }
-      }
-      const gospelPatterns = [
-        /Evangelho[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>Evangelho<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*evangelho[^"]*"[^>]*>([^<]+)/i
-      ];
-      for (const pattern of gospelPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          gospel.reference = match[1].trim().replace(/\s+/g, " ").replace(/[()]/g, "");
-          const gospelTextMatch = html.match(new RegExp(
-            gospel.reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,50}?<[^>]*>([\\s\\S]{100,3000}?)(?:<\\/[pdiv]|<h[2-4]|Medita)",
-            "i"
-          ));
-          if (gospelTextMatch) {
-            gospel.text = gospelTextMatch[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().substring(0, 2e3);
-          }
-          break;
-        }
-      }
-      const meditationPatterns = [
-        /<div[^>]*class="[^"]*medita[çc][ãa]o[^"]*"[^>]*>([\s\S]{100,800}?)<\/div>/i,
-        /<div[^>]*class="[^"]*reflex[ãa]o[^"]*"[^>]*>([\s\S]{100,800}?)<\/div>/i,
-        /<article[^>]*class="[^"]*contempla[^"]*"[^>]*>([\s\S]{100,800}?)<\/article>/i,
-        /<p[^>]*class="[^"]*medita[^"]*"[^>]*>([^<]{100,500})<\/p>/i,
-        /(?:Medita[çc][ãa]o|Reflex[ãa]o)[:\s]*<[^>]*>([\s\S]{100,600}?)(?:<\/[pdiv]|<h[2-4])/i
-      ];
-      for (const pattern of meditationPatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          homily = match[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim().substring(0, 500);
-          if (homily.length > 80) break;
-        }
-      }
-      if (liturgyTitle.length > 5 || firstReading.reference || gospel.reference) {
+      const apiData = await response.json();
+      console.log(`[LITURGY API] Dados recebidos da API CNBB`);
+      const liturgyTitle = apiData.data || "Liturgia do Dia";
+      const liturgyColor = mapColorFromCNBB(apiData.cor || "verde");
+      const liturgyRank = getRankFromTitle(liturgyTitle);
+      const firstReading = apiData.primeiraLeitura ? {
+        reference: apiData.primeiraLeitura.referencia || "",
+        text: apiData.primeiraLeitura.texto || apiData.primeiraLeitura.title || ""
+      } : { reference: "", text: "" };
+      const secondReading = apiData.segundaLeitura ? {
+        reference: apiData.segundaLeitura.referencia || "",
+        text: apiData.segundaLeitura.texto || apiData.segundaLeitura.title || ""
+      } : { reference: "", text: "" };
+      const psalm = apiData.salmo ? {
+        reference: apiData.salmo.referencia || apiData.salmo.refrao || "",
+        response: apiData.salmo.refrao || "",
+        text: apiData.salmo.texto || ""
+      } : { reference: "", response: "", text: "" };
+      const gospel = apiData.evangelho ? {
+        reference: apiData.evangelho.referencia || "",
+        text: apiData.evangelho.texto || apiData.evangelho.title || ""
+      } : { reference: "", text: "" };
+      if (liturgyTitle || firstReading.reference || gospel.reference) {
         const liturgyData = {
           id: `liturgy-${day}-${month}`,
           name: liturgyTitle,
@@ -15454,20 +15975,20 @@ router20.get("/today", async (req, res) => {
             secondReading,
             psalm,
             gospel,
-            homily
+            ""
           ),
           isBrazilian: false,
           rank: liturgyRank,
           liturgicalColor: liturgyColor,
           title: getRankLabel(liturgyRank),
           patronOf: void 0,
-          collectPrayer: homily || void 0,
+          collectPrayer: void 0,
           firstReading: firstReading.reference ? firstReading : void 0,
           secondReading: secondReading.reference ? secondReading : void 0,
           responsorialPsalm: psalm.reference ? psalm : void 0,
           gospel: gospel.reference ? gospel : void 0,
           attributes: void 0,
-          quotes: homily ? [homily.substring(0, 200) + "..."] : void 0
+          quotes: void 0
         };
         console.log(`[LITURGY API] Liturgia encontrada: ${liturgyData.name}`);
         console.log(`[LITURGY API] Leituras: 1\xAA=${firstReading.reference}, 2\xAA=${secondReading.reference || "N/A"}, Salmo=${psalm.reference}, Ev=${gospel.reference}`);
@@ -15477,12 +15998,12 @@ router20.get("/today", async (req, res) => {
             date: today.toISOString().split("T")[0],
             feastDay,
             saints: [liturgyData],
-            source: "paulus"
+            source: "cnbb"
           }
         });
       }
     } catch (liturgyError) {
-      console.error("[LITURGY API] Erro ao buscar liturgia da Paulus:", liturgyError);
+      console.error("[LITURGY API] Erro ao buscar liturgia da CNBB:", liturgyError);
     }
     console.log("[LITURGY API] Usando liturgia gen\xE9rica");
     const weekday = today.toLocaleDateString("pt-BR", { weekday: "long" });
@@ -15493,7 +16014,7 @@ router20.get("/today", async (req, res) => {
       feastDay,
       biography: `\u{1F4D6} Liturgia do dia ${day} de ${getMonthName2(parseInt(month))} de ${today.getFullYear()}.
 
-Para acessar as leituras completas e reflex\xF5es do dia, visite: https://www.paulus.com.br/portal/liturgia-diaria/
+Para acessar as leituras completas e reflex\xF5es do dia, visite: https://liturgia.cnbb.org.br/
 
 L\xE1 voc\xEA encontrar\xE1:
 \u2022 Primeira e Segunda Leituras
@@ -15509,7 +16030,7 @@ L\xE1 voc\xEA encontrar\xE1:
       firstReading: void 0,
       responsorialPsalm: void 0,
       gospel: void 0,
-      attributes: ["Liturgia Di\xE1ria", "Paulus"],
+      attributes: ["Liturgia Di\xE1ria", "CNBB"],
       quotes: void 0
     };
     res.json({
@@ -15529,6 +16050,33 @@ L\xE1 voc\xEA encontrar\xE1:
     });
   }
 });
+function mapColorFromCNBB(cnbbColor) {
+  const colorMap = {
+    "verde": "green",
+    "branco": "white",
+    "branca": "white",
+    "vermelho": "red",
+    "vermelha": "red",
+    "roxo": "purple",
+    "roxa": "purple",
+    "violeta": "purple",
+    "rosa": "rose"
+  };
+  return colorMap[cnbbColor.toLowerCase()] || "green";
+}
+function getRankFromTitle(title) {
+  const titleLower = title.toLowerCase();
+  if (titleLower.includes("solenidade")) {
+    return "SOLEMNITY";
+  } else if (titleLower.includes("festa")) {
+    return "FEAST";
+  } else if (titleLower.includes("mem\xF3ria obrigat\xF3ria")) {
+    return "MEMORIAL";
+  } else if (titleLower.includes("mem\xF3ria")) {
+    return "OPTIONAL_MEMORIAL";
+  }
+  return "FERIAL";
+}
 function getRankLabel(rank) {
   const labels = {
     "SOLEMNITY": "Solenidade",
@@ -15588,11 +16136,11 @@ ${meditation}...`);
   }
   if (parts.length > 0) {
     parts.push(`
-\u{1F517} **Acesse o conte\xFAdo completo:**
-https://www.paulus.com.br/portal/liturgia-diaria/`);
+\u{1F517} **Fonte oficial:**
+https://liturgia.cnbb.org.br/`);
     return parts.join("\n\n");
   }
-  return "Consulte www.paulus.com.br/portal/liturgia-diaria/ para as leituras completas e reflex\xF5es do dia.";
+  return "Consulte liturgia.cnbb.org.br para as leituras completas e reflex\xF5es do dia.";
 }
 router20.get("/date/:date", async (req, res) => {
   try {
@@ -15601,7 +16149,7 @@ router20.get("/date/:date", async (req, res) => {
     const month = String(date2.getMonth() + 1).padStart(2, "0");
     const day = String(date2.getDate()).padStart(2, "0");
     const feastDay = `${month}-${day}`;
-    const saintsOnDate = await db.select().from(saints).where(eq25(saints.feastDay, feastDay)).orderBy(saints.rank);
+    const saintsOnDate = await db.select().from(saints).where(eq26(saints.feastDay, feastDay)).orderBy(saints.rank);
     res.json({
       success: true,
       data: {
@@ -15639,7 +16187,7 @@ router20.get("/month/:month", async (req, res) => {
 });
 router20.get("/brazilian", async (req, res) => {
   try {
-    const brazilianSaints = await db.select().from(saints).where(eq25(saints.isBrazilian, true)).orderBy(saints.feastDay);
+    const brazilianSaints = await db.select().from(saints).where(eq26(saints.isBrazilian, true)).orderBy(saints.feastDay);
     res.json({
       success: true,
       data: brazilianSaints
@@ -15655,7 +16203,7 @@ router20.get("/brazilian", async (req, res) => {
 router20.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [saint] = await db.select().from(saints).where(eq25(saints.id, id)).limit(1);
+    const [saint] = await db.select().from(saints).where(eq26(saints.id, id)).limit(1);
     if (!saint) {
       return res.status(404).json({
         success: false,
@@ -15749,7 +16297,7 @@ router20.get("/readings/:id", async (req, res) => {
       gospel: saints.gospel,
       prayerOfTheFaithful: saints.prayerOfTheFaithful,
       communionAntiphon: saints.communionAntiphon
-    }).from(saints).where(eq25(saints.id, id)).limit(1);
+    }).from(saints).where(eq26(saints.id, id)).limit(1);
     if (!saint) {
       return res.status(404).json({
         success: false,
@@ -15773,10 +16321,10 @@ router20.get("/", async (req, res) => {
     const { rank, brazilian } = req.query;
     let query = db.select().from(saints);
     if (rank) {
-      query = query.where(eq25(saints.rank, rank));
+      query = query.where(eq26(saints.rank, rank));
     }
     if (brazilian === "true") {
-      query = query.where(eq25(saints.isBrazilian, true));
+      query = query.where(eq26(saints.isBrazilian, true));
     }
     const allSaints = await query.orderBy(saints.feastDay);
     res.json({
@@ -15797,7 +16345,7 @@ var saints_default = router20;
 await init_db();
 init_schema();
 import { Router as Router21 } from "express";
-import { eq as eq26, and as and19, gte as gte12, lte as lte11, sql as sql16, or as or9, isNull, count as count6, desc as desc9 } from "drizzle-orm";
+import { eq as eq27, and as and19, gte as gte13, lte as lte12, sql as sql16, or as or9, isNull, count as count6, desc as desc9 } from "drizzle-orm";
 import { format as format9, addDays as addDays6, subDays, startOfMonth as startOfMonth5, endOfMonth as endOfMonth5 } from "date-fns";
 var router21 = Router21();
 router21.get("/urgent-alerts", async (req, res) => {
@@ -15813,17 +16361,23 @@ router21.get("/urgent-alerts", async (req, res) => {
       vacancies: sql16`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
     }).from(schedules).where(
       and19(
-        eq26(schedules.status, "published"),
-        gte12(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte11(schedules.date, format9(next7Days, "yyyy-MM-dd"))
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format9(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format9(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql16`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
-    const criticalMasses = incompleteMasses.filter((mass) => new Date(mass.date) <= next48Hours).map((m) => ({
+    const criticalMasses = incompleteMasses.filter((mass) => {
+      const massDate = /* @__PURE__ */ new Date(mass.date + "T12:00:00");
+      return massDate <= next48Hours;
+    }).map((m) => ({
       ...m,
-      hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1e3 * 60 * 60)),
+      hoursUntil: Math.round(((/* @__PURE__ */ new Date(m.date + "T12:00:00")).getTime() - now.getTime()) / (1e3 * 60 * 60)),
       massTime: m.time
     }));
-    const regularIncomplete = incompleteMasses.filter((mass) => new Date(mass.date) > next48Hours).map((m) => ({
+    const regularIncomplete = incompleteMasses.filter((mass) => {
+      const massDate = /* @__PURE__ */ new Date(mass.date + "T12:00:00");
+      return massDate > next48Hours;
+    }).map((m) => ({
       ...m,
       massTime: m.time
     }));
@@ -15836,21 +16390,27 @@ router21.get("/urgent-alerts", async (req, res) => {
       status: substitutionRequests.status,
       massDate: schedules.date,
       massTime: schedules.time
-    }).from(substitutionRequests).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).where(
+    }).from(substitutionRequests).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).where(
       and19(
-        eq26(schedules.status, "published"),
+        eq27(schedules.status, "published"),
         or9(
-          eq26(substitutionRequests.status, "pending"),
-          eq26(substitutionRequests.status, "available")
+          eq27(substitutionRequests.status, "pending"),
+          eq27(substitutionRequests.status, "available")
         ),
-        gte12(schedules.date, format9(now, "yyyy-MM-dd"))
+        gte13(schedules.date, format9(now, "yyyy-MM-dd"))
       )
     ).orderBy(schedules.date);
-    const urgentSubstitutions = pendingSubstitutions.filter((sub) => new Date(sub.massDate) <= next48Hours).map((s) => ({
+    const urgentSubstitutions = pendingSubstitutions.filter((sub) => {
+      const subDate = /* @__PURE__ */ new Date(sub.massDate + "T12:00:00");
+      return subDate <= next48Hours;
+    }).map((s) => ({
       ...s,
-      hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1e3 * 60 * 60))
+      hoursUntil: Math.round(((/* @__PURE__ */ new Date(s.massDate + "T12:00:00")).getTime() - now.getTime()) / (1e3 * 60 * 60))
     }));
-    const regularSubstitutions = pendingSubstitutions.filter((sub) => new Date(sub.massDate) > next48Hours);
+    const regularSubstitutions = pendingSubstitutions.filter((sub) => {
+      const subDate = /* @__PURE__ */ new Date(sub.massDate + "T12:00:00");
+      return subDate > next48Hours;
+    });
     res.json({
       success: true,
       data: {
@@ -15888,9 +16448,9 @@ router21.get("/next-week-masses", async (req, res) => {
         )`
     }).from(schedules).where(
       and19(
-        eq26(schedules.status, "published"),
-        gte12(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte11(schedules.date, format9(next7Days, "yyyy-MM-dd"))
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format9(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format9(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).orderBy(schedules.date, schedules.time);
     const massesWithStatus = masses.map((mass) => {
@@ -15928,10 +16488,10 @@ router21.get("/ministry-stats", async (req, res) => {
     const thisMonthEnd = endOfMonth5(now);
     const [activeMinistersResult] = await db.select({ count: count6() }).from(users).where(
       and19(
-        eq26(users.status, "active"),
+        eq27(users.status, "active"),
         or9(
-          eq26(users.role, "ministro"),
-          eq26(users.role, "coordenador")
+          eq27(users.role, "ministro"),
+          eq27(users.role, "coordenador")
         )
       )
     );
@@ -15942,13 +16502,13 @@ router21.get("/ministry-stats", async (req, res) => {
       daysSinceService: sql16`EXTRACT(DAY FROM NOW() - ${users.lastService})`
     }).from(users).where(
       and19(
-        eq26(users.status, "active"),
+        eq27(users.status, "active"),
         or9(
-          eq26(users.role, "ministro"),
-          eq26(users.role, "coordenador")
+          eq27(users.role, "ministro"),
+          eq27(users.role, "coordenador")
         ),
         or9(
-          lte11(users.lastService, thirtyDaysAgo),
+          lte12(users.lastService, thirtyDaysAgo),
           isNull(users.lastService)
         )
       )
@@ -15966,9 +16526,9 @@ router21.get("/ministry-stats", async (req, res) => {
         END)`
     }).from(schedules).where(
       and19(
-        eq26(schedules.status, "published"),
-        gte12(schedules.date, format9(thisMonthStart, "yyyy-MM-dd")),
-        lte11(schedules.date, format9(thisMonthEnd, "yyyy-MM-dd"))
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format9(thisMonthStart, "yyyy-MM-dd")),
+        lte12(schedules.date, format9(thisMonthEnd, "yyyy-MM-dd"))
       )
     );
     const [currentQuestionnaire] = await db.select({
@@ -15976,15 +16536,15 @@ router21.get("/ministry-stats", async (req, res) => {
       status: questionnaires.status
     }).from(questionnaires).where(
       and19(
-        eq26(questionnaires.month, now.getMonth() + 1),
-        eq26(questionnaires.year, now.getFullYear())
+        eq27(questionnaires.month, now.getMonth() + 1),
+        eq27(questionnaires.year, now.getFullYear())
       )
     ).limit(1);
     let responseRate = 0;
     if (currentQuestionnaire) {
       const [responseStats] = await db.select({
         totalResponses: count6(questionnaireResponses.id)
-      }).from(questionnaireResponses).where(eq26(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
+      }).from(questionnaireResponses).where(eq27(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
       responseRate = Math.round(
         responseStats.totalResponses / (activeMinistersResult.count || 1) * 100
       );
@@ -15992,8 +16552,8 @@ router21.get("/ministry-stats", async (req, res) => {
     const [pendingSubsCount] = await db.select({ count: count6() }).from(substitutionRequests).where(
       and19(
         or9(
-          eq26(substitutionRequests.status, "pending"),
-          eq26(substitutionRequests.status, "available")
+          eq27(substitutionRequests.status, "pending"),
+          eq27(substitutionRequests.status, "available")
         )
       )
     );
@@ -16001,8 +16561,8 @@ router21.get("/ministry-stats", async (req, res) => {
       count: sql16`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
     }).from(schedules).where(
       and19(
-        eq26(schedules.status, "published"),
-        gte12(schedules.date, format9(now, "yyyy-MM-dd")),
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format9(now, "yyyy-MM-dd")),
         isNull(schedules.ministerId)
       )
     );
@@ -16044,9 +16604,9 @@ router21.get("/incomplete", async (req, res) => {
         ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
     }).from(schedules).where(
       and19(
-        eq26(schedules.status, "published"),
-        gte12(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte11(schedules.date, format9(futureDate, "yyyy-MM-dd"))
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format9(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format9(futureDate, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql16`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
     res.json({
@@ -16153,8 +16713,8 @@ var pushSubscriptions_default = router22;
 await init_db();
 init_schema();
 import { Router as Router23 } from "express";
-import { eq as eq27, and as and20, gte as gte13, desc as desc10, asc as asc3 } from "drizzle-orm";
-import { sql as sql17 } from "drizzle-orm";
+import { eq as eq29, and as and21, gte as gte15, desc as desc11, asc as asc4 } from "drizzle-orm";
+import { sql as sql18 } from "drizzle-orm";
 var router23 = Router23();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
@@ -16176,12 +16736,26 @@ router23.get("/health", (req, res) => {
     status: "ok",
     service: "MESC WhatsApp API",
     version: "1.0.0",
-    endpoints: 9,
+    endpoints: 10,
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
+router23.post("/webhook", async (req, res) => {
+  console.log("\u{1F4E9} [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
+  try {
+    const message = req.body;
+    const { handleMessage: handleMessage2 } = await init_whatsappHandler().then(() => whatsappHandler_exports);
+    handleMessage2(message).catch((error) => {
+      console.error("[WHATSAPP_WEBHOOK] Erro ao processar mensagem:", error);
+    });
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("[WHATSAPP_WEBHOOK] Erro no webhook:", error);
+    res.sendStatus(200);
+  }
+});
 router23.use(authenticateAPIKey);
-function normalizePhone(phone) {
+function normalizePhone2(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
 }
 function getPositionName(position) {
@@ -16197,7 +16771,7 @@ function getPositionName(position) {
   };
   return positions[position] || `Posi\xE7\xE3o ${position}`;
 }
-function formatDateBR(dateStr) {
+function formatDateBR2(dateStr) {
   const date2 = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
   return date2.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -16205,7 +16779,7 @@ function formatDateBR(dateStr) {
     year: "numeric"
   });
 }
-function formatTime(timeStr) {
+function formatTime2(timeStr) {
   return timeStr.substring(0, 5);
 }
 function getDayOfWeek(dateStr) {
@@ -16223,11 +16797,11 @@ router23.post("/escala", async (req, res) => {
         erro: "Campos obrigat\xF3rios: telefone e data (formato YYYY-MM-DD)"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     console.log("\u{1F50D} [WHATSAPP_API /escala] Telefone normalizado:", normalizedPhone, "| Data:", data);
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16240,26 +16814,26 @@ router23.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and20(
-        eq27(schedules.ministerId, minister[0].id),
-        eq27(schedules.date, data)
+      and21(
+        eq29(schedules.ministerId, minister[0].id),
+        eq29(schedules.date, data)
       )
     ).limit(1);
-    console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
+    console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime2(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
     if (!schedule || schedule.length === 0) {
       console.log("\u26A0\uFE0F [WHATSAPP_API /escala] Nenhuma escala encontrada para esta data");
       return res.json({
         encontrado: false,
-        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR(data)}.`
+        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR2(data)}.`
       });
     }
     const s = schedule[0];
     const responseData = {
       encontrado: true,
       ministro: minister[0].name,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
-      horario: formatTime(s.time),
+      horario: formatTime2(s.time),
       funcao: getPositionName(s.position || 0),
       local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
       tipo: s.type === "missa" ? "Missa" : s.type,
@@ -16280,9 +16854,9 @@ router23.post("/proximas", async (req, res) => {
         erro: "Campo obrigat\xF3rio: telefone"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -16293,11 +16867,11 @@ router23.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and20(
-        eq27(schedules.ministerId, minister[0].id),
-        gte13(schedules.date, today)
+      and21(
+        eq29(schedules.ministerId, minister[0].id),
+        gte15(schedules.date, today)
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(3);
+    ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(3);
     if (!upcomingSchedules || upcomingSchedules.length === 0) {
       return res.json({
         encontrado: true,
@@ -16307,9 +16881,9 @@ router23.post("/proximas", async (req, res) => {
       });
     }
     const missas = upcomingSchedules.map((s) => ({
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
-      horario: formatTime(s.time),
+      horario: formatTime2(s.time),
       funcao: getPositionName(s.position || 0),
       local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
       tipo: s.type === "missa" ? "Missa" : s.type,
@@ -16341,18 +16915,19 @@ router23.post("/colegas", async (req, res) => {
       position: schedules.position,
       notes: schedules.notes,
       ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
-    }).from(schedules).innerJoin(users, eq27(schedules.ministerId, users.id)).where(
-      and20(
-        eq27(schedules.date, data),
-        eq27(schedules.time, normalizedTime)
+    }).from(schedules).innerJoin(users, eq29(schedules.ministerId, users.id)).where(
+      and21(
+        eq29(schedules.date, data),
+        eq29(schedules.time, normalizedTime)
       )
-    ).orderBy(asc3(schedules.position));
+    ).orderBy(asc4(schedules.position));
     if (!ministersInMass || ministersInMass.length === 0) {
       return res.json({
         encontrado: false,
-        mensagem: `Nenhum ministro escalado para ${formatDateBR(data)} \xE0s ${formatTime(normalizedTime)}.`
+        mensagem: `Nenhum ministro escalado para ${formatDateBR2(data)} \xE0s ${formatTime2(normalizedTime)}.`
       });
     }
     const colegas = ministersInMass.map((m) => ({
@@ -16363,9 +16938,9 @@ router23.post("/colegas", async (req, res) => {
     }));
     return res.json({
       encontrado: true,
-      data: formatDateBR(data),
+      data: formatDateBR2(data),
       diaSemana: getDayOfWeek(data),
-      horario: formatTime(normalizedTime),
+      horario: formatTime2(normalizedTime),
       totalMinistros: colegas.length,
       ministros: colegas
     });
@@ -16389,7 +16964,7 @@ router23.get("/substituicoes-abertas", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       createdAt: substitutionRequests.createdAt
-    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(eq27(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(limite);
+    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(eq29(substitutionRequests.status, "available")).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(limite);
     if (!openSubstitutions || openSubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -16400,9 +16975,9 @@ router23.get("/substituicoes-abertas", async (req, res) => {
     }
     const vagas = openSubstitutions.map((s) => ({
       id: s.substitutionId,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
-      horario: formatTime(s.time),
+      horario: formatTime2(s.time),
       funcao: getPositionName(s.position || 0),
       local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
       ministroOriginal: s.requesterName,
@@ -16429,9 +17004,9 @@ router23.post("/aceitar-substituicao", async (req, res) => {
         erro: "Campos obrigat\xF3rios: telefone e id_substituicao"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     const substitute = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!substitute || substitute.length === 0) {
@@ -16449,7 +17024,7 @@ router23.post("/aceitar-substituicao", async (req, res) => {
       time: schedules.time,
       position: schedules.position,
       requesterName: users.name
-    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(eq27(substitutionRequests.id, id_substituicao)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(eq29(substitutionRequests.id, id_substituicao)).limit(1);
     if (!substitution || substitution.length === 0) {
       return res.json({
         sucesso: false,
@@ -16473,13 +17048,13 @@ router23.post("/aceitar-substituicao", async (req, res) => {
       substituteId: substitute[0].id,
       status: "pending",
       responseMessage: mensagem || `Aceito via WhatsApp por ${substitute[0].name}`
-    }).where(eq27(substitutionRequests.id, id_substituicao));
+    }).where(eq29(substitutionRequests.id, id_substituicao));
     return res.json({
       sucesso: true,
       substituto: substitute[0].name,
-      data: formatDateBR(sub.date),
+      data: formatDateBR2(sub.date),
       diaSemana: getDayOfWeek(sub.date),
-      horario: formatTime(sub.time),
+      horario: formatTime2(sub.time),
       funcao: getPositionName(sub.position || 0),
       ministroOriginal: sub.requesterName,
       mensagem: `Substitui\xE7\xE3o aceita com sucesso! Aguarde a aprova\xE7\xE3o do coordenador.`,
@@ -16498,9 +17073,9 @@ router23.post("/minhas-substituicoes", async (req, res) => {
         erro: "Campo obrigat\xF3rio: telefone"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -16511,11 +17086,11 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     }
     let whereCondition;
     if (tipo === "solicitadas") {
-      whereCondition = eq27(substitutionRequests.requesterId, minister[0].id);
+      whereCondition = eq29(substitutionRequests.requesterId, minister[0].id);
     } else if (tipo === "aceitas") {
-      whereCondition = eq27(substitutionRequests.substituteId, minister[0].id);
+      whereCondition = eq29(substitutionRequests.substituteId, minister[0].id);
     } else {
-      whereCondition = sql17`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
+      whereCondition = sql18`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
     }
     const mySubstitutions = await db.select({
       substitutionId: substitutionRequests.id,
@@ -16528,7 +17103,7 @@ router23.post("/minhas-substituicoes", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       responseMessage: substitutionRequests.responseMessage
-    }).from(substitutionRequests).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc10(schedules.date), desc10(schedules.time)).limit(10);
+    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc11(schedules.date), desc11(schedules.time)).limit(10);
     if (!mySubstitutions || mySubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -16539,9 +17114,9 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     }
     const substituicoes = mySubstitutions.map((s) => ({
       id: s.substitutionId,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
-      horario: formatTime(s.time),
+      horario: formatTime2(s.time),
       funcao: getPositionName(s.position || 0),
       local: s.location || "Santu\xE1rio S\xE3o Judas Tadeu",
       ministroOriginal: s.requesterName,
@@ -16571,11 +17146,11 @@ router23.post("/proxima-escala", async (req, res) => {
         erro: "Campo obrigat\xF3rio: telefone"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     console.log("\u{1F50D} [WHATSAPP_API /proxima-escala] Telefone normalizado:", normalizedPhone);
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16591,12 +17166,12 @@ router23.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and20(
-        eq27(schedules.ministerId, minister[0].id),
-        gte13(schedules.date, today)
+      and21(
+        eq29(schedules.ministerId, minister[0].id),
+        gte15(schedules.date, today)
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
-    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
+    ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR2(nextSchedule[0].date)} \xE0s ${formatTime2(nextSchedule[0].time)}` : "N\xE3o encontrada");
     if (!nextSchedule || nextSchedule.length === 0) {
       console.log("\u26A0\uFE0F [WHATSAPP_API /proxima-escala] Nenhuma escala futura encontrada");
       return res.json({
@@ -16613,9 +17188,9 @@ router23.post("/proxima-escala", async (req, res) => {
       ministro: minister[0].name,
       escala: {
         date: s.date,
-        data: formatDateBR(s.date),
+        data: formatDateBR2(s.date),
         diaSemana: getDayOfWeek(s.date),
-        horario: formatTime(s.time),
+        horario: formatTime2(s.time),
         posicao: s.position || 0,
         funcao: getPositionName(s.position || 0),
         celebracao: s.type === "missa" ? "Missa" : s.type,
@@ -16646,11 +17221,11 @@ router23.post("/escala-mes", async (req, res) => {
         erro: "M\xEAs deve estar entre 1 e 12"
       });
     }
-    const normalizedPhone = normalizePhone(telefone);
+    const normalizedPhone = normalizePhone2(telefone);
     console.log("\u{1F50D} [WHATSAPP_API /escala-mes] Telefone normalizado:", normalizedPhone, "| M\xEAs:", mes, "| Ano:", ano);
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql18`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16665,18 +17240,18 @@ router23.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and20(
-        eq27(schedules.ministerId, minister[0].id),
-        sql17`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
-        sql17`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
+      and21(
+        eq29(schedules.ministerId, minister[0].id),
+        sql18`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
+        sql18`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time));
+    ).orderBy(asc4(schedules.date), asc4(schedules.time));
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
     const escalas = monthSchedules.map((s) => ({
       date: s.date,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
-      horario: formatTime(s.time),
+      horario: formatTime2(s.time),
       posicao: s.position || 0,
       funcao: getPositionName(s.position || 0),
       celebracao: s.type === "missa" ? "Missa" : s.type,
@@ -16716,17 +17291,242 @@ router23.post("/escala-mes", async (req, res) => {
 });
 var whatsapp_api_default = router23;
 
+// server/escala-alternativa/routes/escalaRoutes.ts
+import { Router as Router24 } from "express";
+
+// server/escala-alternativa/services/pythonScheduleService.ts
+init_logger();
+import { spawn } from "child_process";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = dirname(__filename);
+var PythonScheduleService = class {
+  scriptPath;
+  constructor() {
+    this.scriptPath = join(__dirname, "../scripts/gerar_escala.py");
+  }
+  /**
+   * Executa o script Python de geração de escalas
+   */
+  async generateSchedule(input) {
+    return new Promise((resolve, reject) => {
+      try {
+        const pythonProcess = spawn("python3", [this.scriptPath]);
+        let stdout = "";
+        let stderr = "";
+        pythonProcess.stdout.on("data", (data) => {
+          stdout += data.toString();
+        });
+        pythonProcess.stderr.on("data", (data) => {
+          stderr += data.toString();
+        });
+        pythonProcess.on("close", (code) => {
+          if (code !== 0) {
+            logger.error(`Python script exited with code ${code}`);
+            logger.error(`stderr: ${stderr}`);
+            reject(new Error(`Python script failed: ${stderr}`));
+            return;
+          }
+          try {
+            const result = JSON.parse(stdout);
+            if (result.error) {
+              logger.error(`Python script returned error: ${result.message}`);
+              resolve(result);
+              return;
+            }
+            resolve(result);
+          } catch (parseError) {
+            logger.error(`Failed to parse Python output: ${parseError.message}`);
+            logger.error(`stdout: ${stdout}`);
+            reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+          }
+        });
+        pythonProcess.on("error", (error) => {
+          logger.error(`Failed to start Python process: ${error.message}`);
+          reject(new Error(`Failed to start Python process: ${error.message}`));
+        });
+        const inputJson = JSON.stringify(input);
+        pythonProcess.stdin.write(inputJson);
+        pythonProcess.stdin.end();
+      } catch (error) {
+        logger.error(`Error in generateSchedule: ${error.message}`);
+        reject(error);
+      }
+    });
+  }
+  /**
+   * Valida se o Python está disponível no sistema
+   */
+  async validatePythonAvailable() {
+    return new Promise((resolve) => {
+      const pythonCheck = spawn("python3", ["--version"]);
+      pythonCheck.on("close", (code) => {
+        resolve(code === 0);
+      });
+      pythonCheck.on("error", () => {
+        resolve(false);
+      });
+    });
+  }
+};
+var pythonScheduleService = new PythonScheduleService();
+
+// server/escala-alternativa/controllers/escalaController.ts
+await init_db();
+init_schema();
+init_logger();
+import { eq as eq30, and as and22 } from "drizzle-orm";
+async function gerarEscalaAlternativa(req, res) {
+  try {
+    const { year, month, questionnaireId } = req.body;
+    logger.info(`Gerando escala alternativa para ${month}/${year} usando Python`);
+    let targetQuestionnaire;
+    if (questionnaireId) {
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq30(questionnaires.id, questionnaireId)).limit(1);
+    } else if (year && month) {
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(
+        and22(
+          eq30(questionnaires.year, year),
+          eq30(questionnaires.month, month)
+        )
+      ).limit(1);
+    }
+    if (!targetQuestionnaire) {
+      return res.status(404).json({
+        success: false,
+        message: "Question\xE1rio n\xE3o encontrado para o per\xEDodo especificado"
+      });
+    }
+    const ministersData = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      preferredPositions: users.preferredTimes,
+      avoidPositions: users.canServeAsCouple
+    }).from(users).where(eq30(users.status, "active"));
+    const responses = await db.select().from(questionnaireResponses).where(eq30(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+    logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
+    const formattedUsers = ministersData.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      preferred_positions: m.preferredPositions || [],
+      avoid_positions: []
+    }));
+    const formattedResponses = responses.map((r) => ({
+      user_id: r.userId,
+      questionnaire_id: r.questionnaireId,
+      available_sundays: r.availableSundays || [],
+      preferred_times: r.preferredMassTimes || [],
+      daily_mass_availability: r.dailyMassAvailability || [],
+      weekdays: r.responses?.weekdays || {},
+      responses: r.responses || {}
+    }));
+    const result = await pythonScheduleService.generateSchedule({
+      users: formattedUsers,
+      responses: formattedResponses
+    });
+    if ("error" in result && result.error) {
+      logger.error(`Erro no algoritmo Python: ${result.message}`);
+      return res.status(500).json({
+        success: false,
+        message: `Erro ao gerar escala: ${result.message}`,
+        error: result
+      });
+    }
+    const scheduleData = result;
+    logger.info(`Escala alternativa gerada com sucesso: ${scheduleData.length} atribui\xE7\xF5es`);
+    return res.json({
+      success: true,
+      algorithm: "python-alternative",
+      questionnaire: {
+        id: targetQuestionnaire.id,
+        title: targetQuestionnaire.title,
+        month,
+        year
+      },
+      data: scheduleData,
+      stats: {
+        total_assignments: scheduleData.length,
+        total_ministers: new Set(scheduleData.map((r) => r.ministro_id)).size,
+        preferred_assignments: scheduleData.filter((r) => r.preferido).length
+      }
+    });
+  } catch (error) {
+    logger.error(`Erro ao gerar escala alternativa: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao gerar escala alternativa",
+      error: error.message
+    });
+  }
+}
+async function compararAlgoritmos(req, res) {
+  try {
+    const { year, month } = req.body;
+    logger.info(`Comparando algoritmos para ${month}/${year}`);
+    return res.json({
+      success: true,
+      message: "Funcionalidade de compara\xE7\xE3o em desenvolvimento",
+      algorithms: ["current", "python-alternative"]
+    });
+  } catch (error) {
+    logger.error(`Erro ao comparar algoritmos: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: "Erro ao comparar algoritmos",
+      error: error.message
+    });
+  }
+}
+async function verificarPython(req, res) {
+  try {
+    const available = await pythonScheduleService.validatePythonAvailable();
+    return res.json({
+      success: true,
+      pythonAvailable: available,
+      message: available ? "Python3 est\xE1 dispon\xEDvel no sistema" : "Python3 n\xE3o foi encontrado no sistema"
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Erro ao verificar Python",
+      error: error.message
+    });
+  }
+}
+
+// server/escala-alternativa/routes/escalaRoutes.ts
+var router24 = Router24();
+router24.get("/check-python", authenticateToken, verificarPython);
+router24.post(
+  "/gerar",
+  authenticateToken,
+  requireRole(["coordenador", "gestor"]),
+  gerarEscalaAlternativa
+);
+router24.post(
+  "/comparar",
+  authenticateToken,
+  requireRole(["gestor"]),
+  compararAlgoritmos
+);
+var escalaRoutes_default = router24;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z7 } from "zod";
-import { eq as eq28, count as count7, or as or10 } from "drizzle-orm";
+import { eq as eq31, count as count7, or as or10 } from "drizzle-orm";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql18 } from "drizzle-orm";
+import { sql as sql19 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -16801,7 +17601,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql18`
+    db.execute(sql19`
       SELECT
         id,
         title,
@@ -16817,7 +17617,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql18`
+    db.execute(sql19`
       SELECT
         id,
         track_id AS "trackId",
@@ -16832,7 +17632,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql18`
+    db.execute(sql19`
       SELECT
         id,
         module_id AS "moduleId",
@@ -16849,7 +17649,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql18`
+    userId ? db.execute(sql19`
           SELECT
             id,
             user_id AS "userId",
@@ -16951,7 +17751,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql18`
+  const lessonResult = await db.execute(sql19`
     SELECT
       id,
       module_id AS "moduleId",
@@ -16973,7 +17773,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql18`
+  const sectionsResult = await db.execute(sql19`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -17012,7 +17812,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql18`
+    const progressResult = await db.execute(sql19`
       SELECT
         id,
         user_id AS "userId",
@@ -17048,7 +17848,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql18`
+  const result = await db.execute(sql19`
     SELECT
       id,
       user_id AS "userId",
@@ -17065,7 +17865,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql18`
+  const result = await db.execute(sql19`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -17086,7 +17886,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql18`
+    await db.execute(sql19`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -17098,7 +17898,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql18`
+    await db.execute(sql19`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -17163,7 +17963,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql18`
+        ...totalSections > 0 ? (await db.execute(sql19`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -17172,7 +17972,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql18`
+    await db.execute(sql19`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -17184,7 +17984,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql18`
+    await db.execute(sql19`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -17253,7 +18053,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql18`
+    await db.execute(sql19`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -17265,7 +18065,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql18`
+    await db.execute(sql19`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -17320,7 +18120,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql18`
+  const query = trackId ? sql19`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -17338,7 +18138,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql18`
+      ` : sql19`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -17437,6 +18237,7 @@ async function registerRoutes(app2) {
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
   app2.use("/api/password-reset", passwordResetRateLimiter, router3);
   app2.use("/api/whatsapp", whatsapp_api_default);
+  app2.use("/api/escala-alternativa", csrfProtection, escalaRoutes_default);
   app2.use("/api/questionnaires", csrfProtection, questionnaires_default);
   app2.use("/api/questionnaires/admin", csrfProtection, questionnaireAdmin_default);
   app2.use("/api/schedules", csrfProtection, schedules_default);
@@ -17653,7 +18454,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq28(users.id, userId));
+      }).from(users).where(eq31(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -17852,25 +18653,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq31(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
         const [substitutionCheck] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-          eq28(substitutionRequests.requesterId, userId),
-          eq28(substitutionRequests.substituteId, userId)
+          eq31(substitutionRequests.requesterId, userId),
+          eq31(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -17907,12 +18708,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq31(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-            eq28(substitutionRequests.requesterId, userId),
-            eq28(substitutionRequests.substituteId, userId)
+            eq31(substitutionRequests.requesterId, userId),
+            eq31(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17941,12 +18742,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq31(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq31(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or10(
-            eq28(substitutionRequests.requesterId, userId),
-            eq28(substitutionRequests.substituteId, userId)
+            eq31(substitutionRequests.requesterId, userId),
+            eq31(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -18392,7 +19193,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull2, and: and21 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull2, and: and23 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -18400,8 +19201,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and21(
-          eq28(substitutionRequests.status, "pending"),
+        and23(
+          eq31(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -18413,8 +19214,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and21(
-          eq28(substitutionRequests.status, "pending"),
+        and23(
+          eq31(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );

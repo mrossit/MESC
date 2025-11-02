@@ -1,36 +1,50 @@
-# ✅ Solução Implementada: Liturgia Diária do Padre Paulo Ricardo
+# ✅ Solução Implementada: Liturgia Diária da CNBB
 
 ## 🎯 Mudança Realizada
 
 **Antes:** Card "Santo do Dia" com scraping do Canção Nova (com erros)
-**Agora:** Card "Liturgia do Dia" com scraping do Padre Paulo Ricardo (mais simples e robusto)
+**Depois:** Card "Liturgia do Dia" com scraping do Padre Paulo Ricardo
+**Agora:** Card "Liturgia do Dia" com API oficial da CNBB (expansível e sem redirecionamento)
 
 ## 📋 O Que Foi Implementado
 
-### 1. **Novo Endpoint de Liturgia**
+### 1. **Endpoint de Liturgia com API Oficial da CNBB**
 
 **Localização:** `server/routes/saints.ts` - `GET /api/saints/today`
 
 **Funcionamento:**
-1. Faz fetch de `https://padrepauloricardo.org/liturgia`
-2. Extrai do HTML:
+1. Faz fetch da API oficial da CNBB: `https://liturgia.cnbb.org.br/api/liturgia-diaria`
+2. Extrai os dados estruturados da API:
    - Título da liturgia (ex: "Sábado da 29ª Semana do Tempo Comum")
    - Cor litúrgica (verde, branco, vermelho, roxo, rosa)
-   - Primeira Leitura (referência bíblica)
-   - Salmo Responsorial (referência)
-   - Evangelho (referência)
-3. Formata a resposta no mesmo formato do santo do dia
+   - Primeira Leitura (referência e texto completo)
+   - Salmo Responsorial (referência, refrão e texto)
+   - Segunda Leitura (quando disponível)
+   - Evangelho (referência e texto completo)
+3. Formata a resposta no mesmo formato existente
 4. **Fallback genérico:** Se falhar, retorna liturgia genérica (nunca erro 500)
 
-### 2. **Componente Atualizado**
+**Vantagens da API oficial:**
+- ✅ Dados estruturados e confiáveis
+- ✅ Textos completos das leituras
+- ✅ Sem necessidade de scraping
+- ✅ Fonte oficial da Igreja no Brasil
+
+### 2. **Componente Completamente Redesenhado**
 
 **Localização:** `client/src/components/SaintOfTheDay.tsx`
 
-**Mudanças:**
-- Título: "Santo do Dia" → "Liturgia do Dia"
-- Ícone: `Sparkles` → `BookOpen`
-- Cores: Laranja → Azul
-- Mensagens de erro adaptadas
+**Mudanças principais:**
+- ✅ **Card expansível** usando `Collapsible` ao invés de navegação/Dialog
+- ✅ **Sem redirecionamento externo** - tudo no próprio card
+- ✅ **Textos completos** das leituras exibidos diretamente
+- ✅ **Cores diferenciadas** para cada leitura:
+  - 🔵 Primeira Leitura (azul)
+  - 🟣 Salmo Responsorial (roxo) com refrão destacado
+  - 🟢 Segunda Leitura (verde)
+  - 🟡 Evangelho (amarelo)
+- ✅ **Link para fonte oficial** da CNBB ao final
+- ✅ **Expansão suave** com ícones de seta (ChevronUp/Down)
 
 ### 3. **Exemplo de Resposta**
 
@@ -78,11 +92,13 @@
 
 ## ✅ Vantagens da Nova Implementação
 
-1. ✅ **Mais útil:** Liturgia é mais relevante para ministros do que santo
-2. ✅ **Mais simples:** Código 60% menor e mais fácil de manter
-3. ✅ **Mais robusto:** Fallback genérico garante que nunca dá erro 500
-4. ✅ **Melhor fonte:** Padre Paulo Ricardo é referência em liturgia
-5. ✅ **Sem erros:** Funciona mesmo se o scraping falhar
+1. ✅ **API oficial:** Dados direto da CNBB, fonte oficial da Igreja no Brasil
+2. ✅ **Textos completos:** Leituras completas sem precisar sair do app
+3. ✅ **Sem redirecionamento:** Tudo disponível no card expansível
+4. ✅ **Experiência melhor:** Interface organizada com cores por leitura
+5. ✅ **Mais robusto:** Sem scraping, sem quebra se o site mudar
+6. ✅ **Responsivo:** Funciona perfeitamente em mobile e desktop
+7. ✅ **Acessível:** Estrutura semântica e hierarquia visual clara
 
 ## 🚀 Como Testar
 

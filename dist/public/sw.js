@@ -1,7 +1,7 @@
 // AUTO-INJECTED: These values are automatically updated during build by scripts/inject-version.js
 const VERSION = '5.4.2'; // Injected from package.json
-const BUILD_TIME = '2025-10-27T10:18:08.116Z'; // Injected at build time
-const BUILD_TIMESTAMP = 1761560288117; // Injected at build time (used for cache busting)
+const BUILD_TIME = '2025-11-02T23:18:21.834Z'; // Injected at build time
+const BUILD_TIMESTAMP = 1762125501835; // Injected at build time (used for cache busting)
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
@@ -68,11 +68,19 @@ self.addEventListener('fetch', (event) => {
 
   // Network-first for other API calls (cache only as fallback)
   if (url.pathname.startsWith('/api')) {
+    const method = (request.method || 'GET').toUpperCase();
+
+    // Bypass the cache layer entirely for non-GET requests to prevent Cache API errors
+    if (method !== 'GET') {
+      event.respondWith(fetch(request));
+      return;
+    }
+
     event.respondWith(
       fetch(request)
         .then((response) => {
           // Cache GET requests only as offline fallback
-          if (request.method === 'GET' && response.status === 200) {
+          if (response.status === 200) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
