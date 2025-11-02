@@ -37,12 +37,43 @@ router.get("/health", (req, res) => {
     status: "ok", 
     service: "MESC WhatsApp API",
     version: "1.0.0",
-    endpoints: 9,
+    endpoints: 10,
     timestamp: new Date().toISOString()
   });
 });
 
-// Aplica autenticação em todas as rotas APÓS o health check
+/**
+ * POST /api/whatsapp/webhook
+ * Webhook para receber mensagens do WhatsApp (Z-API / Make)
+ * Não requer API key (webhooks vêm de serviços externos)
+ * 
+ * Body: Mensagem recebida do Z-API ou Make
+ */
+router.post("/webhook", async (req, res) => {
+  console.log("📩 [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
+  
+  try {
+    const message = req.body;
+    
+    // Importar handler dinamicamente
+    const { handleMessage } = await import("../services/whatsappHandler.js");
+    
+    // Processar mensagem de forma assíncrona (não bloqueia a resposta)
+    handleMessage(message).catch((error) => {
+      console.error("[WHATSAPP_WEBHOOK] Erro ao processar mensagem:", error);
+    });
+    
+    // Responder imediatamente ao webhook (200 OK)
+    res.sendStatus(200);
+    
+  } catch (error: any) {
+    console.error("[WHATSAPP_WEBHOOK] Erro no webhook:", error);
+    // Mesmo com erro, retornar 200 para não gerar retry no webhook
+    res.sendStatus(200);
+  }
+});
+
+// Aplica autenticação em todas as rotas APÓS o health check e webhook
 router.use(authenticateAPIKey);
 
 // Função auxiliar para formatar número de telefone (remove espaços, traços, parênteses)
