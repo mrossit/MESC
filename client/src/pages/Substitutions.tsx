@@ -253,7 +253,7 @@ export default function Substitutions() {
           assignmentDate,
         };
       })
-      .sort((a, b) => {
+      .sort((a: { item: SubstitutionRequest; assignmentDate: Date | null }, b: { item: SubstitutionRequest; assignmentDate: Date | null }) => {
         const aDate = a.assignmentDate ?? new Date();
         const bDate = b.assignmentDate ?? new Date();
 
@@ -275,7 +275,7 @@ export default function Substitutions() {
 
     const groups = new Map<string, SubstitutionGroup>();
 
-    processed.forEach((entry) => {
+    processed.forEach((entry: { item: SubstitutionRequest; assignmentDate: Date | null }) => {
       const { item, assignmentDate } = entry;
       const hasValidDate = assignmentDate && !isNaN(assignmentDate.getTime());
       const dateKey = hasValidDate ? format(assignmentDate!, "yyyy-MM-dd") : "sem-data";
@@ -1279,7 +1279,10 @@ export default function Substitutions() {
                   })}
                 </div>
               </div>
-            )}
+            );
+          })}
+        </div>
+      )}
             </CardContent>
           </Card>
         </TabsContent>
