@@ -1279,8 +1279,11 @@ export default function Substitutions() {
                   })}
                 </div>
               </div>
-            )}
-            </CardContent>
+            );
+          })}
+        </div>
+      )}
+    </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
