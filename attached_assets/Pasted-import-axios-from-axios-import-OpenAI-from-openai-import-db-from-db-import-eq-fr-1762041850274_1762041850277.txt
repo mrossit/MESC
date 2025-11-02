@@ -1,0 +1,66 @@
+import axios from "axios";
+import OpenAI from "openai";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
+import { escalas } from "../db/schema";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ZAPI_BASE = `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE}`;
+const ZAPI_HEADERS = { Authorization: process.env.ZAPI_TOKEN };
+
+export async function handleMessage(message: any) {
+  try {
+    const phone = message.from?.replace(/\D/g, "");
+    const text = message.body?.trim().toLowerCase();
+
+    console.log(`Mensagem recebida de ${phone}: ${text}`);
+
+    // 1️⃣ Consulta o banco Neon
+    const ministro = await db.query.ministros.findFirst({
+      where: (m, { eq }) => eq(m.telefone, phone),
+    });
+
+    const proximaEscala = await db.query.escalas.findFirst({
+      where: (e, { eq }) => eq(e.ministro_id, ministro?.id),
+      orderBy: (e, { asc }) => asc(e.data),
+    });
+
+    // 2️⃣ Decide a intenção
+    let resposta: string;
+
+    if (text.startsWith("/escala") || text.startsWith("/proxima")) {
+      if (proximaEscala) {
+        resposta = `Olá ${ministro?.nome}! Sua próxima escala é dia ${proximaEscala.data.toLocaleDateString()} às ${proximaEscala.horario}, na missa ${proximaEscala.missa}.`;
+      } else {
+        resposta = `Olá ${ministro?.nome ?? ""}, não encontrei uma escala futura registrada para você.`;
+      }
+    } else if (text.startsWith("/substituicoes")) {
+      resposta = "As substituições abertas serão listadas em breve 🔄.";
+    } else {
+      // 3️⃣ Usa IA para interpretar mensagens livres
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é o assistente do MESC do Santuário São Judas Tadeu de Sorocaba. Responda de forma acolhedora e objetiva.",
+          },
+          { role: "user", content: text },
+        ],
+      });
+      resposta = completion.choices[0].message?.content ?? "Desculpe, não entendi.";
+    }
+
+    // 4️⃣ Envia resposta pelo WhatsApp via Z-API
+    await axios.post(
+      `${ZAPI_BASE}/send-text`,
+      { phone, message: resposta },
+      { headers: ZAPI_HEADERS }
+    );
+
+    console.log(`✅ Resposta enviada para ${phone}: ${resposta}`);
+  } catch (err) {
+    console.error("Erro ao processar mensagem:", err);
+  }
+}
