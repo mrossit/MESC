@@ -1,6 +1,6 @@
 /**
  * Daily Liturgy Component
- * Displays the daily liturgy from Padre Paulo Ricardo website
+ * Displays the daily liturgy from CNBB official API
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -8,16 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, BookOpen, Heart, Calendar } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { BookOpen, Heart, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface Saint {
   id: string;
@@ -64,7 +61,7 @@ const colorStyles: Record<Saint['liturgicalColor'], string> = {
 };
 
 export function SaintOfTheDay() {
-  const [, setLocation] = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery<SaintsOfDayResponse>({
     queryKey: ['/api/saints/today'],
@@ -120,33 +117,46 @@ export function SaintOfTheDay() {
   const primarySaint = saints[0];
 
   return (
-    <Card
-      className="overflow-hidden cursor-pointer hover:bg-accent/50 transition-colors border border-neutral-border/30 dark:border-border"
-      onClick={() => setLocation('/liturgia')}
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="w-full"
     >
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-          <BookOpen className="h-5 w-5 text-blue-500" />
-          Liturgia do Dia
-        </CardTitle>
-        <CardDescription>
-          {new Date().toLocaleDateString('pt-BR', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-4">
-        <ScrollArea className="h-auto max-h-64">
-          <div className="space-y-4">
-            {saints.map((saint) => (
-              <Dialog key={saint.id}>
-                <DialogTrigger asChild>
-                  <div className="cursor-pointer hover:bg-accent p-3 rounded-lg transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg leading-tight">
+      <Card className="overflow-hidden border border-neutral-border/30 dark:border-border">
+        <CollapsibleTrigger className="w-full text-left">
+          <CardHeader className="pb-3 hover:bg-accent/30 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <BookOpen className="h-5 w-5 text-blue-500" />
+                  Liturgia do Dia
+                </CardTitle>
+                <CardDescription>
+                  {new Date().toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                </CardDescription>
+              </div>
+              {isOpen ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-4">
+            <ScrollArea className="h-auto max-h-[600px]">
+              <div className="space-y-6">
+                {saints.map((saint) => (
+                  <div key={saint.id} className="space-y-4">
+                    <div className="border-b pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-xl leading-tight">
                           {saint.name}
                           {saint.isBrazilian && (
                             <Badge variant="outline" className="ml-2 text-xs">
@@ -154,91 +164,85 @@ export function SaintOfTheDay() {
                             </Badge>
                           )}
                         </h3>
-                        {saint.title && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {saint.title}
+                        <Badge variant="secondary" className="shrink-0">
+                          {rankLabels[saint.rank]}
+                        </Badge>
+                      </div>
+                      {saint.title && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {saint.title}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Leituras principais */}
+                    {saint.firstReading && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-1 text-blue-900 dark:text-blue-100">
+                          <BookOpen className="h-4 w-4" />
+                          Primeira Leitura
+                        </h4>
+                        <p className="text-sm font-medium">{saint.firstReading.reference}</p>
+                        {saint.firstReading.text && (
+                          <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                            {saint.firstReading.text}
                           </p>
                         )}
-                        {saint.patronOf && (
-                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                            <Heart className="h-3 w-3" />
-                            <span>Padroeiro(a) de: {saint.patronOf}</span>
-                          </div>
+                      </div>
+                    )}
+
+                    {saint.responsorialPsalm && (
+                      <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-1 text-purple-900 dark:text-purple-100">
+                          📿 Salmo Responsorial
+                        </h4>
+                        <p className="text-sm font-medium">{saint.responsorialPsalm.reference}</p>
+                        {saint.responsorialPsalm.response && (
+                          <blockquote className="text-sm italic bg-purple-100 dark:bg-purple-900/30 p-3 rounded border-l-4 border-purple-400 mt-2">
+                            <strong>Refrão:</strong> "{saint.responsorialPsalm.response}"
+                          </blockquote>
+                        )}
+                        {saint.responsorialPsalm.text && (
+                          <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                            {saint.responsorialPsalm.text}
+                          </p>
                         )}
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {rankLabels[saint.rank]}
-                      </Badge>
-                    </div>
-
-                    {saint.biography && (
-                      <p className="text-sm mt-3 line-clamp-2 text-muted-foreground">
-                        {saint.biography}
-                      </p>
                     )}
 
-                    {saint.quotes && saint.quotes.length > 0 && (
-                      <blockquote className="mt-3 pl-3 border-l-2 border-primary text-sm italic text-muted-foreground">
-                        "{saint.quotes[0]}"
-                      </blockquote>
-                    )}
-                  </div>
-                </DialogTrigger>
-
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl flex items-center gap-2">
-                      {saint.name}
-                      {saint.isBrazilian && (
-                        <Badge variant="outline" className="text-xs">
-                          🇧🇷 Santo Brasileiro
-                        </Badge>
-                      )}
-                    </DialogTitle>
-                    <DialogDescription className="flex items-center gap-4 mt-2">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(`2024-${saint.feastDay}`).toLocaleDateString('pt-BR', {
-                          day: 'numeric',
-                          month: 'long',
-                        })}
-                      </span>
-                      <Badge variant="secondary">{rankLabels[saint.rank]}</Badge>
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="space-y-6 mt-4">
-                    {saint.title && (
-                      <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-1">
-                          Título
+                    {saint.secondReading && (
+                      <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-1 text-green-900 dark:text-green-100">
+                          <BookOpen className="h-4 w-4" />
+                          Segunda Leitura
                         </h4>
-                        <p>{saint.title}</p>
+                        <p className="text-sm font-medium">{saint.secondReading.reference}</p>
+                        {saint.secondReading.text && (
+                          <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                            {saint.secondReading.text}
+                          </p>
+                        )}
                       </div>
                     )}
 
-                    {saint.patronOf && (
-                      <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-1 flex items-center gap-1">
-                          <Heart className="h-4 w-4" />
-                          Padroeiro(a) de
+                    {saint.gospel && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-1 text-amber-900 dark:text-amber-100">
+                          ✝️ Evangelho
                         </h4>
-                        <p>{saint.patronOf}</p>
+                        <p className="text-sm font-medium">{saint.gospel.reference}</p>
+                        {saint.gospel.text && (
+                          <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                            {saint.gospel.text}
+                          </p>
+                        )}
                       </div>
                     )}
-
-                    <div>
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                        Biografia
-                      </h4>
-                      <p className="text-sm leading-relaxed">{saint.biography}</p>
-                    </div>
 
                     {saint.collectPrayer && (
                       <div className="bg-muted p-4 rounded-lg">
-                        <h4 className="font-semibold text-sm mb-2 flex items-center gap-1">
-                          <BookOpen className="h-4 w-4" />
-                          Oração Coleta
+                        <h4 className="font-semibold text-sm mb-2">
+                          🙏 Oração
                         </h4>
                         <p className="text-sm italic leading-relaxed">
                           {saint.collectPrayer}
@@ -246,79 +250,24 @@ export function SaintOfTheDay() {
                       </div>
                     )}
 
-                    {saint.quotes && saint.quotes.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                          Citações
-                        </h4>
-                        <div className="space-y-2">
-                          {saint.quotes.map((quote, idx) => (
-                            <blockquote
-                              key={idx}
-                              className="pl-4 border-l-2 border-primary text-sm italic"
-                            >
-                              "{quote}"
-                            </blockquote>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {saint.attributes && saint.attributes.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                          Atributos e Símbolos
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {saint.attributes.map((attr, idx) => (
-                            <Badge key={idx} variant="outline">
-                              {attr}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(saint.firstReading || saint.gospel) && (
-                      <div className="bg-primary/5 p-4 rounded-lg">
-                        <h4 className="font-semibold mb-3 flex items-center gap-1">
-                          <BookOpen className="h-4 w-4" />
-                          Leituras Litúrgicas
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                          {saint.firstReading && (
-                            <p>
-                              <span className="font-medium">1ª Leitura:</span>{' '}
-                              {saint.firstReading.reference}
-                            </p>
-                          )}
-                          {saint.responsorialPsalm && (
-                            <p>
-                              <span className="font-medium">Salmo:</span>{' '}
-                              {saint.responsorialPsalm.reference}
-                              {saint.responsorialPsalm.response && (
-                                <span className="italic block ml-4">
-                                  "{saint.responsorialPsalm.response}"
-                                </span>
-                              )}
-                            </p>
-                          )}
-                          {saint.gospel && (
-                            <p>
-                              <span className="font-medium">Evangelho:</span>{' '}
-                              {saint.gospel.reference}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    {/* Fonte */}
+                    <div className="text-center pt-2">
+                      <a
+                        href="https://liturgia.cnbb.org.br/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Fonte: CNBB - Conferência Nacional dos Bispos do Brasil
+                      </a>
+                    </div>
                   </div>
-                </DialogContent>
-              </Dialog>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
