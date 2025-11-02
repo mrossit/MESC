@@ -4,11 +4,11 @@
  */
 
 import express from "express";
-import { handleMessage } from "../services/whatsappHandler";
+import { handleMessage } from "../services/whatsappHandler.js"; // 👈 use .js se estiver rodando via Node/tsx
 
 const router = express.Router();
 
-// 🔹 Health Check — útil para testar se o webhook está ativo
+// 🔹 Health check
 router.get("/webhook", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -21,20 +21,18 @@ router.get("/webhook", (req, res) => {
   });
 });
 
-// 🔹 Endpoint principal do webhook — recebe mensagens do Z-API
+// 🔹 Webhook principal - RECEBE mensagens do WhatsApp via Z-API
 router.post("/webhook", async (req, res) => {
   try {
-    const message = req.body;
+    console.log("📨 Webhook recebido da Z-API:", JSON.stringify(req.body, null, 2));
 
-    console.log("📨 Webhook recebido da Z-API:", JSON.stringify(message, null, 2));
-
-    // Executa o processamento de forma assíncrona para não atrasar o webhook
-    handleMessage(message)
+    // Executa processamento da mensagem de forma assíncrona
+    handleMessage(req.body)
       .then(() => console.log("✅ Mensagem processada com sucesso"))
       .catch((err) => console.error("❌ Erro ao processar mensagem:", err));
 
-    // Responde imediatamente para evitar timeout na Z-API
-    res.status(200).json({ status: "received" });
+    // Responde imediatamente para não travar a Z-API
+    res.status(200).send("OK");
   } catch (err) {
     console.error("❌ Erro no webhook WhatsApp:", err);
     res.status(500).json({ error: "Erro ao processar webhook" });
