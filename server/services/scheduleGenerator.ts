@@ -83,10 +83,7 @@ export class IntelligentScheduleGenerator {
     // Normalize month and year to numbers (handles both string and number inputs)
     this.month = typeof month === 'string' ? parseInt(month, 10) : month;
     this.year = typeof year === 'string' ? parseInt(year, 10) : year;
-<<<<<<< HEAD
-    this.historicalSchedules = (historicalSchedules || []).filter(Boolean);
-=======
->>>>>>> 2cc849f (Fix issue with schedule generation for specific dates)
+    this.historicalSchedules = (historicalSchedules ?? []).filter(Boolean);
     this.loadMinisterAvailability();
     this.analyzeHistoricalSchedules();
   }
