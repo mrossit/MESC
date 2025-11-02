@@ -5,8 +5,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import path from "path";
+import whatsappRouter from "./routes/whatsapp"; // ✅ Import direto e síncrono
 
-// Global error handlers to prevent server crashes
+// ===============================
+//  Global Error Handlers
+// ===============================
 process.on("uncaughtException", (error) => {
   console.error("🚨 Uncaught Exception:", error);
 });
@@ -15,12 +18,17 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("🚨 Unhandled Rejection:", reason);
 });
 
+// ===============================
+//  Express App Setup
+// ===============================
 const app = express();
 
 // Trust proxy for Replit deployment (needed for rate limiter and CORS)
 app.set("trust proxy", true);
 
-// Helmet - Security headers
+// ===============================
+//  Helmet - Security Headers
+// ===============================
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -28,13 +36,13 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: [
           "'self'",
-          "'unsafe-inline'", // Necessário para Vite HMR em dev
-          "'unsafe-eval'", // Necessário para Vite HMR em dev
-          "https://cdn.jsdelivr.net", // Para bibliotecas CDN
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://cdn.jsdelivr.net",
         ],
         styleSrc: [
           "'self'",
-          "'unsafe-inline'", // Necessário para styled components e Tailwind
+          "'unsafe-inline'",
           "https://fonts.googleapis.com",
         ],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -51,26 +59,26 @@ app.use(
           process.env.NODE_ENV === "production" ? [] : null,
       },
     },
-    crossOriginEmbedderPolicy: false, // Permitir embed de recursos externos
+    crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     hsts: {
-      maxAge: 31536000, // 1 ano
+      maxAge: 31536000,
       includeSubDomains: true,
       preload: true,
     },
     frameguard:
       process.env.NODE_ENV === "development"
-        ? false // Permitir iframe no preview do Replit durante desenvolvimento
-        : { action: "deny" }, // Prevenir clickjacking em produção
+        ? false
+        : { action: "deny" },
     noSniff: true,
     xssFilter: true,
-    referrerPolicy: {
-      policy: "strict-origin-when-cross-origin",
-    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   })
 );
 
-// CRITICAL: Health check endpoints MUST be registered FIRST
+// ===============================
+//  Health & Root Endpoints
+// ===============================
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
@@ -79,10 +87,8 @@ app.get("/health", (_req: Request, res: Response) => {
   });
 });
 
-// Root path handler for deployment health checks
 app.get("/", (_req: Request, res: Response, next) => {
   if (res.headersSent) return;
-
   const acceptHeader = _req.get("accept") || "";
   if (
     acceptHeader.includes("application/json") &&
@@ -90,11 +96,12 @@ app.get("/", (_req: Request, res: Response, next) => {
   ) {
     return res.status(200).json({ status: "ok" });
   }
-
   next();
 });
 
-// CORS configuration
+// ===============================
+//  CORS Setup
+// ===============================
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
   : [
@@ -106,7 +113,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Permitir requests sem origem
+      if (!origin) return callback(null, true);
 
       const isAllowed = allowedOrigins.some((allowedOrigin) => {
         if (origin === allowedOrigin) return true;
@@ -120,9 +127,8 @@ app.use(
         return false;
       });
 
-      if (isAllowed) {
-        callback(null, true);
-      } else {
+      if (isAllowed) callback(null, true);
+      else {
         if (process.env.NODE_ENV === "development") {
           console.warn(`🔴 CORS blocked: ${origin}`);
         }
@@ -140,23 +146,26 @@ app.use(
   })
 );
 
-// Rate limiting global para todas as rotas da API
-app.use("/api", apiRateLimiter);
-
+// ===============================
+//  Body Parsing & Static Files
+// ===============================
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve static files from public directory
-app.use(express.static(path.join(process.cwd(), "public")));
+// ✅ Registro do Webhook WhatsApp MESC
+// (deve vir antes do rate limiter e das demais rotas)
+app.use("/api/whatsapp", whatsappRouter);
+console.log("✅ Webhook WhatsApp MESC registrado em /api/whatsapp");
 
-// Serve uploaded files
+app.use(express.static(path.join(process.cwd(), "public")));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// Request logging middleware
+// ===============================
+//  Logging Middleware
+// ===============================
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
-
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (originalPath.startsWith("/api")) {
@@ -164,36 +173,32 @@ app.use((req, res, next) => {
       log(logLine);
     }
   });
-
   next();
 });
 
-(async () => {
-  // ✅ Registro direto do Webhook WhatsApp antes das demais rotas
-  import("./routes/whatsapp.js").then(({ default: whatsappRouter }) => {
-    app.use("/api/whatsapp", whatsappRouter);
-    console.log("✅ Webhook WhatsApp MESC registrado em /api/whatsapp");
-  });
+// ===============================
+//  Rate Limiting & Routes
+// ===============================
+app.use("/api", apiRateLimiter);
 
-  // 🔹 Demais rotas da aplicação
+// ===============================
+//  Error Handler + Server Init
+// ===============================
+(async () => {
   const server = await registerRoutes(app);
 
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     console.error(`❌ ${status} ${req.method} ${req.path}: ${message}`);
-
     if (process.env.NODE_ENV === "development") {
       console.error(err.stack);
     }
-
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
   });
 
-  // Setup vite in development, serve static files in production
   const isDevelopment = process.env.NODE_ENV === "development";
 
   if (isDevelopment) {
