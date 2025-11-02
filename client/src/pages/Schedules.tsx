@@ -190,7 +190,7 @@ interface SubstitutionRequest {
   assignmentId: string;
   requestingMinisterId: string;
   substituteMinisterId: string | null;
-  status: "pending" | "approved" | "auto_approved";
+  status: "pending" | "available" | "approved" | "auto_approved" | "rejected" | "cancelled";
   reason: string;
 }
 
@@ -2846,12 +2846,12 @@ export default function Schedules() {
                   let cardBorderStyle = {};
 
                   if (userAssignment) {
-                    if (userSubstitutionStatus === 'pending') {
+                    if (userSubstitutionStatus === 'pending' || userSubstitutionStatus === 'available') {
                       cardBorderClass = "border-2 bg-white dark:bg-slate-900";
                       cardBorderStyle = { borderColor: '#610C27' };
                       statusBadge = (
                         <Badge className="text-white text-xs" style={{ backgroundColor: '#610C27' }}>
-                          Substituição Pendente
+                          Substituição solicitada
                         </Badge>
                       );
                     } else if (userSubstitutionStatus === 'approved' || userSubstitutionStatus === 'auto_approved') {
