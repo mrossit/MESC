@@ -1053,6 +1053,233 @@ export default function Substitutions() {
             </CardHeader>
             <CardContent>
               {renderSubstitutionList()}
+              {loadingRequests ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : groupedSubstitutionRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhuma solicitação de substituição no momento</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {groupedSubstitutionRequests.map((group) => {
+                    const hasValidDate = group.date && !isNaN(group.date.getTime());
+                    const formattedDate = hasValidDate
+                      ? capitalizeFirst(format(group.date!, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))
+                      : "Data não informada";
+                    const formattedTime = group.massTime
+                      ? formatMassTime(group.massTime)
+                      : "";
+
+                    return (
+                      <div key={group.key} className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-semibold text-foreground">{formattedDate}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span className="font-medium">
+                              {formattedTime
+                                ? `Missa das ${formattedTime}`
+                                : "Horário não informado"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          {group.items.map(({ item, assignmentDate }) => {
+                            const isDirected = item.request.substituteMinisterId !== null;
+                            const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
+                            const isMyRequest = item.requestingUser.id === user?.id;
+
+                            return (
+                              <div
+                                key={item.request.id}
+                                className={cn(
+                                  "border rounded-lg p-4",
+                                  isMyRequest && "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
+                                  isForMe && !isMyRequest && "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                                )}
+                              >
+                        {/* Header com nome e badges */}
+                        <div className="mb-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <p className="font-semibold text-base">
+                              {isMyRequest ? "Sua solicitação" : item.requestingUser.name}
+                            </p>
+                            
+                            {/* Badges */}
+                            <div className="flex flex-wrap gap-2">
+                              {isDirected && !isMyRequest && (
+                                <Badge variant="outline" className="gap-1 whitespace-nowrap">
+                                  <Users className="h-3 w-3 flex-shrink-0" />
+                                  {isForMe ? "Para você" : "Direcionado"}
+                                </Badge>
+                              )}
+                              <Badge variant={getUrgencyColor(item.request.urgency)} className="whitespace-nowrap">
+                                {getUrgencyLabel(item.request.urgency)}
+                              </Badge>
+                              <Badge variant={getStatusColor(item.request.status)} className="whitespace-nowrap">
+                                {getStatusLabel(item.request.status)}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Conteúdo principal em duas colunas */}
+                        <div className="flex flex-col gap-4 mb-4">
+                          {/* Informações da missa */}
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              Detalhes da Missa
+                            </h4>
+                            <div className="bg-muted/50 rounded-md p-3 space-y-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <span className="font-medium whitespace-nowrap">Data:</span>
+                                </div>
+                                <span className="text-muted-foreground truncate ml-6 sm:ml-0">
+                                  {item.assignment?.date && assignmentDate && !isNaN(assignmentDate.getTime())
+                                    ? format(assignmentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                                    : "Data inválida"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <span className="font-medium whitespace-nowrap">Horário:</span>
+                                </div>
+                                <span className="text-muted-foreground ml-6 sm:ml-0">
+                                  {item.assignment?.massTime ? formatMassTime(item.assignment.massTime) : ""}
+                                </span>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Church className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <span className="font-medium whitespace-nowrap">Posição:</span>
+                                </div>
+                                <Badge variant="secondary" className="text-xs ml-6 sm:ml-0 self-start sm:self-auto">
+                                  {getPositionDisplayName(item.assignment?.position || 1)}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Motivo */}
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              Motivo da Solicitação
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3 break-words">
+                              {item.request.reason}
+                            </p>
+                          </div>
+
+                          {/* Substituto (se existir) */}
+                          {item.substituteUser && item.request.status !== "available" && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Ministro Substituto
+                              </h4>
+                              <div className="bg-green-50 dark:bg-green-900/20 rounded-md p-3">
+                                <div className="flex items-center gap-2">
+                                  <UserPlus className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                                    {item.substituteUser.name}
+                                  </span>
+                                </div>
+                                {item.request.status === "approved" && (
+                                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
+                                    Substituição confirmada
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Botões de ação */}
+                        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
+                          {/* Botão para aceitar solicitação direcionada (pending com substituteId) */}
+                          {item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleRespondToRequest(item)}
+                              className="flex-1 sm:flex-initial"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              Responder
+                            </Button>
+                          )}
+
+                          {/* Botão para reivindicar solicitação aberta (available OU pending sem substituteId) */}
+                          {(item.request.status === "available" || (item.request.status === "pending" && !isDirected)) && !isMyRequest && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`/api/substitutions/${item.request.id}/claim`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    credentials: "include",
+                                    body: JSON.stringify({ message: "Aceito substituir" })
+                                  });
+
+                                  if (response.ok) {
+                                    toast({
+                                      title: "Sucesso",
+                                      description: "Substituição aceita com sucesso!"
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+                                  } else {
+                                    const error = await response.json();
+                                    toast({
+                                      title: "Erro",
+                                      description: error.message,
+                                      variant: "destructive"
+                                    });
+                                  }
+                                } catch (error) {
+                                  toast({
+                                    title: "Erro",
+                                    description: "Erro ao aceitar substituição",
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              className="flex-1 sm:flex-initial"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Aceitar Substituição
+                            </Button>
+                          )}
+
+                          {/* Botão para cancelar própria solicitação */}
+                          {(item.request.status === "pending" || item.request.status === "available") && isMyRequest && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700 flex-1 sm:flex-initial"
+                              onClick={() => {
+                                setRequestToCancel(item);
+                                setIsCancelDialogOpen(true);
+                              }}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Cancelar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
