@@ -9,9 +9,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 /**
  * Configuração Z-API para envio de mensagens WhatsApp
  */
-const ZAPI_BASE = `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE}`;
+const ZAPI_BASE = `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE}/token/${process.env.ZAPI_TOKEN}`;
 const ZAPI_HEADERS = {
-  "Client-Token": process.env.ZAPI_TOKEN || "",
+  "Client-Token": process.env.ZAPI_CLIENT_TOKEN || "",
   "Content-Type": "application/json"
 };
 
@@ -58,7 +58,7 @@ function formatTime(timeStr: string): string {
  */
 async function sendWhatsAppMessage(phone: string, message: string): Promise<void> {
   try {
-    if (!process.env.ZAPI_INSTANCE || !process.env.ZAPI_TOKEN) {
+    if (!process.env.ZAPI_INSTANCE || !process.env.ZAPI_TOKEN || !process.env.ZAPI_CLIENT_TOKEN) {
       logger.warn('[WhatsApp] Z-API não configurado - simulando envio de mensagem');
       logger.info(`[WhatsApp] Mensagem para ${phone}: ${message}`);
       return;
