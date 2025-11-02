@@ -32,23 +32,15 @@ router.get('/today', async (req, res) => {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const feastDay = `${month}-${day}`;
 
-    // Buscar liturgia da Paulus
+    // Buscar liturgia da API oficial da CNBB
     try {
-      const liturgyUrl = 'https://www.paulus.com.br/portal/liturgia-diaria/';
-      console.log(`[LITURGY API] Fazendo fetch de ${liturgyUrl}`);
+      const liturgyUrl = 'https://liturgia.cnbb.org.br/api/liturgia-diaria';
+      console.log(`[LITURGY API] Fazendo fetch da API CNBB: ${liturgyUrl}`);
 
       const response = await fetch(liturgyUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Cache-Control': 'max-age=0'
+          'Accept': 'application/json',
+          'User-Agent': 'MESC-App/1.0'
         }
       });
 
@@ -56,299 +48,94 @@ router.get('/today', async (req, res) => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const html = await response.text();
-      console.log(`[LITURGY API] HTML recebido, tamanho: ${html.length} caracteres`);
+      const apiData = await response.json();
+      console.log(`[LITURGY API] Dados recebidos da CNBB`);
 
-      // Extrair informações da liturgia com regex mais precisos
-      let liturgyTitle = 'Liturgia do Dia';
+      // Processar dados da API CNBB
+      let liturgyTitle = apiData.data || 'Liturgia do Dia';
       let liturgyColor = 'green';
-      let liturgyRank = 'MEMORIAL';
+      let liturgyRank = 'FERIAL';
       let firstReading = { reference: '', text: '' };
       let secondReading = { reference: '', text: '' };
       let gospel = { reference: '', text: '' };
-      let psalm = { reference: '', response: '' };
+      let psalm = { reference: '', response: '', text: '' };
       let homily = '';
 
-      // Extrair título da celebração (padrões para Paulus)
-      const titleMatches = [
-        html.match(/<h1[^>]*>([^<]*(?:domingo|segunda|terça|quarta|quinta|sexta|sábado)[^<]*)<\/h1>/i),
-        html.match(/<h2[^>]*class="[^"]*titulo[^"]*"[^>]*>([^<]+)<\/h2>/i),
-        html.match(/<div[^>]*class="[^"]*celebracao[^"]*"[^>]*>([^<]+)<\/div>/i),
-        html.match(/<span[^>]*class="[^"]*celebracao[^"]*"[^>]*>([^<]+)<\/span>/i),
-        html.match(/<title>([^<]*Liturgia[^<]*)<\/title>/i)
-      ];
-
-      for (const match of titleMatches) {
-        if (match) {
-          liturgyTitle = match[1]
-            .trim()
-            .replace(/&nbsp;/g, ' ')
-            .replace(/<[^>]+>/g, '')
-            .replace(/\s+/g, ' ')
-            .replace(/Liturgia Diária/i, '')
-            .replace(/Liturgia de hoje/i, '')
-            .replace(/Paulus/i, '')
-            .replace(/[-–—]/g, '')
-            .trim();
-          if (liturgyTitle.length > 5) break;
-        }
-      }
-
       // Extrair cor litúrgica
-      const colorPatterns = [
-        /cor\s+lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
-        /lit[uú]rgica\s*:\s*([a-záéíóúâêôãõç]+)/i,
-        /color[^>]*>([a-záéíóúâêôãõç]+)</i
-      ];
-
-      for (const pattern of colorPatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          const colorMap: Record<string, string> = {
-            'verde': 'green',
-            'branco': 'white',
-            'branca': 'white',
-            'vermelho': 'red',
-            'vermelha': 'red',
-            'roxo': 'purple',
-            'roxa': 'purple',
-            'violeta': 'purple',
-            'rosa': 'rose'
-          };
-          liturgyColor = colorMap[match[1].toLowerCase()] || 'green';
-          break;
-        }
+      if (apiData.cor) {
+        const colorMap: Record<string, string> = {
+          'verde': 'green',
+          'branco': 'white',
+          'branca': 'white',
+          'vermelho': 'red',
+          'vermelha': 'red',
+          'roxo': 'purple',
+          'roxa': 'purple',
+          'violeta': 'purple',
+          'rosa': 'rose',
+          'preto': 'black'
+        };
+        liturgyColor = colorMap[apiData.cor.toLowerCase()] || 'green';
       }
 
-      // Extrair rank litúrgico
-      if (html.match(/solenidade/i)) {
-        liturgyRank = 'SOLEMNITY';
-      } else if (html.match(/festa/i)) {
-        liturgyRank = 'FEAST';
-      } else if (html.match(/mem[oó]ria\s+obrigat[oó]ria/i)) {
-        liturgyRank = 'MEMORIAL';
-      } else if (html.match(/mem[oó]ria/i)) {
-        liturgyRank = 'OPTIONAL_MEMORIAL';
-      } else {
-        liturgyRank = 'FERIAL';
+      // Extrair título/data
+      if (apiData.liturgia) {
+        liturgyTitle = apiData.liturgia;
+      } else if (apiData.titulo) {
+        liturgyTitle = apiData.titulo;
       }
 
-      // Extrair primeira leitura com padrões mais robustos
-      const firstReadingPatterns = [
-        /(?:1[ªa°]?\s*Leitura|Primeira\s+Leitura)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>(?:1[ªa°]?\s*Leitura|Primeira\s+Leitura)<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*primeira[^"]*leitura[^"]*"[^>]*>([^<]+)/i
-      ];
-
-      for (const pattern of firstReadingPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          firstReading.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
-          break;
-        }
+      // Extrair primeira leitura
+      if (apiData.primeiraLeitura || apiData.primeira_leitura || apiData['1leitura']) {
+        const reading = apiData.primeiraLeitura || apiData.primeira_leitura || apiData['1leitura'];
+        firstReading.reference = reading.referencia || reading.ref || '';
+        firstReading.text = reading.texto || reading.text || '';
       }
 
-      // Extrair texto COMPLETO da primeira leitura (sem limite)
-      if (firstReading.reference) {
-        const escapedRef = firstReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-        // Tenta múltiplos padrões para pegar o texto completo
-        const firstTextPatterns = [
-          new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Salmo|2[ªa°]?\\s*Leitura|Evangelho)', 'i'),
-          new RegExp('Primeira\\s+Leitura[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Salmo)', 'i'),
-          new RegExp('<div[^>]*primeira[^>]*leitura[^>]*>([\\s\\S]{100,15000}?)(?:<\\/div>.*?<h[2-4]|Salmo)', 'i')
-        ];
-
-        for (const pattern of firstTextPatterns) {
-          const match = html.match(pattern);
-          if (match && match[1].length > 50) {
-            firstReading.text = match[1]
-              .replace(/<[^>]+>/g, '')
-              .replace(/&nbsp;/g, ' ')
-              .replace(/&quot;/g, '"')
-              .replace(/&ldquo;/g, '"')
-              .replace(/&rdquo;/g, '"')
-              .replace(/&mdash;/g, '—')
-              .replace(/&ndash;/g, '–')
-              .replace(/\s+/g, ' ')
-              .trim();
-            if (firstReading.text.length > 100) break;
-          }
-        }
+      // Extrair segunda leitura
+      if (apiData.segundaLeitura || apiData.segunda_leitura || apiData['2leitura']) {
+        const reading = apiData.segundaLeitura || apiData.segunda_leitura || apiData['2leitura'];
+        secondReading.reference = reading.referencia || reading.ref || '';
+        secondReading.text = reading.texto || reading.text || '';
       }
 
-      // Extrair segunda leitura (se houver)
-      const secondReadingPatterns = [
-        /(?:2[ªa°]?\s*Leitura|Segunda\s+Leitura)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>(?:2[ªa°]?\s*Leitura|Segunda\s+Leitura)<\/h[2-4]>\s*<[^>]*>([^<]+)/i
-      ];
-
-      for (const pattern of secondReadingPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          secondReading.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
-
-          // Extrair texto COMPLETO da segunda leitura
-          const escapedRef = secondReading.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const secondTextPatterns = [
-            new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Evangelho|Salmo)', 'i'),
-            new RegExp('Segunda\\s+Leitura[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,15000}?)(?:<h[2-4]|Evangelho)', 'i')
-          ];
-
-          for (const pattern of secondTextPatterns) {
-            const match = html.match(pattern);
-            if (match && match[1].length > 50) {
-              secondReading.text = match[1]
-                .replace(/<[^>]+>/g, '')
-                .replace(/&nbsp;/g, ' ')
-                .replace(/&quot;/g, '"')
-                .replace(/&ldquo;/g, '"')
-                .replace(/&rdquo;/g, '"')
-                .replace(/&mdash;/g, '—')
-                .replace(/&ndash;/g, '–')
-                .replace(/\s+/g, ' ')
-                .trim();
-              if (secondReading.text.length > 100) break;
-            }
-          }
-          break;
-        }
-      }
-
-      // Extrair salmo responsorial com resposta
-      const psalmPatterns = [
-        /(?:Salmo\s+Responsorial|Salmo)[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>Salmo[^<]*<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*salmo[^"]*"[^>]*>([^<]+)/i
-      ];
-
-      for (const pattern of psalmPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          psalm.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
-          break;
-        }
-      }
-
-      // Extrair resposta/refrão do salmo
-      const psalmResponsePatterns = [
-        /(?:Respons[oó]rio|Refr[ãa]o)[:\s]*[–—-]?\s*([^<\n.]+)/i,
-        /<[^>]*class="[^"]*respons[^"]*"[^>]*>([^<]+)/i,
-        /<em>([^<]{10,200})<\/em>/i,
-        /R\.\s*([^<\n]{10,200})/i
-      ];
-
-      for (const pattern of psalmResponsePatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 8) {
-          psalm.response = match[1].trim().replace(/\s+/g, ' ').replace(/[."]/g, '');
-          break;
-        }
-      }
-
-      // Extrair texto COMPLETO do salmo
-      if (psalm.reference) {
-        const escapedRef = psalm.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const psalmTextPatterns = [
-          new RegExp(escapedRef + '[\\s\\S]{0,200}?(?:Respons|Refr)[\\s\\S]{0,150}?<[^>]*>([\\s\\S]{100,10000}?)(?:<h[2-4]|Evangelho|2[ªa°]?\\s*Leitura)', 'i'),
-          new RegExp('Salmo[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,200}?<[^>]*>([\\s\\S]{100,10000}?)(?:<h[2-4]|Evangelho)', 'i'),
-          new RegExp('<div[^>]*salmo[^>]*>([\\s\\S]{100,10000}?)(?:<\\/div>.*?<h[2-4]|Evangelho)', 'i')
-        ];
-
-        for (const pattern of psalmTextPatterns) {
-          const match = html.match(pattern);
-          if (match && match[1].length > 50) {
-            const psalmText = match[1]
-              .replace(/<[^>]+>/g, '')
-              .replace(/&nbsp;/g, ' ')
-              .replace(/&quot;/g, '"')
-              .replace(/&ldquo;/g, '"')
-              .replace(/&rdquo;/g, '"')
-              .replace(/&mdash;/g, '—')
-              .replace(/&ndash;/g, '–')
-              .replace(/\s+/g, ' ')
-              .trim();
-
-            if (psalmText.length > 100) {
-              psalm.text = psalmText;
-              break;
-            }
-          }
-        }
+      // Extrair salmo
+      if (apiData.salmo || apiData.salmoResponsorial) {
+        const salmoData = apiData.salmo || apiData.salmoResponsorial;
+        psalm.reference = salmoData.referencia || salmoData.ref || '';
+        psalm.response = salmoData.refrao || salmoData.response || '';
+        psalm.text = salmoData.texto || salmoData.text || '';
       }
 
       // Extrair evangelho
-      const gospelPatterns = [
-        /Evangelho[:\s]*[(<]*([^<)\n]+[0-9][^<)\n]*)/i,
-        /<h[2-4][^>]*>Evangelho<\/h[2-4]>\s*<[^>]*>([^<]+)/i,
-        /class="[^"]*evangelho[^"]*"[^>]*>([^<]+)/i
-      ];
+      if (apiData.evangelho) {
+        gospel.reference = apiData.evangelho.referencia || apiData.evangelho.ref || '';
+        gospel.text = apiData.evangelho.texto || apiData.evangelho.text || '';
+      }
 
-      for (const pattern of gospelPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 3) {
-          gospel.reference = match[1].trim().replace(/\s+/g, ' ').replace(/[()]/g, '');
+      // Extrair meditação/reflexão
+      if (apiData.comentario || apiData.meditacao || apiData.reflexao) {
+        homily = apiData.comentario || apiData.meditacao || apiData.reflexao;
+      }
 
-          // Extrair texto COMPLETO do evangelho
-          const escapedRef = gospel.reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const gospelTextPatterns = [
-            new RegExp(escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,20000}?)(?:<h[2-4]|Medita|Reflex|Ora[çc][ãa]o)', 'i'),
-            new RegExp('Evangelho[\\s\\S]{0,150}?' + escapedRef + '[\\s\\S]{0,100}?<[^>]*>([\\s\\S]{100,20000}?)(?:<h[2-4]|Medita)', 'i'),
-            new RegExp('<div[^>]*evangelho[^>]*>([\\s\\S]{100,20000}?)(?:<\\/div>.*?<h[2-4]|Medita)', 'i')
-          ];
-
-          for (const pattern of gospelTextPatterns) {
-            const match = html.match(pattern);
-            if (match && match[1].length > 50) {
-              gospel.text = match[1]
-                .replace(/<[^>]+>/g, '')
-                .replace(/&nbsp;/g, ' ')
-                .replace(/&quot;/g, '"')
-                .replace(/&ldquo;/g, '"')
-                .replace(/&rdquo;/g, '"')
-                .replace(/&mdash;/g, '—')
-                .replace(/&ndash;/g, '–')
-                .replace(/\s+/g, ' ')
-                .trim();
-              if (gospel.text.length > 100) break;
-            }
-          }
-          break;
+      // Extrair rank litúrgico
+      if (apiData.celebracao) {
+        const celebracao = apiData.celebracao.toLowerCase();
+        if (celebracao.includes('solenidade')) {
+          liturgyRank = 'SOLEMNITY';
+        } else if (celebracao.includes('festa')) {
+          liturgyRank = 'FEAST';
+        } else if (celebracao.includes('memória obrigatória')) {
+          liturgyRank = 'MEMORIAL';
+        } else if (celebracao.includes('memória')) {
+          liturgyRank = 'OPTIONAL_MEMORIAL';
+        } else {
+          liturgyRank = 'FERIAL';
         }
       }
 
-      // Extrair meditação/reflexão COMPLETA (sem limites)
-      const meditationPatterns = [
-        /<div[^>]*class="[^"]*medita[çc][ãa]o[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
-        /<div[^>]*class="[^"]*reflex[ãa]o[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
-        /<article[^>]*class="[^"]*contempla[^"]*"[^>]*>([\s\S]{100,50000}?)<\/article>/i,
-        /<div[^>]*class="[^"]*texto[^"]*medita[^"]*"[^>]*>([\s\S]{100,50000}?)<\/div>/i,
-        /(?:Medita[çc][ãa]o|Reflex[ãa]o|Ora[çc][ãa]o)[:\s]*<[^>]*>([\s\S]{100,50000}?)(?:<\/article>|<\/section>|<div[^>]*class="[^"]*rodape)/i,
-        /<h[2-4][^>]*>(?:Medita[çc][ãa]o|Reflex[ãa]o)<\/h[2-4]>([\s\S]{100,50000}?)(?:<h[2-4]|<\/article>|<\/section>|<footer)/i
-      ];
-
-      for (const pattern of meditationPatterns) {
-        const match = html.match(pattern);
-        if (match && match[1].length > 50) {
-          homily = match[1]
-            .replace(/<[^>]+>/g, '')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&quot;/g, '"')
-            .replace(/&ldquo;/g, '"')
-            .replace(/&rdquo;/g, '"')
-            .replace(/&mdash;/g, '—')
-            .replace(/&ndash;/g, '–')
-            .replace(/&rsquo;/g, "'")
-            .replace(/&lsquo;/g, "'")
-            .replace(/&[a-z]+;/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          if (homily.length > 100) break;
-        }
-      }
-
-      // Se conseguiu extrair alguma informação útil
-      if (liturgyTitle.length > 5 || firstReading.reference || gospel.reference) {
+      // Verificar se conseguimos extrair dados da API
+      if (liturgyTitle || firstReading.reference || gospel.reference) {
         const liturgyData = {
           id: `liturgy-${day}-${month}`,
           name: liturgyTitle,
@@ -392,12 +179,12 @@ router.get('/today', async (req, res) => {
             date: today.toISOString().split('T')[0],
             feastDay,
             saints: [liturgyData],
-            source: 'paulus'
+            source: 'cnbb'
           },
         });
       }
     } catch (liturgyError) {
-      console.error('[LITURGY API] Erro ao buscar liturgia da Paulus:', liturgyError);
+      console.error('[LITURGY API] Erro ao buscar liturgia da CNBB:', liturgyError);
     }
 
     // Fallback: liturgia genérica com informações úteis
@@ -412,7 +199,7 @@ router.get('/today', async (req, res) => {
       feastDay,
       biography: `📖 Liturgia do dia ${day} de ${getMonthName(parseInt(month))} de ${today.getFullYear()}.\n\n` +
                 `Para acessar as leituras completas e reflexões do dia, ` +
-                `visite: https://www.paulus.com.br/portal/liturgia-diaria/\n\n` +
+                `visite: https://liturgia.cnbb.org.br/\n\n` +
                 `Lá você encontrará:\n` +
                 `• Primeira e Segunda Leituras\n` +
                 `• Salmo Responsorial\n` +
@@ -427,7 +214,7 @@ router.get('/today', async (req, res) => {
       firstReading: undefined,
       responsorialPsalm: undefined,
       gospel: undefined,
-      attributes: ['Liturgia Diária', 'Paulus'],
+      attributes: ['Liturgia Diária', 'CNBB'],
       quotes: undefined,
     };
 
@@ -514,7 +301,7 @@ function createRichLiturgyDescription(
     return parts.join('\n\n');
   }
 
-  return 'Liturgia do dia. Para mais informações, visite: https://www.paulus.com.br/portal/liturgia-diaria/';
+  return 'Liturgia do dia. Para mais informações, visite: https://liturgia.cnbb.org.br/';
 }
 
 /**

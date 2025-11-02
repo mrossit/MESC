@@ -136,10 +136,10 @@ export default function LiturgyPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => window.open('https://www.paulus.com.br/portal/liturgia-diaria/', '_blank')}
+          onClick={() => window.open('https://liturgia.cnbb.org.br/', '_blank')}
         >
           <ExternalLink className="h-4 w-4 mr-2" />
-          Ver na Paulus
+          Ver no site da CNBB
         </Button>
       </div>
 
@@ -340,17 +340,17 @@ export default function LiturgyPage() {
                   {/* Footer with credits */}
                   <div className="pt-6 border-t">
                     <p className="text-xs text-center text-muted-foreground">
-                      Conteúdo litúrgico extraído de{' '}
+                      Conteúdo litúrgico fornecido por{' '}
                       <a
-                        href="https://www.paulus.com.br/portal/liturgia-diaria/"
+                        href="https://liturgia.cnbb.org.br/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline hover:text-foreground transition-colors"
                       >
-                        Paulus
+                        CNBB
                       </a>
                       {' • '}
-                      Editora católica
+                      Conferência Nacional dos Bispos do Brasil
                     </p>
                   </div>
                 </div>
