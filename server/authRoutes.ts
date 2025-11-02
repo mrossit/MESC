@@ -47,7 +47,7 @@ router.post('/login', async (req, res) => {
     const result = await login(email, password);
 
     // AUDITORIA: Log login bem-sucedido
-    await auditLoginAttempt(email, true, req);
+    await auditLoginAttempt(email, true, req, undefined, result.user.id);
 
     // Define cookie com o token JWT
     res.cookie('token', result.token, {
