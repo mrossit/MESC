@@ -10,6 +10,7 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 [env]
 PORT = "5000"
+REPL_DISABLE_PACKAGE_CACHE = "1"
 [workflows]
 runButton = "Project"
 [[workflows.workflow]]
