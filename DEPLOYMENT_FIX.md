@@ -1,100 +1,89 @@
-# 🚨 CORREÇÃO PARA DEPLOY - GERAÇÃO DE ESCALAS
+# Correção do Erro de Deployment - Native Bindings
 
 ## Problema
-A geração de escalas retorna dados zerados em produção após o deploy.
+O deployment falha com o erro:
+```
+Build failed due to esbuild error: Could not resolve "../pkg" in node_modules/lightningcss/node/index.js
+```
 
-## Solução Verificada
+Isso acontece porque o esbuild está tentando fazer bundle de pacotes com native bindings (lightningcss, sharp, bcrypt, better-sqlite3, etc.), o que não é possível.
 
-### 1. Compilar o Projeto ANTES do Deploy
+## Soluções Disponíveis
+
+### ✅ SOLUÇÃO 1: Modificar o package.json (RECOMENDADO)
+
+Edite o arquivo `package.json` na linha 8 e adicione o flag `--packages=external`:
+
+**ANTES:**
+```json
+"build": "node scripts/inject-version.js && vite build && esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist",
+```
+
+**DEPOIS:**
+```json
+"build": "node scripts/inject-version.js && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+```
+
+A única mudança é adicionar `--packages=external` antes de `--bundle`.
+
+### ✅ SOLUÇÃO 2: Usar o script de build criado
+
+Use o script bash que foi criado com a correção:
+
+1. No arquivo `package.json`, linha 8, altere para:
+```json
+"build": "bash scripts/build-complete.sh",
+```
+
+### ✅ SOLUÇÃO 3: Adicionar variável de ambiente (COMPLEMENTAR)
+
+Adicione ao arquivo `.replit` na seção `[env]`:
+
+**ANTES:**
+```toml
+[env]
+PORT = "5000"
+```
+
+**DEPOIS:**
+```toml
+[env]
+PORT = "5000"
+REPL_DISABLE_PACKAGE_CACHE = "1"
+```
+
+Esta variável desabilita o cache de pacotes e pode ajudar a garantir que todas as dependências de produção sejam instaladas corretamente.
+
+## O que o flag --packages=external faz?
+
+O flag `--packages=external` instrui o esbuild a **não fazer bundle** dos pacotes em `node_modules`. Em vez disso, esses pacotes são carregados em tempo de execução, o que é essencial para pacotes com native bindings que não podem ser bundled.
+
+## Scripts Criados
+
+Foram criados dois scripts bash para facilitar o processo:
+
+1. **scripts/build-server.sh** - Faz build apenas do servidor com packages=external
+2. **scripts/build-complete.sh** - Faz build completo (frontend + backend) com packages=external
+
+Ambos já estão marcados como executáveis.
+
+## Teste Local
+
+Para testar se o build funciona antes de fazer deploy:
+
 ```bash
 npm run build
 ```
 
-### 2. Verificar que o Build Compilou Corretamente
-O arquivo `dist/index.js` deve ter aproximadamente 240kb
+Se o build for bem-sucedido localmente, o deployment também funcionará.
 
-### 3. Limpar Cache do Navegador
-- Fazer hard refresh (Ctrl+Shift+R ou Cmd+Shift+R)
-- Ou abrir em aba anônima
+## Pacotes com Native Bindings no Projeto
 
-### 4. Verificar Dados no Banco de Produção
+Os seguintes pacotes têm native bindings e não podem ser bundled:
+- `lightningcss` (usado pelo Tailwind/Vite)
+- `sharp` (processamento de imagens)
+- `bcrypt` (criptografia de senhas)
+- `better-sqlite3` (banco de dados SQLite)
+- Potencialmente outros dependendo das dependências transitivas
 
-Execute este script para verificar se há dados necessários:
-
-```bash
-NODE_ENV=production npx tsx scripts/check-ministers-data.ts
-```
-
-Você deve ter:
-- ✅ Pelo menos 1 usuário com role "ministro" ou "coordenador" e status "active"
-- ✅ Horários de missa configurados (table: mass_times_config)
-
-### 5. Se Ainda Não Funcionar
-
-Adicione logs para debug no arquivo `server/utils/scheduleGenerator.ts`:
-
-```typescript
-// Na linha 86, após loadMinistersData()
-console.log('Ministers loaded:', this.ministers.length);
-
-// Na linha 154, após loadAvailabilityData()
-console.log('Availability data loaded:', this.availabilityData.size);
-
-// Na linha 180, após loadMassTimesConfig()
-console.log('Mass times loaded:', this.massTimes.length);
-```
-
-### 6. Ordem de Deploy Correta
-
-1. `git add .`
-2. `git commit -m "Fix schedule generation"`
-3. `npm run build` (IMPORTANTE!)
-4. Fazer o deploy no Replit
-5. Aguardar restart completo
-6. Limpar cache do navegador
-
-### 7. Teste Rápido via API
-
-Após o deploy, teste diretamente:
-
-```bash
-# Login
-curl -X POST https://seu-app.replit.app/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"rossit@icloud.com","password":"123Pegou"}'
-
-# Use o token retornado para testar o preview
-curl https://seu-app.replit.app/api/schedules/preview/2025/9 \
-  -H "Authorization: Bearer SEU_TOKEN_AQUI"
-```
-
-## Dados Esperados
-
-O preview deve retornar algo como:
-```json
-{
-  "success": true,
-  "data": {
-    "totalSchedules": 24,
-    "averageConfidence": 0.8,
-    "schedules": [...],
-    "qualityMetrics": {
-      "uniqueMinistersUsed": 4,
-      "averageMinistersPerMass": 4,
-      "highConfidenceSchedules": 24,
-      "lowConfidenceSchedules": 0
-    }
-  }
-}
-```
-
-## Verificação Final
-
-Se tudo estiver OK, você verá no frontend:
-- Preview mostrando escalas com ministros
-- Confiança média > 0
-- Métricas de qualidade preenchidas
-
-## Contato para Suporte
-
-Se o problema persistir após seguir todos os passos, verifique os logs do servidor no Replit Console.
+Por isso, é essencial usar `--packages=external` no build do servidor.
