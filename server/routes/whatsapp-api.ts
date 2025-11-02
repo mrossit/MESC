@@ -43,6 +43,22 @@ router.get("/health", (req, res) => {
 });
 
 /**
+ * GET /api/whatsapp/webhook
+ * Informações sobre o webhook (não requer autenticação)
+ */
+router.get("/webhook", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "Webhook WhatsApp MESC está ativo",
+    usage: "Configure o Z-API para enviar mensagens via POST para esta URL",
+    url: "https://saojudastadeu.app/api/whatsapp/webhook",
+    method: "POST",
+    authentication: "Não requer autenticação (público para webhooks)",
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
  * POST /api/whatsapp/webhook
  * Webhook para receber mensagens do WhatsApp (Z-API / Make)
  * Não requer API key (webhooks vêm de serviços externos)
