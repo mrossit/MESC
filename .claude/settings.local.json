@@ -10,7 +10,10 @@
       "Bash(git commit:*)",
       "Bash(git log:*)",
       "Bash(npx tsx:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
