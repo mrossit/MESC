@@ -4,7 +4,10 @@
       "Bash(git log --all --since=\"3 days ago\" --grep=\"production\\|deploy\\|standardize\" -i --oneline)",
       "Bash(npm run build)",
       "Bash(git log --oneline -1 --format=\"%h %s\")",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
