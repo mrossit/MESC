@@ -5,11 +5,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import path from "path";
-import whatsappRouter from "./routes/whatsapp"; // ✅ Import direto e síncrono
 
-// ===============================
+// =============================================
 //  Global Error Handlers
-// ===============================
+// =============================================
 process.on("uncaughtException", (error) => {
   console.error("🚨 Uncaught Exception:", error);
 });
@@ -18,17 +17,13 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("🚨 Unhandled Rejection:", reason);
 });
 
-// ===============================
-//  Express App Setup
-// ===============================
 const app = express();
 
-// Trust proxy for Replit deployment (needed for rate limiter and CORS)
+// =============================================
+//  Express Base Config
+// =============================================
 app.set("trust proxy", true);
 
-// ===============================
-//  Helmet - Security Headers
-// ===============================
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -61,11 +56,7 @@ app.use(
     },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
     frameguard:
       process.env.NODE_ENV === "development"
         ? false
@@ -76,9 +67,9 @@ app.use(
   })
 );
 
-// ===============================
-//  Health & Root Endpoints
-// ===============================
+// =============================================
+//  Health & Root Routes
+// =============================================
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
@@ -99,9 +90,9 @@ app.get("/", (_req: Request, res: Response, next) => {
   next();
 });
 
-// ===============================
-//  CORS Setup
-// ===============================
+// =============================================
+//  CORS Configuration
+// =============================================
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
   : [
@@ -114,7 +105,6 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-
       const isAllowed = allowedOrigins.some((allowedOrigin) => {
         if (origin === allowedOrigin) return true;
         if (
@@ -126,7 +116,6 @@ app.use(
         }
         return false;
       });
-
       if (isAllowed) callback(null, true);
       else {
         if (process.env.NODE_ENV === "development") {
@@ -146,23 +135,39 @@ app.use(
   })
 );
 
-// ===============================
-//  Body Parsing & Static Files
-// ===============================
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// ✅ Registro do Webhook WhatsApp MESC
-// (deve vir antes do rate limiter e das demais rotas)
-app.use("/api/whatsapp", whatsappRouter);
-console.log("✅ Webhook WhatsApp MESC registrado em /api/whatsapp");
+// =============================================
+//  ✅ WHATSAPP WEBHOOK DIRETO (SEM DEPENDÊNCIAS)
+// =============================================
+app.post("/api/whatsapp/webhook", express.json(), async (req, res) => {
+  console.log("🔥 Recebido POST direto em /api/whatsapp/webhook");
+  console.log("📦 Corpo recebido:", req.body);
 
+  try {
+    const { from, body } = req.body || {};
+    console.log(`💬 Mensagem de ${from}: ${body}`);
+
+    // Simulação de resposta imediata (teste)
+    res.status(200).send("Webhook executado com sucesso!");
+
+    // Quando quiser ativar o processamento real, descomente:
+    // await handleMessage(req.body);
+  } catch (err) {
+    console.error("❌ Erro ao processar webhook:", err);
+    res.status(500).send("Erro interno");
+  }
+});
+
+console.log("✅ Webhook WhatsApp MESC registrado diretamente em /api/whatsapp/webhook");
+
+// =============================================
+//  Static Files, Logs e Rate Limiter
+// =============================================
 app.use(express.static(path.join(process.cwd(), "public")));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// ===============================
-//  Logging Middleware
-// ===============================
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
@@ -176,14 +181,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===============================
-//  Rate Limiting & Routes
-// ===============================
+// ⚠️ Mantenha o rate limiter após o webhook
 app.use("/api", apiRateLimiter);
 
-// ===============================
-//  Error Handler + Server Init
-// ===============================
+// =============================================
+//  Error Handling & Server Startup
+// =============================================
 (async () => {
   const server = await registerRoutes(app);
 
@@ -191,12 +194,8 @@ app.use("/api", apiRateLimiter);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
     console.error(`❌ ${status} ${req.method} ${req.path}: ${message}`);
-    if (process.env.NODE_ENV === "development") {
-      console.error(err.stack);
-    }
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
+    if (process.env.NODE_ENV === "development") console.error(err.stack);
+    if (!res.headersSent) res.status(status).json({ message });
   });
 
   const isDevelopment = process.env.NODE_ENV === "development";
