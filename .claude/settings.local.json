@@ -7,7 +7,10 @@
       "Bash(rm:*)",
       "Bash(git add:*)",
       "Bash(git restore:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git log:*)",
+      "Bash(npx tsx:*)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []
