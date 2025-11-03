@@ -28,6 +28,7 @@ import formationAdminRoutes from "./routes/formationAdmin";
 import versionRoutes from "./routes/version";
 import liturgicalRoutes from "./routes/liturgical";
 import saintsRoutes from "./routes/saints";
+import cnbbLiturgyRoutes from "./routes/cnbb-liturgy";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import whatsappApiRoutes from "./routes/whatsapp-api";
@@ -180,6 +181,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Saints calendar routes (read-only, no CSRF needed)
   app.use('/api/saints', saintsRoutes);
+  
+  // CNBB Liturgy routes (read-only, no CSRF needed)
+  app.use('/api/cnbb-liturgy', cnbbLiturgyRoutes);
 
   // Dashboard routes (mix of read and incomplete schedules)
   app.use('/api/dashboard', dashboardRoutes);

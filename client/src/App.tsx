@@ -47,7 +47,7 @@ const Install = lazy(() => import("@/pages/install"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Reports = lazy(() => import("@/pages/Reports"));
-const Liturgy = lazy(() => import("@/pages/liturgy"));
+const Liturgy = lazy(() => import("@/pages/LiturgyImproved"));
 
 function RouterWithHooks() {
   // Monitor de atividade - logout automático após 10min de inatividade
