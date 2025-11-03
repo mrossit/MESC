@@ -15912,6 +15912,22 @@ init_schema();
 import { Router as Router20 } from "express";
 import { eq as eq26, sql as sql15, like, or as or8 } from "drizzle-orm";
 var router20 = Router20();
+router20.get("/debug-cnbb", async (req, res) => {
+  try {
+    const response = await fetch("https://liturgia.cnbb.org.br/api/liturgia-diaria");
+    const data = await response.json();
+    res.json({
+      success: true,
+      rawData: data,
+      fields: Object.keys(data),
+      firstReadingFields: data["1leitura"] ? Object.keys(data["1leitura"]) : data.primeiraLeitura ? Object.keys(data.primeiraLeitura) : data.primeira_leitura ? Object.keys(data.primeira_leitura) : [],
+      salmoFields: data.salmo ? Object.keys(data.salmo) : [],
+      evangelhoFields: data.evangelho ? Object.keys(data.evangelho) : []
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 function getMonthName2(month) {
   const monthNames2 = [
     "janeiro",
@@ -15945,26 +15961,65 @@ router20.get("/today", async (req, res) => {
       }
       const apiData = await response.json();
       console.log(`[LITURGY API] Dados recebidos da API CNBB`);
-      const liturgyTitle = apiData.data || "Liturgia do Dia";
+      console.log(`[LITURGY API] Estrutura completa:`, JSON.stringify(apiData, null, 2));
+      const liturgyTitle = apiData.data || apiData.titulo || apiData.title || "Liturgia do Dia";
       const liturgyColor = mapColorFromCNBB(apiData.cor || "verde");
-      const liturgyRank = getRankFromTitle(liturgyTitle);
-      const firstReading = apiData.primeiraLeitura ? {
-        reference: apiData.primeiraLeitura.referencia || "",
-        text: apiData.primeiraLeitura.texto || apiData.primeiraLeitura.title || ""
-      } : { reference: "", text: "" };
-      const secondReading = apiData.segundaLeitura ? {
-        reference: apiData.segundaLeitura.referencia || "",
-        text: apiData.segundaLeitura.texto || apiData.segundaLeitura.title || ""
-      } : { reference: "", text: "" };
-      const psalm = apiData.salmo ? {
-        reference: apiData.salmo.referencia || apiData.salmo.refrao || "",
-        response: apiData.salmo.refrao || "",
-        text: apiData.salmo.texto || ""
-      } : { reference: "", response: "", text: "" };
-      const gospel = apiData.evangelho ? {
-        reference: apiData.evangelho.referencia || "",
-        text: apiData.evangelho.texto || apiData.evangelho.title || ""
-      } : { reference: "", text: "" };
+      const liturgyRank = getRankFromTitle(typeof liturgyTitle === "string" ? liturgyTitle : "FERIAL");
+      console.log(`[LITURGY API] T\xEDtulo extra\xEDdo:`, liturgyTitle);
+      console.log(`[LITURGY API] Campos dispon\xEDveis:`, Object.keys(apiData));
+      let firstReading = { reference: "", text: "" };
+      if (apiData["1leitura"]) {
+        firstReading = {
+          reference: apiData["1leitura"].referencia || apiData["1leitura"].titulo || "",
+          text: apiData["1leitura"].texto || apiData["1leitura"].text || ""
+        };
+      } else if (apiData.primeiraLeitura) {
+        firstReading = {
+          reference: apiData.primeiraLeitura.referencia || apiData.primeiraLeitura.titulo || "",
+          text: apiData.primeiraLeitura.texto || apiData.primeiraLeitura.text || ""
+        };
+      } else if (apiData.primeira_leitura) {
+        firstReading = {
+          reference: apiData.primeira_leitura.referencia || apiData.primeira_leitura.titulo || "",
+          text: apiData.primeira_leitura.texto || apiData.primeira_leitura.text || ""
+        };
+      }
+      console.log(`[LITURGY API] Primeira leitura:`, firstReading);
+      let secondReading = { reference: "", text: "" };
+      if (apiData["2leitura"]) {
+        secondReading = {
+          reference: apiData["2leitura"].referencia || apiData["2leitura"].titulo || "",
+          text: apiData["2leitura"].texto || apiData["2leitura"].text || ""
+        };
+      } else if (apiData.segundaLeitura) {
+        secondReading = {
+          reference: apiData.segundaLeitura.referencia || apiData.segundaLeitura.titulo || "",
+          text: apiData.segundaLeitura.texto || apiData.segundaLeitura.text || ""
+        };
+      } else if (apiData.segunda_leitura) {
+        secondReading = {
+          reference: apiData.segunda_leitura.referencia || apiData.segunda_leitura.titulo || "",
+          text: apiData.segunda_leitura.texto || apiData.segunda_leitura.text || ""
+        };
+      }
+      console.log(`[LITURGY API] Segunda leitura:`, secondReading);
+      let psalm = { reference: "", response: "", text: "" };
+      if (apiData.salmo) {
+        psalm = {
+          reference: apiData.salmo.referencia || apiData.salmo.titulo || apiData.salmo.refrao || "",
+          response: apiData.salmo.refrao || apiData.salmo.response || "",
+          text: apiData.salmo.texto || apiData.salmo.text || ""
+        };
+      }
+      console.log(`[LITURGY API] Salmo:`, psalm);
+      let gospel = { reference: "", text: "" };
+      if (apiData.evangelho) {
+        gospel = {
+          reference: apiData.evangelho.referencia || apiData.evangelho.titulo || "",
+          text: apiData.evangelho.texto || apiData.evangelho.text || ""
+        };
+      }
+      console.log(`[LITURGY API] Evangelho:`, gospel);
       if (liturgyTitle || firstReading.reference || gospel.reference) {
         const liturgyData = {
           id: `liturgy-${day}-${month}`,

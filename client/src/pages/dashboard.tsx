@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout";
 import { MinisterDashboard } from "@/components/minister-dashboard";
+import { SaintOfTheDay } from "@/components/SaintOfTheDay";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -588,6 +589,9 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* LITURGIA DO DIA */}
+        <SaintOfTheDay />
       </div>
     </Layout>
   );
