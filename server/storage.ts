@@ -535,10 +535,13 @@ export class DatabaseStorage implements IStorage {
         id: schedules.id,
         ministerId: schedules.ministerId,
         ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
         date: schedules.date,
         massTime: schedules.time,
         position: schedules.position,
-        status: schedules.status
+        status: schedules.status,
+        type: schedules.type,
+        location: schedules.location
       })
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
@@ -554,10 +557,13 @@ export class DatabaseStorage implements IStorage {
       scheduleId,
       ministerId: a.ministerId,
       ministerName: a.ministerName,
+      scheduleDisplayName: a.scheduleDisplayName,
       date: a.date,
       massTime: this.formatMassTime(a.massTime),
       position: a.position,
-      confirmed: a.status === 'approved'
+      confirmed: a.status === 'approved',
+      type: a.type,
+      location: a.location
     }));
   }
 
