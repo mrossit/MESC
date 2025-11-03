@@ -123,6 +123,7 @@ const POSITION_GROUPS: PositionGroup[] = [
 const SCHEDULE_LEGEND_ITEMS = [
   { label: "Missa Diária", color: "#c5c6c8", textColor: "#2C2C2C" },
   { label: "Dominical", color: "#ffda9e", textColor: "#8B5A00" },
+  { label: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" },
   { label: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" },
   { label: "Sagrado Coração", color: "#fabfb7", textColor: "#8B3A3A" },
   { label: "Imaculado Coração", color: "#e3b1c8", textColor: "#6B2D5C" },
@@ -1362,7 +1363,21 @@ export default function Schedules() {
         assignmentsByPosition.set(assignment.position, assignment);
       });
 
-      const massInfo = getMassTypeAndColor(day, normalizedMassTime);
+      // Verificar se é uma celebração especial (adoração, etc)
+      const firstAssignment = assignmentsForMass[0];
+      let massInfo;
+
+      if (firstAssignment?.type === 'celebracao' && firstAssignment?.location) {
+        // Celebração especial - usar location como tipo e cor roxa/lilás
+        massInfo = {
+          type: firstAssignment.location,
+          color: "#d4b5e8",  // Lilás suave
+          textColor: "#5B2C6F"  // Roxo escuro
+        };
+      } else {
+        // Missa normal - usar lógica padrão
+        massInfo = getMassTypeAndColor(day, normalizedMassTime);
+      }
 
       return {
         key: `${dateStr}-${normalizedMassTime}`,
