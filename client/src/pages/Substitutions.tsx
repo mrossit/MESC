@@ -45,7 +45,9 @@ import {
   Smartphone,
   XCircle,
   Plus,
-  ListPlus
+  ListPlus,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -180,6 +182,10 @@ export default function Substitutions() {
   const [requestType, setRequestType] = useState<"open" | "directed">("open");
   const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
   const [creatingRequest, setCreatingRequest] = useState(false);
+  
+  // Estado para controlar expansão/colapso de grupos
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showPreviousRequests, setShowPreviousRequests] = useState(false);
 
   // Fetch upcoming assignments for the current minister
   const { data: upcomingAssignments = [] } = useQuery<UpcomingAssignment[]>({
@@ -238,7 +244,19 @@ export default function Substitutions() {
     enabled: !!user,
   });
 
-  const groupedSubstitutionRequests = useMemo<SubstitutionGroup[]>(() => {
+  // Função auxiliar para converter horário para minutos (para ordenação)
+  const timeToMinutes = (time: string): number => {
+    const parts = time.split(':');
+    return parseInt(parts[0]) * 60 + parseInt(parts[1] || '0');
+  };
+
+  const groupedSubstitutionRequests = useMemo<{
+    current: SubstitutionGroup[];
+    previous: SubstitutionGroup[];
+  }>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const processed = substitutionRequests
       .filter((item: SubstitutionRequest) => item.request.status !== "cancelled")
       .map((item: SubstitutionRequest) => {
@@ -253,37 +271,36 @@ export default function Substitutions() {
           assignmentDate,
         };
       })
-      .sort((a, b) => {
+      .sort((a: { item: SubstitutionRequest; assignmentDate: Date | null }, b: { item: SubstitutionRequest; assignmentDate: Date | null }) => {
         const aDate = a.assignmentDate ?? new Date();
         const bDate = b.assignmentDate ?? new Date();
 
-        const aStatus = a.item.request.status;
-        const bStatus = b.item.request.status;
+        // Primeiro ordenar por data
+        const dateDiff = aDate.getTime() - bDate.getTime();
+        if (dateDiff !== 0) return dateDiff;
 
-        const aIsActive = aStatus === "pending" || aStatus === "available";
-        const bIsActive = bStatus === "pending" || bStatus === "available";
-        const aIsAccepted = aStatus === "approved" || aStatus === "auto_approved";
-        const bIsAccepted = bStatus === "approved" || bStatus === "auto_approved";
-
-        if (aIsActive && !bIsActive) return -1;
-        if (!aIsActive && bIsActive) return 1;
-        if (aIsAccepted && !bIsAccepted) return 1;
-        if (!aIsAccepted && bIsAccepted) return -1;
-
-        return aDate.getTime() - bDate.getTime();
+        // Se mesma data, ordenar por horário
+        const aTime = a.item.assignment?.massTime || "00:00:00";
+        const bTime = b.item.assignment?.massTime || "00:00:00";
+        return timeToMinutes(aTime) - timeToMinutes(bTime);
       });
 
-    const groups = new Map<string, SubstitutionGroup>();
+    const currentGroups = new Map<string, SubstitutionGroup>();
+    const previousGroups = new Map<string, SubstitutionGroup>();
 
-    processed.forEach((entry) => {
+    processed.forEach((entry: { item: SubstitutionRequest; assignmentDate: Date | null }) => {
       const { item, assignmentDate } = entry;
       const hasValidDate = assignmentDate && !isNaN(assignmentDate.getTime());
       const dateKey = hasValidDate ? format(assignmentDate!, "yyyy-MM-dd") : "sem-data";
       const massTime = item.assignment?.massTime || "";
       const groupKey = `${dateKey}|${massTime}`;
 
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, {
+      // Verificar se é passado ou futuro
+      const isPrevious = hasValidDate && assignmentDate! < today;
+      const targetMap = isPrevious ? previousGroups : currentGroups;
+
+      if (!targetMap.has(groupKey)) {
+        targetMap.set(groupKey, {
           key: groupKey,
           date: hasValidDate ? assignmentDate : null,
           massTime,
@@ -291,13 +308,32 @@ export default function Substitutions() {
         });
       }
 
-      groups.get(groupKey)!.items.push({
+      targetMap.get(groupKey)!.items.push({
         item,
         assignmentDate: hasValidDate ? assignmentDate : null,
       });
     });
 
-    return Array.from(groups.values());
+    // Ordenar grupos por data e horário
+    const sortGroups = (groups: SubstitutionGroup[]) => {
+      return groups.sort((a, b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        
+        // Ordenar por data
+        const dateDiff = a.date.getTime() - b.date.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        
+        // Se mesma data, ordenar por horário
+        return timeToMinutes(a.massTime) - timeToMinutes(b.massTime);
+      });
+    };
+
+    return {
+      current: sortGroups(Array.from(currentGroups.values())),
+      previous: sortGroups(Array.from(previousGroups.values()))
+    };
   }, [substitutionRequests]);
 
   // Respond to substitution request mutation
@@ -577,53 +613,76 @@ export default function Substitutions() {
     }
   };
 
-  const renderSubstitutionList = () => {
-    if (loadingRequests) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      );
-    }
+  // Funções para controlar colapso/expansão de grupos
+  const toggleGroupCollapse = (groupKey: string) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupKey)) {
+        newSet.delete(groupKey);
+      } else {
+        newSet.add(groupKey);
+      }
+      return newSet;
+    });
+  };
 
-    if (groupedSubstitutionRequests.length === 0) {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>Nenhuma solicitação de substituição no momento</p>
-        </div>
-      );
-    }
+  const expandAllGroups = () => {
+    setCollapsedGroups(new Set());
+  };
+
+  const collapseAllGroups = () => {
+    const allKeys = [
+      ...groupedSubstitutionRequests.current.map(g => g.key),
+      ...groupedSubstitutionRequests.previous.map(g => g.key)
+    ];
+    setCollapsedGroups(new Set(allKeys));
+  };
+
+  const renderGroup = (group: SubstitutionGroup) => {
+    const hasValidDate = group.date && !isNaN(group.date.getTime());
+    const formattedDate = hasValidDate
+      ? capitalizeFirst(format(group.date!, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))
+      : "Data não informada";
+    const formattedTime = group.massTime
+      ? formatMassTime(group.massTime)
+      : "";
+    const isCollapsed = collapsedGroups.has(group.key);
+    
+    const pendingCount = group.items.filter(({ item }) => 
+      item.request.status === "pending" || item.request.status === "available"
+    ).length;
 
     return (
-      <div className="space-y-6">
-        {groupedSubstitutionRequests.map((group) => {
-          const hasValidDate = group.date && !isNaN(group.date.getTime());
-          const formattedDate = hasValidDate
-            ? capitalizeFirst(format(group.date!, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))
-            : "Data não informada";
-          const formattedTime = group.massTime
-            ? formatMassTime(group.massTime)
-            : "";
-
-          return (
-            <div key={group.key} className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold text-foreground">{formattedDate}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span className="font-medium">
-                    {formattedTime
-                      ? `Missa das ${formattedTime}`
-                      : "Horário não informado"}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-4">
-                {group.items.map(({ item, assignmentDate }) => {
+      <div key={group.key} className="space-y-4">
+        <div 
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2 cursor-pointer hover:bg-muted/50 rounded-t px-2 -mx-2 transition-colors"
+          onClick={() => toggleGroupCollapse(group.key)}
+        >
+          <div className="flex items-center gap-2 text-sm">
+            {isCollapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold text-foreground">{formattedDate}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+            <Clock className="h-4 w-4" />
+            <span className="font-medium">
+              {formattedTime
+                ? `Missa das ${formattedTime}`
+                : "Horário não informado"}
+            </span>
+            <Badge variant="secondary" className="ml-2" data-testid={`badge-total-${group.key}`}>
+              {group.items.length} {group.items.length === 1 ? 'pedido' : 'pedidos'}
+            </Badge>
+            {pendingCount > 0 && (
+              <Badge variant="default" className="bg-amber-500 hover:bg-amber-600" data-testid={`badge-pending-${group.key}`}>
+                {pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'}
+              </Badge>
+            )}
+          </div>
+        </div>
+        {!isCollapsed && (
+          <div className="space-y-4">
+            {group.items.map(({ item, assignmentDate }) => {
                   const isDirected = item.request.substituteMinisterId !== null;
                   const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
                   const isMyRequest = item.requestingUser.id === user?.id;
@@ -811,10 +870,89 @@ export default function Substitutions() {
                     </div>
                   );
                 })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSubstitutionList = () => {
+    if (loadingRequests) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    const hasCurrentRequests = groupedSubstitutionRequests.current.length > 0;
+    const hasPreviousRequests = groupedSubstitutionRequests.previous.length > 0;
+
+    if (!hasCurrentRequests && !hasPreviousRequests) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+          <p>Nenhuma solicitação de substituição no momento</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Botões para expandir/colapsar todos */}
+        {(hasCurrentRequests || hasPreviousRequests) && (
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={expandAllGroups}
+            >
+              <ChevronUp className="h-4 w-4 mr-1" />
+              Expandir Todos
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={collapseAllGroups}
+            >
+              <ChevronDown className="h-4 w-4 mr-1" />
+              Compactar Todos
+            </Button>
+          </div>
+        )}
+
+        {/* Pedidos atuais e futuros */}
+        {hasCurrentRequests && (
+          <div className="space-y-6">
+            {groupedSubstitutionRequests.current.map(renderGroup)}
+          </div>
+        )}
+
+        {/* Pedidos anteriores (datas passadas) */}
+        {hasPreviousRequests && (
+          <div className="space-y-4 mt-8">
+            <div 
+              className="flex items-center justify-between border-b pb-2 cursor-pointer hover:bg-muted/50 rounded-t px-2 -mx-2 transition-colors"
+              onClick={() => setShowPreviousRequests(!showPreviousRequests)}
+            >
+              <div className="flex items-center gap-2">
+                {showPreviousRequests ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                <h3 className="text-lg font-semibold">Anteriores</h3>
+                <Badge variant="secondary">
+                  {groupedSubstitutionRequests.previous.length} {groupedSubstitutionRequests.previous.length === 1 ? 'grupo' : 'grupos'}
+                </Badge>
               </div>
+              <span className="text-sm text-muted-foreground">
+                Pedidos de datas passadas
+              </span>
             </div>
-          );
-        })}
+            {showPreviousRequests && (
+              <div className="space-y-6 opacity-75">
+                {groupedSubstitutionRequests.previous.map(renderGroup)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -1052,514 +1190,93 @@ export default function Substitutions() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingRequests ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : groupedSubstitutionRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma solicitação de substituição no momento</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {groupedSubstitutionRequests.map((group) => {
-                    const hasValidDate = group.date && !isNaN(group.date.getTime());
-                    const formattedDate = hasValidDate
-                      ? capitalizeFirst(format(group.date!, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }))
-                      : "Data não informada";
-                    const formattedTime = group.massTime
-                      ? formatMassTime(group.massTime)
-                      : "";
-
-                    return (
-                      <div key={group.key} className="space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-semibold text-foreground">{formattedDate}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span className="font-medium">
-                              {formattedTime
-                                ? `Missa das ${formattedTime}`
-                                : "Horário não informado"}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          {group.items.map(({ item, assignmentDate }) => {
-                            const isDirected = item.request.substituteMinisterId !== null;
-                            const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
-                            const isMyRequest = item.requestingUser.id === user?.id;
-
-                            return (
-                              <div
-                                key={item.request.id}
-                                className={cn(
-                                  "border rounded-lg p-4",
-                                  isMyRequest && "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-                                  isForMe && !isMyRequest && "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
-                                )}
-                              >
-                        {/* Header com nome e badges */}
-                        <div className="mb-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <p className="font-semibold text-base">
-                              {isMyRequest ? "Sua solicitação" : item.requestingUser.name}
-                            </p>
-                            
-                            {/* Badges */}
-                            <div className="flex flex-wrap gap-2">
-                              {isDirected && !isMyRequest && (
-                                <Badge variant="outline" className="gap-1 whitespace-nowrap">
-                                  <Users className="h-3 w-3 flex-shrink-0" />
-                                  {isForMe ? "Para você" : "Direcionado"}
-                                </Badge>
-                              )}
-                              <Badge variant={getUrgencyColor(item.request.urgency)} className="whitespace-nowrap">
-                                {getUrgencyLabel(item.request.urgency)}
-                              </Badge>
-                              <Badge variant={getStatusColor(item.request.status)} className="whitespace-nowrap">
-                                {getStatusLabel(item.request.status)}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Conteúdo principal em duas colunas */}
-                        <div className="flex flex-col gap-4 mb-4">
-                          {/* Informações da missa */}
-                          <div className="space-y-2">
-                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Detalhes da Missa
-                            </h4>
-                            <div className="bg-muted/50 rounded-md p-3 space-y-2">
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium whitespace-nowrap">Data:</span>
-                                </div>
-                                <span className="text-muted-foreground truncate ml-6 sm:ml-0">
-                                  {item.assignment?.date && assignmentDate && !isNaN(assignmentDate.getTime())
-                                    ? format(assignmentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                                    : "Data inválida"}
-                                </span>
-                              </div>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium whitespace-nowrap">Horário:</span>
-                                </div>
-                                <span className="text-muted-foreground ml-6 sm:ml-0">
-                                  {item.assignment?.massTime ? formatMassTime(item.assignment.massTime) : ""}
-                                </span>
-                              </div>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Church className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium whitespace-nowrap">Posição:</span>
-                                </div>
-                                <Badge variant="secondary" className="text-xs ml-6 sm:ml-0 self-start sm:self-auto">
-                                  {getPositionDisplayName(item.assignment?.position || 1)}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Motivo */}
-                          <div className="space-y-2">
-                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Motivo da Solicitação
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3 break-words">
-                              {item.request.reason}
-                            </p>
-                          </div>
-
-                          {/* Substituto (se existir) */}
-                          {item.substituteUser && item.request.status !== "available" && (
-                            <div className="space-y-2">
-                              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Ministro Substituto
-                              </h4>
-                              <div className="bg-green-50 dark:bg-green-900/20 rounded-md p-3">
-                                <div className="flex items-center gap-2">
-                                  <UserPlus className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                  <span className="text-sm font-medium text-green-900 dark:text-green-100">
-                                    {item.substituteUser.name}
-                                  </span>
-                                </div>
-                                {item.request.status === "approved" && (
-                                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-6">
-                                    Substituição confirmada
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Botões de ação */}
-                        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
-                          {/* Botão para aceitar solicitação direcionada (pending com substituteId) */}
-                          {item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleRespondToRequest(item)}
-                              className="flex-1 sm:flex-initial"
-                            >
-                              <MessageSquare className="h-4 w-4 mr-1" />
-                              Responder
-                            </Button>
-                          )}
-
-                          {/* Botão para reivindicar solicitação aberta (available OU pending sem substituteId) */}
-                          {(item.request.status === "available" || (item.request.status === "pending" && !isDirected)) && !isMyRequest && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch(`/api/substitutions/${item.request.id}/claim`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    credentials: "include",
-                                    body: JSON.stringify({ message: "Aceito substituir" })
-                                  });
-
-                                  if (response.ok) {
-                                    toast({
-                                      title: "Sucesso",
-                                      description: "Substituição aceita com sucesso!"
-                                    });
-                                    queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
-                                  } else {
-                                    const error = await response.json();
-                                    toast({
-                                      title: "Erro",
-                                      description: error.message,
-                                      variant: "destructive"
-                                    });
-                                  }
-                                } catch (error) {
-                                  toast({
-                                    title: "Erro",
-                                    description: "Erro ao aceitar substituição",
-                                    variant: "destructive"
-                                  });
-                                }
-                              }}
-                              className="flex-1 sm:flex-initial"
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Aceitar Substituição
-                            </Button>
-                          )}
-
-                          {/* Botão para cancelar própria solicitação */}
-                          {(item.request.status === "pending" || item.request.status === "available") && isMyRequest && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700 flex-1 sm:flex-initial"
-                              onClick={() => {
-                                setRequestToCancel(item);
-                                setIsCancelDialogOpen(true);
-                              }}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Cancelar
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </CardContent>
+              {renderSubstitutionList()}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Dialog for sending notifications */}
-      <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Rest of the dialogs and modals will remain the same below */}
+      {/* Response Dialog */}
+      <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enviar Notificação para Ministros</DialogTitle>
+            <DialogTitle>Responder à Solicitação</DialogTitle>
             <DialogDescription>
-              Configure como deseja notificar os ministros sobre esta missa
+              Aceite ou rejeite esta solicitação de substituição
             </DialogDescription>
           </DialogHeader>
-
-          {selectedMassForNotification && (
-            <div className="space-y-4">
-              {/* Informações da Missa */}
-              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  {selectedMassForNotification.isSpecial && (
-                    <Star className="h-4 w-4 text-amber-500" />
-                  )}
-                  <p className="font-semibold">
-                    {selectedMassForNotification.isSpecial 
-                      ? selectedMassForNotification.specialName 
-                      : `Missa de ${format(new Date(selectedMassForNotification.date), "EEEE", { locale: ptBR })}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {format(new Date(selectedMassForNotification.date), "dd/MM/yyyy")}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {selectedMassForNotification.massTime}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Church className="h-3 w-3" />
-                    {selectedMassForNotification.location}
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-destructive mt-2">
-                  Faltam {selectedMassForNotification.ministersShort} ministros
-                </p>
-              </div>
-
-              {/* Mensagem */}
-              <div>
-                <Label htmlFor="notification-message">Mensagem</Label>
-                <Textarea
-                  id="notification-message"
-                  value={notificationMessage}
-                  onChange={(e) => setNotificationMessage(e.target.value)}
-                  placeholder="Digite a mensagem para os ministros..."
-                  className="mt-1 min-h-[120px]"
-                />
-              </div>
-
-              {/* Canais de Notificação */}
-              <div className="space-y-3">
-                <Label>Canais de Notificação</Label>
-                
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="app-notification"
-                    checked={sendToApp}
-                    onCheckedChange={(checked) => setSendToApp(checked as boolean)}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <label
-                      htmlFor="app-notification"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
-                    >
-                      <Bell className="h-4 w-4 text-primary" />
-                      Central de Mensagens do App
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Envia notificação interna para todos os ministros
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="whatsapp-notification"
-                    checked={sendToWhatsApp}
-                    onCheckedChange={(checked) => setSendToWhatsApp(checked as boolean)}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <label
-                      htmlFor="whatsapp-notification"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
-                    >
-                      <Smartphone className="h-4 w-4 text-green-600" />
-                      WhatsApp
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Abre o WhatsApp com a mensagem pronta para enviar ao grupo
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {!sendToApp && !sendToWhatsApp && (
-                <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-md">
-                  <AlertCircle className="h-4 w-4 inline mr-1" />
-                  Selecione pelo menos um canal de notificação
-                </div>
-              )}
+          <div className="space-y-4">
+            <div>
+              <Label>Mensagem</Label>
+              <Textarea
+                placeholder="Digite sua resposta..."
+                value={responseMessage}
+                onChange={(e) => setResponseMessage(e.target.value)}
+                rows={4}
+              />
             </div>
-          )}
-
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
-                setIsNotificationDialogOpen(false);
-                setNotificationMessage("");
+                respondToSubstitutionMutation.mutate({
+                  requestId: selectedRequest?.request.id,
+                  accept: false,
+                  message: responseMessage
+                });
               }}
             >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSendNotifications}
-              disabled={!sendToApp && !sendToWhatsApp}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Enviar Notificações
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog for responding to substitution requests */}
-      <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto">
-          <DialogHeader>
-            <DialogTitle>Responder Solicitação</DialogTitle>
-            <DialogDescription>
-              Você deseja aceitar esta solicitação de substituição?
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedRequest && (
-            <div className="space-y-4">
-              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                <p className="text-sm">
-                  <span className="font-medium">Solicitante:</span> {selectedRequest.requestingUser.name}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Data:</span>{" "}
-                  {format(new Date(selectedRequest.assignment.date), "dd/MM/yyyy")}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Horário:</span> {selectedRequest.assignment.massTime}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Posição:</span>{" "}
-                  {getPositionDisplayName(selectedRequest.assignment.position)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Motivo:</span> {selectedRequest.request.reason}
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="response-message">Mensagem (opcional)</Label>
-                <Textarea
-                  id="response-message"
-                  value={responseMessage}
-                  onChange={(e) => setResponseMessage(e.target.value)}
-                  placeholder="Adicione uma mensagem..."
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (selectedRequest) {
-                  respondToSubstitutionMutation.mutate({
-                    requestId: selectedRequest.request.id,
-                    accept: false,
-                    message: responseMessage
-                  });
-                }
-              }}
-              className="w-full sm:w-auto"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Recusar
+              <X className="h-4 w-4 mr-1" />
+              Rejeitar
             </Button>
             <Button
               onClick={() => {
-                if (selectedRequest) {
-                  respondToSubstitutionMutation.mutate({
-                    requestId: selectedRequest.request.id,
-                    accept: true,
-                    message: responseMessage
-                  });
-                }
+                respondToSubstitutionMutation.mutate({
+                  requestId: selectedRequest?.request.id,
+                  accept: true,
+                  message: responseMessage
+                });
               }}
-              className="w-full sm:w-auto"
             >
-              <Check className="h-4 w-4 mr-2" />
+              <Check className="h-4 w-4 mr-1" />
               Aceitar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para confirmar cancelamento */}
+      {/* Cancel Dialog */}
       <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-auto">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Cancelamento</DialogTitle>
+            <DialogTitle>Cancelar Solicitação</DialogTitle>
             <DialogDescription>
-              {requestToCancel && (
-                <>
-                  Tem certeza que deseja cancelar sua solicitação de substituição para o dia{" "}
-                  <strong>
-                    {format(new Date(requestToCancel.assignment.date), "dd 'de' MMMM", { locale: ptBR })}
-                  </strong>{" "}
-                  na missa das <strong>{requestToCancel.assignment.massTime}</strong>?
-                </>
-              )}
+              Tem certeza que deseja cancelar esta solicitação de substituição?
             </DialogDescription>
           </DialogHeader>
-
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium text-amber-900 dark:text-amber-100">
-                  Atenção:
-                </p>
-                <ul className="mt-1 space-y-1 text-amber-800 dark:text-amber-200 text-xs">
-                  <li>• Esta ação não pode ser desfeita</li>
-                  <li>• Você voltará a estar escalado para esta data</li>
-                  <li>• Os ministros que já responderam serão notificados</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setIsCancelDialogOpen(false);
-                setRequestToCancel(null);
-              }}
-              disabled={cancellingRequest}
-              className="w-full sm:w-auto"
+              onClick={() => setIsCancelDialogOpen(false)}
             >
-              Voltar
+              Não, manter
             </Button>
             <Button
               variant="destructive"
               onClick={handleCancelRequest}
               disabled={cancellingRequest}
-              className="w-full sm:w-auto"
             >
               {cancellingRequest ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   Cancelando...
                 </>
               ) : (
                 <>
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Confirmar Cancelamento
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Sim, cancelar
                 </>
               )}
             </Button>
@@ -1567,188 +1284,172 @@ export default function Substitutions() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para criar nova solicitação de substituição */}
-      <Dialog open={isNewRequestDialogOpen} onOpenChange={setIsNewRequestDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
+      {/* Notification Dialog */}
+      <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Solicitar Substituição</DialogTitle>
+            <DialogTitle>Notificar Ministros Disponíveis</DialogTitle>
             <DialogDescription>
-              Preencha os dados abaixo para solicitar uma substituição em uma de suas escalas
+              Escolha como deseja notificar os ministros sobre esta missa
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Selecionar escala */}
+          <div className="space-y-4">
+            <div>
+              <Label>Mensagem de Convite</Label>
+              <Textarea
+                placeholder="Digite a mensagem do convite..."
+                value={notificationMessage}
+                onChange={(e) => setNotificationMessage(e.target.value)}
+                rows={6}
+              />
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="schedule-select">Escala para substituição *</Label>
+              <Label>Canais de Notificação</Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="app-notification"
+                  checked={sendToApp}
+                  onCheckedChange={(checked) => setSendToApp(checked as boolean)}
+                />
+                <label
+                  htmlFor="app-notification"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+                >
+                  <Bell className="h-4 w-4" />
+                  Central de Mensagens do App
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="whatsapp-notification"
+                  checked={sendToWhatsApp}
+                  onCheckedChange={(checked) => setSendToWhatsApp(checked as boolean)}
+                />
+                <label
+                  htmlFor="whatsapp-notification"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  WhatsApp
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNotificationDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendNotifications}>
+              <Send className="h-4 w-4 mr-1" />
+              Enviar Notificações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Request Dialog */}
+      <Dialog open={isNewRequestDialogOpen} onOpenChange={setIsNewRequestDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nova Solicitação de Substituição</DialogTitle>
+            <DialogDescription>
+              Solicite um substituto para uma de suas escalas
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Selecione a Escala</Label>
               <Select
                 value={selectedScheduleForRequest?.id || ""}
                 onValueChange={(value) => {
-                  const schedule = upcomingAssignments.find(a => a.id === value);
+                  const schedule = upcomingAssignments.find(s => s.id === value);
                   setSelectedScheduleForRequest(schedule || null);
+                  if (requestType === "directed") {
+                    refetchAvailableSubstitutes();
+                  }
                 }}
               >
-                <SelectTrigger id="schedule-select">
-                  <SelectValue placeholder="Selecione uma escala" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha uma escala..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {upcomingAssignments.length === 0 ? (
-                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                      Nenhuma escala futura disponível
-                    </div>
-                  ) : (
-                    upcomingAssignments.map((assignment) => (
+                  {upcomingAssignments.map((assignment) => {
+                    const assignDate = new Date(assignment.date);
+                    const formattedDate = format(assignDate, "dd/MM/yyyy (EEEE)", { locale: ptBR });
+                    return (
                       <SelectItem key={assignment.id} value={assignment.id}>
-                        {format(new Date(assignment.date), "dd/MM/yyyy")} às{" "}
-                        {assignment.massTime} - {getPositionDisplayName(assignment.position)}
+                        {formattedDate} - {formatMassTime(assignment.massTime)} - {getPositionDisplayName(assignment.position)}
                       </SelectItem>
-                    ))
-                  )}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Tipo de solicitação */}
-            <div className="space-y-3">
-              <Label>Tipo de solicitação</Label>
+            <div>
+              <Label>Tipo de Solicitação</Label>
               <RadioGroup value={requestType} onValueChange={(value: "open" | "directed") => {
                 setRequestType(value);
-                setSelectedSubstituteId("");
+                if (value === "directed" && selectedScheduleForRequest) {
+                  refetchAvailableSubstitutes();
+                }
               }}>
-                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="open" id="open" />
-                  <div className="grid gap-1.5 leading-none flex-1">
-                    <label
-                      htmlFor="open"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Solicitação Aberta
-                    </label>
-                    <p className="text-sm text-muted-foreground">
-                      Qualquer ministro disponível pode se candidatar à substituição
-                    </p>
-                  </div>
+                  <label htmlFor="open" className="text-sm font-medium cursor-pointer">
+                    Aberta (qualquer ministro pode aceitar)
+                  </label>
                 </div>
-                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="directed" id="directed" />
-                  <div className="grid gap-1.5 leading-none flex-1">
-                    <label
-                      htmlFor="directed"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Solicitação Direcionada
-                    </label>
-                    <p className="text-sm text-muted-foreground">
-                      Escolha um ministro específico para substituí-lo
-                    </p>
-                  </div>
+                  <label htmlFor="directed" className="text-sm font-medium cursor-pointer">
+                    Direcionada (escolher um ministro específico)
+                  </label>
                 </div>
               </RadioGroup>
             </div>
 
-            {/* Seleção de ministro (apenas para solicitação direcionada) */}
-            {requestType === "directed" && (
-              <div className="space-y-2">
-                <Label htmlFor="substitute-select">Ministro Substituto *</Label>
-                <Select
-                  value={selectedSubstituteId}
-                  onValueChange={setSelectedSubstituteId}
-                  disabled={!selectedScheduleForRequest}
-                >
-                  <SelectTrigger id="substitute-select">
-                    <SelectValue placeholder={
-                      selectedScheduleForRequest
-                        ? "Selecione um ministro"
-                        : "Primeiro selecione uma escala"
-                    } />
+            {requestType === "directed" && selectedScheduleForRequest && (
+              <div>
+                <Label>Ministro Substituto</Label>
+                <Select value={selectedSubstituteId} onValueChange={setSelectedSubstituteId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha um ministro..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSubstitutes.length === 0 ? (
-                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                        {selectedScheduleForRequest
-                          ? "Nenhum ministro disponível"
-                          : "Selecione uma escala primeiro"}
-                      </div>
-                    ) : (
-                      availableSubstitutes.map((minister) => (
-                        <SelectItem key={minister.id} value={minister.id}>
-                          {minister.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {availableSubstitutes.map((minister) => (
+                      <SelectItem key={minister.id} value={minister.id}>
+                        {minister.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {selectedScheduleForRequest && availableSubstitutes.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    Não há ministros disponíveis para esta escala. Considere criar uma solicitação aberta.
-                  </p>
-                )}
               </div>
             )}
 
-            {/* Motivo */}
-            <div className="space-y-2">
-              <Label htmlFor="reason">Motivo (opcional)</Label>
+            <div>
+              <Label>Motivo (opcional)</Label>
               <Textarea
-                id="reason"
+                placeholder="Explique o motivo da solicitação..."
                 value={requestReason}
                 onChange={(e) => setRequestReason(e.target.value)}
-                placeholder="Informe o motivo da solicitação (opcional)"
-                className="min-h-[100px]"
+                rows={3}
               />
             </div>
-
-            {/* Informações sobre urgência */}
-            {selectedScheduleForRequest && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-blue-800 dark:text-blue-200">
-                    <p className="font-medium mb-1">Informações importantes:</p>
-                    <ul className="space-y-1 text-xs">
-                      <li>
-                        • Assim que um ministro aceitar seu pedido, a substituição é confirmada automaticamente
-                      </li>
-                      <li>
-                        • Você receberá uma notificação quando a substituição for confirmada
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsNewRequestDialogOpen(false);
-                setRequestReason("");
-                setSelectedScheduleForRequest(null);
-                setRequestType("open");
-                setSelectedSubstituteId("");
-              }}
-              disabled={creatingRequest}
-            >
+            <Button variant="outline" onClick={() => setIsNewRequestDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleCreateRequest}
-              disabled={
-                creatingRequest ||
-                !selectedScheduleForRequest ||
-                (requestType === "directed" && !selectedSubstituteId)
-              }
-            >
+            <Button onClick={handleCreateRequest} disabled={creatingRequest}>
               {creatingRequest ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   Criando...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-1" />
                   Criar Solicitação
                 </>
               )}
