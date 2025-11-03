@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MinisterTutorial, useShouldShowTutorial } from "@/components/minister-tutorial";
-import { SaintOfTheDay } from "@/components/SaintOfTheDay";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
@@ -302,34 +301,29 @@ export function MinisterDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Santo do Dia */}
-        <SaintOfTheDay />
-
-        {/* Formação */}
-        <Card
-          className="border border-neutral-border/30 dark:border-border cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={() => setLocation('/formation')}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <BookOpen className="h-5 w-5 text-blue-500" />
-              Minha Formação
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                <BookOpen className="h-7 w-7 text-blue-500/70" />
-              </div>
-              <p className="text-muted-foreground font-medium mb-1">Ver conteúdos</p>
-              <p className="text-xs text-muted-foreground/70 max-w-xs">
-                Acompanhe seu progresso nos módulos de formação
-              </p>
+      {/* Formação */}
+      <Card
+        className="border border-neutral-border/30 dark:border-border cursor-pointer hover:bg-accent/50 transition-colors"
+        onClick={() => setLocation('/formation')}
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <BookOpen className="h-5 w-5 text-blue-500" />
+            Minha Formação
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+              <BookOpen className="h-7 w-7 text-blue-500/70" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <p className="text-muted-foreground font-medium mb-1">Ver conteúdos</p>
+            <p className="text-xs text-muted-foreground/70 max-w-xs">
+              Acompanhe seu progresso nos módulos de formação
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Notificações */}
