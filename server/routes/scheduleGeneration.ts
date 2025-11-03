@@ -989,6 +989,7 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
         date: schedules.date,
         time: schedules.time,
         type: schedules.type,
+        location: schedules.location,
         ministerId: schedules.ministerId,
         position: schedules.position,
         status: schedules.status,
@@ -1007,11 +1008,13 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
       date: a.date,
       massTime: a.time, // Frontend expects 'massTime' field
       type: a.type,
+      location: a.location,
       ministerId: a.ministerId,
       position: a.position,
       status: a.status,
       notes: a.notes,
       ministerName: a.ministerName,
+      scheduleDisplayName: a.scheduleDisplayName,
       confirmed: a.status === 'scheduled' // Map status to confirmed boolean
     }));
 

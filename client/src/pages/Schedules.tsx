@@ -183,6 +183,8 @@ interface ScheduleAssignment {
   position: number;
   confirmed: boolean;
   notes?: string;
+  type?: string;
+  location?: string;
 }
 
 interface SubstitutionRequest {
@@ -2111,7 +2113,14 @@ export default function Schedules() {
         <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] sm:w-full mx-auto p-3 sm:p-6">
           <DialogHeader className="space-y-1 sm:space-y-2">
             <DialogTitle className="text-base sm:text-lg leading-tight">
-              Missa das {selectedMassTime && formatMassTime(selectedMassTime)}
+              {(() => {
+                // Verificar se é adoração baseado no location do primeiro assignment
+                const firstAssignment = selectedDateAssignments && selectedDateAssignments.length > 0 ? selectedDateAssignments[0] : null;
+                if (firstAssignment?.location === 'Adoração ao Santíssimo' || firstAssignment?.type === 'celebracao') {
+                  return firstAssignment.location || 'Adoração ao Santíssimo';
+                }
+                return `Missa das ${selectedMassTime && formatMassTime(selectedMassTime)}`;
+              })()}
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
               {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
