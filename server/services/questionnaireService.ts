@@ -219,6 +219,11 @@ export class QuestionnaireService {
         standardized.special_events.first_saturday = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       }
+      // Map Adoration Monday (Rosary at 22h)
+      else if (questionId === 'adoration_monday') {
+        standardized.special_events.adoration_monday = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      }
       // Map custom special events (Finados, etc.)
       else if (questionId.startsWith('special_event_')) {
         const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
