@@ -126,8 +126,7 @@ const SCHEDULE_LEGEND_ITEMS = [
   { label: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" },
   { label: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" },
   { label: "Sagrado Coração", color: "#fabfb7", textColor: "#8B3A3A" },
-  { label: "Imaculado Coração", color: "#e3b1c8", textColor: "#6B2D5C" },
-  { label: "Novena Out", color: "#fdf9c4", textColor: "#8B7500" }
+  { label: "Imaculado Coração", color: "#e3b1c8", textColor: "#6B2D5C" }
 ];
 
 const getMassTypeAndColor = (date: Date, massTime: string) => {
