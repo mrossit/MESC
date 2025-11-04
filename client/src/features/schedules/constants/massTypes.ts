@@ -11,6 +11,11 @@ export const MASS_TYPES = {
     color: '#ffda9e',
     textColor: '#8B5A00'
   },
+  ADORACAO_SANTISSIMO: {
+    type: 'Adoração ao Santíssimo',
+    color: '#d4b5e8',
+    textColor: '#5B2C6F'
+  },
   CURA_LIBERTACAO: {
     type: 'Cura e Libertação',
     color: '#b2e2f2',
@@ -70,6 +75,11 @@ export function getMassTypeAndColor(date: Date, massTime: string): MassTypeInfo 
   // Domingo
   if (dayOfWeek === 0) {
     return MASS_TYPES.DOMINICAL;
+  }
+
+  // Segunda-feira - Adoração ao Santíssimo às 22h
+  if (dayOfWeek === 1 && massTime === '22:00:00') {
+    return MASS_TYPES.ADORACAO_SANTISSIMO;
   }
 
   // 1ª Quinta - Cura e Libertação
