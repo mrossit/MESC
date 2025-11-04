@@ -145,6 +145,10 @@ const getMassTypeAndColor = (date: Date, massTime: string) => {
     return { type: "Missa Dominical", color: "#ffda9e", textColor: "#8B5A00" };
   }
 
+  if (dayOfWeek === 1 && massTime === "22:00:00") {
+    return { type: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" };
+  }
+
   if (dayOfWeek === 4 && isFirstWeek && massTime === "19:30:00") {
     return { type: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" };
   }
