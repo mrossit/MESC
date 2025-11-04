@@ -54,6 +54,11 @@ export function MonthlyScheduleExport({
     const dayOfWeek = getDay(date);
     const day = date.getDate();
 
+    // Segunda-feira - Adoração ao Santíssimo
+    if (dayOfWeek === 1 && time === '22:00:00') {
+      return 'Adoração ao Santíssimo';
+    }
+
     // Casos especiais
     if (dayOfWeek === 4 && day <= 7) {
       // Primeira quinta-feira
