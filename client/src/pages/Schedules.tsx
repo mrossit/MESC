@@ -2908,7 +2908,18 @@ export default function Schedules() {
                           <Clock className="h-5 w-5 text-primary flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-sm sm:text-base">Missa das {formatMassTime(massTime)}</p>
+                              <p className="font-semibold text-sm sm:text-base">
+                                {(() => {
+                                  const firstAssignment = assignments && assignments.length > 0 ? assignments[0] : null;
+                                  if (firstAssignment?.location === 'Adoração ao Santíssimo' || firstAssignment?.type === 'celebracao') {
+                                    return firstAssignment.location || 'Adoração ao Santíssimo';
+                                  }
+                                  if (selectedDate && selectedDate.getDay() === 1 && massTime === '22:00:00') {
+                                    return 'Adoração ao Santíssimo';
+                                  }
+                                  return `Missa das ${formatMassTime(massTime)}`;
+                                })()}
+                              </p>
                               {statusBadge}
                             </div>
                             <p className="text-xs sm:text-sm text-muted-foreground">
