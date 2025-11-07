@@ -1,97 +1,225 @@
-# Overview
+# MESC - Ministros Extraordinários da Sagrada Comunhão
 
-This project is MESC (Ministros Extraordinários da Sagrada Comunhão), a comprehensive church management system for Santuário São Judas Tadeu in Sorocaba, Brazil. Its purpose is to manage extraordinary ministers of Holy Communion, handling scheduling, availability tracking, formation courses, and communication. It supports approximately 150 ministers with various user roles (gestor, coordenador, ministro) and provides features such as automated schedule generation, questionnaire-based availability collection, and ministry management.
+## Overview
 
-# User Preferences
+MESC is a comprehensive web application designed for managing Extraordinary Ministers of Holy Communion at São Judas Tadeu Parish. The system handles minister scheduling, availability tracking, formation courses, and administrative workflows. Built as a full-stack Progressive Web Application (PWA), it provides both desktop and mobile experiences with offline capabilities.
+
+**Core Purpose:**
+- Automated mass schedule generation based on minister availability
+- Monthly questionnaire system for gathering liturgical availability
+- Formation and training management for ministers
+- Real-time notifications and communication
+- Administrative tools for coordinators and managers
+
+## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-# System Architecture
+## System Architecture
 
-## Frontend Architecture
-The frontend uses React 18+ with TypeScript, built with Vite. UI is developed with Tailwind CSS and Shadcn/UI components via MCP. State management is handled by TanStack Query for server state and Wouter for client-side routing. The design system uses a liturgical color palette with neutral tones.
+### Frontend Architecture
 
-## Backend Architecture
-The backend is built with Node.js, Express, and TypeScript. It features JWT-based authentication with bcrypt password hashing. The API adheres to RESTful conventions, utilizing middleware for authentication and role-based authorization, with modularized routes.
+**Framework:** React 18 with TypeScript
+**Build Tool:** Vite 5.4.19
+**State Management:** 
+- React Query (TanStack Query) for server state
+- React Hooks for local state
+**UI Framework:** Radix UI + shadcn/ui components with Tailwind CSS
+**Routing:** Wouter (lightweight client-side routing)
+**PWA:** Service Worker with aggressive cache busting strategy
 
-## Database Design
-The system uses PostgreSQL (Neon) with Drizzle ORM for type-safe operations. The schema supports user management with role-based permissions, scheduling with liturgical positions, a questionnaire system for availability, formation modules, notifications, and family relationship management. Database migrations are managed via Drizzle Kit.
+**Key Design Decisions:**
+- **Component-based architecture** organized by feature domains (schedules, ministers, questionnaires, formation)
+- **Custom hooks pattern** for data fetching and business logic separation
+- **Drag-and-drop capabilities** using @dnd-kit for schedule management
+- **Responsive design** with mobile-first approach and separate mobile/desktop views
+- **Real-time updates** via WebSocket with polling fallback
+- **Offline-first** with service worker caching for critical resources
 
-## Authentication & Authorization
-A custom JWT-based system provides role-based permissions for Gestor (full admin), Coordenador (operational management), and Ministro (personal data). Session management uses secure HTTP-only cookies.
+**Folder Structure:**
+```
+client/src/
+├── components/        # Reusable UI components
+├── features/          # Feature-specific modules (schedules, etc.)
+├── pages/            # Route pages
+├── hooks/            # Custom React hooks
+├── services/         # API client services
+├── config/           # Configuration (routes, constants)
+└── lib/              # Utilities and helpers
+```
 
-## PWA Implementation
-The application is configured as a Progressive Web App with a service worker for offline functionality, a manifest.json for installation, and update prompts for new versions. It features a responsive design optimized for mobile use.
+### Backend Architecture
 
-## Cache Management & Auto-Update System
-An automatic cache invalidation and version control system ensures users always access the latest version. This includes a service worker (disabled in Replit preview, enabled in production) with network-first strategy for critical data and cache-first for static assets, automatic cache cleanup, and a version detection system that triggers a cache clear and reload upon new version deployment.
+**Runtime:** Node.js with Express.js
+**Language:** TypeScript with ES modules
+**Database ORM:** Drizzle ORM
+**Authentication:** JWT-based with bcrypt password hashing
+**API Design:** RESTful with organized route modules
 
-## Scheduling System
-The system includes intelligent schedule generation using AI-assisted questionnaire analysis, supporting liturgical positions, mass time management, and automated minister assignment based on availability and experience.
+**Key Design Decisions:**
+- **Modular route organization** - Routes separated by domain (ministers, schedules, questionnaires, etc.)
+- **Middleware-based security** - Authentication, CSRF protection, rate limiting
+- **Service layer pattern** - Business logic separated from route handlers
+- **Database abstraction** - Storage layer wrapping Drizzle ORM operations
+- **Real-time communication** - WebSocket support for live updates
 
-### Special Placeholder Ministers
-The system uses special minister accounts that function as placeholders in schedules:
-- **VACANTE**: Represented by `ministerId = null` in the database. Used for empty positions that need to be filled.
-- **Ministro SM**: A real minister account (ID: `4cf55562-038f-4a0e-a8e4-9b98169f1339`) used as a placeholder for specific purposes. Email: `sm@placeholder.mesc`
-- **Ministro SJME**: A real minister account (ID: `817bf5fd-3df3-412b-acb8-d633927bd308`) used as a placeholder for specific purposes. Email: `sjme@placeholder.mesc`
+**Folder Structure:**
+```
+server/
+├── routes/           # API endpoint definitions by domain
+├── middleware/       # Authentication, CSRF, rate limiting
+├── utils/            # Business logic (schedule generator, questionnaire service)
+├── services/         # External service integrations
+├── db.ts            # Database configuration
+├── storage.ts       # Data access layer
+└── auth.ts          # Authentication logic
+```
 
-These special ministers can be assigned to schedule positions like regular ministers but serve as visual markers for positions requiring special attention or coordination.
+**Critical Algorithm - Schedule Generator:**
+The core scheduling algorithm (`server/utils/scheduleGenerator.ts`) implements a fair distribution system:
+- **Priority-based mass ordering** (special celebrations → regular masses)
+- **Availability filtering** from monthly questionnaires
+- **Fair rotation** - Limits assignments per minister (max 4/month)
+- **Conflict prevention** - No duplicate assignments on same day
+- **Position preferences** - Respects minister's preferred roles
+- **Family coordination** - Can group or separate married ministers
 
-## Questionnaire Safety Net System
-**Implementation Date**: October 31, 2025  
-**Purpose**: Prevent data loss from questionnaire responses that cannot be processed
+### Data Storage Solutions
 
-The system includes a comprehensive safety net that ensures NO questionnaire response is ever lost, even if the code doesn't know how to process it.
+**Primary Database:** PostgreSQL (via Neon serverless)
+**Development Fallback:** SQLite (better-sqlite3)
+**ORM:** Drizzle ORM with both PostgreSQL and SQLite dialects
 
-### Architecture
-- **Database Fields**: Added `unmappedResponses` (JSONB) and `processingWarnings` (JSONB) to `questionnaire_responses` table
-- **Service Method**: `QuestionnaireService.standardizeResponseWithTracking()` tracks all processed questionIds
-- **Detection**: Any questionId not processed is automatically captured in `unmappedResponses`
-- **Logging**: Console warnings (`⚠️ UNMAPPED RESPONSES DETECTED`) alert administrators to review
+**Schema Organization:**
+```
+shared/schema.ts - Centralized schema definition
+├── users              # Authentication and profiles
+├── ministers          # Minister information and preferences
+├── questionnaires     # Monthly availability surveys
+├── questionnaire_responses  # Minister responses
+├── schedules          # Generated mass schedules
+├── schedule_assignments    # Minister-to-mass assignments
+├── formations         # Training courses and lessons
+├── notifications      # System notifications
+└── activity_logs      # Audit trail
+```
 
-### Known Question Patterns
-The system processes these questionId patterns:
-- `available_sundays`, `main_service_time`, `primary_mass_time`
-- `saint_judas_feast_*`, `saint_judas_novena`
-- `healing_liberation_mass`, `sacred_heart_mass`, `immaculate_heart_mass`
-- `special_event_*` (dynamic events like Finados, Natal - normalized with accent removal)
-- `daily_mass_availability`, `daily_mass`, `daily_mass_days`
-- `can_substitute`, `notes`, `observations`
-- `family_serve_preference`, `monthly_availability`, `other_times_available`
+**Key Design Decisions:**
+- **JSONB fields** for flexible data (responses, preferences, liturgical info)
+- **Standardized response format** (v2.0) for questionnaires with explicit yes/no per mass
+- **Compatibility layer** for reading different questionnaire formats across months
+- **Automatic migrations** via Drizzle Kit
+- **Backup system** with automated database dumps
 
-### Historical Context
-**November 2025 Data Loss Incident**: Partial weekday availability and Finados special event responses were lost due to bugs in the standardization logic. This incident led to the implementation of the safety net system to prevent future data loss. The lost data was manually restored via CSV import for 17 ministers.
+### Authentication & Authorization
 
-### Testing
-A comprehensive test suite (`scripts/test-safety-net.ts`) validates:
-1. Known questions are processed correctly
-2. Unknown questions are captured in unmappedResponses
-3. Processing warnings are generated
-4. Special events with metadata are handled properly
-5. Backward compatibility with existing code
+**Strategy:** JWT (JSON Web Tokens) with httpOnly cookies
+**Password Security:** bcrypt with salt rounds (10)
+**Roles:** Three-tier hierarchy
+- `ministro` - Basic minister access (own data, questionnaires, schedules)
+- `coordenador` - Coordinator access (schedule management, reports)
+- `gestor` - Manager access (full system administration)
 
-# External Dependencies
+**Security Features:**
+- CSRF protection via tokens
+- Rate limiting on authentication endpoints
+- Helmet.js security headers
+- CORS restrictions (whitelist-based)
+- Session management with automatic expiration
+- Role-based route protection
 
-## Core Infrastructure
-- **Neon Database**: PostgreSQL hosting
-- **Replit**: Hosting and deployment
+**Key Design Decisions:**
+- **Stateless authentication** - JWT allows horizontal scaling
+- **Secure cookie storage** - Prevents XSS attacks on tokens
+- **Role-based middleware** - Reusable authorization checks
+- **Development mode role switcher** - Fast testing across roles
 
-## Frontend Libraries
-- **React 18+**: UI framework
-- **TanStack Query**: Server state management
-- **Wouter**: Client-side routing
-- **Tailwind CSS**: CSS framework
-- **Shadcn/UI**: Component library
-- **Lucide React**: Icon library
+### API Structure
 
-## Backend Services
-- **Express**: Web application framework
-- **Drizzle ORM**: Database operations
-- **bcrypt**: Password hashing
-- **jsonwebtoken**: JWT authentication
-- **cookie-parser**: HTTP cookie parsing
+**Pattern:** RESTful with domain-based organization
+**Format:** JSON request/response
+**Error Handling:** Consistent error response format with proper HTTP status codes
 
-## Additional Integrations
-- **QRCode**: QR code generation
-- **date-fns**: Date manipulation
-- **WhatsApp API**: Integration via Make (Integromat) + OpenAI for schedule queries and substitution management.
+**Main API Domains:**
+```
+/api/auth/*              # Authentication (login, logout, session)
+/api/ministers/*         # Minister CRUD and management
+/api/questionnaires/*    # Questionnaire generation and responses
+/api/schedules/*         # Schedule generation, viewing, editing
+/api/formations/*        # Training courses and progress
+/api/dashboard/*         # Dashboard statistics and alerts
+/api/notifications/*     # Real-time notifications
+/api/auxiliary/*         # Auxiliary leader panel (pre/during/post-mass)
+```
+
+**Key Endpoints:**
+- `POST /api/schedules/generate-smart` - Fair algorithm schedule generation
+- `POST /api/questionnaires/generate` - Liturgically-aware questionnaire creation
+- `PUT /api/schedules/manual-adjustment` - Drag-drop minister adjustments
+- `GET /api/dashboard/ministry-stats` - Real-time dashboard metrics
+
+## External Dependencies
+
+### Third-Party Services
+
+**Database Hosting:** Neon (PostgreSQL serverless)
+- Serverless PostgreSQL with automatic scaling
+- Connection pooling via `@neondatabase/serverless`
+- Environment variable: `DATABASE_URL`
+
+**Email Service:** Not currently implemented (placeholder in code)
+- Future integration point for notifications
+- SMTP configuration ready in environment variables
+
+**WhatsApp Integration:** Placeholder endpoint (`appwa.js`)
+- Webhook for future WhatsApp Business API integration
+- Currently used for manual communication
+
+### Key NPM Packages
+
+**Frontend:**
+- `react` & `react-dom` (^18.3.1) - UI framework
+- `@tanstack/react-query` (^5.60.5) - Server state management
+- `wouter` (^3.3.5) - Lightweight routing
+- `@radix-ui/*` - Headless UI components
+- `@dnd-kit/*` - Drag-and-drop functionality
+- `jspdf` & `jspdf-autotable` - PDF generation
+- `xlsx` - Excel export
+- `date-fns` - Date manipulation
+
+**Backend:**
+- `express` (^4.21.1) - Web framework
+- `drizzle-orm` (^0.38.3) - Database ORM
+- `bcrypt` (^6.0.0) - Password hashing
+- `jsonwebtoken` (^9.0.2) - JWT authentication
+- `cookie-parser` (^1.4.7) - Cookie handling
+- `helmet` (^8.0.0) - Security headers
+- `ws` (^8.18.0) - WebSocket support
+
+**Development:**
+- `typescript` (^5.6.3) - Type safety
+- `vite` (^5.4.19) - Build tool
+- `vitest` (^2.1.4) - Testing framework
+- `tsx` (^4.19.2) - TypeScript execution
+
+### Build & Deployment
+
+**Build Process:**
+1. Version injection (`scripts/inject-version.js`)
+2. Vite frontend build → `dist/public/`
+3. esbuild server bundle → `dist/index.js`
+4. Service worker with build timestamp
+
+**Cache Strategy:**
+- Static versioning based on `package.json` version
+- Build-time timestamp injection for cache busting
+- Aggressive old cache deletion on service worker activation
+
+**Environment Variables Required:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - Secret for JWT signing (required, no default)
+- `PORT` - Server port (default: 5000)
+- `NODE_ENV` - Environment (development/production)
+- `ALLOWED_ORIGINS` - CORS whitelist (production)
+
+**Deployment Target:** Replit (with adaptability for other platforms)

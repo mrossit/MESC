@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
+import { updateMetrics } from "./routes/metrics";
 import path from "path";
 
 // =============================================
@@ -176,6 +177,7 @@ app.use((req, res, next) => {
     if (originalPath.startsWith("/api")) {
       const logLine = `${req.method} ${originalPath} ${res.statusCode} in ${duration}ms`;
       log(logLine);
+      updateMetrics(res.statusCode, duration);
     }
   });
   next();
