@@ -47,6 +47,7 @@ const Install = lazy(() => import("@/pages/install"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Reports = lazy(() => import("@/pages/Reports"));
+const Metrics = lazy(() => import("@/pages/Metrics"));
 
 function RouterWithHooks() {
   // Monitor de atividade - logout automático após 10min de inatividade
@@ -150,6 +151,12 @@ function RouterWithHooks() {
         <Route path="/user-management">
           <AuthGuard allowedRoles={["gestor", "coordenador"]}>
             <UserManagement />
+          </AuthGuard>
+        </Route>
+
+        <Route path="/metrics">
+          <AuthGuard allowedRoles={["gestor", "coordenador"]}>
+            <Metrics />
           </AuthGuard>
         </Route>
 

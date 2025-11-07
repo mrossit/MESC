@@ -18,7 +18,8 @@ import {
   User,
   HelpCircle,
   ChartBar,
-  Move
+  Move,
+  Activity
 } from "lucide-react";
 import {
   Sidebar,
@@ -175,6 +176,12 @@ export function AppSidebar() {
       title: "Relatórios",
       href: "/reports",
       icon: ChartBar,
+      roles: ["gestor", "coordenador"]
+    },
+    {
+      title: "Métricas do Sistema",
+      href: "/metrics",
+      icon: Activity,
       roles: ["gestor", "coordenador"]
     },
   ];
