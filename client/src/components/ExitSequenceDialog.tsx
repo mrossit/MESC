@@ -118,30 +118,48 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                 <div className="grid gap-2">
                   {mezaninoPositions.map((position, index) => {
                     const ministerName = positionToMinister.get(position);
+                    
+                    // Posições 27 e 28 são da área externa (missa por cura) - roxo diferente
+                    const isAreaExterna = position === 27 || position === 28;
+                    
+                    // Cores para Mezanino (13-15): #a788ab | #dfcae1 | #f5eef6
+                    // Cores para Área Externa (27-28): #9775aa | #d4c0e3 | #ebe2f2
+                    const bgColor = isAreaExterna ? '#d4c0e3' : '#dfcae1';
+                    const borderColor = isAreaExterna ? '#9775aa' : '#a788ab';
+                    const badgeBorderColor = isAreaExterna ? '#9775aa' : '#a788ab';
+                    const badgeBgColor = isAreaExterna ? '#ebe2f2' : '#f5eef6';
+                    const iconColor = isAreaExterna ? '#9775aa' : '#a788ab';
+                    const textColor = isAreaExterna ? '#7a5a8f' : '#8a6b8d';
+                    const numberBg = isAreaExterna ? '#9775aa' : '#a788ab';
 
                     return (
                       <div
                         key={position}
                         className="flex items-center gap-3 p-3 border-2 rounded-lg"
-                        style={{ backgroundColor: '#dfcae1', borderColor: '#a788ab' }}
+                        style={{ backgroundColor: bgColor, borderColor: borderColor }}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <Badge
                               variant="outline"
                               className="font-medium text-sm px-2.5 py-0.5"
-                              style={{ borderColor: '#a788ab', color: '#a788ab', backgroundColor: '#f5eef6' }}
+                              style={{ borderColor: badgeBorderColor, color: badgeBorderColor, backgroundColor: badgeBgColor }}
                             >
                               {index + 1}º
                             </Badge>
                             <span className="text-sm font-medium">
                               {LITURGICAL_POSITIONS[position]}
                             </span>
+                            {isAreaExterna && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                                Área Externa
+                              </Badge>
+                            )}
                           </div>
                           {ministerName && (
                             <div className="flex items-center gap-1.5 mt-1">
-                              <User className="h-3.5 w-3.5" style={{ color: '#a788ab' }} />
-                              <span className="text-sm font-bold" style={{ color: '#8a6b8d' }}>
+                              <User className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                              <span className="text-sm font-bold" style={{ color: textColor }}>
                                 {ministerName}
                               </span>
                             </div>
@@ -149,7 +167,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                         </div>
                         <div
                           className="w-auto min-w-[3rem] h-12 px-3 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: '#a788ab' }}
+                          style={{ backgroundColor: numberBg }}
                         >
                           <span className="text-xs font-bold text-white whitespace-nowrap">Posição {position}</span>
                         </div>
