@@ -27,43 +27,43 @@ export function PrayerDialog({ open, onOpenChange }: PrayerDialogProps) {
             <div className="p-6 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-2 border-red-200 dark:border-red-800 rounded-lg">
               <div className="space-y-3 text-center">
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Alma de Cristo, santificai-me.
+                  Alma de Cristo, <span className="font-bold">santificai-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Corpo de Cristo, salvai-me.
+                  Corpo de Cristo, <span className="font-bold">salvai-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Sangue de Cristo, inebriai-me.
+                  Sangue de Cristo, <span className="font-bold">inebriai-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Água do lado de Cristo, lavai-me.
+                  Água do lado de Cristo, <span className="font-bold">lavai-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Paixão de Cristo, confortai-me.
+                  Paixão de Cristo, <span className="font-bold">confortai-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Ó bom Jesus, ouvi-me.
+                  Ó bom Jesus, <span className="font-bold">ouvi-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Dentro de Vossas chagas, escondei-me.
+                  Dentro de Vossas chagas, <span className="font-bold">escondei-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Não permitais que me separe de Vós.
+                  <span className="font-bold">Não permitais que me separe de Vós.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Do espírito maligno, defendei-me.
+                  Do espírito maligno, <span className="font-bold">defendei-me.</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  Na hora da minha morte, chamai-me
+                  Na hora da minha morte, <span className="font-bold">chamai-me</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  e mandai-me ir para Vós,
+                  <span className="font-bold">e mandai-me ir para Vós,</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  para que com os vossos Santos Vos louve
+                  <span className="font-bold">para que com os vossos Santos Vos louve</span>
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-red-900 dark:text-red-100">
-                  por todos os séculos dos séculos.
+                  <span className="font-bold">por todos os séculos dos séculos.</span>
                 </p>
                 <p className="text-base sm:text-lg font-bold leading-relaxed text-red-900 dark:text-red-100 mt-4">
                   Amém.
