@@ -132,7 +132,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                               className="font-medium text-sm px-2.5 py-0.5"
                               style={{ borderColor: '#a788ab', color: '#a788ab', backgroundColor: '#f5eef6' }}
                             >
-                              Posição {position}
+                              {index + 1}º
                             </Badge>
                             <span className="text-sm font-medium">
                               {LITURGICAL_POSITIONS[position]}
@@ -148,10 +148,10 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                           )}
                         </div>
                         <div
-                          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                          className="w-auto min-w-[3rem] h-12 px-3 rounded-lg flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: '#a788ab' }}
                         >
-                          <span className="text-base font-bold text-white">{index + 1}º</span>
+                          <span className="text-xs font-bold text-white whitespace-nowrap">Posição {position}</span>
                         </div>
                       </div>
                     );
@@ -192,7 +192,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                             className="font-semibold text-sm px-2.5 py-0.5"
                             style={{ borderColor: borderColor, color: borderColor, backgroundColor: badgeBg }}
                           >
-                            Posição {position}
+                            {index + 1}º
                           </Badge>
                           <span className={`text-sm ${isAuxiliar ? "font-bold" : "font-medium"}`}>
                             {LITURGICAL_POSITIONS[position]}
@@ -208,11 +208,11 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                         )}
                       </div>
                       <div
-                        className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                        className="w-auto min-w-[3rem] h-12 px-3 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: numberBg }}
                       >
-                        <span className="text-base font-bold text-white">
-                          {index + 1}º
+                        <span className="text-xs font-bold text-white whitespace-nowrap">
+                          Posição {position}
                         </span>
                       </div>
                     </div>
