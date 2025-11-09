@@ -123,14 +123,14 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                     const isAreaExterna = position === 27 || position === 28;
                     
                     // Cores para Mezanino (13-15): #a788ab | #dfcae1 | #f5eef6
-                    // Cores para Área Externa (27-28): #9775aa | #d4c0e3 | #ebe2f2
-                    const bgColor = isAreaExterna ? '#d4c0e3' : '#dfcae1';
-                    const borderColor = isAreaExterna ? '#9775aa' : '#a788ab';
-                    const badgeBorderColor = isAreaExterna ? '#9775aa' : '#a788ab';
-                    const badgeBgColor = isAreaExterna ? '#ebe2f2' : '#f5eef6';
-                    const iconColor = isAreaExterna ? '#9775aa' : '#a788ab';
+                    // Cores para Área Externa (27-28): #967284 | #fff0ff
+                    const bgColor = isAreaExterna ? '#fff0ff' : '#dfcae1';
+                    const borderColor = isAreaExterna ? '#967284' : '#a788ab';
+                    const badgeBorderColor = isAreaExterna ? '#967284' : '#a788ab';
+                    const badgeBgColor = isAreaExterna ? '#fff0ff' : '#f5eef6';
+                    const iconColor = isAreaExterna ? '#967284' : '#a788ab';
                     const textColor = isAreaExterna ? '#7a5a8f' : '#8a6b8d';
-                    const numberBg = isAreaExterna ? '#9775aa' : '#a788ab';
+                    const numberBg = isAreaExterna ? '#967284' : '#a788ab';
 
                     return (
                       <div
