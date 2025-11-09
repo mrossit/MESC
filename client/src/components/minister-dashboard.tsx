@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle } from "lucide-react";
+import { Calendar, Clock, BookOpen, Users, Bell, TrendingUp, HelpCircle, CheckCircle, AlertCircle, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MinisterTutorial, useShouldShowTutorial } from "@/components/minister-tutorial";
+import { PrayerDialog } from "@/components/PrayerDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LITURGICAL_POSITIONS } from "@shared/constants";
@@ -53,6 +54,7 @@ export function MinisterDashboard() {
   // Track renders in debug panel (development only)
   useDebugRender('MinisterDashboard');
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isPrayerOpen, setIsPrayerOpen] = useState(false);
   const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -189,9 +191,15 @@ export function MinisterDashboard() {
   return (
     <>
       {/* Tutorial Modal */}
-      <MinisterTutorial 
-        isOpen={isTutorialOpen} 
-        onClose={() => setIsTutorialOpen(false)} 
+      <MinisterTutorial
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+      />
+
+      {/* Prayer Dialog */}
+      <PrayerDialog
+        open={isPrayerOpen}
+        onOpenChange={setIsPrayerOpen}
       />
 
       <div className="space-y-4">
@@ -209,6 +217,15 @@ export function MinisterDashboard() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setIsPrayerOpen(true)}
+                  className="hidden md:flex items-center gap-2 border-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-700 dark:text-red-300"
+                >
+                  <Heart className="h-4 w-4" />
+                  Oração
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleOpenTutorial}
                   className="hidden md:flex items-center gap-2"
                 >
@@ -222,16 +239,27 @@ export function MinisterDashboard() {
                 </div>
               </div>
             </div>
-            {/* Botão do Tutorial para Mobile */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenTutorial}
-              className="md:hidden mt-4 w-full flex items-center justify-center gap-2"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Iniciar Tutorial
-            </Button>
+            {/* Botões para Mobile */}
+            <div className="md:hidden mt-4 flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPrayerOpen(true)}
+                className="w-full flex items-center justify-center gap-2 border-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-700 dark:text-red-300"
+              >
+                <Heart className="h-4 w-4" />
+                Oração Alma de Cristo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenTutorial}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                Iniciar Tutorial
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
