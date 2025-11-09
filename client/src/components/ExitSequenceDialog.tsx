@@ -229,10 +229,10 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                 💡 Dicas Importantes
               </p>
               <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-                <li>A ordem respeita o número e posição de cada ministro para saída organizada</li>
-                <li>Fique atento à sua posição para evitar atropelos e grandes distâncias</li>
-                <li>Revise sempre a ordem antes de sair, pois pode variar conforme o número de ministros</li>
-                <li>Esta organização mostra respeito e beleza da missa, garantindo tranquilidade</li>
+                <li>A ordem respeita o número e posição de cada ministro para saída organizada.</li>
+                <li>Fique atento à sua posição para evitar atropelos e grandes distâncias.</li>
+                <li>Revise sempre a ordem antes de sair, pois pode variar conforme o número de ministros.</li>
+                <li>Esta organização mostra respeito e beleza da missa, tudo de forma discreta.</li>
               </ul>
             </div>
           </div>

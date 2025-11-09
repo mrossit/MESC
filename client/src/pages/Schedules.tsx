@@ -2160,7 +2160,7 @@ export default function Schedules() {
                     size="sm"
                     variant="outline"
                     onClick={() => setIsExitSequenceDialogOpen(true)}
-                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 mt-2"
+                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:text-amber-300 mt-[5px] mb-[5px] pt-[12px] pb-[12px] text-[#300a05] bg-[#ffbfed]"
                   >
                     <Users className="h-3.5 w-3.5 mr-1" />
                     <span>Sequência de Saída</span>
