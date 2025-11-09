@@ -125,17 +125,11 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                         className="flex items-center gap-3 p-3 border-2 rounded-lg"
                         style={{ backgroundColor: '#dfcae1', borderColor: '#a788ab' }}
                       >
-                        <div
-                          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: '#a788ab' }}
-                        >
-                          <span className="text-xl font-bold text-white">{index + 1}</span>
-                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <Badge
                               variant="outline"
-                              className="font-medium"
+                              className="font-medium text-sm px-2.5 py-0.5"
                               style={{ borderColor: '#a788ab', color: '#a788ab', backgroundColor: '#f5eef6' }}
                             >
                               Posição {position}
@@ -152,6 +146,12 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                               </span>
                             </div>
                           )}
+                        </div>
+                        <div
+                          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: '#a788ab' }}
+                        >
+                          <span className="text-base font-bold text-white">{index + 1}º</span>
                         </div>
                       </div>
                     );
@@ -185,19 +185,11 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                       className="flex items-center gap-3 p-3 border-2 rounded-lg bg-[#d1daed] text-[#0a1440]"
                       style={{ backgroundColor: bgColor, borderColor: borderColor }}
                     >
-                      <div
-                        className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: numberBg }}
-                      >
-                        <span className="text-xl font-bold text-white">
-                          {mezaninoPositions.length + index + 1}
-                        </span>
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <Badge
                             variant="outline"
-                            className="font-semibold"
+                            className="font-semibold text-sm px-2.5 py-0.5"
                             style={{ borderColor: borderColor, color: borderColor, backgroundColor: badgeBg }}
                           >
                             Posição {position}
@@ -214,6 +206,14 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                             </span>
                           </div>
                         )}
+                      </div>
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: numberBg }}
+                      >
+                        <span className="text-base font-bold text-white">
+                          {index + 1}º
+                        </span>
                       </div>
                     </div>
                   );
