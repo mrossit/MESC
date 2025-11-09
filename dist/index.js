@@ -2451,11 +2451,11 @@ ${"=".repeat(60)}`);
 \u{1F3AF} FAIRNESS REPORT:`);
           const distributionMap = /* @__PURE__ */ new Map();
           this.ministers.forEach((m) => {
-            const count8 = m.monthlyAssignmentCount || 0;
-            if (!distributionMap.has(count8)) {
-              distributionMap.set(count8, []);
+            const count9 = m.monthlyAssignmentCount || 0;
+            if (!distributionMap.has(count9)) {
+              distributionMap.set(count9, []);
             }
-            distributionMap.get(count8).push(m);
+            distributionMap.get(count9).push(m);
           });
           console.log(`  Assignment Distribution:`);
           for (let i = 0; i <= 4; i++) {
@@ -4013,8 +4013,8 @@ ${"!".repeat(60)}`);
         }
         const distributionMap = /* @__PURE__ */ new Map();
         this.ministers.forEach((m) => {
-          const count8 = m.monthlyAssignmentCount || 0;
-          distributionMap.set(count8, (distributionMap.get(count8) || 0) + 1);
+          const count9 = m.monthlyAssignmentCount || 0;
+          distributionMap.set(count9, (distributionMap.get(count9) || 0) + 1);
         });
         console.log(`[FAIR_ALGORITHM] \u{1F4CA} Current monthly distribution:`);
         for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
@@ -4028,9 +4028,9 @@ ${"!".repeat(60)}`);
       /**
        * Seleciona ministros de backup
        */
-      selectBackupMinisters(available, selected, count8) {
+      selectBackupMinisters(available, selected, count9) {
         const selectedIds = new Set(selected.map((m) => m.id).filter((id) => id !== null));
-        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count8);
+        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count9);
         return backup;
       }
       /**
@@ -5877,10 +5877,10 @@ async function handleMessage(message) {
     const normalizedText = text2.trim().toLowerCase();
     console.log(`\u{1F4AC} De ${normalizedPhone}: ${normalizedText}`);
     const ministro = await db.query.ministros.findFirst({
-      where: (m, { eq: eq29 }) => eq29(m.telefone, normalizedPhone)
+      where: (m, { eq: eq30 }) => eq30(m.telefone, normalizedPhone)
     });
     const proximaEscala = await db.query.escalas.findFirst({
-      where: (e, { eq: eq29 }) => eq29(e.ministro_id, ministro?.id),
+      where: (e, { eq: eq30 }) => eq30(e.ministro_id, ministro?.id),
       orderBy: (e, { asc: asc4 }) => asc4(e.data)
     });
     let resposta = "";
@@ -10772,7 +10772,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
       )
     );
-    const metrics = {
+    const metrics2 = {
       totalSchedules: existingSchedules.length,
       uniqueMinisters: new Set(existingSchedules.map((s) => s.schedules.ministerId)).size,
       averageSchedulesPerMinister: existingSchedules.length / new Set(existingSchedules.map((s) => s.schedules.ministerId)).size,
@@ -10786,7 +10786,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
       data: {
         month,
         year,
-        metrics,
+        metrics: metrics2,
         schedules: existingSchedules.length
       }
     });
@@ -11565,16 +11565,16 @@ function calculateGenerationStatistics(schedules3, options) {
   }
   const coverage = totalPositions > 0 ? filledPositions / totalPositions : 0;
   const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count8) => sum + count8, 0) / assignments.length : 0;
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count9) => sum + count9, 0) / assignments.length : 0;
   const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum, count8) => sum + Math.pow(count8 - avgAssignments, 2), 0) / assignments.length
+    assignments.reduce((sum, count9) => sum + Math.pow(count9 - avgAssignments, 2), 0) / assignments.length
   ) / (avgAssignments || 1) : 0;
   const fairness = Math.max(0, 1 - variance);
   const maxAllowed = options.maxAssignmentsPerMinister || 4;
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count8]) => count8 > maxAllowed || count8 < 1).map(([ministerId, count8]) => ({
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count9]) => count9 > maxAllowed || count9 < 1).map(([ministerId, count9]) => ({
     ministerId,
-    count: count8,
-    reason: count8 > maxAllowed ? "too_many" : "too_few"
+    count: count9,
+    reason: count9 > maxAllowed ? "too_many" : "too_few"
   }));
   const conflicts = [];
   if (variance > 0.3) {
@@ -11686,7 +11686,7 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
       }
     }
   }
-  const overAssigned = Object.entries(ministerCounts).filter(([_, count8]) => count8 > 4);
+  const overAssigned = Object.entries(ministerCounts).filter(([_, count9]) => count9 > 4);
   const noOverAssignments = overAssigned.length === 0;
   if (!noOverAssignments) {
     warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
@@ -11781,7 +11781,7 @@ import { Router as Router8 } from "express";
 await init_scheduleGenerator();
 import { addMonths } from "date-fns";
 var router8 = Router8();
-function generateMockMinisters(count8 = 50) {
+function generateMockMinisters(count9 = 50) {
   const firstNames = [
     "Jo\xE3o",
     "Maria",
@@ -11865,7 +11865,7 @@ function generateMockMinisters(count8 = 50) {
     "Mendes"
   ];
   const ministers = [];
-  for (let i = 0; i < count8; i++) {
+  for (let i = 0; i < count9; i++) {
     const firstName = firstNames[i % firstNames.length];
     const lastName = lastNames[Math.floor(i / firstNames.length) % lastNames.length];
     const name = `${firstName} ${lastName}`;
@@ -12056,16 +12056,16 @@ function calculateTestStatistics(schedules3, ministers) {
   const coverage = totalPositions > 0 ? filledPositions / totalPositions * 100 : 0;
   const averageConfidence = schedules3.length > 0 ? totalConfidence / schedules3.length : 0;
   const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count8) => sum + count8, 0) / assignments.length : 0;
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count9) => sum + count9, 0) / assignments.length : 0;
   const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum, count8) => sum + Math.pow(count8 - avgAssignments, 2), 0) / assignments.length
+    assignments.reduce((sum, count9) => sum + Math.pow(count9 - avgAssignments, 2), 0) / assignments.length
   ) : 0;
   const fairness = Math.max(0, 1 - variance / (avgAssignments || 1));
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count8]) => count8 > 4 || count8 < 1).map(([ministerId, count8]) => ({
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count9]) => count9 > 4 || count9 < 1).map(([ministerId, count9]) => ({
     ministerId,
     ministerName: ministers.find((m) => m.id === ministerId)?.name || "Unknown",
-    count: count8,
-    reason: count8 > 4 ? "too_many_assignments" : "too_few_assignments"
+    count: count9,
+    reason: count9 > 4 ? "too_many_assignments" : "too_few_assignments"
   }));
   const massTypes = {};
   for (const schedule of schedules3) {
@@ -13288,8 +13288,8 @@ router12.get("/unread-count", authenticateToken, async (req, res) => {
       console.warn("[NOTIFICATIONS] Invalid notifications data");
       return res.json({ count: 0 });
     }
-    const count8 = allNotifications.filter((n) => n && !n.read).length;
-    res.json({ count: count8 });
+    const count9 = allNotifications.filter((n) => n && !n.read).length;
+    res.json({ count: count9 });
   } catch (error) {
     console.error("[NOTIFICATIONS] Error counting notifications:", error);
     res.json({ count: 0 });
@@ -15950,8 +15950,150 @@ router21.post("/escala-mes", async (req, res) => {
 });
 var whatsapp_api_default = router21;
 
-// server/escala-alternativa/routes/escalaRoutes.ts
+// server/routes/metrics.ts
 import { Router as Router22 } from "express";
+await init_db();
+init_schema();
+import { eq as eq27, count as count7, gte as gte14 } from "drizzle-orm";
+import os from "os";
+var router22 = Router22();
+var metrics = {
+  total: 0,
+  success: 0,
+  errors: 0,
+  avgResponseTime: 0,
+  lastReset: /* @__PURE__ */ new Date(),
+  responseTimes: []
+};
+function updateMetrics(statusCode, responseTime) {
+  metrics.total++;
+  if (statusCode >= 200 && statusCode < 400) {
+    metrics.success++;
+  } else if (statusCode >= 400) {
+    metrics.errors++;
+  }
+  metrics.responseTimes.push(responseTime);
+  if (metrics.responseTimes.length > 1e3) {
+    metrics.responseTimes.shift();
+  }
+  if (metrics.responseTimes.length > 0) {
+    metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;
+  }
+}
+router22.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const uptime = process.uptime();
+    const memoryUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    const [usersCount] = await db.select({ count: count7() }).from(users);
+    const [activeUsersCount] = await db.select({ count: count7() }).from(users).where(eq27(users.status, "active"));
+    const [schedulesCount] = await db.select({ count: count7() }).from(schedules);
+    const [publishedSchedulesCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.status, "published"));
+    const [responsesCount] = await db.select({ count: count7() }).from(questionnaireResponses);
+    const [substitutionsCount] = await db.select({ count: count7() }).from(substitutionRequests);
+    const [pendingSubstitutions] = await db.select({ count: count7() }).from(substitutionRequests).where(eq27(substitutionRequests.status, "pending"));
+    const thirtyDaysAgo = /* @__PURE__ */ new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const [recentUsersCount] = await db.select({ count: count7() }).from(users).where(gte14(users.createdAt, thirtyDaysAgo));
+    const sortedTimes = [...metrics.responseTimes].sort((a, b) => a - b);
+    const p50 = sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0;
+    const p95 = sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0;
+    const p99 = sortedTimes[Math.floor(sortedTimes.length * 0.99)] || 0;
+    res.json({
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      // Métricas do servidor
+      server: {
+        uptime: Math.floor(uptime),
+        uptimeFormatted: formatUptime(uptime),
+        nodeVersion: process.version,
+        platform: os.platform(),
+        arch: os.arch(),
+        hostname: os.hostname()
+      },
+      // Uso de recursos
+      resources: {
+        memory: {
+          rss: Math.round(memoryUsage.rss / 1024 / 1024),
+          // MB
+          heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+          heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+          external: Math.round(memoryUsage.external / 1024 / 1024),
+          heapUsagePercent: Math.round(memoryUsage.heapUsed / memoryUsage.heapTotal * 100)
+        },
+        cpu: {
+          user: Math.round(cpuUsage.user / 1e3),
+          // ms
+          system: Math.round(cpuUsage.system / 1e3)
+        },
+        system: {
+          totalMemory: Math.round(os.totalmem() / 1024 / 1024 / 1024),
+          // GB
+          freeMemory: Math.round(os.freemem() / 1024 / 1024 / 1024),
+          loadAverage: os.loadavg(),
+          cpuCount: os.cpus().length
+        }
+      },
+      // Métricas de requisições HTTP
+      requests: {
+        total: metrics.total,
+        success: metrics.success,
+        errors: metrics.errors,
+        successRate: metrics.total > 0 ? Math.round(metrics.success / metrics.total * 100) : 0,
+        errorRate: metrics.total > 0 ? Math.round(metrics.errors / metrics.total * 100) : 0,
+        avgResponseTime: Math.round(metrics.avgResponseTime),
+        p50ResponseTime: Math.round(p50),
+        p95ResponseTime: Math.round(p95),
+        p99ResponseTime: Math.round(p99),
+        lastReset: metrics.lastReset.toISOString()
+      },
+      // Estatísticas do banco de dados
+      database: {
+        users: {
+          total: usersCount.count,
+          active: activeUsersCount.count,
+          recentSignups: recentUsersCount.count
+        },
+        schedules: {
+          total: schedulesCount.count,
+          published: publishedSchedulesCount.count
+        },
+        responses: responsesCount.count,
+        substitutions: {
+          total: substitutionsCount.count,
+          pending: pendingSubstitutions.count
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching metrics:", error);
+    res.status(500).json({ error: "Failed to fetch metrics" });
+  }
+});
+router22.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+  metrics.total = 0;
+  metrics.success = 0;
+  metrics.errors = 0;
+  metrics.avgResponseTime = 0;
+  metrics.responseTimes = [];
+  metrics.lastReset = /* @__PURE__ */ new Date();
+  res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
+});
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor(seconds % 86400 / 3600);
+  const minutes = Math.floor(seconds % 3600 / 60);
+  const secs = Math.floor(seconds % 60);
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+  return parts.join(" ");
+}
+var metrics_default = router22;
+
+// server/escala-alternativa/routes/escalaRoutes.ts
+import { Router as Router23 } from "express";
 
 // server/escala-alternativa/services/pythonScheduleService.ts
 init_logger();
@@ -16035,19 +16177,19 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq27, and as and20 } from "drizzle-orm";
+import { eq as eq28, and as and20 } from "drizzle-orm";
 async function gerarEscalaAlternativa(req, res) {
   try {
     const { year, month, questionnaireId } = req.body;
     logger.info(`Gerando escala alternativa para ${month}/${year} usando Python`);
     let targetQuestionnaire;
     if (questionnaireId) {
-      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq27(questionnaires.id, questionnaireId)).limit(1);
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq28(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
         and20(
-          eq27(questionnaires.year, year),
-          eq27(questionnaires.month, month)
+          eq28(questionnaires.year, year),
+          eq28(questionnaires.month, month)
         )
       ).limit(1);
     }
@@ -16064,8 +16206,8 @@ async function gerarEscalaAlternativa(req, res) {
       role: users.role,
       preferredPositions: users.preferredTimes,
       avoidPositions: users.canServeAsCouple
-    }).from(users).where(eq27(users.status, "active"));
-    const responses = await db.select().from(questionnaireResponses).where(eq27(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+    }).from(users).where(eq28(users.status, "active"));
+    const responses = await db.select().from(questionnaireResponses).where(eq28(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
     const formattedUsers = ministersData.map((m) => ({
       id: m.id,
@@ -16159,33 +16301,33 @@ async function verificarPython(req, res) {
 }
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-var router22 = Router22();
-router22.get("/check-python", authenticateToken, verificarPython);
-router22.post(
+var router23 = Router23();
+router23.get("/check-python", authenticateToken, verificarPython);
+router23.post(
   "/gerar",
   authenticateToken,
   requireRole(["coordenador", "gestor"]),
   gerarEscalaAlternativa
 );
-router22.post(
+router23.post(
   "/comparar",
   authenticateToken,
   requireRole(["gestor"]),
   compararAlgoritmos
 );
-var escalaRoutes_default = router22;
+var escalaRoutes_default = router23;
 
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z7 } from "zod";
-import { eq as eq28, count as count7, or as or9 } from "drizzle-orm";
+import { eq as eq29, count as count8, or as or9 } from "drizzle-orm";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql16 } from "drizzle-orm";
+import { sql as sql17 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -16260,7 +16402,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql16`
+    db.execute(sql17`
       SELECT
         id,
         title,
@@ -16276,7 +16418,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql16`
+    db.execute(sql17`
       SELECT
         id,
         track_id AS "trackId",
@@ -16291,7 +16433,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql16`
+    db.execute(sql17`
       SELECT
         id,
         module_id AS "moduleId",
@@ -16308,7 +16450,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql16`
+    userId ? db.execute(sql17`
           SELECT
             id,
             user_id AS "userId",
@@ -16410,7 +16552,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql16`
+  const lessonResult = await db.execute(sql17`
     SELECT
       id,
       module_id AS "moduleId",
@@ -16432,7 +16574,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql16`
+  const sectionsResult = await db.execute(sql17`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -16471,7 +16613,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql16`
+    const progressResult = await db.execute(sql17`
       SELECT
         id,
         user_id AS "userId",
@@ -16507,7 +16649,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql16`
+  const result = await db.execute(sql17`
     SELECT
       id,
       user_id AS "userId",
@@ -16524,7 +16666,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql16`
+  const result = await db.execute(sql17`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -16545,7 +16687,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql16`
+    await db.execute(sql17`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -16557,7 +16699,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql16`
+    await db.execute(sql17`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16622,7 +16764,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql16`
+        ...totalSections > 0 ? (await db.execute(sql17`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -16631,7 +16773,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql16`
+    await db.execute(sql17`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -16643,7 +16785,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql16`
+    await db.execute(sql17`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16712,7 +16854,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql16`
+    await db.execute(sql17`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -16724,7 +16866,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql16`
+    await db.execute(sql17`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16779,7 +16921,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql16`
+  const query = trackId ? sql17`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16797,7 +16939,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql16`
+      ` : sql17`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16916,6 +17058,7 @@ async function registerRoutes(app2) {
   app2.use("/api/dashboard", dashboard_default);
   app2.use("/api/schedules/incomplete", dashboard_default);
   app2.use("/api/push-subscriptions", pushSubscriptions_default);
+  app2.use("/api/metrics", metrics_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -17111,7 +17254,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq28(users.id, userId));
+      }).from(users).where(eq29(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -17310,25 +17453,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
-        const [substitutionCheck] = await db.select({ count: count7() }).from(substitutionRequests).where(or9(
-          eq28(substitutionRequests.requesterId, userId),
-          eq28(substitutionRequests.substituteId, userId)
+        const [substitutionCheck] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
+          eq29(substitutionRequests.requesterId, userId),
+          eq29(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -17365,12 +17508,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or9(
-            eq28(substitutionRequests.requesterId, userId),
-            eq28(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
+            eq29(substitutionRequests.requesterId, userId),
+            eq29(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17399,12 +17542,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count7() }).from(questionnaireResponses).where(eq28(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count7() }).from(schedules).where(eq28(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count7() }).from(substitutionRequests).where(or9(
-            eq28(substitutionRequests.requesterId, userId),
-            eq28(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
+            eq29(substitutionRequests.requesterId, userId),
+            eq29(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17859,7 +18002,7 @@ async function registerRoutes(app2) {
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
         and21(
-          eq28(substitutionRequests.status, "pending"),
+          eq29(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -17872,7 +18015,7 @@ async function registerRoutes(app2) {
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
         and21(
-          eq28(substitutionRequests.status, "pending"),
+          eq29(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -18228,6 +18371,7 @@ app.use((req, res, next) => {
     if (originalPath.startsWith("/api")) {
       const logLine = `${req.method} ${originalPath} ${res.statusCode} in ${duration}ms`;
       log(logLine);
+      updateMetrics(res.statusCode, duration);
     }
   });
   next();
