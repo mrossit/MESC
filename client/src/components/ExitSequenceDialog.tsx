@@ -184,7 +184,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                   return (
                     <div
                       key={position}
-                      className="flex items-center gap-3 p-3 border-2 rounded-lg bg-[#bccbd6] text-[#21163d]"
+                      className="flex items-center gap-3 p-3 border-2 rounded-lg bg-[#d1daed] text-[#0a1440]"
                       style={{ backgroundColor: bgColor, borderColor: borderColor }}
                     >
                       <div
