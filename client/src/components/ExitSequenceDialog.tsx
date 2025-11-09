@@ -112,9 +112,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                     MEZANINO - COMEÇAM A SAÍDA APÓS O PAI NOSSO...
                   </Badge>
                   {totalMinisters >= 25 && (
-                    <span className="text-xs text-muted-foreground">
-                      (Atenção: 2 ministros no mezanino!)
-                    </span>
+                    <span className="text-xs text-muted-foreground">(Atenção: +2 ministros no mezanino!)</span>
                   )}
                 </div>
                 <div className="grid gap-2">
@@ -164,7 +162,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
 
             {/* Sequência Principal */}
             <div className="space-y-3">
-              <Badge className="text-white" style={{ backgroundColor: '#004173' }}>
+              <Badge className="text-white" style={{ backgroundColor: '#576994' }}>
                 SEQUÊNCIA DE SAÍDA APÓS O CORDEIRO...
               </Badge>
               <div className="grid gap-2">
@@ -174,12 +172,12 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                   const ministerName = positionToMinister.get(position);
 
                   // Cores para Auxiliares: #bf9780 | #ecd6c0
-                  // Cores para Demais: #7cdaf9 | #004173
-                  const bgColor = isAuxiliar ? '#ecd6c0' : '#7cdaf9';
-                  const borderColor = isAuxiliar ? '#bf9780' : '#004173';
-                  const numberBg = isAuxiliar ? '#bf9780' : '#004173';
-                  const badgeBg = isAuxiliar ? '#f8ede4' : '#e0f5ff';
-                  const textColor = isAuxiliar ? '#9d7b66' : '#003961';
+                  // Cores para Demais: #b3c5d7 | #576994 | #1f254a
+                  const bgColor = isAuxiliar ? '#ecd6c0' : '#b3c5d7';
+                  const borderColor = isAuxiliar ? '#bf9780' : '#576994';
+                  const numberBg = isAuxiliar ? '#bf9780' : '#1f254a';
+                  const badgeBg = isAuxiliar ? '#f8ede4' : '#dce4ee';
+                  const textColor = isAuxiliar ? '#9d7b66' : '#1f254a';
 
                   return (
                     <div

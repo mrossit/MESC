@@ -2146,29 +2146,18 @@ export default function Schedules() {
               {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </DialogDescription>
 
-            {/* Botão de Sequência de Saída - para todos os ministros escalados */}
-            {(() => {
-              const currentMinister = ministers.find(m => m.id === user?.id);
-              const userAssignmentsForThisMass = selectedDateAssignments?.filter(
-                a => a.ministerId === currentMinister?.id
-              ) || [];
-              const isUserScaledInThisMass = userAssignmentsForThisMass.length > 0;
-
-              if (isUserScaledInThisMass) {
-                return (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsExitSequenceDialogOpen(true)}
-                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:text-amber-300 mt-[5px] mb-[5px] pt-[12px] pb-[12px] text-[#300a05] bg-[#ffbfed]"
-                  >
-                    <Users className="h-3.5 w-3.5 mr-1" />
-                    <span>Sequência de Saída</span>
-                  </Button>
-                );
-              }
-              return null;
-            })()}
+            {/* Botão de Sequência de Saída - disponível para todos */}
+            {selectedDateAssignments && selectedDateAssignments.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsExitSequenceDialogOpen(true)}
+                className="w-full sm:w-auto text-[10px] sm:text-xs border-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:text-amber-300 mt-2 h-7 sm:h-8 px-2 sm:px-3 text-[#300a05] bg-[#ffbfed]"
+              >
+                <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                <span>Sequência de Saída</span>
+              </Button>
+            )}
           </DialogHeader>
 
           <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
