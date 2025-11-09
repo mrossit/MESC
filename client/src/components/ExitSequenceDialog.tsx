@@ -112,7 +112,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                     MEZANINO - COMEÇAM A SAÍDA APÓS O PAI NOSSO...
                   </Badge>
                   {totalMinisters >= 25 && (
-                    <span className="text-xs text-muted-foreground">(Atenção: +2 ministros no mezanino!)</span>
+                    <span className="text-xs text-muted-foreground">(Atenção: +2 ministros saem com o mezanino!)</span>
                   )}
                 </div>
                 <div className="grid gap-2">
