@@ -147,7 +147,7 @@ export function ExitSequenceDialog({ open, onOpenChange, totalMinisters, assigne
                             >
                               {index + 1}º
                             </Badge>
-                            <span className="text-sm font-medium">
+                            <span className="text-sm font-medium text-[#5c3075]">
                               {LITURGICAL_POSITIONS[position]}
                             </span>
                             {isAreaExterna && (
