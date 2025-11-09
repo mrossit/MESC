@@ -64,6 +64,7 @@ import { LITURGICAL_POSITIONS, getPositionDisplayName, MASS_TIMES_BY_DAY, ALL_MA
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
+import { ExitSequenceDialog } from "@/components/ExitSequenceDialog";
 import * as XLSX from 'xlsx';
 
 // Helper function to capitalize first letter of a string
@@ -239,6 +240,7 @@ export default function Schedules() {
   const [isViewScheduleDialogOpen, setIsViewScheduleDialogOpen] = useState(false);
   const [selectedDateAssignments, setSelectedDateAssignments] = useState<ScheduleAssignment[]>([]);
   const [loadingDateAssignments, setLoadingDateAssignments] = useState(false);
+  const [isExitSequenceDialogOpen, setIsExitSequenceDialogOpen] = useState(false);
   const [isSubstitutionDialogOpen, setIsSubstitutionDialogOpen] = useState(false);
   const [selectedAssignmentForSubstitution, setSelectedAssignmentForSubstitution] = useState<ScheduleAssignment | null>(null);
   const [substitutionReason, setSubstitutionReason] = useState("");
@@ -2143,6 +2145,30 @@ export default function Schedules() {
             <DialogDescription className="text-xs sm:text-sm">
               {selectedDate && format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </DialogDescription>
+
+            {/* Botão de Sequência de Saída - para todos os ministros escalados */}
+            {(() => {
+              const currentMinister = ministers.find(m => m.id === user?.id);
+              const userAssignmentsForThisMass = selectedDateAssignments?.filter(
+                a => a.ministerId === currentMinister?.id
+              ) || [];
+              const isUserScaledInThisMass = userAssignmentsForThisMass.length > 0;
+
+              if (isUserScaledInThisMass) {
+                return (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsExitSequenceDialogOpen(true)}
+                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 mt-2"
+                  >
+                    <Users className="h-3.5 w-3.5 mr-1" />
+                    <span>Sequência de Saída</span>
+                  </Button>
+                );
+              }
+              return null;
+            })()}
           </DialogHeader>
 
           <ScrollArea className="max-h-[65vh] sm:max-h-[60vh] -mx-3 px-3 sm:-mx-0 sm:px-0">
@@ -3127,6 +3153,15 @@ export default function Schedules() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Sequência de Saída */}
+      <ExitSequenceDialog
+        open={isExitSequenceDialogOpen}
+        onOpenChange={setIsExitSequenceDialogOpen}
+        totalMinisters={selectedDateAssignments?.length || 0}
+        assignedPositions={selectedDateAssignments?.map(a => a.position) || []}
+        assignments={selectedDateAssignments || []}
+      />
       </div>
     </Layout>
   );
