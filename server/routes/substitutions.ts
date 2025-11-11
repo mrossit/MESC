@@ -3,6 +3,7 @@ import { db } from "../db";
 import { substitutionRequests, schedules, users, questionnaireResponses, questionnaires } from "@shared/schema";
 import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
+import { scheduleCache } from "../services/scheduleCache";
 
 const router = Router();
 
@@ -344,6 +345,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60))
     });
 
+    // Invalidate cache for the affected schedule month
+    scheduleCache.invalidateByDate(schedule.date);
+    console.log(`[CACHE] Invalidated cache after creating substitution request for ${schedule.date}`);
+
     res.json({
       success: true,
       message,
@@ -581,6 +586,13 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
 
     const newStatus = response === "accepted" ? "approved" : "rejected";
 
+    // Buscar dados da escala para invalidar cache
+    const [schedule] = await db
+      .select({ date: schedules.date })
+      .from(schedules)
+      .where(eq(schedules.id, request.scheduleId))
+      .limit(1);
+
     // Phase 1 - Data Integrity: Wrap in transaction to ensure atomicity
     await db.transaction(async (tx) => {
       // Atualizar solicitação
@@ -607,6 +619,12 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
           .where(eq(schedules.id, request.scheduleId));
       }
     });
+
+    // Invalidate cache for the affected schedule month
+    if (schedule) {
+      scheduleCache.invalidateByDate(schedule.date);
+      console.log(`[CACHE] Invalidated cache after responding to substitution for ${schedule.date}`);
+    }
 
     res.json({
       success: true,
@@ -722,6 +740,10 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       })
       .where(eq(schedules.id, request.scheduleId));
 
+    // Invalidate cache for the affected schedule month
+    scheduleCache.invalidateByDate(schedule.date);
+    console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
+
     res.json({
       success: true,
       message: "Substituição aceita com sucesso!"
@@ -775,6 +797,13 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
+    // Buscar dados da escala para invalidar cache
+    const [schedule] = await db
+      .select({ date: schedules.date })
+      .from(schedules)
+      .where(eq(schedules.id, request.scheduleId))
+      .limit(1);
+
     // Atualizar status para cancelado
     await db
       .update(substitutionRequests)
@@ -783,6 +812,12 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
         updatedAt: new Date()
       })
       .where(eq(substitutionRequests.id, id));
+
+    // Invalidate cache for the affected schedule month
+    if (schedule) {
+      scheduleCache.invalidateByDate(schedule.date);
+      console.log(`[CACHE] Invalidated cache after canceling substitution for ${schedule.date}`);
+    }
 
     res.json({
       success: true,
