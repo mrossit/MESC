@@ -778,59 +778,67 @@ router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['ges
 async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], replaceExisting: boolean): Promise<number> {
   if (!db) return 0;
 
-  let savedCount = 0;
+  // Phase 1 - Data Integrity: Wrap entire operation in transaction
+  return await db.transaction(async (tx) => {
+    let savedCount = 0;
 
-  for (const schedule of generatedSchedules) {
-    if (!schedule.massTime.date) continue;
+    for (const schedule of generatedSchedules) {
+      if (!schedule.massTime.date) continue;
 
-    // Se replaceExisting, remover escalas existentes para esta data/hora
-    if (replaceExisting) {
-      // FIRST: Get existing schedule IDs for this date/time
-      const existingSchedules = await db.select({ id: schedules.id })
-        .from(schedules)
-        .where(
-          and(
-            eq(schedules.date, schedule.massTime.date),
-            eq(schedules.time, schedule.massTime.time)
-          )
-        );
+      // Se replaceExisting, remover escalas existentes para esta data/hora
+      if (replaceExisting) {
+        // FIRST: Get existing schedule IDs for this date/time
+        const existingSchedules = await tx.select({ id: schedules.id })
+          .from(schedules)
+          .where(
+            and(
+              eq(schedules.date, schedule.massTime.date),
+              eq(schedules.time, schedule.massTime.time),
+              eq(schedules.isDeleted, false) // Only get non-deleted schedules
+            )
+          );
 
-      if (existingSchedules.length > 0) {
-        const scheduleIds = existingSchedules.map(s => s.id);
+        if (existingSchedules.length > 0) {
+          const scheduleIds = existingSchedules.map(s => s.id);
 
-        // Delete related substitution requests first (foreign key constraint)
-        await db.delete(substitutionRequests).where(
-          inArray(substitutionRequests.scheduleId, scheduleIds)
-        );
+          // Soft delete related substitution requests (will be handled by CASCADE)
+          // For now, we'll keep them but they'll be orphaned if we hard delete later
+        }
+
+        // Soft delete old schedules instead of hard delete
+        await tx.update(schedules)
+          .set({
+            deletedAt: new Date(),
+            isDeleted: true
+          })
+          .where(
+            and(
+              eq(schedules.date, schedule.massTime.date),
+              eq(schedules.time, schedule.massTime.time),
+              eq(schedules.isDeleted, false)
+            )
+          );
       }
 
-      // Now safe to delete old schedules
-      await db.delete(schedules).where(
-        and(
-          eq(schedules.date, schedule.massTime.date),
-          eq(schedules.time, schedule.massTime.time)
-        )
-      );
+      // Inserir ministros escalados com posição para manter a ordem
+      for (let i = 0; i < schedule.ministers.length; i++) {
+        const minister = schedule.ministers[i];
+        await tx.insert(schedules).values({
+          date: schedule.massTime.date,
+          time: schedule.massTime.time,
+          type: 'missa',
+          location: null,
+          ministerId: minister.id, // Pode ser null para VACANTE
+          position: (minister as any).position || (i + 1), // Usar position do ministro ou index + 1
+          status: 'scheduled',
+          notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
+        });
+        savedCount++;
+      }
     }
 
-    // Inserir ministros escalados com posição para manter a ordem
-    for (let i = 0; i < schedule.ministers.length; i++) {
-      const minister = schedule.ministers[i];
-      await db.insert(schedules).values({
-        date: schedule.massTime.date,
-        time: schedule.massTime.time,
-        type: 'missa',
-        location: null,
-        ministerId: minister.id, // Pode ser null para VACANTE
-        position: (minister as any).position || (i + 1), // Usar position do ministro ou index + 1
-        status: 'scheduled',
-        notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
-      });
-      savedCount++;
-    }
-  }
-
-  return savedCount;
+    return savedCount;
+  });
 }
 
 function calculateAverageConfidence(schedules: GeneratedSchedule[]): number {

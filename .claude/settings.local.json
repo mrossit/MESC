@@ -14,7 +14,17 @@
       "Bash(pkill:*)",
       "Bash(curl:*)",
       "Bash(git push:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm run check:*)",
+      "Bash(mkdir:*)",
+      "Bash(BACKUP_FILE=\"backups/backup_pre_phase1_20251110.sql\")",
+      "Bash(pg_dump:*)",
+      "Bash($BACKUP_FILE)",
+      "Bash(pgrep:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(echo:*)",
+      "Bash(TEST_USER_ID=\"f8227758-8c85-40bc-9dfa-c1809ee405e4\":*)"
     ],
     "deny": [],
     "ask": []

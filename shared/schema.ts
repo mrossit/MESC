@@ -1,4 +1,4 @@
-import { sql, relations } from 'drizzle-orm';
+import { sql, relations, eq } from 'drizzle-orm';
 import {
   index,
   uniqueIndex,
@@ -128,6 +128,10 @@ export const users = pgTable("users", {
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+
+  // Soft delete fields (Phase 1 - Data Integrity)
+  deletedAt: timestamp("deleted_at"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
 // Families table
@@ -141,8 +145,8 @@ export const families = pgTable('families', {
 // Family relationships table
 export const familyRelationships = pgTable('family_relationships', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
-  relatedUserId: varchar('related_user_id').notNull().references(() => users.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  relatedUserId: varchar('related_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   relationshipType: varchar('relationship_type', { length: 50 }).notNull(), // spouse, parent, child, sibling
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
@@ -160,7 +164,7 @@ export const questionnaires = pgTable('questionnaires', {
   deadline: timestamp('deadline'),
   targetUserIds: jsonb('target_user_ids').$type<string[]>(),
   notifiedUserIds: jsonb('notified_user_ids').$type<string[]>(),
-  createdById: varchar('created_by_id').references(() => users.id),
+  createdById: varchar('created_by_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -168,8 +172,8 @@ export const questionnaires = pgTable('questionnaires', {
 // Questionnaire responses
 export const questionnaireResponses = pgTable('questionnaire_responses', {
   id: uuid('id').primaryKey().defaultRandom(),
-  questionnaireId: uuid('questionnaire_id').notNull().references(() => questionnaires.id),
-  userId: varchar('user_id').notNull().references(() => users.id),
+  questionnaireId: uuid('questionnaire_id').notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   responses: jsonb('responses').notNull(),
   
   availableSundays: jsonb('available_sundays').$type<string[]>(),
@@ -194,11 +198,20 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   // Family sharing fields
   sharedWithFamilyIds: jsonb('shared_with_family_ids').$type<string[]>(),
   isSharedResponse: boolean('is_shared_response').default(false),
-  sharedFromUserId: varchar('shared_from_user_id').references(() => users.id),
-  
+  sharedFromUserId: varchar('shared_from_user_id').references(() => users.id, { onDelete: 'set null' }),
+
   submittedAt: timestamp('submitted_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
-});
+  updatedAt: timestamp('updated_at').defaultNow(),
+
+  // Soft delete fields (Phase 1 - Data Integrity)
+  deletedAt: timestamp("deleted_at"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+}, (table) => [
+  // Unique constraint for UPSERT - one active response per user per questionnaire
+  uniqueIndex('questionnaire_responses_user_questionnaire_unique')
+    .on(table.userId, table.questionnaireId)
+    .where(eq(table.isDeleted, false))
+]);
 
 // Schedules
 export const schedules = pgTable('schedules', {
@@ -207,10 +220,10 @@ export const schedules = pgTable('schedules', {
   time: time('time').notNull(),
   type: scheduleTypeEnum('type').notNull().default('missa'),
   location: varchar('location', { length: 255 }),
-  ministerId: varchar('minister_id').references(() => users.id),
+  ministerId: varchar('minister_id').references(() => users.id, { onDelete: 'set null' }),
   position: integer('position').default(0), // Order position for ministers at same date/time
   status: varchar('status', { length: 20 }).notNull().default('scheduled'),
-  substituteId: varchar('substitute_id').references(() => users.id),
+  substituteId: varchar('substitute_id').references(() => users.id, { onDelete: 'set null' }),
   notes: text('notes'),
   onSiteAdjustments: jsonb('on_site_adjustments').$type<{
     originalPosition?: number;
@@ -219,7 +232,11 @@ export const schedules = pgTable('schedules', {
     adjustedAt?: string;
     reason?: string;
   }[]>(),
-  createdAt: timestamp('created_at').defaultNow()
+  createdAt: timestamp('created_at').defaultNow(),
+
+  // Soft delete fields (Phase 1 - Data Integrity)
+  deletedAt: timestamp("deleted_at"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
 // Mass Execution Logs (for auxiliary leaders)
@@ -318,7 +335,7 @@ export const substitutionRequests = pgTable('substitution_requests', {
 // Notifications
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   type: notificationTypeEnum('type').notNull(),
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
@@ -374,8 +391,8 @@ export const formationModules = pgTable('formation_modules', {
 // Formation progress
 export const formationProgress = pgTable('formation_progress', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
-  moduleId: uuid('module_id').notNull().references(() => formationModules.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => formationModules.id, { onDelete: 'cascade' }),
   status: formationStatusEnum('status').notNull().default('not_started'),
   progressPercentage: integer('progress_percentage').default(0),
   completedAt: timestamp('completed_at'),
@@ -420,8 +437,8 @@ export const formationLessonSections = pgTable('formation_lesson_sections', {
 // Formation lesson progress (track user progress through individual lessons)
 export const formationLessonProgress = pgTable('formation_lesson_progress', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
-  lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  lessonId: uuid('lesson_id').notNull().references(() => formationLessons.id, { onDelete: 'cascade' }),
   status: formationStatusEnum('status').notNull().default('not_started'),
   progressPercentage: integer('progress_percentage').default(0),
   timeSpentMinutes: integer('time_spent_minutes').default(0),
@@ -449,11 +466,11 @@ export const massTimesConfig = pgTable('mass_times_config', {
 // Password reset requests
 export const passwordResetRequests = pgTable('password_reset_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   requestedAt: timestamp('requested_at').defaultNow().notNull(),
   reason: text('reason'),
   status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, approved, rejected
-  processedBy: varchar('processed_by').references(() => users.id),
+  processedBy: varchar('processed_by').references(() => users.id, { onDelete: 'set null' }),
   processedAt: timestamp('processed_at'),
   adminNotes: text('admin_notes'),
   createdAt: timestamp('created_at').defaultNow()
@@ -480,7 +497,7 @@ export const activeSessions = pgTable('active_sessions', {
 // Activity logs for tracking user interactions and analytics
 export const activityLogs = pgTable('activity_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: varchar('user_id').notNull().references(() => users.id),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   action: varchar('action', { length: 100 }).notNull(), // login, view_schedule, respond_questionnaire, etc
   details: jsonb('details'), // Additional context for the action
   ipAddress: varchar('ip_address', { length: 45 }),
