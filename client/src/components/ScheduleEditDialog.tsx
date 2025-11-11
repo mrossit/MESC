@@ -206,7 +206,8 @@ export function ScheduleEditDialog({
         description: "As alterações foram salvas com sucesso."
       });
 
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // Invalidar todos os caches de schedules (hierárquicos e não-hierárquicos)
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'], exact: false });
       onSave();
       onOpenChange(false);
     } catch (error: any) {

@@ -357,7 +357,10 @@ export default function Substitutions() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+      // Invalidar todas as queries de substituições e schedules relacionados
+      queryClient.invalidateQueries({ queryKey: ["/api/substitutions"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
       toast({
         title: "Sucesso",
         description: "Resposta enviada com sucesso",
@@ -394,7 +397,10 @@ export default function Substitutions() {
           title: "Sucesso",
           description: "Solicitação cancelada com sucesso"
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+        // Invalidar todas as queries de substituições e schedules relacionados
+        queryClient.invalidateQueries({ queryKey: ["/api/substitutions"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
         setIsCancelDialogOpen(false);
         setRequestToCancel(null);
       } else {
@@ -586,7 +592,9 @@ export default function Substitutions() {
           title: "Sucesso",
           description: result.message || "Solicitação criada com sucesso"
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+        // Invalidar todas as queries de substituições e schedules relacionados
+        queryClient.invalidateQueries({ queryKey: ["/api/substitutions"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules"], exact: false });
         queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
         setIsNewRequestDialogOpen(false);
         setRequestReason("");
@@ -827,7 +835,10 @@ export default function Substitutions() {
                                     title: "Sucesso",
                                     description: "Substituição aceita com sucesso!"
                                   });
-                                  queryClient.invalidateQueries({ queryKey: ["/api/substitutions"] });
+                                  // Invalidar todas as queries de substituições e schedules relacionados
+                                  queryClient.invalidateQueries({ queryKey: ["/api/substitutions"], exact: false });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/schedules"], exact: false });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
                                 } else {
                                   const error = await response.json();
                                   toast({
