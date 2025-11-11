@@ -84,8 +84,10 @@ The core scheduling algorithm (`server/utils/scheduleGenerator.ts`) implements a
 - **Position preferences** - Respects minister's preferred roles
 - **Family coordination** - Can group or separate married ministers
 
-**Performance Optimization - Schedule Cache:**
-The system implements an in-memory caching layer (`server/services/scheduleCache.ts`) for schedule queries:
+**Performance Optimization - Two-Tier Caching Strategy:**
+
+**Backend Cache Layer** (`server/services/scheduleCache.ts`):
+- **Purpose:** Reduce PostgreSQL database load for frequently accessed monthly schedules
 - **Cache Strategy:** Read-through caching with 1-hour TTL fallback
 - **Cache Key:** Month-based (`${year}-${month}`) for efficient monthly views
 - **Invalidation:** Automatic cache clearing on all schedule/substitution mutations
@@ -95,6 +97,23 @@ The system implements an in-memory caching layer (`server/services/scheduleCache
   - Substitution workflows (create, respond, claim, cancel)
 - **Benefits:** Reduces database load for frequently accessed monthly schedules
 - **Monitoring:** Built-in stats tracking (hits, misses, size)
+
+**Frontend Cache Layer** (React Query):
+- **Purpose:** Optimize HTTP requests and provide instant UI updates
+- **Cache Strategy:** TanStack Query with hierarchical queryKey invalidation
+- **Invalidation Pattern:** Uses `exact: false` to enable broad invalidations
+- **Key Pattern:**
+  ```typescript
+  // Invalidates all schedule-related queries (current and future hierarchical keys)
+  queryClient.invalidateQueries({ queryKey: ["/api/schedules"], exact: false });
+  // Maintains specific invalidations for queries with different prefixes
+  queryClient.invalidateQueries({ queryKey: ["/api/schedules/minister/upcoming"] });
+  ```
+- **Benefits:** 
+  - Supports future hierarchical queryKeys (e.g., `['/api/schedules', { year, month }]`)
+  - Automatic cache synchronization between related data (substitutions → schedules)
+  - Better UX with instant data updates after mutations
+- **Implementation:** All mutation points in schedules and substitutions invalidate both layers
 
 ### Data Storage Solutions
 
