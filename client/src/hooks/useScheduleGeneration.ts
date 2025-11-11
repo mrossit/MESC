@@ -73,7 +73,8 @@ export function useScheduleGeneration() {
     },
     onSuccess: (data) => {
       setHasUnsavedChanges(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // Invalidar todos os caches de schedules (hierárquicos e não-hierárquicos)
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'], exact: false });
 
       if (data.data?.failedCount > 0) {
         const errorSummary = data.data.errorSummary;
