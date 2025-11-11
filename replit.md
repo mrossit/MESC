@@ -84,6 +84,18 @@ The core scheduling algorithm (`server/utils/scheduleGenerator.ts`) implements a
 - **Position preferences** - Respects minister's preferred roles
 - **Family coordination** - Can group or separate married ministers
 
+**Performance Optimization - Schedule Cache:**
+The system implements an in-memory caching layer (`server/services/scheduleCache.ts`) for schedule queries:
+- **Cache Strategy:** Read-through caching with 1-hour TTL fallback
+- **Cache Key:** Month-based (`${year}-${month}`) for efficient monthly views
+- **Invalidation:** Automatic cache clearing on all schedule/substitution mutations
+- **Invalidation Points:**
+  - Schedule CRUD operations (create, update, delete, publish, unpublish)
+  - Bulk operations (save-generated, emergency-save)
+  - Substitution workflows (create, respond, claim, cancel)
+- **Benefits:** Reduces database load for frequently accessed monthly schedules
+- **Monitoring:** Built-in stats tracking (hits, misses, size)
+
 ### Data Storage Solutions
 
 **Primary Database:** PostgreSQL (via Neon serverless)

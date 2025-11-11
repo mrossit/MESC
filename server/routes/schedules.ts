@@ -3,6 +3,7 @@ import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
+import { scheduleCache } from "../services/scheduleCache";
 
 // Stub implementations for missing functions
 const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
@@ -153,6 +154,15 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       const yearNum = parseInt(year as string);
       const monthNum = parseInt(month as string);
 
+      // Check cache first
+      const cachedData = scheduleCache.get(yearNum, monthNum);
+      if (cachedData) {
+        console.log(`[SCHEDULES_API] ⚡ Returning cached data for ${monthNum}/${yearNum}`);
+        return res.json(cachedData);
+      }
+
+      console.log(`[SCHEDULES_API] 🔍 Cache miss - querying database for ${monthNum}/${yearNum}`);
+
       // Format dates as YYYY-MM-DD strings directly
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-01`;
 
@@ -269,11 +279,17 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         publishedAt: hasPublishedSchedules ? new Date().toISOString() : undefined
       } : null;
 
-      res.json({
+      const responseData = {
         schedules: monthlySchedule ? [monthlySchedule] : [],
         assignments: assignmentsList,
         substitutions: substitutionsList
-      });
+      };
+
+      // Cache the result
+      scheduleCache.set(yearNum, monthNum, responseData);
+      console.log(`[SCHEDULES_API] 💾 Cached result for ${monthNum}/${yearNum}`);
+
+      res.json(responseData);
     } else {
       const allSchedules = await db.select().from(schedules);
       res.json({ schedules: allSchedules, assignments: [] });
@@ -347,6 +363,9 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
       { scheduleId: newSchedule[0].id }
     );
 
+    // Invalidate cache for the month of the new schedule
+    scheduleCache.invalidateByDate(date);
+
     res.status(201).json(newSchedule[0]);
   } catch (error) {
     console.error("Error creating schedule:", error);
@@ -384,6 +403,11 @@ router.put("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (r
       `Escala atualizada`,
       { scheduleId: req.params.id }
     );
+
+    // Invalidate cache for the month of the updated schedule
+    if (updatedSchedule[0].date) {
+      scheduleCache.invalidateByDate(updatedSchedule[0].date);
+    }
 
     res.json(updatedSchedule[0]);
   } catch (error) {
@@ -444,6 +468,9 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
       { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
 
+    // Invalidate cache for this month
+    scheduleCache.invalidate(year, month);
+
     // TODO: Send notifications to all ministers
 
     res.json({
@@ -503,6 +530,11 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       `Escala excluída`,
       { scheduleId: req.params.id }
     );
+
+    // Invalidate cache for the month of the deleted schedule
+    if (schedule[0].date) {
+      scheduleCache.invalidateByDate(schedule[0].date);
+    }
 
     console.log(`Successfully deleted schedule: ${schedule[0].id}`);
     res.json({ message: "Escala excluída com sucesso" });
@@ -577,6 +609,9 @@ router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor'
       `Publicação cancelada para ${month}/${year}`,
       { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
+
+    // Invalidate cache for this month
+    scheduleCache.invalidate(year, month);
 
     console.log('[UNPUBLISH_API] Success! Returning response');
 

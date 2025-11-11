@@ -9,6 +9,7 @@ import { schedules, users, massTimesConfig, questionnaires, questionnaireRespons
 import { and, gte, lte, eq, sql, ne, desc, inArray } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
+import { scheduleCache } from '../services/scheduleCache';
 
 const router = Router();
 
@@ -331,6 +332,13 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
       console.log('First 5 errors:', JSON.stringify(errors.slice(0, 5), null, 2));
     }
 
+    // Invalidate cache for the affected month (even if all saves failed, 
+    // because we deleted existing schedules)
+    if (month && year) {
+      scheduleCache.invalidate(year, month);
+      console.log(`[CACHE] Invalidated cache for ${month}/${year} after emergency save (saved: ${savedCount}, failed: ${failedCount})`);
+    }
+
     res.json({
       success: failedCount === 0,
       message: failedCount === 0
@@ -545,6 +553,37 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
 
     console.log(`Successfully inserted ${saved.length} schedules`);
     logger.info(`Salvas ${saved.length} escalas no banco de dados`);
+
+    // Invalidate cache for the month(s) affected (even if inserts failed,
+    // because we may have deleted existing schedules)
+    const uniqueMonths = new Set<string>();
+    
+    // Extract months from successfully saved schedules
+    saved.forEach(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      const year = scheduleDate.getFullYear();
+      const month = scheduleDate.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      uniqueMonths.add(monthKey);
+    });
+
+    // Also extract months from schedules we attempted to insert
+    schedulesToInsert.forEach(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      const year = scheduleDate.getFullYear();
+      const month = scheduleDate.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      uniqueMonths.add(monthKey);
+    });
+
+    uniqueMonths.forEach(monthKey => {
+      const [year, month] = monthKey.split('-').map(Number);
+      scheduleCache.invalidate(year, month);
+    });
+    
+    if (uniqueMonths.size > 0) {
+      console.log(`[CACHE] Invalidated cache for months: ${Array.from(uniqueMonths).join(', ')}`);
+    }
 
     res.json({
       success: true,
