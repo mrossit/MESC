@@ -581,28 +581,32 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
 
     const newStatus = response === "accepted" ? "approved" : "rejected";
 
-    // Atualizar solicitação
-    await db
-      .update(substitutionRequests)
-      .set({
-        status: newStatus,
-        approvedBy: userId,
-        approvedAt: new Date(),
-        responseMessage: responseMessage || null,
-        updatedAt: new Date()
-      })
-      .where(eq(substitutionRequests.id, id));
-
-    // Se aceito, atualizar a escala
-    if (newStatus === "approved" && request.substituteId) {
-      await db
-        .update(schedules)
+    // Phase 1 - Data Integrity: Wrap in transaction to ensure atomicity
+    await db.transaction(async (tx) => {
+      // Atualizar solicitação
+      await tx
+        .update(substitutionRequests)
         .set({
-          ministerId: request.substituteId,
-          substituteId: request.requesterId
+          status: newStatus,
+          approvedBy: userId,
+          approvedAt: new Date(),
+          responseMessage: responseMessage || null,
+          updatedAt: new Date()
         })
-        .where(eq(schedules.id, request.scheduleId));
-    }
+        .where(eq(substitutionRequests.id, id));
+
+      // Se aceito, atualizar a escala
+      // CRITICAL: Both updates must succeed or both must fail (transaction ensures this)
+      if (newStatus === "approved" && request.substituteId) {
+        await tx
+          .update(schedules)
+          .set({
+            ministerId: request.substituteId,
+            substituteId: request.requesterId
+          })
+          .where(eq(schedules.id, request.scheduleId));
+      }
+    });
 
     res.json({
       success: true,

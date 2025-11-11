@@ -258,7 +258,12 @@ export class DatabaseStorage implements IStorage {
   }
   // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    // Phase 1 - Data Integrity: Filter out soft-deleted users
+    const [user] = await db.select().from(users)
+      .where(and(
+        eq(users.id, id),
+        eq(users.isDeleted, false)
+      ));
     return user;
   }
 
@@ -332,15 +337,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    // Phase 1 - Data Integrity: Soft delete with transaction
+    await db.transaction(async (tx) => {
+      // Soft delete the user (marks as deleted instead of removing)
+      await tx
+        .update(users)
+        .set({
+          deletedAt: new Date(),
+          isDeleted: true,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, id));
+
+      // Note: Related records will be handled by CASCADE DELETE constraints
+      // when we eventually implement hard delete (GDPR compliance)
+      // For now, related records remain in the database
+    });
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    // Phase 1 - Data Integrity: Filter out soft-deleted users
+    return await db.select().from(users)
+      .where(eq(users.isDeleted, false))
+      .orderBy(desc(users.createdAt));
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.role, role as any));
+    // Phase 1 - Data Integrity: Filter out soft-deleted users
+    return await db.select().from(users)
+      .where(and(
+        eq(users.role, role as any),
+        eq(users.isDeleted, false)
+      ));
   }
 
   // Questionnaire operations
