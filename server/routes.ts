@@ -1419,7 +1419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: `Migração concluída com sucesso! ${affectedRequests.length} registro(s) atualizado(s).`,
         affectedCount: affectedRequests.length,
-        affectedRequests: affectedRequests.map(r => ({
+        affectedRequests: affectedRequests.map((r: any) => ({
           id: r.id,
           createdAt: r.createdAt
         }))
