@@ -4,6 +4,7 @@ import { db } from '../db';
 import { users, schedules, questionnaireResponses, substitutionRequests } from '@shared/schema';
 import { eq, count, gte, sql } from 'drizzle-orm';
 import os from 'os';
+import { scheduleCache } from '../services/scheduleCache';
 
 const router = Router();
 
@@ -290,6 +291,30 @@ router.post('/reset', authenticateToken, requireRole(['gestor']), async (req: Au
   metrics.lastReset = new Date();
   
   res.json({ message: 'Métricas resetadas com sucesso', lastReset: metrics.lastReset });
+});
+
+// POST /api/metrics/clear-cache - Limpar todos os caches do sistema
+router.post('/clear-cache', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
+  try {
+    // Obter estatísticas antes de limpar
+    const cacheStats = scheduleCache.getStats();
+    
+    // Limpar cache do servidor
+    scheduleCache.clear();
+    
+    res.json({ 
+      message: 'Cache limpo com sucesso',
+      cleared: {
+        scheduleCache: {
+          entriesCleared: cacheStats.size,
+          keys: cacheStats.keys
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    res.status(500).json({ error: 'Falha ao limpar cache' });
+  }
 });
 
 // Função auxiliar para formatar uptime

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +130,7 @@ interface SlowRoutesData {
 export default function Metrics() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [showErrorsDialog, setShowErrorsDialog] = useState(false);
+  const { toast } = useToast();
   
   const { data: metrics, isLoading, refetch } = useQuery<MetricsData>({
     queryKey: ['/api/metrics'],
@@ -164,6 +166,45 @@ export default function Metrics() {
       }
     } catch (error) {
       console.error('Error resetting metrics:', error);
+    }
+  };
+  
+  const handleClearCache = async () => {
+    if (!confirm('Tem certeza que deseja limpar todos os caches do sistema?')) return;
+    
+    try {
+      const response = await fetch('/api/metrics/clear-cache', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Limpar cache do servidor (feito pelo backend)
+        // Invalidar caches específicos do React Query (preservando autenticação/sessão)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['/api/schedules'], exact: false }),
+          queryClient.invalidateQueries({ queryKey: ['/api/questionnaires'], exact: false }),
+          queryClient.invalidateQueries({ queryKey: ['/api/substitutions'], exact: false }),
+          queryClient.invalidateQueries({ queryKey: ['/api/ministers'], exact: false }),
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard'], exact: false }),
+          queryClient.invalidateQueries({ queryKey: ['/api/formations'], exact: false }),
+          refetch()
+        ]);
+        
+        toast({
+          title: "Cache limpo com sucesso!",
+          description: `${data.cleared.scheduleCache.entriesCleared} entradas de cache de escalas foram removidas.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast({
+        title: "Erro ao limpar cache",
+        description: "Ocorreu um erro ao tentar limpar o cache. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
   
@@ -327,14 +368,26 @@ export default function Metrics() {
                 </CardTitle>
                 <CardDescription>Performance das APIs</CardDescription>
               </div>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={handleReset}
-                data-testid="button-reset-metrics"
-              >
-                Resetar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClearCache}
+                  data-testid="button-clear-cache"
+                  className="flex items-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Limpar Cache
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleReset}
+                  data-testid="button-reset-metrics"
+                >
+                  Resetar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
