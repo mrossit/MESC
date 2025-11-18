@@ -174,9 +174,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Version endpoint (public - sem auth, sem CSRF)
   app.use('/api/version', versionRoutes);
 
-  // Dashboard routes (mix of read and incomplete schedules)
-  app.use('/api/dashboard', dashboardRoutes);
-  app.use('/api/schedules/incomplete', dashboardRoutes);
+  // Dashboard routes (apenas leitura, requer autenticação)
+  app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+  app.use('/api/schedules/incomplete', authenticateToken, dashboardRoutes);
 
   // Push notification subscription routes (read endpoints sem CSRF, write endpoints com CSRF)
   app.use('/api/push-subscriptions', pushSubscriptionsRoutes);
