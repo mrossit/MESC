@@ -115,6 +115,16 @@ The core scheduling algorithm (`server/utils/scheduleGenerator.ts`) implements a
   - Better UX with instant data updates after mutations
 - **Implementation:** All mutation points in schedules and substitutions invalidate both layers
 
+**Cache Management:**
+- **Manual Cache Clear:** `POST /api/metrics/clear-cache` endpoint (gestor role only)
+- **UI Access:** "Limpar Cache" button in Metrics dashboard (`/metrics`)
+- **Behavior:**
+  - Clears server-side schedule cache (Map in memory)
+  - Invalidates specific React Query caches (preserves authentication/session)
+  - Shows toast with count of cleared entries
+  - Targeted invalidation prevents user logout during cache clear
+- **Use Cases:** Troubleshooting stale data, after bulk imports, testing cache performance
+
 ### Data Storage Solutions
 
 **Primary Database:** PostgreSQL (via Neon serverless)
