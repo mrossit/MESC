@@ -8,6 +8,22 @@ import os from 'os';
 const router = Router();
 
 // Armazenar métricas de requisições em memória
+interface ErrorLog {
+  route: string;
+  method: string;
+  statusCode: number;
+  message: string;
+  timestamp: Date;
+}
+
+interface RouteStats {
+  count: number;
+  totalTime: number;
+  avgTime: number;
+  minTime: number;
+  maxTime: number;
+}
+
 interface RequestMetrics {
   total: number;
   success: number;
@@ -15,6 +31,8 @@ interface RequestMetrics {
   avgResponseTime: number;
   lastReset: Date;
   responseTimes: number[];
+  errorLogs: ErrorLog[];
+  routeStats: Map<string, RouteStats>;
 }
 
 const metrics: RequestMetrics = {
@@ -23,17 +41,63 @@ const metrics: RequestMetrics = {
   errors: 0,
   avgResponseTime: 0,
   lastReset: new Date(),
-  responseTimes: []
+  responseTimes: [],
+  errorLogs: [],
+  routeStats: new Map()
 };
 
 // Função para atualizar métricas (será chamada pelo middleware)
-export function updateMetrics(statusCode: number, responseTime: number) {
+export function updateMetrics(
+  statusCode: number, 
+  responseTime: number, 
+  route?: string, 
+  method?: string,
+  errorMessage?: string
+) {
   metrics.total++;
   
   if (statusCode >= 200 && statusCode < 400) {
     metrics.success++;
   } else if (statusCode >= 400) {
     metrics.errors++;
+    
+    // Registrar erro detalhado
+    if (route) {
+      metrics.errorLogs.push({
+        route,
+        method: method || 'UNKNOWN',
+        statusCode,
+        message: errorMessage || `HTTP ${statusCode}`,
+        timestamp: new Date()
+      });
+      
+      // Manter apenas os últimos 100 erros
+      if (metrics.errorLogs.length > 100) {
+        metrics.errorLogs.shift();
+      }
+    }
+  }
+  
+  // Rastrear estatísticas por rota
+  if (route) {
+    const key = `${method || 'GET'} ${route}`;
+    const stats = metrics.routeStats.get(key);
+    
+    if (stats) {
+      stats.count++;
+      stats.totalTime += responseTime;
+      stats.avgTime = stats.totalTime / stats.count;
+      stats.minTime = Math.min(stats.minTime, responseTime);
+      stats.maxTime = Math.max(stats.maxTime, responseTime);
+    } else {
+      metrics.routeStats.set(key, {
+        count: 1,
+        totalTime: responseTime,
+        avgTime: responseTime,
+        minTime: responseTime,
+        maxTime: responseTime
+      });
+    }
   }
   
   metrics.responseTimes.push(responseTime);
@@ -167,6 +231,53 @@ router.get('/', authenticateToken, requireRole(['gestor', 'coordenador']), async
   }
 });
 
+// GET /api/metrics/errors - Obter lista de erros
+router.get('/errors', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    // Retornar erros ordenados do mais recente para o mais antigo
+    const errors = [...metrics.errorLogs]
+      .reverse()
+      .map(error => ({
+        ...error,
+        timestamp: error.timestamp.toISOString()
+      }));
+    
+    res.json({
+      total: metrics.errorLogs.length,
+      errors
+    });
+  } catch (error) {
+    console.error('Error fetching error logs:', error);
+    res.status(500).json({ error: 'Failed to fetch error logs' });
+  }
+});
+
+// GET /api/metrics/slow-routes - Obter top 10 rotas mais lentas
+router.get('/slow-routes', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    // Converter Map para array e ordenar por tempo médio (desc)
+    const routes = Array.from(metrics.routeStats.entries())
+      .map(([route, stats]) => ({
+        route,
+        count: stats.count,
+        avgTime: Math.round(stats.avgTime),
+        minTime: Math.round(stats.minTime),
+        maxTime: Math.round(stats.maxTime),
+        totalTime: Math.round(stats.totalTime)
+      }))
+      .sort((a, b) => b.avgTime - a.avgTime)
+      .slice(0, 10); // Top 10
+    
+    res.json({
+      total: metrics.routeStats.size,
+      routes
+    });
+  } catch (error) {
+    console.error('Error fetching slow routes:', error);
+    res.status(500).json({ error: 'Failed to fetch slow routes' });
+  }
+});
+
 // POST /api/metrics/reset - Resetar métricas de requisições
 router.post('/reset', authenticateToken, requireRole(['gestor']), async (req: AuthRequest, res) => {
   metrics.total = 0;
@@ -174,6 +285,8 @@ router.post('/reset', authenticateToken, requireRole(['gestor']), async (req: Au
   metrics.errors = 0;
   metrics.avgResponseTime = 0;
   metrics.responseTimes = [];
+  metrics.errorLogs = [];
+  metrics.routeStats.clear();
   metrics.lastReset = new Date();
   
   res.json({ message: 'Métricas resetadas com sucesso', lastReset: metrics.lastReset });

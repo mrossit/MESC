@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,9 +19,26 @@ import {
   XCircle,
   RefreshCw,
   Cpu,
-  HardDrive
+  HardDrive,
+  Eye,
+  Zap
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface MetricsData {
   timestamp: string;
@@ -81,12 +99,50 @@ interface MetricsData {
   };
 }
 
+interface ErrorLog {
+  route: string;
+  method: string;
+  statusCode: number;
+  message: string;
+  timestamp: string;
+}
+
+interface ErrorsData {
+  total: number;
+  errors: ErrorLog[];
+}
+
+interface RouteStats {
+  route: string;
+  count: number;
+  avgTime: number;
+  minTime: number;
+  maxTime: number;
+  totalTime: number;
+}
+
+interface SlowRoutesData {
+  total: number;
+  routes: RouteStats[];
+}
+
 export default function Metrics() {
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [showErrorsDialog, setShowErrorsDialog] = useState(false);
   
   const { data: metrics, isLoading, refetch } = useQuery<MetricsData>({
     queryKey: ['/api/metrics'],
     refetchInterval: autoRefresh ? 5000 : false,
+  });
+  
+  const { data: errorsData } = useQuery<ErrorsData>({
+    queryKey: ['/api/metrics/errors'],
+    enabled: showErrorsDialog,
+  });
+  
+  const { data: slowRoutesData } = useQuery<SlowRoutesData>({
+    queryKey: ['/api/metrics/slow-routes'],
+    refetchInterval: autoRefresh ? 10000 : false,
   });
   
   const handleReset = async () => {
@@ -99,7 +155,12 @@ export default function Metrics() {
       });
       
       if (response.ok) {
-        refetch();
+        // Invalidar todas as queries de métricas
+        await Promise.all([
+          refetch(),
+          queryClient.invalidateQueries({ queryKey: ['/api/metrics/errors'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/metrics/slow-routes'] })
+        ]);
       }
     } catch (error) {
       console.error('Error resetting metrics:', error);
@@ -297,13 +358,21 @@ export default function Metrics() {
                   <p className="text-xs text-muted-foreground">{metrics.requests.successRate}%</p>
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm font-medium">Erros</span>
+                <div 
+                  className="space-y-1 cursor-pointer hover:bg-accent rounded-lg p-3 transition-colors"
+                  onClick={() => setShowErrorsDialog(true)}
+                  data-testid="card-errors"
+                >
+                  <div className="flex items-center gap-2 justify-between">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium">Erros</span>
+                    </div>
+                    <Eye className="h-3 w-3 text-muted-foreground" />
                   </div>
                   <p className="text-2xl font-bold text-red-600">{metrics.requests.errors}</p>
                   <p className="text-xs text-muted-foreground">{metrics.requests.errorRate}%</p>
+                  <p className="text-xs text-blue-600 mt-1">Clique para ver detalhes</p>
                 </div>
                 
                 <div className="space-y-1">
@@ -411,7 +480,113 @@ export default function Metrics() {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Rotas Mais Lentas */}
+        {slowRoutesData && slowRoutesData.routes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Top 10 Rotas Mais Lentas
+              </CardTitle>
+              <CardDescription>Rotas que mais demoram em média</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-24">Método</TableHead>
+                    <TableHead>Rota</TableHead>
+                    <TableHead className="text-right">Requisições</TableHead>
+                    <TableHead className="text-right">Tempo Médio</TableHead>
+                    <TableHead className="text-right">Min</TableHead>
+                    <TableHead className="text-right">Max</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {slowRoutesData.routes.map((route, index) => {
+                    const [method, ...pathParts] = route.route.split(' ');
+                    const path = pathParts.join(' ');
+                    
+                    return (
+                      <TableRow key={index} data-testid={`row-slow-route-${index}`}>
+                        <TableCell>
+                          <Badge variant="outline" className="font-mono font-semibold">
+                            {method}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{path}</TableCell>
+                        <TableCell className="text-right">{route.count}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${
+                            route.avgTime > 1000 ? 'text-red-600' :
+                            route.avgTime > 500 ? 'text-orange-600' :
+                            'text-green-600'
+                          }`}>
+                            {route.avgTime}ms
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">{route.minTime}ms</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{route.maxTime}ms</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
+      
+      {/* Dialog de Erros */}
+      <Dialog open={showErrorsDialog} onOpenChange={setShowErrorsDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              Detalhes dos Erros
+            </DialogTitle>
+            <DialogDescription>
+              {errorsData ? `${errorsData.total} erro(s) registrado(s)` : 'Carregando...'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {errorsData && errorsData.errors.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Hora</TableHead>
+                  <TableHead>Método</TableHead>
+                  <TableHead>Rota</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Mensagem</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {errorsData.errors.map((error, index) => (
+                  <TableRow key={index} data-testid={`row-error-${index}`}>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(error.timestamp).toLocaleTimeString('pt-BR')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{error.method}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">{error.route}</TableCell>
+                    <TableCell>
+                      <Badge variant="destructive">{error.statusCode}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">{error.message}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhum erro registrado
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

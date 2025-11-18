@@ -172,12 +172,24 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
+  const originalMethod = req.method;
+  
+  // Capturar mensagem de erro se houver
+  let errorMessage: string | undefined;
+  const originalJson = res.json.bind(res);
+  res.json = function (body: any) {
+    if (res.statusCode >= 400 && body && typeof body === 'object') {
+      errorMessage = body.message || body.error || JSON.stringify(body);
+    }
+    return originalJson(body);
+  };
+  
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (originalPath.startsWith("/api")) {
-      const logLine = `${req.method} ${originalPath} ${res.statusCode} in ${duration}ms`;
+      const logLine = `${originalMethod} ${originalPath} ${res.statusCode} in ${duration}ms`;
       log(logLine);
-      updateMetrics(res.statusCode, duration);
+      updateMetrics(res.statusCode, duration, originalPath, originalMethod, errorMessage);
     }
   });
   next();
