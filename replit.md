@@ -168,12 +168,19 @@ shared/schema.ts - Centralized schema definition
 - CORS restrictions (whitelist-based)
 - Session management with automatic expiration
 - Role-based route protection
+- All dashboard routes require authentication (Nov 2025)
+
+**Protected Routes:**
+- **Public (no auth):** `/api/version`
+- **Authenticated (requires login):** `/api/dashboard/*`, `/api/schedules/*`, `/api/ministers/*`, `/api/reports/*`
+- **Role-restricted:** `/api/metrics/*` (gestor/coordenador only), `/api/formation/admin/*` (coordenador/gestor)
 
 **Key Design Decisions:**
 - **Stateless authentication** - JWT allows horizontal scaling
 - **Secure cookie storage** - Prevents XSS attacks on tokens
 - **Role-based middleware** - Reusable authorization checks
 - **Development mode role switcher** - Fast testing across roles
+- **Defense in depth** - Multiple layers of security (auth + CSRF + rate limiting)
 
 ### API Structure
 
