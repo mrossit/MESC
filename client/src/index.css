@@ -481,6 +481,14 @@
   .hover\:bg-burgundy:hover {
     background-color: rgb(var(--burgundy));
   }
+
+  .hover\:bg-burgundy-soft:hover {
+    background-color: rgb(var(--burgundy-soft));
+  }
+
+  .bg-burgundy-soft {
+    background-color: rgb(var(--burgundy-soft));
+  }
 }
 
 /* Animações suaves */

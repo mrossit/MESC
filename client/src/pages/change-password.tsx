@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function ChangePassword() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [showSuccess, setShowSuccess] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -28,7 +29,7 @@ export default function ChangePassword() {
 
   const changePasswordMutation = useMutation({
     mutationFn: async (data: typeof passwords) => {
-      
+
       try {
         const result = await apiRequest("POST", "/api/auth/change-password", data);
         return result;
@@ -36,12 +37,18 @@ export default function ChangePassword() {
         throw error;
       }
     },
-    onSuccess: () => {
-      toast({
-        title: "Senha alterada com sucesso",
-        description: "Você agora pode acessar o sistema normalmente.",
+    onSuccess: async () => {
+      // Fazer logout para limpar a sessão
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
-      navigate("/dashboard");
+
+      // Limpar cache de autenticação
+      queryClient.clear();
+
+      // Mostrar tela de sucesso
+      setShowSuccess(true);
     },
     onError: (error: any) => {
       toast({
@@ -95,14 +102,54 @@ export default function ChangePassword() {
 
   const passwordStrength = getPasswordStrength(passwords.newPassword);
 
+  // Tela de sucesso
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-responsive pattern-bg-responsive flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <div className="flex items-center justify-center mb-4">
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-center text-green-700 dark:text-green-400">
+              Senha Alterada com Sucesso!
+            </CardTitle>
+            <p className="text-muted-foreground text-center text-sm">
+              Sua nova senha foi salva com segurança. Agora você pode fazer login com ela.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-300">
+                Por segurança, você foi desconectado do sistema. Use sua nova senha para fazer login novamente.
+              </AlertDescription>
+            </Alert>
+
+            <Button
+              className="w-full"
+              onClick={() => navigate("/login")}
+              data-testid="button-go-to-login"
+            >
+              Ir para o Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Tela de troca de senha
   return (
-    <div className="min-h-screen bg-gradient-bg pattern-bg flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-liturgical border-mesc-beige/30">
+    <div className="min-h-screen bg-gradient-responsive pattern-bg-responsive flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-liturgical border-border/50">
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-2">
-            <img 
-              src="/logo-santuario.png" 
-              alt="Santuário São Judas Tadeu" 
+            <img
+              src="/logo-santuario.png"
+              alt="Santuário São Judas Tadeu"
               className="h-40 w-40 object-contain"
             />
           </div>
@@ -127,7 +174,7 @@ export default function ChangePassword() {
                   placeholder="Digite sua senha atual"
                   value={passwords.currentPassword}
                   onChange={(e) => handlePasswordChange("currentPassword", e.target.value)}
-                  className="border-mesc-beige focus:border-mesc-gold focus:ring-mesc-gold pr-12"
+                  className="border-border focus:border-ring focus:ring-ring pr-12"
                   required
                   data-testid="input-current-password"
                 />
@@ -159,7 +206,7 @@ export default function ChangePassword() {
                   placeholder="Digite sua nova senha"
                   value={passwords.newPassword}
                   onChange={(e) => handlePasswordChange("newPassword", e.target.value)}
-                  className="border-mesc-beige focus:border-mesc-gold focus:ring-mesc-gold pr-12"
+                  className="border-border focus:border-ring focus:ring-ring pr-12"
                   required
                   data-testid="input-new-password"
                 />
@@ -196,7 +243,7 @@ export default function ChangePassword() {
                   placeholder="Confirme sua nova senha"
                   value={passwords.confirmPassword}
                   onChange={(e) => handlePasswordChange("confirmPassword", e.target.value)}
-                  className="border-mesc-beige focus:border-mesc-gold focus:ring-mesc-gold pr-12"
+                  className="border-border focus:border-ring focus:ring-ring pr-12"
                   required
                   data-testid="input-confirm-password"
                 />
@@ -225,7 +272,7 @@ export default function ChangePassword() {
             <div className="space-y-3 pt-2">
               <Button
                 type="submit"
-                className="w-full bg-mesc-red hover:bg-mesc-red/90 text-mesc-pearl font-medium"
+                className="w-full bg-burgundy hover:bg-burgundy-soft text-white font-medium"
                 disabled={
                   changePasswordMutation.isPending ||
                   !passwords.currentPassword ||
@@ -240,7 +287,7 @@ export default function ChangePassword() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-mesc-beige hover:bg-mesc-beige/10"
+                className="w-full"
                 onClick={() => navigate("/dashboard")}
               >
                 Cancelar
@@ -249,7 +296,7 @@ export default function ChangePassword() {
           </form>
 
           <div className="mt-6">
-            <Alert className="border-mesc-beige/50">
+            <Alert className="border-border/50">
               <AlertDescription className="text-xs text-muted-foreground">
                 <strong>Dicas para uma senha segura:</strong>
                 <ul className="mt-1 space-y-1 list-disc list-inside">

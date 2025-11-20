@@ -177,14 +177,31 @@ async function importProductionData() {
     // Inserir respostas no desenvolvimento (já limpamos antes ao deletar users)
     if (prodResponses.length > 0) {
       for (const response of prodResponses) {
+        // Converter campos JSONB para string se necessário
+        const responsesJson = typeof response.responses === 'string'
+          ? response.responses
+          : JSON.stringify(response.responses);
+
+        const unmappedJson = response.unmapped_responses
+          ? (typeof response.unmapped_responses === 'string'
+              ? response.unmapped_responses
+              : JSON.stringify(response.unmapped_responses))
+          : null;
+
+        const warningsJson = response.processing_warnings
+          ? (typeof response.processing_warnings === 'string'
+              ? response.processing_warnings
+              : JSON.stringify(response.processing_warnings))
+          : null;
+
         await devSql`
           INSERT INTO questionnaire_responses (
             id, questionnaire_id, user_id, responses, submitted_at,
             unmapped_responses, processing_warnings
           ) VALUES (
             ${response.id}, ${response.questionnaire_id}, ${response.user_id},
-            ${response.responses}, ${response.submitted_at},
-            ${response.unmapped_responses}, ${response.processing_warnings}
+            ${responsesJson}::jsonb, ${response.submitted_at},
+            ${unmappedJson}::jsonb, ${warningsJson}::jsonb
           )
         `;
       }
