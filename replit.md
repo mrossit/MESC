@@ -151,6 +151,11 @@ shared/schema.ts - Centralized schema definition
 - **Compatibility layer** for reading different questionnaire formats across months
 - **Automatic migrations** via Drizzle Kit
 - **Backup system** with automated database dumps
+- **Soft Delete Pattern for Questionnaire Responses** (Nov 2025):
+  - Global unique constraint on (userId, questionnaireId) regardless of soft delete status
+  - UPSERT always updates the same record and resurrects soft-deleted responses
+  - Prevents duplicate responses while maintaining audit trail via soft delete flags
+  - Guarantees atomic operations without race conditions
 
 ### Authentication & Authorization
 

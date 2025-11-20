@@ -24,7 +24,8 @@
       "Bash(netstat:*)",
       "Bash(ss:*)",
       "Bash(echo:*)",
-      "Bash(TEST_USER_ID=\"f8227758-8c85-40bc-9dfa-c1809ee405e4\":*)"
+      "Bash(TEST_USER_ID=\"f8227758-8c85-40bc-9dfa-c1809ee405e4\":*)",
+      "Bash(NODE_ENV=development npx tsx:*)"
     ],
     "deny": [],
     "ask": []

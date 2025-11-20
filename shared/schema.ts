@@ -2,6 +2,7 @@ import { sql, relations, eq } from 'drizzle-orm';
 import {
   index,
   uniqueIndex,
+  unique,
   jsonb,
   pgTable,
   timestamp,
@@ -206,12 +207,12 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   // Soft delete fields (Phase 1 - Data Integrity)
   deletedAt: timestamp("deleted_at"),
   isDeleted: boolean("is_deleted").notNull().default(false),
-}, (table) => [
-  // Unique constraint for UPSERT - one active response per user per questionnaire
-  uniqueIndex('questionnaire_responses_user_questionnaire_unique')
-    .on(table.userId, table.questionnaireId)
-    .where(eq(table.isDeleted, false))
-]);
+}, (table) => ({
+  // Global unique constraint for UPSERT - one response per user per questionnaire (regardless of soft delete status)
+  // Soft delete is just a flag - UPSERT always updates the same record and resurrects it
+  userQuestionnaireUnique: unique('questionnaire_responses_user_questionnaire_key')
+    .on(table.userId, table.questionnaireId),
+}));
 
 // Schedules
 export const schedules = pgTable('schedules', {

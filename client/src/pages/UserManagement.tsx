@@ -151,8 +151,12 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Função para carregar usuários (declarada antes dos mutations)
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (showLoading = true) => {
     try {
+      if (showLoading) {
+        setLoading(true);
+      }
+
       const response = await fetch("/api/users", {
         credentials: "include"
       });
@@ -175,7 +179,9 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -185,7 +191,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       return apiRequest("PATCH", `/api/users/${userId}/role`, { role });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers(false);
       toast({
         title: "Sucesso",
         description: "Perfil do usuário atualizado com sucesso.",
@@ -205,7 +211,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       return apiRequest("PATCH", `/api/users/${userId}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers(false);
       toast({
         title: "Sucesso",
         description: "Status do usuário atualizado com sucesso.",
@@ -225,16 +231,20 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       const response = await apiRequest("POST", "/api/auth/admin-reset-password", { userId, newPassword });
       return response.json();
     },
-    onSuccess: async () => {
-      // Recarregar lista de usuários sem usar query cache (previne loop)
-      await fetchUsers();
+    onSuccess: () => {
+      // Limpar estados do dialog
+      setResetPasswordOpen(false);
+      setNewPassword("");
+      setSelectedUserId(null);
+
+      // Atualizar lista de usuários
+      fetchUsers(false);
+
+      // Mostrar toast
       toast({
         title: "Senha resetada com sucesso",
         description: "O usuário receberá uma notificação e precisará criar uma nova senha no próximo login.",
       });
-      setResetPasswordOpen(false);
-      setNewPassword("");
-      setSelectedUserId(null);
     },
     onError: (error) => {
       toast({
@@ -251,7 +261,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers(false);
       toast({
         title: "Usuário excluído",
         description: "O usuário foi excluído permanentemente do sistema.",
@@ -279,7 +289,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      fetchUsers(false);
       toast({
         title: "Usuário bloqueado",
         description: "O usuário foi bloqueado e não poderá mais acessar o sistema.",
@@ -729,7 +739,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-8 w-8 p-0">
                                 <span className="sr-only">Abrir menu</span>

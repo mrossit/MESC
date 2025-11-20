@@ -541,9 +541,13 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       processingWarnings: processingWarnings, // 🛡️ SAFETY NET: Save warnings
       sharedWithFamilyIds: data.sharedWithFamilyIds || [],
       isSharedResponse: false,
+      isDeleted: false, // Ensure non-deleted (supports soft delete resurrection)
+      deletedAt: null, // Clear deletion timestamp
       submittedAt: new Date(),
       updatedAt: new Date()
     };
+
+    console.log('[RESPONSES] Data being sent for UPSERT:', JSON.stringify(responseValues, null, 2));
 
     let result: { responseData: any; isUpdate: boolean };
 
@@ -566,6 +570,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
             unmappedResponses: unmappedResponses,
             processingWarnings: processingWarnings,
             sharedWithFamilyIds: data.sharedWithFamilyIds || [],
+            isDeleted: false, // Resurrect soft-deleted records
+            deletedAt: null, // Clear deletion timestamp
             submittedAt: new Date(),
             updatedAt: new Date()
           }
@@ -685,7 +691,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
                 notes: extractedData.notes,
                 isSharedResponse: true,
                 sharedFromUserId: minister.id,
-                sharedWithFamilyIds: []
+                sharedWithFamilyIds: [],
+                isDeleted: false, // Ensure non-deleted (supports soft delete resurrection)
+                deletedAt: null // Clear deletion timestamp
               })
               .onConflictDoUpdate({
                 target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
@@ -698,6 +706,8 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
                   specialEvents: extractedData.specialEvents,
                   canSubstitute: extractedData.canSubstitute,
                   notes: extractedData.notes,
+                  isDeleted: false, // Resurrect soft-deleted records
+                  deletedAt: null, // Clear deletion timestamp
                   submittedAt: new Date(),
                   updatedAt: new Date()
                   // Note: Only update if it's still a shared response (protected by unique index on non-deleted)
