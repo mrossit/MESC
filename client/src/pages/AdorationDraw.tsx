@@ -205,6 +205,11 @@ export default function AdorationDraw() {
     ? groupResultsByMonday(drawData.results)
     : {};
 
+  console.log("Current drawData:", drawData);
+  console.log("drawData is null?", drawData === null);
+  console.log("drawData is undefined?", drawData === undefined);
+  console.log("!drawData?", !drawData);
+
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
