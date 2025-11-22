@@ -101,7 +101,9 @@ export default function AdorationDraw() {
         }
         throw new Error("Erro ao buscar sorteio");
       }
-      return response.json();
+      const data = await response.json();
+      console.log("Draw data received:", data);
+      return data;
     },
   });
 
