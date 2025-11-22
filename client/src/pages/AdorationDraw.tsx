@@ -110,13 +110,17 @@ export default function AdorationDraw() {
   // Create draw mutation
   const createDrawMutation = useMutation({
     mutationFn: async () => {
+      console.log("Creating draw for:", selectedMonth, selectedYear);
       const response = await apiRequest("POST", "/api/adoration/draw", {
         month: selectedMonth,
         year: selectedYear,
       });
-      return response.json();
+      const data = await response.json();
+      console.log("Draw created response:", data);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Draw creation successful:", data);
       toast({
         title: "Sorteio realizado com sucesso!",
         description: `O sorteio para ${getMonthName(selectedMonth)}/${selectedYear} foi concluído.`,
@@ -127,6 +131,7 @@ export default function AdorationDraw() {
       refetch();
     },
     onError: (error: Error) => {
+      console.error("Draw creation failed:", error);
       toast({
         variant: "destructive",
         title: "Erro ao realizar sorteio",
