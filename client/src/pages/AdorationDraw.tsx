@@ -83,7 +83,7 @@ export default function AdorationDraw() {
     isLoading,
     error,
     refetch,
-  } = useQuery<AdorationDraw>({
+  } = useQuery<AdorationDraw | null>({
     queryKey: ["/api/adoration/results", selectedYear, selectedMonth],
     queryFn: async () => {
       const response = await fetch(
@@ -101,19 +101,20 @@ export default function AdorationDraw() {
         }
         throw new Error("Erro ao buscar sorteio");
       }
-      const data = await response.json();
-      console.log("Draw data received:", data);
-      return data;
+      const result = await response.json();
+      // O backend retorna { success, message, data } então extraímos o data
+      return result.data || result;
     },
   });
 
   // Create draw mutation
   const createDrawMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/adoration/draw", {
+      const response = await apiRequest("POST", "/api/adoration/draw", {
         month: selectedMonth,
         year: selectedYear,
       });
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -137,7 +138,8 @@ export default function AdorationDraw() {
   // Delete draw mutation
   const deleteDrawMutation = useMutation({
     mutationFn: async (drawId: string) => {
-      return await apiRequest("DELETE", `/api/adoration/draw/${drawId}`);
+      const response = await apiRequest("DELETE", `/api/adoration/draw/${drawId}`);
+      return response.json();
     },
     onSuccess: () => {
       toast({
