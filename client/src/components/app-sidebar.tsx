@@ -138,6 +138,7 @@ export function AppSidebar() {
         { title: "Acompanhamento", href: "/questionnaire-responses", roles: ["gestor", "coordenador"] },
         { title: "Escalas", href: "/schedules", roles: ["gestor", "coordenador", "ministro"] },
         { title: "Geração Automática", href: "/schedules/auto-generation", roles: ["gestor", "coordenador"] },
+        { title: "Sorteio de Adoração", href: "/adoration-draw", roles: ["gestor", "coordenador"] },
         { title: "Substituições", href: "/schedules/substitutions", roles: ["gestor", "coordenador", "ministro"] },
       ]
     },
@@ -183,12 +184,6 @@ export function AppSidebar() {
       title: "Métricas do Sistema",
       href: "/metrics",
       icon: Activity,
-      roles: ["gestor", "coordenador"]
-    },
-    {
-      title: "Sorteio de Adoração",
-      href: "/adoration-draw",
-      icon: Shuffle,
       roles: ["gestor", "coordenador"]
     },
   ];
