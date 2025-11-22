@@ -14,6 +14,8 @@ import {
   formationLessons,
   formationLessonSections,
   formationLessonProgress,
+  adorationDraws,
+  adorationDrawResults,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -38,6 +40,9 @@ import {
   type InsertFormationLessonSection,
   type FormationLessonProgress,
   type InsertFormationLessonProgress,
+  type AdorationDraw,
+  type InsertAdorationDraw,
+  type AdorationDrawResult,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
@@ -190,6 +195,13 @@ export interface IStorage {
   createFormationTrack(track: InsertFormationTrack): Promise<FormationTrack>;
   updateFormationTrack(id: string, track: Partial<InsertFormationTrack>): Promise<FormationTrack>;
   deleteFormationTrack(id: string): Promise<void>;
+  
+  // Adoration draw operations
+  createAdorationDraw(draw: InsertAdorationDraw): Promise<AdorationDraw>;
+  getAdorationDraws(year: number, month: number): Promise<AdorationDraw[]>;
+  getAdorationDrawResults(drawId: string): Promise<AdorationDrawResult[]>;
+  addAdorationDrawResult(drawId: string, ministerId: string, mondayOfWeek: number, isVoluntary: boolean): Promise<AdorationDrawResult>;
+  deleteAdorationDraw(id: string): Promise<void>;
   
   // Formation module operations
   getFormationModules(trackId: string): Promise<FormationModule[]>;
@@ -1444,7 +1456,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     const totals = trackOverviews.reduce(
-      (acc, track) => {
+      (acc: any, track: any) => {
         acc.totalModules += track.stats.totalModules;
         acc.totalLessons += track.stats.totalLessons;
         acc.completedLessons += track.stats.completedLessons;
