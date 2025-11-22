@@ -220,44 +220,21 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
     const enrichedResults = results.map(result => {
       const minister = ministerMap.get(result.ministerId);
       return {
-        ...result,
-        ministerName: minister?.name || 'Desconhecido',
-        ministerEmail: minister?.email
+        minister_id: result.ministerId,
+        minister_name: minister?.name || 'Desconhecido',
+        monday_of_week: result.mondayOfWeek,
+        is_voluntary: result.isVoluntary
       };
     });
 
-    // Agrupar por semana
-    const mondaysInMonth = getMondaysInMonth(year, month);
-    const resultsByWeek = enrichedResults.reduce((acc, result) => {
-      const weekKey = `week_${result.mondayOfWeek}`;
-      if (!acc[weekKey]) {
-        acc[weekKey] = {
-          weekNumber: result.mondayOfWeek,
-          date: mondaysInMonth[result.mondayOfWeek - 1]?.toISOString().split('T')[0] || null,
-          ministers: []
-        };
-      }
-      acc[weekKey].ministers.push({
-        id: result.ministerId,
-        name: result.ministerName,
-        email: result.ministerEmail,
-        isVoluntary: result.isVoluntary
-      });
-      return acc;
-    }, {} as any);
-
     res.json({
-      success: true,
-      data: {
-        drawId: draw.id,
-        month,
-        year,
-        createdAt: draw.createdAt,
-        totalMinisters: ministerIds.length,
-        voluntaryCount: enrichedResults.filter(r => r.isVoluntary).length,
-        mandatoryCount: enrichedResults.filter(r => !r.isVoluntary).length,
-        weeks: Object.values(resultsByWeek)
-      }
+      id: draw.id,
+      month,
+      year,
+      total_ministers_to_draw: ministerIds.length,
+      created_by: draw.createdBy,
+      created_at: draw.createdAt,
+      results: enrichedResults
     });
 
   } catch (error: any) {
