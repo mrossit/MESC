@@ -157,8 +157,11 @@ export default function AdorationDraw() {
   });
 
   const getMonthName = (month: number) => {
-    const date = new Date(2024, month - 1, 1);
-    return format(date, "MMMM", { locale: ptBR });
+    const monthNames = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+    return monthNames[month - 1] || "Mês inválido";
   };
 
   const getMonthDates = (month: number, year: number) => {
@@ -350,9 +353,11 @@ export default function AdorationDraw() {
                 </CardTitle>
                 <CardDescription>
                   Criado em{" "}
-                  {format(new Date(drawData.created_at), "dd/MM/yyyy 'às' HH:mm", {
-                    locale: ptBR,
-                  })}
+                  {drawData.created_at
+                    ? format(new Date(drawData.created_at), "dd/MM/yyyy 'às' HH:mm", {
+                        locale: ptBR,
+                      })
+                    : "Data não disponível"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -424,9 +429,11 @@ export default function AdorationDraw() {
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="font-semibold text-lg">
-                            {format(monday, "dd/MM/yyyy (EEEE)", {
-                              locale: ptBR,
-                            })}
+                            {monday
+                              ? format(monday, "dd/MM/yyyy (EEEE)", {
+                                  locale: ptBR,
+                                })
+                              : "Data inválida"}
                           </h3>
                           <Badge variant="secondary">
                             {ministers.length}{" "}
