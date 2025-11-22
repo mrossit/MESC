@@ -108,7 +108,7 @@ export default function AdorationDraw() {
   // Create draw mutation
   const createDrawMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("/api/adoration/draw", "POST", {
+      return await apiRequest("POST", "/api/adoration/draw", {
         month: selectedMonth,
         year: selectedYear,
       });
@@ -135,7 +135,7 @@ export default function AdorationDraw() {
   // Delete draw mutation
   const deleteDrawMutation = useMutation({
     mutationFn: async (drawId: string) => {
-      return await apiRequest(`/api/adoration/draw/${drawId}`, "DELETE");
+      return await apiRequest("DELETE", `/api/adoration/draw/${drawId}`);
     },
     onSuccess: () => {
       toast({
