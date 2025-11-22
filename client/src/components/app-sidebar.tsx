@@ -19,7 +19,8 @@ import {
   HelpCircle,
   ChartBar,
   Move,
-  Activity
+  Activity,
+  Shuffle
 } from "lucide-react";
 import {
   Sidebar,
@@ -182,6 +183,12 @@ export function AppSidebar() {
       title: "Métricas do Sistema",
       href: "/metrics",
       icon: Activity,
+      roles: ["gestor", "coordenador"]
+    },
+    {
+      title: "Sorteio de Adoração",
+      href: "/adoration-draw",
+      icon: Shuffle,
       roles: ["gestor", "coordenador"]
     },
   ];
