@@ -826,35 +826,12 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
 
       // Se replaceExisting, remover escalas existentes para esta data/hora
       if (replaceExisting) {
-        // FIRST: Get existing schedule IDs for this date/time
-        const existingSchedules = await tx.select({ id: schedules.id })
-          .from(schedules)
+        // Delete old schedules for this date/time
+        await tx.delete(schedules)
           .where(
             and(
               eq(schedules.date, schedule.massTime.date),
-              eq(schedules.time, schedule.massTime.time),
-              eq(schedules.isDeleted, false) // Only get non-deleted schedules
-            )
-          );
-
-        if (existingSchedules.length > 0) {
-          const scheduleIds = existingSchedules.map(s => s.id);
-
-          // Soft delete related substitution requests (will be handled by CASCADE)
-          // For now, we'll keep them but they'll be orphaned if we hard delete later
-        }
-
-        // Soft delete old schedules instead of hard delete
-        await tx.update(schedules)
-          .set({
-            deletedAt: new Date(),
-            isDeleted: true
-          })
-          .where(
-            and(
-              eq(schedules.date, schedule.massTime.date),
-              eq(schedules.time, schedule.massTime.time),
-              eq(schedules.isDeleted, false)
+              eq(schedules.time, schedule.massTime.time)
             )
           );
       }
