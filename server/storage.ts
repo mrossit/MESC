@@ -1365,7 +1365,7 @@ export class DatabaseStorage implements IStorage {
       : [];
 
     const progressMap = new Map<string, FormationLessonProgress>(
-      progressRecords.map((record) => [record.lessonId, record])
+      progressRecords.map((record: FormationLessonProgress) => [record.lessonId, record])
     );
 
     const lessonsByModule = new Map<string, Array<FormationLesson & { progress: FormationLessonProgress | null }>>();
@@ -1421,7 +1421,7 @@ export class DatabaseStorage implements IStorage {
       modulesByTrack.get(module.trackId)!.push(moduleEntry);
     }
 
-    const trackOverviews = tracks.map((track) => {
+    const trackOverviews = tracks.map((track: FormationTrack) => {
       const trackModules = modulesByTrack.get(track.id) ?? [];
       const totalModules = trackModules.length;
       const totalLessons = trackModules.reduce((acc, module) => acc + module.stats.totalLessons, 0);
@@ -1483,6 +1483,61 @@ export class DatabaseStorage implements IStorage {
         lastUpdated: new Date().toISOString()
       }
     };
+  }
+
+  // Adoration draw operations
+  async createAdorationDraw(drawData: InsertAdorationDraw): Promise<AdorationDraw> {
+    const [draw] = await db
+      .insert(adorationDraws)
+      .values({
+        month: drawData.month,
+        year: drawData.year,
+        totalMinistersToDraw: drawData.totalMinistersToDraw,
+        createdBy: drawData.createdBy
+      })
+      .returning();
+    return draw;
+  }
+
+  async getAdorationDraws(year: number, month: number): Promise<AdorationDraw[]> {
+    return await db
+      .select()
+      .from(adorationDraws)
+      .where(and(
+        eq(adorationDraws.year, year),
+        eq(adorationDraws.month, month)
+      ))
+      .orderBy(desc(adorationDraws.createdAt));
+  }
+
+  async getAdorationDrawResults(drawId: string): Promise<AdorationDrawResult[]> {
+    return await db
+      .select()
+      .from(adorationDrawResults)
+      .where(eq(adorationDrawResults.drawId, drawId))
+      .orderBy(adorationDrawResults.mondayOfWeek);
+  }
+
+  async addAdorationDrawResult(
+    drawId: string, 
+    ministerId: string, 
+    mondayOfWeek: number, 
+    isVoluntary: boolean
+  ): Promise<AdorationDrawResult> {
+    const [result] = await db
+      .insert(adorationDrawResults)
+      .values({
+        drawId,
+        ministerId,
+        mondayOfWeek,
+        isVoluntary
+      })
+      .returning();
+    return result;
+  }
+
+  async deleteAdorationDraw(id: string): Promise<void> {
+    await db.delete(adorationDraws).where(eq(adorationDraws.id, id));
   }
 }
 
