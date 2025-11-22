@@ -128,11 +128,7 @@ export const users = pgTable("users", {
   rejectionReason: text('rejection_reason'),
   
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-
-  // Soft delete fields (Phase 1 - Data Integrity)
-  deletedAt: timestamp("deleted_at"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow()
 });
 
 // Families table
@@ -233,11 +229,7 @@ export const schedules = pgTable('schedules', {
     adjustedAt?: string;
     reason?: string;
   }[]>(),
-  createdAt: timestamp('created_at').defaultNow(),
-
-  // Soft delete fields (Phase 1 - Data Integrity)
-  deletedAt: timestamp("deleted_at"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Mass Execution Logs (for auxiliary leaders)
