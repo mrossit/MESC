@@ -29,7 +29,8 @@ import {
   LogOut,
   ChevronRight,
   Home,
-  UserCog
+  UserCog,
+  Shuffle
 } from "lucide-react";
 
 interface SearchItem {
@@ -163,6 +164,15 @@ export function CommandSearch() {
       description: "Relatórios do sistema",
       href: "/reports",
       icon: FileText,
+      group: "Gestão",
+      roles: ["gestor", "coordenador"]
+    },
+    {
+      id: "adoration-draw",
+      title: "Sorteio de Adoração",
+      description: "Sorteio de ministros para adoração ao Santíssimo",
+      href: "/adoration-draw",
+      icon: Shuffle,
       group: "Gestão",
       roles: ["gestor", "coordenador"]
     },

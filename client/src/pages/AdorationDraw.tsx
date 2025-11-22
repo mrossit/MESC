@@ -77,11 +77,6 @@ export default function AdorationDraw() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
-  // Fetch CSRF token
-  const { data: csrfToken } = useQuery({
-    queryKey: ["/api/auth/csrf-token"],
-  });
-
   // Fetch draw results
   const {
     data: drawData,
