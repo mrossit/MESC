@@ -7,6 +7,7 @@ MESC is a comprehensive web application designed for managing Extraordinary Mini
 **Core Purpose:**
 - Automated mass schedule generation based on minister availability
 - Monthly questionnaire system for gathering liturgical availability
+- **Automated lottery system for Monday Eucharistic Adoration (Nov 2025)**
 - Formation and training management for ministers
 - Real-time notifications and communication
 - Administrative tools for coordinators and managers
@@ -83,6 +84,7 @@ The core scheduling algorithm (`server/utils/scheduleGenerator.ts`) implements a
 - **Conflict prevention** - No duplicate assignments on same day
 - **Position preferences** - Respects minister's preferred roles
 - **Family coordination** - Can group or separate married ministers
+- **Adoration integration (Nov 2025)** - Automatically schedules drawn ministers for Monday 22h adoration
 
 **Performance Optimization - Two-Tier Caching Strategy:**
 
@@ -140,6 +142,8 @@ shared/schema.ts - Centralized schema definition
 ├── questionnaire_responses  # Minister responses
 ├── schedules          # Generated mass schedules
 ├── schedule_assignments    # Minister-to-mass assignments
+├── adoration_draws    # Monthly adoration lottery draws (Nov 2025)
+├── adoration_draw_results  # Ministers assigned per Monday (Nov 2025)
 ├── formations         # Training courses and lessons
 ├── notifications      # System notifications
 └── activity_logs      # Audit trail
