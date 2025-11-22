@@ -112,17 +112,14 @@ export default function AdorationDraw() {
   // Create draw mutation
   const createDrawMutation = useMutation({
     mutationFn: async () => {
-      console.log("Creating draw for:", selectedMonth, selectedYear);
       const response = await apiRequest("POST", "/api/adoration/draw", {
         month: selectedMonth,
         year: selectedYear,
       });
       const data = await response.json();
-      console.log("Draw created response:", data);
       return data;
     },
     onSuccess: (data) => {
-      console.log("Draw creation successful:", data);
       toast({
         title: "Sorteio realizado com sucesso!",
         description: `O sorteio para ${getMonthName(selectedMonth)}/${selectedYear} foi concluído.`,
@@ -133,7 +130,6 @@ export default function AdorationDraw() {
       refetch();
     },
     onError: (error: Error) => {
-      console.error("Draw creation failed:", error);
       toast({
         variant: "destructive",
         title: "Erro ao realizar sorteio",
@@ -207,10 +203,6 @@ export default function AdorationDraw() {
     ? groupResultsByMonday(drawData.results)
     : {};
 
-  console.log("Current drawData:", drawData);
-  console.log("drawData is null?", drawData === null);
-  console.log("drawData is undefined?", drawData === undefined);
-  console.log("!drawData?", !drawData);
 
   return (
     <Layout>
@@ -438,8 +430,8 @@ export default function AdorationDraw() {
               <CardContent>
                 <div className="space-y-6">
                   {mondays.map((monday, index) => {
-                    const dayOfMonth = monday.getDate();
-                    const ministers = groupedResults[dayOfMonth] || [];
+                    const weekNumber = index + 1; // 1, 2, 3, 4, 5
+                    const ministers = groupedResults[weekNumber] || [];
 
                     return (
                       <div key={index} className="border rounded-lg p-4">
