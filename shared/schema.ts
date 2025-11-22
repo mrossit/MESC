@@ -469,6 +469,33 @@ export const passwordResetRequests = pgTable('password_reset_requests', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Adoration draws - tracks sorteios para adoração ao Santíssimo
+export const adorationDraws = pgTable('adoration_draws', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  month: integer('month').notNull(),
+  year: integer('year').notNull(),
+  totalMinistersToDraw: integer('total_ministers_to_draw').notNull(),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_adoration_draws_month_year').on(table.year, table.month)
+]);
+
+// Adoration draw results - ministros sorteados
+export const adorationDrawResults = pgTable('adoration_draw_results', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  drawId: uuid('draw_id').notNull().references(() => adorationDraws.id, { onDelete: 'cascade' }),
+  ministerId: varchar('minister_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mondayOfWeek: integer('monday_of_week').notNull(), // Semana do mês (1, 2, 3, 4, 5)
+  isVoluntary: boolean('is_voluntary').default(false), // true = respondeu sim no questionário, false = sorteado obrigatoriamente
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_adoration_draw_results_draw').on(table.drawId),
+  index('idx_adoration_draw_results_minister').on(table.ministerId),
+  unique('unique_adoration_draw_minister_week').on(table.drawId, table.ministerId, table.mondayOfWeek)
+]);
+
 // Active sessions for activity tracking and auto-logout
 export const activeSessions = pgTable('active_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -901,6 +928,18 @@ export const insertFormationLessonProgressSchema = createInsertSchema(formationL
   completedSections: true,
   lastAccessedAt: true
 });
+
+// Adoration schemas
+export const insertAdorationDrawSchema = createInsertSchema(adorationDraws).pick({
+  month: true,
+  year: true,
+  totalMinistersToDraw: true,
+  createdBy: true
+});
+
+export type AdorationDraw = typeof adorationDraws.$inferSelect;
+export type InsertAdorationDraw = z.infer<typeof insertAdorationDrawSchema>;
+export type AdorationDrawResult = typeof adorationDrawResults.$inferSelect;
 
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
