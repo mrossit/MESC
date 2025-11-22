@@ -228,13 +228,16 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
     });
 
     res.json({
-      id: draw.id,
-      month,
-      year,
-      total_ministers_to_draw: ministerIds.length,
-      created_by: draw.createdBy,
-      created_at: draw.createdAt,
-      results: enrichedResults
+      success: true,
+      data: {
+        id: draw.id,
+        month,
+        year,
+        total_ministers_to_draw: ministerIds.length,
+        created_by: draw.createdBy,
+        created_at: draw.createdAt,
+        results: enrichedResults
+      }
     });
 
   } catch (error: any) {
