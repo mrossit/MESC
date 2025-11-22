@@ -72,8 +72,11 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
     }
 
     // 4. Determinar quantos ministros total sortear
-    const ministersToDrawTotal = totalMinistersToDraw || Math.ceil(allMinisters.length / 4); // Aproximadamente 1/4 dos ministros
-    const ministersPerMonday = Math.ceil(ministersToDrawTotal / mondayCount);
+    // Calcula: total de ministros dividido pelo número de segundas do mês
+    const ministersPerMonday = totalMinistersToDraw 
+      ? Math.ceil(totalMinistersToDraw / mondayCount)
+      : Math.ceil(allMinisters.length / mondayCount);
+    const ministersToDrawTotal = ministersPerMonday * mondayCount;
 
     logger.info(`Sorteio: ${allMinisters.length} ministros disponíveis, ${mondayCount} segundas, ${ministersPerMonday} por segunda`);
 
