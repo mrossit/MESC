@@ -221,7 +221,7 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
     const ministerMap = new Map(ministers.map((m: any) => [m.id, m]));
 
     const enrichedResults = results.map(result => {
-      const minister = ministerMap.get(result.ministerId);
+      const minister = ministerMap.get(result.ministerId) as any;
       return {
         minister_id: result.ministerId,
         minister_name: minister?.name || 'Desconhecido',
