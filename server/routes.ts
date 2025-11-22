@@ -31,6 +31,7 @@ import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import whatsappApiRoutes from "./routes/whatsapp-api";
 import metricsRoutes from "./routes/metrics";
 import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
+import adorationRoutes from "./routes/adoration";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -183,6 +184,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Metrics routes (apenas para gestor/coordenador, apenas leitura)
   app.use('/api/metrics', metricsRoutes);
+
+  // Adoration draw routes (coordenador/gestor only, com proteção CSRF)
+  app.use('/api/adoration', csrfProtection, adorationRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
