@@ -82,7 +82,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
 
     // 5. Verificar respostas voluntárias no questionário (se existir)
     const voluntaryMinisters = await getVoluntaryMinistersForAdoration(year, month);
-    const voluntaryMinisterIds = new Set(voluntaryMinisters.map(m => m.id));
+    const voluntaryMinisterIds = new Set(voluntaryMinisters.map((m: any) => m.id));
 
     logger.info(`${voluntaryMinisters.length} ministros se voluntariaram para adoração`);
 
@@ -114,20 +114,20 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       
       // Embaralhar lista de ministros disponíveis (não sorteados ainda)
       const availableForThisMonday = shuffle(
-        allMinisters.filter(m => !selectedMinisters.has(m.id))
+        allMinisters.filter((m: any) => !selectedMinisters.has(m.id))
       );
 
       // Primeiro, adicionar voluntários se houver
       const voluntariesForThisMonday = availableForThisMonday
-        .filter(m => voluntaryMinisterIds.has(m.id))
+        .filter((m: any) => voluntaryMinisterIds.has(m.id))
         .slice(0, ministersPerMonday);
 
       for (const minister of voluntariesForThisMonday) {
-        await storage.addAdorationDrawResult(draw.id, minister.id, mondayOfWeek, true);
-        selectedMinisters.add(minister.id);
+        await storage.addAdorationDrawResult(draw.id, (minister as any).id, mondayOfWeek, true);
+        selectedMinisters.add((minister as any).id);
         drawResults.push({
-          ministerId: minister.id,
-          ministerName: minister.name,
+          ministerId: (minister as any).id,
+          ministerName: (minister as any).name,
           mondayOfWeek,
           date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
           isVoluntary: true
@@ -138,15 +138,15 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       const remainingNeeded = ministersPerMonday - voluntariesForThisMonday.length;
       if (remainingNeeded > 0) {
         const nonVolunteers = availableForThisMonday
-          .filter(m => !voluntaryMinisterIds.has(m.id) && !selectedMinisters.has(m.id))
+          .filter((m: any) => !voluntaryMinisterIds.has(m.id) && !selectedMinisters.has(m.id))
           .slice(0, remainingNeeded);
 
         for (const minister of nonVolunteers) {
-          await storage.addAdorationDrawResult(draw.id, minister.id, mondayOfWeek, false);
-          selectedMinisters.add(minister.id);
+          await storage.addAdorationDrawResult(draw.id, (minister as any).id, mondayOfWeek, false);
+          selectedMinisters.add((minister as any).id);
           drawResults.push({
-            ministerId: minister.id,
-            ministerName: minister.name,
+            ministerId: (minister as any).id,
+            ministerName: (minister as any).name,
             mondayOfWeek,
             date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
             isVoluntary: false
@@ -218,7 +218,7 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
       .from(users)
       .where(inArray(users.id, ministerIds));
 
-    const ministerMap = new Map(ministers.map(m => [m.id, m]));
+    const ministerMap = new Map(ministers.map((m: any) => [m.id, m]));
 
     const enrichedResults = results.map(result => {
       const minister = ministerMap.get(result.ministerId);
@@ -322,7 +322,7 @@ async function getVoluntaryMinistersForAdoration(year: number, month: number) {
 
     // 3. Filtrar ministros que disseram "sim" para adoração (mondayAdoration)
     const voluntaryMinisterIds = responses
-      .filter(response => {
+      .filter((response: any) => {
         const resp = response.response as any;
         // Verificar se respondeu sim para mondayAdoration em qualquer formato
         return resp?.extra_activities?.mondayAdoration === 'yes' ||
@@ -330,7 +330,7 @@ async function getVoluntaryMinistersForAdoration(year: number, month: number) {
                resp?.mondayAdoration === 'yes' ||
                resp?.mondayAdoration === true;
       })
-      .map(r => r.userId);
+      .map((r: any) => r.userId);
 
     if (voluntaryMinisterIds.length === 0) {
       return [];
