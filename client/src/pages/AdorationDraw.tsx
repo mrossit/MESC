@@ -102,8 +102,10 @@ export default function AdorationDraw() {
         throw new Error("Erro ao buscar sorteio");
       }
       const result = await response.json();
-      // O backend retorna { success, message, data } então extraímos o data
-      return result.data || result;
+      // O backend retorna { success, message, data } ou diretamente os dados
+      // Se result tem a propriedade 'data', retornar result.data (pode ser null)
+      // Se não, retornar o result inteiro
+      return result.hasOwnProperty('data') ? result.data : result;
     },
   });
 
