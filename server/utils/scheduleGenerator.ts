@@ -170,7 +170,7 @@ export class ScheduleGenerator {
       // 2. Gerar horários de missa para o mês
       console.time('[PERF] Generate monthly mass times');
       console.log(`\n[STEP 4] 📅 Generating monthly mass times for ${month}/${year}...`);
-      const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
+      const monthlyMassTimes = await this.generateMonthlyMassTimes(year, month);
       console.timeEnd('[PERF] Generate monthly mass times');
 
       // 🔥 DATA VALIDATION: Check if monthly masses were generated
@@ -1196,7 +1196,7 @@ export class ScheduleGenerator {
   /**
    * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
    */
-  private generateMonthlyMassTimes(year: number, month: number): MassTime[] {
+  private async generateMonthlyMassTimes(year: number, month: number): Promise<MassTime[]> {
     const monthlyTimes: MassTime[] = [];
     const startDate = startOfMonth(new Date(year, month - 1));
     const endDate = endOfMonth(new Date(year, month - 1));
