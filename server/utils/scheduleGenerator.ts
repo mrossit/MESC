@@ -1,7 +1,7 @@
 import { logger } from './logger.js';
-import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families } from '@shared/schema';
+import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families, adorationDrawResults, adorationDraws } from '@shared/schema';
 import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
-import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday, isMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
 import { validateAndLogOctoberMasses, printOctoberScheduleComparison } from './octoberMassValidator.js';
@@ -1411,6 +1411,26 @@ export class ScheduleGenerator {
         });
       }
 
+      // REGRA 11: Adoração ao Santíssimo (Segundas-feiras às 22h)
+      // Buscar ministros sorteados para esta segunda-feira específica
+      if (isMonday(currentDate)) {
+        const mondayOfWeek = this.getMondayWeekNumber(currentDate);
+        const adorationMinisters = await this.getAdorationMinistersForMonday(year, month, mondayOfWeek);
+        
+        if (adorationMinisters.length > 0) {
+          monthlyTimes.push({
+            id: `adoracao-${dateStr}`,
+            dayOfWeek,
+            time: '22:00',
+            date: dateStr,
+            minMinisters: adorationMinisters.length,
+            maxMinisters: adorationMinisters.length,
+            type: 'adoracao_santissimo'
+          });
+          console.log(`[SCHEDULE_GEN] 🙏 Adoração ao Santíssimo: ${dateStr} 22:00 (${adorationMinisters.length} ministros sorteados)`);
+        }
+      }
+
       currentDate = addDays(currentDate, 1);
     }
 
@@ -2539,6 +2559,112 @@ export class ScheduleGenerator {
   private getDayName(dayOfWeek: number): string {
     const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     return days[dayOfWeek];
+  }
+
+  /**
+   * Get which Monday of the month this date is (1st, 2nd, 3rd, 4th, or 5th)
+   */
+  private getMondayWeekNumber(date: Date): number {
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    const firstDayOfMonth = new Date(year, month, 1);
+    
+    // Find first Monday
+    let firstMonday = new Date(firstDayOfMonth);
+    while (firstMonday.getDay() !== 1) {
+      firstMonday = addDays(firstMonday, 1);
+    }
+    
+    // Count how many weeks from first Monday
+    const daysDiff = Math.floor((date.getTime() - firstMonday.getTime()) / (1000 * 60 * 60 * 24));
+    const weekNumber = Math.floor(daysDiff / 7) + 1;
+    
+    return weekNumber;
+  }
+
+  /**
+   * Get ministers selected in the adoration draw for a specific Monday
+   */
+  private async getAdorationMinistersForMonday(year: number, month: number, mondayOfWeek: number): Promise<Minister[]> {
+    if (!this.db) {
+      console.log('[ADORATION] Database not available, skipping adoration ministers');
+      return [];
+    }
+
+    try {
+      // 1. Find the draw for this month
+      const [draw] = await this.db
+        .select()
+        .from(adorationDraws)
+        .where(
+          and(
+            eq(adorationDraws.year, year),
+            eq(adorationDraws.month, month)
+          )
+        )
+        .limit(1);
+
+      if (!draw) {
+        console.log(`[ADORATION] No draw found for ${month}/${year}`);
+        return [];
+      }
+
+      // 2. Get ministers selected for this specific Monday
+      const results = await this.db
+        .select({
+          ministerId: adorationDrawResults.ministerId,
+          isVoluntary: adorationDrawResults.isVoluntary
+        })
+        .from(adorationDrawResults)
+        .where(
+          and(
+            eq(adorationDrawResults.drawId, draw.id),
+            eq(adorationDrawResults.mondayOfWeek, mondayOfWeek)
+          )
+        );
+
+      if (results.length === 0) {
+        console.log(`[ADORATION] No ministers assigned for week ${mondayOfWeek} of ${month}/${year}`);
+        return [];
+      }
+
+      // 3. Get full minister data
+      const ministerIds = results.map(r => r.ministerId);
+      const ministersData = await this.db
+        .select()
+        .from(users)
+        .where(and(
+          users.id in ministerIds,
+          eq(users.status, 'active')
+        ));
+
+      // 4. Convert to Minister objects
+      const ministers: Minister[] = ministersData.map(m => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        totalServices: m.totalServices || 0,
+        lastService: m.lastService,
+        preferredTimes: (m.preferredTimes as string[]) || [],
+        canServeAsCouple: m.canServeAsCouple || false,
+        spouseMinisterId: m.spouseMinisterId,
+        familyId: m.familyId,
+        availabilityScore: 1.0, // Always available (drawn)
+        preferenceScore: 1.0,
+        monthlyAssignmentCount: 0
+      }));
+
+      const voluntaryCount = results.filter(r => r.isVoluntary).length;
+      const mandatoryCount = results.length - voluntaryCount;
+
+      console.log(`[ADORATION] Found ${ministers.length} ministers for week ${mondayOfWeek}: ${voluntaryCount} voluntary, ${mandatoryCount} mandatory`);
+
+      return ministers;
+
+    } catch (error) {
+      console.error('[ADORATION] Error loading ministers for adoration:', error);
+      return [];
+    }
   }
 }
 
