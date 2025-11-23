@@ -411,9 +411,37 @@ export class DatabaseStorage implements IStorage {
 
   // Questionnaire response operations
   async submitQuestionnaireResponse(responseData: any): Promise<QuestionnaireResponse> {
+    // 🔧 CORREÇÃO: UPSERT para lidar com respostas duplicadas (usuário pode responder novamente)
+    // A constraint UNIQUE em (userId, questionnaireId) garante uma resposta por ministro por questionário
     const [response] = await db
       .insert(questionnaireResponses)
-      .values(responseData)
+      .values({
+        ...responseData,
+        isDeleted: false, // Garantir que não está marcado como deletado
+        deletedAt: null // Limpar timestamp de deleção
+      })
+      .onConflictDoUpdate({
+        target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
+        set: {
+          responses: responseData.responses,
+          availableSundays: responseData.availableSundays,
+          preferredMassTimes: responseData.preferredMassTimes,
+          alternativeTimes: responseData.alternativeTimes,
+          dailyMassAvailability: responseData.dailyMassAvailability,
+          specialEvents: responseData.specialEvents,
+          canSubstitute: responseData.canSubstitute,
+          notes: responseData.notes,
+          unmappedResponses: responseData.unmappedResponses,
+          processingWarnings: responseData.processingWarnings,
+          sharedWithFamilyIds: responseData.sharedWithFamilyIds,
+          isSharedResponse: responseData.isSharedResponse,
+          sharedFromUserId: responseData.sharedFromUserId,
+          isDeleted: false, // Ressuscitar registros soft-deleted
+          deletedAt: null, // Limpar timestamp de deleção
+          submittedAt: new Date(),
+          updatedAt: new Date()
+        }
+      })
       .returning();
     return response;
   }
