@@ -39,6 +39,8 @@ interface StandardizedResponse {
   };
   can_substitute: boolean;
   notes?: string;
+  alternative_times?: string[]; // Public field in v2.0 schema for times beyond primary mass
+  _alternativeTimes?: string[]; // Internal field for migration/conversion only
 }
 
 interface LegacyResponseItem {
@@ -267,7 +269,21 @@ export class QuestionnaireService {
       }
       // Map other times available
       else if (questionId === 'other_times_available') {
-        // Base question, conditional options handled elsewhere
+        // Extract alternative times from yes_no_with_options response
+        if (answer && answer !== 'Não') {
+          // Handle object format: { answer: "Sim", selectedOptions: ["8h", "10h", ...] }
+          if (typeof answer === 'object' && answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
+            (standardized as any)._alternativeTimes = answer.selectedOptions;
+          }
+          // Handle legacy array format: ["8h", "10h"]
+          else if (Array.isArray(answer)) {
+            (standardized as any)._alternativeTimes = answer;
+          }
+          // Handle string format: "8h" (single value)
+          else if (typeof answer === 'string' && answer !== 'Sim') {
+            (standardized as any)._alternativeTimes = [answer];
+          }
+        }
         processedQuestionIds.add(questionId);
       }
     }
@@ -529,6 +545,11 @@ export class QuestionnaireService {
       response.can_substitute = false;
     }
 
+    // Migrate alternative_times to internal _alternativeTimes for extraction
+    if (response.alternative_times && Array.isArray(response.alternative_times)) {
+      response._alternativeTimes = response.alternative_times;
+    }
+
     return response as StandardizedResponse;
   }
 
@@ -595,10 +616,13 @@ export class QuestionnaireService {
       // - ["Segunda-feira", ...] = can serve on specific days
     }
 
+    // Extract alternative times from internal field
+    const alternativeTimes = (standardized as any)._alternativeTimes || null;
+
     return {
       availableSundays: availableSundays.length > 0 ? availableSundays : null,
       preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
-      alternativeTimes: null, // Not used in v2.0
+      alternativeTimes: alternativeTimes, // Extract from _alternativeTimes internal field
       dailyMassAvailability: hasWeekdayData 
         ? (dailyMassAvailability.length > 0 ? dailyMassAvailability : []) 
         : null, // Empty array if answered NO, null if didn't answer
