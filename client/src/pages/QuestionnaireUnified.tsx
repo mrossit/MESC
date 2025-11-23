@@ -713,6 +713,12 @@ export default function QuestionnaireUnified() {
         // O backend retorna o objeto completo da resposta
         setExistingResponse(responseData);
 
+        // Scroll suave para o topo da página para mostrar a mensagem de sucesso
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+
         // Reset isSubmitted after 5 seconds para permitir reenvio
         setTimeout(() => {
           setIsSubmitted(false);
