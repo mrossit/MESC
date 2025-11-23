@@ -661,12 +661,14 @@ export default function QuestionnaireUnified() {
         .map(([questionId, answer]) => {
           // Compact the answer format
           if (answer?.answer !== undefined) {
-            // For yes_no_with_options, only include selectedOptions if they exist
+            // For yes_no_with_options, ALWAYS send the full object to preserve structure
+            // Even if selectedOptions is empty, the backend needs to know it's a yes_no_with_options response
             return {
               questionId,
-              answer: answer.selectedOptions?.length > 0 
-                ? { answer: answer.answer, selectedOptions: answer.selectedOptions }
-                : answer.answer
+              answer: {
+                answer: answer.answer,
+                selectedOptions: answer.selectedOptions || []
+              }
             };
           }
           return {
