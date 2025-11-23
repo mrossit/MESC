@@ -522,6 +522,15 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
     console.log('[RESPONSES] Dados extraídos:', extractedData);
 
+    // Promote alternativeTimes back to v2.0 public field before saving
+    if (extractedData.alternativeTimes && Array.isArray(extractedData.alternativeTimes)) {
+      (standardizedResponse as any).alternative_times = extractedData.alternativeTimes;
+    }
+    
+    // Clean up internal helper fields before saving to JSON (don't persist to database)
+    delete (standardizedResponse as any)._alternativeTimes;
+    delete (standardizedResponse as any)._preferredTime;
+
     // Phase 1 - Data Integrity: UPSERT pattern to prevent race conditions
     // This atomically inserts or updates, eliminating the check-then-insert race condition
     console.log('[RESPONSES] Using UPSERT to save response (prevents race conditions)');
