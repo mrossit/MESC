@@ -175,12 +175,13 @@ export default function QuestionnaireUnified() {
     }
   }, [template, isAdmin]);
 
-  // Carregar familiares quando estiver no modo de responder
+  // Carregar familiares quando o template existe, independentemente do modo
+  // Isso permite que compartilhamento familiar funcione mesmo quando questionário é reaberto
   useEffect(() => {
-    if (mode === 'respond' && template?.id && user?.id) {
+    if (template?.id && user?.id) {
       loadFamilyMembers();
     }
-  }, [mode, template?.id, user?.id]);
+  }, [template?.id, user?.id]);
 
 
 
