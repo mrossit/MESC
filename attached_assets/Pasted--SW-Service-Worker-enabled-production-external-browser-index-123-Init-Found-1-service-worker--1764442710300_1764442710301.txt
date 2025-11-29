@@ -1,0 +1,37 @@
+[SW] Service Worker enabled (production/external browser)
+(index):123 [Init] Found 1 service worker registrations
+(index):128 [SW] Registration successful: https://saojudastadeu.replit.app/
+useWebSocket-C51zfRIa.js:1 [WS] Attempting to connect to: wss://saojudastadeu.replit.app/ws
+useWebSocket-C51zfRIa.js:1 [WS] Connected successfully
+dashboard-DHnv7DIG.js:1 [WS CALLBACK] Alert update received
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+useWebSocket-C51zfRIa.js:1 [WS] Disconnecting...
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] useEffect family-sharing chamado
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] template?.id: undefined
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] user?.id: 629a3fcc-96e2-4ac1-881f-2c8726fbd9d3
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] Condição NÃO atendida - faltam dados
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+useWebSocket-C51zfRIa.js:1 [WS] Connection closed: 1006 
+useWebSocket-C51zfRIa.js:1 [WS] Reconnecting in 300s (attempt 1/3)
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] useEffect family-sharing chamado
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] template?.id: 3524fdec-aa9d-46af-933b-40c9e53d7e71
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] user?.id: 629a3fcc-96e2-4ac1-881f-2c8726fbd9d3
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] Condição atendida, chamando loadFamilyMembers
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Response status: 200 ok: true
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Membros carregados: [{…}]
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Todos responderam - scenario: none
+2QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+2QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] useEffect family-sharing chamado
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] template?.id: dc38a935-b8d4-42ac-a4b6-feb0ce1a6105
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] user?.id: 629a3fcc-96e2-4ac1-881f-2c8726fbd9d3
+QuestionnaireUnified-CDiFvaNT.js:1 [DEBUG] Condição atendida, chamando loadFamilyMembers
+QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Response status: 200 ok: true
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Membros carregados: [{…}]
+QuestionnaireUnified-CDiFvaNT.js:1 [FAMILY-SHARING] Todos responderam - scenario: none
+3QuestionnaireUnified-CDiFvaNT.js:1 [COMPONENT] QuestionnaireUnified renderizado
+(index):135 [SW] Checking for updates...

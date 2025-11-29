@@ -980,12 +980,15 @@ export class DatabaseStorage implements IStorage {
         if (!user) return null;
 
         // Check if family member has already responded to this questionnaire
+        // Only count direct responses (isSharedResponse: false), not shared copies
         const response = await db
           .select()
           .from(questionnaireResponses)
           .where(and(
             eq(questionnaireResponses.questionnaireId, questionnaireId),
-            eq(questionnaireResponses.userId, rel.relatedUserId)
+            eq(questionnaireResponses.userId, rel.relatedUserId),
+            eq(questionnaireResponses.isSharedResponse, false), // Only count direct responses
+            eq(questionnaireResponses.isDeleted, false) // Exclude soft-deleted responses
           ))
           .limit(1);
 

@@ -63,7 +63,6 @@ type Response = {
 };
 
 export default function QuestionnaireUnified() {
-  console.log('[COMPONENT] QuestionnaireUnified renderizado');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [template, setTemplate] = useState<QuestionnaireTemplate | null>(null);
@@ -179,15 +178,8 @@ export default function QuestionnaireUnified() {
   // Carregar familiares quando o template existe, independentemente do modo
   // Isso permite que compartilhamento familiar funcione mesmo quando questionário é reaberto
   useEffect(() => {
-    console.log('[DEBUG] useEffect family-sharing chamado');
-    console.log('[DEBUG] template?.id:', template?.id);
-    console.log('[DEBUG] user?.id:', user?.id);
-    
     if (template?.id && user?.id) {
-      console.log('[DEBUG] Condição atendida, chamando loadFamilyMembers');
       loadFamilyMembers();
-    } else {
-      console.log('[DEBUG] Condição NÃO atendida - faltam dados');
     }
   }, [template?.id, user?.id]);
 
@@ -202,11 +194,8 @@ export default function QuestionnaireUnified() {
         credentials: 'include'
       });
       
-      console.log('[FAMILY-SHARING] Response status:', res.status, 'ok:', res.ok);
-      
       if (res.ok) {
         const members = await res.json();
-        console.log('[FAMILY-SHARING] Membros carregados:', members);
         setFamilyMembers(members);
         
         // Analisar cenário para determinar validação
@@ -214,26 +203,20 @@ export default function QuestionnaireUnified() {
         
         if (members.length === 0) {
           // Não há familiares cadastrados
-          console.log('[FAMILY-SHARING] Nenhum familiar encontrado - scenario: none');
           setFamilySharingScenario('none');
         } else if (respondedMembers.length === 0) {
           // Cenário 1: Nenhum familiar respondeu ainda
-          console.log('[FAMILY-SHARING] Nenhum familiar respondeu - scenario: need_choice');
           setFamilySharingScenario('need_choice');
         } else if (respondedMembers.length > 0 && respondedMembers.length < members.length) {
           // Cenário 2: Alguns familiares já responderam
-          console.log('[FAMILY-SHARING] Alguns responderam - scenario: some_responded');
           setFamilySharingScenario('some_responded');
         } else {
           // Todos os familiares já responderam
-          console.log('[FAMILY-SHARING] Todos responderam - scenario: none');
           setFamilySharingScenario('none');
         }
-      } else {
-        console.error('[FAMILY-SHARING] Erro na resposta:', res.status, res.statusText);
       }
     } catch (error) {
-      console.error('[FAMILY-SHARING] Erro ao carregar familiares:', error);
+      console.error('Erro ao carregar familiares:', error);
     } finally {
       setLoadingFamilyMembers(false);
     }
