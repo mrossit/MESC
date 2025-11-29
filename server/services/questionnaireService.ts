@@ -236,6 +236,15 @@ export class QuestionnaireService {
         (standardized.special_events as any)[normalizedName] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       }
+      // 🔥 CRITICAL FIX: Map custom_ questions (Natal, Ano Novo, etc.)
+      // These are user-created custom questions with IDs like custom_1763406457753
+      // Store as BOOLEAN to maintain compatibility with schedule generator consumers
+      else if (questionId.startsWith('custom_')) {
+        const normalizedAnswer = this.normalizeValue(answer);
+        (standardized.special_events as any)[questionId] = normalizedAnswer;
+        processedQuestionIds.add(questionId);
+        console.log(`[QUESTIONNAIRE_SERVICE] ✅ Mapped custom question: ${questionId} = ${normalizedAnswer}`);
+      }
       // Map daily mass availability
       else if (questionId === 'daily_mass_availability' || questionId === 'daily_mass') {
         this.parseDailyMassAvailability(answer, standardized);
