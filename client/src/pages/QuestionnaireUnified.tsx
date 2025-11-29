@@ -178,8 +178,15 @@ export default function QuestionnaireUnified() {
   // Carregar familiares quando o template existe, independentemente do modo
   // Isso permite que compartilhamento familiar funcione mesmo quando questionário é reaberto
   useEffect(() => {
+    console.log('[DEBUG] useEffect family-sharing chamado');
+    console.log('[DEBUG] template?.id:', template?.id);
+    console.log('[DEBUG] user?.id:', user?.id);
+    
     if (template?.id && user?.id) {
+      console.log('[DEBUG] Condição atendida, chamando loadFamilyMembers');
       loadFamilyMembers();
+    } else {
+      console.log('[DEBUG] Condição NÃO atendida - faltam dados');
     }
   }, [template?.id, user?.id]);
 
