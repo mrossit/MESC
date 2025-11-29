@@ -63,6 +63,7 @@ type Response = {
 };
 
 export default function QuestionnaireUnified() {
+  console.log('[COMPONENT] QuestionnaireUnified renderizado');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [template, setTemplate] = useState<QuestionnaireTemplate | null>(null);
