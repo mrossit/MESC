@@ -15,6 +15,13 @@
       "when": 1757902913090,
       "tag": "0001_green_malcolm_colcord",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764539175260,
+      "tag": "0002_perpetual_hellion",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,8 @@ __export(schema_exports, {
   activeSessionsRelations: () => activeSessionsRelations,
   activityLogs: () => activityLogs,
   activityLogsRelations: () => activityLogsRelations,
+  adorationDrawResults: () => adorationDrawResults,
+  adorationDraws: () => adorationDraws,
   celebrationRankEnum: () => celebrationRankEnum,
   families: () => families,
   familiesRelations: () => familiesRelations,
@@ -39,6 +41,7 @@ __export(schema_exports, {
   formationStatusEnum: () => formationStatusEnum,
   formationTracks: () => formationTracks,
   formationTracksRelations: () => formationTracksRelations,
+  insertAdorationDrawSchema: () => insertAdorationDrawSchema,
   insertFormationLessonProgressSchema: () => insertFormationLessonProgressSchema,
   insertFormationLessonSchema: () => insertFormationLessonSchema,
   insertFormationLessonSectionSchema: () => insertFormationLessonSectionSchema,
@@ -88,6 +91,7 @@ import { sql, relations } from "drizzle-orm";
 import {
   index,
   uniqueIndex,
+  unique,
   jsonb,
   pgTable,
   timestamp,
@@ -101,7 +105,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertAdorationDrawSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -186,6 +190,21 @@ var init_schema = __esm({
       lastService: timestamp("last_service"),
       totalServices: integer("total_services").default(0),
       formationCompleted: boolean("formation_completed").default(false),
+      // 🤖 ADAPTIVE LEARNING: Reliability metrics for intelligent schedule generation
+      reliabilityScore: integer("reliability_score").default(100),
+      // 0-100 score based on behavior
+      substitutionRequestCount: integer("substitution_request_count").default(0),
+      // How many times requested substitution
+      substitutionFulfilledCount: integer("substitution_fulfilled_count").default(0),
+      // How many times helped as substitute
+      manualRemovalCount: integer("manual_removal_count").default(0),
+      // Removed from auto-generated schedule by coordinator
+      noShowCount: integer("no_show_count").default(0),
+      // Failed to show up when scheduled
+      lastReliabilityUpdate: timestamp("last_reliability_update"),
+      // When score was last recalculated
+      reliabilityNotes: text("reliability_notes"),
+      // Coordinator notes about reliability issues
       // Observations
       observations: text("observations"),
       // Display name for schedules (optional custom name shown in schedule lists)
@@ -207,8 +226,8 @@ var init_schema = __esm({
     });
     familyRelationships = pgTable("family_relationships", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
-      relatedUserId: varchar("related_user_id").notNull().references(() => users.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      relatedUserId: varchar("related_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       relationshipType: varchar("relationship_type", { length: 50 }).notNull(),
       // spouse, parent, child, sibling
       createdAt: timestamp("created_at").defaultNow(),
@@ -225,14 +244,14 @@ var init_schema = __esm({
       deadline: timestamp("deadline"),
       targetUserIds: jsonb("target_user_ids").$type(),
       notifiedUserIds: jsonb("notified_user_ids").$type(),
-      createdById: varchar("created_by_id").references(() => users.id),
+      createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
     questionnaireResponses = pgTable("questionnaire_responses", {
       id: uuid("id").primaryKey().defaultRandom(),
-      questionnaireId: uuid("questionnaire_id").notNull().references(() => questionnaires.id),
-      userId: varchar("user_id").notNull().references(() => users.id),
+      questionnaireId: uuid("questionnaire_id").notNull().references(() => questionnaires.id, { onDelete: "cascade" }),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       responses: jsonb("responses").notNull(),
       availableSundays: jsonb("available_sundays").$type(),
       preferredMassTimes: jsonb("preferred_mass_times").$type(),
@@ -248,21 +267,28 @@ var init_schema = __esm({
       // Family sharing fields
       sharedWithFamilyIds: jsonb("shared_with_family_ids").$type(),
       isSharedResponse: boolean("is_shared_response").default(false),
-      sharedFromUserId: varchar("shared_from_user_id").references(() => users.id),
+      sharedFromUserId: varchar("shared_from_user_id").references(() => users.id, { onDelete: "set null" }),
       submittedAt: timestamp("submitted_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
-    });
+      updatedAt: timestamp("updated_at").defaultNow(),
+      // Soft delete fields (Phase 1 - Data Integrity)
+      deletedAt: timestamp("deleted_at"),
+      isDeleted: boolean("is_deleted").notNull().default(false)
+    }, (table) => ({
+      // Global unique constraint for UPSERT - one response per user per questionnaire (regardless of soft delete status)
+      // Soft delete is just a flag - UPSERT always updates the same record and resurrects it
+      userQuestionnaireUnique: unique("questionnaire_responses_user_questionnaire_key").on(table.userId, table.questionnaireId)
+    }));
     schedules = pgTable("schedules", {
       id: uuid("id").primaryKey().defaultRandom(),
       date: date("date").notNull(),
       time: time("time").notNull(),
       type: scheduleTypeEnum("type").notNull().default("missa"),
       location: varchar("location", { length: 255 }),
-      ministerId: varchar("minister_id").references(() => users.id),
+      ministerId: varchar("minister_id").references(() => users.id, { onDelete: "set null" }),
       position: integer("position").default(0),
       // Order position for ministers at same date/time
       status: varchar("status", { length: 20 }).notNull().default("scheduled"),
-      substituteId: varchar("substitute_id").references(() => users.id),
+      substituteId: varchar("substitute_id").references(() => users.id, { onDelete: "set null" }),
       notes: text("notes"),
       onSiteAdjustments: jsonb("on_site_adjustments").$type(),
       createdAt: timestamp("created_at").defaultNow()
@@ -340,7 +366,7 @@ var init_schema = __esm({
     ]);
     notifications = pgTable("notifications", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       type: notificationTypeEnum("type").notNull(),
       title: varchar("title", { length: 255 }).notNull(),
       message: text("message").notNull(),
@@ -388,8 +414,8 @@ var init_schema = __esm({
     });
     formationProgress = pgTable("formation_progress", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
-      moduleId: uuid("module_id").notNull().references(() => formationModules.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      moduleId: uuid("module_id").notNull().references(() => formationModules.id, { onDelete: "cascade" }),
       status: formationStatusEnum("status").notNull().default("not_started"),
       progressPercentage: integer("progress_percentage").default(0),
       completedAt: timestamp("completed_at"),
@@ -428,8 +454,8 @@ var init_schema = __esm({
     });
     formationLessonProgress = pgTable("formation_lesson_progress", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
-      lessonId: uuid("lesson_id").notNull().references(() => formationLessons.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      lessonId: uuid("lesson_id").notNull().references(() => formationLessons.id, { onDelete: "cascade" }),
       status: formationStatusEnum("status").notNull().default("not_started"),
       progressPercentage: integer("progress_percentage").default(0),
       timeSpentMinutes: integer("time_spent_minutes").default(0),
@@ -453,16 +479,41 @@ var init_schema = __esm({
     });
     passwordResetRequests = pgTable("password_reset_requests", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       requestedAt: timestamp("requested_at").defaultNow().notNull(),
       reason: text("reason"),
       status: varchar("status", { length: 20 }).notNull().default("pending"),
       // pending, approved, rejected
-      processedBy: varchar("processed_by").references(() => users.id),
+      processedBy: varchar("processed_by").references(() => users.id, { onDelete: "set null" }),
       processedAt: timestamp("processed_at"),
       adminNotes: text("admin_notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
+    adorationDraws = pgTable("adoration_draws", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      month: integer("month").notNull(),
+      year: integer("year").notNull(),
+      totalMinistersToDraw: integer("total_ministers_to_draw").notNull(),
+      createdBy: varchar("created_by").notNull().references(() => users.id),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_adoration_draws_month_year").on(table.year, table.month)
+    ]);
+    adorationDrawResults = pgTable("adoration_draw_results", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      drawId: uuid("draw_id").notNull().references(() => adorationDraws.id, { onDelete: "cascade" }),
+      ministerId: varchar("minister_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      mondayOfWeek: integer("monday_of_week").notNull(),
+      // Semana do mês (1, 2, 3, 4, 5)
+      isVoluntary: boolean("is_voluntary").default(false),
+      // true = respondeu sim no questionário, false = sorteado obrigatoriamente
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_adoration_draw_results_draw").on(table.drawId),
+      index("idx_adoration_draw_results_minister").on(table.ministerId),
+      unique("unique_adoration_draw_minister_week").on(table.drawId, table.ministerId, table.mondayOfWeek)
+    ]);
     activeSessions = pgTable("active_sessions", {
       id: uuid("id").primaryKey().defaultRandom(),
       userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -481,7 +532,7 @@ var init_schema = __esm({
     ]);
     activityLogs = pgTable("activity_logs", {
       id: uuid("id").primaryKey().defaultRandom(),
-      userId: varchar("user_id").notNull().references(() => users.id),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       action: varchar("action", { length: 100 }).notNull(),
       // login, view_schedule, respond_questionnaire, etc
       details: jsonb("details"),
@@ -854,6 +905,12 @@ var init_schema = __esm({
       completedSections: true,
       lastAccessedAt: true
     });
+    insertAdorationDrawSchema = createInsertSchema(adorationDraws).pick({
+      month: true,
+      year: true,
+      totalMinistersToDraw: true,
+      createdBy: true
+    });
   }
 });
 
@@ -960,7 +1017,7 @@ __export(storage_exports, {
   DatabaseStorage: () => DatabaseStorage,
   storage: () => storage
 });
-import { eq, and, desc, count, sql as sql2, gte, lte, or, inArray } from "drizzle-orm";
+import { eq as eq2, and, desc, count, sql as sql2, gte, lte, or, inArray } from "drizzle-orm";
 import Database from "better-sqlite3";
 var DrizzleSQLiteFallback, DatabaseStorage, storage;
 var init_storage = __esm({
@@ -1043,7 +1100,7 @@ var init_storage = __esm({
       }
       // User operations (mandatory for Replit Auth)
       async getUser(id) {
-        const [user] = await db.select().from(users).where(eq(users.id, id));
+        const [user] = await db.select().from(users).where(eq2(users.id, id));
         return user;
       }
       async upsertUser(userData) {
@@ -1093,17 +1150,17 @@ var init_storage = __esm({
         if (updateData.name) {
           updateData.name = formatName(updateData.name);
         }
-        const [user] = await db.update(users).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
+        const [user] = await db.update(users).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(users.id, id)).returning();
         return user;
       }
       async deleteUser(id) {
-        await db.delete(users).where(eq(users.id, id));
+        await db.delete(users).where(eq2(users.id, id));
       }
       async getAllUsers() {
         return await db.select().from(users).orderBy(desc(users.createdAt));
       }
       async getUsersByRole(role) {
-        return await db.select().from(users).where(eq(users.role, role));
+        return await db.select().from(users).where(eq2(users.role, role));
       }
       // Questionnaire operations
       async createQuestionnaire(questionnaireData) {
@@ -1123,7 +1180,7 @@ var init_storage = __esm({
         return await db.select().from(questionnaires).orderBy(desc(questionnaires.createdAt));
       }
       async getQuestionnaireById(id) {
-        const [questionnaire] = await db.select().from(questionnaires).where(eq(questionnaires.id, id));
+        const [questionnaire] = await db.select().from(questionnaires).where(eq2(questionnaires.id, id));
         return questionnaire;
       }
       async updateQuestionnaire(id, questionnaireData) {
@@ -1137,19 +1194,48 @@ var init_storage = __esm({
         if (questionnaireData.questions) updateData.questions = questionnaireData.questions;
         if (questionnaireData.deadline !== void 0) updateData.deadline = questionnaireData.deadline;
         if (questionnaireData.targetUserIds !== void 0) updateData.targetUserIds = questionnaireData.targetUserIds;
-        const [questionnaire] = await db.update(questionnaires).set(updateData).where(eq(questionnaires.id, id)).returning();
+        const [questionnaire] = await db.update(questionnaires).set(updateData).where(eq2(questionnaires.id, id)).returning();
         return questionnaire;
       }
       async deleteQuestionnaire(id) {
-        await db.delete(questionnaires).where(eq(questionnaires.id, id));
+        await db.delete(questionnaires).where(eq2(questionnaires.id, id));
       }
       // Questionnaire response operations
       async submitQuestionnaireResponse(responseData) {
-        const [response] = await db.insert(questionnaireResponses).values(responseData).returning();
+        const [response] = await db.insert(questionnaireResponses).values({
+          ...responseData,
+          isDeleted: false,
+          // Garantir que não está marcado como deletado
+          deletedAt: null
+          // Limpar timestamp de deleção
+        }).onConflictDoUpdate({
+          target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
+          set: {
+            responses: responseData.responses,
+            availableSundays: responseData.availableSundays,
+            preferredMassTimes: responseData.preferredMassTimes,
+            alternativeTimes: responseData.alternativeTimes,
+            dailyMassAvailability: responseData.dailyMassAvailability,
+            specialEvents: responseData.specialEvents,
+            canSubstitute: responseData.canSubstitute,
+            notes: responseData.notes,
+            unmappedResponses: responseData.unmappedResponses,
+            processingWarnings: responseData.processingWarnings,
+            sharedWithFamilyIds: responseData.sharedWithFamilyIds,
+            isSharedResponse: responseData.isSharedResponse,
+            sharedFromUserId: responseData.sharedFromUserId,
+            isDeleted: false,
+            // Ressuscitar registros soft-deleted
+            deletedAt: null,
+            // Limpar timestamp de deleção
+            submittedAt: /* @__PURE__ */ new Date(),
+            updatedAt: /* @__PURE__ */ new Date()
+          }
+        }).returning();
         return response;
       }
       async getQuestionnaireResponses(questionnaireId) {
-        return await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.questionnaireId, questionnaireId));
+        return await db.select().from(questionnaireResponses).where(eq2(questionnaireResponses.questionnaireId, questionnaireId));
       }
       // Schedule operations
       async createSchedule(scheduleData) {
@@ -1223,7 +1309,7 @@ var init_storage = __esm({
           status: schedules.status,
           notes: schedules.notes,
           ministerName: users.name
-        }).from(schedules).leftJoin(users, eq(schedules.ministerId, users.id)).where(eq(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+        }).from(schedules).leftJoin(users, eq2(schedules.ministerId, users.id)).where(eq2(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
         return assignments.map((a) => ({
           id: a.id,
           date: a.date,
@@ -1254,7 +1340,7 @@ var init_storage = __esm({
           status: schedules.status,
           type: schedules.type,
           location: schedules.location
-        }).from(schedules).leftJoin(users, eq(schedules.ministerId, users.id)).where(and(
+        }).from(schedules).leftJoin(users, eq2(schedules.ministerId, users.id)).where(and(
           gte(schedules.date, startDate),
           lte(schedules.date, endDate)
         )).orderBy(schedules.date, schedules.time, schedules.position);
@@ -1276,18 +1362,18 @@ var init_storage = __esm({
         return [];
       }
       async getScheduleById(id) {
-        const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
+        const [schedule] = await db.select().from(schedules).where(eq2(schedules.id, id));
         return schedule;
       }
       async getScheduleAssignments(scheduleId) {
         return [];
       }
       async updateSchedule(id, scheduleData) {
-        const [schedule] = await db.update(schedules).set({ ...scheduleData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(schedules.id, id)).returning();
+        const [schedule] = await db.update(schedules).set({ ...scheduleData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(schedules.id, id)).returning();
         return schedule;
       }
       async deleteSchedule(id) {
-        await db.delete(schedules).where(eq(schedules.id, id));
+        await db.delete(schedules).where(eq2(schedules.id, id));
       }
       // Substitution request operations
       async createSubstitutionRequest(requestData) {
@@ -1295,14 +1381,14 @@ var init_storage = __esm({
         return request;
       }
       async getSubstitutionRequests(scheduleId) {
-        return await db.select().from(substitutionRequests).where(eq(substitutionRequests.scheduleId, scheduleId));
+        return await db.select().from(substitutionRequests).where(eq2(substitutionRequests.scheduleId, scheduleId));
       }
       async updateSubstitutionRequest(id, requestData) {
-        const [request] = await db.update(substitutionRequests).set({ ...requestData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(substitutionRequests.id, id)).returning();
+        const [request] = await db.update(substitutionRequests).set({ ...requestData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(substitutionRequests.id, id)).returning();
         return request;
       }
       async deleteSubstitutionRequest(id) {
-        await db.delete(substitutionRequests).where(eq(substitutionRequests.id, id));
+        await db.delete(substitutionRequests).where(eq2(substitutionRequests.id, id));
       }
       // Mass times operations
       async createMassTime(massTimeData) {
@@ -1313,11 +1399,11 @@ var init_storage = __esm({
         return await db.select().from(massTimesConfig).orderBy(massTimesConfig.dayOfWeek, massTimesConfig.time);
       }
       async updateMassTime(id, massTimeData) {
-        const [massTime] = await db.update(massTimesConfig).set({ ...massTimeData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(massTimesConfig.id, id)).returning();
+        const [massTime] = await db.update(massTimesConfig).set({ ...massTimeData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(massTimesConfig.id, id)).returning();
         return massTime;
       }
       async deleteMassTime(id) {
-        await db.delete(massTimesConfig).where(eq(massTimesConfig.id, id));
+        await db.delete(massTimesConfig).where(eq2(massTimesConfig.id, id));
       }
       // Notification operations
       async createNotification(notificationData) {
@@ -1325,10 +1411,10 @@ var init_storage = __esm({
         return notification;
       }
       async getUserNotifications(userId) {
-        return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+        return await db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
       }
       async markNotificationAsRead(id) {
-        await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq(notifications.id, id));
+        await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq2(notifications.id, id));
       }
       async createPushSubscription(subscription) {
         await this.ensurePushSubscriptionTable();
@@ -1337,19 +1423,19 @@ var init_storage = __esm({
       }
       async getPushSubscriptionByEndpoint(endpoint) {
         await this.ensurePushSubscriptionTable();
-        const result = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).limit(1);
+        const result = await db.select().from(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, endpoint)).limit(1);
         return result[0];
       }
       async upsertPushSubscription(userId, subscription) {
         await this.ensurePushSubscriptionTable();
-        const existing = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
+        const existing = await db.select().from(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
         if (existing.length > 0) {
           const [updated] = await db.update(pushSubscriptions).set({
             userId,
             authKey: subscription.keys.auth,
             p256dhKey: subscription.keys.p256dh,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq(pushSubscriptions.id, existing[0].id)).returning();
+          }).where(eq2(pushSubscriptions.id, existing[0].id)).returning();
           return updated;
         }
         const [created] = await db.insert(pushSubscriptions).values({
@@ -1362,11 +1448,11 @@ var init_storage = __esm({
       }
       async removePushSubscription(userId, endpoint) {
         await this.ensurePushSubscriptionTable();
-        await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
+        await db.delete(pushSubscriptions).where(and(eq2(pushSubscriptions.userId, userId), eq2(pushSubscriptions.endpoint, endpoint)));
       }
       async removePushSubscriptionByEndpoint(endpoint) {
         await this.ensurePushSubscriptionTable();
-        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+        await db.delete(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, endpoint));
       }
       async getPushSubscriptionsByUserIds(userIds) {
         await this.ensurePushSubscriptionTable();
@@ -1378,17 +1464,17 @@ var init_storage = __esm({
       }
       // Dashboard statistics
       async getDashboardStats() {
-        const [totalMinistersResult] = await db.select({ count: count() }).from(users).where(and(eq(users.status, "active"), eq(users.role, "ministro")));
-        const [weeklyMassesResult] = await db.select({ count: count() }).from(massTimesConfig).where(eq(massTimesConfig.isActive, true));
+        const [totalMinistersResult] = await db.select({ count: count() }).from(users).where(and(eq2(users.status, "active"), eq2(users.role, "ministro")));
+        const [weeklyMassesResult] = await db.select({ count: count() }).from(massTimesConfig).where(eq2(massTimesConfig.isActive, true));
         const [availableTodayResult] = await db.select({ count: count() }).from(users).where(and(
-          eq(users.status, "active"),
-          eq(users.role, "ministro"),
-          eq(users.availableForSpecialEvents, true)
+          eq2(users.status, "active"),
+          eq2(users.role, "ministro"),
+          eq2(users.availableForSpecialEvents, true)
         ));
         const weekStart = /* @__PURE__ */ new Date();
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         const [substitutionsResult] = await db.select({ count: count() }).from(substitutionRequests).where(and(
-          eq(substitutionRequests.status, "pending"),
+          eq2(substitutionRequests.status, "pending"),
           gte(substitutionRequests.createdAt, weekStart)
         ));
         return {
@@ -1401,13 +1487,13 @@ var init_storage = __esm({
       }
       // Family relationship operations
       async getFamilyMembers(userId) {
-        const relationships = await db.select().from(familyRelationships).where(eq(familyRelationships.userId, userId));
+        const relationships = await db.select().from(familyRelationships).where(eq2(familyRelationships.userId, userId));
         return relationships;
       }
       async addFamilyMember(userId, relatedUserId, relationshipType) {
         const existingRelationship = await db.select().from(familyRelationships).where(and(
-          eq(familyRelationships.userId, userId),
-          eq(familyRelationships.relatedUserId, relatedUserId)
+          eq2(familyRelationships.userId, userId),
+          eq2(familyRelationships.relatedUserId, relatedUserId)
         ));
         if (existingRelationship.length > 0) {
           throw new Error("Relationship already exists");
@@ -1433,21 +1519,21 @@ var init_storage = __esm({
         return relationship;
       }
       async removeFamilyMember(relationshipId) {
-        const [relationship] = await db.select().from(familyRelationships).where(eq(familyRelationships.id, relationshipId));
+        const [relationship] = await db.select().from(familyRelationships).where(eq2(familyRelationships.id, relationshipId));
         if (relationship) {
           await db.delete(familyRelationships).where(and(
-            eq(familyRelationships.userId, relationship.relatedUserId),
-            eq(familyRelationships.relatedUserId, relationship.userId)
+            eq2(familyRelationships.userId, relationship.relatedUserId),
+            eq2(familyRelationships.relatedUserId, relationship.userId)
           ));
         }
-        await db.delete(familyRelationships).where(eq(familyRelationships.id, relationshipId));
+        await db.delete(familyRelationships).where(eq2(familyRelationships.id, relationshipId));
       }
       async getFamilyPreference(userId) {
         const user = await this.getUser(userId);
         if (!user || !user.familyId) {
           return null;
         }
-        const [family] = await db.select().from(families).where(eq(families.id, user.familyId));
+        const [family] = await db.select().from(families).where(eq2(families.id, user.familyId));
         if (!family) {
           return null;
         }
@@ -1461,18 +1547,22 @@ var init_storage = __esm({
         if (!user || !user.familyId) {
           throw new Error("User has no family");
         }
-        await db.update(families).set({ preferServeTogether }).where(eq(families.id, user.familyId));
+        await db.update(families).set({ preferServeTogether }).where(eq2(families.id, user.familyId));
       }
       // Family questionnaire sharing methods
       async getFamilyMembersForQuestionnaire(userId, questionnaireId) {
-        const relationships = await db.select().from(familyRelationships).where(eq(familyRelationships.userId, userId));
+        const relationships = await db.select().from(familyRelationships).where(eq2(familyRelationships.userId, userId));
         const familyMembers = await Promise.all(
           relationships.map(async (rel) => {
             const user = await this.getUser(rel.relatedUserId);
             if (!user) return null;
             const response = await db.select().from(questionnaireResponses).where(and(
-              eq(questionnaireResponses.questionnaireId, questionnaireId),
-              eq(questionnaireResponses.userId, rel.relatedUserId)
+              eq2(questionnaireResponses.questionnaireId, questionnaireId),
+              eq2(questionnaireResponses.userId, rel.relatedUserId),
+              eq2(questionnaireResponses.isSharedResponse, false),
+              // Only count direct responses
+              eq2(questionnaireResponses.isDeleted, false)
+              // Exclude soft-deleted responses
             )).limit(1);
             return {
               id: user.id,
@@ -1488,21 +1578,21 @@ var init_storage = __esm({
       }
       async checkUserMinisterialActivity(userId) {
         try {
-          const responses = await db.select().from(questionnaireResponses).where(eq(questionnaireResponses.userId, userId)).limit(1);
+          const responses = await db.select().from(questionnaireResponses).where(eq2(questionnaireResponses.userId, userId)).limit(1);
           if (responses.length > 0) {
             return {
               isUsed: true,
               reason: "Usu\xE1rio j\xE1 respondeu question\xE1rios"
             };
           }
-          const ministerAssignments = await db.select().from(schedules).where(eq(schedules.ministerId, userId)).limit(1);
+          const ministerAssignments = await db.select().from(schedules).where(eq2(schedules.ministerId, userId)).limit(1);
           if (ministerAssignments.length > 0) {
             return {
               isUsed: true,
               reason: "Usu\xE1rio j\xE1 foi escalado para missas"
             };
           }
-          const substituteAssignments = await db.select().from(schedules).where(eq(schedules.substituteId, userId)).limit(1);
+          const substituteAssignments = await db.select().from(schedules).where(eq2(schedules.substituteId, userId)).limit(1);
           if (substituteAssignments.length > 0) {
             return {
               isUsed: true,
@@ -1510,8 +1600,8 @@ var init_storage = __esm({
             };
           }
           const substitutionActivity = await db.select().from(substitutionRequests).where(or(
-            eq(substitutionRequests.requesterId, userId),
-            eq(substitutionRequests.substituteId, userId)
+            eq2(substitutionRequests.requesterId, userId),
+            eq2(substitutionRequests.substituteId, userId)
           )).limit(1);
           if (substitutionActivity.length > 0) {
             return {
@@ -1546,13 +1636,13 @@ var init_storage = __esm({
         );
       }
       async getFormationTrackById(id) {
-        const [track] = await db.select().from(formationTracks).where(eq(formationTracks.id, id));
+        const [track] = await db.select().from(formationTracks).where(eq2(formationTracks.id, id));
         return track;
       }
       // Formation module operations
       async getFormationModules(trackId) {
         return await DrizzleSQLiteFallback.safeQuery(
-          () => db.select().from(formationModules).where(eq(formationModules.trackId, trackId)).orderBy(formationModules.orderIndex, formationModules.title),
+          () => db.select().from(formationModules).where(eq2(formationModules.trackId, trackId)).orderBy(formationModules.orderIndex, formationModules.title),
           `SELECT * FROM formation_modules WHERE trackId = '${trackId}' ORDER BY orderIndex, title`,
           (row) => ({
             ...row,
@@ -1566,33 +1656,33 @@ var init_storage = __esm({
         return track;
       }
       async updateFormationTrack(id, trackData) {
-        const [track] = await db.update(formationTracks).set({ ...trackData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(formationTracks.id, id)).returning();
+        const [track] = await db.update(formationTracks).set({ ...trackData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationTracks.id, id)).returning();
         return track;
       }
       async deleteFormationTrack(id) {
-        await db.delete(formationTracks).where(eq(formationTracks.id, id));
+        await db.delete(formationTracks).where(eq2(formationTracks.id, id));
       }
       // Formation lesson operations
       async getFormationLessons(trackId, moduleId) {
         const query = db.select().from(formationLessons);
         if (trackId && moduleId) {
-          return await query.where(and(eq(formationLessons.trackId, trackId), eq(formationLessons.moduleId, moduleId))).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(and(eq2(formationLessons.trackId, trackId), eq2(formationLessons.moduleId, moduleId))).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         } else if (trackId) {
-          return await query.where(eq(formationLessons.trackId, trackId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(eq2(formationLessons.trackId, trackId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         } else if (moduleId) {
-          return await query.where(eq(formationLessons.moduleId, moduleId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(eq2(formationLessons.moduleId, moduleId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         }
         return await query.orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
       }
       async getFormationLessonById(id) {
-        const [lesson] = await db.select().from(formationLessons).where(eq(formationLessons.id, id));
+        const [lesson] = await db.select().from(formationLessons).where(eq2(formationLessons.id, id));
         return lesson;
       }
       async getFormationLessonByNumber(trackId, moduleId, lessonNumber) {
         const [lesson] = await db.select().from(formationLessons).where(and(
-          eq(formationLessons.trackId, trackId),
-          eq(formationLessons.moduleId, moduleId),
-          eq(formationLessons.lessonNumber, lessonNumber)
+          eq2(formationLessons.trackId, trackId),
+          eq2(formationLessons.moduleId, moduleId),
+          eq2(formationLessons.lessonNumber, lessonNumber)
         ));
         return lesson;
       }
@@ -1620,18 +1710,18 @@ var init_storage = __esm({
         return lesson;
       }
       async updateFormationLesson(id, lessonData) {
-        const [lesson] = await db.update(formationLessons).set({ ...lessonData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(formationLessons.id, id)).returning();
+        const [lesson] = await db.update(formationLessons).set({ ...lessonData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationLessons.id, id)).returning();
         return lesson;
       }
       async deleteFormationLesson(id) {
-        await db.delete(formationLessons).where(eq(formationLessons.id, id));
+        await db.delete(formationLessons).where(eq2(formationLessons.id, id));
       }
       // Formation lesson section operations
       async getFormationLessonSections(lessonId) {
-        return await db.select().from(formationLessonSections).where(eq(formationLessonSections.lessonId, lessonId)).orderBy(formationLessonSections.orderIndex);
+        return await db.select().from(formationLessonSections).where(eq2(formationLessonSections.lessonId, lessonId)).orderBy(formationLessonSections.orderIndex);
       }
       async getFormationLessonSectionById(id) {
-        const [section] = await db.select().from(formationLessonSections).where(eq(formationLessonSections.id, id));
+        const [section] = await db.select().from(formationLessonSections).where(eq2(formationLessonSections.id, id));
         return section;
       }
       async createFormationLessonSection(sectionData) {
@@ -1639,37 +1729,37 @@ var init_storage = __esm({
         return section;
       }
       async updateFormationLessonSection(id, sectionData) {
-        const [section] = await db.update(formationLessonSections).set({ ...sectionData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(formationLessonSections.id, id)).returning();
+        const [section] = await db.update(formationLessonSections).set({ ...sectionData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationLessonSections.id, id)).returning();
         return section;
       }
       async deleteFormationLessonSection(id) {
-        await db.delete(formationLessonSections).where(eq(formationLessonSections.id, id));
+        await db.delete(formationLessonSections).where(eq2(formationLessonSections.id, id));
       }
       // Formation lesson progress operations
       async getFormationLessonProgress(userId, lessonId) {
-        const query = db.select().from(formationLessonProgress).where(eq(formationLessonProgress.userId, userId));
+        const query = db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.userId, userId));
         if (lessonId) {
-          return await query.where(and(eq(formationLessonProgress.userId, userId), eq(formationLessonProgress.lessonId, lessonId)));
+          return await query.where(and(eq2(formationLessonProgress.userId, userId), eq2(formationLessonProgress.lessonId, lessonId)));
         }
         return await query.orderBy(desc(formationLessonProgress.lastAccessedAt));
       }
       async getFormationLessonProgressById(id) {
-        const [progress] = await db.select().from(formationLessonProgress).where(eq(formationLessonProgress.id, id));
+        const [progress] = await db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.id, id));
         return progress;
       }
       async getUserFormationProgress(userId, trackId) {
         if (trackId) {
-          return await db.select().from(formationLessonProgress).innerJoin(formationLessons, eq(formationLessonProgress.lessonId, formationLessons.id)).where(and(
-            eq(formationLessonProgress.userId, userId),
-            eq(formationLessons.trackId, trackId)
+          return await db.select().from(formationLessonProgress).innerJoin(formationLessons, eq2(formationLessonProgress.lessonId, formationLessons.id)).where(and(
+            eq2(formationLessonProgress.userId, userId),
+            eq2(formationLessons.trackId, trackId)
           )).orderBy(desc(formationLessonProgress.lastAccessedAt));
         }
         return await this.getFormationLessonProgress(userId);
       }
       async createOrUpdateFormationLessonProgress(progressData) {
         const [existingProgress] = await db.select().from(formationLessonProgress).where(and(
-          eq(formationLessonProgress.userId, progressData.userId),
-          eq(formationLessonProgress.lessonId, progressData.lessonId)
+          eq2(formationLessonProgress.userId, progressData.userId),
+          eq2(formationLessonProgress.lessonId, progressData.lessonId)
         ));
         if (existingProgress) {
           const [progress] = await db.update(formationLessonProgress).set({
@@ -1680,7 +1770,7 @@ var init_storage = __esm({
             lastAccessedAt: /* @__PURE__ */ new Date(),
             completedAt: progressData.status === "completed" ? /* @__PURE__ */ new Date() : null,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq(formationLessonProgress.id, existingProgress.id)).returning();
+          }).where(eq2(formationLessonProgress.id, existingProgress.id)).returning();
           return progress;
         } else {
           const [progress] = await db.insert(formationLessonProgress).values({
@@ -1693,14 +1783,14 @@ var init_storage = __esm({
       }
       async markLessonSectionCompleted(userId, lessonId, sectionId) {
         const [currentProgress] = await db.select().from(formationLessonProgress).where(and(
-          eq(formationLessonProgress.userId, userId),
-          eq(formationLessonProgress.lessonId, lessonId)
+          eq2(formationLessonProgress.userId, userId),
+          eq2(formationLessonProgress.lessonId, lessonId)
         ));
         const currentSections = currentProgress?.completedSections || [];
         if (!currentSections.includes(sectionId)) {
           currentSections.push(sectionId);
         }
-        const totalSections = await db.select({ count: count() }).from(formationLessonSections).where(eq(formationLessonSections.lessonId, lessonId));
+        const totalSections = await db.select({ count: count() }).from(formationLessonSections).where(eq2(formationLessonSections.lessonId, lessonId));
         const progressPercentage = Math.round(currentSections.length / (totalSections[0]?.count || 1) * 100);
         const status = progressPercentage === 100 ? "completed" : "in_progress";
         return await this.createOrUpdateFormationLessonProgress({
@@ -1731,7 +1821,7 @@ var init_storage = __esm({
           db.select().from(formationModules).orderBy(formationModules.trackId, formationModules.orderIndex),
           db.select().from(formationLessons).orderBy(formationLessons.trackId, formationLessons.moduleId, formationLessons.lessonNumber)
         ]);
-        const progressRecords = userId ? await db.select().from(formationLessonProgress).where(eq(formationLessonProgress.userId, userId)) : [];
+        const progressRecords = userId ? await db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.userId, userId)) : [];
         const progressMap = new Map(
           progressRecords.map((record) => [record.lessonId, record])
         );
@@ -1826,6 +1916,37 @@ var init_storage = __esm({
             lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
           }
         };
+      }
+      // Adoration draw operations
+      async createAdorationDraw(drawData) {
+        const [draw] = await db.insert(adorationDraws).values({
+          month: drawData.month,
+          year: drawData.year,
+          totalMinistersToDraw: drawData.totalMinistersToDraw,
+          createdBy: drawData.createdBy
+        }).returning();
+        return draw;
+      }
+      async getAdorationDraws(year, month) {
+        return await db.select().from(adorationDraws).where(and(
+          eq2(adorationDraws.year, year),
+          eq2(adorationDraws.month, month)
+        )).orderBy(desc(adorationDraws.createdAt));
+      }
+      async getAdorationDrawResults(drawId) {
+        return await db.select().from(adorationDrawResults).where(eq2(adorationDrawResults.drawId, drawId)).orderBy(adorationDrawResults.mondayOfWeek);
+      }
+      async addAdorationDrawResult(drawId, ministerId, mondayOfWeek, isVoluntary) {
+        const [result] = await db.insert(adorationDrawResults).values({
+          drawId,
+          ministerId,
+          mondayOfWeek,
+          isVoluntary
+        }).returning();
+        return result;
+      }
+      async deleteAdorationDraw(id) {
+        await db.delete(adorationDraws).where(eq2(adorationDraws.id, id));
       }
     };
     storage = new DatabaseStorage();
@@ -1927,7 +2048,7 @@ var init_logger = __esm({
 });
 
 // server/utils/saintNameMatching.ts
-import { eq as eq10 } from "drizzle-orm";
+import { eq as eq11 } from "drizzle-orm";
 async function loadAllSaintsData() {
   if (saintsCache) {
     return saintsCache;
@@ -2220,8 +2341,8 @@ __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
   generateAutomaticSchedule: () => generateAutomaticSchedule
 });
-import { eq as eq11, and as and7, or as or5, sql as sql4, ne as ne2 } from "drizzle-orm";
-import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday } from "date-fns";
+import { eq as eq12, and as and7, or as or5, sql as sql4, ne as ne2, inArray as inArray2 } from "drizzle-orm";
+import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
   return await generator.generateScheduleForMonth(year, month, isPreview);
@@ -2266,8 +2387,8 @@ ${"=".repeat(60)}`);
 `);
         console.time("[PERF] Total generation time");
         console.time("[PERF] Database initialization");
-        const { db: db2 } = await init_db().then(() => db_exports);
-        this.db = db2;
+        const { db: db3 } = await init_db().then(() => db_exports);
+        this.db = db3;
         console.timeEnd("[PERF] Database initialization");
         console.log(`\u2705 Database initialized in ${Date.now() - startTime}ms`);
         this.dailyAssignments = /* @__PURE__ */ new Map();
@@ -2342,7 +2463,7 @@ ${"!".repeat(60)}`);
           console.time("[PERF] Generate monthly mass times");
           console.log(`
 [STEP 4] \u{1F4C5} Generating monthly mass times for ${month}/${year}...`);
-          const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
+          const monthlyMassTimes = await this.generateMonthlyMassTimes(year, month);
           console.timeEnd("[PERF] Generate monthly mass times");
           console.log(`
 [VALIDATION] Monthly masses generated:`, {
@@ -2556,11 +2677,18 @@ ${"!".repeat(60)}`);
             preferredTimes: users.preferredTimes,
             canServeAsCouple: users.canServeAsCouple,
             spouseMinisterId: users.spouseMinisterId,
-            familyId: users.familyId
+            familyId: users.familyId,
+            preferredPositions: users.preferredPositions,
+            avoidPositions: users.avoidPositions,
+            reliabilityScore: users.reliabilityScore,
+            substitutionRequestCount: users.substitutionRequestCount,
+            substitutionFulfilledCount: users.substitutionFulfilledCount,
+            manualRemovalCount: users.manualRemovalCount,
+            noShowCount: users.noShowCount
           }).from(users).where(
             and7(
               or5(
-                eq11(users.status, "active"),
+                eq12(users.status, "active"),
                 sql4`${users.status} IS NULL`
                 // Incluir usuários com status null
               ),
@@ -2580,6 +2708,8 @@ ${"!".repeat(60)}`);
           preferredTimes: m.preferredTimes || [],
           canServeAsCouple: m.canServeAsCouple || false,
           familyId: m.familyId || null,
+          preferredPositions: m.preferredPositions || [],
+          avoidPositions: m.avoidPositions || [],
           availabilityScore: this.calculateAvailabilityScore(m),
           preferenceScore: this.calculatePreferenceScore(m),
           // 🔥 FAIR ALGORITHM: Initialize monthly counters
@@ -2614,7 +2744,7 @@ ${"!".repeat(60)}`);
             id: families.id,
             name: families.name,
             preferServeTogether: families.preferServeTogether
-          }).from(families).where(sql4`${families.id} = ANY(${uniqueFamilyIds})`);
+          }).from(families).where(inArray2(families.id, uniqueFamilyIds));
           for (const family of familiesData) {
             this.familyPreferences.set(family.id, family.preferServeTogether ?? true);
           }
@@ -2961,8 +3091,8 @@ ${"!".repeat(60)}`);
         const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
           and7(
-            eq11(questionnaires.month, month),
-            eq11(questionnaires.year, year)
+            eq12(questionnaires.month, month),
+            eq12(questionnaires.year, year)
           )
         ).limit(1);
         if (!targetQuestionnaire) {
@@ -2977,7 +3107,7 @@ ${"!".repeat(60)}`);
           }
           return;
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(eq12(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         console.log(`[SCHEDULE_GEN] \u{1F504} Using COMPATIBILITY LAYER for ${year}/${month}`);
         responses.forEach((r, index2) => {
@@ -3140,7 +3270,7 @@ ${"!".repeat(60)}`);
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq11(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq12(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -3152,7 +3282,7 @@ ${"!".repeat(60)}`);
       /**
        * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
        */
-      generateMonthlyMassTimes(year, month) {
+      async generateMonthlyMassTimes(year, month) {
         const monthlyTimes = [];
         const startDate = startOfMonth(new Date(year, month - 1));
         const endDate = endOfMonth(new Date(year, month - 1));
@@ -3325,13 +3455,112 @@ ${"!".repeat(60)}`);
               console.log(`[SCHEDULE_GEN] \u2705 Missa S\xE3o Judas Mensal: ${dateStr} ${config.time} (${config.ministers} ministros)`);
             });
           }
+          if (isMonday(currentDate)) {
+            const mondayOfWeek = this.getMondayWeekNumber(currentDate);
+            const adorationMinisters = await this.getAdorationMinistersForMonday(year, month, mondayOfWeek);
+            if (adorationMinisters.length > 0) {
+              monthlyTimes.push({
+                id: `adoracao-${dateStr}`,
+                dayOfWeek,
+                time: "22:00",
+                date: dateStr,
+                minMinisters: adorationMinisters.length,
+                maxMinisters: adorationMinisters.length,
+                type: "adoracao_santissimo"
+              });
+              console.log(`[SCHEDULE_GEN] \u{1F64F} Adora\xE7\xE3o ao Sant\xEDssimo: ${dateStr} 22:00 (${adorationMinisters.length} ministros sorteados)`);
+            }
+          }
           currentDate = addDays(currentDate, 1);
         }
+        const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
+        monthlyTimes.push(...specialMasses);
         const filteredTimes = this.resolveTimeConflicts(monthlyTimes);
         console.log(`[SCHEDULE_GEN] \u2705 Total de ${monthlyTimes.length} hor\xE1rios \u2192 ${filteredTimes.length} ap\xF3s filtro de conflitos!`);
         return filteredTimes.sort(
           (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)
         );
+      }
+      /**
+       * Carrega missas especiais customizadas do questionário
+       */
+      async loadSpecialMassesFromQuestionnaire(year, month) {
+        const specialMasses = [];
+        if (!this.db) {
+          console.log("[SCHEDULE_GEN] No database connection, skipping special masses from questionnaire");
+          return specialMasses;
+        }
+        try {
+          const [questionnaire] = await this.db.select().from(questionnaires).where(
+            and7(
+              eq12(questionnaires.month, month),
+              eq12(questionnaires.year, year)
+            )
+          ).limit(1);
+          if (!questionnaire) {
+            console.log(`[SCHEDULE_GEN] No questionnaire found for ${month}/${year}`);
+            return specialMasses;
+          }
+          console.log(`[SCHEDULE_GEN] \u{1F3AF} Loading special masses from questionnaire: ${questionnaire.title}`);
+          let questions = questionnaire.questions;
+          if (typeof questions === "string") {
+            questions = JSON.parse(questions);
+          }
+          const customQuestions = questions.filter(
+            (q) => q.category === "custom" || q.category === "special_event"
+          );
+          console.log(`[SCHEDULE_GEN] Found ${customQuestions.length} custom/special event questions`);
+          for (const question of customQuestions) {
+            const massInfo = this.extractMassInfoFromQuestion(question.question, year, month);
+            if (massInfo) {
+              specialMasses.push({
+                id: `custom-${question.id}`,
+                dayOfWeek: massInfo.dayOfWeek,
+                time: massInfo.time,
+                date: massInfo.date,
+                minMinisters: massInfo.minMinisters || 7,
+                maxMinisters: massInfo.maxMinisters || 7,
+                type: question.id,
+                // Usar o ID da pergunta como tipo
+                description: question.question
+              });
+              console.log(`[SCHEDULE_GEN] \u2705 Special mass added: ${massInfo.date} ${massInfo.time} - ${question.question.substring(0, 60)}...`);
+            } else {
+              console.log(`[SCHEDULE_GEN] \u26A0\uFE0F Could not extract mass info from: ${question.question}`);
+            }
+          }
+          console.log(`[SCHEDULE_GEN] \u{1F4CA} Total special masses from questionnaire: ${specialMasses.length}`);
+        } catch (error) {
+          console.error("[SCHEDULE_GEN] Error loading special masses from questionnaire:", error);
+        }
+        return specialMasses;
+      }
+      /**
+       * Extrai informações de data e horário de uma pergunta de missa especial
+       */
+      extractMassInfoFromQuestion(question, year, month) {
+        const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (!dateMatch) {
+          return null;
+        }
+        const day = parseInt(dateMatch[1]);
+        const monthFromQuestion = parseInt(dateMatch[2]);
+        const yearFromQuestion = parseInt(dateMatch[3]);
+        const timeMatch = question.match(/(?:às|as)\s+(\d{1,2})(?:h|:)(\d{2})?/i);
+        if (!timeMatch) {
+          return null;
+        }
+        const hour = parseInt(timeMatch[1]).toString().padStart(2, "0");
+        const minute = timeMatch[2] ? timeMatch[2] : "00";
+        const time2 = `${hour}:${minute}`;
+        const date2 = `${yearFromQuestion}-${monthFromQuestion.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+        const dateObj = new Date(yearFromQuestion, monthFromQuestion - 1, day);
+        const dayOfWeek = dateObj.getDay();
+        return {
+          date: date2,
+          time: time2,
+          dayOfWeek
+        };
       }
       /**
        * Resolve conflitos de horário: missa especial substitui missa normal
@@ -3514,16 +3743,8 @@ ${"!".repeat(60)}`);
         console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
         const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);
         const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
-        console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros!");
-        const ministersWithPositions = selectedMinisters.map((minister, index2) => {
-          const ministerWithPosition = {
-            ...minister,
-            position: index2 + 1
-            // Atribuir posições sequenciais
-          };
-          console.log(`[SCHEDULE_GEN] \u2705 Ministro ${minister.name} recebeu posi\xE7\xE3o ${index2 + 1}`);
-          return ministerWithPosition;
-        });
+        console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros com base em prefer\xEAncias!");
+        const ministersWithPositions = this.assignPositionsIntelligently(selectedMinisters);
         const backupWithPositions = backupMinisters.map((minister, index2) => ({
           ...minister,
           position: selectedMinisters.length + index2 + 1
@@ -3538,6 +3759,97 @@ ${"!".repeat(60)}`);
         };
         console.log("[SCHEDULE_GEN] \u{1F6A8} RESULTADO FINAL:", JSON.stringify(result, null, 2).substring(0, 500));
         return result;
+      }
+      /**
+       * 🎯 INTELLIGENT POSITION ASSIGNMENT
+       * Atribui posições aos ministros considerando suas preferências
+       */
+      assignPositionsIntelligently(ministers) {
+        console.log("[POSITION_ASSIGN] \u{1F3AF} Starting intelligent position assignment for", ministers.length, "ministers");
+        if (ministers.length === 0) {
+          return [];
+        }
+        const assignedPositions = /* @__PURE__ */ new Set();
+        const ministersWithPositions = [];
+        const unassignedMinisters = [];
+        console.log("[POSITION_ASSIGN] \u{1F4CB} PHASE 1: Assigning preferred positions");
+        const ministersByPriority = [...ministers].sort((a, b) => {
+          const aPrefs = a.preferredPositions?.length || 0;
+          const bPrefs = b.preferredPositions?.length || 0;
+          if (aPrefs === 0 && bPrefs === 0) return 0;
+          if (aPrefs === 0) return 1;
+          if (bPrefs === 0) return -1;
+          return aPrefs - bPrefs;
+        });
+        for (const minister of ministersByPriority) {
+          const prefs = minister.preferredPositions || [];
+          const avoid = minister.avoidPositions || [];
+          if (prefs.length > 0) {
+            let assigned = false;
+            for (const preferredPos of prefs) {
+              if (preferredPos < 1 || preferredPos > ministers.length) {
+                continue;
+              }
+              if (!assignedPositions.has(preferredPos)) {
+                ministersWithPositions.push({
+                  ...minister,
+                  position: preferredPos
+                });
+                assignedPositions.add(preferredPos);
+                assigned = true;
+                console.log(`[POSITION_ASSIGN] \u2705 ${minister.name} \u2192 Posi\xE7\xE3o ${preferredPos} (preferida)`);
+                break;
+              }
+            }
+            if (!assigned) {
+              unassignedMinisters.push(minister);
+              console.log(`[POSITION_ASSIGN] \u23F3 ${minister.name} \u2192 Nenhuma posi\xE7\xE3o preferida dispon\xEDvel (prefere: ${prefs.join(", ")})`);
+            }
+          } else {
+            unassignedMinisters.push(minister);
+          }
+        }
+        console.log("[POSITION_ASSIGN] \u{1F4CB} PHASE 2: Assigning remaining positions");
+        for (const minister of unassignedMinisters) {
+          const avoid = minister.avoidPositions || [];
+          let assigned = false;
+          for (let pos = 1; pos <= ministers.length; pos++) {
+            if (!assignedPositions.has(pos) && !avoid.includes(pos)) {
+              ministersWithPositions.push({
+                ...minister,
+                position: pos
+              });
+              assignedPositions.add(pos);
+              assigned = true;
+              console.log(`[POSITION_ASSIGN] \u2705 ${minister.name} \u2192 Posi\xE7\xE3o ${pos} (dispon\xEDvel, n\xE3o evitada)`);
+              break;
+            }
+          }
+          if (!assigned) {
+            for (let pos = 1; pos <= ministers.length; pos++) {
+              if (!assignedPositions.has(pos)) {
+                ministersWithPositions.push({
+                  ...minister,
+                  position: pos
+                });
+                assignedPositions.add(pos);
+                console.log(`[POSITION_ASSIGN] \u26A0\uFE0F ${minister.name} \u2192 Posi\xE7\xE3o ${pos} (FOR\xC7ADA - estava na lista de evitar: ${avoid.join(", ")})`);
+                break;
+              }
+            }
+          }
+        }
+        const sorted = ministersWithPositions.sort((a, b) => (a.position || 0) - (b.position || 0));
+        console.log("[POSITION_ASSIGN] \u2705 Position assignment complete:");
+        sorted.forEach((m) => {
+          const prefs = m.preferredPositions || [];
+          const avoid = m.avoidPositions || [];
+          const isPreferred = prefs.includes(m.position || 0);
+          const isAvoided = avoid.includes(m.position || 0);
+          const status = isPreferred ? "\u2705 PREFERIDA" : isAvoided ? "\u26A0\uFE0F EVITADA" : "\u2796 NEUTRA";
+          console.log(`[POSITION_ASSIGN]   ${m.position}. ${m.name} - ${status}`);
+        });
+        return sorted;
       }
       /**
        * Filtra ministros disponíveis para uma missa específica
@@ -3716,6 +4028,17 @@ ${"!".repeat(60)}`);
           console.log(`[SCHEDULE_GEN] ${ministerId} tem disponibilidade di\xE1ria: ${hasAnyDailyAvailability}`);
           return hasAnyDailyAvailability;
         }
+        const specialEvents = availability.specialEvents;
+        if (massType.startsWith("custom_") || massType.startsWith("healing_liberation") || massType.startsWith("sacred_heart") || massType.startsWith("immaculate_heart") || massType === "special_event_1" || massType.startsWith("adoration_")) {
+          if (specialEvents && typeof specialEvents === "object") {
+            const response = specialEvents[massType];
+            const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
+            console.log(`[SPECIAL_MASS] \u{1F3AF} ${ministerId} for CUSTOM event ${massType}: ${response} = ${isAvailable}`);
+            return isAvailable;
+          }
+          console.log(`[SPECIAL_MASS] \u274C ${ministerId}: No special events data for ${massType}`);
+          return false;
+        }
         const massTypeMapping = {
           "missa_cura_libertacao": "healing_liberation",
           // v2.0: healing_liberation (não healing_liberation_mass!)
@@ -3726,16 +4049,15 @@ ${"!".repeat(60)}`);
           "missa_sao_judas": "saint_judas_novena"
         };
         if (massType === "missa_sao_judas_festa" && massTime && massDate) {
-          const specialEvents2 = availability.specialEvents;
-          console.log(`[SPECIAL_MASS] \u{1F4E6} Special events for ${ministerId}:`, typeof specialEvents2, specialEvents2 ? Object.keys(specialEvents2) : "null");
-          if (specialEvents2 && typeof specialEvents2 === "object") {
-            console.log(`[SPECIAL_MASS] \u{1F511} saint_judas_feast exists:`, !!specialEvents2.saint_judas_feast, typeof specialEvents2.saint_judas_feast);
-            if (specialEvents2.saint_judas_feast && typeof specialEvents2.saint_judas_feast === "object") {
+          console.log(`[SPECIAL_MASS] \u{1F4E6} Special events for ${ministerId}:`, typeof specialEvents, specialEvents ? Object.keys(specialEvents) : "null");
+          if (specialEvents && typeof specialEvents === "object") {
+            console.log(`[SPECIAL_MASS] \u{1F511} saint_judas_feast exists:`, !!specialEvents.saint_judas_feast, typeof specialEvents.saint_judas_feast);
+            if (specialEvents.saint_judas_feast && typeof specialEvents.saint_judas_feast === "object") {
               const datetimeKey = `${massDate}_${massTime}`;
               console.log(`[SPECIAL_MASS] \u2705 Checking key: ${datetimeKey}`);
-              let response = specialEvents2.saint_judas_feast[datetimeKey];
+              let response = specialEvents.saint_judas_feast[datetimeKey];
               if (response === void 0) {
-                const nestedByDate = specialEvents2.saint_judas_feast[massDate];
+                const nestedByDate = specialEvents.saint_judas_feast[massDate];
                 if (nestedByDate && typeof nestedByDate === "object") {
                   const normalizedTime = massTime.padStart(5, "0");
                   response = nestedByDate[massTime] ?? nestedByDate[normalizedTime];
@@ -3758,7 +4080,7 @@ ${"!".repeat(60)}`);
             };
             const questionKey2 = timeToQuestionKey[massTime];
             if (questionKey2) {
-              const response = specialEvents2[questionKey2];
+              const response = specialEvents[questionKey2];
               const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
               console.log(`[SCHEDULE_GEN] \u{1F50D} ${ministerId} para ${massType} (legacy ${questionKey2}): ${response} = ${isAvailable}`);
               return isAvailable;
@@ -3769,7 +4091,6 @@ ${"!".repeat(60)}`);
         if (!questionKey) {
           return true;
         }
-        const specialEvents = availability.specialEvents;
         if (specialEvents && typeof specialEvents === "object") {
           const response = specialEvents[questionKey];
           if (questionKey === "saint_judas_novena" && Array.isArray(response)) {
@@ -4128,6 +4449,82 @@ ${"!".repeat(60)}`);
         const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
         return days[dayOfWeek];
       }
+      /**
+       * Get which Monday of the month this date is (1st, 2nd, 3rd, 4th, or 5th)
+       */
+      getMondayWeekNumber(date2) {
+        const month = date2.getMonth();
+        const year = date2.getFullYear();
+        const firstDayOfMonth = new Date(year, month, 1);
+        let firstMonday = new Date(firstDayOfMonth);
+        while (firstMonday.getDay() !== 1) {
+          firstMonday = addDays(firstMonday, 1);
+        }
+        const daysDiff = Math.floor((date2.getTime() - firstMonday.getTime()) / (1e3 * 60 * 60 * 24));
+        const weekNumber = Math.floor(daysDiff / 7) + 1;
+        return weekNumber;
+      }
+      /**
+       * Get ministers selected in the adoration draw for a specific Monday
+       */
+      async getAdorationMinistersForMonday(year, month, mondayOfWeek) {
+        if (!this.db) {
+          console.log("[ADORATION] Database not available, skipping adoration ministers");
+          return [];
+        }
+        try {
+          const [draw] = await this.db.select().from(adorationDraws).where(
+            and7(
+              eq12(adorationDraws.year, year),
+              eq12(adorationDraws.month, month)
+            )
+          ).limit(1);
+          if (!draw) {
+            console.log(`[ADORATION] No draw found for ${month}/${year}`);
+            return [];
+          }
+          const results = await this.db.select({
+            ministerId: adorationDrawResults.ministerId,
+            isVoluntary: adorationDrawResults.isVoluntary
+          }).from(adorationDrawResults).where(
+            and7(
+              eq12(adorationDrawResults.drawId, draw.id),
+              eq12(adorationDrawResults.mondayOfWeek, mondayOfWeek)
+            )
+          );
+          if (results.length === 0) {
+            console.log(`[ADORATION] No ministers assigned for week ${mondayOfWeek} of ${month}/${year}`);
+            return [];
+          }
+          const ministerIds = results.map((r) => r.ministerId);
+          const ministersData = await this.db.select().from(users).where(and7(
+            users.id in ministerIds,
+            eq12(users.status, "active")
+          ));
+          const ministers = ministersData.map((m) => ({
+            id: m.id,
+            name: m.name,
+            role: m.role,
+            totalServices: m.totalServices || 0,
+            lastService: m.lastService,
+            preferredTimes: m.preferredTimes || [],
+            canServeAsCouple: m.canServeAsCouple || false,
+            spouseMinisterId: m.spouseMinisterId,
+            familyId: m.familyId,
+            availabilityScore: 1,
+            // Always available (drawn)
+            preferenceScore: 1,
+            monthlyAssignmentCount: 0
+          }));
+          const voluntaryCount = results.filter((r) => r.isVoluntary).length;
+          const mandatoryCount = results.length - voluntaryCount;
+          console.log(`[ADORATION] Found ${ministers.length} ministers for week ${mondayOfWeek}: ${voluntaryCount} voluntary, ${mandatoryCount} mandatory`);
+          return ministers;
+        } catch (error) {
+          console.error("[ADORATION] Error loading ministers for adoration:", error);
+          return [];
+        }
+      }
     };
   }
 });
@@ -4141,7 +4538,7 @@ __export(websocket_exports, {
   notifySubstitutionRequest: () => notifySubstitutionRequest
 });
 import { WebSocketServer, WebSocket } from "ws";
-import { eq as eq20, and as and15, gte as gte9, lte as lte9, sql as sql11, or as or7 } from "drizzle-orm";
+import { eq as eq22, and as and16, gte as gte10, lte as lte9, sql as sql12, or as or7 } from "drizzle-orm";
 import { format as format7, addDays as addDays4 } from "date-fns";
 function initializeWebSocket(httpServer) {
   wss = new WebSocketServer({
@@ -4210,13 +4607,13 @@ async function getCriticalAlerts() {
   const criticalMasses = await db.select({
     date: schedules.date,
     time: schedules.time,
-    vacancies: sql11`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+    vacancies: sql12`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
   }).from(schedules).where(
-    and15(
-      gte9(schedules.date, format7(now, "yyyy-MM-dd")),
+    and16(
+      gte10(schedules.date, format7(now, "yyyy-MM-dd")),
       lte9(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
     )
-  ).groupBy(schedules.date, schedules.time).having(sql11`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+  ).groupBy(schedules.date, schedules.time).having(sql12`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
   const criticalWithHours = criticalMasses.map((m) => ({
     ...m,
     hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1e3 * 60 * 60)),
@@ -4231,13 +4628,13 @@ async function getCriticalAlerts() {
     status: substitutionRequests.status,
     massDate: schedules.date,
     massTime: schedules.time
-  }).from(substitutionRequests).innerJoin(users, eq20(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq20(substitutionRequests.scheduleId, schedules.id)).where(
-    and15(
+  }).from(substitutionRequests).innerJoin(users, eq22(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq22(substitutionRequests.scheduleId, schedules.id)).where(
+    and16(
       or7(
-        eq20(substitutionRequests.status, "pending"),
-        eq20(substitutionRequests.status, "available")
+        eq22(substitutionRequests.status, "pending"),
+        eq22(substitutionRequests.status, "available")
       ),
-      gte9(schedules.date, format7(now, "yyyy-MM-dd")),
+      gte10(schedules.date, format7(now, "yyyy-MM-dd")),
       lte9(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
     )
   ).orderBy(schedules.date);
@@ -4310,7 +4707,7 @@ __export(formation_seed_exports, {
   default: () => formation_seed_default,
   seedFormation: () => seedFormation
 });
-import { eq as eq23 } from "drizzle-orm";
+import { eq as eq25 } from "drizzle-orm";
 async function seedFormation() {
   console.log("\u{1F331} Starting formation seed...");
   try {
@@ -4340,7 +4737,7 @@ async function seedFormation() {
     ];
     console.log("\u{1F4DA} Inserting tracks...");
     for (const track of tracks) {
-      const existing = await db.select().from(formationTracks).where(eq23(formationTracks.id, track.id)).limit(1);
+      const existing = await db.select().from(formationTracks).where(eq25(formationTracks.id, track.id)).limit(1);
       if (existing.length === 0) {
         await db.insert(formationTracks).values(track);
         console.log(`  \u2713 Created track: ${track.title}`);
@@ -5877,10 +6274,10 @@ async function handleMessage(message) {
     const normalizedText = text2.trim().toLowerCase();
     console.log(`\u{1F4AC} De ${normalizedPhone}: ${normalizedText}`);
     const ministro = await db.query.ministros.findFirst({
-      where: (m, { eq: eq30 }) => eq30(m.telefone, normalizedPhone)
+      where: (m, { eq: eq33 }) => eq33(m.telefone, normalizedPhone)
     });
     const proximaEscala = await db.query.escalas.findFirst({
-      where: (e, { eq: eq30 }) => eq30(e.ministro_id, ministro?.id),
+      where: (e, { eq: eq33 }) => eq33(e.ministro_id, ministro?.id),
       orderBy: (e, { asc: asc4 }) => asc4(e.data)
     });
     let resposta = "";
@@ -5953,7 +6350,7 @@ init_schema();
 init_nameFormatter();
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { eq as eq2 } from "drizzle-orm";
+import { eq as eq3 } from "drizzle-orm";
 function getJWTSecret() {
   if (!process.env.JWT_SECRET) {
     throw new Error(
@@ -5993,7 +6390,7 @@ function authenticateToken(req, res, next) {
   const secret = JWT_SECRET;
   const verifyAndCheckStatus = async (user) => {
     try {
-      const [currentUser] = await db.select().from(users).where(eq2(users.id, user.id)).limit(1);
+      const [currentUser] = await db.select().from(users).where(eq3(users.id, user.id)).limit(1);
       if (!currentUser || currentUser.status !== "active") {
         return res.status(403).json({ message: "Conta inativa ou pendente. Entre em contato com a coordena\xE7\xE3o." });
       }
@@ -6029,7 +6426,7 @@ function requireRole(roles) {
     if (!req.user) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const [currentUser] = await db.select({ role: users.role }).from(users).where(eq2(users.id, req.user.id)).limit(1);
+    const [currentUser] = await db.select({ role: users.role }).from(users).where(eq3(users.id, req.user.id)).limit(1);
     if (!currentUser || !roles.includes(currentUser.role)) {
       return res.status(403).json({ message: "Permiss\xE3o insuficiente para esta a\xE7\xE3o" });
     }
@@ -6039,7 +6436,7 @@ function requireRole(roles) {
 async function login(email, password) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const [user] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
+    const [user] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
     if (!user) {
       throw new Error("Usu\xE1rio ou senha errados, revise os dados e tente novamente.");
     }
@@ -6056,7 +6453,7 @@ async function login(email, password) {
     }
     const token = generateToken(user);
     try {
-      await db.update(users).set({ lastLogin: /* @__PURE__ */ new Date() }).where(eq2(users.id, user.id));
+      await db.update(users).set({ lastLogin: /* @__PURE__ */ new Date() }).where(eq3(users.id, user.id));
     } catch (updateError) {
     }
     const { passwordHash: _, ...userWithoutPassword } = user;
@@ -6071,7 +6468,7 @@ async function login(email, password) {
 async function register(userData) {
   try {
     const normalizedEmail = userData.email.trim().toLowerCase();
-    const [existingUser] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
+    const [existingUser] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
     if (existingUser) {
       throw new Error("Este email j\xE1 est\xE1 cadastrado");
     }
@@ -6095,7 +6492,7 @@ async function register(userData) {
 }
 async function changePassword(userId, currentPassword, newPassword) {
   try {
-    const [user] = await db.select().from(users).where(eq2(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq3(users.id, userId)).limit(1);
     if (!user) {
       throw new Error("Usu\xE1rio n\xE3o encontrado");
     }
@@ -6108,7 +6505,7 @@ async function changePassword(userId, currentPassword, newPassword) {
       passwordHash: newPasswordHash,
       requiresPasswordChange: false,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq2(users.id, userId));
+    }).where(eq3(users.id, userId));
     return { message: "Senha alterada com sucesso" };
   } catch (error) {
     throw error;
@@ -6117,7 +6514,7 @@ async function changePassword(userId, currentPassword, newPassword) {
 async function resetPassword(email) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const [user] = await db.select().from(users).where(eq2(users.email, normalizedEmail)).limit(1);
+    const [user] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
     if (!user) {
       return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
     }
@@ -6128,7 +6525,7 @@ async function resetPassword(email) {
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq2(users.id, user.id));
+    }).where(eq3(users.id, user.id));
     if (process.env.NODE_ENV === "development") {
       console.log(`[DEV ONLY] Senha tempor\xE1ria para ${email}: ${tempPassword}`);
     }
@@ -6143,13 +6540,13 @@ import { Router as Router2 } from "express";
 await init_db();
 init_schema();
 import { z } from "zod";
-import { eq as eq5 } from "drizzle-orm";
+import { eq as eq6 } from "drizzle-orm";
 
 // server/routes/session.ts
 await init_db();
 init_schema();
 import { Router } from "express";
-import { eq as eq3, and as and2, sql as sql3 } from "drizzle-orm";
+import { eq as eq4, and as and2, sql as sql3 } from "drizzle-orm";
 import { nanoid } from "nanoid";
 var router = Router();
 var INACTIVITY_TIMEOUT_MINUTES = 10;
@@ -6171,8 +6568,8 @@ async function createSession(userId, ipAddress, userAgent) {
   try {
     await db.update(activeSessions).set({ isActive: false }).where(
       and2(
-        eq3(activeSessions.userId, userId),
-        eq3(activeSessions.isActive, true)
+        eq4(activeSessions.userId, userId),
+        eq4(activeSessions.isActive, true)
       )
     );
     await db.insert(activeSessions).values({
@@ -6193,7 +6590,7 @@ router.post("/destroy", async (req, res) => {
   const sessionToken = req.cookies?.session_token || req.body.sessionToken;
   if (sessionToken) {
     try {
-      await db.update(activeSessions).set({ isActive: false }).where(eq3(activeSessions.sessionToken, sessionToken));
+      await db.update(activeSessions).set({ isActive: false }).where(eq4(activeSessions.sessionToken, sessionToken));
       console.log("[SESSION] \u{1F6AA} Destroyed - Token:", sessionToken.substring(0, 10) + "...");
     } catch (error) {
       console.error("[SESSION] Error destroying:", error);
@@ -6206,13 +6603,13 @@ router.get("/cleanup", async (req, res) => {
   try {
     const inactiveResult = await db.update(activeSessions).set({ isActive: false }).where(
       and2(
-        eq3(activeSessions.isActive, true),
+        eq4(activeSessions.isActive, true),
         sql3`EXTRACT(EPOCH FROM (NOW() - ${activeSessions.lastActivityAt})) / 60 > ${INACTIVITY_TIMEOUT_MINUTES}`
       )
     ).returning({ id: activeSessions.id });
     const deleteResult = await db.delete(activeSessions).where(
       and2(
-        eq3(activeSessions.isActive, false),
+        eq4(activeSessions.isActive, false),
         sql3`${activeSessions.createdAt} < NOW() - INTERVAL '30 days'`
       )
     ).returning({ id: activeSessions.id });
@@ -6233,7 +6630,7 @@ var session_default = router;
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq4 } from "drizzle-orm";
+import { eq as eq5 } from "drizzle-orm";
 function sanitizeAuditData(data) {
   if (!data || typeof data !== "object") {
     return data;
@@ -6326,7 +6723,7 @@ async function auditLoginAttempt(email, success, req, reason, userId) {
   let resolvedUserId = userId;
   if (!resolvedUserId) {
     try {
-      const [foundUser] = await db.select({ id: users.id }).from(users).where(eq4(users.email, normalizedEmail)).limit(1);
+      const [foundUser] = await db.select({ id: users.id }).from(users).where(eq5(users.email, normalizedEmail)).limit(1);
       resolvedUserId = foundUser?.id;
     } catch (error) {
       logger.warn("[AUDIT] Failed to resolve userId for login attempt", {
@@ -6540,7 +6937,7 @@ router2.get("/me", authenticateToken, async (req, res) => {
       lastName: users.lastName,
       phone: users.phone,
       photoUrl: users.photoUrl
-    }).from(users).where(eq5(users.id, userId)).limit(1);
+    }).from(users).where(eq6(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -6586,7 +6983,7 @@ router2.post("/logout", authenticateToken, async (req, res) => {
   if (sessionToken) {
     try {
       const { activeSessions: activeSessions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.update(activeSessions2).set({ isActive: false }).where(eq5(activeSessions2.sessionToken, sessionToken));
+      await db.update(activeSessions2).set({ isActive: false }).where(eq6(activeSessions2.sessionToken, sessionToken));
       console.log("[AUTH] Sess\xE3o marcada como inativa no logout");
     } catch (error) {
       console.error("[AUTH] Erro ao inativar sess\xE3o:", error);
@@ -6659,7 +7056,7 @@ var emailResetSchema = z.object({
 router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId, newPassword } = adminResetSchema.parse(req.body);
-    const [user] = await db.select().from(users).where(eq5(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq6(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -6678,7 +7075,7 @@ router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", 
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq5(users.id, userId));
+    }).where(eq6(users.id, userId));
     await logAudit("USER_UPDATE" /* USER_UPDATE */, {
       userId: currentUser?.id,
       targetUserId: userId,
@@ -6759,7 +7156,7 @@ var authRoutes_default = router2;
 await init_db();
 init_schema();
 import { Router as Router3 } from "express";
-import { eq as eq6, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
+import { eq as eq7, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
 var router3 = Router3();
 router3.post("/request-reset", async (req, res) => {
   try {
@@ -6770,7 +7167,7 @@ router3.post("/request-reset", async (req, res) => {
         message: "Email \xE9 obrigat\xF3rio"
       });
     }
-    const [user] = await db.select().from(users).where(eq6(users.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq7(users.email, email)).limit(1);
     if (!user) {
       return res.json({
         success: true,
@@ -6779,8 +7176,8 @@ router3.post("/request-reset", async (req, res) => {
     }
     const [existingRequest] = await db.select().from(passwordResetRequests).where(
       and3(
-        eq6(passwordResetRequests.userId, user.id),
-        eq6(passwordResetRequests.status, "pending")
+        eq7(passwordResetRequests.userId, user.id),
+        eq7(passwordResetRequests.status, "pending")
       )
     ).limit(1);
     if (existingRequest) {
@@ -6796,11 +7193,11 @@ router3.post("/request-reset", async (req, res) => {
     });
     const coordinators = await db.select().from(users).where(
       and3(
-        eq6(users.status, "active"),
+        eq7(users.status, "active"),
         // Notifica tanto coordenadores quanto gestores
         or2(
-          eq6(users.role, "coordenador"),
-          eq6(users.role, "gestor")
+          eq7(users.role, "coordenador"),
+          eq7(users.role, "gestor")
         )
       )
     );
@@ -6836,7 +7233,7 @@ router3.get("/pending-requests", async (req, res) => {
       requestedAt: passwordResetRequests.requestedAt,
       reason: passwordResetRequests.reason,
       status: passwordResetRequests.status
-    }).from(passwordResetRequests).leftJoin(users, eq6(passwordResetRequests.userId, users.id)).where(eq6(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
+    }).from(passwordResetRequests).leftJoin(users, eq7(passwordResetRequests.userId, users.id)).where(eq7(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
     res.json({ success: true, requests });
   } catch (error) {
     console.error("Erro ao buscar solicita\xE7\xF5es:", error);
@@ -6850,7 +7247,7 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq6(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq7(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -6864,13 +7261,13 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
       passwordHash: hashedPassword,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(users.id, request.userId));
+    }).where(eq7(users.id, request.userId));
     await db.update(passwordResetRequests).set({
       status: "approved",
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes: adminNotes || "Senha resetada pelo administrador"
-    }).where(eq6(passwordResetRequests.id, requestId));
+    }).where(eq7(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
@@ -6898,7 +7295,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq6(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq7(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -6910,7 +7307,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes
-    }).where(eq6(passwordResetRequests.id, requestId));
+    }).where(eq7(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Solicita\xE7\xE3o de Reset Negada",
@@ -7075,7 +7472,7 @@ await init_db();
 init_schema();
 import { Router as Router4 } from "express";
 import { z as z2 } from "zod";
-import { eq as eq7, and as and4, or as or3, ne, gte as gte2, lte as lte2 } from "drizzle-orm";
+import { eq as eq8, and as and4, or as or3, ne, gte as gte2, lte as lte2 } from "drizzle-orm";
 
 // server/utils/questionnaireGenerator.ts
 init_logger();
@@ -7667,8 +8064,8 @@ router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -7698,8 +8095,8 @@ router4.get("/templates/:year/:month", authenticateToken, requireRole(["gestor",
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -7732,8 +8129,8 @@ router4.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
     const { month, year } = schema.parse(req.body);
     const userId = req.user?.id || req.session?.userId;
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
       // Ignorar templates deletados
     ));
@@ -7810,14 +8207,14 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, data.month),
-      eq7(questionnaires.year, data.year)
+      eq8(questionnaires.month, data.month),
+      eq8(questionnaires.year, data.year)
     ));
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions: data.questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq7(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq8(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -7857,8 +8254,8 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
     });
     const questionData = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7874,7 +8271,7 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, template.id)).returning();
+    }).where(eq8(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7896,8 +8293,8 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     });
     const updates = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7917,7 +8314,7 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, template.id)).returning();
+    }).where(eq8(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7933,8 +8330,8 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     const month = parseInt(req.params.month);
     const questionId = req.params.questionId;
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -7949,7 +8346,7 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, template.id)).returning();
+    }).where(eq8(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -7976,8 +8373,8 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -8008,15 +8405,15 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
     };
-    const [updated] = await db.update(questionnaires).set(updateData).where(eq7(questionnaires.id, template.id)).returning();
+    const [updated] = await db.update(questionnaires).set(updateData).where(eq8(questionnaires.id, template.id)).returning();
     const isResend = template.status === "sent" && resend;
     const allMinisters = await db.select({
       id: users.id,
       name: users.name,
       email: users.email
     }).from(users).where(and4(
-      eq7(users.role, "ministro"),
-      eq7(users.status, "active")
+      eq8(users.role, "ministro"),
+      eq8(users.status, "active")
     ));
     const monthNames2 = [
       "Janeiro",
@@ -8062,14 +8459,14 @@ router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, templateId)).returning();
+    }).where(eq8(questionnaires.id, templateId)).returning();
     res.json({
       message: "Question\xE1rio enviado com sucesso!",
       template: {
@@ -8088,7 +8485,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -8099,7 +8496,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
       status: "closed",
       // closedAt: new Date(), // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, templateId)).returning();
+    }).where(eq8(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -8115,7 +8512,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -8132,7 +8529,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
       and4(
         gte2(schedules.date, startDateStr),
         lte2(schedules.date, endDateStr),
-        eq7(schedules.status, "published")
+        eq8(schedules.status, "published")
       )
     ).limit(1);
     console.log("[REOPEN] Escalas publicadas encontradas:", publishedSchedules.length);
@@ -8148,7 +8545,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
       status: "sent",
       // closedAt: null, // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, templateId)).returning();
+    }).where(eq8(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -8166,8 +8563,8 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -8179,12 +8576,12 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
     if (responses.length > 0) {
       const [updated] = await db.update(questionnaires).set({
         status: "deleted",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq7(questionnaires.id, template.id)).returning();
+      }).where(eq8(questionnaires.id, template.id)).returning();
       res.json({
         message: "Template marcado como deletado. Respostas existentes foram preservadas.",
         template: {
@@ -8193,7 +8590,7 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
         }
       });
     } else {
-      await db.delete(questionnaires).where(eq7(questionnaires.id, template.id));
+      await db.delete(questionnaires).where(eq8(questionnaires.id, template.id));
       res.json({
         message: "Template deletado com sucesso!",
         deleted: true
@@ -8212,8 +8609,8 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.json({
@@ -8233,16 +8630,16 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       phone: users.phone
     }).from(users).where(and4(
       or3(
-        eq7(users.role, "ministro"),
-        eq7(users.role, "coordenador")
+        eq8(users.role, "ministro"),
+        eq8(users.role, "coordenador")
       ),
-      eq7(users.status, "active")
+      eq8(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
     const ministersWithResponses = allMinisters.map((minister) => {
       const response = responses.find((r) => r.userId === minister.id);
       if (response) {
@@ -8316,13 +8713,13 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq7(questionnaires.id, templateId)).limit(1);
+    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and4(
-      eq7(questionnaireResponses.questionnaireId, templateId),
-      eq7(questionnaireResponses.userId, ministerId)
+      eq8(questionnaireResponses.questionnaireId, templateId),
+      eq8(questionnaireResponses.userId, ministerId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -8331,7 +8728,7 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq7(users.id, ministerId)).limit(1);
+    }).from(users).where(eq8(users.id, ministerId)).limit(1);
     res.json({
       user,
       response: {
@@ -8358,13 +8755,13 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year)
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, template.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
     const summary = {};
     const questions = template.questions;
     responses.forEach((response) => {
@@ -8425,8 +8822,8 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, month),
-      eq7(questionnaires.year, year),
+      eq8(questionnaires.month, month),
+      eq8(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -8439,7 +8836,7 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       status: "sent",
       // 'sent' is the open status
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(questionnaires.id, questionnaire.id)).returning();
+    }).where(eq8(questionnaires.id, questionnaire.id)).returning();
     res.json({
       message: `Question\xE1rio de ${getMonthName(month)}/${year} aberto com sucesso`,
       questionnaire: {
@@ -8463,8 +8860,8 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, currentMonth),
-      eq7(questionnaires.year, currentYear),
+      eq8(questionnaires.month, currentMonth),
+      eq8(questionnaires.year, currentYear),
       ne(questionnaires.status, "deleted")
     ));
     const shouldAutoClose = currentDay >= 25;
@@ -8474,7 +8871,7 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       const [updated] = await db.update(questionnaires).set({
         status: "closed",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq7(questionnaires.id, questionnaire.id)).returning();
+      }).where(eq8(questionnaires.id, questionnaire.id)).returning();
       autoCloseTriggered = true;
       return res.json({
         currentDay,
@@ -8528,8 +8925,8 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq7(questionnaires.month, monthNum),
-      eq7(questionnaires.year, yearNum),
+      eq8(questionnaires.month, monthNum),
+      eq8(questionnaires.year, yearNum),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -8551,10 +8948,10 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       id: users.id
     }).from(users).where(and4(
       or3(
-        eq7(users.role, "ministro"),
-        eq7(users.role, "coordenador")
+        eq8(users.role, "ministro"),
+        eq8(users.role, "coordenador")
       ),
-      eq7(users.status, "active")
+      eq8(users.status, "active")
     ));
     const totalActiveUsers = activeUsers.length;
     const responses = await db.select({
@@ -8562,7 +8959,7 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq7(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
     const totalResponses = responses.length;
     const responseRate = totalActiveUsers > 0 ? parseFloat((totalResponses / totalActiveUsers * 100).toFixed(2)) : 0;
     const pendingResponses = totalActiveUsers - totalResponses;
@@ -8624,12 +9021,12 @@ await init_db();
 init_schema();
 import { Router as Router5 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq9, and as and6, or as or4 } from "drizzle-orm";
+import { eq as eq10, and as and6, or as or4 } from "drizzle-orm";
 
 // server/utils/csvExporter.ts
 await init_db();
 init_schema();
-import { eq as eq8, and as and5 } from "drizzle-orm";
+import { eq as eq9, and as and5 } from "drizzle-orm";
 function convertResponsesToCSV(data) {
   if (data.length === 0) {
     return "Sem dados para exportar";
@@ -8741,14 +9138,14 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   if (!db) {
     throw new Error("Database not available");
   }
-  const [questionnaire] = await db.select().from(questionnaires).where(eq8(questionnaires.id, questionnaireId)).limit(1);
+  const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
   if (!questionnaire) {
     throw new Error("Questionnaire not found");
   }
   const responsesWithUsers = await db.select({
     response: questionnaireResponses,
     user: users
-  }).from(questionnaireResponses).innerJoin(users, eq8(questionnaireResponses.userId, users.id)).where(eq8(questionnaireResponses.questionnaireId, questionnaireId));
+  }).from(questionnaireResponses).innerJoin(users, eq9(questionnaireResponses.userId, users.id)).where(eq9(questionnaireResponses.questionnaireId, questionnaireId));
   const exportData = responsesWithUsers.map(({ response, user }) => {
     const formattedResponses = [];
     if (response.availableSundays && response.availableSundays.length > 0) {
@@ -8886,7 +9283,7 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   });
   const respondedUserIds = new Set(responsesWithUsers.map((r) => r.user.id));
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
-    const nonRespondents = await db.select().from(users).where(eq8(users.role, "ministro"));
+    const nonRespondents = await db.select().from(users).where(eq9(users.role, "ministro"));
     nonRespondents.filter((user) => !respondedUserIds.has(user.id)).forEach((user) => {
       exportData.push({
         ministerId: user.id,
@@ -8905,8 +9302,8 @@ async function getMonthlyResponsesForExport(month, year) {
     throw new Error("Database not available");
   }
   const [questionnaire] = await db.select().from(questionnaires).where(and5(
-    eq8(questionnaires.month, month),
-    eq8(questionnaires.year, year)
+    eq9(questionnaires.month, month),
+    eq9(questionnaires.year, year)
   )).limit(1);
   if (!questionnaire) {
     throw new Error(`No questionnaire found for ${month}/${year}`);
@@ -9054,6 +9451,11 @@ var QuestionnaireService = class {
         const normalizedName = eventName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "_");
         standardized.special_events[normalizedName] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
+      } else if (questionId.startsWith("custom_")) {
+        const normalizedAnswer = this.normalizeValue(answer);
+        standardized.special_events[questionId] = normalizedAnswer;
+        processedQuestionIds.add(questionId);
+        console.log(`[QUESTIONNAIRE_SERVICE] \u2705 Mapped custom question: ${questionId} = ${normalizedAnswer}`);
       } else if (questionId === "daily_mass_availability" || questionId === "daily_mass") {
         this.parseDailyMassAvailability(answer, standardized);
         processedQuestionIds.add(questionId);
@@ -9073,6 +9475,15 @@ var QuestionnaireService = class {
       } else if (questionId === "monthly_availability") {
         processedQuestionIds.add(questionId);
       } else if (questionId === "other_times_available") {
+        if (answer && answer !== "N\xE3o") {
+          if (typeof answer === "object" && answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
+            standardized._alternativeTimes = answer.selectedOptions;
+          } else if (Array.isArray(answer)) {
+            standardized._alternativeTimes = answer;
+          } else if (typeof answer === "string" && answer !== "Sim") {
+            standardized._alternativeTimes = [answer];
+          }
+        }
         processedQuestionIds.add(questionId);
       }
     }
@@ -9277,6 +9688,9 @@ var QuestionnaireService = class {
     if (typeof response.can_substitute !== "boolean") {
       response.can_substitute = false;
     }
+    if (response.alternative_times && Array.isArray(response.alternative_times)) {
+      response._alternativeTimes = response.alternative_times;
+    }
     return response;
   }
   /**
@@ -9318,11 +9732,12 @@ var QuestionnaireService = class {
         }
       });
     }
+    const alternativeTimes = standardized._alternativeTimes || null;
     return {
       availableSundays: availableSundays.length > 0 ? availableSundays : null,
       preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
-      alternativeTimes: null,
-      // Not used in v2.0
+      alternativeTimes,
+      // Extract from _alternativeTimes internal field
       dailyMassAvailability: hasWeekdayData ? dailyMassAvailability.length > 0 ? dailyMassAvailability : [] : null,
       // Empty array if answered NO, null if didn't answer
       specialEvents: standardized.special_events,
@@ -9360,15 +9775,15 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and6(
-      eq9(questionnaires.month, month),
-      eq9(questionnaires.year, year)
+      eq10(questionnaires.month, month),
+      eq10(questionnaires.year, year)
     )).limit(1);
     const questions = generateQuestionnaireQuestions(month, year);
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq9(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq10(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -9386,8 +9801,8 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
         name: users.name,
         email: users.email
       }).from(users).where(and6(
-        eq9(users.role, "ministro"),
-        eq9(users.status, "active")
+        eq10(users.role, "ministro"),
+        eq10(users.status, "active")
       ));
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -9424,8 +9839,8 @@ router5.get("/templates/:year/:month", authenticateToken, async (req, res) => {
     }
     try {
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq9(questionnaires.month, month),
-        eq9(questionnaires.year, year)
+        eq10(questionnaires.month, month),
+        eq10(questionnaires.year, year)
       )).limit(1);
       if (!template) {
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado para este per\xEDodo" });
@@ -9495,7 +9910,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service temporarily unavailable. Please try again later." });
     }
     if (data.questionnaireId) {
-      const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, data.questionnaireId)).limit(1);
+      const [template] = await db.select().from(questionnaires).where(eq10(questionnaires.id, data.questionnaireId)).limit(1);
       if (template && template.status === "closed") {
         return res.status(400).json({ error: "Este question\xE1rio foi encerrado e n\xE3o aceita mais respostas" });
       }
@@ -9503,7 +9918,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Buscando usu\xE1rio para userId:", userId);
     let minister = null;
     try {
-      const [foundUser] = await db.select().from(users).where(eq9(users.id, userId)).limit(1);
+      const [foundUser] = await db.select().from(users).where(eq10(users.id, userId)).limit(1);
       console.log("[RESPONSES] Usu\xE1rio encontrado:", foundUser);
       if (foundUser && foundUser.role === "ministro") {
         minister = {
@@ -9534,8 +9949,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     if (!templateId) {
       console.log("[RESPONSES] Buscando template para m\xEAs:", data.month, "ano:", data.year);
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq9(questionnaires.month, data.month),
-        eq9(questionnaires.year, data.year)
+        eq10(questionnaires.month, data.month),
+        eq10(questionnaires.year, data.year)
       )).limit(1);
       if (template) {
         templateId = template.id;
@@ -9555,12 +9970,6 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       }
     }
     console.log("[RESPONSES] Template ID final:", templateId);
-    console.log("[RESPONSES] Verificando resposta existente para userId:", minister.id, "templateId:", templateId);
-    const [existingResponse] = await db.select().from(questionnaireResponses).where(and6(
-      eq9(questionnaireResponses.userId, minister.id),
-      eq9(questionnaireResponses.questionnaireId, templateId)
-    )).limit(1);
-    console.log("[RESPONSES] Resposta existente encontrada?", existingResponse ? "Sim" : "N\xE3o");
     console.log("[RESPONSES] Standardizing responses to v2.0 format with tracking");
     const processingResult = QuestionnaireService.standardizeResponseWithTracking(
       data.responses,
@@ -9580,14 +9989,44 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Extracting structured data");
     const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
     console.log("[RESPONSES] Dados extra\xEDdos:", extractedData);
+    if (extractedData.alternativeTimes && Array.isArray(extractedData.alternativeTimes)) {
+      standardizedResponse.alternative_times = extractedData.alternativeTimes;
+    }
+    delete standardizedResponse._alternativeTimes;
+    delete standardizedResponse._preferredTime;
+    console.log("[RESPONSES] Using UPSERT to save response (prevents race conditions)");
+    const responseValues = {
+      userId: minister.id,
+      questionnaireId: templateId,
+      responses: JSON.stringify(standardizedResponse),
+      // SAVE STANDARDIZED V2.0 FORMAT
+      availableSundays: extractedData.availableSundays,
+      preferredMassTimes: extractedData.preferredMassTimes,
+      alternativeTimes: extractedData.alternativeTimes,
+      dailyMassAvailability: extractedData.dailyMassAvailability,
+      specialEvents: extractedData.specialEvents,
+      canSubstitute: extractedData.canSubstitute,
+      notes: extractedData.notes,
+      unmappedResponses,
+      // 🛡️ SAFETY NET: Save unmapped responses
+      processingWarnings,
+      // 🛡️ SAFETY NET: Save warnings
+      sharedWithFamilyIds: data.sharedWithFamilyIds || [],
+      isSharedResponse: false,
+      isDeleted: false,
+      // Ensure non-deleted (supports soft delete resurrection)
+      deletedAt: null,
+      // Clear deletion timestamp
+      submittedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    console.log("[RESPONSES] Data being sent for UPSERT:", JSON.stringify(responseValues, null, 2));
     let result;
-    if (existingResponse) {
-      console.log("[RESPONSES] Atualizando resposta existente:", existingResponse.id);
-      try {
-        const [updated] = await db.update(questionnaireResponses).set({
-          questionnaireId: templateId,
+    try {
+      const [saved] = await db.insert(questionnaireResponses).values(responseValues).onConflictDoUpdate({
+        target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
+        set: {
           responses: JSON.stringify(standardizedResponse),
-          // SAVE STANDARDIZED V2.0 FORMAT
           availableSundays: extractedData.availableSundays,
           preferredMassTimes: extractedData.preferredMassTimes,
           alternativeTimes: extractedData.alternativeTimes,
@@ -9596,54 +10035,25 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           canSubstitute: extractedData.canSubstitute,
           notes: extractedData.notes,
           unmappedResponses,
-          // 🛡️ SAFETY NET: Save unmapped responses
           processingWarnings,
-          // 🛡️ SAFETY NET: Save warnings
-          submittedAt: /* @__PURE__ */ new Date(),
-          sharedWithFamilyIds: data.sharedWithFamilyIds || []
-        }).where(eq9(questionnaireResponses.id, existingResponse.id)).returning();
-        console.log("[RESPONSES] Resposta atualizada com sucesso");
-        const responseData = {
-          ...updated,
-          responses: typeof updated.responses === "string" ? JSON.parse(updated.responses) : updated.responses
-        };
-        result = { responseData, isUpdate: true };
-      } catch (updateError) {
-        console.error("[RESPONSES] Erro ao atualizar resposta:", updateError);
-        throw updateError;
-      }
-    } else {
-      console.log("[RESPONSES] Criando nova resposta");
-      try {
-        const [created] = await db.insert(questionnaireResponses).values({
-          userId: minister.id,
-          questionnaireId: templateId,
-          responses: JSON.stringify(standardizedResponse),
-          // SAVE STANDARDIZED V2.0 FORMAT
-          availableSundays: extractedData.availableSundays,
-          preferredMassTimes: extractedData.preferredMassTimes,
-          alternativeTimes: extractedData.alternativeTimes,
-          dailyMassAvailability: extractedData.dailyMassAvailability,
-          specialEvents: extractedData.specialEvents,
-          canSubstitute: extractedData.canSubstitute,
-          notes: extractedData.notes,
-          unmappedResponses,
-          // 🛡️ SAFETY NET: Save unmapped responses
-          processingWarnings,
-          // 🛡️ SAFETY NET: Save warnings
           sharedWithFamilyIds: data.sharedWithFamilyIds || [],
-          isSharedResponse: false
-        }).returning();
-        console.log("[RESPONSES] Resposta criada com sucesso");
-        const responseData = {
-          ...created,
-          responses: typeof created.responses === "string" ? JSON.parse(created.responses) : created.responses
-        };
-        result = { responseData, isUpdate: false };
-      } catch (insertError) {
-        console.error("[RESPONSES] Erro ao criar resposta:", insertError);
-        throw insertError;
-      }
+          isDeleted: false,
+          // Resurrect soft-deleted records
+          deletedAt: null,
+          // Clear deletion timestamp
+          submittedAt: /* @__PURE__ */ new Date(),
+          updatedAt: /* @__PURE__ */ new Date()
+        }
+      }).returning();
+      console.log("[RESPONSES] Resposta salva com sucesso (UPSERT)");
+      const responseData = {
+        ...saved,
+        responses: typeof saved.responses === "string" ? JSON.parse(saved.responses) : saved.responses
+      };
+      result = { responseData, isUpdate: false };
+    } catch (upsertError) {
+      console.error("[RESPONSES] Erro ao salvar resposta (UPSERT):", upsertError);
+      throw upsertError;
     }
     if (data.familyServePreference && data.sharedWithFamilyIds && data.sharedWithFamilyIds.length > 0) {
       try {
@@ -9661,8 +10071,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       for (const familyUserId of data.sharedWithFamilyIds) {
         try {
           const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and6(
-            eq9(users.id, familyUserId),
-            eq9(users.status, "active")
+            eq10(users.id, familyUserId),
+            eq10(users.status, "active")
           )).limit(1);
           if (!familyMember) {
             console.warn(`[RESPONSES] Usu\xE1rio n\xE3o encontrado ou inativo: ${familyUserId}`);
@@ -9670,28 +10080,34 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           }
           const [familyRelation] = await db.select().from(familyRelationships).where(or4(
             and6(
-              eq9(familyRelationships.userId, minister.id),
-              eq9(familyRelationships.relatedUserId, familyUserId)
+              eq10(familyRelationships.userId, minister.id),
+              eq10(familyRelationships.relatedUserId, familyUserId)
             ),
             and6(
-              eq9(familyRelationships.userId, familyUserId),
-              eq9(familyRelationships.relatedUserId, minister.id)
+              eq10(familyRelationships.userId, familyUserId),
+              eq10(familyRelationships.relatedUserId, minister.id)
             )
           )).limit(1);
           if (!familyRelation) {
             console.warn(`[RESPONSES] Sem rela\xE7\xE3o familiar v\xE1lida entre ${minister.id} e ${familyUserId}`);
             continue;
           }
-          const [existingFamilyResponse] = await db.select().from(questionnaireResponses).where(and6(
-            eq9(questionnaireResponses.userId, familyUserId),
-            eq9(questionnaireResponses.questionnaireId, templateId)
+          const [existingPersonalResponse] = await db.select({ isSharedResponse: questionnaireResponses.isSharedResponse, sharedFromUserId: questionnaireResponses.sharedFromUserId }).from(questionnaireResponses).where(and6(
+            eq10(questionnaireResponses.userId, familyUserId),
+            eq10(questionnaireResponses.questionnaireId, templateId),
+            eq10(questionnaireResponses.isDeleted, false),
+            eq10(questionnaireResponses.isSharedResponse, false)
+            // Only check for personal responses
           )).limit(1);
-          if (!existingFamilyResponse) {
+          if (existingPersonalResponse) {
+            console.log(`[RESPONSES] ${familyMember.name} j\xE1 possui resposta pr\xF3pria, n\xE3o sobrescrevendo`);
+            continue;
+          }
+          try {
             await db.insert(questionnaireResponses).values({
               userId: familyUserId,
               questionnaireId: templateId,
               responses: JSON.stringify(standardizedResponse),
-              // SAVE STANDARDIZED V2.0 FORMAT
               availableSundays: extractedData.availableSundays,
               preferredMassTimes: extractedData.preferredMassTimes,
               alternativeTimes: extractedData.alternativeTimes,
@@ -9701,25 +10117,35 @@ router5.post("/responses", authenticateToken, async (req, res) => {
               notes: extractedData.notes,
               isSharedResponse: true,
               sharedFromUserId: minister.id,
-              sharedWithFamilyIds: []
+              sharedWithFamilyIds: [],
+              isDeleted: false,
+              // Ensure non-deleted (supports soft delete resurrection)
+              deletedAt: null
+              // Clear deletion timestamp
+            }).onConflictDoUpdate({
+              target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
+              set: {
+                responses: JSON.stringify(standardizedResponse),
+                availableSundays: extractedData.availableSundays,
+                preferredMassTimes: extractedData.preferredMassTimes,
+                alternativeTimes: extractedData.alternativeTimes,
+                dailyMassAvailability: extractedData.dailyMassAvailability,
+                specialEvents: extractedData.specialEvents,
+                canSubstitute: extractedData.canSubstitute,
+                notes: extractedData.notes,
+                isDeleted: false,
+                // Resurrect soft-deleted records
+                deletedAt: null,
+                // Clear deletion timestamp
+                submittedAt: /* @__PURE__ */ new Date(),
+                updatedAt: /* @__PURE__ */ new Date()
+                // Note: Only update if it's still a shared response (protected by unique index on non-deleted)
+              }
             });
-            console.log(`[RESPONSES] Resposta compartilhada criada para ${familyMember.name} (${familyUserId})`);
-          } else if (existingFamilyResponse.isSharedResponse && existingFamilyResponse.sharedFromUserId === minister.id) {
-            await db.update(questionnaireResponses).set({
-              responses: JSON.stringify(standardizedResponse),
-              // SAVE STANDARDIZED V2.0 FORMAT
-              availableSundays: extractedData.availableSundays,
-              preferredMassTimes: extractedData.preferredMassTimes,
-              alternativeTimes: extractedData.alternativeTimes,
-              dailyMassAvailability: extractedData.dailyMassAvailability,
-              specialEvents: extractedData.specialEvents,
-              canSubstitute: extractedData.canSubstitute,
-              notes: extractedData.notes,
-              submittedAt: /* @__PURE__ */ new Date()
-            }).where(eq9(questionnaireResponses.id, existingFamilyResponse.id));
-            console.log(`[RESPONSES] Resposta compartilhada atualizada para ${familyMember.name} (${familyUserId})`);
-          } else {
-            console.log(`[RESPONSES] ${familyMember.name} j\xE1 possui resposta pr\xF3pria, n\xE3o sobrescrevendo`);
+            console.log(`[RESPONSES] Resposta compartilhada salva (UPSERT) para ${familyMember.name} (${familyUserId})`);
+          } catch (familyUpsertError) {
+            console.error(`[RESPONSES] Erro no UPSERT familiar:`, familyUpsertError);
+            throw familyUpsertError;
           }
         } catch (shareError) {
           console.error(`[RESPONSES] Erro ao compartilhar com familiar ${familyUserId}:`, shareError);
@@ -9757,7 +10183,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       return res.json(null);
     }
     try {
-      const [user] = await db.select().from(users).where(eq9(users.id, userId)).limit(1);
+      const [user] = await db.select().from(users).where(eq10(users.id, userId)).limit(1);
       const minister = user && (user.role === "ministro" || user.role === "coordenador" || user.role === "gestor") ? {
         id: user.id,
         userId: user.id
@@ -9775,7 +10201,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
         questionnaireId: questionnaireResponses.questionnaireId,
         month: questionnaires.month,
         year: questionnaires.year
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq9(questionnaireResponses.userId, minister.id));
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq10(questionnaireResponses.userId, minister.id));
       console.log("[GET /responses] Todas as respostas do usu\xE1rio:", allUserResponses);
       const [response] = await db.select({
         id: questionnaireResponses.id,
@@ -9789,10 +10215,10 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
           questions: questionnaires.questions,
           status: questionnaires.status
         }
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-        eq9(questionnaireResponses.userId, minister.id),
-        eq9(questionnaires.month, month),
-        eq9(questionnaires.year, year)
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+        eq10(questionnaireResponses.userId, minister.id),
+        eq10(questionnaires.month, month),
+        eq10(questionnaires.year, year)
       )).limit(1);
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
@@ -9835,8 +10261,8 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       return res.json([]);
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq9(questionnaires.month, month),
-      eq9(questionnaires.year, year)
+      eq10(questionnaires.month, month),
+      eq10(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({
@@ -9856,14 +10282,14 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       email: users.email,
       phone: users.phone
     }).from(users).where(and6(
-      eq9(users.role, "ministro"),
-      eq9(users.status, "active")
+      eq10(users.role, "ministro"),
+      eq10(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaire.id));
     const responseMap = new Map(responses.map((r) => [r.userId, r]));
     const ministerResponses = ministers.map((minister) => {
       const response = responseMap.get(minister.id);
@@ -9910,13 +10336,13 @@ router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq9(questionnaires.month, month),
-      eq9(questionnaires.year, year)
+      eq10(questionnaires.month, month),
+      eq10(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaire.id));
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
@@ -9951,7 +10377,7 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     if (!db) {
       return res.status(500).json({ error: "Database not available" });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
@@ -9959,13 +10385,13 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq9(users.id, userId)).limit(1);
+    }).from(users).where(eq10(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and6(
-      eq9(questionnaireResponses.questionnaireId, templateId),
-      eq9(questionnaireResponses.userId, userId)
+      eq10(questionnaireResponses.questionnaireId, templateId),
+      eq10(questionnaireResponses.userId, userId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -10017,9 +10443,9 @@ router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
         month: questionnaires.month,
         year: questionnaires.year
       }
-    }).from(questionnaireResponses).leftJoin(users, eq9(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq9(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-      eq9(questionnaires.month, month),
-      eq9(questionnaires.year, year)
+    }).from(questionnaireResponses).leftJoin(users, eq10(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+      eq10(questionnaires.month, month),
+      eq10(questionnaires.year, year)
     ));
     res.json(responses);
   } catch (error) {
@@ -10037,7 +10463,7 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -10047,7 +10473,7 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     const [updated] = await db.update(questionnaires).set({
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq9(questionnaires.id, templateId)).returning();
+    }).where(eq10(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -10067,7 +10493,7 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -10077,7 +10503,7 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq9(questionnaires.id, templateId)).returning();
+    }).where(eq10(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -10105,7 +10531,7 @@ router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coo
     const { format: format9 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
     const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
-    const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -10145,21 +10571,21 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     console.log(`[REPROCESS] \u{1F504} Iniciando reprocessamento...`);
     console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
     if (questionnaireId) {
-      const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
+      const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
       if (!questionnaire) {
         console.log(`[REPROCESS] \u274C Question\xE1rio ${questionnaireId} n\xE3o encontrado!`);
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado" });
       }
       console.log(`[REPROCESS] \u2705 Question\xE1rio encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
     }
-    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
+    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
     console.log(`[REPROCESS] \u{1F4DD} Encontradas ${allResponses.length} respostas para reprocessar...`);
     let updated = 0;
     let errors = 0;
     for (const response of allResponses) {
       try {
         const responsesArray = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
-        const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, response.questionnaireId)).limit(1);
+        const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, response.questionnaireId)).limit(1);
         const processingResult = QuestionnaireService.standardizeResponseWithTracking(
           responsesArray,
           questionnaire?.month,
@@ -10193,7 +10619,7 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
           // 🛡️ SAFETY NET
           processingWarnings
           // 🛡️ SAFETY NET
-        }).where(eq9(questionnaireResponses.id, response.id));
+        }).where(eq10(questionnaireResponses.id, response.id));
         updated++;
       } catch (error) {
         console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
@@ -10227,9 +10653,93 @@ await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and8, gte as gte4, lte as lte4, eq as eq12, sql as sql5, ne as ne3, desc as desc4, inArray as inArray2 } from "drizzle-orm";
+import { and as and8, gte as gte4, lte as lte4, eq as eq13, sql as sql5, ne as ne3, desc as desc4, inArray as inArray3 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
+
+// server/services/scheduleCache.ts
+var ScheduleCache = class {
+  cache = /* @__PURE__ */ new Map();
+  TTL = 1e3 * 60 * 60;
+  // 1 hour TTL as fallback
+  /**
+   * Generate cache key from year and month
+   */
+  getCacheKey(year, month) {
+    return `schedule-${year}-${month}`;
+  }
+  /**
+   * Get cached schedule data for a specific month
+   */
+  get(year, month) {
+    const key = this.getCacheKey(year, month);
+    const entry = this.cache.get(key);
+    if (!entry) {
+      console.log(`[CACHE] \u274C MISS - No cache for ${month}/${year}`);
+      return null;
+    }
+    const now = Date.now();
+    if (now - entry.timestamp > this.TTL) {
+      console.log(`[CACHE] \u23F0 EXPIRED - Cache for ${month}/${year} is too old`);
+      this.cache.delete(key);
+      return null;
+    }
+    console.log(`[CACHE] \u2705 HIT - Returning cached data for ${month}/${year}`);
+    return entry.data;
+  }
+  /**
+   * Set cache for a specific month
+   */
+  set(year, month, data) {
+    const key = this.getCacheKey(year, month);
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+    console.log(`[CACHE] \u{1F4BE} STORED - Cached data for ${month}/${year}`);
+  }
+  /**
+   * Invalidate cache for a specific month
+   */
+  invalidate(year, month) {
+    const key = this.getCacheKey(year, month);
+    const deleted = this.cache.delete(key);
+    if (deleted) {
+      console.log(`[CACHE] \u{1F5D1}\uFE0F  INVALIDATED - Cleared cache for ${month}/${year}`);
+    } else {
+      console.log(`[CACHE] \u26A0\uFE0F  SKIP - No cache found for ${month}/${year}`);
+    }
+  }
+  /**
+   * Invalidate cache for a specific date (extracts month/year from date)
+   */
+  invalidateByDate(date2) {
+    const dateObj = new Date(date2);
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth() + 1;
+    this.invalidate(year, month);
+  }
+  /**
+   * Clear all cached data
+   */
+  clear() {
+    const size = this.cache.size;
+    this.cache.clear();
+    console.log(`[CACHE] \u{1F9F9} CLEARED - Removed ${size} cache entries`);
+  }
+  /**
+   * Get cache statistics
+   */
+  getStats() {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+};
+var scheduleCache = new ScheduleCache();
+
+// server/routes/scheduleGeneration.ts
 var router6 = Router6();
 var generateScheduleSchema = z4.object({
   year: z4.number().min(2024).max(2030),
@@ -10258,8 +10768,8 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     if (db) {
       const [targetQuestionnaire] = await db.select().from(questionnaires).where(
         and8(
-          eq12(questionnaires.month, month),
-          eq12(questionnaires.year, year)
+          eq13(questionnaires.month, month),
+          eq13(questionnaires.year, year)
         )
       ).limit(1);
       if (!targetQuestionnaire) {
@@ -10270,7 +10780,7 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           errorCode: "NO_QUESTIONNAIRE"
         });
       }
-      const responses = await db.select().from(questionnaireResponses).where(eq12(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+      const responses = await db.select().from(questionnaireResponses).where(eq13(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
       if (responses.length === 0) {
         logger.warn(`Tentativa de gerar escalas sem respostas: ${month}/${year}`);
         return res.status(400).json({
@@ -10387,7 +10897,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
           const deletedSubstitutions = await db.delete(substitutionRequests).where(
-            inArray2(substitutionRequests.scheduleId, scheduleIds)
+            inArray3(substitutionRequests.scheduleId, scheduleIds)
           );
           console.log(`Deleted substitution requests`);
           const deletedSchedules = await db.delete(schedules).where(
@@ -10409,7 +10919,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
           throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
         }
         if (schedule.ministerId) {
-          const [ministerExists] = await db.select({ id: users.id }).from(users).where(eq12(users.id, schedule.ministerId)).limit(1);
+          const [ministerExists] = await db.select({ id: users.id }).from(users).where(eq13(users.id, schedule.ministerId)).limit(1);
           if (!ministerExists) {
             throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
           }
@@ -10462,6 +10972,10 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
     console.log(`Saved: ${savedCount}, Failed: ${failedCount}`);
     if (failedCount > 0) {
       console.log("First 5 errors:", JSON.stringify(errors.slice(0, 5), null, 2));
+    }
+    if (month && year) {
+      scheduleCache.invalidate(year, month);
+      console.log(`[CACHE] Invalidated cache for ${month}/${year} after emergency save (saved: ${savedCount}, failed: ${failedCount})`);
     }
     res.json({
       success: failedCount === 0,
@@ -10519,7 +11033,7 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
       }
     };
     if (db && analysis.ministerIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray2(users.id, analysis.ministerIds.slice(0, 50)));
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray3(users.id, analysis.ministerIds.slice(0, 50)));
       analysis.ministerIdsInDb = existingMinisters.length;
       analysis.ministerIdsRequested = analysis.ministerIds.length;
       const existingIds = new Set(existingMinisters.map((m) => m.id));
@@ -10569,7 +11083,7 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         const scheduleIds = existingSchedules.map((s) => s.id);
         console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), "...");
         const deletedSubstitutions = await db.delete(substitutionRequests).where(
-          inArray2(substitutionRequests.scheduleId, scheduleIds)
+          inArray3(substitutionRequests.scheduleId, scheduleIds)
         );
         console.log(`Deleted substitution requests:`, deletedSubstitutions);
         logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
@@ -10622,6 +11136,28 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
     const saved = await db.insert(schedules).values(schedulesToInsert).returning();
     console.log(`Successfully inserted ${saved.length} schedules`);
     logger.info(`Salvas ${saved.length} escalas no banco de dados`);
+    const uniqueMonths = /* @__PURE__ */ new Set();
+    saved.forEach((schedule) => {
+      const scheduleDate = new Date(schedule.date);
+      const year = scheduleDate.getFullYear();
+      const month = scheduleDate.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      uniqueMonths.add(monthKey);
+    });
+    schedulesToInsert.forEach((schedule) => {
+      const scheduleDate = new Date(schedule.date);
+      const year = scheduleDate.getFullYear();
+      const month = scheduleDate.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      uniqueMonths.add(monthKey);
+    });
+    uniqueMonths.forEach((monthKey) => {
+      const [year, month] = monthKey.split("-").map(Number);
+      scheduleCache.invalidate(year, month);
+    });
+    if (uniqueMonths.size > 0) {
+      console.log(`[CACHE] Invalidated cache for months: ${Array.from(uniqueMonths).join(", ")}`);
+    }
     res.json({
       success: true,
       message: `${saved.length} escalas salvas com sucesso`,
@@ -10715,15 +11251,15 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       totalServices: users.totalServices
     }).from(users).where(
       and8(
-        eq12(users.status, "active"),
+        eq13(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq12(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq12(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    const massTimesData = await db.select().from(massTimesConfig).where(eq13(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq13(questionnaireResponses.questionnaireId, questionnaires.id)).where(
       and8(
-        eq12(questionnaires.month, month),
-        eq12(questionnaires.year, year)
+        eq13(questionnaires.month, month),
+        eq13(questionnaires.year, year)
       )
     );
     res.json({
@@ -10766,7 +11302,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
       and8(
         sql5`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
         sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
@@ -10800,47 +11336,37 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
 });
 async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
   if (!db) return 0;
-  let savedCount = 0;
-  for (const schedule of generatedSchedules) {
-    if (!schedule.massTime.date) continue;
-    if (replaceExisting) {
-      const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
-        and8(
-          eq12(schedules.date, schedule.massTime.date),
-          eq12(schedules.time, schedule.massTime.time)
-        )
-      );
-      if (existingSchedules.length > 0) {
-        const scheduleIds = existingSchedules.map((s) => s.id);
-        await db.delete(substitutionRequests).where(
-          inArray2(substitutionRequests.scheduleId, scheduleIds)
+  return await db.transaction(async (tx) => {
+    let savedCount = 0;
+    for (const schedule of generatedSchedules) {
+      if (!schedule.massTime.date) continue;
+      if (replaceExisting) {
+        await tx.delete(schedules).where(
+          and8(
+            eq13(schedules.date, schedule.massTime.date),
+            eq13(schedules.time, schedule.massTime.time)
+          )
         );
       }
-      await db.delete(schedules).where(
-        and8(
-          eq12(schedules.date, schedule.massTime.date),
-          eq12(schedules.time, schedule.massTime.time)
-        )
-      );
+      for (let i = 0; i < schedule.ministers.length; i++) {
+        const minister = schedule.ministers[i];
+        await tx.insert(schedules).values({
+          date: schedule.massTime.date,
+          time: schedule.massTime.time,
+          type: "missa",
+          location: null,
+          ministerId: minister.id,
+          // Pode ser null para VACANTE
+          position: minister.position || i + 1,
+          // Usar position do ministro ou index + 1
+          status: "scheduled",
+          notes: `Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
+        });
+        savedCount++;
+      }
     }
-    for (let i = 0; i < schedule.ministers.length; i++) {
-      const minister = schedule.ministers[i];
-      await db.insert(schedules).values({
-        date: schedule.massTime.date,
-        time: schedule.massTime.time,
-        type: "missa",
-        location: null,
-        ministerId: minister.id,
-        // Pode ser null para VACANTE
-        position: minister.position || i + 1,
-        // Usar position do ministro ou index + 1
-        status: "scheduled",
-        notes: `Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
-      });
-      savedCount++;
-    }
-  }
-  return savedCount;
+    return savedCount;
+  });
 }
 function calculateAverageConfidence(schedules3) {
   if (schedules3.length === 0) return 0;
@@ -10971,7 +11497,7 @@ router6.get("/by-date/:date", authenticateToken, async (req, res) => {
       notes: schedules.notes,
       ministerName: users.name,
       scheduleDisplayName: users.scheduleDisplayName
-    }).from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(eq12(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
+    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(eq13(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position);
     const formattedAssignments = assignments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -11016,9 +11542,9 @@ router6.get("/:date/:time", authenticateToken, async (req, res) => {
       type: schedules.type,
       location: schedules.location,
       position: schedules.position
-    }).from(schedules).leftJoin(users, eq12(schedules.ministerId, users.id)).where(and8(
-      eq12(schedules.date, date2),
-      eq12(schedules.time, time2)
+    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(and8(
+      eq13(schedules.date, date2),
+      eq13(schedules.time, time2)
     )).orderBy(schedules.position);
     res.json({
       date: date2,
@@ -11053,9 +11579,9 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     if (!data.skipDuplicateCheck) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
       const [existing] = await db.select().from(schedules).where(and8(
-        eq12(schedules.date, data.date),
-        eq12(schedules.time, data.time),
-        eq12(schedules.ministerId, data.ministerId)
+        eq13(schedules.date, data.date),
+        eq13(schedules.time, data.time),
+        eq13(schedules.ministerId, data.ministerId)
       )).limit(1);
       if (existing) {
         logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
@@ -11071,8 +11597,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
     } else {
       const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and8(
-        eq12(schedules.date, data.date),
-        eq12(schedules.time, data.time)
+        eq13(schedules.date, data.date),
+        eq13(schedules.time, data.time)
       )).orderBy(desc4(schedules.position));
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
       logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
@@ -11101,7 +11627,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(eq12(schedules.id, id));
+    await db.delete(schedules).where(eq13(schedules.id, id));
     res.json({ success: true, message: "Ministro removido da escala" });
   } catch (error) {
     logger.error("Error removing minister from schedule:", error);
@@ -11124,18 +11650,18 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     }
     console.log("[batch-update] Fetching existing schedules for:", { date: date2, time: time2 });
     const existingSchedules = await db.select().from(schedules).where(and8(
-      eq12(schedules.date, date2),
-      eq12(schedules.time, time2)
+      eq13(schedules.date, date2),
+      eq13(schedules.time, time2)
     ));
     console.log("[batch-update] Found existing schedules:", existingSchedules.length);
     if (ministers.length === 0) {
       console.log("[batch-update] All ministers removed - deleting entire mass and related substitutions");
       for (const schedule of existingSchedules) {
-        await db.delete(substitutionRequests).where(eq12(substitutionRequests.scheduleId, schedule.id));
+        await db.delete(substitutionRequests).where(eq13(substitutionRequests.scheduleId, schedule.id));
       }
       await db.delete(schedules).where(and8(
-        eq12(schedules.date, date2),
-        eq12(schedules.time, time2)
+        eq13(schedules.date, date2),
+        eq13(schedules.time, time2)
       ));
       console.log("[batch-update] Mass deleted successfully");
       return res.json({ success: true, message: "Missa removida completamente do calend\xE1rio" });
@@ -11148,7 +11674,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
         await db.update(schedules).set({
           ministerId,
           position
-        }).where(eq12(schedules.id, existingSchedules[i].id));
+        }).where(eq13(schedules.id, existingSchedules[i].id));
       } else {
         console.log("[batch-update] Creating new schedule at position:", position);
         await db.insert(schedules).values({
@@ -11165,13 +11691,13 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
       const schedulesToDelete = existingSchedules.slice(ministers.length);
       console.log("[batch-update] Removing excess schedules:", schedulesToDelete.length);
       for (const schedule of schedulesToDelete) {
-        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq12(substitutionRequests.scheduleId, schedule.id)).limit(1);
+        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq13(substitutionRequests.scheduleId, schedule.id)).limit(1);
         if (hasSubstitutions.length > 0) {
           console.log("[batch-update] Schedule has substitutions, setting ministerId to null:", schedule.id);
-          await db.update(schedules).set({ ministerId: null }).where(eq12(schedules.id, schedule.id));
+          await db.update(schedules).set({ ministerId: null }).where(eq13(schedules.id, schedule.id));
         } else {
           console.log("[batch-update] Deleting schedule:", schedule.id);
-          await db.delete(schedules).where(eq12(schedules.id, schedule.id));
+          await db.delete(schedules).where(eq13(schedules.id, schedule.id));
         }
       }
     }
@@ -11190,7 +11716,7 @@ await init_db();
 init_schema();
 import { Router as Router7 } from "express";
 await init_scheduleGenerator();
-import { eq as eq13, and as and9, gte as gte5, lte as lte5, ne as ne4 } from "drizzle-orm";
+import { eq as eq14, and as and9, gte as gte5, lte as lte5, ne as ne4 } from "drizzle-orm";
 
 // server/utils/liturgicalCalculations.ts
 function calculateEaster(year) {
@@ -11430,8 +11956,8 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     }
     const existingAssignments = await db.select().from(schedules).where(
       and9(
-        eq13(schedules.date, date2),
-        eq13(schedules.ministerId, ministerId),
+        eq14(schedules.date, date2),
+        eq14(schedules.ministerId, ministerId),
         ne4(schedules.time, time2)
       )
     );
@@ -11444,13 +11970,13 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     }
     const existing = await db.select().from(schedules).where(
       and9(
-        eq13(schedules.date, date2),
-        eq13(schedules.time, time2),
-        eq13(schedules.ministerId, ministerId)
+        eq14(schedules.date, date2),
+        eq14(schedules.time, time2),
+        eq14(schedules.ministerId, ministerId)
       )
     );
     if (existing.length > 0) {
-      await db.update(schedules).set({ position: newPosition }).where(eq13(schedules.id, existing[0].id));
+      await db.update(schedules).set({ position: newPosition }).where(eq14(schedules.id, existing[0].id));
     } else {
       await db.insert(schedules).values({
         date: date2,
@@ -11594,18 +12120,18 @@ function calculateGenerationStatistics(schedules3, options) {
   };
 }
 async function checkMinisterAvailability(ministerId, date2, time2) {
-  const minister = await db.select().from(users).where(eq13(users.id, ministerId)).limit(1);
+  const minister = await db.select().from(users).where(eq14(users.id, ministerId)).limit(1);
   if (minister.length === 0) {
     return { available: false, reason: "Ministro n\xE3o encontrado" };
   }
   const dateObj = new Date(date2);
   const month = dateObj.getMonth() + 1;
   const year = dateObj.getFullYear();
-  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq13(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq14(questionnaireResponses.questionnaireId, questionnaires.id)).where(
     and9(
-      eq13(questionnaireResponses.userId, ministerId),
-      eq13(questionnaires.month, month),
-      eq13(questionnaires.year, year)
+      eq14(questionnaireResponses.userId, ministerId),
+      eq14(questionnaires.month, month),
+      eq14(questionnaires.year, year)
     )
   );
   if (responses.length === 0) {
@@ -11723,9 +12249,9 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
       if (!ministerId) continue;
       const existing = await db.select().from(schedules).where(
         and9(
-          eq13(schedules.date, date2),
-          eq13(schedules.time, time2),
-          eq13(schedules.ministerId, ministerId)
+          eq14(schedules.date, date2),
+          eq14(schedules.time, time2),
+          eq14(schedules.ministerId, ministerId)
         )
       );
       if (existing.length === 0) {
@@ -12098,7 +12624,7 @@ var testScheduleGeneration_default = router8;
 await init_db();
 init_schema();
 import { Router as Router9 } from "express";
-import { eq as eq14, and as and10, sql as sql7, gte as gte6, lte as lte6 } from "drizzle-orm";
+import { eq as eq15, and as and10, sql as sql7, gte as gte6, lte as lte6 } from "drizzle-orm";
 var logActivity = async (userId, action, description, metadata) => {
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
@@ -12114,7 +12640,7 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
     const targetMinisterId = req.query.ministerId || userId;
-    const minister = await db.select().from(users).where(eq14(users.id, targetMinisterId)).limit(1);
+    const minister = await db.select().from(users).where(eq15(users.id, targetMinisterId)).limit(1);
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
@@ -12132,7 +12658,7 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
       status: schedules.status
     }).from(schedules).where(
       and10(
-        eq14(schedules.ministerId, ministerId),
+        eq15(schedules.ministerId, ministerId),
         gte6(schedules.date, today.toISOString().split("T")[0])
         // Aceitar qualquer status (scheduled ou published)
       )
@@ -12168,8 +12694,8 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       position: schedules.position,
       confirmed: sql7`true`,
       status: schedules.status
-    }).from(schedules).leftJoin(users, eq14(schedules.ministerId, users.id)).where(
-      eq14(schedules.date, targetDateStr)
+    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
+      eq15(schedules.date, targetDateStr)
       // Aceitar qualquer status (scheduled ou published)
     ).orderBy(schedules.time, schedules.position);
     if (allAssignments.length === 0) {
@@ -12199,6 +12725,12 @@ router9.get("/", authenticateToken, async (req, res) => {
     if (month && year) {
       const yearNum = parseInt(year);
       const monthNum = parseInt(month);
+      const cachedData = scheduleCache.get(yearNum, monthNum);
+      if (cachedData) {
+        console.log(`[SCHEDULES_API] \u26A1 Returning cached data for ${monthNum}/${yearNum}`);
+        return res.json(cachedData);
+      }
+      console.log(`[SCHEDULES_API] \u{1F50D} Cache miss - querying database for ${monthNum}/${yearNum}`);
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-01`;
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
@@ -12237,7 +12769,7 @@ router9.get("/", authenticateToken, async (req, res) => {
           photoUrl: users.photoUrl,
           notes: schedules.notes,
           status: schedules.status
-        }).from(schedules).leftJoin(users, eq14(schedules.ministerId, users.id)).where(
+        }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
           and10(
             gte6(schedules.date, startDateStr),
             lte6(schedules.date, endDateStr)
@@ -12277,11 +12809,14 @@ router9.get("/", authenticateToken, async (req, res) => {
         createdAt: schedulesList[0].createdAt?.toISOString() || (/* @__PURE__ */ new Date()).toISOString(),
         publishedAt: hasPublishedSchedules ? (/* @__PURE__ */ new Date()).toISOString() : void 0
       } : null;
-      res.json({
+      const responseData = {
         schedules: monthlySchedule ? [monthlySchedule] : [],
         assignments: assignmentsList,
         substitutions: substitutionsList
-      });
+      };
+      scheduleCache.set(yearNum, monthNum, responseData);
+      console.log(`[SCHEDULES_API] \u{1F4BE} Cached result for ${monthNum}/${yearNum}`);
+      res.json(responseData);
     } else {
       const allSchedules = await db.select().from(schedules);
       res.json({ schedules: allSchedules, assignments: [] });
@@ -12296,7 +12831,7 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para criar escalas" });
     }
@@ -12309,8 +12844,8 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     }
     const existing = await db.select().from(schedules).where(
       and10(
-        eq14(schedules.date, date2),
-        eq14(schedules.time, time2)
+        eq15(schedules.date, date2),
+        eq15(schedules.time, time2)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -12333,6 +12868,7 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       `Nova escala criada para ${date2} \xE0s ${time2}`,
       { scheduleId: newSchedule[0].id }
     );
+    scheduleCache.invalidateByDate(date2);
     res.status(201).json(newSchedule[0]);
   } catch (error) {
     console.error("Error creating schedule:", error);
@@ -12344,12 +12880,12 @@ router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para editar escalas" });
     }
     const { notes } = req.body;
-    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq14(schedules.id, req.params.id)).returning();
+    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq15(schedules.id, req.params.id)).returning();
     if (updatedSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12359,6 +12895,9 @@ router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
       `Escala atualizada`,
       { scheduleId: req.params.id }
     );
+    if (updatedSchedule[0].date) {
+      scheduleCache.invalidateByDate(updatedSchedule[0].date);
+    }
     res.json(updatedSchedule[0]);
   } catch (error) {
     console.error("Error updating schedule:", error);
@@ -12370,7 +12909,7 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para publicar escalas" });
     }
@@ -12400,6 +12939,7 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
       `Escala publicada para ${month}/${year}`,
       { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
+    scheduleCache.invalidate(year, month);
     res.json({
       message: `Escala publicada com sucesso! ${result.length} escalas atualizadas.`,
       schedulesUpdated: result.length
@@ -12415,26 +12955,29 @@ router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para excluir escalas" });
     }
-    const schedule = await db.select().from(schedules).where(eq14(schedules.id, req.params.id)).limit(1);
+    const schedule = await db.select().from(schedules).where(eq15(schedules.id, req.params.id)).limit(1);
     if (schedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     if (schedule[0].status === "published") {
       return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
     }
-    await db.delete(substitutionRequests).where(eq14(substitutionRequests.scheduleId, req.params.id));
+    await db.delete(substitutionRequests).where(eq15(substitutionRequests.scheduleId, req.params.id));
     console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-    await db.delete(schedules).where(eq14(schedules.id, req.params.id));
+    await db.delete(schedules).where(eq15(schedules.id, req.params.id));
     await logActivity(
       req.user?.id,
       "schedule_deleted",
       `Escala exclu\xEDda`,
       { scheduleId: req.params.id }
     );
+    if (schedule[0].date) {
+      scheduleCache.invalidateByDate(schedule[0].date);
+    }
     console.log(`Successfully deleted schedule: ${schedule[0].id}`);
     res.json({ message: "Escala exclu\xEDda com sucesso" });
   } catch (error) {
@@ -12450,7 +12993,7 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       console.log("[UNPUBLISH_API] No user ID found");
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       console.log("[UNPUBLISH_API] User not authorized, role:", user[0]?.role);
       return res.status(403).json({ message: "Sem permiss\xE3o para cancelar publica\xE7\xE3o" });
@@ -12487,6 +13030,7 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       `Publica\xE7\xE3o cancelada para ${month}/${year}`,
       { scheduleId: req.params.id, month, year, schedulesUpdated: result.length }
     );
+    scheduleCache.invalidate(year, month);
     console.log("[UNPUBLISH_API] Success! Returning response");
     res.json({
       message: `Publica\xE7\xE3o cancelada com sucesso! ${result.length} escalas atualizadas.`,
@@ -12502,12 +13046,12 @@ router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq14(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq15(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para gerar escalas" });
     }
     const scheduleId = req.params.scheduleId;
-    const schedule = await db.select().from(schedules).where(eq14(schedules.id, scheduleId)).limit(1);
+    const schedule = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
     if (schedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12524,7 +13068,7 @@ router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     await db.update(schedules).set({
       status: "generated",
       notes: `Generated schedule with ${result.stats.totalAssignments} assignments`
-    }).where(eq14(schedules.id, scheduleId));
+    }).where(eq15(schedules.id, scheduleId));
     console.log(`Updated schedule ${scheduleId} to generated status`);
     await logActivity(
       req.user?.id,
@@ -12558,15 +13102,15 @@ var schedules_default = router9;
 await init_db();
 init_schema();
 import { Router as Router10 } from "express";
-import { eq as eq15, and as and11, inArray as inArray4, sql as sql8 } from "drizzle-orm";
+import { eq as eq16, and as and11, inArray as inArray5, sql as sql8 } from "drizzle-orm";
 import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
 var router10 = Router10();
 async function isAuxiliaryForMass(userId, scheduleId) {
   const assignment = await db.select().from(schedules).where(
     and11(
-      eq15(schedules.id, scheduleId),
-      eq15(schedules.ministerId, userId),
-      inArray4(schedules.position, [1, 2])
+      eq16(schedules.id, scheduleId),
+      eq16(schedules.ministerId, userId),
+      inArray5(schedules.position, [1, 2])
     )
   ).limit(1);
   return assignment.length > 0;
@@ -12590,7 +13134,7 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const massSchedule = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    const massSchedule = await db.select().from(schedules).where(eq16(schedules.id, scheduleId)).limit(1);
     if (massSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12617,14 +13161,14 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp,
       onSiteAdjustments: schedules.onSiteAdjustments
-    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
       and11(
-        eq15(schedules.date, schedule.date),
-        eq15(schedules.time, schedule.time),
-        eq15(schedules.status, "scheduled")
+        eq16(schedules.date, schedule.date),
+        eq16(schedules.time, schedule.time),
+        eq16(schedules.status, "scheduled")
       )
     ).orderBy(schedules.position);
-    const checkIns = await db.select().from(ministerCheckIns).where(eq15(ministerCheckIns.scheduleId, scheduleId));
+    const checkIns = await db.select().from(ministerCheckIns).where(eq16(ministerCheckIns.scheduleId, scheduleId));
     const standbyList = await db.select({
       id: standbyMinisters.id,
       ministerId: standbyMinisters.ministerId,
@@ -12636,8 +13180,8 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       calledAt: standbyMinisters.calledAt,
       response: standbyMinisters.response,
       assignedPosition: standbyMinisters.assignedPosition
-    }).from(standbyMinisters).leftJoin(users, eq15(standbyMinisters.ministerId, users.id)).where(eq15(standbyMinisters.scheduleId, scheduleId));
-    const executionLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    }).from(standbyMinisters).leftJoin(users, eq16(standbyMinisters.ministerId, users.id)).where(eq16(standbyMinisters.scheduleId, scheduleId));
+    const executionLog = await db.select().from(massExecutionLogs).where(eq16(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     const massDateTime = parseISO(`${schedule.date}T${schedule.time}`);
     const now = /* @__PURE__ */ new Date();
     const minutesUntilMass = Math.floor((massDateTime.getTime() - now.getTime()) / (1e3 * 60));
@@ -12701,7 +13245,7 @@ router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq16(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -12716,14 +13260,14 @@ router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
       lastService: users.lastService
     }).from(users).where(
       and11(
-        eq15(users.status, "active"),
-        eq15(users.role, "ministro")
+        eq16(users.status, "active"),
+        eq16(users.role, "ministro")
       )
     ).limit(20);
     const assignedMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
       and11(
-        eq15(schedules.date, date2),
-        eq15(schedules.time, time2)
+        eq16(schedules.date, date2),
+        eq16(schedules.time, time2)
       )
     );
     const assignedIds = new Set(assignedMinisters.map((a) => a.ministerId).filter(Boolean));
@@ -12754,8 +13298,8 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
     }
     const assignment = await db.select().from(schedules).where(
       and11(
-        eq15(schedules.id, scheduleId),
-        eq15(schedules.ministerId, ministerId)
+        eq16(schedules.id, scheduleId),
+        eq16(schedules.ministerId, ministerId)
       )
     ).limit(1);
     if (assignment.length === 0) {
@@ -12764,8 +13308,8 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
     const position = assignment[0].position || 0;
     const existingCheckIn = await db.select().from(ministerCheckIns).where(
       and11(
-        eq15(ministerCheckIns.scheduleId, scheduleId),
-        eq15(ministerCheckIns.ministerId, ministerId)
+        eq16(ministerCheckIns.scheduleId, scheduleId),
+        eq16(ministerCheckIns.ministerId, ministerId)
       )
     ).limit(1);
     if (existingCheckIn.length > 0) {
@@ -12773,7 +13317,7 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
         status,
         notes,
         checkedInAt: /* @__PURE__ */ new Date()
-      }).where(eq15(ministerCheckIns.id, existingCheckIn[0].id));
+      }).where(eq16(ministerCheckIns.id, existingCheckIn[0].id));
     } else {
       await db.insert(ministerCheckIns).values({
         scheduleId,
@@ -12815,9 +13359,9 @@ router10.put("/redistribute", authenticateToken, async (req, res) => {
       const { ministerId, fromPosition, toPosition, reason } = change;
       await db.update(schedules).set({ position: toPosition }).where(
         and11(
-          eq15(schedules.id, scheduleId),
-          eq15(schedules.ministerId, ministerId),
-          eq15(schedules.position, fromPosition)
+          eq16(schedules.id, scheduleId),
+          eq16(schedules.ministerId, ministerId),
+          eq16(schedules.position, fromPosition)
         )
       );
       appliedChanges.push({
@@ -12829,12 +13373,12 @@ router10.put("/redistribute", authenticateToken, async (req, res) => {
         details: reason
       });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq16(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       const currentChanges = existingLog[0].changesMade || [];
       await db.update(massExecutionLogs).set({
         changesMade: [...currentChanges, ...appliedChanges]
-      }).where(eq15(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq16(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -12865,12 +13409,12 @@ router10.post("/call-standby", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq15(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq16(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     const { date: date2, time: time2 } = massInfo[0];
-    const auxiliary = await db.select({ name: users.name }).from(users).where(eq15(users.id, userId)).limit(1);
+    const auxiliary = await db.select({ name: users.name }).from(users).where(eq16(users.id, userId)).limit(1);
     const auxiliaryName = auxiliary[0]?.name || "Auxiliar";
     await db.insert(standbyMinisters).values({
       scheduleId,
@@ -12924,7 +13468,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq15(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq16(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       await db.update(massExecutionLogs).set({
         attendance,
@@ -12932,7 +13476,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
         comments,
         incidents,
         highlights
-      }).where(eq15(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq16(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -12953,15 +13497,15 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
           await db.update(users).set({
             lastService: /* @__PURE__ */ new Date(),
             totalServices: sql8`${users.totalServices} + 1`
-          }).where(eq15(users.id, record.ministerId));
+          }).where(eq16(users.id, record.ministerId));
         }
       }
     }
     if (incidents && incidents.length > 0) {
       const coordinators = await db.select().from(users).where(
         and11(
-          inArray4(users.role, ["coordenador", "gestor"]),
-          eq15(users.status, "active")
+          inArray5(users.role, ["coordenador", "gestor"]),
+          eq16(users.status, "active")
         )
       );
       for (const coordinator of coordinators) {
@@ -12994,7 +13538,7 @@ init_schema();
 import { Router as Router11 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq16 } from "drizzle-orm";
+import { eq as eq17 } from "drizzle-orm";
 var router11 = Router11();
 var upload = multer({
   storage: multer.memoryStorage(),
@@ -13061,7 +13605,7 @@ router11.post("/profile-photo", authenticateToken, upload.single("photo"), handl
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq16(users.id, userId));
+    }).where(eq17(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -13093,7 +13637,7 @@ router11.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq16(users.id, userId));
+    }).where(eq17(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -13111,7 +13655,7 @@ import { z as z5 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq17, and as and12 } from "drizzle-orm";
+import { eq as eq18, and as and12 } from "drizzle-orm";
 
 // server/utils/pushNotifications.ts
 await init_storage();
@@ -13299,8 +13843,8 @@ router12.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const notification = await db.select().from(notifications).where(and12(
-      eq17(notifications.id, id),
-      eq17(notifications.userId, req.user.id)
+      eq18(notifications.id, id),
+      eq18(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -13327,7 +13871,7 @@ router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq17(users.status, "active")
+      eq18(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -13392,12 +13936,12 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq17(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq18(users.status, "active"));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou TODOS os usu\xE1rios ativos:", recipients.length);
       } else {
         recipients = await db.select({ id: users.id }).from(users).where(and12(
-          eq17(users.role, data.recipientRole),
-          eq17(users.status, "active")
+          eq18(users.role, data.recipientRole),
+          eq18(users.status, "active")
         ));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou usu\xE1rios com role", data.recipientRole, ":", recipients.length);
       }
@@ -13405,8 +13949,8 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
       console.log("[NOTIFICA\xC7\xD5ES] IDs dos destinat\xE1rios:", recipientUserIds);
     } else {
       const recipients = await db.select({ id: users.id }).from(users).where(and12(
-        eq17(users.role, "ministro"),
-        eq17(users.status, "active")
+        eq18(users.role, "ministro"),
+        eq18(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
       console.log("[NOTIFICA\xC7\xD5ES] Sem filtro, usando ministros ativos por padr\xE3o:", recipientUserIds.length);
@@ -13470,17 +14014,17 @@ router12.delete("/:id", authenticateToken, async (req, res) => {
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq17(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq18(notifications.id, id)).limit(1);
     } else {
       notification = await db.select().from(notifications).where(and12(
-        eq17(notifications.id, id),
-        eq17(notifications.userId, req.user.id)
+        eq18(notifications.id, id),
+        eq18(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq17(notifications.id, id));
+    await db.delete(notifications).where(eq18(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -13497,7 +14041,7 @@ var notifications_default = router12;
 await init_db();
 init_schema();
 import { Router as Router13 } from "express";
-import { eq as eq18, sql as sql9, and as and13, gte as gte8, lte as lte8, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
+import { eq as eq19, sql as sql9, and as and13, gte as gte8, lte as lte8, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
 await init_db();
@@ -13549,7 +14093,7 @@ router13.get("/availability", authenticateToken, requireRole(["gestor", "coorden
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq18(users.id, questionnaireResponses.userId)).where(
+    }).from(questionnaireResponses).leftJoin(users, eq19(users.id, questionnaireResponses.userId)).where(
       and13(
         startDate ? gte8(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
         endDate ? lte8(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
@@ -13579,7 +14123,7 @@ router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
       pendingRequests: sql9`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq18(users.id, substitutionRequests.requesterId)).where(
+    }).from(substitutionRequests).leftJoin(users, eq19(users.id, substitutionRequests.requesterId)).where(
       and13(
         startDate ? gte8(substitutionRequests.createdAt, new Date(startDate)) : sql9`true`,
         endDate ? lte8(substitutionRequests.createdAt, new Date(endDate)) : sql9`true`
@@ -13595,9 +14139,9 @@ router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
            ${startDate ? sql9`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql9``}
            ${endDate ? sql9`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql9``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq18(users.id, schedules.ministerId)).where(
+    }).from(schedules).leftJoin(users, eq19(users.id, schedules.ministerId)).where(
       and13(
-        schedules.status ? eq18(schedules.status, "published") : sql9`true`,
+        schedules.status ? eq19(schedules.status, "published") : sql9`true`,
         startDate ? gte8(schedules.createdAt, new Date(startDate)) : sql9`true`,
         endDate ? lte8(schedules.createdAt, new Date(endDate)) : sql9`true`
       )
@@ -13625,7 +14169,7 @@ router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
       uniqueDays: sql9`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq18(users.id, activityLogs.userId)).where(
+    }).from(activityLogs).leftJoin(users, eq19(users.id, activityLogs.userId)).where(
       and13(
         startDate ? gte8(activityLogs.createdAt, new Date(startDate)) : sql9`true`,
         endDate ? lte8(activityLogs.createdAt, new Date(endDate)) : sql9`true`
@@ -13646,11 +14190,11 @@ router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
     }).from(users).leftJoin(
       questionnaireResponses,
       and13(
-        eq18(users.id, questionnaireResponses.userId),
+        eq19(users.id, questionnaireResponses.userId),
         startDate ? gte8(questionnaireResponses.submittedAt, new Date(startDate)) : sql9`true`,
         endDate ? lte8(questionnaireResponses.submittedAt, new Date(endDate)) : sql9`true`
       )
-    ).where(eq18(users.status, "active"));
+    ).where(eq19(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -13676,7 +14220,7 @@ router13.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq18(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql9`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq19(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql9`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
       totalModules: sql9`
           (SELECT COUNT(*) FROM formation_modules)
@@ -13707,7 +14251,7 @@ router13.get("/families", authenticateToken, requireRole(["gestor", "coordenador
       totalServices: sql9`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq18(users.familyId, families.id)).groupBy(families.id, families.name).having(sql9`COUNT(${users.id}) > 1`).orderBy(desc6(sql9`active_members`), desc6(sql9`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq19(users.familyId, families.id)).groupBy(families.id, families.name).having(sql9`COUNT(${users.id}) > 1`).orderBy(desc6(sql9`active_members`), desc6(sql9`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -13723,7 +14267,7 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     const now = /* @__PURE__ */ new Date();
     const startOfMonth5 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth5 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq18(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq19(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count4(),
       approved: sql9`
@@ -13737,7 +14281,7 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     );
     const formationThisMonth = await db.select({ count: count4() }).from(formationProgress).where(
       and13(
-        eq18(formationProgress.status, "completed"),
+        eq19(formationProgress.status, "completed"),
         formationProgress.completedAt ? gte8(formationProgress.completedAt, startOfMonth5) : sql9`false`,
         formationProgress.completedAt ? lte8(formationProgress.completedAt, endOfMonth5) : sql9`false`
       )
@@ -13780,7 +14324,7 @@ var reports_default = router13;
 await init_db();
 init_schema();
 import { Router as Router14 } from "express";
-import { eq as eq19, and as and14, sql as sql10 } from "drizzle-orm";
+import { eq as eq20, and as and14, sql as sql10 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -13814,8 +14358,8 @@ router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
 router14.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const minister = await db.select().from(users).where(and14(
-      eq19(users.id, req.params.id),
-      eq19(users.role, "ministro")
+      eq20(users.id, req.params.id),
+      eq20(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13874,8 +14418,8 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
     const result = await db.update(users).set(updateData).where(and14(
-      eq19(users.id, userId),
-      eq19(users.role, "ministro")
+      eq20(users.id, userId),
+      eq20(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13898,8 +14442,8 @@ router14.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
     const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and14(
-      eq19(users.id, ministerId),
-      eq19(users.role, "ministro")
+      eq20(users.id, ministerId),
+      eq20(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -13922,7 +14466,120 @@ var ministers_default = router14;
 await init_db();
 init_schema();
 import { Router as Router15 } from "express";
-import { eq as eq21, and as and16, sql as sql12, gte as gte10, desc as desc7, count as count5, notInArray, inArray as inArray5 } from "drizzle-orm";
+import { eq as eq23, and as and17, sql as sql13, gte as gte11, desc as desc7, count as count5, notInArray, inArray as inArray6 } from "drizzle-orm";
+
+// server/services/reliabilityScoreService.ts
+init_schema();
+init_logger();
+import { db as db2 } from "@db";
+import { eq as eq21, sql as sql11 } from "drizzle-orm";
+var PENALTIES = {
+  SUBSTITUTION_REQUEST: 5,
+  // Each substitution request reduces score by 5 points
+  MANUAL_REMOVAL: 8,
+  // Each manual removal reduces score by 8 points
+  NO_SHOW: 20
+  // Each no-show drastically reduces score by 20 points
+};
+var BONUSES = {
+  SUBSTITUTION_FULFILLED: 3
+  // Each time helping as substitute adds 3 points (max +15)
+};
+var SCORE_CATEGORIES = {
+  EXCELLENT: { min: 90, max: 100, label: "Excelente" },
+  GOOD: { min: 75, max: 89, label: "Bom" },
+  FAIR: { min: 60, max: 74, label: "Regular" },
+  POOR: { min: 40, max: 59, label: "Ruim" },
+  CRITICAL: { min: 0, max: 39, label: "Cr\xEDtico" }
+};
+function calculateReliabilityScore(substitutionRequestCount, substitutionFulfilledCount, manualRemovalCount, noShowCount) {
+  const baseScore = 100;
+  const substitutionPenalty = substitutionRequestCount * PENALTIES.SUBSTITUTION_REQUEST;
+  const manualRemovalPenalty = manualRemovalCount * PENALTIES.MANUAL_REMOVAL;
+  const noShowPenalty = noShowCount * PENALTIES.NO_SHOW;
+  const helpBonus = Math.min(substitutionFulfilledCount * BONUSES.SUBSTITUTION_FULFILLED, 15);
+  let finalScore = baseScore - substitutionPenalty - manualRemovalPenalty - noShowPenalty + helpBonus;
+  finalScore = Math.max(0, Math.min(100, finalScore));
+  return {
+    baseScore,
+    substitutionPenalty,
+    manualRemovalPenalty,
+    noShowPenalty,
+    helpBonus,
+    finalScore
+  };
+}
+function getScoreCategory(score) {
+  if (score >= SCORE_CATEGORIES.EXCELLENT.min) return "excellent";
+  if (score >= SCORE_CATEGORIES.GOOD.min) return "good";
+  if (score >= SCORE_CATEGORIES.FAIR.min) return "fair";
+  if (score >= SCORE_CATEGORIES.POOR.min) return "poor";
+  return "critical";
+}
+async function updateMinisterReliabilityScore(ministerId) {
+  try {
+    const [minister] = await db2.select().from(users).where(eq21(users.id, ministerId)).limit(1);
+    if (!minister) {
+      logger.error(`Minister ${ministerId} not found for reliability update`);
+      return null;
+    }
+    const scoreComponents = calculateReliabilityScore(
+      minister.substitutionRequestCount || 0,
+      minister.substitutionFulfilledCount || 0,
+      minister.manualRemovalCount || 0,
+      minister.noShowCount || 0
+    );
+    let trend = "stable";
+    const oldScore = minister.reliabilityScore || 100;
+    if (scoreComponents.finalScore > oldScore + 5) trend = "improving";
+    else if (scoreComponents.finalScore < oldScore - 5) trend = "declining";
+    await db2.update(users).set({
+      reliabilityScore: scoreComponents.finalScore,
+      lastReliabilityUpdate: /* @__PURE__ */ new Date()
+    }).where(eq21(users.id, ministerId));
+    const metrics2 = {
+      ministerId,
+      ministerName: minister.name,
+      reliabilityScore: scoreComponents.finalScore,
+      substitutionRequestCount: minister.substitutionRequestCount || 0,
+      substitutionFulfilledCount: minister.substitutionFulfilledCount || 0,
+      manualRemovalCount: minister.manualRemovalCount || 0,
+      noShowCount: minister.noShowCount || 0,
+      lastUpdate: /* @__PURE__ */ new Date(),
+      trend,
+      category: getScoreCategory(scoreComponents.finalScore)
+    };
+    logger.info(`[RELIABILITY] Updated score for ${minister.name}: ${oldScore} \u2192 ${scoreComponents.finalScore} (${trend})`);
+    return metrics2;
+  } catch (error) {
+    logger.error(`Error updating reliability score for minister ${ministerId}:`, error);
+    return null;
+  }
+}
+async function trackSubstitutionRequest(ministerId, scheduleId) {
+  try {
+    await db2.update(users).set({
+      substitutionRequestCount: sql11`${users.substitutionRequestCount} + 1`
+    }).where(eq21(users.id, ministerId));
+    logger.info(`[RELIABILITY] Tracked substitution request for minister ${ministerId}`);
+    await updateMinisterReliabilityScore(ministerId);
+  } catch (error) {
+    logger.error(`Error tracking substitution request:`, error);
+  }
+}
+async function trackSubstitutionFulfillment(substituteId, scheduleId) {
+  try {
+    await db2.update(users).set({
+      substitutionFulfilledCount: sql11`${users.substitutionFulfilledCount} + 1`
+    }).where(eq21(users.id, substituteId));
+    logger.info(`[RELIABILITY] Tracked substitution fulfillment for minister ${substituteId} (BONUS)`);
+    await updateMinisterReliabilityScore(substituteId);
+  } catch (error) {
+    logger.error(`Error tracking substitution fulfillment:`, error);
+  }
+}
+
+// server/routes/substitutions.ts
 var router15 = Router15();
 function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
@@ -13940,10 +14597,10 @@ async function countMonthlySubstitutions(requesterId) {
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDayOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const result = await db.select({ count: count5() }).from(substitutionRequests).where(
-    and16(
-      eq21(substitutionRequests.requesterId, requesterId),
-      gte10(substitutionRequests.createdAt, firstDayOfMonth),
-      sql12`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
+    and17(
+      eq23(substitutionRequests.requesterId, requesterId),
+      gte11(substitutionRequests.createdAt, firstDayOfMonth),
+      sql13`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
     )
   );
   return result[0]?.count || 0;
@@ -13959,7 +14616,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         message: "ID da escala \xE9 obrigat\xF3rio"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq23(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -13990,9 +14647,9 @@ router15.post("/", authenticateToken, async (req, res) => {
       });
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
-      and16(
-        eq21(substitutionRequests.scheduleId, scheduleId),
-        inArray5(substitutionRequests.status, ["pending", "available"])
+      and17(
+        eq23(substitutionRequests.scheduleId, scheduleId),
+        inArray6(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -14015,6 +14672,7 @@ router15.post("/", authenticateToken, async (req, res) => {
       createdAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
     }).returning();
+    await trackSubstitutionRequest(requesterId, scheduleId);
     const requestQuery = db.select({
       request: substitutionRequests,
       assignment: schedules,
@@ -14024,7 +14682,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         profilePhoto: users.photoUrl
       }
-    }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).where(eq21(substitutionRequests.id, newRequest.id)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq23(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq23(substitutionRequests.requesterId, users.id)).where(eq23(substitutionRequests.id, newRequest.id)).limit(1);
     const [requestWithDetails] = await requestQuery;
     let substituteUser = null;
     if (finalSubstituteId) {
@@ -14034,7 +14692,7 @@ router15.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         phone: users.phone,
         whatsapp: users.whatsapp
-      }).from(users).where(eq21(users.id, finalSubstituteId)).limit(1);
+      }).from(users).where(eq23(users.id, finalSubstituteId)).limit(1);
       substituteUser = substitute || null;
     }
     const responseData = {
@@ -14052,6 +14710,8 @@ router15.post("/", authenticateToken, async (req, res) => {
       urgency,
       hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60))
     });
+    scheduleCache.invalidateByDate(schedule.date);
+    console.log(`[CACHE] Invalidated cache after creating substitution request for ${schedule.date}`);
     res.json({
       success: true,
       message,
@@ -14087,7 +14747,7 @@ router15.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
+      }).from(substitutionRequests).innerJoin(schedules, eq23(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq23(substitutionRequests.requesterId, users.id)).orderBy(desc7(substitutionRequests.createdAt));
     } else {
       requests = await db.select({
         request: substitutionRequests,
@@ -14098,8 +14758,8 @@ router15.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).where(
-        sql12`${substitutionRequests.requesterId} = ${userId}
+      }).from(substitutionRequests).innerJoin(schedules, eq23(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq23(substitutionRequests.requesterId, users.id)).where(
+        sql13`${substitutionRequests.requesterId} = ${userId}
             OR ${substitutionRequests.substituteId} = ${userId}
             OR ${substitutionRequests.status} = 'available'`
       ).orderBy(desc7(substitutionRequests.createdAt));
@@ -14111,7 +14771,7 @@ router15.get("/", authenticateToken, async (req, res) => {
           const [substitute] = await db.select({
             id: users.id,
             name: users.name
-          }).from(users).where(eq21(users.id, req2.request.substituteId)).limit(1);
+          }).from(users).where(eq23(users.id, req2.request.substituteId)).limit(1);
           if (substitute) {
             substituteUser = substitute;
           }
@@ -14142,7 +14802,7 @@ router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
-    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq23(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       console.log("[Substitutions] Escala n\xE3o encontrada:", scheduleId);
       return res.status(404).json({
@@ -14157,11 +14817,11 @@ router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
       email: users.email,
       photoUrl: users.photoUrl
     }).from(users).where(
-      and16(
-        eq21(users.status, "active"),
-        eq21(users.role, "ministro"),
+      and17(
+        eq23(users.status, "active"),
+        eq23(users.role, "ministro"),
         // Não está escalado no mesmo horário
-        sql12`NOT EXISTS (
+        sql13`NOT EXISTS (
             SELECT 1 FROM ${schedules} s
             WHERE s.minister_id = ${users.id}
             AND s.date = ${schedule.date}
@@ -14195,7 +14855,7 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
         message: "Resposta inv\xE1lida. Use 'accepted' ou 'rejected'"
       });
     }
-    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq23(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -14216,18 +14876,28 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
       });
     }
     const newStatus = response === "accepted" ? "approved" : "rejected";
-    await db.update(substitutionRequests).set({
-      status: newStatus,
-      approvedBy: userId,
-      approvedAt: /* @__PURE__ */ new Date(),
-      responseMessage: responseMessage || null,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq21(substitutionRequests.id, id));
+    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq23(schedules.id, request.scheduleId)).limit(1);
+    await db.transaction(async (tx) => {
+      await tx.update(substitutionRequests).set({
+        status: newStatus,
+        approvedBy: userId,
+        approvedAt: /* @__PURE__ */ new Date(),
+        responseMessage: responseMessage || null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq23(substitutionRequests.id, id));
+      if (newStatus === "approved" && request.substituteId) {
+        await tx.update(schedules).set({
+          ministerId: request.substituteId,
+          substituteId: request.requesterId
+        }).where(eq23(schedules.id, request.scheduleId));
+      }
+    });
     if (newStatus === "approved" && request.substituteId) {
-      await db.update(schedules).set({
-        ministerId: request.substituteId,
-        substituteId: request.requesterId
-      }).where(eq21(schedules.id, request.scheduleId));
+      await trackSubstitutionFulfillment(request.substituteId, request.scheduleId);
+    }
+    if (schedule) {
+      scheduleCache.invalidateByDate(schedule.date);
+      console.log(`[CACHE] Invalidated cache after responding to substitution for ${schedule.date}`);
     }
     res.json({
       success: true,
@@ -14246,7 +14916,7 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     const { message } = req.body;
-    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq23(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -14266,7 +14936,7 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Voc\xEA n\xE3o pode reivindicar sua pr\xF3pria solicita\xE7\xE3o"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq21(schedules.id, request.scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq23(schedules.id, request.scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -14274,11 +14944,11 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
       });
     }
     const conflictingSchedule = await db.select().from(schedules).where(
-      and16(
-        eq21(schedules.ministerId, userId),
-        eq21(schedules.date, schedule.date),
-        eq21(schedules.time, schedule.time),
-        eq21(schedules.status, "scheduled")
+      and17(
+        eq23(schedules.ministerId, userId),
+        eq23(schedules.date, schedule.date),
+        eq23(schedules.time, schedule.time),
+        eq23(schedules.status, "scheduled")
       )
     ).limit(1);
     if (conflictingSchedule.length > 0) {
@@ -14294,11 +14964,13 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
       approvedAt: /* @__PURE__ */ new Date(),
       responseMessage: message || null,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq21(substitutionRequests.id, id));
+    }).where(eq23(substitutionRequests.id, id));
     await db.update(schedules).set({
       ministerId: userId,
       substituteId: request.requesterId
-    }).where(eq21(schedules.id, request.scheduleId));
+    }).where(eq23(schedules.id, request.scheduleId));
+    scheduleCache.invalidateByDate(schedule.date);
+    console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
     res.json({
       success: true,
       message: "Substitui\xE7\xE3o aceita com sucesso!"
@@ -14315,7 +14987,7 @@ router15.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const [request] = await db.select().from(substitutionRequests).where(eq21(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq23(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -14336,10 +15008,15 @@ router15.delete("/:id", authenticateToken, async (req, res) => {
         message: "Apenas solicita\xE7\xF5es pendentes ou dispon\xEDveis podem ser canceladas"
       });
     }
+    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq23(schedules.id, request.scheduleId)).limit(1);
     await db.update(substitutionRequests).set({
       status: "cancelled",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq21(substitutionRequests.id, id));
+    }).where(eq23(substitutionRequests.id, id));
+    if (schedule) {
+      scheduleCache.invalidateByDate(schedule.date);
+      console.log(`[CACHE] Invalidated cache after canceling substitution for ${schedule.date}`);
+    }
     res.json({
       success: true,
       message: "Solicita\xE7\xE3o cancelada com sucesso"
@@ -14358,7 +15035,7 @@ var substitutions_default = router15;
 await init_db();
 init_schema();
 import { Router as Router16 } from "express";
-import { eq as eq22, and as and17, gte as gte11, lte as lte10, sql as sql13 } from "drizzle-orm";
+import { eq as eq24, and as and18, gte as gte12, lte as lte10, sql as sql14 } from "drizzle-orm";
 var router16 = Router16();
 var MINIMUM_MINISTERS = {
   "08:00:00": 12,
@@ -14392,11 +15069,11 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       position: schedules.position,
       status: schedules.status,
       id: schedules.id
-    }).from(schedules).leftJoin(users, eq22(schedules.ministerId, users.id)).where(
-      and17(
-        gte11(schedules.date, startDateStr),
+    }).from(schedules).leftJoin(users, eq24(schedules.ministerId, users.id)).where(
+      and18(
+        gte12(schedules.date, startDateStr),
         lte10(schedules.date, endDateStr),
-        eq22(schedules.status, "scheduled")
+        eq24(schedules.status, "scheduled")
       )
     ).orderBy(schedules.date, schedules.time);
     const scheduleIds = monthSchedules.map((s) => s.id);
@@ -14406,12 +15083,12 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       substituteId: substitutionRequests.substituteId,
       status: substitutionRequests.status
     }).from(substitutionRequests).where(
-      and17(
-        sql13`${substitutionRequests.scheduleId} IN (${sql13.join(
-          scheduleIds.map((id) => sql13`${id}`),
-          sql13`, `
+      and18(
+        sql14`${substitutionRequests.scheduleId} IN (${sql14.join(
+          scheduleIds.map((id) => sql14`${id}`),
+          sql14`, `
         )})`,
-        sql13`${substitutionRequests.status} IN ('pending', 'approved')`
+        sql14`${substitutionRequests.status} IN ('pending', 'approved')`
       )
     ) : [];
     const substitutionsMap = /* @__PURE__ */ new Map();
@@ -14431,9 +15108,9 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       name: users.name,
       lastService: users.lastService
     }).from(users).where(
-      and17(
-        eq22(users.status, "active"),
-        eq22(users.role, "ministro")
+      and18(
+        eq24(users.status, "active"),
+        eq24(users.role, "ministro")
       )
     );
     const pendencies = [];
@@ -14526,7 +15203,7 @@ var mass_pendencies_default = router16;
 await init_db();
 init_schema();
 import { Router as Router17 } from "express";
-import { eq as eq24, asc as asc2 } from "drizzle-orm";
+import { eq as eq26, asc as asc2 } from "drizzle-orm";
 var router17 = Router17();
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
@@ -14571,7 +15248,7 @@ router17.get("/tracks", async (req, res) => {
 router17.get("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const track = await db.select().from(formationTracks).where(eq24(formationTracks.id, id)).limit(1);
+    const track = await db.select().from(formationTracks).where(eq26(formationTracks.id, id)).limit(1);
     if (track.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14607,7 +15284,7 @@ router17.patch("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationTracks.id, id)).returning();
+    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(formationTracks.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14629,14 +15306,14 @@ router17.patch("/tracks/:id", async (req, res) => {
 router17.delete("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const modules = await db.select().from(formationModules).where(eq24(formationModules.trackId, id));
+    const modules = await db.select().from(formationModules).where(eq26(formationModules.trackId, id));
     if (modules.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta trilha possui m\xF3dulos. Delete os m\xF3dulos primeiro ou desative a trilha."
       });
     }
-    const deleted = await db.delete(formationTracks).where(eq24(formationTracks.id, id)).returning();
+    const deleted = await db.delete(formationTracks).where(eq26(formationTracks.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -14658,7 +15335,7 @@ router17.delete("/tracks/:id", async (req, res) => {
 router17.get("/tracks/:trackId/modules", async (req, res) => {
   try {
     const { trackId } = req.params;
-    const modules = await db.select().from(formationModules).where(eq24(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
+    const modules = await db.select().from(formationModules).where(eq26(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
     res.json({ modules });
   } catch (error) {
     console.error("Error fetching formation modules:", error);
@@ -14671,7 +15348,7 @@ router17.get("/tracks/:trackId/modules", async (req, res) => {
 router17.get("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const module = await db.select().from(formationModules).where(eq24(formationModules.id, id)).limit(1);
+    const module = await db.select().from(formationModules).where(eq26(formationModules.id, id)).limit(1);
     if (module.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14707,7 +15384,7 @@ router17.patch("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationModules).set(updates).where(eq24(formationModules.id, id)).returning();
+    const updated = await db.update(formationModules).set(updates).where(eq26(formationModules.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14729,14 +15406,14 @@ router17.patch("/modules/:id", async (req, res) => {
 router17.delete("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq24(formationLessons.moduleId, id));
+    const lessons = await db.select().from(formationLessons).where(eq26(formationLessons.moduleId, id));
     if (lessons.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Este m\xF3dulo possui li\xE7\xF5es. Delete as li\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationModules).where(eq24(formationModules.id, id)).returning();
+    const deleted = await db.delete(formationModules).where(eq26(formationModules.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -14758,7 +15435,7 @@ router17.delete("/modules/:id", async (req, res) => {
 router17.get("/modules/:moduleId/lessons", async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq24(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
+    const lessons = await db.select().from(formationLessons).where(eq26(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
     res.json({ lessons });
   } catch (error) {
     console.error("Error fetching formation lessons:", error);
@@ -14771,7 +15448,7 @@ router17.get("/modules/:moduleId/lessons", async (req, res) => {
 router17.get("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lesson = await db.select().from(formationLessons).where(eq24(formationLessons.id, id)).limit(1);
+    const lesson = await db.select().from(formationLessons).where(eq26(formationLessons.id, id)).limit(1);
     if (lesson.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14807,7 +15484,7 @@ router17.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationLessons.id, id)).returning();
+    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(formationLessons.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14829,14 +15506,14 @@ router17.patch("/lessons/:id", async (req, res) => {
 router17.delete("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.lessonId, id));
+    const sections = await db.select().from(formationLessonSections).where(eq26(formationLessonSections.lessonId, id));
     if (sections.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta li\xE7\xE3o possui se\xE7\xF5es. Delete as se\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationLessons).where(eq24(formationLessons.id, id)).returning();
+    const deleted = await db.delete(formationLessons).where(eq26(formationLessons.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -14858,7 +15535,7 @@ router17.delete("/lessons/:id", async (req, res) => {
 router17.get("/lessons/:lessonId/sections", async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
+    const sections = await db.select().from(formationLessonSections).where(eq26(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
     res.json({ sections });
   } catch (error) {
     console.error("Error fetching lesson sections:", error);
@@ -14871,7 +15548,7 @@ router17.get("/lessons/:lessonId/sections", async (req, res) => {
 router17.get("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const section = await db.select().from(formationLessonSections).where(eq24(formationLessonSections.id, id)).limit(1);
+    const section = await db.select().from(formationLessonSections).where(eq26(formationLessonSections.id, id)).limit(1);
     if (section.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14907,7 +15584,7 @@ router17.patch("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq24(formationLessonSections.id, id)).returning();
+    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(formationLessonSections.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14929,7 +15606,7 @@ router17.patch("/sections/:id", async (req, res) => {
 router17.delete("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.delete(formationLessonSections).where(eq24(formationLessonSections.id, id)).returning();
+    const deleted = await db.delete(formationLessonSections).where(eq26(formationLessonSections.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -14959,7 +15636,7 @@ router17.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
       });
     }
     const updates = sectionIds.map(
-      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq24(formationLessonSections.id, id))
+      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq26(formationLessonSections.id, id))
     );
     await Promise.all(updates);
     res.json({
@@ -14993,7 +15670,7 @@ var version_default = router18;
 await init_db();
 init_schema();
 import { Router as Router19 } from "express";
-import { eq as eq25, and as and18, gte as gte12, lte as lte11, sql as sql14, or as or8, isNull, count as count6, desc as desc9 } from "drizzle-orm";
+import { eq as eq27, and as and19, gte as gte13, lte as lte11, sql as sql15, or as or8, isNull, count as count6, desc as desc9 } from "drizzle-orm";
 import { format as format8, addDays as addDays5, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
 var router19 = Router19();
 router19.get("/urgent-alerts", async (req, res) => {
@@ -15004,16 +15681,16 @@ router19.get("/urgent-alerts", async (req, res) => {
     const incompleteMasses = await db.select({
       date: schedules.date,
       time: schedules.time,
-      totalSlots: sql14`COUNT(*)`,
-      filledSlots: sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
-      vacancies: sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+      totalSlots: sql15`COUNT(*)`,
+      filledSlots: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      vacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
     }).from(schedules).where(
-      and18(
-        eq25(schedules.status, "published"),
-        gte12(schedules.date, format8(now, "yyyy-MM-dd")),
+      and19(
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format8(now, "yyyy-MM-dd")),
         lte11(schedules.date, format8(next7Days, "yyyy-MM-dd"))
       )
-    ).groupBy(schedules.date, schedules.time).having(sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+    ).groupBy(schedules.date, schedules.time).having(sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
     const criticalMasses = incompleteMasses.filter((mass) => {
       const massDate = /* @__PURE__ */ new Date(mass.date + "T12:00:00");
       return massDate <= next48Hours;
@@ -15038,14 +15715,14 @@ router19.get("/urgent-alerts", async (req, res) => {
       status: substitutionRequests.status,
       massDate: schedules.date,
       massTime: schedules.time
-    }).from(substitutionRequests).innerJoin(users, eq25(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq25(substitutionRequests.scheduleId, schedules.id)).where(
-      and18(
-        eq25(schedules.status, "published"),
+    }).from(substitutionRequests).innerJoin(users, eq27(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq27(substitutionRequests.scheduleId, schedules.id)).where(
+      and19(
+        eq27(schedules.status, "published"),
         or8(
-          eq25(substitutionRequests.status, "pending"),
-          eq25(substitutionRequests.status, "available")
+          eq27(substitutionRequests.status, "pending"),
+          eq27(substitutionRequests.status, "available")
         ),
-        gte12(schedules.date, format8(now, "yyyy-MM-dd"))
+        gte13(schedules.date, format8(now, "yyyy-MM-dd"))
       )
     ).orderBy(schedules.date);
     const urgentSubstitutions = pendingSubstitutions.filter((sub) => {
@@ -15081,12 +15758,12 @@ router19.get("/next-week-masses", async (req, res) => {
     const masses = await db.select({
       date: schedules.date,
       massTime: schedules.time,
-      totalSlots: sql14`COUNT(*)`,
-      totalAssigned: sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
-      totalVacancies: sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
-      requiredMinisters: sql14`COUNT(*)`,
+      totalSlots: sql15`COUNT(*)`,
+      totalAssigned: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      totalVacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      requiredMinisters: sql15`COUNT(*)`,
       // All slots are required
-      hasPendingSubstitutions: sql14`EXISTS(
+      hasPendingSubstitutions: sql15`EXISTS(
           SELECT 1 FROM ${substitutionRequests}
           WHERE ${substitutionRequests.scheduleId} IN (
             SELECT id FROM ${schedules} AS s2
@@ -15095,9 +15772,9 @@ router19.get("/next-week-masses", async (req, res) => {
           AND ${substitutionRequests.status} IN ('pending', 'available')
         )`
     }).from(schedules).where(
-      and18(
-        eq25(schedules.status, "published"),
-        gte12(schedules.date, format8(now, "yyyy-MM-dd")),
+      and19(
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format8(now, "yyyy-MM-dd")),
         lte11(schedules.date, format8(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).orderBy(schedules.date, schedules.time);
@@ -15135,11 +15812,11 @@ router19.get("/ministry-stats", async (req, res) => {
     const thisMonthStart = startOfMonth4(now);
     const thisMonthEnd = endOfMonth4(now);
     const [activeMinistersResult] = await db.select({ count: count6() }).from(users).where(
-      and18(
-        eq25(users.status, "active"),
+      and19(
+        eq27(users.status, "active"),
         or8(
-          eq25(users.role, "ministro"),
-          eq25(users.role, "coordenador")
+          eq27(users.role, "ministro"),
+          eq27(users.role, "coordenador")
         )
       )
     );
@@ -15147,23 +15824,23 @@ router19.get("/ministry-stats", async (req, res) => {
       id: users.id,
       name: users.name,
       lastService: users.lastService,
-      daysSinceService: sql14`EXTRACT(DAY FROM NOW() - ${users.lastService})`
+      daysSinceService: sql15`EXTRACT(DAY FROM NOW() - ${users.lastService})`
     }).from(users).where(
-      and18(
-        eq25(users.status, "active"),
+      and19(
+        eq27(users.status, "active"),
         or8(
-          eq25(users.role, "ministro"),
-          eq25(users.role, "coordenador")
+          eq27(users.role, "ministro"),
+          eq27(users.role, "coordenador")
         ),
         or8(
           lte11(users.lastService, thirtyDaysAgo),
           isNull(users.lastService)
         )
       )
-    ).orderBy(desc9(sql14`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
+    ).orderBy(desc9(sql15`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
     const [monthStats] = await db.select({
-      totalMasses: sql14`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
-      fullyStaffedMasses: sql14`COUNT(DISTINCT CASE
+      totalMasses: sql15`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
+      fullyStaffedMasses: sql15`COUNT(DISTINCT CASE
           WHEN NOT EXISTS(
             SELECT 1 FROM schedules AS s2
             WHERE s2.date = ${schedules.date}
@@ -15173,9 +15850,9 @@ router19.get("/ministry-stats", async (req, res) => {
           ) THEN (${schedules.date}, ${schedules.time})
         END)`
     }).from(schedules).where(
-      and18(
-        eq25(schedules.status, "published"),
-        gte12(schedules.date, format8(thisMonthStart, "yyyy-MM-dd")),
+      and19(
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format8(thisMonthStart, "yyyy-MM-dd")),
         lte11(schedules.date, format8(thisMonthEnd, "yyyy-MM-dd"))
       )
     );
@@ -15183,34 +15860,34 @@ router19.get("/ministry-stats", async (req, res) => {
       id: questionnaires.id,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and18(
-        eq25(questionnaires.month, now.getMonth() + 1),
-        eq25(questionnaires.year, now.getFullYear())
+      and19(
+        eq27(questionnaires.month, now.getMonth() + 1),
+        eq27(questionnaires.year, now.getFullYear())
       )
     ).limit(1);
     let responseRate = 0;
     if (currentQuestionnaire) {
       const [responseStats] = await db.select({
         totalResponses: count6(questionnaireResponses.id)
-      }).from(questionnaireResponses).where(eq25(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
+      }).from(questionnaireResponses).where(eq27(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
       responseRate = Math.round(
         responseStats.totalResponses / (activeMinistersResult.count || 1) * 100
       );
     }
     const [pendingSubsCount] = await db.select({ count: count6() }).from(substitutionRequests).where(
-      and18(
+      and19(
         or8(
-          eq25(substitutionRequests.status, "pending"),
-          eq25(substitutionRequests.status, "available")
+          eq27(substitutionRequests.status, "pending"),
+          eq27(substitutionRequests.status, "available")
         )
       )
     );
     const [incompleteMassesCount] = await db.select({
-      count: sql14`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
+      count: sql15`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
     }).from(schedules).where(
-      and18(
-        eq25(schedules.status, "published"),
-        gte12(schedules.date, format8(now, "yyyy-MM-dd")),
+      and19(
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format8(now, "yyyy-MM-dd")),
         isNull(schedules.ministerId)
       )
     );
@@ -15243,20 +15920,20 @@ router19.get("/incomplete", async (req, res) => {
     const incomplete = await db.select({
       date: schedules.date,
       massTime: schedules.time,
-      vacancies: sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
-      totalSlots: sql14`COUNT(*)`,
-      positions: sql14`ARRAY_AGG(
+      vacancies: sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      totalSlots: sql15`COUNT(*)`,
+      positions: sql15`ARRAY_AGG(
           CASE WHEN ${schedules.ministerId} IS NULL
           THEN ${schedules.position}
           END
         ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
     }).from(schedules).where(
-      and18(
-        eq25(schedules.status, "published"),
-        gte12(schedules.date, format8(now, "yyyy-MM-dd")),
+      and19(
+        eq27(schedules.status, "published"),
+        gte13(schedules.date, format8(now, "yyyy-MM-dd")),
         lte11(schedules.date, format8(futureDate, "yyyy-MM-dd"))
       )
-    ).groupBy(schedules.date, schedules.time).having(sql14`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
+    ).groupBy(schedules.date, schedules.time).having(sql15`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
     res.json({
       success: true,
       data: incomplete.map((item) => ({
@@ -15361,8 +16038,8 @@ var pushSubscriptions_default = router20;
 await init_db();
 init_schema();
 import { Router as Router21 } from "express";
-import { eq as eq26, and as and19, gte as gte13, desc as desc10, asc as asc3 } from "drizzle-orm";
-import { sql as sql15 } from "drizzle-orm";
+import { eq as eq28, and as and20, gte as gte14, desc as desc10, asc as asc3 } from "drizzle-orm";
+import { sql as sql16 } from "drizzle-orm";
 var router21 = Router21();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
@@ -15460,7 +16137,7 @@ router21.post("/escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala] Telefone normalizado:", normalizedPhone, "| Data:", data);
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -15473,9 +16150,9 @@ router21.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and19(
-        eq26(schedules.ministerId, minister[0].id),
-        eq26(schedules.date, data)
+      and20(
+        eq28(schedules.ministerId, minister[0].id),
+        eq28(schedules.date, data)
       )
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
@@ -15515,7 +16192,7 @@ router21.post("/proximas", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -15526,9 +16203,9 @@ router21.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and19(
-        eq26(schedules.ministerId, minister[0].id),
-        gte13(schedules.date, today)
+      and20(
+        eq28(schedules.ministerId, minister[0].id),
+        gte14(schedules.date, today)
       )
     ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(3);
     if (!upcomingSchedules || upcomingSchedules.length === 0) {
@@ -15577,10 +16254,10 @@ router21.post("/colegas", async (req, res) => {
       scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
-    }).from(schedules).innerJoin(users, eq26(schedules.ministerId, users.id)).where(
-      and19(
-        eq26(schedules.date, data),
-        eq26(schedules.time, normalizedTime)
+    }).from(schedules).innerJoin(users, eq28(schedules.ministerId, users.id)).where(
+      and20(
+        eq28(schedules.date, data),
+        eq28(schedules.time, normalizedTime)
       )
     ).orderBy(asc3(schedules.position));
     if (!ministersInMass || ministersInMass.length === 0) {
@@ -15623,7 +16300,7 @@ router21.get("/substituicoes-abertas", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       createdAt: substitutionRequests.createdAt
-    }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).where(eq26(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(limite);
+    }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(eq28(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(limite);
     if (!openSubstitutions || openSubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -15665,7 +16342,7 @@ router21.post("/aceitar-substituicao", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const substitute = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!substitute || substitute.length === 0) {
@@ -15683,7 +16360,7 @@ router21.post("/aceitar-substituicao", async (req, res) => {
       time: schedules.time,
       position: schedules.position,
       requesterName: users.name
-    }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).where(eq26(substitutionRequests.id, id_substituicao)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(eq28(substitutionRequests.id, id_substituicao)).limit(1);
     if (!substitution || substitution.length === 0) {
       return res.json({
         sucesso: false,
@@ -15707,7 +16384,7 @@ router21.post("/aceitar-substituicao", async (req, res) => {
       substituteId: substitute[0].id,
       status: "pending",
       responseMessage: mensagem || `Aceito via WhatsApp por ${substitute[0].name}`
-    }).where(eq26(substitutionRequests.id, id_substituicao));
+    }).where(eq28(substitutionRequests.id, id_substituicao));
     return res.json({
       sucesso: true,
       substituto: substitute[0].name,
@@ -15734,7 +16411,7 @@ router21.post("/minhas-substituicoes", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -15745,11 +16422,11 @@ router21.post("/minhas-substituicoes", async (req, res) => {
     }
     let whereCondition;
     if (tipo === "solicitadas") {
-      whereCondition = eq26(substitutionRequests.requesterId, minister[0].id);
+      whereCondition = eq28(substitutionRequests.requesterId, minister[0].id);
     } else if (tipo === "aceitas") {
-      whereCondition = eq26(substitutionRequests.substituteId, minister[0].id);
+      whereCondition = eq28(substitutionRequests.substituteId, minister[0].id);
     } else {
-      whereCondition = sql15`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
+      whereCondition = sql16`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
     }
     const mySubstitutions = await db.select({
       substitutionId: substitutionRequests.id,
@@ -15762,7 +16439,7 @@ router21.post("/minhas-substituicoes", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       responseMessage: substitutionRequests.responseMessage
-    }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc10(schedules.date), desc10(schedules.time)).limit(10);
+    }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc10(schedules.date), desc10(schedules.time)).limit(10);
     if (!mySubstitutions || mySubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -15809,7 +16486,7 @@ router21.post("/proxima-escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /proxima-escala] Telefone normalizado:", normalizedPhone);
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -15825,9 +16502,9 @@ router21.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and19(
-        eq26(schedules.ministerId, minister[0].id),
-        gte13(schedules.date, today)
+      and20(
+        eq28(schedules.ministerId, minister[0].id),
+        gte14(schedules.date, today)
       )
     ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
@@ -15884,7 +16561,7 @@ router21.post("/escala-mes", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala-mes] Telefone normalizado:", normalizedPhone, "| M\xEAs:", mes, "| Ano:", ano);
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql15`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql16`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -15899,10 +16576,10 @@ router21.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and19(
-        eq26(schedules.ministerId, minister[0].id),
-        sql15`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
-        sql15`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
+      and20(
+        eq28(schedules.ministerId, minister[0].id),
+        sql16`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
+        sql16`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
       )
     ).orderBy(asc3(schedules.date), asc3(schedules.time));
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
@@ -15954,7 +16631,7 @@ var whatsapp_api_default = router21;
 import { Router as Router22 } from "express";
 await init_db();
 init_schema();
-import { eq as eq27, count as count7, gte as gte14 } from "drizzle-orm";
+import { eq as eq29, count as count7, gte as gte15 } from "drizzle-orm";
 import os from "os";
 var router22 = Router22();
 var metrics = {
@@ -15963,14 +16640,47 @@ var metrics = {
   errors: 0,
   avgResponseTime: 0,
   lastReset: /* @__PURE__ */ new Date(),
-  responseTimes: []
+  responseTimes: [],
+  errorLogs: [],
+  routeStats: /* @__PURE__ */ new Map()
 };
-function updateMetrics(statusCode, responseTime) {
+function updateMetrics(statusCode, responseTime, route, method, errorMessage) {
   metrics.total++;
   if (statusCode >= 200 && statusCode < 400) {
     metrics.success++;
   } else if (statusCode >= 400) {
     metrics.errors++;
+    if (route) {
+      metrics.errorLogs.push({
+        route,
+        method: method || "UNKNOWN",
+        statusCode,
+        message: errorMessage || `HTTP ${statusCode}`,
+        timestamp: /* @__PURE__ */ new Date()
+      });
+      if (metrics.errorLogs.length > 100) {
+        metrics.errorLogs.shift();
+      }
+    }
+  }
+  if (route) {
+    const key = `${method || "GET"} ${route}`;
+    const stats = metrics.routeStats.get(key);
+    if (stats) {
+      stats.count++;
+      stats.totalTime += responseTime;
+      stats.avgTime = stats.totalTime / stats.count;
+      stats.minTime = Math.min(stats.minTime, responseTime);
+      stats.maxTime = Math.max(stats.maxTime, responseTime);
+    } else {
+      metrics.routeStats.set(key, {
+        count: 1,
+        totalTime: responseTime,
+        avgTime: responseTime,
+        minTime: responseTime,
+        maxTime: responseTime
+      });
+    }
   }
   metrics.responseTimes.push(responseTime);
   if (metrics.responseTimes.length > 1e3) {
@@ -15986,15 +16696,15 @@ router22.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
     const [usersCount] = await db.select({ count: count7() }).from(users);
-    const [activeUsersCount] = await db.select({ count: count7() }).from(users).where(eq27(users.status, "active"));
+    const [activeUsersCount] = await db.select({ count: count7() }).from(users).where(eq29(users.status, "active"));
     const [schedulesCount] = await db.select({ count: count7() }).from(schedules);
-    const [publishedSchedulesCount] = await db.select({ count: count7() }).from(schedules).where(eq27(schedules.status, "published"));
+    const [publishedSchedulesCount] = await db.select({ count: count7() }).from(schedules).where(eq29(schedules.status, "published"));
     const [responsesCount] = await db.select({ count: count7() }).from(questionnaireResponses);
     const [substitutionsCount] = await db.select({ count: count7() }).from(substitutionRequests);
-    const [pendingSubstitutions] = await db.select({ count: count7() }).from(substitutionRequests).where(eq27(substitutionRequests.status, "pending"));
+    const [pendingSubstitutions] = await db.select({ count: count7() }).from(substitutionRequests).where(eq29(substitutionRequests.status, "pending"));
     const thirtyDaysAgo = /* @__PURE__ */ new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const [recentUsersCount] = await db.select({ count: count7() }).from(users).where(gte14(users.createdAt, thirtyDaysAgo));
+    const [recentUsersCount] = await db.select({ count: count7() }).from(users).where(gte15(users.createdAt, thirtyDaysAgo));
     const sortedTimes = [...metrics.responseTimes].sort((a, b) => a - b);
     const p50 = sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0;
     const p95 = sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0;
@@ -16069,14 +16779,68 @@ router22.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
+router22.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const errors = [...metrics.errorLogs].reverse().map((error) => ({
+      ...error,
+      timestamp: error.timestamp.toISOString()
+    }));
+    res.json({
+      total: metrics.errorLogs.length,
+      errors
+    });
+  } catch (error) {
+    console.error("Error fetching error logs:", error);
+    res.status(500).json({ error: "Failed to fetch error logs" });
+  }
+});
+router22.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const routes = Array.from(metrics.routeStats.entries()).map(([route, stats]) => ({
+      route,
+      count: stats.count,
+      avgTime: Math.round(stats.avgTime),
+      minTime: Math.round(stats.minTime),
+      maxTime: Math.round(stats.maxTime),
+      totalTime: Math.round(stats.totalTime)
+    })).sort((a, b) => b.avgTime - a.avgTime).slice(0, 10);
+    res.json({
+      total: metrics.routeStats.size,
+      routes
+    });
+  } catch (error) {
+    console.error("Error fetching slow routes:", error);
+    res.status(500).json({ error: "Failed to fetch slow routes" });
+  }
+});
 router22.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   metrics.total = 0;
   metrics.success = 0;
   metrics.errors = 0;
   metrics.avgResponseTime = 0;
   metrics.responseTimes = [];
+  metrics.errorLogs = [];
+  metrics.routeStats.clear();
   metrics.lastReset = /* @__PURE__ */ new Date();
   res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
+});
+router22.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+  try {
+    const cacheStats = scheduleCache.getStats();
+    scheduleCache.clear();
+    res.json({
+      message: "Cache limpo com sucesso",
+      cleared: {
+        scheduleCache: {
+          entriesCleared: cacheStats.size,
+          keys: cacheStats.keys
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error clearing cache:", error);
+    res.status(500).json({ error: "Falha ao limpar cache" });
+  }
 });
 function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400);
@@ -16177,19 +16941,19 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq28, and as and20 } from "drizzle-orm";
+import { eq as eq30, and as and21 } from "drizzle-orm";
 async function gerarEscalaAlternativa(req, res) {
   try {
     const { year, month, questionnaireId } = req.body;
     logger.info(`Gerando escala alternativa para ${month}/${year} usando Python`);
     let targetQuestionnaire;
     if (questionnaireId) {
-      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq28(questionnaires.id, questionnaireId)).limit(1);
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq30(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
-        and20(
-          eq28(questionnaires.year, year),
-          eq28(questionnaires.month, month)
+        and21(
+          eq30(questionnaires.year, year),
+          eq30(questionnaires.month, month)
         )
       ).limit(1);
     }
@@ -16206,8 +16970,8 @@ async function gerarEscalaAlternativa(req, res) {
       role: users.role,
       preferredPositions: users.preferredTimes,
       avoidPositions: users.canServeAsCouple
-    }).from(users).where(eq28(users.status, "active"));
-    const responses = await db.select().from(questionnaireResponses).where(eq28(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+    }).from(users).where(eq30(users.status, "active"));
+    const responses = await db.select().from(questionnaireResponses).where(eq30(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
     const formattedUsers = ministersData.map((m) => ({
       id: m.id,
@@ -16317,17 +17081,261 @@ router23.post(
 );
 var escalaRoutes_default = router23;
 
+// server/routes/adoration.ts
+import { Router as Router24 } from "express";
+import { z as z7 } from "zod";
+await init_storage();
+init_logger();
+await init_db();
+init_schema();
+import { eq as eq31, and as and22, inArray as inArray7 } from "drizzle-orm";
+var router24 = Router24();
+var createDrawSchema = z7.object({
+  month: z7.number().min(1).max(12),
+  year: z7.number().min(2024).max(2030),
+  totalMinistersToDraw: z7.number().min(1).max(100).optional()
+  // Opcional, será calculado automaticamente
+});
+router24.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { month, year, totalMinistersToDraw } = createDrawSchema.parse(req.body);
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: "Usu\xE1rio n\xE3o autenticado" });
+    }
+    logger.info(`Iniciando sorteio de adora\xE7\xE3o para ${month}/${year} por ${req.user.id}`);
+    const existingDraws = await storage.getAdorationDraws(year, month);
+    if (existingDraws.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `J\xE1 existe um sorteio para ${month}/${year}. Delete o sorteio anterior para criar um novo.`,
+        drawId: existingDraws[0].id
+      });
+    }
+    const allMinisters = await db.select().from(users).where(
+      and22(
+        eq31(users.status, "active"),
+        inArray7(users.role, ["ministro", "coordenador"])
+      )
+    );
+    if (allMinisters.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "N\xE3o h\xE1 ministros ativos dispon\xEDveis para sorteio"
+      });
+    }
+    const mondaysInMonth = getMondaysInMonth(year, month);
+    const mondayCount = mondaysInMonth.length;
+    if (mondayCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: `N\xE3o h\xE1 segundas-feiras no m\xEAs ${month}/${year}`
+      });
+    }
+    const ministersPerMonday = totalMinistersToDraw ? Math.ceil(totalMinistersToDraw / mondayCount) : Math.ceil(allMinisters.length / mondayCount);
+    const ministersToDrawTotal = ministersPerMonday * mondayCount;
+    logger.info(`Sorteio: ${allMinisters.length} ministros dispon\xEDveis, ${mondayCount} segundas, ${ministersPerMonday} por segunda`);
+    const voluntaryMinisters = await getVoluntaryMinistersForAdoration(year, month);
+    const voluntaryMinisterIds = new Set(voluntaryMinisters.map((m) => m.id));
+    logger.info(`${voluntaryMinisters.length} ministros se voluntariaram para adora\xE7\xE3o`);
+    const draw = await storage.createAdorationDraw({
+      month,
+      year,
+      totalMinistersToDraw: ministersToDrawTotal,
+      createdBy: req.user.id
+    });
+    const selectedMinisters = /* @__PURE__ */ new Set();
+    const drawResults = [];
+    const shuffle = (array) => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    for (let weekIndex = 0; weekIndex < mondayCount; weekIndex++) {
+      const mondayOfWeek = weekIndex + 1;
+      const availableForThisMonday = shuffle(
+        allMinisters.filter((m) => !selectedMinisters.has(m.id))
+      );
+      const voluntariesForThisMonday = availableForThisMonday.filter((m) => voluntaryMinisterIds.has(m.id)).slice(0, ministersPerMonday);
+      for (const minister of voluntariesForThisMonday) {
+        await storage.addAdorationDrawResult(draw.id, minister.id, mondayOfWeek, true);
+        selectedMinisters.add(minister.id);
+        drawResults.push({
+          ministerId: minister.id,
+          ministerName: minister.name,
+          mondayOfWeek,
+          date: mondaysInMonth[weekIndex].toISOString().split("T")[0],
+          isVoluntary: true
+        });
+      }
+      const remainingNeeded = ministersPerMonday - voluntariesForThisMonday.length;
+      if (remainingNeeded > 0) {
+        const nonVolunteers = availableForThisMonday.filter((m) => !voluntaryMinisterIds.has(m.id) && !selectedMinisters.has(m.id)).slice(0, remainingNeeded);
+        for (const minister of nonVolunteers) {
+          await storage.addAdorationDrawResult(draw.id, minister.id, mondayOfWeek, false);
+          selectedMinisters.add(minister.id);
+          drawResults.push({
+            ministerId: minister.id,
+            ministerName: minister.name,
+            mondayOfWeek,
+            date: mondaysInMonth[weekIndex].toISOString().split("T")[0],
+            isVoluntary: false
+          });
+        }
+      }
+    }
+    logger.info(`Sorteio conclu\xEDdo: ${selectedMinisters.size} ministros distribu\xEDdos em ${mondayCount} segundas`);
+    res.json({
+      success: true,
+      message: `Sorteio realizado com sucesso para ${month}/${year}`,
+      data: {
+        drawId: draw.id,
+        month,
+        year,
+        totalMinisters: selectedMinisters.size,
+        totalMondays: mondayCount,
+        ministersPerMonday,
+        voluntaryCount: drawResults.filter((r) => r.isVoluntary).length,
+        mandatoryCount: drawResults.filter((r) => !r.isVoluntary).length,
+        results: drawResults
+      }
+    });
+  } catch (error) {
+    logger.error("Erro ao executar sorteio de adora\xE7\xE3o:", error);
+    if (error instanceof z7.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Dados inv\xE1lidos",
+        errors: error.errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao executar sorteio"
+    });
+  }
+});
+router24.get("/results/:year/:month", authenticateToken, async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const draws = await storage.getAdorationDraws(year, month);
+    if (draws.length === 0) {
+      return res.json({
+        success: true,
+        message: "Nenhum sorteio encontrado para este m\xEAs",
+        data: null
+      });
+    }
+    const draw = draws[0];
+    const results = await storage.getAdorationDrawResults(draw.id);
+    const ministerIds = [...new Set(results.map((r) => r.ministerId))];
+    const ministers = await db.select().from(users).where(inArray7(users.id, ministerIds));
+    const ministerMap = new Map(ministers.map((m) => [m.id, m]));
+    const enrichedResults = results.map((result) => {
+      const minister = ministerMap.get(result.ministerId);
+      return {
+        minister_id: result.ministerId,
+        minister_name: minister?.name || "Desconhecido",
+        monday_of_week: result.mondayOfWeek,
+        is_voluntary: result.isVoluntary
+      };
+    });
+    res.json({
+      success: true,
+      data: {
+        id: draw.id,
+        month,
+        year,
+        total_ministers_to_draw: ministerIds.length,
+        created_by: draw.createdBy,
+        created_at: draw.createdAt,
+        results: enrichedResults
+      }
+    });
+  } catch (error) {
+    logger.error("Erro ao buscar resultados de adora\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao buscar resultados"
+    });
+  }
+});
+router24.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { drawId } = req.params;
+    await storage.deleteAdorationDraw(drawId);
+    logger.info(`Sorteio ${drawId} deletado por ${req.user?.id}`);
+    res.json({
+      success: true,
+      message: "Sorteio deletado com sucesso"
+    });
+  } catch (error) {
+    logger.error("Erro ao deletar sorteio:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erro ao deletar sorteio"
+    });
+  }
+});
+function getMondaysInMonth(year, month) {
+  const mondays = [];
+  const date2 = new Date(year, month - 1, 1);
+  while (date2.getDay() !== 1) {
+    date2.setDate(date2.getDate() + 1);
+  }
+  while (date2.getMonth() === month - 1) {
+    mondays.push(new Date(date2));
+    date2.setDate(date2.getDate() + 7);
+  }
+  return mondays;
+}
+async function getVoluntaryMinistersForAdoration(year, month) {
+  try {
+    const [questionnaire] = await db.select().from(questionnaires).where(
+      and22(
+        eq31(questionnaires.year, year),
+        eq31(questionnaires.month, month)
+      )
+    ).limit(1);
+    if (!questionnaire) {
+      return [];
+    }
+    const responses = await db.select().from(questionnaireResponses).where(eq31(questionnaireResponses.questionnaireId, questionnaire.id));
+    const voluntaryMinisterIds = responses.filter((response) => {
+      const resp = response.response;
+      return resp?.extra_activities?.mondayAdoration === "yes" || resp?.extra_activities?.mondayAdoration === true || resp?.mondayAdoration === "yes" || resp?.mondayAdoration === true;
+    }).map((r) => r.userId);
+    if (voluntaryMinisterIds.length === 0) {
+      return [];
+    }
+    const voluntaryMinisters = await db.select().from(users).where(
+      and22(
+        inArray7(users.id, voluntaryMinisterIds),
+        eq31(users.status, "active")
+      )
+    );
+    return voluntaryMinisters;
+  } catch (error) {
+    logger.error("Erro ao buscar volunt\xE1rios para adora\xE7\xE3o:", error);
+    return [];
+  }
+}
+var adoration_default = router24;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
-import { z as z7 } from "zod";
-import { eq as eq29, count as count8, or as or9 } from "drizzle-orm";
+import { z as z8 } from "zod";
+import { eq as eq32, count as count8, or as or9 } from "drizzle-orm";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql17 } from "drizzle-orm";
+import { sql as sql18 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -16402,7 +17410,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         title,
@@ -16418,7 +17426,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         track_id AS "trackId",
@@ -16433,7 +17441,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql17`
+    db.execute(sql18`
       SELECT
         id,
         module_id AS "moduleId",
@@ -16450,7 +17458,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql17`
+    userId ? db.execute(sql18`
           SELECT
             id,
             user_id AS "userId",
@@ -16552,7 +17560,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql17`
+  const lessonResult = await db.execute(sql18`
     SELECT
       id,
       module_id AS "moduleId",
@@ -16574,7 +17582,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql17`
+  const sectionsResult = await db.execute(sql18`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -16613,7 +17621,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql17`
+    const progressResult = await db.execute(sql18`
       SELECT
         id,
         user_id AS "userId",
@@ -16649,7 +17657,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql17`
+  const result = await db.execute(sql18`
     SELECT
       id,
       user_id AS "userId",
@@ -16666,7 +17674,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql17`
+  const result = await db.execute(sql18`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -16687,7 +17695,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -16699,7 +17707,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16764,7 +17772,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql17`
+        ...totalSections > 0 ? (await db.execute(sql18`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -16773,7 +17781,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -16785,7 +17793,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16854,7 +17862,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql17`
+    await db.execute(sql18`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -16866,7 +17874,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql17`
+    await db.execute(sql18`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -16921,7 +17929,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql17`
+  const query = trackId ? sql18`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16939,7 +17947,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql17`
+      ` : sql18`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -16983,17 +17991,17 @@ async function listLessonProgressEntries(params) {
 }
 
 // server/routes.ts
-var formationProgressUpdateSchema = z7.object({
-  lessonId: z7.string(),
-  isCompleted: z7.boolean().optional(),
-  timeSpent: z7.number().int().min(0).optional(),
-  progressPercentage: z7.number().min(0).max(100).optional(),
-  completedSections: z7.array(z7.string()).optional(),
-  quizScore: z7.number().optional(),
-  notes: z7.string().optional()
+var formationProgressUpdateSchema = z8.object({
+  lessonId: z8.string(),
+  isCompleted: z8.boolean().optional(),
+  timeSpent: z8.number().int().min(0).optional(),
+  progressPercentage: z8.number().min(0).max(100).optional(),
+  completedSections: z8.array(z8.string()).optional(),
+  quizScore: z8.number().optional(),
+  notes: z8.string().optional()
 });
 function handleApiError(error, operation) {
-  if (error instanceof z7.ZodError) {
+  if (error instanceof z8.ZodError) {
     return {
       status: 400,
       message: `Dados inv\xE1lidos para ${operation}`,
@@ -17055,10 +18063,11 @@ async function registerRoutes(app2) {
   app2.use("/api/mass-pendencies", mass_pendencies_default);
   app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
   app2.use("/api/version", version_default);
-  app2.use("/api/dashboard", dashboard_default);
-  app2.use("/api/schedules/incomplete", dashboard_default);
+  app2.use("/api/dashboard", authenticateToken, dashboard_default);
+  app2.use("/api/schedules/incomplete", authenticateToken, dashboard_default);
   app2.use("/api/push-subscriptions", pushSubscriptions_default);
   app2.use("/api/metrics", metrics_default);
+  app2.use("/api/adoration", csrfProtection, adoration_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -17254,7 +18263,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq29(users.id, userId));
+      }).from(users).where(eq32(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -17306,8 +18315,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const statusUpdateSchema = z7.object({
-        status: z7.enum(["active", "inactive", "pending"], {
+      const statusUpdateSchema = z8.object({
+        status: z8.enum(["active", "inactive", "pending"], {
           errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
         })
       });
@@ -17331,7 +18340,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z7.ZodError) {
+      if (error instanceof z8.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -17343,8 +18352,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const roleUpdateSchema = z7.object({
-        role: z7.enum(["gestor", "coordenador", "ministro"], {
+      const roleUpdateSchema = z8.object({
+        role: z8.enum(["gestor", "coordenador", "ministro"], {
           errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
         })
       });
@@ -17375,7 +18384,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z7.ZodError) {
+      if (error instanceof z8.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -17453,25 +18462,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq32(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
         const [substitutionCheck] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-          eq29(substitutionRequests.requesterId, userId),
-          eq29(substitutionRequests.substituteId, userId)
+          eq32(substitutionRequests.requesterId, userId),
+          eq32(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -17508,12 +18517,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq32(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-            eq29(substitutionRequests.requesterId, userId),
-            eq29(substitutionRequests.substituteId, userId)
+            eq32(substitutionRequests.requesterId, userId),
+            eq32(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17542,12 +18551,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq29(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq29(schedules.substituteId, userId));
+          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq32(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq32(schedules.substituteId, userId));
           const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-            eq29(substitutionRequests.requesterId, userId),
-            eq29(substitutionRequests.substituteId, userId)
+            eq32(substitutionRequests.requesterId, userId),
+            eq32(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -17634,7 +18643,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z7.ZodError) {
+      if (error instanceof z8.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -17722,7 +18731,7 @@ async function registerRoutes(app2) {
       res.status(201).json(massTime);
     } catch (error) {
       console.error("Error creating mass time:", error);
-      if (error instanceof z7.ZodError) {
+      if (error instanceof z8.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create mass time" });
@@ -17735,7 +18744,7 @@ async function registerRoutes(app2) {
       res.json(massTime);
     } catch (error) {
       console.error("Error updating mass time:", error);
-      if (error instanceof z7.ZodError) {
+      if (error instanceof z8.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update mass time" });
@@ -17993,7 +19002,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull2, and: and21 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull2, and: and23 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -18001,8 +19010,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and21(
-          eq29(substitutionRequests.status, "pending"),
+        and23(
+          eq32(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -18014,8 +19023,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and21(
-          eq29(substitutionRequests.status, "pending"),
+        and23(
+          eq32(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -18366,12 +19375,21 @@ app.use("/uploads", express2.static(path3.join(process.cwd(), "uploads")));
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
+  const originalMethod = req.method;
+  let errorMessage;
+  const originalJson = res.json.bind(res);
+  res.json = function(body) {
+    if (res.statusCode >= 400 && body && typeof body === "object") {
+      errorMessage = body.message || body.error || JSON.stringify(body);
+    }
+    return originalJson(body);
+  };
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (originalPath.startsWith("/api")) {
-      const logLine = `${req.method} ${originalPath} ${res.statusCode} in ${duration}ms`;
+      const logLine = `${originalMethod} ${originalPath} ${res.statusCode} in ${duration}ms`;
       log(logLine);
-      updateMetrics(res.statusCode, duration);
+      updateMetrics(res.statusCode, duration, originalPath, originalMethod, errorMessage);
     }
   });
   next();

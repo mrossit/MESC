@@ -114,7 +114,16 @@ export const users = pgTable("users", {
   lastService: timestamp('last_service'),
   totalServices: integer('total_services').default(0),
   formationCompleted: boolean('formation_completed').default(false),
-  
+
+  // 🤖 ADAPTIVE LEARNING: Reliability metrics for intelligent schedule generation
+  reliabilityScore: integer('reliability_score').default(100), // 0-100 score based on behavior
+  substitutionRequestCount: integer('substitution_request_count').default(0), // How many times requested substitution
+  substitutionFulfilledCount: integer('substitution_fulfilled_count').default(0), // How many times helped as substitute
+  manualRemovalCount: integer('manual_removal_count').default(0), // Removed from auto-generated schedule by coordinator
+  noShowCount: integer('no_show_count').default(0), // Failed to show up when scheduled
+  lastReliabilityUpdate: timestamp('last_reliability_update'), // When score was last recalculated
+  reliabilityNotes: text('reliability_notes'), // Coordinator notes about reliability issues
+
   // Observations
   observations: text('observations'),
 

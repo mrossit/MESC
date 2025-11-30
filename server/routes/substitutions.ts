@@ -4,6 +4,7 @@ import { substitutionRequests, schedules, users, questionnaireResponses, questio
 import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { scheduleCache } from "../services/scheduleCache";
+import { trackSubstitutionRequest, trackSubstitutionFulfillment } from "../services/reliabilityScoreService";
 
 const router = Router();
 
@@ -283,6 +284,9 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         updatedAt: new Date()
       })
       .returning();
+
+    // 🤖 ADAPTIVE LEARNING: Track substitution request for reliability scoring
+    await trackSubstitutionRequest(requesterId, scheduleId);
 
     // Buscar dados completos para retorno (incluindo dados do suplente se houver)
     const requestQuery = db
@@ -619,6 +623,11 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
           .where(eq(schedules.id, request.scheduleId));
       }
     });
+
+    // 🤖 ADAPTIVE LEARNING: Track substitution fulfillment for reliability scoring
+    if (newStatus === "approved" && request.substituteId) {
+      await trackSubstitutionFulfillment(request.substituteId, request.scheduleId);
+    }
 
     // Invalidate cache for the affected schedule month
     if (schedule) {
