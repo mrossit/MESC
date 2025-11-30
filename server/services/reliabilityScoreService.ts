@@ -14,7 +14,7 @@
  */
 
 import { db } from '@db';
-import { users, substitutionRequests } from '@shared/schema';
+import { users, substitutionRequests, notifications } from '@shared/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 
@@ -103,6 +103,41 @@ export function getScoreCategory(score: number): 'excellent' | 'good' | 'fair' |
   if (score >= SCORE_CATEGORIES.FAIR.min) return 'fair';
   if (score >= SCORE_CATEGORIES.POOR.min) return 'poor';
   return 'critical';
+}
+
+/**
+ * Get current reliability score for a specific minister (without updating)
+ */
+export async function getMinisterReliabilityScore(ministerId: string): Promise<ReliabilityMetrics | null> {
+  try {
+    const [minister] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, ministerId))
+      .limit(1);
+
+    if (!minister) {
+      return null;
+    }
+
+    const score = minister.reliabilityScore || 100;
+
+    return {
+      ministerId,
+      ministerName: minister.name,
+      reliabilityScore: score,
+      substitutionRequestCount: minister.substitutionRequestCount || 0,
+      substitutionFulfilledCount: minister.substitutionFulfilledCount || 0,
+      manualRemovalCount: minister.manualRemovalCount || 0,
+      noShowCount: minister.noShowCount || 0,
+      lastUpdate: minister.lastReliabilityUpdate,
+      trend: 'stable', // Trend calculation would require historical data
+      category: getScoreCategory(score),
+    };
+  } catch (error) {
+    logger.error(`Error getting reliability score for minister ${ministerId}:`, error);
+    return null;
+  }
 }
 
 /**
@@ -316,5 +351,113 @@ export async function getLowReliabilityMinisters(threshold: number = 60): Promis
   } catch (error) {
     logger.error('Error getting low reliability ministers:', error);
     return [];
+  }
+}
+
+/**
+ * 🤖 ADAPTIVE LEARNING - PHASE 5: Automated Alert System
+ * Check for ministers with low reliability and send notifications to coordinators
+ */
+export async function checkAndAlertLowReliability(): Promise<{
+  alertsSent: number;
+  ministersChecked: number;
+  criticalMinisters: number;
+}> {
+  try {
+    logger.info('[ADAPTIVE ALERTS] 🔍 Running reliability check...');
+
+    const lowReliabilityMinisters = await getLowReliabilityMinisters(50); // Critical threshold
+    const ministersChecked = (await getAllReliabilityMetrics()).length;
+
+    logger.info(`[ADAPTIVE ALERTS] Found ${lowReliabilityMinisters.length} ministers with low reliability out of ${ministersChecked} total`);
+
+    if (lowReliabilityMinisters.length === 0) {
+      logger.info('[ADAPTIVE ALERTS] ✅ No alerts needed - all ministers have acceptable reliability');
+      return {
+        alertsSent: 0,
+        ministersChecked,
+        criticalMinisters: 0,
+      };
+    }
+
+    // Get all coordinators and gestors
+    const coordinators = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+      })
+      .from(users)
+      .where(
+        and(
+          sql`${users.role} IN ('coordenador', 'gestor')`,
+          eq(users.status, 'active')
+        )
+      );
+
+    logger.info(`[ADAPTIVE ALERTS] Notifying ${coordinators.length} coordinators/gestors`);
+
+    let alertsSent = 0;
+    let criticalCount = 0;
+
+    for (const minister of lowReliabilityMinisters) {
+      const isCritical = minister.category === 'critical'; // Score < 40
+      if (isCritical) criticalCount++;
+
+      const message = isCritical
+        ? `🚨 CRÍTICO: ${minister.ministerName} está com confiabilidade muito baixa (${minister.reliabilityScore} pontos). ` +
+          `Pedidos de substituição: ${minister.substitutionRequestCount}, ` +
+          `Remoções manuais: ${minister.manualRemovalCount}, ` +
+          `Faltas: ${minister.noShowCount}. ` +
+          `Recomenda-se conversar com o ministro.`
+        : `⚠️ ATENÇÃO: ${minister.ministerName} está com confiabilidade baixa (${minister.reliabilityScore} pontos). ` +
+          `Pedidos de substituição: ${minister.substitutionRequestCount}, ` +
+          `Remoções manuais: ${minister.manualRemovalCount}, ` +
+          `Faltas: ${minister.noShowCount}.`;
+
+      // Send notification to all coordinators
+      for (const coordinator of coordinators) {
+        try {
+          await db.insert(notifications).values({
+            userId: coordinator.id,
+            type: isCritical ? 'alert' : 'info',
+            title: isCritical
+              ? 'Alerta Crítico: Confiabilidade Muito Baixa'
+              : 'Atenção: Confiabilidade Baixa',
+            message,
+            actionUrl: `/admin/users/${minister.ministerId}`, // Link to minister profile
+            priority: isCritical ? 'high' : 'medium',
+            metadata: JSON.stringify({
+              ministerId: minister.ministerId,
+              ministerName: minister.ministerName,
+              reliabilityScore: minister.reliabilityScore,
+              category: minister.category,
+              substitutionRequestCount: minister.substitutionRequestCount,
+              manualRemovalCount: minister.manualRemovalCount,
+              noShowCount: minister.noShowCount,
+            }),
+          });
+
+          alertsSent++;
+        } catch (notifError) {
+          logger.error(`[ADAPTIVE ALERTS] Failed to send notification to ${coordinator.name}:`, notifError);
+        }
+      }
+
+      logger.info(
+        `[ADAPTIVE ALERTS] ${isCritical ? '🚨' : '⚠️'} Alert sent for ${minister.ministerName} (score: ${minister.reliabilityScore})`
+      );
+    }
+
+    logger.info(`[ADAPTIVE ALERTS] ✅ Completed: ${alertsSent} alerts sent for ${lowReliabilityMinisters.length} ministers`);
+
+    return {
+      alertsSent,
+      ministersChecked,
+      criticalMinisters: criticalCount,
+    };
+  } catch (error) {
+    logger.error('[ADAPTIVE ALERTS] ⚠️ Error during reliability check:', error);
+    throw error;
   }
 }
