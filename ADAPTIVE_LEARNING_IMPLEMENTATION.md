@@ -482,8 +482,40 @@ psql $DATABASE_URL -c "UPDATE users SET reliability_score=100,
 **Status**: ✅ **SISTEMA COMPLETO E PRONTO PARA PRODUÇÃO**
 **Build**: ✅ Compilação bem-sucedida (v5.4.2)
 
+### 🔒 POLÍTICA DE PRIVACIDADE E PROPÓSITO ESPIRITUAL
+
+**IMPORTANTE**: As métricas de reliability são **INVISÍVEIS** para os ministros regulares.
+
+**Motivo**: O ministério deve ser exercido por amor a Deus e vontade própria de servir, não por competição ou busca de pontuação. Expor essas métricas poderia:
+- ❌ Criar competição entre ministros
+- ❌ Desviar o foco do propósito espiritual
+- ❌ Transformar serviço em "jogo de pontos"
+- ❌ Gerar ressentimento e divisão
+
+**Implementação da privacidade**:
+- ✅ Função `sanitizeUserData()` remove campos de reliability antes de retornar dados aos ministros
+- ✅ Endpoints `/api/auth/user` e `/api/profile` filtram dados sensíveis
+- ✅ Apenas coordenadores e gestores veem as métricas completas
+- ✅ APIs `/api/reliability/*` protegidas com `requireRole(['gestor', 'coordenador'])`
+
+**Localização**: `server/routes.ts:61-84`
+
+```typescript
+// Ministers should NOT see reliability metrics
+function sanitizeUserData(user: any, requestingUserRole?: string): any {
+  if (requestingUserRole === 'coordenador' || requestingUserRole === 'gestor') {
+    return user; // Full data for coordinators
+  }
+
+  // Remove reliability fields for ministers
+  const { reliabilityScore, substitutionRequestCount, ... } = user;
+  return sanitizedUser;
+}
+```
+
 ### 🚀 Próximos passos sugeridos:
 1. Configurar `CRON_API_KEY` nas variáveis de ambiente
 2. Agendar execução semanal do endpoint `/api/cron/reliability-check`
-3. Monitorar métricas via `/api/reliability/metrics`
+3. Monitorar métricas via `/api/reliability/metrics` (coordenadores apenas)
 4. Ajustar thresholds conforme necessário após observar comportamento real
+5. **NUNCA** expor métricas de reliability no frontend para ministros regulares
