@@ -61,68 +61,71 @@ async function importResponses() {
     // 3. Importar dados com conversão segura de JSON
     console.log("📤 Importando respostas para o dev...");
 
-    const batchSize = 25;
     let successCount = 0;
     let errorCount = 0;
+    const errors: any[] = [];
 
-    for (let i = 0; i < responses.length; i += batchSize) {
-      const batch = responses.slice(i, i + batchSize);
+    for (let i = 0; i < responses.length; i++) {
+      const row = responses[i];
+      try {
+        // Parse JSON fields com validação
+        const parseJSON = (val: any) => {
+          if (!val) return null;
+          try {
+            return typeof val === "string" ? JSON.parse(val) : val;
+          } catch {
+            return null;
+          }
+        };
 
-      for (const row of batch) {
-        try {
-          // Parse JSON fields com validação
-          const parseJSON = (val: any) => {
-            if (!val) return null;
-            try {
-              return typeof val === "string" ? JSON.parse(val) : val;
-            } catch {
-              return null;
-            }
-          };
+        const values = [
+          row.id,
+          row.questionnaire_id,
+          row.user_id,
+          parseJSON(row.responses),
+          parseJSON(row.available_sundays),
+          parseJSON(row.preferred_mass_times),
+          parseJSON(row.alternative_times),
+          parseJSON(row.daily_mass_availability),
+          parseJSON(row.special_events),
+          row.can_substitute,
+          row.notes,
+          row.submitted_at,
+          parseJSON(row.shared_with_family_ids),
+          row.is_shared_response,
+          row.shared_from_user_id,
+          parseJSON(row.unmapped_responses),
+          parseJSON(row.processing_warnings),
+          row.deleted_at,
+          row.is_deleted,
+        ];
 
-          const values = [
-            row.id,
-            row.questionnaire_id,
-            row.user_id,
-            parseJSON(row.responses),
-            parseJSON(row.available_sundays),
-            parseJSON(row.preferred_mass_times),
-            parseJSON(row.alternative_times),
-            parseJSON(row.daily_mass_availability),
-            parseJSON(row.special_events),
-            row.can_substitute,
-            row.notes,
-            row.submitted_at,
-            parseJSON(row.shared_with_family_ids),
-            row.is_shared_response,
-            row.shared_from_user_id,
-            parseJSON(row.unmapped_responses),
-            parseJSON(row.processing_warnings),
-            row.deleted_at,
-            row.is_deleted,
-          ];
+        await devDb(
+          `INSERT INTO questionnaire_responses 
+          (id, questionnaire_id, user_id, responses, available_sundays, preferred_mass_times, 
+           alternative_times, daily_mass_availability, special_events, can_substitute, notes, 
+           submitted_at, shared_with_family_ids, is_shared_response, shared_from_user_id, 
+           unmapped_responses, processing_warnings, deleted_at, is_deleted) 
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          ON CONFLICT (id) DO NOTHING;`,
+          values
+        );
 
-          await devDb(
-            `INSERT INTO questionnaire_responses 
-            (id, questionnaire_id, user_id, responses, available_sundays, preferred_mass_times, 
-             alternative_times, daily_mass_availability, special_events, can_substitute, notes, 
-             submitted_at, shared_with_family_ids, is_shared_response, shared_from_user_id, 
-             unmapped_responses, processing_warnings, deleted_at, is_deleted) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-            ON CONFLICT (id) DO NOTHING;`,
-            values
-          );
+        successCount++;
 
-          successCount++;
-        } catch (rowError: any) {
-          errorCount++;
-          console.log(`   ⚠️  Erro na linha ${i + 1}: ${rowError.message?.substring(0, 50)}`);
+        if ((i + 1) % 50 === 0) {
+          console.log(`   ✓ Processadas ${i + 1} respostas...`);
         }
+      } catch (rowError: any) {
+        errorCount++;
+        errors.push({
+          index: i,
+          id: row.id,
+          userId: row.user_id,
+          message: rowError.message,
+          code: rowError.code,
+        });
       }
-
-      console.log(
-        `   ✓ Processadas ${Math.min(i + batchSize, responses.length)} respostas (${successCount} sucesso, ${errorCount} erro)`
-      );
     }
 
     console.log("");
@@ -130,6 +133,10 @@ async function importResponses() {
     console.log(`   Total de respostas importadas: ${successCount}`);
     if (errorCount > 0) {
       console.log(`   ⚠️  Erros ao importar: ${errorCount}`);
+      console.log("\n📋 Primeiros 5 erros:");
+      errors.slice(0, 5).forEach((err) => {
+        console.log(`   - ID ${err.id} (user: ${err.userId}): ${err.message.substring(0, 80)}`);
+      });
     }
     console.log("   Pronto para testes de escala! 🚀");
   } catch (error) {
