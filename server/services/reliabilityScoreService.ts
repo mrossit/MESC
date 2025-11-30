@@ -13,10 +13,10 @@
  * - No-Show Penalty (20% weight): Failed to attend scheduled masses = severe penalty
  */
 
-import { db } from '@db';
-import { users, substitutionRequests, notifications } from '@shared/schema';
+import { db } from '../db';
+import { users, substitutionRequests, notifications } from '../../shared/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 export interface ReliabilityMetrics {
   ministerId: string;
