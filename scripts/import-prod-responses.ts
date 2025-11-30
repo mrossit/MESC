@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 
 async function importResponses() {
@@ -33,22 +32,14 @@ async function importResponses() {
       process.exit(0);
     }
 
-    // 2. Limpar dados antigos no dev (opcional)
+    // 2. Limpar dados antigos no dev
     console.log("🗑️  Limpando dados antigos do dev...");
     await devDb(`TRUNCATE TABLE questionnaire_responses CASCADE;`);
     console.log("   ✓ Tabela limpa");
 
-    // 3. Resetar sequence para evitar conflitos de ID
-    console.log("🔢 Resetando contador de IDs...");
-    await devDb(
-      `ALTER SEQUENCE questionnaire_responses_id_seq RESTART WITH 1;`
-    );
-    console.log("   ✓ Sequence resetada");
-
-    // 4. Importar dados
+    // 3. Importar dados em lotes
     console.log("📤 Importando respostas para o dev...");
 
-    // Construir INSERT em lotes para evitar query muito grande
     const batchSize = 100;
     for (let i = 0; i < responses.length; i += batchSize) {
       const batch = responses.slice(i, i + batchSize);
@@ -88,12 +79,6 @@ async function importResponses() {
         `   ✓ Importadas respostas ${i + 1} a ${Math.min(i + batchSize, responses.length)}`
       );
     }
-
-    // 5. Atualizar sequence final
-    const maxId = Math.max(...responses.map((r: any) => r.id));
-    await devDb(
-      `ALTER SEQUENCE questionnaire_responses_id_seq RESTART WITH ${maxId + 1};`
-    );
 
     console.log("");
     console.log("✅ IMPORTAÇÃO CONCLUÍDA!");
