@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families, adorationDrawResults, adorationDraws } from '@shared/schema';
-import { eq, and, or, gte, lte, desc, sql, ne, count } from 'drizzle-orm';
+import { eq, and, or, gte, lte, desc, sql, ne, count, inArray } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday, isMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
@@ -489,7 +489,7 @@ export class ScheduleGenerator {
           preferServeTogether: families.preferServeTogether,
         })
         .from(families)
-        .where(sql`${families.id} = ANY(${uniqueFamilyIds})`);
+        .where(inArray(families.id, uniqueFamilyIds));
 
       for (const family of familiesData) {
         this.familyPreferences.set(family.id, family.preferServeTogether ?? true);
