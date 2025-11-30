@@ -26,6 +26,12 @@ export interface Minister {
   // Position preferences
   preferredPositions?: number[]; // Array de posições preferidas [1, 2, 3]
   avoidPositions?: number[]; // Array de posições a evitar [4, 5]
+  // 🤖 ADAPTIVE LEARNING: Reliability metrics
+  reliabilityScore?: number; // 0-100 based on behavior (substitutions, no-shows, etc)
+  substitutionRequestCount?: number;
+  substitutionFulfilledCount?: number;
+  manualRemovalCount?: number;
+  noShowCount?: number;
   // 🔥 FAIR ALGORITHM: Track monthly assignments
   monthlyAssignmentCount?: number; // Assignments in current month (max 4)
   lastAssignedDate?: string; // Last date this minister was assigned (YYYY-MM-DD)
@@ -424,7 +430,12 @@ export class ScheduleGenerator {
         spouseMinisterId: users.spouseMinisterId,
         familyId: users.familyId,
         preferredPositions: users.preferredPositions,
-        avoidPositions: users.avoidPositions
+        avoidPositions: users.avoidPositions,
+        reliabilityScore: users.reliabilityScore,
+        substitutionRequestCount: users.substitutionRequestCount,
+        substitutionFulfilledCount: users.substitutionFulfilledCount,
+        manualRemovalCount: users.manualRemovalCount,
+        noShowCount: users.noShowCount
       }).from(users).where(
         and(
           or(
