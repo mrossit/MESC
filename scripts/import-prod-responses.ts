@@ -20,10 +20,35 @@ async function importResponses() {
     const prodDb = neon(prodUrl);
     const devDb = neon(devUrl);
 
-    // 1. Buscar dados da production
+    // 1. Descobrir colunas que existem em ambos os bancos
+    console.log("🔍 Descobrindo estrutura do banco...");
+    
+    const prodColumns = await prodDb(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_name = 'questionnaire_responses' 
+       ORDER BY ordinal_position`
+    );
+    
+    const devColumns = await devDb(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_name = 'questionnaire_responses' 
+       ORDER BY ordinal_position`
+    );
+
+    const prodColumnNames = new Set(prodColumns.map((c: any) => c.column_name));
+    const devColumnNames = new Set(devColumns.map((c: any) => c.column_name));
+    
+    // Colunas comuns (existem em ambos os bancos)
+    const commonColumns = Array.from(devColumnNames).filter(col => 
+      prodColumnNames.has(col) && col !== 'updated_at'
+    );
+
+    console.log(`   ✓ Colunas compatíveis: ${commonColumns.join(", ")}`);
+
+    // 2. Buscar dados da production
     console.log("📥 Buscando dados de questionnaire_responses da production...");
     const responses = await prodDb(
-      `SELECT * FROM questionnaire_responses ORDER BY id;`
+      `SELECT ${commonColumns.join(", ")} FROM questionnaire_responses ORDER BY id;`
     );
     console.log(`   ✓ ${responses.length} respostas encontradas`);
 
@@ -32,44 +57,35 @@ async function importResponses() {
       process.exit(0);
     }
 
-    // 2. Limpar dados antigos no dev
+    // 3. Limpar dados antigos no dev
     console.log("🗑️  Limpando dados antigos do dev...");
     await devDb(`TRUNCATE TABLE questionnaire_responses CASCADE;`);
     console.log("   ✓ Tabela limpa");
 
-    // 3. Importar dados em lotes
+    // 4. Importar dados em lotes
     console.log("📤 Importando respostas para o dev...");
 
-    const batchSize = 100;
+    const batchSize = 50;
     for (let i = 0; i < responses.length; i += batchSize) {
       const batch = responses.slice(i, i + batchSize);
 
       const placeholders = batch
-        .map(
-          (_, idx) =>
-            `($${idx * 10 + 1},$${idx * 10 + 2},$${idx * 10 + 3},$${idx * 10 + 4},$${idx * 10 + 5},$${idx * 10 + 6},$${idx * 10 + 7},$${idx * 10 + 8},$${idx * 10 + 9},$${idx * 10 + 10})`
-        )
+        .map((_, idx) => {
+          const params = commonColumns.map((_, paramIdx) => `$${idx * commonColumns.length + paramIdx + 1}`);
+          return `(${params.join(",")})`;
+        })
         .join(",");
 
       const values: any[] = [];
       batch.forEach((r: any) => {
-        values.push(
-          r.id,
-          r.questionnaire_id,
-          r.user_id,
-          r.responses,
-          r.submitted_at,
-          r.is_shared_response,
-          r.shared_by_user_id,
-          r.is_deleted,
-          r.deleted_at,
-          r.created_at
-        );
+        commonColumns.forEach(col => {
+          values.push(r[col]);
+        });
       });
 
       const insertQuery = `
         INSERT INTO questionnaire_responses 
-        (id, questionnaire_id, user_id, responses, submitted_at, is_shared_response, shared_by_user_id, is_deleted, deleted_at, created_at) 
+        (${commonColumns.join(",")}) 
         VALUES ${placeholders}
         ON CONFLICT (id) DO NOTHING;
       `;
