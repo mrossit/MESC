@@ -1820,8 +1820,8 @@ export class ScheduleGenerator {
     const selectedMinisters = this.selectOptimalMinisters(availableMinsters, massTime);
     console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
 
-    // 3. Selecionar ministros de backup
-    const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);
+    // 3. Selecionar ministros de backup - TODOS os disponíveis que não foram escalados
+    const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters);
 
     // 4. Calcular score de confiança
     const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
@@ -2682,15 +2682,23 @@ export class ScheduleGenerator {
   }
 
   /**
-   * Seleciona ministros de backup
+   * Seleciona ministros de backup - TODOS os disponíveis que não foram escalados
+   * 
+   * CORREÇÃO: O backup deve listar TODOS os ministros que deram disponibilidade
+   * para aquela missa mas não foram escalados porque a cota já estava preenchida.
+   * Removido o limite de "count" para mostrar todos.
    */
-  private selectBackupMinisters(available: Minister[], selected: Minister[], count: number): Minister[] {
+  private selectBackupMinisters(available: Minister[], selected: Minister[]): Minister[] {
     const selectedIds = new Set(selected.map(m => m.id).filter(id => id !== null));
+    
+    // Retorna TODOS os ministros disponíveis que não foram selecionados
+    // Ordenados por nome para facilitar a leitura (não por score)
     const backup = available
       .filter(m => m.id && !selectedIds.has(m.id))
-      .sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null))
-      .slice(0, count);
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+    console.log(`[BACKUP] 📋 ${backup.length} ministros disponíveis não escalados (backup completo)`);
+    
     return backup;
   }
 
