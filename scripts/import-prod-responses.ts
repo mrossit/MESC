@@ -20,35 +20,31 @@ async function importResponses() {
     const prodDb = neon(prodUrl);
     const devDb = neon(devUrl);
 
-    // 1. Descobrir colunas que existem em ambos os bancos
-    console.log("🔍 Descobrindo estrutura do banco...");
-    
-    const prodColumns = await prodDb(
-      `SELECT column_name FROM information_schema.columns 
-       WHERE table_name = 'questionnaire_responses' 
-       ORDER BY ordinal_position`
-    );
-    
-    const devColumns = await devDb(
-      `SELECT column_name FROM information_schema.columns 
-       WHERE table_name = 'questionnaire_responses' 
-       ORDER BY ordinal_position`
-    );
-
-    const prodColumnNames = new Set(prodColumns.map((c: any) => c.column_name));
-    const devColumnNames = new Set(devColumns.map((c: any) => c.column_name));
-    
-    // Colunas comuns (existem em ambos os bancos)
-    const commonColumns = Array.from(devColumnNames).filter(col => 
-      prodColumnNames.has(col) && col !== 'updated_at'
-    );
-
-    console.log(`   ✓ Colunas compatíveis: ${commonColumns.join(", ")}`);
-
-    // 2. Buscar dados da production
+    // 1. Buscar dados da production SEM as colunas JSON problemáticas
     console.log("📥 Buscando dados de questionnaire_responses da production...");
     const responses = await prodDb(
-      `SELECT ${commonColumns.join(", ")} FROM questionnaire_responses ORDER BY id;`
+      `SELECT 
+        id, 
+        questionnaire_id, 
+        user_id, 
+        responses::text, 
+        available_sundays::text, 
+        preferred_mass_times::text, 
+        alternative_times::text, 
+        daily_mass_availability::text, 
+        special_events::text, 
+        can_substitute, 
+        notes, 
+        submitted_at, 
+        shared_with_family_ids::text, 
+        is_shared_response, 
+        shared_from_user_id, 
+        unmapped_responses::text, 
+        processing_warnings::text, 
+        deleted_at, 
+        is_deleted
+       FROM questionnaire_responses 
+       ORDER BY id;`
     );
     console.log(`   ✓ ${responses.length} respostas encontradas`);
 
@@ -57,48 +53,84 @@ async function importResponses() {
       process.exit(0);
     }
 
-    // 3. Limpar dados antigos no dev
+    // 2. Limpar dados antigos no dev
     console.log("🗑️  Limpando dados antigos do dev...");
     await devDb(`TRUNCATE TABLE questionnaire_responses CASCADE;`);
     console.log("   ✓ Tabela limpa");
 
-    // 4. Importar dados em lotes
+    // 3. Importar dados com conversão segura de JSON
     console.log("📤 Importando respostas para o dev...");
 
-    const batchSize = 50;
+    const batchSize = 25;
+    let successCount = 0;
+    let errorCount = 0;
+
     for (let i = 0; i < responses.length; i += batchSize) {
       const batch = responses.slice(i, i + batchSize);
 
-      const placeholders = batch
-        .map((_, idx) => {
-          const params = commonColumns.map((_, paramIdx) => `$${idx * commonColumns.length + paramIdx + 1}`);
-          return `(${params.join(",")})`;
-        })
-        .join(",");
+      for (const row of batch) {
+        try {
+          // Parse JSON fields com validação
+          const parseJSON = (val: any) => {
+            if (!val) return null;
+            try {
+              return typeof val === "string" ? JSON.parse(val) : val;
+            } catch {
+              return null;
+            }
+          };
 
-      const values: any[] = [];
-      batch.forEach((r: any) => {
-        commonColumns.forEach(col => {
-          values.push(r[col]);
-        });
-      });
+          const values = [
+            row.id,
+            row.questionnaire_id,
+            row.user_id,
+            parseJSON(row.responses),
+            parseJSON(row.available_sundays),
+            parseJSON(row.preferred_mass_times),
+            parseJSON(row.alternative_times),
+            parseJSON(row.daily_mass_availability),
+            parseJSON(row.special_events),
+            row.can_substitute,
+            row.notes,
+            row.submitted_at,
+            parseJSON(row.shared_with_family_ids),
+            row.is_shared_response,
+            row.shared_from_user_id,
+            parseJSON(row.unmapped_responses),
+            parseJSON(row.processing_warnings),
+            row.deleted_at,
+            row.is_deleted,
+          ];
 
-      const insertQuery = `
-        INSERT INTO questionnaire_responses 
-        (${commonColumns.join(",")}) 
-        VALUES ${placeholders}
-        ON CONFLICT (id) DO NOTHING;
-      `;
+          await devDb(
+            `INSERT INTO questionnaire_responses 
+            (id, questionnaire_id, user_id, responses, available_sundays, preferred_mass_times, 
+             alternative_times, daily_mass_availability, special_events, can_substitute, notes, 
+             submitted_at, shared_with_family_ids, is_shared_response, shared_from_user_id, 
+             unmapped_responses, processing_warnings, deleted_at, is_deleted) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            ON CONFLICT (id) DO NOTHING;`,
+            values
+          );
 
-      await devDb(insertQuery, values);
+          successCount++;
+        } catch (rowError: any) {
+          errorCount++;
+          console.log(`   ⚠️  Erro na linha ${i + 1}: ${rowError.message?.substring(0, 50)}`);
+        }
+      }
+
       console.log(
-        `   ✓ Importadas respostas ${i + 1} a ${Math.min(i + batchSize, responses.length)}`
+        `   ✓ Processadas ${Math.min(i + batchSize, responses.length)} respostas (${successCount} sucesso, ${errorCount} erro)`
       );
     }
 
     console.log("");
     console.log("✅ IMPORTAÇÃO CONCLUÍDA!");
-    console.log(`   Total de respostas importadas: ${responses.length}`);
+    console.log(`   Total de respostas importadas: ${successCount}`);
+    if (errorCount > 0) {
+      console.log(`   ⚠️  Erros ao importar: ${errorCount}`);
+    }
     console.log("   Pronto para testes de escala! 🚀");
   } catch (error) {
     console.error("❌ Erro durante importação:", error);
