@@ -1434,9 +1434,9 @@ export class ScheduleGenerator {
       currentDate = addDays(currentDate, 1);
     }
 
-    // TODO: REGRA 7: Carregar missas especiais do questionário
-    // const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
-    // monthlyTimes.push(...specialMasses);
+    // REGRA 7: Carregar missas especiais do questionário
+    const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
+    monthlyTimes.push(...specialMasses);
 
     // 🔧 APLICAR FILTRO DE CONFLITOS: Missa especial sobrepõe missa normal no mesmo horário
     const filteredTimes = this.resolveTimeConflicts(monthlyTimes);
@@ -1446,7 +1446,128 @@ export class ScheduleGenerator {
       a.date!.localeCompare(b.date!) || a.time.localeCompare(b.time)
     );
   }
-  
+
+  /**
+   * Carrega missas especiais customizadas do questionário
+   */
+  private async loadSpecialMassesFromQuestionnaire(year: number, month: number): Promise<MassTime[]> {
+    const specialMasses: MassTime[] = [];
+
+    if (!this.db) {
+      console.log('[SCHEDULE_GEN] No database connection, skipping special masses from questionnaire');
+      return specialMasses;
+    }
+
+    try {
+      // Buscar o questionário do mês
+      const [questionnaire] = await this.db.select()
+        .from(questionnaires)
+        .where(
+          and(
+            eq(questionnaires.month, month),
+            eq(questionnaires.year, year)
+          )
+        )
+        .limit(1);
+
+      if (!questionnaire) {
+        console.log(`[SCHEDULE_GEN] No questionnaire found for ${month}/${year}`);
+        return specialMasses;
+      }
+
+      console.log(`[SCHEDULE_GEN] 🎯 Loading special masses from questionnaire: ${questionnaire.title}`);
+
+      // Parse questions
+      let questions = questionnaire.questions;
+      if (typeof questions === 'string') {
+        questions = JSON.parse(questions);
+      }
+
+      // Filtrar perguntas de categoria "custom" e "special_event"
+      const customQuestions = (questions as any[]).filter(
+        q => q.category === 'custom' || q.category === 'special_event'
+      );
+
+      console.log(`[SCHEDULE_GEN] Found ${customQuestions.length} custom/special event questions`);
+
+      // Para cada pergunta customizada, extrair informações da missa
+      for (const question of customQuestions) {
+        // Extrair data e horário da pergunta
+        // Formato esperado: "Você pode servir na missa ... - dia DD/MM/YYYY às HH:MM?"
+        const massInfo = this.extractMassInfoFromQuestion(question.question, year, month);
+
+        if (massInfo) {
+          specialMasses.push({
+            id: `custom-${question.id}`,
+            dayOfWeek: massInfo.dayOfWeek,
+            time: massInfo.time,
+            date: massInfo.date,
+            minMinisters: massInfo.minMinisters || 7,
+            maxMinisters: massInfo.maxMinisters || 7,
+            type: question.id, // Usar o ID da pergunta como tipo
+            description: question.question
+          });
+          console.log(`[SCHEDULE_GEN] ✅ Special mass added: ${massInfo.date} ${massInfo.time} - ${question.question.substring(0, 60)}...`);
+        } else {
+          console.log(`[SCHEDULE_GEN] ⚠️ Could not extract mass info from: ${question.question}`);
+        }
+      }
+
+      console.log(`[SCHEDULE_GEN] 📊 Total special masses from questionnaire: ${specialMasses.length}`);
+    } catch (error) {
+      console.error('[SCHEDULE_GEN] Error loading special masses from questionnaire:', error);
+    }
+
+    return specialMasses;
+  }
+
+  /**
+   * Extrai informações de data e horário de uma pergunta de missa especial
+   */
+  private extractMassInfoFromQuestion(question: string, year: number, month: number): {
+    date: string;
+    time: string;
+    dayOfWeek: number;
+    minMinisters?: number;
+    maxMinisters?: number;
+  } | null {
+    // Padrões de regex para extrair data e hora
+    // Ex: "dia 08/12/2025 às 19h30" ou "quinta feira 01/01/2026 às 19h"
+
+    // Extrair data DD/MM/YYYY
+    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!dateMatch) {
+      return null;
+    }
+
+    const day = parseInt(dateMatch[1]);
+    const monthFromQuestion = parseInt(dateMatch[2]);
+    const yearFromQuestion = parseInt(dateMatch[3]);
+
+    // Extrair horário (HH:MM ou HHh ou HHhMM)
+    const timeMatch = question.match(/(?:às|as)\s+(\d{1,2})(?:h|:)(\d{2})?/i);
+    if (!timeMatch) {
+      return null;
+    }
+
+    const hour = parseInt(timeMatch[1]).toString().padStart(2, '0');
+    const minute = timeMatch[2] ? timeMatch[2] : '00';
+    const time = `${hour}:${minute}`;
+
+    // Criar data no formato YYYY-MM-DD
+    const date = `${yearFromQuestion}-${monthFromQuestion.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+    // Calcular dia da semana
+    const dateObj = new Date(yearFromQuestion, monthFromQuestion - 1, day);
+    const dayOfWeek = dateObj.getDay();
+
+    return {
+      date,
+      time,
+      dayOfWeek
+    };
+  }
+
   /**
    * Resolve conflitos de horário: missa especial substitui missa normal
    */
@@ -1971,6 +2092,23 @@ export class ScheduleGenerator {
       return hasAnyDailyAvailability;
     }
 
+    // 🔥 CHECK FOR CUSTOM EVENTS: If massType starts with "custom_" or is a known special event ID, check directly
+    const specialEvents = (availability as any).specialEvents;
+
+    // If this is a custom event, check directly in specialEvents
+    if (massType.startsWith('custom_') || massType.startsWith('healing_liberation') ||
+        massType.startsWith('sacred_heart') || massType.startsWith('immaculate_heart') ||
+        massType === 'special_event_1' || massType.startsWith('adoration_')) {
+      if (specialEvents && typeof specialEvents === 'object') {
+        const response = specialEvents[massType];
+        const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
+        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} for CUSTOM event ${massType}: ${response} = ${isAvailable}`);
+        return isAvailable;
+      }
+      console.log(`[SPECIAL_MASS] ❌ ${ministerId}: No special events data for ${massType}`);
+      return false;
+    }
+
     // 🔥 CRITICAL FIX: Mapear tipos de missa para campos CORRETOS do questionário v2.0
     const massTypeMapping: { [key: string]: string } = {
       'missa_cura_libertacao': 'healing_liberation',     // v2.0: healing_liberation (não healing_liberation_mass!)
@@ -1981,7 +2119,6 @@ export class ScheduleGenerator {
 
     // Para missas de São Judas festa, mapear o horário específico
     if (massType === 'missa_sao_judas_festa' && massTime && massDate) {
-      const specialEvents = (availability as any).specialEvents;
       console.log(`[SPECIAL_MASS] 📦 Special events for ${ministerId}:`, typeof specialEvents, specialEvents ? Object.keys(specialEvents) : 'null');
 
       if (specialEvents && typeof specialEvents === 'object') {
@@ -2035,8 +2172,7 @@ export class ScheduleGenerator {
       return true;
     }
 
-    // Se temos dados de eventos especiais, verificar
-    const specialEvents = (availability as any).specialEvents;
+    // Se temos dados de eventos especiais, verificar (specialEvents já declarado acima)
     if (specialEvents && typeof specialEvents === 'object') {
       const response = specialEvents[questionKey];
 
