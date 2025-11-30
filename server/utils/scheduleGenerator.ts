@@ -23,6 +23,9 @@ export interface Minister {
   availabilityScore: number;
   preferenceScore: number;
   position?: number; // Posição litúrgica atribuída
+  // Position preferences
+  preferredPositions?: number[]; // Array de posições preferidas [1, 2, 3]
+  avoidPositions?: number[]; // Array de posições a evitar [4, 5]
   // 🔥 FAIR ALGORITHM: Track monthly assignments
   monthlyAssignmentCount?: number; // Assignments in current month (max 4)
   lastAssignedDate?: string; // Last date this minister was assigned (YYYY-MM-DD)
@@ -419,7 +422,9 @@ export class ScheduleGenerator {
         preferredTimes: users.preferredTimes,
         canServeAsCouple: users.canServeAsCouple,
         spouseMinisterId: users.spouseMinisterId,
-        familyId: users.familyId
+        familyId: users.familyId,
+        preferredPositions: users.preferredPositions,
+        avoidPositions: users.avoidPositions
       }).from(users).where(
         and(
           or(
@@ -444,6 +449,8 @@ export class ScheduleGenerator {
         preferredTimes: m.preferredTimes || [],
         canServeAsCouple: m.canServeAsCouple || false,
         familyId: m.familyId || null,
+        preferredPositions: m.preferredPositions || [],
+        avoidPositions: m.avoidPositions || [],
         availabilityScore: this.calculateAvailabilityScore(m),
         preferenceScore: this.calculatePreferenceScore(m),
         // 🔥 FAIR ALGORITHM: Initialize monthly counters
@@ -1810,16 +1817,9 @@ export class ScheduleGenerator {
 
     // 5. ✅ Daily assignments are now tracked in minister.lastAssignedDate (done in selectOptimalMinisters)
 
-    // 6. Atribuir posições litúrgicas aos ministros
-    console.log('[SCHEDULE_GEN] ✅ DEBUGGING: Atribuindo posições aos ministros!');
-    const ministersWithPositions = selectedMinisters.map((minister, index) => {
-      const ministerWithPosition = {
-        ...minister,
-        position: index + 1 // Atribuir posições sequenciais
-      };
-      console.log(`[SCHEDULE_GEN] ✅ Ministro ${minister.name} recebeu posição ${index + 1}`);
-      return ministerWithPosition;
-    });
+    // 6. Atribuir posições litúrgicas aos ministros considerando preferências
+    console.log('[SCHEDULE_GEN] ✅ DEBUGGING: Atribuindo posições aos ministros com base em preferências!');
+    const ministersWithPositions = this.assignPositionsIntelligently(selectedMinisters);
 
     const backupWithPositions = backupMinisters.map((minister, index) => ({
       ...minister,
@@ -1839,6 +1839,127 @@ export class ScheduleGenerator {
     
     console.log('[SCHEDULE_GEN] 🚨 RESULTADO FINAL:', JSON.stringify(result, null, 2).substring(0, 500));
     return result;
+  }
+
+  /**
+   * 🎯 INTELLIGENT POSITION ASSIGNMENT
+   * Atribui posições aos ministros considerando suas preferências
+   */
+  private assignPositionsIntelligently(ministers: Minister[]): Minister[] {
+    console.log('[POSITION_ASSIGN] 🎯 Starting intelligent position assignment for', ministers.length, 'ministers');
+
+    // Se não há ministros, retornar array vazio
+    if (ministers.length === 0) {
+      return [];
+    }
+
+    // Array para rastrear posições já atribuídas
+    const assignedPositions = new Set<number>();
+    const ministersWithPositions: Minister[] = [];
+    const unassignedMinisters: Minister[] = [];
+
+    // PHASE 1: Tentar atribuir ministros às suas posições preferidas
+    console.log('[POSITION_ASSIGN] 📋 PHASE 1: Assigning preferred positions');
+
+    // Ordenar ministros por prioridade: quem tem menos preferências vai primeiro (mais específico)
+    const ministersByPriority = [...ministers].sort((a, b) => {
+      const aPrefs = a.preferredPositions?.length || 0;
+      const bPrefs = b.preferredPositions?.length || 0;
+      if (aPrefs === 0 && bPrefs === 0) return 0; // Ambos sem preferências
+      if (aPrefs === 0) return 1; // a sem preferência vai para o final
+      if (bPrefs === 0) return -1; // b sem preferência vai para o final
+      return aPrefs - bPrefs; // Quem tem menos preferências tem prioridade (mais específico)
+    });
+
+    for (const minister of ministersByPriority) {
+      const prefs = minister.preferredPositions || [];
+      const avoid = minister.avoidPositions || [];
+
+      // Se tem preferências, tentar atribuir uma delas
+      if (prefs.length > 0) {
+        let assigned = false;
+
+        for (const preferredPos of prefs) {
+          // Verificar se a posição está dentro do range válido
+          if (preferredPos < 1 || preferredPos > ministers.length) {
+            continue;
+          }
+
+          // Se a posição preferida está livre, atribuir
+          if (!assignedPositions.has(preferredPos)) {
+            ministersWithPositions.push({
+              ...minister,
+              position: preferredPos
+            });
+            assignedPositions.add(preferredPos);
+            assigned = true;
+            console.log(`[POSITION_ASSIGN] ✅ ${minister.name} → Posição ${preferredPos} (preferida)`);
+            break;
+          }
+        }
+
+        if (!assigned) {
+          unassignedMinisters.push(minister);
+          console.log(`[POSITION_ASSIGN] ⏳ ${minister.name} → Nenhuma posição preferida disponível (prefere: ${prefs.join(', ')})`);
+        }
+      } else {
+        // Sem preferências, adicionar à lista de não atribuídos
+        unassignedMinisters.push(minister);
+      }
+    }
+
+    // PHASE 2: Atribuir posições restantes aos ministros não atribuídos
+    console.log('[POSITION_ASSIGN] 📋 PHASE 2: Assigning remaining positions');
+
+    for (const minister of unassignedMinisters) {
+      const avoid = minister.avoidPositions || [];
+      let assigned = false;
+
+      // Procurar uma posição livre que não esteja na lista de "evitar"
+      for (let pos = 1; pos <= ministers.length; pos++) {
+        if (!assignedPositions.has(pos) && !avoid.includes(pos)) {
+          ministersWithPositions.push({
+            ...minister,
+            position: pos
+          });
+          assignedPositions.add(pos);
+          assigned = true;
+          console.log(`[POSITION_ASSIGN] ✅ ${minister.name} → Posição ${pos} (disponível, não evitada)`);
+          break;
+        }
+      }
+
+      // Se não encontrou posição que não seja "evitada", atribuir qualquer posição livre
+      if (!assigned) {
+        for (let pos = 1; pos <= ministers.length; pos++) {
+          if (!assignedPositions.has(pos)) {
+            ministersWithPositions.push({
+              ...minister,
+              position: pos
+            });
+            assignedPositions.add(pos);
+            console.log(`[POSITION_ASSIGN] ⚠️ ${minister.name} → Posição ${pos} (FORÇADA - estava na lista de evitar: ${avoid.join(', ')})`);
+            break;
+          }
+        }
+      }
+    }
+
+    // PHASE 3: Ordenar por posição antes de retornar
+    const sorted = ministersWithPositions.sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    // Log final
+    console.log('[POSITION_ASSIGN] ✅ Position assignment complete:');
+    sorted.forEach(m => {
+      const prefs = m.preferredPositions || [];
+      const avoid = m.avoidPositions || [];
+      const isPreferred = prefs.includes(m.position || 0);
+      const isAvoided = avoid.includes(m.position || 0);
+      const status = isPreferred ? '✅ PREFERIDA' : isAvoided ? '⚠️ EVITADA' : '➖ NEUTRA';
+      console.log(`[POSITION_ASSIGN]   ${m.position}. ${m.name} - ${status}`);
+    });
+
+    return sorted;
   }
 
   /**
