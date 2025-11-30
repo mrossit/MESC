@@ -58,6 +58,31 @@ const formationProgressUpdateSchema = z.object({
   notes: z.string().optional()
 });
 
+// 🤖 ADAPTIVE LEARNING: Sanitize user data to hide reliability metrics from ministers
+// Reliability scores should ONLY be visible to coordinators/managers to avoid:
+// - Competition between ministers
+// - Deviation from spiritual purpose (serving God, not chasing points)
+function sanitizeUserData(user: any, requestingUserRole?: string): any {
+  // Coordinators and managers can see all data
+  if (requestingUserRole === 'coordenador' || requestingUserRole === 'gestor') {
+    return user;
+  }
+
+  // Ministers should NOT see reliability metrics - remove sensitive fields
+  const {
+    reliabilityScore,
+    substitutionRequestCount,
+    substitutionFulfilledCount,
+    manualRemovalCount,
+    noShowCount,
+    lastReliabilityUpdate,
+    reliabilityNotes,
+    ...sanitizedUser
+  } = user;
+
+  return sanitizedUser;
+}
+
 // Função utilitária para tratamento de erro centralizado
 function handleApiError(error: any, operation: string) {
   if (error instanceof z.ZodError) {
@@ -207,7 +232,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
-      res.json(user);
+
+      // 🤖 ADAPTIVE LEARNING: Hide reliability metrics from ministers
+      const sanitizedUser = sanitizeUserData(user, req.user?.role);
+      res.json(sanitizedUser);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuário atual");
       res.status(errorResponse.status).json(errorResponse);
@@ -225,7 +253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
-      res.json(user);
+
+      // 🤖 ADAPTIVE LEARNING: Hide reliability metrics from ministers
+      const sanitizedUser = sanitizeUserData(user, req.user?.role);
+      res.json(sanitizedUser);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar perfil");
       res.status(errorResponse.status).json(errorResponse);
