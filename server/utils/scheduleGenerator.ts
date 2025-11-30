@@ -2460,24 +2460,27 @@ export class ScheduleGenerator {
       return [];
     }
 
-    // 2. Sort by assignment count (ascending) - LEAST ASSIGNED FIRST
+    // 2. 🤖 ADAPTIVE LEARNING: Sort by final score (reliability + availability + preference + fairness)
     const sorted = [...eligible].sort((a, b) => {
+      const scoreA = this.calculateFinalMinisterScore(a, massTime);
+      const scoreB = this.calculateFinalMinisterScore(b, massTime);
+
+      // Higher score = better candidate (descending sort)
+      if (scoreA !== scoreB) {
+        return scoreB - scoreA;
+      }
+
+      // Tie-breaker 1: Monthly assignment count (fewer is better for fairness)
       const countA = a.monthlyAssignmentCount || 0;
       const countB = b.monthlyAssignmentCount || 0;
-
       if (countA !== countB) {
-        return countA - countB; // Ascending: least assigned first
+        return countA - countB;
       }
 
-      // Tie-breaker 1: Prefer those who haven't served recently
+      // Tie-breaker 2: Last service date (older first)
       const lastServiceA = a.lastService ? a.lastService.getTime() : 0;
       const lastServiceB = b.lastService ? b.lastService.getTime() : 0;
-      if (lastServiceA !== lastServiceB) {
-        return lastServiceA - lastServiceB; // Older service first
-      }
-
-      // Tie-breaker 2: Total services (lifetime balance)
-      return a.totalServices - b.totalServices;
+      return lastServiceA - lastServiceB;
     });
 
     console.log(`[FAIR_ALGORITHM] 📊 Sorted by assignment count:`);
@@ -2811,7 +2814,51 @@ export class ScheduleGenerator {
   }
 
   private calculatePreferenceScore(minister: any): number {
-    return (minister.preferredTimes?.length || 0) + (minister.canServeAsCouple ? 2 : 0);
+    const basePreference = (minister.preferredTimes?.length || 0) + (minister.canServeAsCouple ? 2 : 0);
+
+    // 🤖 ADAPTIVE LEARNING: Include reliability score (normalized to 0-10 scale)
+    const reliabilityBonus = Math.floor((minister.reliabilityScore || 100) / 10);
+
+    return basePreference + reliabilityBonus;
+  }
+
+  /**
+   * 🤖 ADAPTIVE LEARNING: Calculate final minister score for selection
+   * Combines availability, preference, reliability, and fairness
+   */
+  private calculateFinalMinisterScore(minister: Minister, massTime?: MassTime): number {
+    const availabilityScore = this.calculateAvailabilityScore(minister);
+    const preferenceScore = this.calculatePreferenceScore(minister);
+    const reliabilityScore = minister.reliabilityScore || 100;
+    const monthlyCount = minister.monthlyAssignmentCount || 0;
+
+    // Weighted formula:
+    // 40% Reliability (adaptive learning - behavior pattern)
+    // 30% Availability (historical service count)
+    // 20% Preference (minister preferences)
+    // 10% Fairness (avoid overloading same ministers)
+
+    const fairnessScore = Math.max(0, 100 - (monthlyCount * 15)); // Reduce score for ministers with many assignments
+
+    const finalScore =
+      (reliabilityScore * 0.4) +
+      (Math.min(availabilityScore, 100) * 0.3) +
+      (Math.min(preferenceScore, 100) * 0.2) +
+      (fairnessScore * 0.1);
+
+    // 🚨 SEVERE PENALTY for low reliability (similar to shadowban)
+    if (reliabilityScore < 50) {
+      console.log(`[ADAPTIVE] ⚠️ ${minister.name} has LOW reliability (${reliabilityScore}) - marking as LAST RESORT`);
+      return finalScore * 0.5; // 50% penalty - goes to end of line
+    }
+
+    // 🎯 BONUS for excellent reliability
+    if (reliabilityScore >= 95) {
+      console.log(`[ADAPTIVE] ✅ ${minister.name} has EXCELLENT reliability (${reliabilityScore}) - priority boost`);
+      return finalScore * 1.1; // 10% bonus
+    }
+
+    return finalScore;
   }
 
   private calculateServiceVariance(ministers: Minister[]): number {

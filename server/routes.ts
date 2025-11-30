@@ -30,6 +30,8 @@ import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import whatsappApiRoutes from "./routes/whatsapp-api";
 import metricsRoutes from "./routes/metrics";
+import reliabilityMetricsRoutes from "./routes/reliabilityMetrics";
+import cronRoutes from "./routes/cron";
 import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
 import adorationRoutes from "./routes/adoration";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
@@ -184,6 +186,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Metrics routes (apenas para gestor/coordenador, apenas leitura)
   app.use('/api/metrics', metricsRoutes);
+
+  // 🤖 ADAPTIVE LEARNING - Reliability metrics API (gestor/coordenador only)
+  app.use('/api/reliability', csrfProtection, reliabilityMetricsRoutes);
+
+  // 🤖 ADAPTIVE LEARNING - Cron/scheduled tasks (API key protected, no CSRF)
+  app.use('/api/cron', cronRoutes);
 
   // Adoration draw routes (coordenador/gestor only, com proteção CSRF)
   app.use('/api/adoration', csrfProtection, adorationRoutes);

@@ -4,6 +4,7 @@ import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
+import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
 
 // Stub implementations for missing functions
 const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
@@ -470,6 +471,18 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
 
     // Invalidate cache for this month
     scheduleCache.invalidate(year, month);
+
+    // 🤖 ADAPTIVE LEARNING - PHASE 3: Analyze and learn from coordinator modifications
+    try {
+      const learningReport = await analyzeMonthlyPatterns(month, year);
+      console.log(`[ADAPTIVE] 📊 Learning analysis complete for ${month}/${year}:`);
+      console.log(`  - Acceptance rate: ${learningReport.acceptanceRate.toFixed(1)}%`);
+      console.log(`  - Algorithm health: ${learningReport.algorithmHealth}`);
+      console.log(`  - Ministers with updated scores: ${learningReport.frequentlyRemovedMinisters.length}`);
+    } catch (error) {
+      console.error("[ADAPTIVE] ⚠️ Error during learning analysis:", error);
+      // Don't fail the publish if learning analysis fails
+    }
 
     // TODO: Send notifications to all ministers
 
