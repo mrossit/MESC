@@ -48,8 +48,20 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
     const ministerId = minister[0].id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
+    // Check if the logged-in user is a coordinator/manager
+    const loggedInUser = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const isAdmin = loggedInUser.length > 0 &&
+      (loggedInUser[0].role === 'coordenador' || loggedInUser[0].role === 'gestor');
+
     // Note: scheduleAssignments table doesn't exist in schema - using schedules table instead
+    // IMPORTANT: Ministers can only see PUBLISHED schedules
+    // Coordinators/Managers can see all schedules
     const upcomingAssignments = await db
       .select({
         id: schedules.id,
@@ -65,8 +77,9 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .where(
         and(
           eq(schedules.ministerId, ministerId),
-          gte(schedules.date, today.toISOString().split('T')[0])
-          // Aceitar qualquer status (scheduled ou published)
+          gte(schedules.date, today.toISOString().split('T')[0]),
+          // Only show published schedules to regular ministers
+          isAdmin ? undefined : eq(schedules.status, 'published')
         )
       )
       .orderBy(schedules.date)
@@ -95,11 +108,26 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
 router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.params;
+    const userId = req.user?.id;
+
+    // Check if user is coordinator/manager
+    let isAdmin = false;
+    if (userId) {
+      const userResult = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      isAdmin = userResult.length > 0 &&
+        (userResult[0].role === 'coordenador' || userResult[0].role === 'gestor');
+    }
+
     // Parse date string directly to avoid timezone issues
     // Expected format: ISO date string (YYYY-MM-DD) or full ISO datetime
     const targetDateStr = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
-    
-    // Buscar TODOS os ministros escalados naquela data (não apenas 1!)
+
+    // IMPORTANT: Ministers can only see PUBLISHED schedules
+    // Coordinators/Managers can see all schedules
     const allAssignments = await db
       .select({
         id: schedules.id,
@@ -116,8 +144,10 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(
-        eq(schedules.date, targetDateStr)
-        // Aceitar qualquer status (scheduled ou published)
+        and(
+          eq(schedules.date, targetDateStr),
+          isAdmin ? undefined : eq(schedules.status, 'published')
+        )
       )
       .orderBy(schedules.time, schedules.position);
     
@@ -147,22 +177,36 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { month, year } = req.query;
-    
+    const userId = req.user?.id;
+
+    // Check if user is coordinator/manager
+    let isAdmin = false;
+    if (userId) {
+      const userResult = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      isAdmin = userResult.length > 0 &&
+        (userResult[0].role === 'coordenador' || userResult[0].role === 'gestor');
+    }
+
     let query = db.select().from(schedules);
-    
+
     if (month && year) {
       // Calculate date range for the month using string formatting to avoid timezone issues
       const yearNum = parseInt(year as string);
       const monthNum = parseInt(month as string);
 
-      // Check cache first
-      const cachedData = scheduleCache.get(yearNum, monthNum);
+      // Check cache first - but only use cache for admin users who can see all
+      // For regular users, we need to filter by published status
+      const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
       if (cachedData) {
         console.log(`[SCHEDULES_API] ⚡ Returning cached data for ${monthNum}/${yearNum}`);
         return res.json(cachedData);
       }
 
-      console.log(`[SCHEDULES_API] 🔍 Cache miss - querying database for ${monthNum}/${yearNum}`);
+      console.log(`[SCHEDULES_API] 🔍 Cache miss - querying database for ${monthNum}/${yearNum} (isAdmin: ${isAdmin})`);
 
       // Format dates as YYYY-MM-DD strings directly
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-01`;
@@ -173,13 +217,16 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
       let schedulesList: any[] = [];
       try {
+        // IMPORTANT: Ministers can only see PUBLISHED schedules
+        // Coordinators/Managers can see all schedules
         schedulesList = await db
           .select()
           .from(schedules)
           .where(
             and(
               gte(schedules.date, startDateStr),
-              lte(schedules.date, endDateStr)
+              lte(schedules.date, endDateStr),
+              isAdmin ? undefined : eq(schedules.status, 'published')
             )
           );
       } catch (error) {
@@ -212,6 +259,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       }> = [];
 
       if (schedulesList.length > 0) {
+        // IMPORTANT: Apply same filter as schedulesList - ministers only see published
         assignmentsList = await db
           .select({
             id: schedules.id,
@@ -232,7 +280,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
           .where(
             and(
               gte(schedules.date, startDateStr),
-              lte(schedules.date, endDateStr)
+              lte(schedules.date, endDateStr),
+              isAdmin ? undefined : eq(schedules.status, 'published')
             )
           )
           .orderBy(schedules.date, schedules.time, schedules.position);
@@ -496,11 +545,11 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
   }
 });
 
-// Delete schedule
+// Delete schedule - supports both individual schedule UUID and month-based ID (schedule-YYYY-MM)
 router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
   try {
     console.log("DELETE schedule request for ID:", req.params.id);
-    
+
     // Only coordinators can delete schedules
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usuário não autenticado" });
@@ -510,47 +559,120 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       return res.status(403).json({ message: "Sem permissão para excluir escalas" });
     }
 
-    // Check if schedule exists and is not published
-    const schedule = await db
-      .select()
-      .from(schedules)
-      .where(eq(schedules.id, req.params.id))
-      .limit(1);
+    // Check if this is a month-based ID (schedule-YYYY-MM format)
+    const monthIdMatch = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
 
-    if (schedule.length === 0) {
-      return res.status(404).json({ message: "Escala não encontrada" });
+    if (monthIdMatch) {
+      // Month-based delete - delete ALL schedules for the month
+      const year = parseInt(monthIdMatch[1]);
+      const month = parseInt(monthIdMatch[2]);
+
+      console.log(`[DELETE_SCHEDULE] Month-based delete for ${month}/${year}`);
+
+      // Calculate date range for the month
+      const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+      // Get all schedules for the month
+      const schedulesList = await db
+        .select()
+        .from(schedules)
+        .where(
+          and(
+            gte(schedules.date, startDateStr),
+            lte(schedules.date, endDateStr)
+          )
+        );
+
+      if (schedulesList.length === 0) {
+        return res.status(404).json({ message: "Nenhuma escala encontrada para este mês" });
+      }
+
+      // Check if any schedule is published
+      const hasPublished = schedulesList.some(s => s.status === "published");
+      if (hasPublished) {
+        return res.status(400).json({ message: "Não é possível excluir escalas publicadas. Cancele a publicação primeiro." });
+      }
+
+      // Get all schedule IDs
+      const scheduleIds = schedulesList.map(s => s.id);
+
+      // Delete related substitution requests first
+      for (const scheduleId of scheduleIds) {
+        await db
+          .delete(substitutionRequests)
+          .where(eq(substitutionRequests.scheduleId, scheduleId));
+      }
+
+      console.log(`[DELETE_SCHEDULE] Deleted substitution requests for ${scheduleIds.length} schedules`);
+
+      // Delete all schedules for the month
+      await db
+        .delete(schedules)
+        .where(
+          and(
+            gte(schedules.date, startDateStr),
+            lte(schedules.date, endDateStr)
+          )
+        );
+
+      await logActivity(
+        req.user?.id!,
+        "schedule_deleted",
+        `Escalas de ${month}/${year} excluídas`,
+        { month, year, count: scheduleIds.length }
+      );
+
+      // Invalidate cache for the month
+      scheduleCache.invalidate(year, month);
+
+      console.log(`[DELETE_SCHEDULE] Successfully deleted ${scheduleIds.length} schedules for ${month}/${year}`);
+      res.json({ message: `${scheduleIds.length} escalas excluídas com sucesso` });
+
+    } else {
+      // Individual schedule delete (UUID)
+      const schedule = await db
+        .select()
+        .from(schedules)
+        .where(eq(schedules.id, req.params.id))
+        .limit(1);
+
+      if (schedule.length === 0) {
+        return res.status(404).json({ message: "Escala não encontrada" });
+      }
+
+      if (schedule[0].status === "published") {
+        return res.status(400).json({ message: "Não é possível excluir uma escala publicada" });
+      }
+
+      // Delete related substitution requests first (due to foreign key constraints)
+      await db
+        .delete(substitutionRequests)
+        .where(eq(substitutionRequests.scheduleId, req.params.id));
+
+      console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
+
+      // Finally delete the schedule
+      await db
+        .delete(schedules)
+        .where(eq(schedules.id, req.params.id));
+
+      await logActivity(
+        req.user?.id!,
+        "schedule_deleted",
+        `Escala excluída`,
+        { scheduleId: req.params.id }
+      );
+
+      // Invalidate cache for the month of the deleted schedule
+      if (schedule[0].date) {
+        scheduleCache.invalidateByDate(schedule[0].date);
+      }
+
+      console.log(`Successfully deleted schedule: ${schedule[0].id}`);
+      res.json({ message: "Escala excluída com sucesso" });
     }
-
-    if (schedule[0].status === "published") {
-      return res.status(400).json({ message: "Não é possível excluir uma escala publicada" });
-    }
-
-    // Delete related substitution requests first (due to foreign key constraints)
-    await db
-      .delete(substitutionRequests)
-      .where(eq(substitutionRequests.scheduleId, req.params.id));
-
-    console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-
-    // Finally delete the schedule
-    await db
-      .delete(schedules)
-      .where(eq(schedules.id, req.params.id));
-
-    await logActivity(
-      req.user?.id!,
-      "schedule_deleted",
-      `Escala excluída`,
-      { scheduleId: req.params.id }
-    );
-
-    // Invalidate cache for the month of the deleted schedule
-    if (schedule[0].date) {
-      scheduleCache.invalidateByDate(schedule[0].date);
-    }
-
-    console.log(`Successfully deleted schedule: ${schedule[0].id}`);
-    res.json({ message: "Escala excluída com sucesso" });
   } catch (error) {
     console.error("Error deleting schedule - Full error:", error);
     res.status(500).json({ message: "Erro ao excluir escala" });

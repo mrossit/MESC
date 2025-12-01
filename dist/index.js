@@ -3161,6 +3161,9 @@ ${"!".repeat(60)}`);
        * Exemplos de entrada:
        *   - "Domingo 05/10" → "1" (se 05/10 for o primeiro domingo)
        *   - "Domingo (12/10) – Missa em honra à Nossa Senhora Aparecida" → "2"
+       *
+       * ⚠️ IMPORTANTE: Se os dados já estão no formato v2.0 (YYYY-MM-DD HH:MM),
+       * devemos preservá-los para que a verificação de horário funcione corretamente!
        */
       normalizeSundayFormat(sundays, month, year) {
         if (!sundays || sundays.length === 0) return [];
@@ -3168,6 +3171,12 @@ ${"!".repeat(60)}`);
           return sundays;
         }
         if (sundays.includes("Nenhum domingo")) {
+          return sundays;
+        }
+        const isV2Format = sundays.some((s) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s));
+        if (isV2Format) {
+          console.log(`[NORMALIZE] \u2705 Dados no formato v2.0 detectados - preservando data+hora`);
+          console.log(`[NORMALIZE] Domingos: ${sundays.join(", ")}`);
           return sundays;
         }
         const normalized = [];
@@ -3741,7 +3750,7 @@ ${"!".repeat(60)}`);
         console.log(`[SCHEDULE_GEN] Available ministers for this mass: ${availableMinsters.length}`);
         const selectedMinisters = this.selectOptimalMinisters(availableMinsters, massTime);
         console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
-        const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters, 2);
+        const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters);
         const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
         console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros com base em prefer\xEAncias!");
         const ministersWithPositions = this.assignPositionsIntelligently(selectedMinisters);
@@ -3913,39 +3922,34 @@ ${"!".repeat(60)}`);
               });
               console.log(`[AVAILABILITY_CHECK] Verificando ${dateTimeKey}: ${availableForSunday ? "\u2705 SIM" : "\u274C N\xC3O"}`);
               if (!availableForSunday) {
-                const date2 = new Date(massTime.date);
-                const dayOfMonth = date2.getDate();
-                const sundayOfMonth = Math.ceil(dayOfMonth / 7);
-                availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
-                if (!availableForSunday) {
-                  const possibleFormats = [
-                    `Domingo ${dateStr}`,
-                    // "Domingo 05/10"
-                    dateStr,
-                    // "05/10"
-                    `${dateStr.split("/")[0]}/10`,
-                    // "05/10" para outubro
-                    parseInt(dateStr.split("/")[0]).toString()
-                    // "5" ao invés de "05"
-                  ];
-                  for (const format9 of possibleFormats) {
-                    if (availability.availableSundays.some(
-                      (sunday) => sunday.includes(format9) || sunday === format9
-                    )) {
-                      availableForSunday = true;
-                      console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format9}`);
-                      break;
+                const isV2Format = availability.availableSundays.some((s) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s));
+                if (isV2Format) {
+                  console.log(`[AVAILABILITY_CHECK] Formato v2.0 detectado - sem fallback legado`);
+                } else {
+                  const date2 = new Date(massTime.date);
+                  const dayOfMonth = date2.getDate();
+                  const sundayOfMonth = Math.ceil(dayOfMonth / 7);
+                  availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+                  if (!availableForSunday) {
+                    const possibleFormats = [
+                      `Domingo ${dateStr}`,
+                      // "Domingo 05/10"
+                      dateStr
+                      // "05/10"
+                    ];
+                    for (const format9 of possibleFormats) {
+                      if (availability.availableSundays.some((sunday) => sunday === format9)) {
+                        availableForSunday = true;
+                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format9}`);
+                        break;
+                      }
                     }
                   }
                 }
               }
             }
             if (!availableForSunday) {
-              if (availability.preferredMassTimes?.includes(timeStr) || availability.preferredMassTimes?.includes(massTime.time)) {
-                logger.debug(`${minister.name} tem prefer\xEAncia pelo hor\xE1rio ${timeStr}, considerando dispon\xEDvel`);
-                return true;
-              }
-              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} N\xC3O dispon\xEDvel para ${dateTimeKey}`);
+              console.log(`[AVAILABILITY_CHECK] \u274C ${minister.name} N\xC3O marcou ${dateTimeKey} no question\xE1rio`);
               return false;
             }
             if (availability.preferredMassTimes && availability.preferredMassTimes.length > 0) {
@@ -4089,7 +4093,29 @@ ${"!".repeat(60)}`);
         }
         const questionKey = massTypeMapping[massType];
         if (!questionKey) {
-          return true;
+          const regularTypes = [
+            "missa_dominical",
+            "missa_diaria",
+            "missa",
+            "missa_sao_judas",
+            "missa_sao_judas_festa",
+            "missa_finados",
+            "missa_puc",
+            "missa_sao_judas_mensal",
+            "adoracao_santissimo"
+          ];
+          if (regularTypes.includes(massType)) {
+            console.log(`[SPECIAL_MASS] \u2139\uFE0F Tipo regular ${massType}, verifica\xE7\xE3o por dia/hor\xE1rio`);
+            return true;
+          }
+          if (specialEvents && typeof specialEvents === "object" && specialEvents[massType] !== void 0) {
+            const response = specialEvents[massType];
+            const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
+            console.log(`[SPECIAL_MASS] \u{1F3AF} ${ministerId} para tipo ${massType}: ${response} = ${isAvailable}`);
+            return isAvailable;
+          }
+          console.log(`[SPECIAL_MASS] \u274C Tipo ${massType} sem resposta espec\xEDfica`);
+          return false;
         }
         if (specialEvents && typeof specialEvents === "object") {
           const response = specialEvents[questionKey];
@@ -4349,11 +4375,16 @@ ${"!".repeat(60)}`);
         return selected;
       }
       /**
-       * Seleciona ministros de backup
+       * Seleciona ministros de backup - TODOS os disponíveis que não foram escalados
+       * 
+       * CORREÇÃO: O backup deve listar TODOS os ministros que deram disponibilidade
+       * para aquela missa mas não foram escalados porque a cota já estava preenchida.
+       * Removido o limite de "count" para mostrar todos.
        */
-      selectBackupMinisters(available, selected, count9) {
+      selectBackupMinisters(available, selected) {
         const selectedIds = new Set(selected.map((m) => m.id).filter((id) => id !== null));
-        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => this.calculateMinisterScore(b, null) - this.calculateMinisterScore(a, null)).slice(0, count9);
+        const backup = available.filter((m) => m.id && !selectedIds.has(m.id)).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        console.log(`[BACKUP] \u{1F4CB} ${backup.length} ministros dispon\xEDveis n\xE3o escalados (backup completo)`);
         return backup;
       }
       /**
@@ -13127,6 +13158,8 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
     const ministerId = minister[0].id;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
+    const loggedInUser = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+    const isAdmin = loggedInUser.length > 0 && (loggedInUser[0].role === "coordenador" || loggedInUser[0].role === "gestor");
     const upcomingAssignments = await db.select({
       id: schedules.id,
       date: schedules.date,
@@ -13139,8 +13172,9 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
     }).from(schedules).where(
       and12(
         eq17(schedules.ministerId, ministerId),
-        gte8(schedules.date, today.toISOString().split("T")[0])
-        // Aceitar qualquer status (scheduled ou published)
+        gte8(schedules.date, today.toISOString().split("T")[0]),
+        // Only show published schedules to regular ministers
+        isAdmin ? void 0 : eq17(schedules.status, "published")
       )
     ).orderBy(schedules.date).limit(10);
     const formattedAssignments = upcomingAssignments.map((assignment) => ({
@@ -13162,6 +13196,12 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
 router9.get("/by-date/:date", authenticateToken, async (req, res) => {
   try {
     const { date: date2 } = req.params;
+    const userId = req.user?.id;
+    let isAdmin = false;
+    if (userId) {
+      const userResult = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+      isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
+    }
     const targetDateStr = date2.includes("T") ? date2.split("T")[0] : date2.split(" ")[0];
     const allAssignments = await db.select({
       id: schedules.id,
@@ -13175,8 +13215,10 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       confirmed: sql9`true`,
       status: schedules.status
     }).from(schedules).leftJoin(users, eq17(schedules.ministerId, users.id)).where(
-      eq17(schedules.date, targetDateStr)
-      // Aceitar qualquer status (scheduled ou published)
+      and12(
+        eq17(schedules.date, targetDateStr),
+        isAdmin ? void 0 : eq17(schedules.status, "published")
+      )
     ).orderBy(schedules.time, schedules.position);
     if (allAssignments.length === 0) {
       return res.json({
@@ -13201,16 +13243,22 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
 router9.get("/", authenticateToken, async (req, res) => {
   try {
     const { month, year } = req.query;
+    const userId = req.user?.id;
+    let isAdmin = false;
+    if (userId) {
+      const userResult = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+      isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
+    }
     let query = db.select().from(schedules);
     if (month && year) {
       const yearNum = parseInt(year);
       const monthNum = parseInt(month);
-      const cachedData = scheduleCache.get(yearNum, monthNum);
+      const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
       if (cachedData) {
         console.log(`[SCHEDULES_API] \u26A1 Returning cached data for ${monthNum}/${yearNum}`);
         return res.json(cachedData);
       }
-      console.log(`[SCHEDULES_API] \u{1F50D} Cache miss - querying database for ${monthNum}/${yearNum}`);
+      console.log(`[SCHEDULES_API] \u{1F50D} Cache miss - querying database for ${monthNum}/${yearNum} (isAdmin: ${isAdmin})`);
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-01`;
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
@@ -13219,7 +13267,8 @@ router9.get("/", authenticateToken, async (req, res) => {
         schedulesList = await db.select().from(schedules).where(
           and12(
             gte8(schedules.date, startDateStr),
-            lte7(schedules.date, endDateStr)
+            lte7(schedules.date, endDateStr),
+            isAdmin ? void 0 : eq17(schedules.status, "published")
           )
         );
       } catch (error) {
@@ -13252,7 +13301,8 @@ router9.get("/", authenticateToken, async (req, res) => {
         }).from(schedules).leftJoin(users, eq17(schedules.ministerId, users.id)).where(
           and12(
             gte8(schedules.date, startDateStr),
-            lte7(schedules.date, endDateStr)
+            lte7(schedules.date, endDateStr),
+            isAdmin ? void 0 : eq17(schedules.status, "published")
           )
         ).orderBy(schedules.date, schedules.time, schedules.position);
       }
@@ -13448,27 +13498,70 @@ router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para excluir escalas" });
     }
-    const schedule = await db.select().from(schedules).where(eq17(schedules.id, req.params.id)).limit(1);
-    if (schedule.length === 0) {
-      return res.status(404).json({ message: "Escala n\xE3o encontrada" });
+    const monthIdMatch = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
+    if (monthIdMatch) {
+      const year = parseInt(monthIdMatch[1]);
+      const month = parseInt(monthIdMatch[2]);
+      console.log(`[DELETE_SCHEDULE] Month-based delete for ${month}/${year}`);
+      const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+      const schedulesList = await db.select().from(schedules).where(
+        and12(
+          gte8(schedules.date, startDateStr),
+          lte7(schedules.date, endDateStr)
+        )
+      );
+      if (schedulesList.length === 0) {
+        return res.status(404).json({ message: "Nenhuma escala encontrada para este m\xEAs" });
+      }
+      const hasPublished = schedulesList.some((s) => s.status === "published");
+      if (hasPublished) {
+        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir escalas publicadas. Cancele a publica\xE7\xE3o primeiro." });
+      }
+      const scheduleIds = schedulesList.map((s) => s.id);
+      for (const scheduleId of scheduleIds) {
+        await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, scheduleId));
+      }
+      console.log(`[DELETE_SCHEDULE] Deleted substitution requests for ${scheduleIds.length} schedules`);
+      await db.delete(schedules).where(
+        and12(
+          gte8(schedules.date, startDateStr),
+          lte7(schedules.date, endDateStr)
+        )
+      );
+      await logActivity(
+        req.user?.id,
+        "schedule_deleted",
+        `Escalas de ${month}/${year} exclu\xEDdas`,
+        { month, year, count: scheduleIds.length }
+      );
+      scheduleCache.invalidate(year, month);
+      console.log(`[DELETE_SCHEDULE] Successfully deleted ${scheduleIds.length} schedules for ${month}/${year}`);
+      res.json({ message: `${scheduleIds.length} escalas exclu\xEDdas com sucesso` });
+    } else {
+      const schedule = await db.select().from(schedules).where(eq17(schedules.id, req.params.id)).limit(1);
+      if (schedule.length === 0) {
+        return res.status(404).json({ message: "Escala n\xE3o encontrada" });
+      }
+      if (schedule[0].status === "published") {
+        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
+      }
+      await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, req.params.id));
+      console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
+      await db.delete(schedules).where(eq17(schedules.id, req.params.id));
+      await logActivity(
+        req.user?.id,
+        "schedule_deleted",
+        `Escala exclu\xEDda`,
+        { scheduleId: req.params.id }
+      );
+      if (schedule[0].date) {
+        scheduleCache.invalidateByDate(schedule[0].date);
+      }
+      console.log(`Successfully deleted schedule: ${schedule[0].id}`);
+      res.json({ message: "Escala exclu\xEDda com sucesso" });
     }
-    if (schedule[0].status === "published") {
-      return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
-    }
-    await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, req.params.id));
-    console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-    await db.delete(schedules).where(eq17(schedules.id, req.params.id));
-    await logActivity(
-      req.user?.id,
-      "schedule_deleted",
-      `Escala exclu\xEDda`,
-      { scheduleId: req.params.id }
-    );
-    if (schedule[0].date) {
-      scheduleCache.invalidateByDate(schedule[0].date);
-    }
-    console.log(`Successfully deleted schedule: ${schedule[0].id}`);
-    res.json({ message: "Escala exclu\xEDda com sucesso" });
   } catch (error) {
     console.error("Error deleting schedule - Full error:", error);
     res.status(500).json({ message: "Erro ao excluir escala" });
