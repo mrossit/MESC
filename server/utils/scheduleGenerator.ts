@@ -1052,6 +1052,9 @@ export class ScheduleGenerator {
    * Exemplos de entrada:
    *   - "Domingo 05/10" → "1" (se 05/10 for o primeiro domingo)
    *   - "Domingo (12/10) – Missa em honra à Nossa Senhora Aparecida" → "2"
+   *
+   * ⚠️ IMPORTANTE: Se os dados já estão no formato v2.0 (YYYY-MM-DD HH:MM),
+   * devemos preservá-los para que a verificação de horário funcione corretamente!
    */
   private normalizeSundayFormat(sundays: string[], month: number, year: number): string[] {
     if (!sundays || sundays.length === 0) return [];
@@ -1064,6 +1067,15 @@ export class ScheduleGenerator {
     // Se tem "Nenhum domingo", retornar como está
     if (sundays.includes('Nenhum domingo')) {
       return sundays;
+    }
+
+    // 🔥 V2.0 FIX: Se os dados estão no formato v2.0 (YYYY-MM-DD HH:MM), preservar!
+    // Isso é CRÍTICO para que o backup respeite o horário de disponibilidade
+    const isV2Format = sundays.some(s => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s));
+    if (isV2Format) {
+      console.log(`[NORMALIZE] ✅ Dados no formato v2.0 detectados - preservando data+hora`);
+      console.log(`[NORMALIZE] Domingos: ${sundays.join(', ')}`);
+      return sundays; // Retornar como está para preservar o horário
     }
 
     const normalized: string[] = [];
