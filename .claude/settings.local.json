@@ -28,7 +28,8 @@
       "Bash(NODE_ENV=development npx tsx:*)",
       "Bash(npx drizzle-kit:*)",
       "Bash(npm run dev:*)",
-      "Bash(timeout 8 npm run dev:*)"
+      "Bash(timeout 8 npm run dev:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

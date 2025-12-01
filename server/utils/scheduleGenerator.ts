@@ -2077,31 +2077,39 @@ export class ScheduleGenerator {
           console.log(`[AVAILABILITY_CHECK] Verificando ${dateTimeKey}: ${availableForSunday ? '✅ SIM' : '❌ NÃO'}`);
 
           // Se não encontrou no formato v2.0, tentar formato legado
+          // IMPORTANTE: Só aplicar fallback se os dados NÃO estão no formato v2.0
           if (!availableForSunday) {
-            // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
-            const date = new Date(massTime.date!);
-            const dayOfMonth = date.getDate();
-            const sundayOfMonth = Math.ceil(dayOfMonth / 7);
+            // Detectar se os dados estão no formato v2.0 (YYYY-MM-DD HH:MM)
+            const isV2Format = availability.availableSundays.some(s => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s));
 
-            // Formato legado: "1", "2", "3", "4", "5"
-            availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
+            if (isV2Format) {
+              // Se é formato v2.0, NÃO aplicar fallback legado
+              // O match exato já foi feito acima e falhou - ministro não está disponível
+              console.log(`[AVAILABILITY_CHECK] Formato v2.0 detectado - sem fallback legado`);
+            } else {
+              // Apenas para dados legados (formato antigo)
+              // Calcular qual domingo do mês é este (1º, 2º, 3º, 4º ou 5º)
+              const date = new Date(massTime.date!);
+              const dayOfMonth = date.getDate();
+              const sundayOfMonth = Math.ceil(dayOfMonth / 7);
 
-            if (!availableForSunday) {
-              // Outros formatos legados
-              const possibleFormats = [
-                `Domingo ${dateStr}`,  // "Domingo 05/10"
-                dateStr,                // "05/10"
-                `${dateStr.split('/')[0]}/10`, // "05/10" para outubro
-                parseInt(dateStr.split('/')[0]).toString() // "5" ao invés de "05"
-              ];
+              // Formato legado: "1", "2", "3", "4", "5"
+              availableForSunday = availability.availableSundays.includes(sundayOfMonth.toString());
 
-              for (const format of possibleFormats) {
-                if (availability.availableSundays.some(sunday =>
-                  sunday.includes(format) || sunday === format
-                )) {
-                  availableForSunday = true;
-                  console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format}`);
-                  break;
+              if (!availableForSunday) {
+                // Outros formatos legados - usar match EXATO, não includes()
+                // para evitar matches parciais incorretos (ex: "14" em "2025-12-14")
+                const possibleFormats = [
+                  `Domingo ${dateStr}`,  // "Domingo 05/10"
+                  dateStr                 // "05/10"
+                ];
+
+                for (const format of possibleFormats) {
+                  if (availability.availableSundays.some(sunday => sunday === format)) {
+                    availableForSunday = true;
+                    console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format}`);
+                    break;
+                  }
                 }
               }
             }
