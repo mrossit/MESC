@@ -2096,14 +2096,10 @@ export class ScheduleGenerator {
           }
         }
 
-        // Se não está disponível para o domingo, verificar se pelo menos tem o horário preferido
+        // 🔧 FIX: A resposta do questionário é o VEREDICTO
+        // Se não marcou o domingo específico, NÃO está disponível - ponto final
         if (!availableForSunday) {
-          // Se não marcou domingos mas marcou horário preferido, pode estar disponível
-          if (availability.preferredMassTimes?.includes(timeStr) || availability.preferredMassTimes?.includes(massTime.time)) {
-            logger.debug(`${minister.name} tem preferência pelo horário ${timeStr}, considerando disponível`);
-            return true;
-          }
-          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} NÃO disponível para ${dateTimeKey}`);
+          console.log(`[AVAILABILITY_CHECK] ❌ ${minister.name} NÃO marcou ${dateTimeKey} no questionário`);
           return false;
         }
 
@@ -2300,8 +2296,27 @@ export class ScheduleGenerator {
 
     const questionKey = massTypeMapping[massType];
     if (!questionKey) {
-      // Para outros tipos não mapeados, permitir
-      return true;
+      // 🔧 FIX: Tipos regulares (domingos, diárias) são verificados por dia/horário depois
+      // Tipos de São Judas têm verificação própria
+      // Qualquer outro tipo: verificar se há resposta específica em specialEvents
+      const regularTypes = ['missa_dominical', 'missa_diaria', 'missa', 'missa_sao_judas', 'missa_sao_judas_festa', 
+                           'missa_finados', 'missa_puc', 'missa_sao_judas_mensal', 'adoracao_santissimo'];
+      if (regularTypes.includes(massType)) {
+        console.log(`[SPECIAL_MASS] ℹ️ Tipo regular ${massType}, verificação por dia/horário`);
+        return true;
+      }
+      
+      // Para tipos desconhecidos, verificar se existe resposta direta em specialEvents
+      if (specialEvents && typeof specialEvents === 'object' && specialEvents[massType] !== undefined) {
+        const response = specialEvents[massType];
+        const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
+        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} para tipo ${massType}: ${response} = ${isAvailable}`);
+        return isAvailable;
+      }
+      
+      // Tipo desconhecido sem resposta - não disponível
+      console.log(`[SPECIAL_MASS] ❌ Tipo ${massType} sem resposta específica`);
+      return false;
     }
 
     // Se temos dados de eventos especiais, verificar (specialEvents já declarado acima)
