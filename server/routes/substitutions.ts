@@ -13,9 +13,8 @@ function calculateUrgency(massDateStr: string, massTime: string): "low" | "mediu
   const now = new Date();
   const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  // Use Date.UTC to create a UTC date, then convert to local Date object
-  // This ensures consistent timezone handling
-  const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  // Criar data em HORÁRIO LOCAL (não UTC) - as datas da missa são em horário local
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -30,9 +29,8 @@ function shouldAutoApprove(massDateStr: string, massTime: string): boolean {
   const now = new Date();
   const [year, month, day] = massDateStr.split('-').map(Number);
   const [hours, minutes] = massTime.split(':').map(Number);
-  // Use Date.UTC to create a UTC date, then convert to local Date object
-  // This ensures consistent timezone handling
-  const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  // Criar data em HORÁRIO LOCAL (não UTC) - as datas da missa são em horário local
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -206,12 +204,11 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Verificar se a data/hora da missa já passou
-    // Usar UTC para evitar problemas de timezone
+    // Usar horário LOCAL (não UTC) - as datas da missa são em horário local
     const [year, month, day] = schedule.date.split('-').map(Number);
     const [hours, minutes] = schedule.time.split(':').map(Number);
-    // Use Date.UTC to create a UTC date, then convert to local Date object
-    // This ensures consistent timezone handling across the application
-    const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+    // Criar data em HORÁRIO LOCAL para comparação correta
+    const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
     const now = new Date();
     console.log('[Substitutions] Verificando data:', {
@@ -598,7 +595,7 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
       .limit(1);
 
     // Phase 1 - Data Integrity: Wrap in transaction to ensure atomicity
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       // Atualizar solicitação
       await tx
         .update(substitutionRequests)
