@@ -29,7 +29,9 @@
       "Bash(npx drizzle-kit:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout 8 npm run dev:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
