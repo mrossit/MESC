@@ -248,6 +248,7 @@ export default function Schedules() {
   const [ministerSearch, setMinisterSearch] = useState("");
   const [filterByPreferredPosition, setFilterByPreferredPosition] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [selectedEventType, setSelectedEventType] = useState<string>("missa");
   const [availableSubstitutes, setAvailableSubstitutes] = useState<any[]>([]);
   const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
   const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
@@ -480,7 +481,7 @@ export default function Schedules() {
         time: selectedMassTime,
         ministerId: selectedMinisterId === 'VACANT' ? null : selectedMinisterId,
         position: selectedPosition,
-        type: 'missa',
+        type: selectedEventType,
         skipDuplicateCheck: !!editingAssignmentId // NOVO: permitir edição sem verificação de duplicação
       };
 
@@ -516,6 +517,7 @@ export default function Schedules() {
         setIsCustomTime(false);
         setCustomTimeInput("");
         setSelectedPosition(1);
+        setSelectedEventType("missa"); // Resetar para tipo padrão
         setEditingAssignmentId(null); // Limpar modo de edição
       } else {
         const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
@@ -2580,6 +2582,26 @@ export default function Schedules() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Define a ordem em que o ministro aparece na lista (1 = primeiro)
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Tipo de Evento</label>
+              <Select
+                value={selectedEventType}
+                onValueChange={(value) => setSelectedEventType(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de evento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="missa">Missa</SelectItem>
+                  <SelectItem value="celebracao">Adoração ao Santíssimo</SelectItem>
+                  <SelectItem value="evento">Evento (digitação manual)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Missa (padrão), Adoração ou Evento manual
               </p>
             </div>
 

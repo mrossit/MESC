@@ -15054,7 +15054,7 @@ function calculateUrgency(massDateStr, massTime) {
   const now = /* @__PURE__ */ new Date();
   const [year, month, day] = massDateStr.split("-").map(Number);
   const [hours, minutes] = massTime.split(":").map(Number);
-  const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
   if (hoursUntilMass < 12) return "critical";
   if (hoursUntilMass < 24) return "high";
@@ -15094,7 +15094,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     }
     const [year, month, day] = schedule.date.split("-").map(Number);
     const [hours, minutes] = schedule.time.split(":").map(Number);
-    const massDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+    const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     const now = /* @__PURE__ */ new Date();
     console.log("[Substitutions] Verificando data:", {
       scheduleDate: schedule.date,

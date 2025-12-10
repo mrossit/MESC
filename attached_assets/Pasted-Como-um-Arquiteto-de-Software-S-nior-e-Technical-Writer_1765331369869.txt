@@ -1,0 +1,72 @@
+Como um Arquiteto de Software Sênior e Technical Writer especialista em padrões Microsoft, me chamo Vangrey.
+
+Sua tarefa é realizar uma análise de Engenharia Reversa no projeto atual chamado MESC. A estrutura de arquivos está desorganizada e preciso entender a lógica antes de corrigir bugs.
+
+Por favor, execute as seguintes etapas em MODO LEITURA (não altere nenhum código, apenas leia e analise):
+
+1. Explore a estrutura de diretórios recursivamente (ignorando node_modules e arquivos de build).
+2. Identifique os pontos de entrada da aplicação (entry points), arquivos de configuração (env, tsconfig, package.json) e as rotas principais.
+3. Analise o fluxo de dados: como o frontend (client) se comunica com o backend (server) e o banco de dados.
+
+Com base nessa análise, gere um Manual Técnico de Visão Geral em Português (PT-BR), seguindo um tom profissional, técnico e direto (estilo Microsoft Learn), contendo:
+
+## 1. Visão Geral da Arquitetura
+Descreva a stack tecnológica (Frameworks, DB, Linguagem) e o padrão arquitetural identificado (MVC, Monolito Modular, etc).
+
+## 2. Estrutura de Diretórios Anotada
+Liste as pastas principais e explique, em uma frase, a responsabilidade de cada uma no contexto atual do projeto.
+
+## 3. Fluxo de Execução
+Explique passo a passo o ciclo de vida de uma requisição típica nesta aplicação (do momento que o usuário clica até o dado ser salvo).
+
+## 4. Dívida Técnica e Pontos de Atenção
+Liste brevemente onde a estrutura foge dos padrões ou onde parece estar a "bagunça" mencionada (ex: lógica misturada em controllers, falta de tipagem, etc).
+
+## 5. Lógica de Negócio
+Descreva as funcionalidades principais e os processos críticos (ex.: substituições, cálculos, aprovações).
+
+## 6. Banco de Dados
+Documente a estrutura, os scripts SQL e as relações entre tabelas, se houver.
+
+## 7. Dependências
+Liste as bibliotecas externas utilizadas e o papel de cada uma.
+
+## 8. Pontos de Atenção
+Identifique áreas frágeis, lógica confusa, riscos de bugs e arquivos possivelmente desatualizados ou duplicados.
+
+Regras importantes:
+- Apenas modo leitura. Descrever, mapear e documentar — nunca alterar.
+- Não gerar patches, diffs, correções ou melhorias.
+- Não perguntar nada — apenas leia e documente.
+- Documentar tudo mesmo que pareça confuso ou desorganizado. 
+- Utilizar idioma pt-br de forma clara e objetiva.
+
+Formato de saída esperado:
+
+# Documentação Técnica – Sistema MESC
+## 1. Visão Geral
+(...)
+
+## 2. Estrutura de Pastas
+Tabela com pasta / descrição
+
+## 3. Arquivos principais
+(...)
+
+## 4. Fluxo de Execução
+(...)
+
+## 5. Lógica de Negócio
+(...)
+
+## 6. Banco de Dados
+(...)
+
+## 7. Dependências
+(...)
+
+## 8. Pontos de Atenção
+(...)
+```
+
+Execute agora. Estou no aguardo.
