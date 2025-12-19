@@ -8393,19 +8393,20 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const updatedQuestions = template.questions.filter((q) => {
-      if (q.id === questionId) {
-        return q.category !== "custom";
-      }
-      return true;
-    });
+    const questionToDelete = template.questions.find((q) => q.id === questionId);
+    if (!questionToDelete) {
+      return res.status(404).json({ error: "Question not found" });
+    }
+    const updatedQuestions = template.questions.filter((q) => q.id !== questionId);
+    console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question}" (categoria: ${questionToDelete.category}) do question\xE1rio ${month}/${year}`);
     const [updated] = await db.update(questionnaires).set({
       questions: updatedQuestions,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq8(questionnaires.id, template.id)).returning();
     res.json({
       ...updated,
-      questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
+      questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions),
+      deletedQuestion: questionToDelete
     });
   } catch (error) {
     console.error("Error deleting question:", error);

@@ -1267,11 +1267,45 @@ export default function QuestionnaireUnified() {
     }
   };
 
-  const deleteQuestion = (questionId: string) => {
-    if (template) {
+  const deleteQuestion = async (questionId: string) => {
+    if (!template) return;
+
+    // Encontrar a pergunta para mostrar informação na mensagem de sucesso
+    const questionToDelete = template.questions.find(q => q.id === questionId);
+    const isStandardQuestion = questionToDelete?.category !== 'custom';
+
+    // Se o template já existe no banco (tem ID), deletar via API
+    if (template.id) {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/questionnaires/admin/templates/${selectedYear}/${selectedMonth}/questions/${questionId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setTemplate({ ...template, questions: data.questions });
+          setSuccess(isStandardQuestion
+            ? 'Pergunta padrão removida! Se necessário, você pode regenerar o template para restaurá-la.'
+            : 'Pergunta customizada removida com sucesso!');
+        } else {
+          const errorData = await res.json();
+          setError(errorData.error || 'Erro ao remover pergunta');
+        }
+      } catch (err) {
+        console.error('Erro ao deletar pergunta:', err);
+        setError('Erro ao remover pergunta');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Template ainda não salvo, apenas atualizar estado local
       const updatedQuestions = template.questions.filter(q => q.id !== questionId);
       setTemplate({ ...template, questions: updatedQuestions });
-      setSuccess('Pergunta removida com sucesso!');
+      setSuccess(isStandardQuestion
+        ? 'Pergunta padrão removida! Se necessário, você pode regenerar o template para restaurá-la.'
+        : 'Pergunta customizada removida com sucesso!');
     }
   };
 
@@ -2212,19 +2246,22 @@ export default function QuestionnaireUnified() {
 }
 
 // Componente para card de pergunta no modo admin
-function QuestionAdminCard({ 
-  question, 
-  index, 
-  totalQuestions, 
-  onEdit, 
-  onDelete, 
-  onMoveUp, 
+function QuestionAdminCard({
+  question,
+  index,
+  totalQuestions,
+  onEdit,
+  onDelete,
+  onMoveUp,
   onMoveDown,
-  getCategoryBadge 
+  getCategoryBadge
 }: any) {
   const canEdit = true;
-  const canDelete = question.category === 'custom';
-  
+  // Permitir deletar qualquer pergunta - coordenadores têm controle total
+  // Isso é necessário para meses com peculiaridades (ex: Janeiro com missas já no questionário de Dezembro)
+  const canDelete = true;
+  const isStandardQuestion = question.category !== 'custom';
+
   return (
     <Card className={question.modified ? "border-yellow-400" : ""}>
       <CardContent className="p-3 sm:p-4 pt-4 sm:pt-6">
@@ -2282,7 +2319,8 @@ function QuestionAdminCard({
                 variant="ghost"
                 size="sm"
                 onClick={onDelete}
-                title="Remover pergunta"
+                title={isStandardQuestion ? "Remover pergunta padrão (pode ser regenerada)" : "Remover pergunta customizada"}
+                className={isStandardQuestion ? "text-orange-500 hover:text-orange-700 hover:bg-orange-50" : "text-red-500 hover:text-red-700 hover:bg-red-50"}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
