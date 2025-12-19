@@ -362,7 +362,8 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
   }
 });
 
-// Deletar pergunta customizada
+// Deletar qualquer pergunta (customizada ou padrão)
+// Isso permite flexibilidade para meses com peculiaridades (ex: Janeiro com missas já no questionário de Dezembro)
 router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
   try {
     const year = parseInt(req.params.year);
@@ -380,14 +381,18 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
       return res.status(404).json({ error: 'Template not found' });
     }
 
-    const updatedQuestions = (template.questions as any[]).filter(q => {
-      // Permitir deletar apenas perguntas customizadas
-      // Perguntas automáticas não podem ser deletadas, apenas editadas
-      if (q.id === questionId) {
-        return q.category !== 'custom';
-      }
-      return true;
-    });
+    // Encontrar a pergunta que será deletada para registro
+    const questionToDelete = (template.questions as any[]).find(q => q.id === questionId);
+
+    if (!questionToDelete) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    // Permitir deletar qualquer pergunta (customizada ou padrão)
+    // Coordenadores têm controle total sobre o questionário
+    const updatedQuestions = (template.questions as any[]).filter(q => q.id !== questionId);
+
+    console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question}" (categoria: ${questionToDelete.category}) do questionário ${month}/${year}`);
 
     const [updated] = await db
       .update(questionnaires)
@@ -400,7 +405,8 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
 
     res.json({
       ...updated,
-      questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions as string)
+      questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions as string),
+      deletedQuestion: questionToDelete
     });
   } catch (error) {
     console.error('Error deleting question:', error);
