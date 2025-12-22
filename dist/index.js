@@ -2932,8 +2932,11 @@ ${"!".repeat(60)}`);
             dailyMassAvailability = orderedWeekdayLabels.filter((label) => weekdayAvailabilitySet.has(label));
             const specialEventsData = data.special_events || {};
             Object.assign(specialEvents, specialEventsData);
-            canSubstitute = data.can_substitute === true;
-            console.log(`[COMPATIBILITY_LAYER] \u2705 v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events`);
+            if (data.alternative_times && Array.isArray(data.alternative_times)) {
+              alternativeTimes = data.alternative_times;
+            }
+            canSubstitute = data.can_substitute === true || data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0;
+            console.log(`[COMPATIBILITY_LAYER] \u2705 v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events, canSubstitute=${canSubstitute}, altTimes=${alternativeTimes.length}`);
           } catch (error) {
             console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing v2.0:`, error);
           }
@@ -4408,6 +4411,8 @@ ${"!".repeat(60)}`);
           const timeHour = `${massTime.time.substring(0, 2)}h`;
           if (availability?.preferredMassTimes.includes(timeHour)) {
             score += 0.5;
+          } else if (availability?.alternativeTimes?.includes(timeHour)) {
+            score += 0.2;
           } else if (availability?.preferredMassTimes && availability.preferredMassTimes.length > 0) {
             score -= 0.3;
           }
@@ -9520,7 +9525,8 @@ var QuestionnaireService = class {
         this.parseDailyMassDays(answer, standardized);
         processedQuestionIds.add(questionId);
       } else if (questionId === "can_substitute") {
-        standardized.can_substitute = this.normalizeValue(answer);
+        const normalizedAnswer = typeof answer === "string" ? answer.toLowerCase().trim() : answer;
+        standardized.can_substitute = normalizedAnswer === "yes" || normalizedAnswer === "sundays_only" || normalizedAnswer === "sim" || normalizedAnswer === true;
         processedQuestionIds.add(questionId);
       } else if ((questionId === "notes" || questionId === "observations") && typeof answer === "string") {
         standardized.notes = answer;
@@ -9555,6 +9561,12 @@ var QuestionnaireService = class {
         }
       }
       delete standardized._preferredTime;
+    }
+    if (standardized._alternativeTimes && Array.isArray(standardized._alternativeTimes) && standardized._alternativeTimes.length > 0) {
+      if (!standardized.can_substitute) {
+        console.log(`[QUESTIONNAIRE_SERVICE] \u{1F504} Auto-setting can_substitute=true because alternative_times has values`);
+        standardized.can_substitute = true;
+      }
     }
   }
   /**
@@ -9742,11 +9754,18 @@ var QuestionnaireService = class {
         friday: false
       };
     }
-    if (typeof response.can_substitute !== "boolean") {
+    if (typeof response.can_substitute === "string") {
+      const normalized = response.can_substitute.toLowerCase().trim();
+      response.can_substitute = normalized === "yes" || normalized === "sundays_only" || normalized === "sim" || normalized === "true";
+    } else if (typeof response.can_substitute !== "boolean") {
       response.can_substitute = false;
     }
     if (response.alternative_times && Array.isArray(response.alternative_times)) {
       response._alternativeTimes = response.alternative_times;
+      if (response.alternative_times.length > 0 && !response.can_substitute) {
+        console.log(`[QUESTIONNAIRE_SERVICE] \u{1F504} V2.0: Auto-setting can_substitute=true because alternative_times has values`);
+        response.can_substitute = true;
+      }
     }
     return response;
   }
