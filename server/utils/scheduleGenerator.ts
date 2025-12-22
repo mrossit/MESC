@@ -754,10 +754,17 @@ export class ScheduleGenerator {
         // Copy all special events to the specialEvents object
         Object.assign(specialEvents, specialEventsData);
 
-        // Parse substitution
-        canSubstitute = data.can_substitute === true;
+        // Parse alternative times from v2.0 format
+        if (data.alternative_times && Array.isArray(data.alternative_times)) {
+          alternativeTimes = data.alternative_times;
+        }
 
-        console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events`);
+        // 🔥 FIX: Parse substitution - also consider alternative_times
+        // If can_substitute is true OR has alternative_times, minister can substitute
+        canSubstitute = data.can_substitute === true ||
+          (data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0);
+
+        console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events, canSubstitute=${canSubstitute}, altTimes=${alternativeTimes.length}`);
       } catch (error) {
         console.error(`[COMPATIBILITY_LAYER] ❌ Error parsing v2.0:`, error);
       }
@@ -2762,15 +2769,20 @@ export class ScheduleGenerator {
     }
 
     // 3. Preferência de horário (30% do peso - aumentado para forçar diversificação)
+    // 🔥 FIX: Now considers alternativeTimes as a secondary preference
     if (massTime && minister.id) {
       const availability = this.availabilityData.get(minister.id);
       const timeHour = `${massTime.time.substring(0, 2)}h`;
-      
+
       if (availability?.preferredMassTimes.includes(timeHour)) {
         // Bonus maior para preferência exata de horário
         score += 0.5;
+      } else if (availability?.alternativeTimes?.includes(timeHour)) {
+        // 🔥 FIX: Bonus for alternative time (smaller than preferred, but positive)
+        // This means the minister indicated they CAN serve at this time
+        score += 0.2;
       } else if (availability?.preferredMassTimes && availability.preferredMassTimes.length > 0) {
-        // Penalidade para ministros que preferem outros horários
+        // Penalidade apenas se NÃO está nos horários alternativos
         score -= 0.3;
       }
     }
