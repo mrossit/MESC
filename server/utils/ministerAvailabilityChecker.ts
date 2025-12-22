@@ -268,6 +268,7 @@ export function getAvailableTimes(minister: Minister, date: string): string[] {
 
 /**
  * Check if minister can substitute
+ * 🔥 FIX: Now considers alternative_times as indicator of substitution availability
  */
 export function canSubstitute(minister: Minister): boolean {
   if (!minister.questionnaireResponse?.responses) {
@@ -279,16 +280,73 @@ export function canSubstitute(minister: Minister): boolean {
     : minister.questionnaireResponse.responses;
 
   if (response.format_version === '2.0') {
-    return response.can_substitute === true;
+    // Check explicit can_substitute flag
+    if (response.can_substitute === true) {
+      return true;
+    }
+
+    // 🔥 FIX: If minister has alternative_times, they can substitute
+    if (response.alternative_times &&
+        Array.isArray(response.alternative_times) &&
+        response.alternative_times.length > 0) {
+      return true;
+    }
+
+    return false;
   }
 
   // Legacy format
   if (Array.isArray(response)) {
     const answer = response.find((r: any) => r.questionId === 'can_substitute');
-    return answer?.answer === 'Sim';
+    // 🔥 FIX: Handle 'sundays_only' as true for substitution purposes
+    const value = answer?.answer?.toLowerCase?.() || answer?.answer;
+    if (value === 'sim' || value === 'yes' || value === 'sundays_only' || value === true) {
+      return true;
+    }
+
+    // Check for alternative times in legacy format
+    const altTimes = response.find((r: any) => r.questionId === 'other_times_available');
+    if (altTimes?.answer && altTimes.answer !== 'Não') {
+      return true;
+    }
   }
 
   return false;
+}
+
+/**
+ * Get minister's alternative times (times they can serve besides their preferred time)
+ */
+export function getAlternativeTimes(minister: Minister): string[] {
+  if (!minister.questionnaireResponse?.responses) {
+    return [];
+  }
+
+  const response = typeof minister.questionnaireResponse.responses === 'string'
+    ? JSON.parse(minister.questionnaireResponse.responses)
+    : minister.questionnaireResponse.responses;
+
+  if (response.format_version === '2.0') {
+    return response.alternative_times || [];
+  }
+
+  // Legacy format
+  if (Array.isArray(response)) {
+    const altTimes = response.find((r: any) => r.questionId === 'other_times_available');
+    if (altTimes?.answer) {
+      if (typeof altTimes.answer === 'object' && altTimes.answer.selectedOptions) {
+        return altTimes.answer.selectedOptions;
+      }
+      if (Array.isArray(altTimes.answer)) {
+        return altTimes.answer;
+      }
+      if (typeof altTimes.answer === 'string' && altTimes.answer !== 'Não' && altTimes.answer !== 'Sim') {
+        return [altTimes.answer];
+      }
+    }
+  }
+
+  return [];
 }
 
 /**

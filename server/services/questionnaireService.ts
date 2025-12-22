@@ -256,8 +256,16 @@ export class QuestionnaireService {
         processedQuestionIds.add(questionId);
       }
       // Map substitution availability
+      // 🔥 FIX: Handle 'yes', 'sundays_only', 'Sim' as true (only 'no'/'Não' is false)
       else if (questionId === 'can_substitute') {
-        standardized.can_substitute = this.normalizeValue(answer);
+        const normalizedAnswer = typeof answer === 'string' ? answer.toLowerCase().trim() : answer;
+        // 'yes', 'sundays_only', 'Sim' all mean the minister CAN substitute
+        // Only 'no' or 'Não' means they cannot
+        standardized.can_substitute =
+          normalizedAnswer === 'yes' ||
+          normalizedAnswer === 'sundays_only' ||
+          normalizedAnswer === 'sim' ||
+          normalizedAnswer === true;
         processedQuestionIds.add(questionId);
       }
       // Map notes/observations
@@ -309,6 +317,17 @@ export class QuestionnaireService {
         }
       }
       delete (standardized as any)._preferredTime;
+    }
+
+    // 🔥 FIX: If minister indicated alternative times, they CAN substitute
+    // Having alternative times means they're willing to serve at different times
+    if ((standardized as any)._alternativeTimes &&
+        Array.isArray((standardized as any)._alternativeTimes) &&
+        (standardized as any)._alternativeTimes.length > 0) {
+      if (!standardized.can_substitute) {
+        console.log(`[QUESTIONNAIRE_SERVICE] 🔄 Auto-setting can_substitute=true because alternative_times has values`);
+        standardized.can_substitute = true;
+      }
     }
   }
 
@@ -550,13 +569,29 @@ export class QuestionnaireService {
         friday: false
       };
     }
-    if (typeof response.can_substitute !== 'boolean') {
+
+    // 🔥 FIX: Handle can_substitute properly
+    // If it's a string like 'yes', 'sundays_only', convert to boolean
+    if (typeof response.can_substitute === 'string') {
+      const normalized = response.can_substitute.toLowerCase().trim();
+      response.can_substitute =
+        normalized === 'yes' ||
+        normalized === 'sundays_only' ||
+        normalized === 'sim' ||
+        normalized === 'true';
+    } else if (typeof response.can_substitute !== 'boolean') {
       response.can_substitute = false;
     }
 
     // Migrate alternative_times to internal _alternativeTimes for extraction
     if (response.alternative_times && Array.isArray(response.alternative_times)) {
       response._alternativeTimes = response.alternative_times;
+
+      // 🔥 FIX: If alternative_times has values, minister CAN substitute
+      if (response.alternative_times.length > 0 && !response.can_substitute) {
+        console.log(`[QUESTIONNAIRE_SERVICE] 🔄 V2.0: Auto-setting can_substitute=true because alternative_times has values`);
+        response.can_substitute = true;
+      }
     }
 
     return response as StandardizedResponse;
