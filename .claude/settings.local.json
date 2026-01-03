@@ -31,7 +31,9 @@
       "Bash(timeout 8 npm run dev:*)",
       "Bash(xargs:*)",
       "Bash(cat:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(env)"
     ],
     "deny": [],
     "ask": []
