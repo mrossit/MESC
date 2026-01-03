@@ -24,17 +24,11 @@ function calculateUrgency(massDateStr: string, massTime: string): "low" | "mediu
   return "low";
 }
 
-// Verificar se solicitação deve ser auto-aprovada (> 12h antes)
+// Verificar se solicitação deve ser auto-aprovada (sempre aprovado agora)
 function shouldAutoApprove(massDateStr: string, massTime: string): boolean {
-  const now = new Date();
-  const [year, month, day] = massDateStr.split('-').map(Number);
-  const [hours, minutes] = massTime.split(':').map(Number);
-  // Criar data em HORÁRIO LOCAL (não UTC) - as datas da missa são em horário local
-  const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-
-  const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-  return hoursUntilMass >= 12;
+  // 🔧 ALTERAÇÃO: Removida a trava de 12h. 
+  // Todas as substituições agora são auto-aprovadas se houver um substituto.
+  return true;
 }
 
 // Contar substituições do ministro no mês atual
