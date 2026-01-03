@@ -226,6 +226,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
+    // 🔧 REMOVIDO: Bloqueio por tempo de antecedência. 
+    // Agora o sistema permite pedidos mesmo no dia da missa.
+    // A urgência será calculada e exibida como 'critical'.
+
     // Verificar se o ministro é o escalado
     if (schedule.ministerId !== requesterId) {
       return res.status(403).json({
