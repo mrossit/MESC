@@ -311,6 +311,7 @@ router.get('/ministry-stats', async (req, res) => {
       .limit(1);
 
     let responseRate = 0;
+    let hasResponded = false;
     if (currentQuestionnaire) {
       const [responseStats] = await db
         .select({
@@ -322,6 +323,21 @@ router.get('/ministry-stats', async (req, res) => {
       responseRate = Math.round(
         (responseStats.totalResponses / (activeMinistersResult.count || 1)) * 100
       );
+
+      // Check if current user (minister) has responded
+      const userId = (req as any).user?.id;
+      if (userId) {
+        const [userResponse] = await db
+          .select()
+          .from(questionnaireResponses)
+          .where(and(
+            eq(questionnaireResponses.userId, userId),
+            eq(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
+            eq(questionnaireResponses.isDeleted, false)
+          ))
+          .limit(1);
+        hasResponded = !!userResponse;
+      }
     }
 
     // Pending actions count
@@ -356,6 +372,7 @@ router.get('/ministry-stats', async (req, res) => {
       data: {
         activeMinisters: activeMinistersResult.count,
         responseRate,
+        hasResponded,
         monthCoverage: {
           total: monthStats?.totalMasses || 0,
           fullyStaffed: monthStats?.fullyStaffedMasses || 0,
