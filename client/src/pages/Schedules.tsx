@@ -1781,12 +1781,19 @@ export default function Schedules() {
                             ) : null}
                             {availableMassTimes && availableMassTimes.slice(0, 3).map((time) => {
                               const timeAssignments = dayAssignments.filter(a => formatMassTime(a.massTime) === time);
+                              const isAdoration = time === "22:00" && day.getDay() === 1;
                               return (
-                                <div key={time} className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-xs">{time}</span>
+                                <div key={time} className={`flex items-center gap-1 ${isAdoration ? 'bg-purple-100 dark:bg-purple-900/40 px-1 rounded border border-purple-200' : ''}`}>
+                                  {isAdoration ? (
+                                    <Star className="h-3 w-3 text-purple-600" />
+                                  ) : (
+                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span className={`text-xs ${isAdoration ? 'text-purple-700 font-bold' : ''}`}>
+                                    {isAdoration ? "Adoração" : time}
+                                  </span>
                                   {timeAssignments.length > 0 && (
-                                    <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                    <Badge variant={isAdoration ? "default" : "secondary"} className={`h-4 px-1 text-xs ${isAdoration ? 'bg-purple-600' : ''}`}>
                                       {timeAssignments.length}
                                     </Badge>
                                   )}
@@ -1804,12 +1811,19 @@ export default function Schedules() {
                           (<>
                             {availableMassTimes && availableMassTimes.slice(0, 3).map((time) => {
                               const timeAssignments = dayAssignments.filter(a => formatMassTime(a.massTime) === time);
+                              const isAdoration = time === "22:00" && day.getDay() === 1;
                               return (
-                                <div key={time} className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-xs">{time}</span>
+                                <div key={time} className={`flex items-center gap-1 ${isAdoration ? 'bg-purple-100 dark:bg-purple-900/40 px-1 rounded border border-purple-200' : ''}`}>
+                                  {isAdoration ? (
+                                    <Star className="h-3 w-3 text-purple-600" />
+                                  ) : (
+                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span className={`text-xs ${isAdoration ? 'text-purple-700 font-bold' : ''}`}>
+                                    {isAdoration ? "Adoração" : time}
+                                  </span>
                                   {timeAssignments.length > 0 && (
-                                    <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                    <Badge variant={isAdoration ? "default" : "secondary"} className={`h-4 px-1 text-xs ${isAdoration ? 'bg-purple-600' : ''}`}>
                                       {timeAssignments.length}
                                     </Badge>
                                   )}
