@@ -353,8 +353,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
           adorationAssignments = drawResults.map((res: any) => {
             const mondayDate = mondaysInMonth[res.mondayOfWeek - 1];
             return {
-              id: res.id,
-              scheduleId: res.id,
+              id: `adoracao-${res.id}`,
+              scheduleId: `adoracao-${res.id}`,
               ministerId: res.ministerId,
               date: mondayDate,
               massTime: "22:00:00",
@@ -365,7 +365,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
               photoUrl: null,
               notes: res.isVoluntary ? "Voluntário" : "Sorteado",
               status: "published",
-              type: "adoracao" // Campo especial para o frontend
+              type: "adoracao"
             };
           });
         }
