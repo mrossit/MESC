@@ -1107,10 +1107,10 @@ export default function QuestionnaireUnified() {
         // Para coordenadores: sempre mostrar "Enviado aos Ministros"
         // Para ministros: mostrar baseado se já respondeu ou não
         admin: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
-        pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendente', icon: AlertCircle },
-        responded: { color: 'bg-green-100 text-green-800', label: 'Enviado', icon: CheckCircle }
+        pending: { color: 'bg-yellow-500 text-white', label: 'Pendente', icon: AlertCircle },
+        responded: { color: 'bg-blue-500 text-white', label: 'Respondido - ainda aceita respostas', icon: CheckCircle }
       },
-      closed: { color: 'bg-red-100 text-red-800', label: 'Encerrado', icon: Lock }
+      closed: { color: 'bg-gray-500 text-white', label: 'Encerrado', icon: Lock }
     };
     
     let config;
