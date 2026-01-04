@@ -130,39 +130,44 @@ const SCHEDULE_LEGEND_ITEMS = [
   { label: "Imaculado Coração", color: "#e3b1c8", textColor: "#6B2D5C" }
 ];
 
-const getMassTypeAndColor = (date: Date, massTime: string) => {
-  const dayOfWeek = date.getDay();
-  const dayOfMonth = date.getDate();
-  const month = date.getMonth() + 1;
-  const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
-  const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
+  const getMassTypeAndColor = (date: Date, massTime: string, assignment?: ScheduleAssignment) => {
+    // 🕊️ ADORAÇÃO: Identificação prioritária
+    if (assignment?.type === 'adoracao' || (date.getDay() === 1 && massTime === "22:00:00")) {
+      return { type: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" };
+    }
 
-  if (isNovena) {
-    return { type: "Novena de Outubro", color: "#fdf9c4", textColor: "#8B7500" };
-  }
+    const dayOfWeek = date.getDay();
+    const dayOfMonth = date.getDate();
+    const month = date.getMonth() + 1;
+    const isFirstWeek = dayOfMonth >= 1 && dayOfMonth <= 7;
+    const isNovena = month === 10 && dayOfMonth >= 20 && dayOfMonth <= 27;
 
-  if (dayOfWeek === 0) {
-    return { type: "Missa Dominical", color: "#ffda9e", textColor: "#8B5A00" };
-  }
+    if (isNovena) {
+      return { type: "Novena de Outubro", color: "#fdf9c4", textColor: "#8B7500" };
+    }
 
-  if (dayOfWeek === 1 && massTime === "22:00:00") {
-    return { type: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" };
-  }
+    if (dayOfWeek === 0) {
+      return { type: "Missa Dominical", color: "#ffda9e", textColor: "#8B5A00" };
+    }
 
-  if (dayOfWeek === 4 && isFirstWeek && massTime === "19:30:00") {
-    return { type: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" };
-  }
+    if (dayOfWeek === 1 && massTime === "22:00:00") {
+      return { type: "Adoração ao Santíssimo", color: "#d4b5e8", textColor: "#5B2C6F" };
+    }
 
-  if (dayOfWeek === 5 && isFirstWeek) {
-    return { type: "Sagrado Coração de Jesus", color: "#fabfb7", textColor: "#8B3A3A" };
-  }
+    if (dayOfWeek === 4 && isFirstWeek && massTime === "19:30:00") {
+      return { type: "Cura e Libertação", color: "#b2e2f2", textColor: "#0D5F7F" };
+    }
 
-  if (dayOfWeek === 6 && isFirstWeek) {
-    return { type: "Imaculado Coração de Maria", color: "#e3b1c8", textColor: "#6B2D5C" };
-  }
+    if (dayOfWeek === 5 && isFirstWeek) {
+      return { type: "Sagrado Coração de Jesus", color: "#fabfb7", textColor: "#8B3A3A" };
+    }
 
-  return { type: "Missa Diária", color: "#c5c6c8", textColor: "#2C2C2C" };
-};
+    if (dayOfWeek === 6 && isFirstWeek) {
+      return { type: "Imaculado Coração de Maria", color: "#e3b1c8", textColor: "#6B2D5C" };
+    }
+
+    return { type: "Missa Diária", color: "#c5c6c8", textColor: "#2C2C2C" };
+  };
 
 const TOTAL_POSITIONS = Object.keys(LITURGICAL_POSITIONS).length;
 
