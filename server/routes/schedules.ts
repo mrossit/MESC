@@ -173,7 +173,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
   }
 });
 
-// Get schedules for a specific month
+// Obter escalas para um mês específico
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { month, year } = req.query;
@@ -312,6 +312,70 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             )
         : [];
 
+      // 🕊️ INCLUSÃO DE ADORAÇÃO: Buscar resultados do sorteio de adoração para o mês
+      let adorationAssignments: any[] = [];
+      try {
+        const { adorationDraws, adorationDrawResults, users } = await import('@shared/schema');
+        const draws = await db
+          .select()
+          .from(adorationDraws)
+          .where(and(eq(adorationDraws.month, monthNum), eq(adorationDraws.year, yearNum)))
+          .limit(1);
+
+        if (draws.length > 0) {
+          const drawResults = await db
+            .select({
+              id: adorationDrawResults.id,
+              ministerId: adorationDrawResults.ministerId,
+              ministerName: users.name,
+              scheduleDisplayName: users.scheduleDisplayName,
+              mondayOfWeek: adorationDrawResults.mondayOfWeek,
+              isVoluntary: adorationDrawResults.isVoluntary
+            })
+            .from(adorationDrawResults)
+            .leftJoin(users, eq(adorationDrawResults.ministerId, users.id))
+            .where(eq(adorationDrawResults.drawId, draws[0].id));
+
+          // Helper: Get all Mondays in a given month
+          function getMondaysInMonth(year: number, month: number): string[] {
+            const mondays: string[] = [];
+            const date = new Date(year, month - 1, 1);
+            while (date.getDay() !== 1) date.setDate(date.getDate() + 1);
+            while (date.getMonth() === month - 1) {
+              mondays.push(date.toISOString().split('T')[0]);
+              date.setDate(date.getDate() + 7);
+            }
+            return mondays;
+          }
+
+          const mondaysInMonth = getMondaysInMonth(yearNum, monthNum);
+
+          adorationAssignments = drawResults.map((res: any) => {
+            const mondayDate = mondaysInMonth[res.mondayOfWeek - 1];
+            return {
+              id: res.id,
+              scheduleId: res.id,
+              ministerId: res.ministerId,
+              date: mondayDate,
+              massTime: "22:00:00",
+              position: 0,
+              confirmed: true,
+              ministerName: res.ministerName,
+              scheduleDisplayName: res.scheduleDisplayName,
+              photoUrl: null,
+              notes: res.isVoluntary ? "Voluntário" : "Sorteado",
+              status: "published",
+              type: "adoracao" // Campo especial para o frontend
+            };
+          });
+        }
+      } catch (e) {
+        console.error("[SCHEDULES_API] Erro ao buscar adoração:", e);
+      }
+
+      // Mesclar escalações de missas com as de adoração
+      const allAssignmentsList = [...assignmentsList, ...adorationAssignments];
+
       // Create monthly schedule metadata object
       // The frontend expects a Schedule object with month, year, status
       // Determine status: "published" if ANY schedule is published, "draft" otherwise
@@ -331,7 +395,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
       const responseData = {
         schedules: monthlySchedule ? [monthlySchedule] : [],
-        assignments: assignmentsList,
+        assignments: allAssignmentsList,
         substitutions: substitutionsList
       };
 
@@ -590,13 +654,13 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       }
 
       // Check if any schedule is published
-      const hasPublished = schedulesList.some(s => s.status === "published");
+      const hasPublished = schedulesList.some((s: any) => s.status === "published");
       if (hasPublished) {
         return res.status(400).json({ message: "Não é possível excluir escalas publicadas. Cancele a publicação primeiro." });
       }
 
       // Get all schedule IDs
-      const scheduleIds = schedulesList.map(s => s.id);
+      const scheduleIds = schedulesList.map((s: any) => s.id);
 
       // Delete related substitution requests first
       for (const scheduleId of scheduleIds) {
