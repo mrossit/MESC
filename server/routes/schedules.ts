@@ -139,7 +139,11 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         massTime: schedules.time,
         position: schedules.position,
         confirmed: sql`true`,
-        status: schedules.status
+        status: schedules.status,
+        // Campos necessários para identificar adoração e celebrações especiais
+        type: schedules.type,
+        location: schedules.location,
+        notes: schedules.notes
       })
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
