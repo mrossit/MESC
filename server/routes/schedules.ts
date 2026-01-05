@@ -128,7 +128,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
 
     // IMPORTANT: Ministers can only see PUBLISHED schedules
     // Coordinators/Managers can see all schedules
-    const allAssignments = await db
+    const massAssignments = await db
       .select({
         id: schedules.id,
         scheduleId: schedules.id,
@@ -154,18 +154,89 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         )
       )
       .orderBy(schedules.time, schedules.position);
-    
+
+    // 🕊️ INCLUSÃO DE ADORAÇÃO: Verificar se a data é uma segunda-feira e buscar sorteio
+    let adorationAssignments: any[] = [];
+    try {
+      const targetDate = new Date(targetDateStr + 'T12:00:00');
+      const isMonday = targetDate.getDay() === 1;
+
+      if (isMonday) {
+        const { adorationDraws, adorationDrawResults } = await import('@shared/schema');
+        const monthNum = targetDate.getMonth() + 1;
+        const yearNum = targetDate.getFullYear();
+
+        // Buscar sorteio do mês
+        const draws = await db
+          .select()
+          .from(adorationDraws)
+          .where(and(eq(adorationDraws.month, monthNum), eq(adorationDraws.year, yearNum)))
+          .limit(1);
+
+        if (draws.length > 0) {
+          // Calcular qual segunda-feira do mês é esta data
+          const firstDayOfMonth = new Date(yearNum, monthNum - 1, 1);
+          let mondayOfWeek = 0;
+          const tempDate = new Date(firstDayOfMonth);
+          while (tempDate.getDay() !== 1) tempDate.setDate(tempDate.getDate() + 1);
+          while (tempDate <= targetDate) {
+            mondayOfWeek++;
+            if (tempDate.toISOString().split('T')[0] === targetDateStr) break;
+            tempDate.setDate(tempDate.getDate() + 7);
+          }
+
+          // Buscar resultados apenas para esta segunda-feira específica
+          const drawResults = await db
+            .select({
+              id: adorationDrawResults.id,
+              ministerId: adorationDrawResults.ministerId,
+              ministerName: users.name,
+              scheduleDisplayName: users.scheduleDisplayName,
+              mondayOfWeek: adorationDrawResults.mondayOfWeek,
+              isVoluntary: adorationDrawResults.isVoluntary
+            })
+            .from(adorationDrawResults)
+            .leftJoin(users, eq(adorationDrawResults.ministerId, users.id))
+            .where(and(
+              eq(adorationDrawResults.drawId, draws[0].id),
+              eq(adorationDrawResults.mondayOfWeek, mondayOfWeek)
+            ));
+
+          adorationAssignments = drawResults.map((res: any) => ({
+            id: `adoracao-${res.id}`,
+            scheduleId: `adoracao-${res.id}`,
+            ministerId: res.ministerId,
+            date: targetDateStr,
+            massTime: "22:00:00",
+            position: 0,
+            confirmed: true,
+            ministerName: res.ministerName,
+            scheduleDisplayName: res.scheduleDisplayName,
+            notes: res.isVoluntary ? "Voluntário" : "Sorteado",
+            status: "published",
+            type: "adoracao",
+            location: "Adoração ao Santíssimo"
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("[SCHEDULES_BY_DATE] Erro ao buscar adoração:", e);
+    }
+
+    // Mesclar escalações de missas com as de adoração
+    const allAssignments = [...massAssignments, ...adorationAssignments];
+
     if (allAssignments.length === 0) {
-      return res.json({ 
-        schedule: null, 
+      return res.json({
+        schedule: null,
         assignments: [],
         message: "Nenhuma escala encontrada para esta data"
       });
     }
-    
+
     res.json({
       schedule: {
-        id: allAssignments[0].scheduleId,
+        id: massAssignments.length > 0 ? massAssignments[0].scheduleId : `adoracao-${targetDateStr}`,
         date: targetDateStr,
         status: "scheduled"
       },
