@@ -1,16 +1,18 @@
 import { logger } from './logger.js';
-import { users, schedules, massTimesConfig } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { users, schedules, massTimesConfig, questionnaires } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay, isSunday } from 'date-fns';
 import { ResponseCompiler } from '../services/responseCompiler';
 import { AvailabilityService } from '../services/availabilityService';
-import type { CompiledAvailability } from '../services/responseCompiler';
+import type { CompiledAvailability, ParsedCustomQuestion } from '../services/responseCompiler';
 
 /**
  * SCHEDULE GENERATOR V2.0
  *
  * Refactored version using ResponseCompiler and AvailabilityService.
  * Cleaner separation of concerns and easier to maintain.
+ *
+ * 🔧 FIX 2026-01: Now supports custom questions (custom_*) by parsing date/time from questionnaire
  */
 
 export interface Minister {
@@ -50,6 +52,9 @@ export class ScheduleGeneratorV2 {
   private ministers: Minister[] = [];
   private massTimes: MassTime[] = [];
   private compiledData!: Map<string, CompiledAvailability>;
+
+  // 🔧 FIX: Custom questions from questionnaire (for special masses)
+  private customQuestions: ParsedCustomQuestion[] = [];
 
   // Runtime tracking
   private monthlyAssignments: Map<string, number> = new Map(); // ministerId -> count
@@ -106,7 +111,100 @@ export class ScheduleGeneratorV2 {
     await this.loadMassTimesConfig();
     console.timeEnd('[PERF] Load mass config');
 
+    // 🔧 FIX: Load custom questions from questionnaire (for special masses)
+    console.log(`\n[STEP 5] 📌 Loading custom questions from questionnaire...`);
+    console.time('[PERF] Load custom questions');
+    await this.loadCustomQuestions();
+    console.timeEnd('[PERF] Load custom questions');
+
     console.log(`\n✅ Initialization complete in ${Date.now() - startTime}ms\n`);
+  }
+
+  /**
+   * 🔧 FIX: Load ALL questions with date/time from questionnaire
+   *
+   * Parses ANY question that contains date and time in the text
+   * Works with ANY category: custom, special_event, special, etc.
+   * Works with ANY ID format: custom_*, special_event_*, etc.
+   */
+  private async loadCustomQuestions(): Promise<void> {
+    try {
+      const questionnaireResult = await this.db.select()
+        .from(questionnaires)
+        .where(
+          and(
+            eq(questionnaires.month, this.month),
+            eq(questionnaires.year, this.year)
+          )
+        )
+        .limit(1);
+
+      if (questionnaireResult.length === 0) {
+        console.log(`   ⚠️  No questionnaire found for ${this.month}/${this.year}`);
+        return;
+      }
+
+      const questions = questionnaireResult[0].questions;
+      if (!questions || !Array.isArray(questions)) {
+        return;
+      }
+
+      // Categories that may contain specific date/time questions
+      const relevantCategories = ['custom', 'special_event', 'special'];
+
+      for (const q of questions) {
+        const category = q.category || '';
+
+        // Skip regular/daily categories - they don't have specific dates
+        if (category === 'regular' || category === 'daily') {
+          continue;
+        }
+
+        // Process if it's a relevant category OR if ID suggests it's special
+        const isRelevantCategory = relevantCategories.includes(category);
+        const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event');
+
+        if (!isRelevantCategory && !isSpecialId) {
+          continue;
+        }
+
+        const questionText = q.question || '';
+
+        // Extract date: "dia 28/01/2026" or "28/01/2026" or "28/01"
+        const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/i);
+
+        // Extract time: "às 7h", "às 15h", "às 19h30", "ás 15h"
+        const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+
+        if (dateMatch && timeMatch) {
+          const day = dateMatch[1].padStart(2, '0');
+          const month = dateMatch[2].padStart(2, '0');
+          const extractedYear = dateMatch[3] || this.year.toString();
+
+          const hour = timeMatch[1].padStart(2, '0');
+          const minute = (timeMatch[2] || '00').padStart(2, '0');
+
+          this.customQuestions.push({
+            id: q.id,
+            question: questionText,
+            date: `${extractedYear}-${month}-${day}`,
+            time: `${hour}:${minute}`,
+            category: category
+          });
+        }
+      }
+
+      if (this.customQuestions.length > 0) {
+        console.log(`   ✅ Found ${this.customQuestions.length} questions with special masses:`);
+        this.customQuestions.forEach(cq => {
+          console.log(`      - ${cq.date} às ${cq.time} (${cq.category})`);
+        });
+      } else {
+        console.log(`   ℹ️  No questions with date/time found`);
+      }
+    } catch (error) {
+      console.error(`   ❌ Error loading custom questions:`, error);
+    }
   }
 
   /**
@@ -217,15 +315,75 @@ export class ScheduleGeneratorV2 {
       currentDate = addDays(currentDate, 1);
     }
 
-    // Add special masses for October (São Judas)
-    if (this.month === 10) {
+    // Add special masses for October (São Judas) - LEGACY SUPPORT
+    if (this.month === 10 && this.year === 2025) {
       masses.push(...this.generateOctoberSpecialMasses());
     }
 
-    return masses.sort((a, b) => {
+    // 🔧 FIX: Add special masses from custom questions (dynamic)
+    masses.push(...this.generateCustomMasses());
+
+    // Remove duplicates (same date + time)
+    const uniqueMasses = this.deduplicateMasses(masses);
+
+    return uniqueMasses.sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return a.time.localeCompare(b.time);
     });
+  }
+
+  /**
+   * 🔧 FIX: Generate special masses from custom questions
+   *
+   * Creates mass entries for each custom question with date/time
+   */
+  private generateCustomMasses(): MassTime[] {
+    const masses: MassTime[] = [];
+
+    for (const customQ of this.customQuestions) {
+      const existingMass = masses.find(m => m.date === customQ.date && m.time === customQ.time);
+
+      if (!existingMass) {
+        const date = new Date(customQ.date + 'T12:00:00');
+        const dayOfWeek = date.getDay();
+
+        masses.push({
+          id: `${customQ.date}_${customQ.time}`,
+          date: customQ.date,
+          dayOfWeek,
+          time: customQ.time,
+          type: 'custom_special',  // Mark as custom special mass
+          minMinisters: 6,   // Default for special masses
+          maxMinisters: 12   // Can adjust based on event type
+        });
+
+        console.log(`   📌 Added custom mass: ${customQ.date} às ${customQ.time}`);
+      }
+    }
+
+    if (masses.length > 0) {
+      console.log(`   ✅ Generated ${masses.length} custom special masses`);
+    }
+
+    return masses;
+  }
+
+  /**
+   * 🔧 FIX: Remove duplicate masses (same date + time)
+   */
+  private deduplicateMasses(masses: MassTime[]): MassTime[] {
+    const seen = new Map<string, MassTime>();
+
+    for (const mass of masses) {
+      const key = `${mass.date}_${mass.time}`;
+
+      // If we already have this mass, prefer the custom one (more specific)
+      if (!seen.has(key) || mass.type === 'custom_special') {
+        seen.set(key, mass);
+      }
+    }
+
+    return Array.from(seen.values());
   }
 
   /**

@@ -7,6 +7,8 @@ import { eq, and, isNotNull } from 'drizzle-orm';
  *
  * Compiles questionnaire responses into a standardized format for schedule generation.
  * Handles multiple response formats (V2.0, V1.0 array, legacy fields) automatically.
+ *
+ * 🔧 FIX 2026-01: Now supports custom questions (custom_*) by parsing date/time from question text
  */
 
 // ===== TYPES =====
@@ -51,6 +53,17 @@ export interface CompiledAvailability {
   };
 }
 
+/**
+ * Parsed custom question with extracted date/time
+ */
+export interface ParsedCustomQuestion {
+  id: string;
+  question: string;
+  date: string;      // '2026-01-28'
+  time: string;      // '07:00'
+  category: string;
+}
+
 // ===== MAIN SERVICE =====
 
 export class ResponseCompiler {
@@ -82,7 +95,17 @@ export class ResponseCompiler {
     }
 
     const questionnaireId = questionnaire[0].id;
+    const questionnaireQuestions = questionnaire[0].questions;
     console.log(`   Questionário ID: ${questionnaireId}`);
+
+    // 🔧 FIX: Parse custom questions from questionnaire to extract date/time
+    const customQuestions = this.parseCustomQuestions(questionnaireQuestions, year);
+    if (customQuestions.length > 0) {
+      console.log(`   📌 Encontradas ${customQuestions.length} perguntas customizadas:`);
+      customQuestions.forEach(q => {
+        console.log(`      - ${q.id}: ${q.date} às ${q.time}`);
+      });
+    }
 
     // 2. Buscar todas as respostas do banco
     const responses = await db.select()
@@ -106,7 +129,8 @@ export class ResponseCompiler {
           row.questionnaire_responses,
           row.users,
           month,
-          year
+          year,
+          customQuestions  // 🔧 FIX: Pass custom questions for processing
         );
 
         compiled.set(compiledData.userId, compiledData);
@@ -121,13 +145,81 @@ export class ResponseCompiler {
   }
 
   /**
+   * 🔧 FIX: Parse ALL questions with date/time from questionnaire
+   *
+   * Extracts date and time from ANY question text that contains them, like:
+   * - "Você pode servir na Missa em honra à São Judas Tadeu - quarta feira, dia 28/01/2026 às 7h ?"
+   * - "Você pode servir sexta-feira dia 28/11/2025 às 15h - Missa votiva..."
+   *
+   * Works with ANY category: custom, special_event, special, etc.
+   * Works with ANY ID format: custom_*, special_event_*, etc.
+   */
+  private static parseCustomQuestions(questions: any, year: number): ParsedCustomQuestion[] {
+    const parsed: ParsedCustomQuestion[] = [];
+
+    if (!questions || !Array.isArray(questions)) {
+      return parsed;
+    }
+
+    // Categories that may contain specific date/time questions
+    const relevantCategories = ['custom', 'special_event', 'special'];
+
+    for (const q of questions) {
+      const category = q.category || '';
+
+      // Skip regular/daily categories - they don't have specific dates
+      if (category === 'regular' || category === 'daily') {
+        continue;
+      }
+
+      // Process if it's a relevant category OR if ID suggests it's special
+      const isRelevantCategory = relevantCategories.includes(category);
+      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event');
+
+      if (!isRelevantCategory && !isSpecialId) {
+        continue;
+      }
+
+      const questionText = q.question || '';
+
+      // Try to extract date: "dia 28/01/2026" or "28/01/2026" or "28/01" or "dia 28/11"
+      const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/i);
+
+      // Try to extract time: "às 7h", "às 15h", "às 19h30", "às 19:30", "ás 15h"
+      const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+
+      if (dateMatch && timeMatch) {
+        const day = dateMatch[1].padStart(2, '0');
+        const month = dateMatch[2].padStart(2, '0');
+        const extractedYear = dateMatch[3] || year.toString();
+
+        const hour = timeMatch[1].padStart(2, '0');
+        const minute = (timeMatch[2] || '00').padStart(2, '0');
+
+        parsed.push({
+          id: q.id,
+          question: questionText,
+          date: `${extractedYear}-${month}-${day}`,
+          time: `${hour}:${minute}`,
+          category: category
+        });
+
+        console.log(`      📅 Parsed: ${q.id} -> ${extractedYear}-${month}-${day} às ${hour}:${minute}`);
+      }
+    }
+
+    return parsed;
+  }
+
+  /**
    * Compila resposta individual detectando formato automaticamente
    */
   private static compileUserResponse(
     response: any,
     user: any,
     month: number,
-    year: number
+    year: number,
+    customQuestions: ParsedCustomQuestion[] = []  // 🔧 FIX: Accept custom questions
   ): CompiledAvailability {
 
     const rawData = typeof response.responses === 'string'
@@ -179,7 +271,102 @@ export class ResponseCompiler {
         console.warn(`  ⚠️ Formato desconhecido para ${user.name}`);
     }
 
+    // 🔧 FIX: Process custom questions from responses and special_events fields
+    if (customQuestions.length > 0) {
+      compiled = this.processCustomQuestions(rawData, response, compiled, customQuestions, user.name);
+    }
+
     return compiled;
+  }
+
+  /**
+   * 🔧 FIX: Process custom questions responses
+   *
+   * Looks for answers in:
+   * 1. responses JSON (rawData) - for questionId matching
+   * 2. special_events field in the response record
+   */
+  private static processCustomQuestions(
+    rawData: any,
+    fullResponse: any,
+    base: CompiledAvailability,
+    customQuestions: ParsedCustomQuestion[],
+    userName: string
+  ): CompiledAvailability {
+
+    let processedCount = 0;
+
+    for (const customQ of customQuestions) {
+      let answer: any = null;
+
+      // 1. Try to find in rawData (if it's an array format)
+      if (Array.isArray(rawData)) {
+        const found = rawData.find((item: any) => item.questionId === customQ.id);
+        if (found) {
+          answer = found.answer;
+        }
+      }
+      // If rawData is an object, try direct access
+      else if (rawData && typeof rawData === 'object') {
+        answer = rawData[customQ.id];
+      }
+
+      // 2. Try to find in special_events field
+      if (answer === null || answer === undefined) {
+        const specialEvents = fullResponse.specialEvents || fullResponse.special_events;
+        if (specialEvents && typeof specialEvents === 'object') {
+          answer = specialEvents[customQ.id];
+        }
+      }
+
+      // 3. Try to find directly in the responses field as object
+      if (answer === null || answer === undefined) {
+        const responses = fullResponse.responses;
+        if (responses && typeof responses === 'object' && !Array.isArray(responses)) {
+          answer = responses[customQ.id];
+        }
+      }
+
+      // If we found an answer, process it
+      if (answer !== null && answer !== undefined) {
+        const isAvailable = this.parseAnswer(answer);
+
+        // Add to availability dates
+        if (!base.availability.dates[customQ.date]) {
+          base.availability.dates[customQ.date] = {
+            date: customQ.date,
+            times: {}
+          };
+        }
+
+        base.availability.dates[customQ.date].times[customQ.time] = isAvailable;
+
+        if (isAvailable) {
+          processedCount++;
+          console.log(`      ✓ Custom: ${customQ.date} às ${customQ.time} = Sim`);
+        }
+      }
+    }
+
+    if (processedCount > 0) {
+      console.log(`    ✅ ${userName}: ${processedCount} disponibilidades em perguntas customizadas`);
+    }
+
+    return base;
+  }
+
+  /**
+   * 🔧 FIX: Parse answer to boolean
+   */
+  private static parseAnswer(answer: any): boolean {
+    if (typeof answer === 'boolean') {
+      return answer;
+    }
+    if (typeof answer === 'string') {
+      const normalized = answer.toLowerCase().trim();
+      return normalized === 'sim' || normalized === 'yes' || normalized === 'true';
+    }
+    return false;
   }
 
   // ===== FORMAT PROCESSORS =====
