@@ -13233,7 +13233,11 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       massTime: schedules.time,
       position: schedules.position,
       confirmed: sql9`true`,
-      status: schedules.status
+      status: schedules.status,
+      // Campos necessários para identificar adoração e celebrações especiais
+      type: schedules.type,
+      location: schedules.location,
+      notes: schedules.notes
     }).from(schedules).leftJoin(users, eq17(schedules.ministerId, users.id)).where(
       and12(
         eq17(schedules.date, targetDateStr),
