@@ -34,7 +34,9 @@
       "Bash(python3:*)",
       "Bash(grep:*)",
       "Bash(env)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node /tmp/test-adoration.mjs:*)",
+      "Bash(node test-adoration.mjs:*)"
     ],
     "deny": [],
     "ask": []

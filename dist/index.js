@@ -13223,7 +13223,7 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
       isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
     }
     const targetDateStr = date2.includes("T") ? date2.split("T")[0] : date2.split(" ")[0];
-    const allAssignments = await db.select({
+    const massAssignments = await db.select({
       id: schedules.id,
       scheduleId: schedules.id,
       ministerId: schedules.ministerId,
@@ -13244,6 +13244,57 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
         isAdmin ? void 0 : eq17(schedules.status, "published")
       )
     ).orderBy(schedules.time, schedules.position);
+    let adorationAssignments = [];
+    try {
+      const targetDate = /* @__PURE__ */ new Date(targetDateStr + "T12:00:00");
+      const isMonday2 = targetDate.getDay() === 1;
+      if (isMonday2) {
+        const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const monthNum = targetDate.getMonth() + 1;
+        const yearNum = targetDate.getFullYear();
+        const draws = await db.select().from(adorationDraws2).where(and12(eq17(adorationDraws2.month, monthNum), eq17(adorationDraws2.year, yearNum))).limit(1);
+        if (draws.length > 0) {
+          const firstDayOfMonth = new Date(yearNum, monthNum - 1, 1);
+          let mondayOfWeek = 0;
+          const tempDate = new Date(firstDayOfMonth);
+          while (tempDate.getDay() !== 1) tempDate.setDate(tempDate.getDate() + 1);
+          while (tempDate <= targetDate) {
+            mondayOfWeek++;
+            if (tempDate.toISOString().split("T")[0] === targetDateStr) break;
+            tempDate.setDate(tempDate.getDate() + 7);
+          }
+          const drawResults = await db.select({
+            id: adorationDrawResults2.id,
+            ministerId: adorationDrawResults2.ministerId,
+            ministerName: users.name,
+            scheduleDisplayName: users.scheduleDisplayName,
+            mondayOfWeek: adorationDrawResults2.mondayOfWeek,
+            isVoluntary: adorationDrawResults2.isVoluntary
+          }).from(adorationDrawResults2).leftJoin(users, eq17(adorationDrawResults2.ministerId, users.id)).where(and12(
+            eq17(adorationDrawResults2.drawId, draws[0].id),
+            eq17(adorationDrawResults2.mondayOfWeek, mondayOfWeek)
+          ));
+          adorationAssignments = drawResults.map((res2) => ({
+            id: `adoracao-${res2.id}`,
+            scheduleId: `adoracao-${res2.id}`,
+            ministerId: res2.ministerId,
+            date: targetDateStr,
+            massTime: "22:00:00",
+            position: 0,
+            confirmed: true,
+            ministerName: res2.ministerName,
+            scheduleDisplayName: res2.scheduleDisplayName,
+            notes: res2.isVoluntary ? "Volunt\xE1rio" : "Sorteado",
+            status: "published",
+            type: "adoracao",
+            location: "Adora\xE7\xE3o ao Sant\xEDssimo"
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("[SCHEDULES_BY_DATE] Erro ao buscar adora\xE7\xE3o:", e);
+    }
+    const allAssignments = [...massAssignments, ...adorationAssignments];
     if (allAssignments.length === 0) {
       return res.json({
         schedule: null,
@@ -13253,7 +13304,7 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
     }
     res.json({
       schedule: {
-        id: allAssignments[0].scheduleId,
+        id: massAssignments.length > 0 ? massAssignments[0].scheduleId : `adoracao-${targetDateStr}`,
         date: targetDateStr,
         status: "scheduled"
       },
