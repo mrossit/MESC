@@ -13346,6 +13346,54 @@ router9.get("/", authenticateToken, async (req, res) => {
           sql9`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
         )
       ) : [];
+      let adorationAssignments = [];
+      try {
+        const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2, users: users3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const draws = await db.select().from(adorationDraws2).where(and12(eq17(adorationDraws2.month, monthNum), eq17(adorationDraws2.year, yearNum))).limit(1);
+        if (draws.length > 0) {
+          let getMondaysInMonth3 = function(year2, month2) {
+            const mondays = [];
+            const date2 = new Date(year2, month2 - 1, 1);
+            while (date2.getDay() !== 1) date2.setDate(date2.getDate() + 1);
+            while (date2.getMonth() === month2 - 1) {
+              mondays.push(date2.toISOString().split("T")[0]);
+              date2.setDate(date2.getDate() + 7);
+            }
+            return mondays;
+          };
+          var getMondaysInMonth2 = getMondaysInMonth3;
+          const drawResults = await db.select({
+            id: adorationDrawResults2.id,
+            ministerId: adorationDrawResults2.ministerId,
+            ministerName: users3.name,
+            scheduleDisplayName: users3.scheduleDisplayName,
+            mondayOfWeek: adorationDrawResults2.mondayOfWeek,
+            isVoluntary: adorationDrawResults2.isVoluntary
+          }).from(adorationDrawResults2).leftJoin(users3, eq17(adorationDrawResults2.ministerId, users3.id)).where(eq17(adorationDrawResults2.drawId, draws[0].id));
+          const mondaysInMonth = getMondaysInMonth3(yearNum, monthNum);
+          adorationAssignments = drawResults.map((res2) => {
+            const mondayDate = mondaysInMonth[res2.mondayOfWeek - 1];
+            return {
+              id: `adoracao-${res2.id}`,
+              scheduleId: `adoracao-${res2.id}`,
+              ministerId: res2.ministerId,
+              date: mondayDate,
+              massTime: "22:00:00",
+              position: 0,
+              confirmed: true,
+              ministerName: res2.ministerName,
+              scheduleDisplayName: res2.scheduleDisplayName,
+              photoUrl: null,
+              notes: res2.isVoluntary ? "Volunt\xE1rio" : "Sorteado",
+              status: "published",
+              type: "adoracao"
+            };
+          });
+        }
+      } catch (e) {
+        console.error("[SCHEDULES_API] Erro ao buscar adora\xE7\xE3o:", e);
+      }
+      const allAssignmentsList = [...assignmentsList, ...adorationAssignments];
       const hasPublishedSchedules = schedulesList.some((s) => s.status === "published");
       const scheduleStatus = hasPublishedSchedules ? "published" : "draft";
       const monthlySchedule = schedulesList.length > 0 ? {
@@ -13361,7 +13409,7 @@ router9.get("/", authenticateToken, async (req, res) => {
       } : null;
       const responseData = {
         schedules: monthlySchedule ? [monthlySchedule] : [],
-        assignments: assignmentsList,
+        assignments: allAssignmentsList,
         substitutions: substitutionsList
       };
       scheduleCache.set(yearNum, monthNum, responseData);
@@ -16355,6 +16403,7 @@ router19.get("/ministry-stats", async (req, res) => {
       )
     ).limit(1);
     let responseRate = 0;
+    let hasResponded = false;
     if (currentQuestionnaire) {
       const [responseStats] = await db.select({
         totalResponses: count6(questionnaireResponses.id)
@@ -16362,6 +16411,15 @@ router19.get("/ministry-stats", async (req, res) => {
       responseRate = Math.round(
         responseStats.totalResponses / (activeMinistersResult.count || 1) * 100
       );
+      const userId = req.user?.id;
+      if (userId) {
+        const [userResponse] = await db.select().from(questionnaireResponses).where(and20(
+          eq28(questionnaireResponses.userId, userId),
+          eq28(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
+          eq28(questionnaireResponses.isDeleted, false)
+        )).limit(1);
+        hasResponded = !!userResponse;
+      }
     }
     const [pendingSubsCount] = await db.select({ count: count6() }).from(substitutionRequests).where(
       and20(
@@ -16385,6 +16443,7 @@ router19.get("/ministry-stats", async (req, res) => {
       data: {
         activeMinisters: activeMinistersResult.count,
         responseRate,
+        hasResponded,
         monthCoverage: {
           total: monthStats?.totalMasses || 0,
           fullyStaffed: monthStats?.fullyStaffedMasses || 0,
