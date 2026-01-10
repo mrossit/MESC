@@ -393,9 +393,12 @@ export default function Substitutions() {
       });
 
       if (response.ok) {
+        const isCoordinatorAction = isCoordinator && requestToCancel.requestingUser.id !== user?.id;
         toast({
           title: "Sucesso",
-          description: "Solicitação cancelada com sucesso"
+          description: isCoordinatorAction 
+            ? `Solicitação de ${requestToCancel.requestingUser.name} excluída com sucesso`
+            : "Solicitação cancelada com sucesso"
         });
         // Invalidar todas as queries de substituições e schedules relacionados
         queryClient.invalidateQueries({ queryKey: ["/api/substitutions"], exact: false });
@@ -862,8 +865,8 @@ export default function Substitutions() {
                           </Button>
                         )}
 
-                        {/* Botão para cancelar própria solicitação */}
-                        {(item.request.status === "pending" || item.request.status === "available") && isMyRequest && (
+                        {/* Botão para cancelar solicitação (própria ou coordenador) */}
+                        {(item.request.status === "pending" || item.request.status === "available") && (isMyRequest || isCoordinator) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -874,7 +877,7 @@ export default function Substitutions() {
                             }}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
+                            {isCoordinator && !isMyRequest ? "Excluir" : "Cancelar"}
                           </Button>
                         )}
                       </div>
@@ -1262,9 +1265,15 @@ export default function Substitutions() {
       <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancelar Solicitação</DialogTitle>
+            <DialogTitle>
+              {isCoordinator && requestToCancel?.requestingUser.id !== user?.id 
+                ? "Excluir Solicitação" 
+                : "Cancelar Solicitação"}
+            </DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja cancelar esta solicitação de substituição?
+              {isCoordinator && requestToCancel?.requestingUser.id !== user?.id 
+                ? `Tem certeza que deseja excluir a solicitação de ${requestToCancel?.requestingUser.name}?`
+                : "Tem certeza que deseja cancelar esta solicitação de substituição?"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1282,12 +1291,12 @@ export default function Substitutions() {
               {cancellingRequest ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Cancelando...
+                  {isCoordinator && requestToCancel?.requestingUser.id !== user?.id ? "Excluindo..." : "Cancelando..."}
                 </>
               ) : (
                 <>
                   <XCircle className="h-4 w-4 mr-1" />
-                  Sim, cancelar
+                  {isCoordinator && requestToCancel?.requestingUser.id !== user?.id ? "Sim, excluir" : "Sim, cancelar"}
                 </>
               )}
             </Button>

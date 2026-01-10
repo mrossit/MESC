@@ -36,7 +36,8 @@
       "Bash(env)",
       "Bash(ls:*)",
       "Bash(node /tmp/test-adoration.mjs:*)",
-      "Bash(node test-adoration.mjs:*)"
+      "Bash(node test-adoration.mjs:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
