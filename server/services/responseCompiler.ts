@@ -280,11 +280,16 @@ export class ResponseCompiler {
   }
 
   /**
-   * 🔧 FIX: Process custom questions responses
+   * 🔧 FIX DEFINITIVO: Process custom questions responses
    *
-   * Looks for answers in:
-   * 1. responses JSON (rawData) - for questionId matching
-   * 2. special_events field in the response record
+   * HISTÓRICO DE BUGS:
+   * - Bug recorrente: código não encontrava respostas de eventos customizados
+   * - Causa: não procurava em rawData.special_events (formato V2.0)
+   *
+   * LOCAIS ONDE AS RESPOSTAS PODEM ESTAR:
+   * 1. rawData.special_events[questionId] - FORMATO V2.0 (principal!)
+   * 2. rawData[questionId] - acesso direto (legacy)
+   * 3. Array format: [{questionId, answer}] - V1.0
    */
   private static processCustomQuestions(
     rawData: any,
@@ -295,39 +300,50 @@ export class ResponseCompiler {
   ): CompiledAvailability {
 
     let processedCount = 0;
+    let notFoundCount = 0;
 
     for (const customQ of customQuestions) {
       let answer: any = null;
+      let foundIn: string = '';
 
-      // 1. Try to find in rawData (if it's an array format)
-      if (Array.isArray(rawData)) {
+      // ========================================
+      // FORMATO V2.0 - VERIFICAR PRIMEIRO!
+      // As respostas estão em rawData.special_events
+      // ========================================
+      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+        // 1. PRINCIPAL: Procurar em special_events (onde V2.0 salva custom events)
+        if (rawData.special_events && typeof rawData.special_events === 'object') {
+          const seValue = rawData.special_events[customQ.id];
+          if (seValue !== null && seValue !== undefined) {
+            answer = seValue;
+            foundIn = 'rawData.special_events';
+          }
+        }
+
+        // 2. Fallback: acesso direto no rawData (caso legado)
+        if (answer === null || answer === undefined) {
+          const directValue = rawData[customQ.id];
+          if (directValue !== null && directValue !== undefined) {
+            answer = directValue;
+            foundIn = 'rawData (direct)';
+          }
+        }
+      }
+
+      // ========================================
+      // FORMATO V1.0 ARRAY - [{questionId, answer}]
+      // ========================================
+      if ((answer === null || answer === undefined) && Array.isArray(rawData)) {
         const found = rawData.find((item: any) => item.questionId === customQ.id);
         if (found) {
           answer = found.answer;
-        }
-      }
-      // If rawData is an object, try direct access
-      else if (rawData && typeof rawData === 'object') {
-        answer = rawData[customQ.id];
-      }
-
-      // 2. Try to find in special_events field
-      if (answer === null || answer === undefined) {
-        const specialEvents = fullResponse.specialEvents || fullResponse.special_events;
-        if (specialEvents && typeof specialEvents === 'object') {
-          answer = specialEvents[customQ.id];
+          foundIn = 'rawData array';
         }
       }
 
-      // 3. Try to find directly in the responses field as object
-      if (answer === null || answer === undefined) {
-        const responses = fullResponse.responses;
-        if (responses && typeof responses === 'object' && !Array.isArray(responses)) {
-          answer = responses[customQ.id];
-        }
-      }
-
-      // If we found an answer, process it
+      // ========================================
+      // PROCESSAR RESPOSTA ENCONTRADA
+      // ========================================
       if (answer !== null && answer !== undefined) {
         const isAvailable = this.parseAnswer(answer);
 
@@ -343,13 +359,19 @@ export class ResponseCompiler {
 
         if (isAvailable) {
           processedCount++;
-          console.log(`      ✓ Custom: ${customQ.date} às ${customQ.time} = Sim`);
+          console.log(`      ✓ Custom: ${customQ.date} às ${customQ.time} = Sim (${foundIn})`);
         }
+      } else {
+        notFoundCount++;
+        console.log(`      ⚠️ Custom: ${customQ.id} - resposta não encontrada`);
       }
     }
 
     if (processedCount > 0) {
       console.log(`    ✅ ${userName}: ${processedCount} disponibilidades em perguntas customizadas`);
+    }
+    if (notFoundCount > 0) {
+      console.log(`    ⚠️ ${userName}: ${notFoundCount} perguntas customizadas sem resposta`);
     }
 
     return base;
