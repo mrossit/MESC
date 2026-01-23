@@ -42,7 +42,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       });
     }
 
-    // 2. Buscar todos os ministros ativos e coordenadores
+    // 2. Buscar todos os ministros ativos e coordenadores COM familyId
     const allMinisters = await db
       .select()
       .from(users)
@@ -71,31 +71,75 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       });
     }
 
-    // 4. Determinar quantos ministros total sortear
-    // Calcula: total de ministros dividido pelo número de segundas do mês
-    const ministersPerMonday = totalMinistersToDraw 
-      ? Math.ceil(totalMinistersToDraw / mondayCount)
-      : Math.ceil(allMinisters.length / mondayCount);
-    const ministersToDrawTotal = ministersPerMonday * mondayCount;
+    // 4. Agrupar ministros por família
+    // Familiares devem ser escalados JUNTOS na mesma segunda-feira
+    const familyGroups = new Map<string, typeof allMinisters>();
+    const individualsWithoutFamily: typeof allMinisters = [];
 
-    logger.info(`Sorteio: ${allMinisters.length} ministros disponíveis, ${mondayCount} segundas, ${ministersPerMonday} por segunda`);
+    for (const minister of allMinisters) {
+      if (minister.familyId) {
+        if (!familyGroups.has(minister.familyId)) {
+          familyGroups.set(minister.familyId, []);
+        }
+        familyGroups.get(minister.familyId)!.push(minister);
+      } else {
+        individualsWithoutFamily.push(minister);
+      }
+    }
 
-    // 5. Verificar respostas voluntárias no questionário (se existir)
+    logger.info(`Sorteio: ${allMinisters.length} ministros, ${familyGroups.size} famílias, ${individualsWithoutFamily.length} individuais`);
+
+    // 5. Criar unidades de sorteio (família inteira conta como 1 unidade)
+    interface DrawUnit {
+      id: string; // familyId ou odMinisterId
+      members: typeof allMinisters;
+      isFamily: boolean;
+      isVoluntary: boolean;
+    }
+
     const voluntaryMinisters = await getVoluntaryMinistersForAdoration(year, month);
     const voluntaryMinisterIds = new Set(voluntaryMinisters.map((m: any) => m.id));
 
+    const drawUnits: DrawUnit[] = [];
+
+    // Adicionar famílias como unidades
+    for (const [familyId, members] of familyGroups) {
+      // Família é voluntária se pelo menos um membro é voluntário
+      const hasVoluntary = members.some(m => voluntaryMinisterIds.has(m.id));
+      drawUnits.push({
+        id: familyId,
+        members,
+        isFamily: true,
+        isVoluntary: hasVoluntary
+      });
+    }
+
+    // Adicionar individuais como unidades
+    for (const minister of individualsWithoutFamily) {
+      drawUnits.push({
+        id: minister.id,
+        members: [minister],
+        isFamily: false,
+        isVoluntary: voluntaryMinisterIds.has(minister.id)
+      });
+    }
+
+    // 6. Determinar quantas UNIDADES por segunda (não ministros)
+    const unitsPerMonday = Math.ceil(drawUnits.length / mondayCount);
+
+    logger.info(`${drawUnits.length} unidades de sorteio, ${unitsPerMonday} por segunda`);
     logger.info(`${voluntaryMinisters.length} ministros se voluntariaram para adoração`);
 
-    // 6. Criar o sorteio
+    // 7. Criar o sorteio
     const draw = await storage.createAdorationDraw({
       month,
       year,
-      totalMinistersToDraw: ministersToDrawTotal,
+      totalMinistersToDraw: allMinisters.length,
       createdBy: req.user.id
     });
 
-    // 7. Executar o sorteio distribuindo entre as segundas
-    const selectedMinisters = new Set<string>();
+    // 8. Executar o sorteio distribuindo UNIDADES entre as segundas
+    const selectedUnits = new Set<string>();
     const drawResults = [];
 
     // Shuffle array helper
@@ -111,51 +155,64 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
     // Para cada segunda-feira do mês
     for (let weekIndex = 0; weekIndex < mondayCount; weekIndex++) {
       const mondayOfWeek = weekIndex + 1; // 1, 2, 3, 4, 5
-      
-      // Embaralhar lista de ministros disponíveis (não sorteados ainda)
-      const availableForThisMonday = shuffle(
-        allMinisters.filter((m: any) => !selectedMinisters.has(m.id))
+
+      // Unidades disponíveis (não sorteadas ainda)
+      const availableUnits = shuffle(
+        drawUnits.filter(u => !selectedUnits.has(u.id))
       );
 
       // Primeiro, adicionar voluntários se houver
-      const voluntariesForThisMonday = availableForThisMonday
-        .filter((m: any) => voluntaryMinisterIds.has(m.id))
-        .slice(0, ministersPerMonday);
+      const voluntaryUnits = availableUnits
+        .filter(u => u.isVoluntary)
+        .slice(0, unitsPerMonday);
 
-      for (const minister of voluntariesForThisMonday) {
-        await storage.addAdorationDrawResult(draw.id, (minister as any).id, mondayOfWeek, true);
-        selectedMinisters.add((minister as any).id);
-        drawResults.push({
-          ministerId: (minister as any).id,
-          ministerName: (minister as any).name,
-          mondayOfWeek,
-          date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
-          isVoluntary: true
-        });
+      for (const unit of voluntaryUnits) {
+        selectedUnits.add(unit.id);
+        // Adicionar TODOS os membros da unidade (família inteira)
+        for (const member of unit.members) {
+          await storage.addAdorationDrawResult(draw.id, member.id, mondayOfWeek, true);
+          drawResults.push({
+            ministerId: member.id,
+            ministerName: member.name,
+            mondayOfWeek,
+            date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
+            isVoluntary: true,
+            familyId: unit.isFamily ? unit.id : null
+          });
+        }
       }
 
       // Completar com sorteados obrigatórios se necessário
-      const remainingNeeded = ministersPerMonday - voluntariesForThisMonday.length;
+      const remainingNeeded = unitsPerMonday - voluntaryUnits.length;
       if (remainingNeeded > 0) {
-        const nonVolunteers = availableForThisMonday
-          .filter((m: any) => !voluntaryMinisterIds.has(m.id) && !selectedMinisters.has(m.id))
+        const nonVoluntaryUnits = availableUnits
+          .filter(u => !u.isVoluntary && !selectedUnits.has(u.id))
           .slice(0, remainingNeeded);
 
-        for (const minister of nonVolunteers) {
-          await storage.addAdorationDrawResult(draw.id, (minister as any).id, mondayOfWeek, false);
-          selectedMinisters.add((minister as any).id);
-          drawResults.push({
-            ministerId: (minister as any).id,
-            ministerName: (minister as any).name,
-            mondayOfWeek,
-            date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
-            isVoluntary: false
-          });
+        for (const unit of nonVoluntaryUnits) {
+          selectedUnits.add(unit.id);
+          // Adicionar TODOS os membros da unidade (família inteira)
+          for (const member of unit.members) {
+            await storage.addAdorationDrawResult(draw.id, member.id, mondayOfWeek, false);
+            drawResults.push({
+              ministerId: member.id,
+              ministerName: member.name,
+              mondayOfWeek,
+              date: mondaysInMonth[weekIndex].toISOString().split('T')[0],
+              isVoluntary: false,
+              familyId: unit.isFamily ? unit.id : null
+            });
+          }
         }
       }
     }
 
-    logger.info(`Sorteio concluído: ${selectedMinisters.size} ministros distribuídos em ${mondayCount} segundas`);
+    const totalMinistersDrawn = drawResults.length;
+    const totalFamilies = drawResults.filter(r => r.familyId).length > 0
+      ? new Set(drawResults.filter(r => r.familyId).map(r => r.familyId)).size
+      : 0;
+
+    logger.info(`Sorteio concluído: ${totalMinistersDrawn} ministros em ${selectedUnits.size} unidades (${totalFamilies} famílias) distribuídos em ${mondayCount} segundas`);
 
     res.json({
       success: true,
@@ -260,9 +317,9 @@ router.delete('/draw/:drawId', authenticateToken, requireRole(['gestor', 'coorde
   try {
     const { drawId } = req.params;
     await storage.deleteAdorationDraw(drawId);
-    
+
     logger.info(`Sorteio ${drawId} deletado por ${req.user?.id}`);
-    
+
     res.json({
       success: true,
       message: 'Sorteio deletado com sucesso'
@@ -272,6 +329,183 @@ router.delete('/draw/:drawId', authenticateToken, requireRole(['gestor', 'coorde
     res.status(500).json({
       success: false,
       message: error.message || 'Erro ao deletar sorteio'
+    });
+  }
+});
+
+// Schema de validação para troca de dia
+const swapDaySchema = z.object({
+  newMondayOfWeek: z.number().min(1).max(5)
+});
+
+/**
+ * POST /api/adoration/swap-day/:drawId
+ * Troca o dia de adoração de um ministro (não permite cancelar, apenas trocar)
+ * Familiares são movidos juntos automaticamente
+ */
+router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { drawId } = req.params;
+    const { newMondayOfWeek } = swapDaySchema.parse(req.body);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuário não autenticado' });
+    }
+
+    // 1. Verificar se o ministro está neste sorteio
+    const currentResult = await storage.getAdorationDrawResultByMinister(drawId, userId);
+    if (!currentResult) {
+      return res.status(404).json({
+        success: false,
+        message: 'Você não está escalado neste sorteio de adoração'
+      });
+    }
+
+    // 2. Verificar se a nova semana é diferente da atual
+    if (currentResult.mondayOfWeek === newMondayOfWeek) {
+      return res.status(400).json({
+        success: false,
+        message: 'Você já está escalado para esta semana'
+      });
+    }
+
+    // 3. Buscar familiares para mover junto
+    const familyMemberIds = await storage.getFamilyMemberIds(userId);
+    const ministersToMove = familyMemberIds.length > 0 ? familyMemberIds : [userId];
+
+    logger.info(`Troca de dia: ${ministersToMove.length} ministro(s) de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
+
+    // 4. Mover todos os familiares para a nova semana
+    const movedMinisters = [];
+    for (const memberId of ministersToMove) {
+      const memberResult = await storage.getAdorationDrawResultByMinister(drawId, memberId);
+      if (memberResult) {
+        await storage.updateAdorationDrawResultMonday(drawId, memberId, newMondayOfWeek);
+        const memberUser = await db.select().from(users).where(eq(users.id, memberId)).limit(1);
+        movedMinisters.push({
+          id: memberId,
+          name: memberUser[0]?.name || 'Desconhecido',
+          oldWeek: memberResult.mondayOfWeek,
+          newWeek: newMondayOfWeek
+        });
+      }
+    }
+
+    // 5. Buscar as datas das segundas para retornar
+    const draw = await storage.getAdorationDrawById(drawId);
+    let mondayDates: Date[] = [];
+    if (draw) {
+      mondayDates = getMondaysInMonth(draw.year, draw.month);
+    }
+
+    const oldDate = mondayDates[currentResult.mondayOfWeek - 1]?.toISOString().split('T')[0] || 'N/A';
+    const newDate = mondayDates[newMondayOfWeek - 1]?.toISOString().split('T')[0] || 'N/A';
+
+    logger.info(`Troca concluída: ${movedMinisters.map(m => m.name).join(', ')} movidos de ${oldDate} para ${newDate}`);
+
+    res.json({
+      success: true,
+      message: familyMemberIds.length > 1
+        ? `Você e sua família foram movidos de ${oldDate} para ${newDate}`
+        : `Você foi movido de ${oldDate} para ${newDate}`,
+      data: {
+        movedMinisters,
+        oldWeek: currentResult.mondayOfWeek,
+        newWeek: newMondayOfWeek,
+        oldDate,
+        newDate
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('Erro ao trocar dia de adoração:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dados inválidos',
+        errors: error.errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erro ao trocar dia'
+    });
+  }
+});
+
+/**
+ * GET /api/adoration/my-schedule/:year/:month
+ * Retorna a escalação de adoração do ministro logado para o mês
+ */
+router.get('/my-schedule/:year/:month', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuário não autenticado' });
+    }
+
+    // 1. Buscar sorteio do mês
+    const draws = await storage.getAdorationDraws(year, month);
+    if (draws.length === 0) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Nenhum sorteio encontrado para este mês'
+      });
+    }
+
+    const draw = draws[0];
+
+    // 2. Buscar resultado do ministro
+    const result = await storage.getAdorationDrawResultByMinister(draw.id, userId);
+    if (!result) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Você não está escalado para adoração neste mês'
+      });
+    }
+
+    // 3. Calcular as datas das segundas
+    const mondaysInMonth = getMondaysInMonth(year, month);
+    const scheduledDate = mondaysInMonth[result.mondayOfWeek - 1];
+
+    // 4. Buscar familiares escalados juntos
+    const familyMemberIds = await storage.getFamilyMemberIds(userId);
+    const familyMembers = [];
+    for (const memberId of familyMemberIds) {
+      if (memberId !== userId) {
+        const memberUser = await db.select().from(users).where(eq(users.id, memberId)).limit(1);
+        if (memberUser[0]) {
+          familyMembers.push({ id: memberId, name: memberUser[0].name });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        drawId: draw.id,
+        mondayOfWeek: result.mondayOfWeek,
+        date: scheduledDate?.toISOString().split('T')[0],
+        isVoluntary: result.isVoluntary,
+        familyMembers,
+        availableMondays: mondaysInMonth.map((d, idx) => ({
+          week: idx + 1,
+          date: d.toISOString().split('T')[0]
+        }))
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('Erro ao buscar escalação de adoração:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erro ao buscar escalação'
     });
   }
 });
