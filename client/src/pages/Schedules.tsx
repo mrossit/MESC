@@ -214,6 +214,9 @@ type ListViewRow = {
   color: string;
   textColor: string;
   assignmentsByPosition: Map<number, ScheduleAssignment>;
+  // Campos opcionais para adoração
+  isAdoration?: boolean;
+  adorationMinisters?: Array<{ name: string; isVoluntary: boolean }>;
 };
 
 // Constantes importadas do arquivo centralizado
@@ -229,6 +232,14 @@ export default function Schedules() {
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [substitutions, setSubstitutions] = useState<SubstitutionRequest[]>([]);
   const [ministers, setMinisters] = useState<any[]>([]);
+  const [adorationData, setAdorationData] = useState<{
+    results: Array<{
+      minister_id: string;
+      minister_name: string;
+      monday_of_week: number;
+      is_voluntary: boolean;
+    }>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -288,7 +299,30 @@ export default function Schedules() {
   useEffect(() => {
     fetchSchedules();
     fetchMinisters();
+    fetchAdorationData();
   }, [currentMonth]);
+
+  const fetchAdorationData = async () => {
+    try {
+      const month = currentMonth.getMonth() + 1;
+      const year = currentMonth.getFullYear();
+      const response = await fetch(`/api/adoration/results/${year}/${month}`, {
+        credentials: "include"
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setAdorationData(data.data);
+        } else {
+          setAdorationData(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching adoration data:", error);
+      setAdorationData(null);
+    }
+  };
 
   const fetchSchedules = async () => {
     try {
@@ -1341,17 +1375,29 @@ export default function Schedules() {
     end: endOfMonth(currentMonth)
   });
 
+  // Helper para calcular semana do mês para uma segunda-feira
+  const getMondayWeekOfMonth = (day: Date): number => {
+    const firstDayOfMonth = new Date(day.getFullYear(), day.getMonth(), 1);
+    let mondayCount = 0;
+    for (let d = 1; d <= day.getDate(); d++) {
+      const checkDate = new Date(day.getFullYear(), day.getMonth(), d);
+      if (checkDate.getDay() === 1) mondayCount++;
+    }
+    return mondayCount;
+  };
+
   const listViewRows: ListViewRow[] = allMonthDays.flatMap((day) => {
     const dateStr = format(day, "yyyy-MM-dd");
-    
+    const rows: ListViewRow[] = [];
+
     const standardMassTimes = getMassTimesForDate(day);
-    
+
     const actualMassTimes = assignments
       .filter(assignment => assignment.date === dateStr)
       .map(assignment => assignment.massTime);
-    
+
     const uniqueActualTimes = Array.from(new Set(actualMassTimes));
-    
+
     const allMassTimes = Array.from(
       new Set([
         ...standardMassTimes.map(normalizeMassTime),
@@ -1359,11 +1405,8 @@ export default function Schedules() {
       ])
     ).sort();
 
-    if (allMassTimes.length === 0) {
-      return [];
-    }
-
-    return allMassTimes.map((massTime) => {
+    // Adicionar missas normais
+    allMassTimes.forEach((massTime) => {
       const normalizedMassTime = normalizeMassTime(massTime);
       const assignmentsForMass = assignments.filter(
         (assignment) =>
@@ -1391,7 +1434,7 @@ export default function Schedules() {
         massInfo = getMassTypeAndColor(day, normalizedMassTime);
       }
 
-      return {
+      rows.push({
         key: `${dateStr}-${normalizedMassTime}`,
         dayNumber: day.getDate(),
         dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
@@ -1399,8 +1442,32 @@ export default function Schedules() {
         color: massInfo.color,
         textColor: massInfo.textColor,
         assignmentsByPosition
-      };
+      });
     });
+
+    // Adicionar linha de ADORAÇÃO se for segunda-feira e houver dados
+    if (day.getDay() === 1 && adorationData?.results) {
+      const weekOfMonth = getMondayWeekOfMonth(day);
+      const adorationMinisters = adorationData.results
+        .filter(r => r.monday_of_week === weekOfMonth)
+        .map(r => ({ name: r.minister_name, isVoluntary: r.is_voluntary }));
+
+      if (adorationMinisters.length > 0) {
+        rows.push({
+          key: `${dateStr}-adoracao`,
+          dayNumber: day.getDate(),
+          dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
+          time: "22:00",
+          color: "#e9d5ff",  // Roxo claro
+          textColor: "#7c3aed",  // Roxo
+          assignmentsByPosition: new Map(),
+          isAdoration: true,
+          adorationMinisters
+        });
+      }
+    }
+
+    return rows;
   });
 
   console.log('[SCHEDULES_PAGE] Current month:', currentMonth.getMonth() + 1, 'year:', currentMonth.getFullYear());
@@ -2119,24 +2186,61 @@ export default function Schedules() {
                             {row.dayNumber}
                           </td>
                           <td className="border border-border px-2 py-1 capitalize text-center font-medium">
-                            {row.dayName}
+                            {row.isAdoration ? (
+                              <span className="flex items-center gap-1 justify-center">
+                                <Star className="h-3 w-3" />
+                                {row.dayName}
+                              </span>
+                            ) : row.dayName}
                           </td>
                           <td className="border border-border px-2 py-1 text-center font-medium">
-                            {row.time}
+                            {row.isAdoration ? (
+                              <span className="font-bold">Adoração</span>
+                            ) : row.time}
                           </td>
-                          {Array.from({ length: TOTAL_POSITIONS }, (_, index) => {
-                            const position = index + 1;
-                            const assignment = row.assignmentsByPosition.get(position);
-                            const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || "";
-                            return (
-                              <td
-                                key={`${row.key}-${position}`}
-                                className="border border-border px-2 py-1 text-left align-middle"
-                              >
-                                {displayName}
-                              </td>
-                            );
-                          })}
+                          {row.isAdoration ? (
+                            // Linha de adoração: célula única expandida com lista de ministros
+                            <td
+                              colSpan={TOTAL_POSITIONS}
+                              className="border border-border px-3 py-2 text-left"
+                            >
+                              <div className="flex flex-wrap gap-1">
+                                {row.adorationMinisters?.map((minister, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                                      minister.isVoluntary
+                                        ? 'bg-green-100 text-green-800 border border-green-300'
+                                        : 'bg-purple-100 text-purple-800 border border-purple-300'
+                                    }`}
+                                  >
+                                    {minister.name}
+                                    {minister.isVoluntary && (
+                                      <Star className="h-3 w-3 ml-1 fill-current" />
+                                    )}
+                                  </span>
+                                ))}
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  ({row.adorationMinisters?.length} ministros)
+                                </span>
+                              </div>
+                            </td>
+                          ) : (
+                            // Linha normal: células por posição
+                            Array.from({ length: TOTAL_POSITIONS }, (_, index) => {
+                              const position = index + 1;
+                              const assignment = row.assignmentsByPosition.get(position);
+                              const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || "";
+                              return (
+                                <td
+                                  key={`${row.key}-${position}`}
+                                  className="border border-border px-2 py-1 text-left align-middle"
+                                >
+                                  {displayName}
+                                </td>
+                              );
+                            })
+                          )}
                         </tr>
                       ))}
                     </tbody>

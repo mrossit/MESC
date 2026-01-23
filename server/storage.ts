@@ -199,9 +199,13 @@ export interface IStorage {
   // Adoration draw operations
   createAdorationDraw(draw: InsertAdorationDraw): Promise<AdorationDraw>;
   getAdorationDraws(year: number, month: number): Promise<AdorationDraw[]>;
+  getAdorationDrawById(id: string): Promise<AdorationDraw | null>;
   getAdorationDrawResults(drawId: string): Promise<AdorationDrawResult[]>;
   addAdorationDrawResult(drawId: string, ministerId: string, mondayOfWeek: number, isVoluntary: boolean): Promise<AdorationDrawResult>;
   deleteAdorationDraw(id: string): Promise<void>;
+  getAdorationDrawResultByMinister(drawId: string, ministerId: string): Promise<AdorationDrawResult | null>;
+  updateAdorationDrawResultMonday(drawId: string, ministerId: string, newMondayOfWeek: number): Promise<AdorationDrawResult | null>;
+  getFamilyMemberIds(ministerId: string): Promise<string[]>;
   
   // Formation module operations
   getFormationModules(trackId: string): Promise<FormationModule[]>;
@@ -1541,6 +1545,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(adorationDraws.createdAt));
   }
 
+  async getAdorationDrawById(id: string): Promise<AdorationDraw | null> {
+    const [draw] = await db
+      .select()
+      .from(adorationDraws)
+      .where(eq(adorationDraws.id, id))
+      .limit(1);
+    return draw || null;
+  }
+
   async getAdorationDrawResults(drawId: string): Promise<AdorationDrawResult[]> {
     return await db
       .select()
@@ -1569,6 +1582,58 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAdorationDraw(id: string): Promise<void> {
     await db.delete(adorationDraws).where(eq(adorationDraws.id, id));
+  }
+
+  // Buscar resultado de adoração por ministro e sorteio
+  async getAdorationDrawResultByMinister(drawId: string, ministerId: string): Promise<AdorationDrawResult | null> {
+    const [result] = await db
+      .select()
+      .from(adorationDrawResults)
+      .where(
+        and(
+          eq(adorationDrawResults.drawId, drawId),
+          eq(adorationDrawResults.ministerId, ministerId)
+        )
+      )
+      .limit(1);
+    return result || null;
+  }
+
+  // Atualizar a semana de um resultado de adoração (troca de dia)
+  async updateAdorationDrawResultMonday(
+    drawId: string,
+    ministerId: string,
+    newMondayOfWeek: number
+  ): Promise<AdorationDrawResult | null> {
+    const [result] = await db
+      .update(adorationDrawResults)
+      .set({ mondayOfWeek: newMondayOfWeek })
+      .where(
+        and(
+          eq(adorationDrawResults.drawId, drawId),
+          eq(adorationDrawResults.ministerId, ministerId)
+        )
+      )
+      .returning();
+    return result || null;
+  }
+
+  // Buscar familiares de um ministro para troca conjunta
+  async getFamilyMemberIds(ministerId: string): Promise<string[]> {
+    const [user] = await db
+      .select({ familyId: users.familyId })
+      .from(users)
+      .where(eq(users.id, ministerId))
+      .limit(1);
+
+    if (!user?.familyId) return [];
+
+    const familyMembers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.familyId, user.familyId));
+
+    return familyMembers.map(m => m.id);
   }
 }
 
