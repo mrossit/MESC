@@ -105,7 +105,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
     // Adicionar famílias como unidades
     for (const [familyId, members] of familyGroups) {
       // Família é voluntária se pelo menos um membro é voluntário
-      const hasVoluntary = members.some(m => voluntaryMinisterIds.has(m.id));
+      const hasVoluntary = members.some((m: { id: string }) => voluntaryMinisterIds.has(m.id));
       drawUnits.push({
         id: familyId,
         members,
@@ -221,9 +221,9 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
         drawId: draw.id,
         month,
         year,
-        totalMinisters: selectedMinisters.size,
+        totalMinisters: totalMinistersDrawn,
         totalMondays: mondayCount,
-        ministersPerMonday,
+        unitsPerMonday,
         voluntaryCount: drawResults.filter(r => r.isVoluntary).length,
         mandatoryCount: drawResults.filter(r => !r.isVoluntary).length,
         results: drawResults
@@ -341,7 +341,7 @@ const swapDaySchema = z.object({
 /**
  * POST /api/adoration/swap-day/:drawId
  * Troca o dia de adoração de um ministro (não permite cancelar, apenas trocar)
- * Familiares são movidos juntos automaticamente
+ * Apenas o ministro solicitante é movido (familiares não são movidos automaticamente)
  */
 router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -370,29 +370,13 @@ router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res
       });
     }
 
-    // 3. Buscar familiares para mover junto
-    const familyMemberIds = await storage.getFamilyMemberIds(userId);
-    const ministersToMove = familyMemberIds.length > 0 ? familyMemberIds : [userId];
+    logger.info(`Troca de dia: ministro ${userId} de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
 
-    logger.info(`Troca de dia: ${ministersToMove.length} ministro(s) de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
+    // 3. Mover apenas o ministro solicitante para a nova semana
+    await storage.updateAdorationDrawResultMonday(drawId, userId, newMondayOfWeek);
 
-    // 4. Mover todos os familiares para a nova semana
-    const movedMinisters = [];
-    for (const memberId of ministersToMove) {
-      const memberResult = await storage.getAdorationDrawResultByMinister(drawId, memberId);
-      if (memberResult) {
-        await storage.updateAdorationDrawResultMonday(drawId, memberId, newMondayOfWeek);
-        const memberUser = await db.select().from(users).where(eq(users.id, memberId)).limit(1);
-        movedMinisters.push({
-          id: memberId,
-          name: memberUser[0]?.name || 'Desconhecido',
-          oldWeek: memberResult.mondayOfWeek,
-          newWeek: newMondayOfWeek
-        });
-      }
-    }
-
-    // 5. Buscar as datas das segundas para retornar
+    // 4. Buscar nome do ministro e datas das segundas
+    const [ministerUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     const draw = await storage.getAdorationDrawById(drawId);
     let mondayDates: Date[] = [];
     if (draw) {
@@ -402,15 +386,18 @@ router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res
     const oldDate = mondayDates[currentResult.mondayOfWeek - 1]?.toISOString().split('T')[0] || 'N/A';
     const newDate = mondayDates[newMondayOfWeek - 1]?.toISOString().split('T')[0] || 'N/A';
 
-    logger.info(`Troca concluída: ${movedMinisters.map(m => m.name).join(', ')} movidos de ${oldDate} para ${newDate}`);
+    logger.info(`Troca concluída: ${ministerUser?.name} movido de ${oldDate} para ${newDate}`);
 
     res.json({
       success: true,
-      message: familyMemberIds.length > 1
-        ? `Você e sua família foram movidos de ${oldDate} para ${newDate}`
-        : `Você foi movido de ${oldDate} para ${newDate}`,
+      message: `Você foi movido de ${oldDate} para ${newDate}`,
       data: {
-        movedMinisters,
+        movedMinisters: [{
+          id: userId,
+          name: ministerUser?.name || 'Desconhecido',
+          oldWeek: currentResult.mondayOfWeek,
+          newWeek: newMondayOfWeek
+        }],
         oldWeek: currentResult.mondayOfWeek,
         newWeek: newMondayOfWeek,
         oldDate,
