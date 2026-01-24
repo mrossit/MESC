@@ -275,6 +275,14 @@ export function validateDateTimeKey(key: string): boolean {
  *   "Domingo 05/10" → "2025-10-05"
  *   "05/10" → "2025-10-05"
  */
+/**
+ * Get the number of days in a specific month
+ */
+function getDaysInMonth(year: number, month: number): number {
+  // month is 1-indexed (1 = January)
+  return new Date(year, month, 0).getDate();
+}
+
 export function convertLegacyDateToISO(legacyDate: string, year: number, month: number): string | null {
   // Extract day from patterns like "Domingo 05/10" or "05/10"
   const dayMatch = legacyDate.match(/(\d{1,2})\/(\d{1,2})/);
@@ -285,6 +293,13 @@ export function convertLegacyDateToISO(legacyDate: string, year: number, month: 
 
     // Validate month matches
     if (extractedMonth === month) {
+      // Validate day is within valid range for the month
+      const maxDays = getDaysInMonth(year, month);
+      if (day < 1 || day > maxDays) {
+        console.warn(`[DATE_VALIDATOR] Invalid day ${day} for month ${month}/${year} (max: ${maxDays})`);
+        return null;
+      }
+
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }

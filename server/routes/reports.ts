@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db } from "../db";
 import {
   users,
@@ -13,6 +14,15 @@ import {
 import { eq, sql, and, gte, lte, desc, asc, count, avg } from "drizzle-orm";
 import { authenticateToken, requireRole } from "../auth";
 import { createActivityLogger } from "../utils/activityLogger";
+
+// Helper to safely parse date strings
+function parseQueryDate(dateStr: unknown): Date | null {
+  if (typeof dateStr !== 'string' || !dateStr) return null;
+  const parsed = new Date(dateStr);
+  // Check if date is valid
+  if (isNaN(parsed.getTime())) return null;
+  return parsed;
+}
 
 const router = Router();
 
@@ -44,8 +54,8 @@ router.get("/availability", authenticateToken, requireRole(["gestor", "coordenad
       .leftJoin(users, eq(users.id, questionnaireResponses.userId))
       .where(
         and(
-          startDate ? gte(questionnaireResponses.submittedAt, new Date(startDate as string)) : sql`true`,
-          endDate ? lte(questionnaireResponses.submittedAt, new Date(endDate as string)) : sql`true`
+          parseQueryDate(startDate) ? gte(questionnaireResponses.submittedAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(questionnaireResponses.submittedAt, parseQueryDate(endDate)!) : sql`true`
         )
       )
       .groupBy(questionnaireResponses.userId, users.name)
@@ -87,8 +97,8 @@ router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordena
       .leftJoin(users, eq(users.id, substitutionRequests.requesterId))
       .where(
         and(
-          startDate ? gte(substitutionRequests.createdAt, new Date(startDate as string)) : sql`true`,
-          endDate ? lte(substitutionRequests.createdAt, new Date(endDate as string)) : sql`true`
+          parseQueryDate(startDate) ? gte(substitutionRequests.createdAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(substitutionRequests.createdAt, parseQueryDate(endDate)!) : sql`true`
         )
       )
       .groupBy(substitutionRequests.requesterId, users.name)
@@ -104,8 +114,8 @@ router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordena
         substitutionRequests: sql<number>`
           (SELECT COUNT(*) FROM ${substitutionRequests}
            WHERE ${substitutionRequests.requesterId} = ${schedules.ministerId}
-           ${startDate ? sql`AND ${substitutionRequests.createdAt} >= ${new Date(startDate as string)}` : sql``}
-           ${endDate ? sql`AND ${substitutionRequests.createdAt} <= ${new Date(endDate as string)}` : sql``})
+           ${startDate ? sql`AND ${substitutionRequests.createdAt} >= ${parseQueryDate(startDate)!}` : sql``}
+           ${endDate ? sql`AND ${substitutionRequests.createdAt} <= ${parseQueryDate(endDate)!}` : sql``})
         `.as('substitution_requests')
       })
       .from(schedules)
@@ -113,8 +123,8 @@ router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordena
       .where(
         and(
           schedules.status ? eq(schedules.status, "published") : sql`true`,
-          startDate ? gte(schedules.createdAt, new Date(startDate as string)) : sql`true`,
-          endDate ? lte(schedules.createdAt, new Date(endDate as string)) : sql`true`
+          parseQueryDate(startDate) ? gte(schedules.createdAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(schedules.createdAt, parseQueryDate(endDate)!) : sql`true`
         )
       )
       .groupBy(schedules.ministerId, users.name)
@@ -156,8 +166,8 @@ router.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador
       .leftJoin(users, eq(users.id, activityLogs.userId))
       .where(
         and(
-          startDate ? gte(activityLogs.createdAt, new Date(startDate as string)) : sql`true`,
-          endDate ? lte(activityLogs.createdAt, new Date(endDate as string)) : sql`true`
+          parseQueryDate(startDate) ? gte(activityLogs.createdAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(activityLogs.createdAt, parseQueryDate(endDate)!) : sql`true`
         )
       )
       .groupBy(activityLogs.userId, users.name)
@@ -184,8 +194,8 @@ router.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador
         questionnaireResponses,
         and(
           eq(users.id, questionnaireResponses.userId),
-          startDate ? gte(questionnaireResponses.submittedAt, new Date(startDate as string)) : sql`true`,
-          endDate ? lte(questionnaireResponses.submittedAt, new Date(endDate as string)) : sql`true`
+          parseQueryDate(startDate) ? gte(questionnaireResponses.submittedAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(questionnaireResponses.submittedAt, parseQueryDate(endDate)!) : sql`true`
         )
       )
       .where(eq(users.status, "active"));

@@ -209,15 +209,31 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
           .limit(1);
 
         if (draws.length > 0) {
-          // Calcular qual segunda-feira do mês é esta data
+          // Calcular qual segunda-feira do mês é esta data (1ª, 2ª, 3ª, 4ª ou 5ª)
           const firstDayOfMonth = new Date(yearNum, monthNum - 1, 1);
           let mondayOfWeek = 0;
           const tempDate = new Date(firstDayOfMonth);
-          while (tempDate.getDay() !== 1) tempDate.setDate(tempDate.getDate() + 1);
+
+          // Encontra a primeira segunda-feira do mês
+          while (tempDate.getDay() !== 1) {
+            tempDate.setDate(tempDate.getDate() + 1);
+          }
+
+          // Conta quantas segundas-feiras até a data alvo (inclusive)
+          // Se a primeira segunda-feira é igual ou anterior à targetDate, começa a contar
           while (tempDate <= targetDate) {
             mondayOfWeek++;
-            if (tempDate.toISOString().split('T')[0] === targetDateStr) break;
+            // Se encontrou a data alvo, para de contar
+            const tempDateStr = tempDate.toISOString().split('T')[0];
+            if (tempDateStr === targetDateStr) {
+              break;
+            }
             tempDate.setDate(tempDate.getDate() + 7);
+          }
+
+          // Se mondayOfWeek ainda é 0, a targetDate não é uma segunda-feira válida
+          if (mondayOfWeek === 0) {
+            console.log(`[ADORATION] Data ${targetDateStr} não corresponde a uma segunda-feira válida do mês`);
           }
 
           // Buscar resultados apenas para esta segunda-feira específica
@@ -519,7 +535,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       };
 
       // Cache the result
-      scheduleCache.set(yearNum, monthNum, responseData);
+      scheduleCache.setSync(yearNum, monthNum, responseData);
       console.log(`[SCHEDULES_API] 💾 Cached result for ${monthNum}/${yearNum}`);
 
       res.json(responseData);

@@ -43,8 +43,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return await bcrypt.compare(password, hash);
 }
 
+// User payload for JWT token
+interface JWTUserPayload {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
 // Função para gerar JWT
-export function generateToken(user: any): string {
+export function generateToken(user: JWTUserPayload): string {
   return jwt.sign(
     {
       id: user.id,
@@ -53,9 +61,9 @@ export function generateToken(user: any): string {
       role: user.role
     },
     JWT_SECRET,
-    { 
+    {
       expiresIn: JWT_EXPIRES_IN
-    } as any
+    } as jwt.SignOptions
   );
 }
 
@@ -65,7 +73,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   const secret: string = JWT_SECRET;
 
-  const verifyAndCheckStatus = async (user: any) => {
+  const verifyAndCheckStatus = async (user: JWTUserPayload) => {
     try {
       // Use Drizzle ORM for database access (works with both SQLite and PostgreSQL)
       const [currentUser] = await db
@@ -94,20 +102,20 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     }
     
     // Usa o token do cookie
-    jwt.verify(cookieToken, secret, async (err: any, user: any) => {
-      if (err) {
+    jwt.verify(cookieToken, secret, async (err: jwt.VerifyErrors | null, decoded: unknown) => {
+      if (err || !decoded) {
         return res.status(403).json({ message: 'Token inválido ou expirado' });
       }
-      await verifyAndCheckStatus(user);
+      await verifyAndCheckStatus(decoded as JWTUserPayload);
     });
     return;
   }
 
-  jwt.verify(token, secret, async (err: any, user: any) => {
-    if (err) {
+  jwt.verify(token, secret, async (err: jwt.VerifyErrors | null, decoded: unknown) => {
+    if (err || !decoded) {
       return res.status(403).json({ message: 'Token inválido ou expirado' });
     }
-    await verifyAndCheckStatus(user);
+    await verifyAndCheckStatus(decoded as JWTUserPayload);
   });
 }
 
