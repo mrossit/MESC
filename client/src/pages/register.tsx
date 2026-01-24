@@ -273,10 +273,27 @@ export default function Register() {
 
             <Alert className="mt-4 border-border/50 bg-muted/50">
               <AlertDescription className="text-sm text-foreground/70">
-                <strong>Importante:</strong> Seu cadastro precisa ser aprovado pelo coordenador 
+                <strong>Importante:</strong> Seu cadastro precisa ser aprovado pelo coordenador
                 antes de você poder acessar o sistema. Isso pode levar alguns dias.
               </AlertDescription>
             </Alert>
+
+            <div className="text-center pt-4">
+              <p className="text-xs text-foreground/50">
+                Ao se cadastrar, você concorda com nossos{" "}
+                <Link href="/terms-of-use">
+                  <span className="text-primary hover:underline cursor-pointer">
+                    Termos de Uso
+                  </span>
+                </Link>
+                {" "}e{" "}
+                <Link href="/privacy-policy">
+                  <span className="text-primary hover:underline cursor-pointer">
+                    Política de Privacidade
+                  </span>
+                </Link>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
