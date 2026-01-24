@@ -986,9 +986,9 @@ router.get('/responses/:templateId/:ministerId', requireAuth, requireRole(['gest
     }).from(users)
       .where(eq(users.id, ministerId))
       .limit(1);
-    
+
     res.json({
-      user,
+      user: user || { name: 'Usuário não encontrado', email: null, phone: null },
       response: {
         submittedAt: response.submittedAt,
         responses: JSON.parse(response.responses as string),

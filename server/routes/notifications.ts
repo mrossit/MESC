@@ -108,6 +108,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     const notifications = await storage.getUserNotifications(req.user!.id);
     res.json(notifications);
   } catch (error) {
+    console.error('[NOTIFICATIONS] Error fetching notifications:', error);
     res.status(500).json({ error: "Erro ao buscar notificações" });
   }
 });
@@ -162,6 +163,7 @@ router.patch("/:id/read", requireAuth, async (req: AuthRequest, res: Response) =
     await storage.markNotificationAsRead(id);
     res.json({ message: "Notificação marcada como lida" });
   } catch (error) {
+    console.error('[NOTIFICATIONS] Error marking notification as read:', error);
     res.status(500).json({ error: "Erro ao processar requisição" });
   }
 });
@@ -177,6 +179,7 @@ router.patch("/read-all", requireAuth, async (req: AuthRequest, res: Response) =
     
     res.json({ message: "Todas as notificações foram marcadas como lidas" });
   } catch (error) {
+    console.error('[NOTIFICATIONS] Error marking all as read:', error);
     res.status(500).json({ error: "Erro ao processar requisição" });
   }
 });
@@ -420,6 +423,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     
     res.json({ message: "Notificação excluída com sucesso" });
   } catch (error) {
+    console.error('[NOTIFICATIONS] Error deleting notification:', error);
     res.status(500).json({ error: "Erro ao excluir notificação" });
   }
 });
