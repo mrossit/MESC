@@ -15,6 +15,31 @@ function getMonthName(month: number): string {
   return months[month - 1];
 }
 
+/**
+ * Helper function to validate and parse year/month from URL params
+ */
+function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ error: 'Ano e mês devem ser números válidos' });
+    return null;
+  }
+
+  if (month < 1 || month > 12) {
+    res.status(400).json({ error: 'Mês deve estar entre 1 e 12' });
+    return null;
+  }
+
+  if (year < 2020 || year > 2100) {
+    res.status(400).json({ error: 'Ano deve estar entre 2020 e 2100' });
+    return null;
+  }
+
+  return { year, month };
+}
+
 // Middleware para verificar se o usuário é admin
 // router.use(requireAuth); // Aplicado individualmente nas rotas
 // router.use(requireRole(['gestor', 'coordenador'])); // Aplicado individualmente nas rotas
@@ -62,10 +87,11 @@ router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), asyn
 
 // Obter template com perguntas editáveis
 router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
-  try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
 
+  try {
     const [template] = await db.select().from(questionnaires)
       .where(and(
         eq(questionnaires.month, month),
@@ -252,10 +278,11 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
 
 // Adicionar pergunta customizada a um template existente
 router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    
     const schema = z.object({
       type: z.enum(['multiple_choice', 'checkbox', 'text', 'time_selection']),
       question: z.string(),
@@ -307,11 +334,12 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
 
 // Atualizar pergunta específica
 router.put('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+  const questionId = req.params.questionId;
+
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    const questionId = req.params.questionId;
-    
     const schema = z.object({
       question: z.string(),
       options: z.array(z.string()).optional(),
@@ -365,11 +393,12 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
 // Deletar qualquer pergunta (customizada ou padrão)
 // Isso permite flexibilidade para meses com peculiaridades (ex: Janeiro com missas já no questionário de Dezembro)
 router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
-  try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    const questionId = req.params.questionId;
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+  const questionId = req.params.questionId;
 
+  try {
     const [template] = await db.select().from(questionnaires)
       .where(and(
         eq(questionnaires.month, month),
@@ -416,10 +445,11 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
 
 // Enviar ou reenviar questionário para todos os ministros (por year/month)
 router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    
     // Debug completo do request
     console.log('[SEND] Início do endpoint');
     console.log('[SEND] Params:', { year, month });
@@ -708,10 +738,11 @@ router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coord
 
 // Deletar template completo - funcionalidade para produção
 router.delete('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
-  try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
 
+  try {
     if (!db) {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
@@ -774,10 +805,11 @@ router.delete('/templates/:year/:month', requireAuth, requireRole(['gestor', 'co
 
 // Obter status das respostas dos ministros para um mês específico
 router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    
     if (!db) {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
@@ -977,10 +1009,11 @@ router.get('/responses/:templateId/:ministerId', requireAuth, requireRole(['gest
 
 // Obter resumo acumulado de todas as respostas
 router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    
     if (!db) {
       return res.status(503).json({ error: 'Database service unavailable' });
     }

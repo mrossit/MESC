@@ -13,6 +13,31 @@ import { scheduleCache } from '../services/scheduleCache';
 
 const router = Router();
 
+/**
+ * Helper function to validate and parse year/month from URL params
+ */
+function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ success: false, message: 'Ano e mês devem ser números válidos' });
+    return null;
+  }
+
+  if (month < 1 || month > 12) {
+    res.status(400).json({ success: false, message: 'Mês deve estar entre 1 e 12' });
+    return null;
+  }
+
+  if (year < 2024 || year > 2030) {
+    res.status(400).json({ success: false, message: 'Ano deve estar entre 2024 e 2030' });
+    return null;
+  }
+
+  return { year, month };
+}
+
 // Schema para validação de entrada
 const generateScheduleSchema = z.object({
   year: z.number().min(2024).max(2030),
@@ -635,15 +660,9 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
  */
 router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-
-    if (!year || !month || month < 1 || month > 12) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ano e mês devem ser válidos'
-      });
-    }
+    const params = parseYearMonthParams(req, res);
+    if (!params) return;
+    const { year, month } = params;
 
     console.log('[PREVIEW ROUTE] 🚀 Starting schedule preview with 30s timeout');
 
@@ -704,10 +723,11 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
  * GET /api/schedules/debug/:year/:month
  */
 router.get('/debug/:year/:month', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
-  try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
 
+  try {
     // Importar as classes necessárias
     const { ScheduleGenerator } = await import('../utils/scheduleGenerator');
     const generator = new ScheduleGenerator();
@@ -776,10 +796,11 @@ router.get('/debug/:year/:month', authenticateToken, requireRole(['gestor', 'coo
  * GET /api/schedules/quality-metrics/:year/:month
  */
 router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
-  try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
 
+  try {
     if (!db) {
       return res.status(503).json({
         success: false,
