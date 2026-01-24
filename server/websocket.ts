@@ -131,7 +131,7 @@ async function getCriticalAlerts() {
     .groupBy(schedules.date, schedules.time)
     .having(sql`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
 
-  const criticalWithHours = criticalMasses.map(m => ({
+  const criticalWithHours = criticalMasses.map((m: any) => ({
     ...m,
     hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1000 * 60 * 60)),
     massTime: m.time,
@@ -166,7 +166,7 @@ async function getCriticalAlerts() {
 
   return {
     criticalMasses: criticalWithHours,
-    urgentSubstitutions: urgentSubstitutions.map(s => ({
+    urgentSubstitutions: urgentSubstitutions.map((s: any) => ({
       ...s,
       hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1000 * 60 * 60)),
     })),

@@ -127,8 +127,8 @@ export async function compareAndLearn(
   console.log(`[COMPARISON] 🔍 Analyzing schedules for ${year}-${String(month).padStart(2, '0')}`);
 
   // Get all published schedules for the month
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
+  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
   const monthSchedules = await db
     .select()
@@ -232,7 +232,14 @@ export async function analyzeMonthlyPatterns(
 
   // Get minister details for frequently removed
   const frequentlyRemovedMinisters = await getMinisterDetails(removalCounts);
-  const frequentlyAddedMinisters = await getMinisterDetails(additionCounts);
+  const addedMinistersRaw = await getMinisterDetails(additionCounts);
+  // Map removalCount to additionCount for the added ministers
+  const frequentlyAddedMinisters = addedMinistersRaw.map((m: any) => ({
+    ministerId: m.ministerId,
+    ministerName: m.ministerName,
+    additionCount: m.removalCount, // The function returns removalCount but we need additionCount
+    reliabilityScore: m.reliabilityScore,
+  }));
 
   // Sort mass times by change count
   const massTimesWithMostChanges = Array.from(massTimeChanges.entries())
@@ -313,13 +320,13 @@ async function getMinisterDetails(
     .execute();
 
   return ministers
-    .map(m => ({
+    .map((m: any) => ({
       ministerId: m.id,
       ministerName: m.name,
       removalCount: counts.get(m.id) || 0,
       reliabilityScore: m.reliabilityScore || 100,
     }))
-    .sort((a, b) => b.removalCount - a.removalCount)
+    .sort((a: any, b: any) => b.removalCount - a.removalCount)
     .slice(0, 10); // Top 10
 }
 

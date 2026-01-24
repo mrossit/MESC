@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 interface ScheduleAssignment {
   id: string;
-  scheduleId: string;
+  scheduleId?: string;
   ministerId: string;
   ministerName: string;
   date: string;

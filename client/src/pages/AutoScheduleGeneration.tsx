@@ -90,7 +90,7 @@ export default function AutoScheduleGeneration() {
       // Invalidar cache para forçar recarga dos dados
       queryClient.invalidateQueries({ queryKey: ['/api/questionnaires'] });
 
-    } catch (error: Error) {
+    } catch (error: any) {
       toast({
         title: "Erro ao atualizar respostas",
         description: error.message || "Ocorreu um erro ao processar as respostas.",
@@ -127,7 +127,7 @@ export default function AutoScheduleGeneration() {
         throw new Error(result.message || 'Erro ao gerar escala de teste');
       }
 
-    } catch (error: Error) {
+    } catch (error: any) {
       toast({
         title: "Erro ao gerar escala de teste",
         description: error.message || "Ocorreu um erro inesperado.",

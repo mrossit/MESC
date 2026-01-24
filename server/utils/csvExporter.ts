@@ -203,7 +203,7 @@ export async function getQuestionnaireResponsesForExport(
     .where(eq(questionnaireResponses.questionnaireId, questionnaireId));
 
   // Format data for CSV export
-  const exportData: CSVExportData[] = responsesWithUsers.map(({ response, user }) => {
+  const exportData: CSVExportData[] = responsesWithUsers.map(({ response, user }: { response: any; user: any }) => {
     const formattedResponses: any[] = [];
 
     // Priority 1: Use structured columns if they have data

@@ -340,8 +340,8 @@ export class ResponseParser {
           case 'saint_judas_novena':
             if (Array.isArray(item.answer) && item.answer[0] !== 'Nenhum dia') {
               v2Response.responses.special_events!.saint_judas_novena = item.answer
-                .map(str => this.convertLegacyNovenaString(str, year, month))
-                .filter((x): x is string => x !== null);
+                .map((str: string) => this.convertLegacyNovenaString(str, year, month))
+                .filter((x: string | null): x is string => x !== null);
             }
             break;
 

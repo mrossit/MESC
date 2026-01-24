@@ -225,7 +225,7 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
 
     if (pushConfig.enabled) {
       await sendPushNotificationToUsers(
-        ministers.map((minister) => minister.id),
+        ministers.map((minister: any) => minister.id),
         {
           title,
           body: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,

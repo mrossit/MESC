@@ -65,7 +65,7 @@ export default function MinistersDirectory() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Get current user info
-  const { data: authData } = useQuery({
+  const { data: authData } = useQuery<any>({
     queryKey: ['/api/auth/me'],
   });
   const user = authData?.user;

@@ -10,6 +10,7 @@ type PushPayload = {
 
 let webpush: any = null;
 try {
+  // @ts-expect-error - web-push module has no type declarations
   const module = await import("web-push");
   webpush = module.default ?? module;
 } catch (error) {

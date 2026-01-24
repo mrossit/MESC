@@ -115,7 +115,7 @@ function checkV2Availability(response: any, mass: Mass): boolean {
 
     const weekday = weekdayMap[dayOfWeek];
     if (weekday && response.weekdays?.[weekday] === true) {
-      console.log(`[AVAILABILITY] ✅ ${weekday} mass available for minister`);
+      console.log(`[AVAILABILITY] ✅ ${String(weekday)} mass available for minister`);
       return true;
     }
   }

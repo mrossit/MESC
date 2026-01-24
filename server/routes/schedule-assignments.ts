@@ -50,7 +50,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
         );
 
       isAuxiliar1or2ForThisMass = userAssignmentsForThisMass.some(
-        a => a.position === 1 || a.position === 2
+        (a: any) => a.position === 1 || a.position === 2
       );
     }
 
