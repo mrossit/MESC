@@ -50,7 +50,18 @@
       "Bash(npx pwa-asset-generator:*)",
       "Bash(node scripts/generate-splash.mjs:*)",
       "Bash(git status:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(if [ -n \"$VAPID_PUBLIC_KEY\" ])",
+      "Bash(then echo \"VAPID_PUBLIC_KEY: Set \\($#VAPID_PUBLIC_KEY chars\\)\")",
+      "Bash(else echo \"VAPID_PUBLIC_KEY: NOT SET\")",
+      "Bash(fi)",
+      "Bash(if [ -n \"$VAPID_PRIVATE_KEY\" ])",
+      "Bash(then echo \"VAPID_PRIVATE_KEY: Set \\($#VAPID_PRIVATE_KEY chars\\)\")",
+      "Bash(else echo \"VAPID_PRIVATE_KEY: NOT SET\")",
+      "Bash(if [ -n \"$VAPID_SUBJECT\" ])",
+      "Bash(then echo \"VAPID_SUBJECT: $VAPID_SUBJECT\")",
+      "Bash(else echo \"VAPID_SUBJECT: NOT SET\")",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
