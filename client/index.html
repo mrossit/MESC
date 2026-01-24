@@ -94,18 +94,20 @@
     <!-- PWA Update Prompt -->
     <script>
       if ('serviceWorker' in navigator) {
-        // Detecta se está no preview do Replit
-        const isReplitPreview = window.location.hostname.includes('replit.dev') || 
-                                window.location.hostname.includes('repl.co');
-        
-        if (isReplitPreview) {
-          console.log('[SW] Running in Replit preview - Service Worker DISABLED to prevent cache issues');
-          
-          // Desregistra todos os service workers existentes no preview
+        // Detecta se está no preview do Replit (dev) vs produção (.replit.app)
+        const isReplitDev = window.location.hostname.includes('replit.dev') ||
+                           window.location.hostname.includes('repl.co');
+        // .replit.app é produção - habilitar service worker
+        const isReplitProduction = window.location.hostname.includes('replit.app');
+
+        if (isReplitDev && !isReplitProduction) {
+          console.log('[SW] Running in Replit DEV preview - Service Worker DISABLED to prevent cache issues');
+
+          // Desregistra todos os service workers existentes no preview de dev
           window.addEventListener('load', () => {
             navigator.serviceWorker.getRegistrations().then(registrations => {
               if (registrations.length > 0) {
-                console.log('[SW] Unregistering', registrations.length, 'service workers in Replit preview');
+                console.log('[SW] Unregistering', registrations.length, 'service workers in Replit dev preview');
                 registrations.forEach(registration => {
                   registration.unregister().then(() => {
                     console.log('[SW] Unregistered service worker:', registration.scope);

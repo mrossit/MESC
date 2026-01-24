@@ -18,7 +18,8 @@ export function FloatingNotificationBell({ className }: FloatingNotificationBell
   // Fetch unread count
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Refetch every 60 seconds
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
   // Handle scroll to show/hide floating button
