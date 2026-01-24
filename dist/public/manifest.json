@@ -2,32 +2,33 @@
   "name": "MESC - Sistema de Gestão de Ministros da Sagrada Comunhão",
   "short_name": "MESC",
   "description": "Sistema de gestão para Ministros Extraordinários da Sagrada Comunhão do Santuário São Judas Tadeu",
-  "start_url": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#F8F4ED",
   "theme_color": "#5C4033",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/sjtlogo.png",
+      "src": "/images/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/sjtlogo.png",
+      "src": "/images/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/sjtlogo.png",
+      "src": "/images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/sjtlogo.png",
+      "src": "/images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -45,7 +46,7 @@
       "url": "/dashboard",
       "icons": [
         {
-          "src": "/sjtlogo.png",
+          "src": "/images/icon-192.png",
           "sizes": "192x192"
         }
       ]
@@ -57,7 +58,7 @@
       "url": "/schedules",
       "icons": [
         {
-          "src": "/sjtlogo.png",
+          "src": "/images/icon-192.png",
           "sizes": "192x192"
         }
       ]
