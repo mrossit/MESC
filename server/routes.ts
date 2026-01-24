@@ -13,7 +13,6 @@ import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
 import smartScheduleRoutes from "./routes/smartScheduleGeneration";
-import testScheduleRoutes from "./routes/testScheduleGeneration";
 import schedulesRoutes from "./routes/schedules";
 import auxiliaryPanelRoutes from "./routes/auxiliaryPanel";
 import uploadRoutes from "./routes/upload";
@@ -168,9 +167,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Smart schedule generation routes (advanced algorithm) - com proteção CSRF
   app.use('/api/schedules', csrfProtection, smartScheduleRoutes);
-
-  // Test schedule generation routes (mock data testing) - com proteção CSRF
-  app.use('/api/schedules', csrfProtection, testScheduleRoutes);
 
   // Auxiliary panel routes (for positions 1 and 2) - com proteção CSRF
   app.use('/api/auxiliary', csrfProtection, auxiliaryPanelRoutes);

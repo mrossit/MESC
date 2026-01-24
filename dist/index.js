@@ -3617,6 +3617,7 @@ ${"!".repeat(60)}`);
           const year = parseInt(dateParts[0]);
           const month = parseInt(dateParts[1]);
           const day = parseInt(dateParts[2]);
+          if (isNaN(year) || isNaN(month) || isNaN(day)) return true;
           const massDate = new Date(year, month - 1, day);
           const dayOfWeek = massDate.getDay();
           if (mass.date && mass.date.endsWith("-28") && mass.type === "missa_diaria") {
@@ -8148,6 +8149,23 @@ function getMonthName(month) {
   ];
   return months[month - 1];
 }
+function parseYearMonthParams(req, res) {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ error: "Ano e m\xEAs devem ser n\xFAmeros v\xE1lidos" });
+    return null;
+  }
+  if (month < 1 || month > 12) {
+    res.status(400).json({ error: "M\xEAs deve estar entre 1 e 12" });
+    return null;
+  }
+  if (year < 2020 || year > 2100) {
+    res.status(400).json({ error: "Ano deve estar entre 2020 e 2100" });
+    return null;
+  }
+  return { year, month };
+}
 router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
@@ -8181,9 +8199,10 @@ router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
   }
 });
 router4.get("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     const [template] = await db.select().from(questionnaires).where(and4(
       eq8(questionnaires.month, month),
       eq8(questionnaires.year, year),
@@ -8332,9 +8351,10 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
   }
 });
 router4.post("/templates/:year/:month/questions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     const schema = z2.object({
       type: z2.enum(["multiple_choice", "checkbox", "text", "time_selection"]),
       question: z2.string(),
@@ -8372,10 +8392,11 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
   }
 });
 router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+  const questionId = req.params.questionId;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    const questionId = req.params.questionId;
     const schema = z2.object({
       question: z2.string(),
       options: z2.array(z2.string()).optional(),
@@ -8415,10 +8436,11 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
   }
 });
 router4.delete("/templates/:year/:month/questions/:questionId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
+  const questionId = req.params.questionId;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    const questionId = req.params.questionId;
     const [template] = await db.select().from(questionnaires).where(and4(
       eq8(questionnaires.month, month),
       eq8(questionnaires.year, year),
@@ -8448,9 +8470,10 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
   }
 });
 router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     console.log("[SEND] In\xEDcio do endpoint");
     console.log("[SEND] Params:", { year, month });
     console.log("[SEND] Headers:", req.headers);
@@ -8647,9 +8670,10 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
   }
 });
 router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
@@ -8693,9 +8717,10 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
   }
 });
 router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
@@ -8821,7 +8846,7 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
       phone: users.phone
     }).from(users).where(eq8(users.id, ministerId)).limit(1);
     res.json({
-      user,
+      user: user || { name: "Usu\xE1rio n\xE3o encontrado", email: null, phone: null },
       response: {
         submittedAt: response.submittedAt,
         responses: JSON.parse(response.responses),
@@ -8839,9 +8864,10 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
   }
 });
 router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
@@ -8856,7 +8882,14 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
     const summary = {};
     const questions = template.questions;
     responses.forEach((response) => {
-      const parsedResponses = JSON.parse(response.responses);
+      let parsedResponses;
+      try {
+        parsedResponses = JSON.parse(response.responses);
+        if (!Array.isArray(parsedResponses)) return;
+      } catch {
+        console.warn("[QUESTIONNAIRE] Failed to parse response:", response.id);
+        return;
+      }
       parsedResponses.forEach((resp) => {
         if (!summary[resp.questionId]) {
           summary[resp.questionId] = {};
@@ -9854,6 +9887,23 @@ var QuestionnaireService = class {
 
 // server/routes/questionnaires.ts
 var router5 = Router5();
+function parseYearMonth(req, res) {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ error: "Ano e m\xEAs devem ser n\xFAmeros v\xE1lidos" });
+    return null;
+  }
+  if (month < 1 || month > 12) {
+    res.status(400).json({ error: "M\xEAs deve estar entre 1 e 12" });
+    return null;
+  }
+  if (year < 2020 || year > 2100) {
+    res.status(400).json({ error: "Ano deve estar entre 2020 e 2100" });
+    return null;
+  }
+  return { year, month };
+}
 var monthNames = [
   "Janeiro",
   "Fevereiro",
@@ -9868,6 +9918,15 @@ var monthNames = [
   "Novembro",
   "Dezembro"
 ];
+function safeParseJSON(value, fallback) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    console.error("[QUESTIONNAIRE] Failed to parse JSON:", error);
+    return fallback;
+  }
+}
 router5.post("/templates", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const schema = z3.object({
@@ -9931,8 +9990,9 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
 });
 router5.get("/templates/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     if (!db) {
       const questions = generateQuestionnaireQuestions(month, year);
       return res.json({
@@ -10153,7 +10213,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       console.log("[RESPONSES] Resposta salva com sucesso (UPSERT)");
       const responseData = {
         ...saved,
-        responses: typeof saved.responses === "string" ? JSON.parse(saved.responses) : saved.responses
+        responses: safeParseJSON(saved.responses, [])
       };
       result = { responseData, isUpdate: false };
     } catch (upsertError) {
@@ -10281,8 +10341,9 @@ router5.post("/responses", authenticateToken, async (req, res) => {
 });
 router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userId = req.user?.id;
     if (!db) {
       return res.json(null);
@@ -10328,7 +10389,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
         console.log("[GET /responses] Tipo do campo responses:", typeof response.responses);
-        const parsedResponses = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+        const parsedResponses = safeParseJSON(response.responses, []);
         const result = {
           id: response.id,
           userId: response.userId,
@@ -10356,8 +10417,9 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
 });
 router5.get("/admin/responses-status/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user.role;
     if (userRole !== "gestor" && userRole !== "coordenador") {
       return res.status(403).json({ error: "Insufficient permissions" });
@@ -10431,8 +10493,9 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
 });
 router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user.role;
     if (userRole !== "gestor" && userRole !== "coordenador") {
       return res.status(403).json({ error: "Insufficient permissions" });
@@ -10451,7 +10514,7 @@ router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
-      const userResponses = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+      const userResponses = safeParseJSON(response.responses, []);
       if (Array.isArray(userResponses)) {
         userResponses.forEach((r) => {
           if (!summary[r.questionId]) {
@@ -10501,7 +10564,7 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
     }
-    const userResponses = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+    const userResponses = safeParseJSON(response.responses, []);
     res.json({
       user,
       response: {
@@ -10523,8 +10586,9 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
 });
 router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user.role;
     if (userRole !== "gestor" && userRole !== "coordenador") {
       return res.status(403).json({ error: "Insufficient permissions" });
@@ -10648,12 +10712,10 @@ router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coo
 });
 router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const { format: format9 = "detailed" } = req.query;
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-      return res.status(400).json({ error: "Invalid month or year" });
-    }
     const exportData = await getMonthlyResponsesForExport(month, year);
     const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const monthName = monthNames[month - 1];
@@ -10689,7 +10751,7 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     let errors = 0;
     for (const response of allResponses) {
       try {
-        const responsesArray = typeof response.responses === "string" ? JSON.parse(response.responses) : response.responses;
+        const responsesArray = safeParseJSON(response.responses, []);
         const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, response.questionnaireId)).limit(1);
         const processingResult = QuestionnaireService.standardizeResponseWithTracking(
           responsesArray,
@@ -10846,6 +10908,23 @@ var scheduleCache = new ScheduleCache();
 
 // server/routes/scheduleGeneration.ts
 var router6 = Router6();
+function parseYearMonthParams2(req, res) {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ success: false, message: "Ano e m\xEAs devem ser n\xFAmeros v\xE1lidos" });
+    return null;
+  }
+  if (month < 1 || month > 12) {
+    res.status(400).json({ success: false, message: "M\xEAs deve estar entre 1 e 12" });
+    return null;
+  }
+  if (year < 2024 || year > 2030) {
+    res.status(400).json({ success: false, message: "Ano deve estar entre 2024 e 2030" });
+    return null;
+  }
+  return { year, month };
+}
 var generateScheduleSchema = z4.object({
   year: z4.number().min(2024).max(2030),
   month: z4.number().min(1).max(12),
@@ -11292,14 +11371,9 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
 });
 router6.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
-    if (!year || !month || month < 1 || month > 12) {
-      return res.status(400).json({
-        success: false,
-        message: "Ano e m\xEAs devem ser v\xE1lidos"
-      });
-    }
+    const params = parseYearMonthParams2(req, res);
+    if (!params) return;
+    const { year, month } = params;
     console.log("[PREVIEW ROUTE] \u{1F680} Starting schedule preview with 30s timeout");
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
@@ -11343,9 +11417,10 @@ router6.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "
   }
 });
 router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams2(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     const { ScheduleGenerator: ScheduleGenerator2 } = await init_scheduleGenerator().then(() => scheduleGenerator_exports);
     const generator = new ScheduleGenerator2();
     const ministersData = await db.select({
@@ -11398,9 +11473,10 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
   }
 });
 router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const params = parseYearMonthParams2(req, res);
+  if (!params) return;
+  const { year, month } = params;
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
     if (!db) {
       return res.status(503).json({
         success: false,
@@ -11511,7 +11587,9 @@ function calculateBalanceScore(schedules3) {
     });
   });
   const counts = Object.values(ministerCounts);
+  if (counts.length === 0) return 0;
   const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  if (avg2 === 0) return 0;
   const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length;
   return Math.max(0, 1 - Math.sqrt(variance) / avg2);
 }
@@ -11569,6 +11647,7 @@ function calculateDistributionBalance(schedules3) {
   const counts = Object.values(ministerCounts);
   if (counts.length === 0) return 0;
   const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  if (avg2 === 0) return 0;
   const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length;
   return Math.max(0, 1 - Math.sqrt(variance) / avg2);
 }
@@ -12323,8 +12402,8 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
     warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
   }
   const counts = Object.values(ministerCounts);
-  const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
-  const variance = counts.length > 0 ? Math.sqrt(counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length) / avg2 : 0;
+  const avg2 = counts.length > 0 ? counts.reduce((sum, c) => sum + c, 0) / counts.length : 0;
+  const variance = counts.length > 0 && avg2 > 0 ? Math.sqrt(counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length) / avg2 : 0;
   if (variance > 0.3) {
     warnings.push(`Distribui\xE7\xE3o desbalanceada (vari\xE2ncia: ${(variance * 100).toFixed(0)}%)`);
   }
@@ -13365,6 +13444,9 @@ router9.get("/", authenticateToken, async (req, res) => {
     if (month && year) {
       const yearNum = parseInt(year);
       const monthNum = parseInt(month);
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({ error: "Invalid month or year parameter" });
+      }
       const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
       if (cachedData) {
         console.log(`[SCHEDULES_API] \u26A1 Returning cached data for ${monthNum}/${yearNum}`);
@@ -13609,6 +13691,9 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     }
     const year = parseInt(match[1]);
     const month = parseInt(match[2]);
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: "Invalid month or year in schedule ID" });
+    }
     const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
@@ -13662,6 +13747,9 @@ router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     if (monthIdMatch) {
       const year = parseInt(monthIdMatch[1]);
       const month = parseInt(monthIdMatch[2]);
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ error: "Invalid month or year in schedule ID" });
+      }
       console.log(`[DELETE_SCHEDULE] Month-based delete for ${month}/${year}`);
       const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
@@ -13748,6 +13836,9 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
     }
     const year = parseInt(match[1]);
     const month = parseInt(match[2]);
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: "Invalid month or year in schedule ID" });
+    }
     console.log("[UNPUBLISH_API] Parsed year:", year, "month:", month);
     const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
@@ -14560,6 +14651,7 @@ router12.get("/", authenticateToken, async (req, res) => {
     const notifications2 = await storage.getUserNotifications(req.user.id);
     res.json(notifications2);
   } catch (error) {
+    console.error("[NOTIFICATIONS] Error fetching notifications:", error);
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
   }
 });
@@ -14594,6 +14686,7 @@ router12.patch("/:id/read", authenticateToken, async (req, res) => {
     await storage.markNotificationAsRead(id);
     res.json({ message: "Notifica\xE7\xE3o marcada como lida" });
   } catch (error) {
+    console.error("[NOTIFICATIONS] Error marking notification as read:", error);
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
@@ -14604,6 +14697,7 @@ router12.patch("/read-all", authenticateToken, async (req, res) => {
     await Promise.all(unreadNotifications.map((n) => storage.markNotificationAsRead(n.id)));
     res.json({ message: "Todas as notifica\xE7\xF5es foram marcadas como lidas" });
   } catch (error) {
+    console.error("[NOTIFICATIONS] Error marking all as read:", error);
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
@@ -14774,6 +14868,7 @@ router12.delete("/:id", authenticateToken, async (req, res) => {
     });
     res.json({ message: "Notifica\xE7\xE3o exclu\xEDda com sucesso" });
   } catch (error) {
+    console.error("[NOTIFICATIONS] Error deleting notification:", error);
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
@@ -15211,9 +15306,18 @@ import { Router as Router15 } from "express";
 import { eq as eq24, and as and18, sql as sql14, gte as gte12, desc as desc7, count as count5, notInArray, inArray as inArray6 } from "drizzle-orm";
 var router15 = Router15();
 function calculateUrgency(massDateStr, massTime) {
+  if (!massDateStr || !massTime) return "low";
   const now = /* @__PURE__ */ new Date();
-  const [year, month, day] = massDateStr.split("-").map(Number);
-  const [hours, minutes] = massTime.split(":").map(Number);
+  const dateParts = massDateStr.split("-").map(Number);
+  const timeParts = massTime.split(":").map(Number);
+  const year = dateParts[0] || 0;
+  const month = dateParts[1] || 1;
+  const day = dateParts[2] || 1;
+  const hours = timeParts[0] || 0;
+  const minutes = timeParts[1] || 0;
+  if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+    return "low";
+  }
   const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
   const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
   if (hoursUntilMass < 12) return "critical";
@@ -15252,8 +15356,13 @@ router15.post("/", authenticateToken, async (req, res) => {
         message: "Escala n\xE3o encontrada"
       });
     }
-    const [year, month, day] = schedule.date.split("-").map(Number);
-    const [hours, minutes] = schedule.time.split(":").map(Number);
+    const dateParts = schedule.date?.split("-").map(Number) || [];
+    const timeParts = schedule.time?.split(":").map(Number) || [];
+    const year = dateParts[0] || 2024;
+    const month = dateParts[1] || 1;
+    const day = dateParts[2] || 1;
+    const hours = timeParts[0] || 0;
+    const minutes = timeParts[1] || 0;
     const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     const now = /* @__PURE__ */ new Date();
     console.log("[Substitutions] Verificando data:", {
@@ -15572,6 +15681,15 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Escala n\xE3o encontrada"
       });
     }
+    const scheduleDate = new Date(schedule.date);
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    if (scheduleDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: "N\xE3o \xE9 poss\xEDvel aceitar substitui\xE7\xE3o para missa que j\xE1 passou"
+      });
+    }
     const conflictingSchedule = await db.select().from(schedules).where(
       and18(
         eq24(schedules.ministerId, userId),
@@ -15586,18 +15704,25 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Voc\xEA j\xE1 est\xE1 escalado neste hor\xE1rio"
       });
     }
-    await db.update(substitutionRequests).set({
-      status: "approved",
-      substituteId: userId,
-      approvedBy: userId,
-      approvedAt: /* @__PURE__ */ new Date(),
-      responseMessage: message || null,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq24(substitutionRequests.id, id));
-    await db.update(schedules).set({
-      ministerId: userId,
-      substituteId: request.requesterId
-    }).where(eq24(schedules.id, request.scheduleId));
+    await db.transaction(async (tx) => {
+      const [currentRequest] = await tx.select().from(substitutionRequests).where(eq24(substitutionRequests.id, id)).limit(1);
+      const stillAvailable = currentRequest && (currentRequest.status === "available" || currentRequest.status === "pending" && !currentRequest.substituteId);
+      if (!stillAvailable) {
+        throw new Error("SUBSTITUTION_ALREADY_CLAIMED");
+      }
+      await tx.update(substitutionRequests).set({
+        status: "approved",
+        substituteId: userId,
+        approvedBy: userId,
+        approvedAt: /* @__PURE__ */ new Date(),
+        responseMessage: message || null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq24(substitutionRequests.id, id));
+      await tx.update(schedules).set({
+        ministerId: userId,
+        substituteId: request.requesterId
+      }).where(eq24(schedules.id, request.scheduleId));
+    });
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
     res.json({
@@ -15605,6 +15730,12 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
       message: "Substitui\xE7\xE3o aceita com sucesso!"
     });
   } catch (error) {
+    if (error?.message === "SUBSTITUTION_ALREADY_CLAIMED") {
+      return res.status(409).json({
+        success: false,
+        message: "Esta solicita\xE7\xE3o j\xE1 foi aceita por outro ministro"
+      });
+    }
     console.error("Erro ao reivindicar substitui\xE7\xE3o:", error);
     res.status(500).json({
       success: false,
@@ -17724,7 +17855,7 @@ router23.get(
     try {
       const metrics2 = await getAllReliabilityMetrics();
       const totalMinisters = metrics2.length;
-      const averageScore = metrics2.reduce((sum, m) => sum + m.reliabilityScore, 0) / totalMinisters;
+      const averageScore = totalMinisters > 0 ? metrics2.reduce((sum, m) => sum + m.reliabilityScore, 0) / totalMinisters : 0;
       const totalSubstitutionRequests = metrics2.reduce(
         (sum, m) => sum + m.substitutionRequestCount,
         0
@@ -17745,8 +17876,8 @@ router23.get(
         poor: metrics2.filter((m) => m.category === "poor").length,
         critical: metrics2.filter((m) => m.category === "critical").length
       };
-      const criticalPercentage = distribution.critical / totalMinisters * 100;
-      const excellentPercentage = distribution.excellent / totalMinisters * 100;
+      const criticalPercentage = totalMinisters > 0 ? distribution.critical / totalMinisters * 100 : 0;
+      const excellentPercentage = totalMinisters > 0 ? distribution.excellent / totalMinisters * 100 : 0;
       let systemHealth;
       if (criticalPercentage >= 20) systemHealth = "critical";
       else if (criticalPercentage >= 10) systemHealth = "needs_attention";
@@ -18067,6 +18198,23 @@ await init_db();
 init_schema();
 import { eq as eq33, and as and23, inArray as inArray7 } from "drizzle-orm";
 var router26 = Router26();
+function parseYearMonthParams3(req, res) {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ success: false, message: "Ano e m\xEAs devem ser n\xFAmeros v\xE1lidos" });
+    return null;
+  }
+  if (month < 1 || month > 12) {
+    res.status(400).json({ success: false, message: "M\xEAs deve estar entre 1 e 12" });
+    return null;
+  }
+  if (year < 2024 || year > 2030) {
+    res.status(400).json({ success: false, message: "Ano deve estar entre 2024 e 2030" });
+    return null;
+  }
+  return { year, month };
+}
 var createDrawSchema = z7.object({
   month: z7.number().min(1).max(12),
   year: z7.number().min(2024).max(2030),
@@ -18234,8 +18382,9 @@ router26.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
 });
 router26.get("/results/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonthParams3(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const draws = await storage.getAdorationDraws(year, month);
     if (draws.length === 0) {
       return res.json({
@@ -18296,7 +18445,7 @@ router26.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coor
   }
 });
 var swapDaySchema = z7.object({
-  newMondayOfWeek: z7.number().min(1).max(5)
+  newMondayOfWeek: z7.number().int().min(1).max(5)
 });
 router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
   try {
@@ -18363,8 +18512,9 @@ router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
 });
 router26.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonthParams3(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ success: false, message: "Usu\xE1rio n\xE3o autenticado" });
@@ -18387,6 +18537,13 @@ router26.get("/my-schedule/:year/:month", authenticateToken, async (req, res) =>
       });
     }
     const mondaysInMonth = getMondaysInMonth(year, month);
+    if (result.mondayOfWeek < 1 || result.mondayOfWeek > mondaysInMonth.length) {
+      logger.warn(`[ADORATION] Invalid mondayOfWeek ${result.mondayOfWeek} for user ${userId}, month has ${mondaysInMonth.length} mondays`);
+      return res.status(400).json({
+        success: false,
+        message: "Dados de escala\xE7\xE3o inv\xE1lidos. Por favor, contate um coordenador."
+      });
+    }
     const scheduledDate = mondaysInMonth[result.mondayOfWeek - 1];
     const familyMemberIds = await storage.getFamilyMemberIds(userId);
     const familyMembers = [];
@@ -19838,8 +19995,10 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/schedules", authenticateToken, async (req, res) => {
     try {
-      const month = req.query.month ? parseInt(req.query.month) : void 0;
-      const year = req.query.year ? parseInt(req.query.year) : void 0;
+      const monthParsed = req.query.month ? parseInt(req.query.month) : NaN;
+      const yearParsed = req.query.year ? parseInt(req.query.year) : NaN;
+      const month = isNaN(monthParsed) ? void 0 : monthParsed;
+      const year = isNaN(yearParsed) ? void 0 : yearParsed;
       const scheduleSummary = await storage.getSchedulesSummary(month, year);
       const assignments = await storage.getMonthAssignments(month, year);
       const substitutionsData = await storage.getMonthSubstitutions(month, year);
