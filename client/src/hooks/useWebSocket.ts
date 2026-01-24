@@ -9,15 +9,26 @@ import { authAPI } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
 interface WebSocketMessage {
-  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'PING';
+  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'USER_NOTIFICATION' | 'UNREAD_COUNT' | 'PING';
   data?: any;
   timestamp: string;
+}
+
+interface UserNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  actionUrl?: string | null;
+  createdAt: string;
 }
 
 interface UseWebSocketOptions {
   onSubstitutionRequest?: (data: any) => void;
   onCriticalMass?: (data: any) => void;
   onAlertUpdate?: (data: any) => void;
+  onUserNotification?: (data: UserNotification) => void;
+  onUnreadCountUpdate?: (count: number) => void;
   enabled?: boolean;
 }
 
@@ -36,7 +47,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
 
-  const { onSubstitutionRequest, onCriticalMass, onAlertUpdate, enabled = true } = options;
+  const { onSubstitutionRequest, onCriticalMass, onAlertUpdate, onUserNotification, onUnreadCountUpdate, enabled = true } = options;
 
   // Debounced setIsConnected to prevent rapid UI updates
   const setIsConnectedDebounced = useCallback((connected: boolean) => {
@@ -139,6 +150,24 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               }
               break;
 
+            case 'USER_NOTIFICATION':
+              if (onUserNotification) {
+                onUserNotification(message.data);
+              }
+              // Show toast for new notification
+              toast({
+                title: message.data.title,
+                description: message.data.message,
+                variant: "default",
+              });
+              break;
+
+            case 'UNREAD_COUNT':
+              if (onUnreadCountUpdate && message.data?.count !== undefined) {
+                onUnreadCountUpdate(message.data.count);
+              }
+              break;
+
             case 'PING':
               // Respond to ping
               ws.send(JSON.stringify({ type: 'PONG' }));
@@ -186,7 +215,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       isConnectingRef.current = false;
       setIsConnectedDebounced(false);
     }
-  }, [user, enabled, onSubstitutionRequest, onCriticalMass, onAlertUpdate, toast, setIsConnectedDebounced]);
+  }, [user, enabled, onSubstitutionRequest, onCriticalMass, onAlertUpdate, onUserNotification, onUnreadCountUpdate, toast, setIsConnectedDebounced]);
 
   const disconnect = useCallback(() => {
     console.log('[WS] Disconnecting...');

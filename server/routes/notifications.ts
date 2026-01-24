@@ -7,6 +7,7 @@ import { storage } from "../storage";
 import { notifications, users } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { pushConfig, sendPushNotificationToUsers } from "../utils/pushNotifications";
+import { notifyUsers } from "../websocket";
 
 const router = Router();
 
@@ -352,6 +353,21 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
     const createdNotifications = await Promise.all(notificationPromises);
     console.log('[NOTIFICAÇÕES] Notificações criadas no banco:', createdNotifications.length);
 
+    // Enviar via WebSocket para atualização em tempo real
+    if (createdNotifications.length > 0) {
+      const firstNotification = createdNotifications[0];
+      notifyUsers(recipientUserIds, {
+        id: firstNotification.id,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        actionUrl: data.actionUrl ?? null,
+        createdAt: firstNotification.createdAt?.toISOString() ?? new Date().toISOString()
+      });
+      console.log('[NOTIFICAÇÕES] WebSocket: notificação enviada para', recipientUserIds.length, 'usuários conectados');
+    }
+
+    // Enviar push notification para dispositivos móveis/desktop
     if (pushConfig.enabled) {
       console.log('[NOTIFICAÇÕES] Push notifications habilitado, enviando para', recipientUserIds.length, 'destinatários');
       await sendPushNotificationToUsers(recipientUserIds, {

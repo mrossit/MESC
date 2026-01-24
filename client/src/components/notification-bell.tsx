@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "@/hooks/use-navigate";
@@ -46,7 +47,6 @@ export function NotificationBell({ compact = false, showLabel = false, className
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [lastCount, setLastCount] = useState(0);
   const {
     isSupported: pushSupported,
     status: pushStatus,
@@ -58,40 +58,38 @@ export function NotificationBell({ compact = false, showLabel = false, className
     error: pushError
   } = usePushNotifications();
 
+  // WebSocket callback for new notifications - invalidate queries for real-time update
+  const handleUserNotification = useCallback(() => {
+    // Invalidate both queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+  }, [queryClient]);
+
+  // WebSocket callback for unread count updates
+  const handleUnreadCountUpdate = useCallback((count: number) => {
+    // Update the cache directly for instant UI update
+    queryClient.setQueryData(["/api/notifications/unread-count"], { count });
+  }, [queryClient]);
+
+  // Connect to WebSocket for real-time notifications
+  useWebSocket({
+    onUserNotification: handleUserNotification,
+    onUnreadCountUpdate: handleUnreadCountUpdate,
+    enabled: true
+  });
+
   // Fetch notifications
   const { data: notifications = [], refetch: refetchNotifications } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     enabled: open, // Only fetch when popover is open
   });
 
-  // Fetch unread count
-  // Polling re-enabled with longer interval (60s) to reduce server load
+  // Fetch unread count - polling as fallback, WebSocket provides instant updates
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    refetchInterval: 60000, // Poll every 60 seconds
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    refetchInterval: 120000, // Reduced to 2min since WebSocket handles real-time
+    staleTime: 60000, // Consider data fresh for 1 minute
   });
-
-  // Check for new notifications
-  useEffect(() => {
-    if (unreadCount && unreadCount.count > lastCount && lastCount > 0) {
-      // New notification arrived
-      toast({
-        title: "Nova notificação",
-        description: "Você recebeu uma nova mensagem",
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/communication")}
-          >
-            Ver
-          </Button>
-        ),
-      });
-    }
-    setLastCount(unreadCount?.count || 0);
-  }, [unreadCount, lastCount, navigate]);
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
