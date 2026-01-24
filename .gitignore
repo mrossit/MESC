@@ -114,3 +114,16 @@ replit.nix
 # ==========================================
 # BMAD (local only - arquivos de agentes)
 # ==========================================
+
+# ==========================================
+# DADOS DE USUÁRIO (LGPD) - NUNCA COMMITAR!
+# ==========================================
+USUARIOS-*.csv
+USUARIOS-*.txt
+*-EXPORT.csv
+*-HASHES-*.txt
+*.backup
+*.bak
+cookies.txt
+build-output.txt
+escala_*.csv

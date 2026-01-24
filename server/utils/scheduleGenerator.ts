@@ -4,11 +4,7 @@ import { eq, and, or, gte, lte, desc, sql, ne, count, inArray } from 'drizzle-or
 import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday, isMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
-import { validateAndLogOctoberMasses, printOctoberScheduleComparison } from './octoberMassValidator.js';
 import { isAvailableForMass } from './ministerAvailabilityChecker.js';
-
-// 🚨 DEBUG: CONFIRMAR QUE O CÓDIGO ATUALIZADO ESTÁ SENDO EXECUTADO
-console.log('🚀 [SCHEDULE_GENERATOR] MÓDULO CARREGADO - VERSÃO COM FAIR ALGORITHM! Timestamp:', new Date().toISOString());
 
 export interface Minister {
   id: string | null; // null = VACANTE
@@ -200,17 +196,6 @@ export class ScheduleGenerator {
         console.error(error.message);
         console.error(`${'!'.repeat(60)}\n`);
         throw error;
-      }
-
-      // 2.1. VALIDATE October masses if applicable
-      if (month === 10) {
-        console.log(`\n[SCHEDULE_GEN] 🔍 Validating October mass schedule...`);
-        printOctoberScheduleComparison(monthlyMassTimes, year);
-        const isValid = validateAndLogOctoberMasses(monthlyMassTimes, year);
-
-        if (!isValid) {
-          console.log(`[SCHEDULE_GEN] ⚠️ October validation found errors, but continuing with generation...`);
-        }
       }
 
       // 2.5. Load ALL saints data ONCE (crucial performance optimization) - OPTIONAL

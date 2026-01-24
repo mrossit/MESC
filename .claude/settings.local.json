@@ -40,7 +40,8 @@
       "Bash(wc:*)",
       "Bash(npx vitest:*)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
-      "Bash(timeout 10 npm run dev)"
+      "Bash(timeout 10 npm run dev)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []

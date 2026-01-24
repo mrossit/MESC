@@ -5,12 +5,22 @@ import { hashPassword } from './auth';
 async function seedAdmin() {
   try {
     console.log('🔐 Criando usuário administrador...');
-    
-    // Dados do administrador master
+
+    // Dados do administrador master - usar variáveis de ambiente
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminName = process.env.ADMIN_NAME || 'Administrador';
+
+    if (!adminEmail || !adminPassword) {
+      console.error('❌ ADMIN_EMAIL e ADMIN_PASSWORD são obrigatórios!');
+      console.log('Use: ADMIN_EMAIL=seu@email.com ADMIN_PASSWORD=suasenha npx tsx server/seedAdmin.ts');
+      process.exit(1);
+    }
+
     const adminData = {
-      email: 'rossit@icloud.com',
-      password: '123Pegou$&@',
-      name: 'Marco Rossit',
+      email: adminEmail,
+      password: adminPassword,
+      name: adminName,
       role: 'gestor' as const, // Gestor tem acesso completo conforme PRD
     };
     
@@ -42,69 +52,9 @@ async function seedAdmin() {
       console.log('ℹ️  Usuário administrador já existe.');
     }
     
-    // Cria também um coordenador de exemplo
-    const coordenadorData = {
-      email: 'coordenador@saoludastadeu.com.br',
-      password: 'Coord@2025',
-      name: 'Coordenador Exemplo',
-      role: 'coordenador' as const,
-    };
-    
-    const coordPasswordHash = await hashPassword(coordenadorData.password);
-    
-    const [coord] = await db
-      .insert(users)
-      .values({
-        email: coordenadorData.email,
-        passwordHash: coordPasswordHash,
-        name: coordenadorData.name,
-        role: coordenadorData.role,
-        status: 'active',
-        requiresPasswordChange: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .onConflictDoNothing()
-      .returning();
-    
-    if (coord) {
-      console.log('\n✅ Usuário coordenador criado com sucesso!');
-      console.log('📧 Email:', coordenadorData.email);
-      console.log('🔑 Senha: Verifique a senha hardcoded no arquivo seedAdmin.ts');
-    }
-    
-    // Cria um ministro de exemplo
-    const ministroData = {
-      email: 'ministro@exemplo.com',
-      password: 'Ministro@2025',
-      name: 'Ministro Exemplo',
-      role: 'ministro' as const,
-    };
-    
-    const ministroPasswordHash = await hashPassword(ministroData.password);
-    
-    const [ministro] = await db
-      .insert(users)
-      .values({
-        email: ministroData.email,
-        passwordHash: ministroPasswordHash,
-        name: ministroData.name,
-        role: ministroData.role,
-        status: 'active',
-        requiresPasswordChange: true,
-        phone: '(15) 99999-9999',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .onConflictDoNothing()
-      .returning();
-    
-    if (ministro) {
-      console.log('\n✅ Usuário ministro criado com sucesso!');
-      console.log('📧 Email:', ministroData.email);
-      console.log('🔑 Senha: Verifique a senha hardcoded no arquivo seedAdmin.ts');
-    }
-    
+    // Usuários de exemplo removidos para produção
+    // Para criar usuários adicionais, use a interface de administração
+
     console.log('\n✨ Seed concluído com sucesso!');
     process.exit(0);
   } catch (error) {
