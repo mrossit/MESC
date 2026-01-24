@@ -706,11 +706,23 @@ export default function Schedules() {
 
       // Definir grupos de posições com células mescladas
       // Logo em base64 (incorporado para funcionar em PDF/HTML)
-      const logoBase64 = 'data:image/png;base64,' + (await fetch('/sjtlogo.png').then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.readAsDataURL(blob);
-      })));
+      let logoBase64 = '';
+      try {
+        const logoBlob = await fetch('/sjtlogo.png').then(r => r.blob());
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const parts = result?.split(',');
+            resolve(parts?.[1] || '');
+          };
+          reader.onerror = () => reject(new Error('Failed to read logo'));
+          reader.readAsDataURL(logoBlob);
+        });
+        logoBase64 = base64Data ? 'data:image/png;base64,' + base64Data : '';
+      } catch (error) {
+        console.warn('Could not load logo for export:', error);
+      }
 
       const positionGroups = POSITION_GROUPS;
       const legendItems = SCHEDULE_LEGEND_ITEMS;
@@ -1156,7 +1168,9 @@ export default function Schedules() {
 
     // Validação de data passada no frontend ANTES de enviar ao servidor
     const assignmentDate = parseScheduleDate(selectedAssignmentForSubstitution.date);
-    const [hours, minutes] = selectedAssignmentForSubstitution.massTime.split(':').map(Number);
+    const timeParts = selectedAssignmentForSubstitution.massTime?.split(':').map(Number) || [];
+    const hours = timeParts[0] ?? 0;
+    const minutes = timeParts[1] ?? 0;
     assignmentDate.setHours(hours, minutes, 0, 0);
 
     const now = new Date();
