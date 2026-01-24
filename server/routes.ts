@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
@@ -57,11 +57,34 @@ const formationProgressUpdateSchema = z.object({
   notes: z.string().optional()
 });
 
+// Type for user data with optional reliability fields (allows null from database)
+interface UserWithReliability extends Partial<User> {
+  reliabilityScore?: number | null;
+  substitutionRequestCount?: number | null;
+  substitutionFulfilledCount?: number | null;
+  manualRemovalCount?: number | null;
+  noShowCount?: number | null;
+  lastReliabilityUpdate?: Date | null;
+  reliabilityNotes?: string | null;
+}
+
+// Type for API error response
+interface ApiErrorResponse {
+  status: number;
+  message: string;
+  errors?: unknown[];
+}
+
+// Type for database errors
+interface DatabaseError extends Error {
+  code?: string;
+}
+
 // 🤖 ADAPTIVE LEARNING: Sanitize user data to hide reliability metrics from ministers
 // Reliability scores should ONLY be visible to coordinators/managers to avoid:
 // - Competition between ministers
 // - Deviation from spiritual purpose (serving God, not chasing points)
-function sanitizeUserData(user: any, requestingUserRole?: string): any {
+function sanitizeUserData(user: UserWithReliability, requestingUserRole?: string): Partial<User> {
   // Coordinators and managers can see all data
   if (requestingUserRole === 'coordenador' || requestingUserRole === 'gestor') {
     return user;
@@ -83,7 +106,7 @@ function sanitizeUserData(user: any, requestingUserRole?: string): any {
 }
 
 // Função utilitária para tratamento de erro centralizado
-function handleApiError(error: any, operation: string) {
+function handleApiError(error: unknown, operation: string): ApiErrorResponse {
   if (error instanceof z.ZodError) {
     return {
       status: 400,
@@ -92,31 +115,32 @@ function handleApiError(error: any, operation: string) {
     };
   }
 
-  if (error.code === '23505') { // PostgreSQL unique violation
+  const dbError = error as DatabaseError;
+  if (dbError.code === '23505') { // PostgreSQL unique violation
     return {
       status: 409,
       message: `Já existe um registro com estes dados para ${operation}`
     };
   }
 
-  if (error.code === '23503') { // PostgreSQL foreign key violation
+  if (dbError.code === '23503') { // PostgreSQL foreign key violation
     return {
       status: 400,
       message: `Referência inválida encontrada para ${operation}`
     };
   }
 
-  if (error.message && error.message.includes('não encontrado')) {
+  if (dbError.message && dbError.message.includes('não encontrado')) {
     return {
       status: 404,
-      message: error.message
+      message: dbError.message
     };
   }
 
-  if (error.message && error.message.includes('não autorizado')) {
+  if (dbError.message && dbError.message.includes('não autorizado')) {
     return {
       status: 403,
-      message: error.message
+      message: dbError.message
     };
   }
 
@@ -1460,7 +1484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: `Migração concluída com sucesso! ${affectedRequests.length} registro(s) atualizado(s).`,
         affectedCount: affectedRequests.length,
-        affectedRequests: affectedRequests.map((r: any) => ({
+        affectedRequests: affectedRequests.map((r: { id: string; createdAt: Date | null }) => ({
           id: r.id,
           createdAt: r.createdAt
         }))
@@ -1476,7 +1500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Global error handler for uncaught route errors
-  app.use((err: any, req: any, res: any, next: any) => {
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     console.error('🚨 Route error:', err.message);
 
     if (process.env.NODE_ENV === 'development') {
