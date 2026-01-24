@@ -486,6 +486,16 @@ router.get('/my-schedule/:year/:month', authenticateToken, async (req: AuthReque
 
     // 3. Calcular as datas das segundas
     const mondaysInMonth = getMondaysInMonth(year, month);
+
+    // Validate mondayOfWeek is within bounds
+    if (result.mondayOfWeek < 1 || result.mondayOfWeek > mondaysInMonth.length) {
+      logger.warn(`[ADORATION] Invalid mondayOfWeek ${result.mondayOfWeek} for user ${userId}, month has ${mondaysInMonth.length} mondays`);
+      return res.status(400).json({
+        success: false,
+        message: 'Dados de escalação inválidos. Por favor, contate um coordenador.'
+      });
+    }
+
     const scheduledDate = mondaysInMonth[result.mondayOfWeek - 1];
 
     // 4. Buscar familiares escalados juntos
