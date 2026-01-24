@@ -10,9 +10,23 @@ const router = Router();
 
 // Calcular urgência baseada no tempo até a missa
 function calculateUrgency(massDateStr: string, massTime: string): "low" | "medium" | "high" | "critical" {
+  if (!massDateStr || !massTime) return "low";
+
   const now = new Date();
-  const [year, month, day] = massDateStr.split('-').map(Number);
-  const [hours, minutes] = massTime.split(':').map(Number);
+  const dateParts = massDateStr.split('-').map(Number);
+  const timeParts = massTime.split(':').map(Number);
+
+  const year = dateParts[0] || 0;
+  const month = dateParts[1] || 1;
+  const day = dateParts[2] || 1;
+  const hours = timeParts[0] || 0;
+  const minutes = timeParts[1] || 0;
+
+  // Validar que os valores são números válidos
+  if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+    return "low";
+  }
+
   // Criar data em HORÁRIO LOCAL (não UTC) - as datas da missa são em horário local
   const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
@@ -55,7 +69,9 @@ async function countMonthlySubstitutions(requesterId: string): Promise<number> {
 async function findAvailableSubstitute(massDate: string, massTime: string): Promise<string | null> {
   try {
     // 1. Buscar o questionário ativo do mês/ano da missa
-    const [year, month] = massDate.split('-').map(Number);
+    const dateParts = massDate?.split('-').map(Number) || [];
+    const year = dateParts[0] || new Date().getFullYear();
+    const month = dateParts[1] || (new Date().getMonth() + 1);
 
     const [activeQuestionnaire] = await db
       .select()
@@ -199,8 +215,15 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
 
     // Verificar se a data/hora da missa já passou
     // Usar horário LOCAL (não UTC) - as datas da missa são em horário local
-    const [year, month, day] = schedule.date.split('-').map(Number);
-    const [hours, minutes] = schedule.time.split(':').map(Number);
+    const dateParts = schedule.date?.split('-').map(Number) || [];
+    const timeParts = schedule.time?.split(':').map(Number) || [];
+
+    const year = dateParts[0] || 2024;
+    const month = dateParts[1] || 1;
+    const day = dateParts[2] || 1;
+    const hours = timeParts[0] || 0;
+    const minutes = timeParts[1] || 0;
+
     // Criar data em HORÁRIO LOCAL para comparação correta
     const massDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
