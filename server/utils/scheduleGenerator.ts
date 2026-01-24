@@ -1624,6 +1624,10 @@ export class ScheduleGenerator {
       const year = parseInt(dateParts[0]);
       const month = parseInt(dateParts[1]);
       const day = parseInt(dateParts[2]);
+
+      // Validate parsed values
+      if (isNaN(year) || isNaN(month) || isNaN(day)) return true;
+
       const massDate = new Date(year, month - 1, day);
       const dayOfWeek = massDate.getDay(); // 0=Sunday, 6=Saturday
 
