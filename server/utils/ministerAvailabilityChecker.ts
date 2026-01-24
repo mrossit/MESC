@@ -21,16 +21,29 @@ interface Minister {
 }
 
 /**
+ * Safely parse minister response JSON
+ */
+function safeParseResponse(minister: Minister): any | null {
+  if (!minister.questionnaireResponse?.responses) {
+    return null;
+  }
+
+  try {
+    return typeof minister.questionnaireResponse.responses === 'string'
+      ? JSON.parse(minister.questionnaireResponse.responses)
+      : minister.questionnaireResponse.responses;
+  } catch {
+    console.warn(`[AVAILABILITY] Failed to parse response for minister ${minister.id}`);
+    return null;
+  }
+}
+
+/**
  * Check if minister is available for a specific mass
  */
 export function isAvailableForMass(minister: Minister, mass: Mass): boolean {
-  if (!minister.questionnaireResponse?.responses) {
-    return false;
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return false;
 
   // Handle v2.0 format (preferred)
   if (response.format_version === '2.0') {
@@ -202,13 +215,8 @@ function normalizeTime(time: any): string {
  * Get all available dates for a minister
  */
 export function getAvailableDates(minister: Minister): string[] {
-  if (!minister.questionnaireResponse?.responses) {
-    return [];
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return [];
 
   if (response.format_version === '2.0') {
     return Object.keys(response.masses || {});
@@ -239,13 +247,8 @@ export function getAvailableDates(minister: Minister): string[] {
  * Get all available times for a minister on a specific date
  */
 export function getAvailableTimes(minister: Minister, date: string): string[] {
-  if (!minister.questionnaireResponse?.responses) {
-    return [];
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return [];
 
   if (response.format_version === '2.0') {
     const massesForDate = response.masses?.[date] || {};
@@ -271,13 +274,8 @@ export function getAvailableTimes(minister: Minister, date: string): string[] {
  * 🔥 FIX: Now considers alternative_times as indicator of substitution availability
  */
 export function canSubstitute(minister: Minister): boolean {
-  if (!minister.questionnaireResponse?.responses) {
-    return false;
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return false;
 
   if (response.format_version === '2.0') {
     // Check explicit can_substitute flag
@@ -318,13 +316,8 @@ export function canSubstitute(minister: Minister): boolean {
  * Get minister's alternative times (times they can serve besides their preferred time)
  */
 export function getAlternativeTimes(minister: Minister): string[] {
-  if (!minister.questionnaireResponse?.responses) {
-    return [];
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return [];
 
   if (response.format_version === '2.0') {
     return response.alternative_times || [];
@@ -353,13 +346,8 @@ export function getAlternativeTimes(minister: Minister): string[] {
  * Get minister's special event availability
  */
 export function getSpecialEventAvailability(minister: Minister) {
-  if (!minister.questionnaireResponse?.responses) {
-    return {};
-  }
-
-  const response = typeof minister.questionnaireResponse.responses === 'string'
-    ? JSON.parse(minister.questionnaireResponse.responses)
-    : minister.questionnaireResponse.responses;
+  const response = safeParseResponse(minister);
+  if (!response) return {};
 
   if (response.format_version === '2.0') {
     return response.special_events || {};
