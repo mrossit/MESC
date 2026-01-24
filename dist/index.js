@@ -842,7 +842,8 @@ var init_schema = __esm({
       experience: true,
       specialSkills: true,
       liturgicalTraining: true,
-      observations: true
+      observations: true,
+      extraActivities: true
     });
     insertQuestionnaireSchema = createInsertSchema(questionnaires).pick({
       title: true,
@@ -2685,11 +2686,11 @@ ${"!".repeat(60)}`);
           logger.warn("Database n\xE3o dispon\xEDvel, criando dados mock para preview em desenvolvimento");
           console.log("[SCHEDULE_GEN] Creating mock ministers data for development preview only");
           this.ministers = [
-            { id: "1", name: "Jo\xE3o Silva", role: "ministro", totalServices: 5, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.8, preferenceScore: 0.7, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
-            { id: "2", name: "Maria Santos", role: "ministro", totalServices: 3, lastService: null, preferredTimes: ["08:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.9, preferenceScore: 0.8, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
-            { id: "3", name: "Pedro Costa", role: "ministro", totalServices: 4, lastService: null, preferredTimes: ["19:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.7, preferenceScore: 0.6, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
-            { id: "4", name: "Ana Lima", role: "ministro", totalServices: 2, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.85, preferenceScore: 0.75, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
-            { id: "5", name: "Carlos Oliveira", role: "coordenador", totalServices: 6, lastService: null, preferredTimes: ["08:00", "10:00"], canServeAsCouple: false, spouseMinisterId: null, availabilityScore: 0.95, preferenceScore: 0.9, monthlyAssignmentCount: 0, lastAssignedDate: void 0 }
+            { id: "1", name: "Jo\xE3o Silva", role: "ministro", totalServices: 5, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, familyId: null, availabilityScore: 0.8, preferenceScore: 0.7, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "2", name: "Maria Santos", role: "ministro", totalServices: 3, lastService: null, preferredTimes: ["08:00"], canServeAsCouple: false, spouseMinisterId: null, familyId: null, availabilityScore: 0.9, preferenceScore: 0.8, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "3", name: "Pedro Costa", role: "ministro", totalServices: 4, lastService: null, preferredTimes: ["19:00"], canServeAsCouple: false, spouseMinisterId: null, familyId: null, availabilityScore: 0.7, preferenceScore: 0.6, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "4", name: "Ana Lima", role: "ministro", totalServices: 2, lastService: null, preferredTimes: ["10:00"], canServeAsCouple: false, spouseMinisterId: null, familyId: null, availabilityScore: 0.85, preferenceScore: 0.75, monthlyAssignmentCount: 0, lastAssignedDate: void 0 },
+            { id: "5", name: "Carlos Oliveira", role: "coordenador", totalServices: 6, lastService: null, preferredTimes: ["08:00", "10:00"], canServeAsCouple: false, spouseMinisterId: null, familyId: null, availabilityScore: 0.95, preferenceScore: 0.9, monthlyAssignmentCount: 0, lastAssignedDate: void 0 }
           ];
           return;
         }
@@ -2730,8 +2731,8 @@ ${"!".repeat(60)}`);
           console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
         } catch (queryError) {
           console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR:`, queryError);
-          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR STACK:`, queryError.stack);
-          throw new Error(`Erro na consulta de ministros: ${queryError.message || queryError}`);
+          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR STACK:`, queryError?.stack);
+          throw new Error(`Erro na consulta de ministros: ${queryError?.message || queryError}`);
         }
         this.ministers = ministersData.map((m) => ({
           ...m,
@@ -3782,15 +3783,15 @@ ${"!".repeat(60)}`);
         console.log(`[SCHEDULE_GEN] Generating for mass: ${massTime.date} at ${massTime.time}`);
         const availableMinsters = this.getAvailableMinistersForMass(massTime);
         console.log(`[SCHEDULE_GEN] Available ministers for this mass: ${availableMinsters.length}`);
-        const selectedMinisters2 = this.selectOptimalMinisters(availableMinsters, massTime);
-        console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters2.length}`);
-        const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters2);
-        const confidence = this.calculateScheduleConfidence(selectedMinisters2, massTime);
+        const selectedMinisters = this.selectOptimalMinisters(availableMinsters, massTime);
+        console.log(`[SCHEDULE_GEN] Selected ministers: ${selectedMinisters.length}`);
+        const backupMinisters = this.selectBackupMinisters(availableMinsters, selectedMinisters);
+        const confidence = this.calculateScheduleConfidence(selectedMinisters, massTime);
         console.log("[SCHEDULE_GEN] \u2705 DEBUGGING: Atribuindo posi\xE7\xF5es aos ministros com base em prefer\xEAncias!");
-        const ministersWithPositions = this.assignPositionsIntelligently(selectedMinisters2);
+        const ministersWithPositions = this.assignPositionsIntelligently(selectedMinisters);
         const backupWithPositions = backupMinisters.map((minister, index2) => ({
           ...minister,
-          position: selectedMinisters2.length + index2 + 1
+          position: selectedMinisters.length + index2 + 1
         }));
         console.log("[SCHEDULE_GEN] \u{1F6A8} RETORNANDO RESULTADO COM POSI\xC7\xD5ES! ministersWithPositions:", ministersWithPositions.length);
         console.log("[SCHEDULE_GEN] \u{1F6A8} Primeiro ministro com posi\xE7\xE3o:", JSON.stringify(ministersWithPositions[0], null, 2));
@@ -4590,7 +4591,7 @@ ${"!".repeat(60)}`);
           }
           const ministerIds = results.map((r) => r.ministerId);
           const ministersData = await this.db.select().from(users).where(and7(
-            users.id in ministerIds,
+            inArray2(users.id, ministerIds),
             eq12(users.status, "active")
           ));
           const ministers = ministersData.map((m) => ({
@@ -6365,17 +6366,14 @@ async function handleMessage(message) {
     const normalizedPhone = phone.replace(/\D/g, "");
     const normalizedText = text2.trim().toLowerCase();
     console.log(`\u{1F4AC} De ${normalizedPhone}: ${normalizedText}`);
-    const ministro = await db.query.ministros.findFirst({
-      where: (m, { eq: eq35 }) => eq35(m.telefone, normalizedPhone)
+    const ministro = await db.query.users.findFirst({
+      where: (u, { eq: eq35 }) => eq35(u.phone, normalizedPhone)
     });
-    const proximaEscala = await db.query.escalas.findFirst({
-      where: (e, { eq: eq35 }) => eq35(e.ministro_id, ministro?.id),
-      orderBy: (e, { asc: asc4 }) => asc4(e.data)
-    });
+    let proximaEscala;
     let resposta = "";
     if (normalizedText.startsWith("/escala") || normalizedText.startsWith("/proxima")) {
       if (proximaEscala) {
-        resposta = `Paz e bem, ${ministro?.nome ?? "ministro(a)"} \u{1F64F}
+        resposta = `Paz e bem, ${ministro?.name ?? "ministro(a)"} \u{1F64F}
 Sua pr\xF3xima escala \xE9 no dia ${new Date(
           proximaEscala.data
         ).toLocaleDateString("pt-BR")} \xE0s ${proximaEscala.horario} (${proximaEscala.missa}).`;
@@ -6849,7 +6847,7 @@ var registerSchema = z.object({
   password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   phone: z.string().optional(),
-  role: z.enum(["reitor", "coordenador", "ministro"]).optional()
+  role: z.enum(["gestor", "coordenador", "ministro"]).optional()
 });
 var publicRegisterSchema = z.object({
   email: z.string().email("Email inv\xE1lido"),
@@ -6952,7 +6950,7 @@ router2.post("/register", async (req, res) => {
 router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const userData = registerSchema.parse(req.body);
-    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor" && req.user?.role !== "reitor") {
+    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor") {
       return res.status(403).json({
         success: false,
         message: "Apenas gestores podem criar coordenadores ou outros gestores"
@@ -11683,7 +11681,7 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     if (!db) {
       return res.status(503).json({ message: "Database unavailable" });
     }
-    if (!data.skipDuplicateCheck) {
+    if (!data.skipDuplicateCheck && data.ministerId) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
       const [existing] = await db.select().from(schedules).where(and8(
         eq13(schedules.date, data.date),
@@ -12518,6 +12516,7 @@ function generateMockMinisters(count9 = 50) {
       canServeAsCouple: i % 10 === 0,
       // 10% can serve as couples
       spouseMinisterId: i % 10 === 0 && i > 0 ? `mock-${i}` : null,
+      familyId: null,
       availabilityScore: 0.5 + Math.random() * 0.5,
       // 0.5 to 1.0
       preferenceScore: Math.random()
@@ -13031,8 +13030,8 @@ function extractMinisterIds(ministersData) {
 }
 async function compareAndLearn(month, year) {
   console.log(`[COMPARISON] \u{1F50D} Analyzing schedules for ${year}-${String(month).padStart(2, "0")}`);
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
   const monthSchedules = await db.select().from(schedules).where(
     and11(
       gte7(schedules.date, startDate),
@@ -13093,7 +13092,14 @@ async function analyzeMonthlyPatterns(month, year) {
     );
   }
   const frequentlyRemovedMinisters = await getMinisterDetails(removalCounts);
-  const frequentlyAddedMinisters = await getMinisterDetails(additionCounts);
+  const addedMinistersRaw = await getMinisterDetails(additionCounts);
+  const frequentlyAddedMinisters = addedMinistersRaw.map((m) => ({
+    ministerId: m.ministerId,
+    ministerName: m.ministerName,
+    additionCount: m.removalCount,
+    // The function returns removalCount but we need additionCount
+    reliabilityScore: m.reliabilityScore
+  }));
   const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count9]) => ({ time: time2, changeCount: count9 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
   let algorithmHealth;
   if (acceptanceRate >= 85) algorithmHealth = "excellent";
@@ -15843,9 +15849,9 @@ router17.post("/seed", async (req, res) => {
     const { default: seedFormation2 } = await init_formation_seed().then(() => formation_seed_exports);
     const result = await seedFormation2();
     res.status(200).json({
+      ...result,
       success: true,
-      message: "Formation content seeded successfully",
-      ...result
+      message: "Formation content seeded successfully"
     });
   } catch (error) {
     console.error("Error running formation seed:", error);
@@ -18203,9 +18209,9 @@ router26.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
         drawId: draw.id,
         month,
         year,
-        totalMinisters: selectedMinisters.size,
+        totalMinisters: totalMinistersDrawn,
         totalMondays: mondayCount,
-        ministersPerMonday,
+        unitsPerMonday,
         voluntaryCount: drawResults.filter((r) => r.isVoluntary).length,
         mandatoryCount: drawResults.filter((r) => !r.isVoluntary).length,
         results: drawResults
@@ -18313,23 +18319,9 @@ router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
         message: "Voc\xEA j\xE1 est\xE1 escalado para esta semana"
       });
     }
-    const familyMemberIds = await storage.getFamilyMemberIds(userId);
-    const ministersToMove = familyMemberIds.length > 0 ? familyMemberIds : [userId];
-    logger.info(`Troca de dia: ${ministersToMove.length} ministro(s) de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
-    const movedMinisters = [];
-    for (const memberId of ministersToMove) {
-      const memberResult = await storage.getAdorationDrawResultByMinister(drawId, memberId);
-      if (memberResult) {
-        await storage.updateAdorationDrawResultMonday(drawId, memberId, newMondayOfWeek);
-        const memberUser = await db.select().from(users).where(eq33(users.id, memberId)).limit(1);
-        movedMinisters.push({
-          id: memberId,
-          name: memberUser[0]?.name || "Desconhecido",
-          oldWeek: memberResult.mondayOfWeek,
-          newWeek: newMondayOfWeek
-        });
-      }
-    }
+    logger.info(`Troca de dia: ministro ${userId} de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
+    await storage.updateAdorationDrawResultMonday(drawId, userId, newMondayOfWeek);
+    const [ministerUser] = await db.select().from(users).where(eq33(users.id, userId)).limit(1);
     const draw = await storage.getAdorationDrawById(drawId);
     let mondayDates = [];
     if (draw) {
@@ -18337,12 +18329,17 @@ router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     }
     const oldDate = mondayDates[currentResult.mondayOfWeek - 1]?.toISOString().split("T")[0] || "N/A";
     const newDate = mondayDates[newMondayOfWeek - 1]?.toISOString().split("T")[0] || "N/A";
-    logger.info(`Troca conclu\xEDda: ${movedMinisters.map((m) => m.name).join(", ")} movidos de ${oldDate} para ${newDate}`);
+    logger.info(`Troca conclu\xEDda: ${ministerUser?.name} movido de ${oldDate} para ${newDate}`);
     res.json({
       success: true,
-      message: familyMemberIds.length > 1 ? `Voc\xEA e sua fam\xEDlia foram movidos de ${oldDate} para ${newDate}` : `Voc\xEA foi movido de ${oldDate} para ${newDate}`,
+      message: `Voc\xEA foi movido de ${oldDate} para ${newDate}`,
       data: {
-        movedMinisters,
+        movedMinisters: [{
+          id: userId,
+          name: ministerUser?.name || "Desconhecido",
+          oldWeek: currentResult.mondayOfWeek,
+          newWeek: newMondayOfWeek
+        }],
         oldWeek: currentResult.mondayOfWeek,
         newWeek: newMondayOfWeek,
         oldDate,
