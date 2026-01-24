@@ -178,9 +178,10 @@ app.use((req, res, next) => {
   // Capturar mensagem de erro se houver
   let errorMessage: string | undefined;
   const originalJson = res.json.bind(res);
-  res.json = function (body: any) {
+  res.json = function (body: unknown) {
     if (res.statusCode >= 400 && body && typeof body === 'object') {
-      errorMessage = body.message || body.error || JSON.stringify(body);
+      const errorBody = body as Record<string, unknown>;
+      errorMessage = (errorBody.message as string) || (errorBody.error as string) || JSON.stringify(body);
     }
     return originalJson(body);
   };
@@ -223,7 +224,7 @@ app.use("/api", apiRateLimiter);
 
   const port = parseInt(process.env.PORT || "5000", 10);
 
-  server.on("error", (error: any) => {
+  server.on("error", (error: NodeJS.ErrnoException) => {
     console.error("❌ Server error:", error);
     if (error.code === "EADDRINUSE") {
       console.error(`❌ Port ${port} is already in use`);

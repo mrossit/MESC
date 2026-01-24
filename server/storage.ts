@@ -49,10 +49,18 @@ import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
 import Database from 'better-sqlite3';
 import { formatName } from "./utils/nameFormatter";
 
+// Type for SQLite row data
+type SQLiteRow = Record<string, unknown>;
+
+// Type for database errors
+interface DrizzleError extends Error {
+  code?: string;
+}
+
 // SOLUÇÃO DEFINITIVA: Fallback SQLite quando Drizzle falha
 class DrizzleSQLiteFallback {
   private static sqliteDb: Database.Database | null = null;
-  
+
   static getSQLiteDB(): Database.Database {
     // Only allow SQLite in development mode
     if (process.env.NODE_ENV === 'production') {
@@ -63,11 +71,11 @@ class DrizzleSQLiteFallback {
     }
     return this.sqliteDb;
   }
-  
+
   static async safeQuery<T>(
     drizzleQuery: () => Promise<T>,
     fallbackSQL: string,
-    fallbackMapper: (row: any) => any = (row) => row
+    fallbackMapper: (row: SQLiteRow) => unknown = (row) => row
   ): Promise<T> {
     // In production, always use Drizzle (no fallback)
     if (process.env.NODE_ENV === 'production') {
@@ -77,23 +85,24 @@ class DrizzleSQLiteFallback {
     // In development, try Drizzle first then fallback to SQLite
     try {
       return await drizzleQuery();
-    } catch (drizzleError: any) {
-      if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
-        console.warn('[FALLBACK] Drizzle failed in dev, using SQLite directly:', drizzleError.message);
+    } catch (drizzleError: unknown) {
+      const err = drizzleError as DrizzleError;
+      if (err.code === 'SQLITE_ERROR' || err.message?.includes('SQLITE')) {
+        console.warn('[FALLBACK] Drizzle failed in dev, using SQLite directly:', err.message);
 
         // Usar SQLite direto como fallback
         const sqlite = this.getSQLiteDB();
-        const result = sqlite.prepare(fallbackSQL).all();
+        const result = sqlite.prepare(fallbackSQL).all() as SQLiteRow[];
         return result.map(fallbackMapper) as T;
       }
       throw drizzleError;
     }
   }
-  
+
   static async safeQueryFirst<T>(
     drizzleQuery: () => Promise<T>,
     fallbackSQL: string,
-    fallbackMapper: (row: any) => any = (row) => row
+    fallbackMapper: (row: SQLiteRow) => unknown = (row) => row
   ): Promise<T> {
     // In production, always use Drizzle (no fallback)
     if (process.env.NODE_ENV === 'production') {
@@ -103,11 +112,12 @@ class DrizzleSQLiteFallback {
     // In development, try Drizzle first then fallback to SQLite
     try {
       return await drizzleQuery();
-    } catch (drizzleError: any) {
-      if (drizzleError.code === 'SQLITE_ERROR' || drizzleError.message?.includes('SQLITE')) {
+    } catch (drizzleError: unknown) {
+      const err = drizzleError as DrizzleError;
+      if (err.code === 'SQLITE_ERROR' || err.message?.includes('SQLITE')) {
         // Fallback silencioso para SQLite em desenvolvimento
         const sqlite = this.getSQLiteDB();
-        const result = sqlite.prepare(fallbackSQL).get();
+        const result = sqlite.prepare(fallbackSQL).get() as SQLiteRow | undefined;
         return (result ? fallbackMapper(result) : undefined) as T;
       }
       throw drizzleError;
@@ -115,53 +125,124 @@ class DrizzleSQLiteFallback {
   }
 }
 
+// Input types for storage operations
+export interface QuestionnaireResponseInput {
+  questionnaireId: string;
+  userId: string;
+  responses: Record<string, unknown>;
+  availableSundays?: string[];
+  preferredMassTimes?: string[];
+  alternativeTimes?: string[];
+  dailyMassAvailability?: string[];
+  specialEvents?: Record<string, unknown>;
+  canSubstitute?: boolean;
+  notes?: string;
+  // Optional fields for data processing
+  unmappedResponses?: Array<{
+    questionId: string;
+    question?: string;
+    answer: unknown;
+    metadata?: unknown;
+  }>;
+  processingWarnings?: string[];
+  sharedWithFamilyIds?: string[];
+  isSharedResponse?: boolean;
+  sharedFromUserId?: string | null;
+}
+
+export interface ScheduleInput {
+  date: string;
+  time: string;
+  type?: 'missa' | 'celebracao' | 'evento';
+  location?: string;
+  ministerId?: string | null;
+  position?: number;
+  notes?: string;
+}
+
+export interface ScheduleSummary {
+  date: string;
+  time: string;
+  totalMinisters: number;
+  assignedMinisters: number;
+  status: string;
+}
+
+export interface ScheduleAssignment {
+  id: string;
+  scheduleId: string;
+  ministerId: string | null;
+  ministerName: string | null;
+  position: number;
+  status: string;
+}
+
+export interface SubstitutionRequestInput {
+  scheduleId: string;
+  requesterId: string;
+  reason?: string;
+  urgency?: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface NotificationInput {
+  userId: string;
+  type: 'schedule' | 'substitution' | 'formation' | 'announcement' | 'reminder';
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  actionUrl?: string | null;
+  priority?: string;
+  read?: boolean;
+  expiresAt?: Date | null;
+}
+
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // MESC specific operations
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
-  
+
   // Questionnaire operations
   createQuestionnaire(questionnaire: InsertQuestionnaire & { createdById: string }): Promise<Questionnaire>;
   getQuestionnaires(): Promise<Questionnaire[]>;
   getQuestionnaireById(id: string): Promise<Questionnaire | undefined>;
   updateQuestionnaire(id: string, questionnaire: Partial<InsertQuestionnaire>): Promise<Questionnaire>;
   deleteQuestionnaire(id: string): Promise<void>;
-  
+
   // Questionnaire response operations
-  submitQuestionnaireResponse(response: any): Promise<QuestionnaireResponse>;
+  submitQuestionnaireResponse(response: QuestionnaireResponseInput): Promise<QuestionnaireResponse>;
   getQuestionnaireResponses(questionnaireId: string): Promise<QuestionnaireResponse[]>;
-  
+
   // Schedule operations
-  createSchedule(schedule: any): Promise<Schedule>;
+  createSchedule(schedule: ScheduleInput): Promise<Schedule>;
   getSchedules(): Promise<Schedule[]>;
-  getSchedulesSummary(month?: number, year?: number): Promise<any[]>;
-  getSchedulesByDate(date: string): Promise<any[]>;
+  getSchedulesSummary(month?: number, year?: number): Promise<ScheduleSummary[]>;
+  getSchedulesByDate(date: string): Promise<Schedule[]>;
   getScheduleById(id: string): Promise<Schedule | undefined>;
-  getScheduleAssignments(scheduleId: string): Promise<any[]>;
-  updateSchedule(id: string, schedule: any): Promise<Schedule>;
+  getScheduleAssignments(scheduleId: string): Promise<ScheduleAssignment[]>;
+  updateSchedule(id: string, schedule: Partial<ScheduleInput>): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
-  
+
   // Substitution request operations
-  createSubstitutionRequest(request: any): Promise<SubstitutionRequest>;
+  createSubstitutionRequest(request: SubstitutionRequestInput): Promise<SubstitutionRequest>;
   getSubstitutionRequests(scheduleId: string): Promise<SubstitutionRequest[]>;
-  updateSubstitutionRequest(id: string, request: any): Promise<SubstitutionRequest>;
+  updateSubstitutionRequest(id: string, request: Partial<SubstitutionRequestInput>): Promise<SubstitutionRequest>;
   deleteSubstitutionRequest(id: string): Promise<void>;
-  
+
   // Mass times operations
   createMassTime(massTime: InsertMassTime): Promise<MassTimeConfig>;
   getMassTimes(): Promise<MassTimeConfig[]>;
   updateMassTime(id: string, massTime: Partial<InsertMassTime>): Promise<MassTimeConfig>;
   deleteMassTime(id: string): Promise<void>;
-  
+
   // Notification operations
-  createNotification(notification: any): Promise<Notification>;
+  createNotification(notification: NotificationInput): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
   markNotificationAsRead(id: string): Promise<void>;
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
@@ -414,7 +495,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Questionnaire response operations
-  async submitQuestionnaireResponse(responseData: any): Promise<QuestionnaireResponse> {
+  async submitQuestionnaireResponse(responseData: QuestionnaireResponseInput): Promise<QuestionnaireResponse> {
     // 🔧 CORREÇÃO: UPSERT para lidar com respostas duplicadas (usuário pode responder novamente)
     // A constraint UNIQUE em (userId, questionnaireId) garante uma resposta por ministro por questionário
     const [response] = await db
@@ -458,7 +539,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Schedule operations
-  async createSchedule(scheduleData: any): Promise<Schedule> {
+  async createSchedule(scheduleData: ScheduleInput): Promise<Schedule> {
     const [schedule] = await db
       .insert(schedules)
       .values(scheduleData)
@@ -630,7 +711,7 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
 
-  async updateSchedule(id: string, scheduleData: any): Promise<Schedule> {
+  async updateSchedule(id: string, scheduleData: Partial<ScheduleInput>): Promise<Schedule> {
     const [schedule] = await db
       .update(schedules)
       .set({ ...scheduleData, updatedAt: new Date() })
@@ -644,7 +725,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Substitution request operations
-  async createSubstitutionRequest(requestData: any): Promise<SubstitutionRequest> {
+  async createSubstitutionRequest(requestData: SubstitutionRequestInput): Promise<SubstitutionRequest> {
     const [request] = await db
       .insert(substitutionRequests)
       .values(requestData)
@@ -659,7 +740,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(substitutionRequests.scheduleId, scheduleId));
   }
 
-  async updateSubstitutionRequest(id: string, requestData: any): Promise<SubstitutionRequest> {
+  async updateSubstitutionRequest(id: string, requestData: Partial<SubstitutionRequestInput>): Promise<SubstitutionRequest> {
     const [request] = await db
       .update(substitutionRequests)
       .set({ ...requestData, updatedAt: new Date() })
@@ -699,7 +780,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Notification operations
-  async createNotification(notificationData: any): Promise<Notification> {
+  async createNotification(notificationData: NotificationInput): Promise<Notification> {
     const [notification] = await db
       .insert(notifications)
       .values(notificationData)
@@ -1101,8 +1182,8 @@ export class DatabaseStorage implements IStorage {
         ...row,
         isActive: !!row.isActive,
         isRequired: !!row.isRequired,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        createdAt: row.createdAt ? new Date(row.createdAt as string) : new Date(),
+        updatedAt: row.updatedAt ? new Date(row.updatedAt as string) : new Date()
       })
     );
   }
@@ -1119,8 +1200,8 @@ export class DatabaseStorage implements IStorage {
       `SELECT * FROM formation_modules WHERE trackId = '${trackId}' ORDER BY orderIndex, title`,
       (row) => ({
         ...row,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        createdAt: row.createdAt ? new Date(row.createdAt as string) : new Date(),
+        updatedAt: row.updatedAt ? new Date(row.updatedAt as string) : new Date()
       })
     );
   }
