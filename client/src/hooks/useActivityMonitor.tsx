@@ -91,7 +91,14 @@ export function useActivityMonitor() {
         credentials: 'include'
       });
 
-      const data = await response.json();
+      // Safe JSON parsing with error handling
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('[ACTIVITY] Erro ao parsear resposta JSON:', parseError);
+        return; // Skip processing if response isn't valid JSON
+      }
 
       if (data.expired) {
         

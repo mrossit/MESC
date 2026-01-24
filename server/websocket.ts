@@ -16,9 +16,52 @@ interface AuthenticatedWebSocket extends WebSocket {
   isAlive?: boolean;
 }
 
+interface CriticalMassAlert {
+  date: string;
+  time: string;
+  vacancies: number;
+  hoursUntil: number;
+  massTime: string;
+}
+
+interface UrgentSubstitution {
+  id: string;
+  scheduleId: string;
+  requesterId: string;
+  requesterName: string | null;
+  reason: string | null;
+  status: string;
+  massDate: string;
+  massTime: string;
+  hoursUntil: number;
+}
+
+interface AlertData {
+  criticalMasses: CriticalMassAlert[];
+  urgentSubstitutions: UrgentSubstitution[];
+  totalCritical: number;
+}
+
+interface SubstitutionRequestData {
+  id: string;
+  scheduleId: string;
+  requesterId: string;
+  requesterName?: string;
+  massDate?: string;
+  massTime?: string;
+}
+
+interface CriticalMassData {
+  date: string;
+  time: string;
+  vacancies: number;
+}
+
+type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | undefined;
+
 interface NotificationMessage {
   type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'PING';
-  data?: any;
+  data?: NotificationData;
   timestamp: string;
 }
 
@@ -131,8 +174,11 @@ async function getCriticalAlerts() {
     .groupBy(schedules.date, schedules.time)
     .having(sql`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
 
-  const criticalWithHours = criticalMasses.map((m: any) => ({
-    ...m,
+  type CriticalMassResult = typeof criticalMasses[number];
+  const criticalWithHours: CriticalMassAlert[] = criticalMasses.map((m: CriticalMassResult) => ({
+    date: m.date,
+    time: m.time,
+    vacancies: m.vacancies,
     hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1000 * 60 * 60)),
     massTime: m.time,
   }));
@@ -164,9 +210,10 @@ async function getCriticalAlerts() {
     )
     .orderBy(schedules.date);
 
+  type SubstitutionResult = typeof urgentSubstitutions[number];
   return {
     criticalMasses: criticalWithHours,
-    urgentSubstitutions: urgentSubstitutions.map((s: any) => ({
+    urgentSubstitutions: urgentSubstitutions.map((s: SubstitutionResult) => ({
       ...s,
       hoursUntil: Math.round((new Date(s.massDate).getTime() - now.getTime()) / (1000 * 60 * 60)),
     })),
@@ -201,7 +248,7 @@ async function broadcastCriticalAlerts() {
 /**
  * Notify about new substitution request
  */
-export function notifySubstitutionRequest(substitutionData: any) {
+export function notifySubstitutionRequest(substitutionData: SubstitutionRequestData) {
   const message: NotificationMessage = {
     type: 'SUBSTITUTION_REQUEST',
     data: substitutionData,
@@ -221,7 +268,7 @@ export function notifySubstitutionRequest(substitutionData: any) {
 /**
  * Notify about critical mass alert
  */
-export function notifyCriticalMass(massData: any) {
+export function notifyCriticalMass(massData: CriticalMassData) {
   const message: NotificationMessage = {
     type: 'CRITICAL_MASS',
     data: massData,

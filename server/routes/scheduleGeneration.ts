@@ -36,17 +36,33 @@ function parseYearMonthParams(req: AuthRequest, res: import('express').Response)
     return null;
   }
 
-  if (year < 2024 || year > 2030) {
-    res.status(400).json({ success: false, message: 'Ano deve estar entre 2024 e 2030' });
+  // Dynamic year validation: allow current year -1 to current year +10
+  const currentYear = new Date().getFullYear();
+  const minYear = currentYear - 1;
+  const maxYear = currentYear + 10;
+  if (year < minYear || year > maxYear) {
+    res.status(400).json({ success: false, message: `Ano deve estar entre ${minYear} e ${maxYear}` });
     return null;
   }
 
   return { year, month };
 }
 
+// Dynamic year range for validation (current year -1 to +10)
+const getYearRange = () => {
+  const currentYear = new Date().getFullYear();
+  return { min: currentYear - 1, max: currentYear + 10 };
+};
+
 // Schema para validação de entrada
 const generateScheduleSchema = z.object({
-  year: z.number().min(2024).max(2030),
+  year: z.number().refine(
+    (year) => {
+      const { min, max } = getYearRange();
+      return year >= min && year <= max;
+    },
+    { message: 'Ano fora do intervalo permitido' }
+  ),
   month: z.number().min(1).max(12),
   saveToDatabase: z.boolean().default(false),
   replaceExisting: z.boolean().default(false)
@@ -113,7 +129,35 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
         });
       }
 
-      logger.info(`Validação OK: questionário ${targetQuestionnaire.id} com ${responses.length} respostas`);
+      // Validate that responses have actual content (not empty objects)
+      type ResponseType = typeof responses[number];
+      const validResponses = responses.filter((r: ResponseType) => {
+        // Check if response has userId and some meaningful data
+        if (!r.userId) return false;
+
+        // Check if responses field is not empty
+        const hasResponses = r.responses && typeof r.responses === 'object' &&
+          Object.keys(r.responses as object).length > 0;
+
+        // Check for alternative availability fields
+        const hasAvailability = (r.availableSundays && Array.isArray(r.availableSundays) && r.availableSundays.length > 0) ||
+          (r.preferredMassTimes && Array.isArray(r.preferredMassTimes) && r.preferredMassTimes.length > 0);
+
+        return hasResponses || hasAvailability;
+      });
+
+      if (validResponses.length === 0) {
+        logger.warn(`Tentativa de gerar escalas com respostas vazias: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: 'As respostas do questionário estão vazias ou incompletas. Aguarde os ministros responderem corretamente.',
+          errorCode: 'EMPTY_RESPONSES',
+          totalResponses: responses.length,
+          validResponses: 0
+        });
+      }
+
+      logger.info(`Validação OK: questionário ${targetQuestionnaire.id} com ${validResponses.length} respostas válidas de ${responses.length} totais`);
     }
 
     // Verificar se já existem escalas para o mês
@@ -189,16 +233,25 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     console.error('❌ [ROUTE] ERRO MESSAGE:', error.message);
     logger.error('Erro ao gerar escalas automáticas:', error);
     
-    // SEMPRE retornar detalhes do erro para debugging
-    res.status(500).json({
+    // Return error details only in development
+    const errorResponse: { success: false; message: string; errorCode?: string; errorDetails?: object } = {
       success: false,
       message: error.message || 'Falha na geração automática de escalas',
-      errorDetails: {
+    };
+
+    // Only expose error details in development for debugging
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.errorDetails = {
         message: error.message,
         name: error.name,
         stack: error.stack
-      }
-    });
+      };
+    } else {
+      // In production, only include error code if available
+      errorResponse.errorCode = error.code || 'GENERATION_ERROR';
+    }
+
+    res.status(500).json(errorResponse);
   }
 });
 
