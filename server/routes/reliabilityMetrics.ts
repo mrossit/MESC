@@ -333,8 +333,9 @@ router.get(
 
       // Calculate statistics
       const totalMinisters = metrics.length;
-      const averageScore =
-        metrics.reduce((sum, m) => sum + m.reliabilityScore, 0) / totalMinisters;
+      const averageScore = totalMinisters > 0
+        ? metrics.reduce((sum, m) => sum + m.reliabilityScore, 0) / totalMinisters
+        : 0;
 
       const totalSubstitutionRequests = metrics.reduce(
         (sum, m) => sum + m.substitutionRequestCount,
@@ -360,8 +361,8 @@ router.get(
       };
 
       // System health
-      const criticalPercentage = (distribution.critical / totalMinisters) * 100;
-      const excellentPercentage = (distribution.excellent / totalMinisters) * 100;
+      const criticalPercentage = totalMinisters > 0 ? (distribution.critical / totalMinisters) * 100 : 0;
+      const excellentPercentage = totalMinisters > 0 ? (distribution.excellent / totalMinisters) * 100 : 0;
 
       let systemHealth: 'excellent' | 'good' | 'needs_attention' | 'critical';
       if (criticalPercentage >= 20) systemHealth = 'critical';

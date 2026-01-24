@@ -611,8 +611,8 @@ async function validateScheduleBeforePublish(
 
   // Check 4: Distribution variance
   const counts = Object.values(ministerCounts);
-  const avg = counts.reduce((sum, c) => sum + c, 0) / counts.length;
-  const variance = counts.length > 0
+  const avg = counts.length > 0 ? counts.reduce((sum, c) => sum + c, 0) / counts.length : 0;
+  const variance = counts.length > 0 && avg > 0
     ? Math.sqrt(counts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / counts.length) / avg
     : 0;
 

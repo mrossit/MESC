@@ -114,7 +114,7 @@ export class AvailabilityService {
     return {
       available: available.length,
       total,
-      percentage: Math.round((available.length / total) * 100),
+      percentage: total > 0 ? Math.round((available.length / total) * 100) : 0,
       ministers: available.map(userId => ({
         id: userId,
         name: this.getMinisterName(userId)
@@ -238,13 +238,13 @@ export class AvailabilityService {
     return {
       totalMinisters,
       totalAvailabilities,
-      avgAvailabilitiesPerMinister: Math.round(totalAvailabilities / totalMinisters),
+      avgAvailabilitiesPerMinister: totalMinisters > 0 ? Math.round(totalAvailabilities / totalMinisters) : 0,
       ministersWithWeekdayAvailability,
       ministersCanSubstitute,
       ministersWithFamily,
-      percentageWeekdayAvailable: Math.round((ministersWithWeekdayAvailability / totalMinisters) * 100),
-      percentageCanSubstitute: Math.round((ministersCanSubstitute / totalMinisters) * 100),
-      percentageWithFamily: Math.round((ministersWithFamily / totalMinisters) * 100)
+      percentageWeekdayAvailable: totalMinisters > 0 ? Math.round((ministersWithWeekdayAvailability / totalMinisters) * 100) : 0,
+      percentageCanSubstitute: totalMinisters > 0 ? Math.round((ministersCanSubstitute / totalMinisters) * 100) : 0,
+      percentageWithFamily: totalMinisters > 0 ? Math.round((ministersWithFamily / totalMinisters) * 100) : 0
     };
   }
 
