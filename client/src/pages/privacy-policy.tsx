@@ -22,7 +22,7 @@ export default function PrivacyPolicy() {
           Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)
         </p>
         <p className="text-sm text-muted-foreground mt-2">
-          Última atualização: {new Date().toLocaleDateString('pt-BR')}
+          Última atualização: 24 de janeiro de 2025
         </p>
       </div>
 
@@ -296,10 +296,65 @@ export default function PrivacyPolicy() {
         </CardContent>
       </Card>
 
-      {/* 7. Retenção */}
+      {/* 7. Cookies e Armazenamento Local */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>7. Tempo de Retenção</CardTitle>
+          <CardTitle>7. Cookies e Armazenamento Local</CardTitle>
+          <CardDescription>
+            Tecnologias de armazenamento utilizadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>Utilizamos as seguintes tecnologias de armazenamento no navegador:</p>
+          <ul className="list-disc pl-6 space-y-2">
+            <li>
+              <strong>LocalStorage:</strong> Armazena suas preferências (tema claro/escuro)
+              e dados de sessão para melhorar a experiência de uso
+            </li>
+            <li>
+              <strong>Cookies de sessão:</strong> Utilizados exclusivamente para
+              autenticação e segurança (CSRF protection)
+            </li>
+            <li>
+              <strong>Service Worker:</strong> Permite funcionamento offline e
+              recebimento de notificações push
+            </li>
+          </ul>
+          <p className="mt-3">
+            Não utilizamos cookies de rastreamento, analytics de terceiros ou
+            tecnologias de publicidade.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 8. Notificações Push */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>8. Notificações Push</CardTitle>
+          <CardDescription>
+            Comunicação via notificações do dispositivo
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            Com seu consentimento explícito, enviamos notificações push para:
+          </p>
+          <ul className="list-disc pl-6 space-y-2">
+            <li>Alertas sobre escalas e substituições</li>
+            <li>Lembretes de missas agendadas</li>
+            <li>Comunicados importantes da coordenação</li>
+          </ul>
+          <p className="mt-3">
+            Você pode desativar as notificações a qualquer momento nas
+            configurações do seu dispositivo ou nas configurações do sistema.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 9. Retenção */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>9. Tempo de Retenção</CardTitle>
           <CardDescription>
             Por quanto tempo mantemos seus dados
           </CardDescription>
@@ -330,10 +385,10 @@ export default function PrivacyPolicy() {
         </CardContent>
       </Card>
 
-      {/* 8. Encarregado de Dados */}
+      {/* 10. Encarregado de Dados */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>8. Encarregado de Dados (DPO)</CardTitle>
+          <CardTitle>10. Encarregado de Dados (DPO)</CardTitle>
           <CardDescription>
             Responsável pela proteção dos dados pessoais
           </CardDescription>
@@ -357,10 +412,10 @@ export default function PrivacyPolicy() {
         </CardContent>
       </Card>
 
-      {/* 9. Alterações */}
+      {/* 11. Alterações */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>9. Alterações nesta Política</CardTitle>
+          <CardTitle>11. Alterações nesta Política</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
           <p>
@@ -371,17 +426,35 @@ export default function PrivacyPolicy() {
         </CardContent>
       </Card>
 
+      {/* 12. Identificação do Controlador */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>12. Identificação do Controlador</CardTitle>
+          <CardDescription>
+            Responsável pelo tratamento dos dados
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p><strong>Controlador:</strong> Paróquia Santuário São Judas Tadeu</p>
+          <p><strong>Endereço:</strong> Sorocaba - SP</p>
+          <p><strong>Sistema:</strong> MESC - Ministros Extraordinários da Sagrada Comunhão</p>
+          <p className="mt-3">
+            <strong>Contato:</strong> dpo@saojudastadeu.app
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Rodapé */}
       <Separator className="my-6" />
 
       <div className="text-center text-sm text-muted-foreground">
         <p>
-          <strong>Paróquia São Judas Tadeu</strong>
+          <strong>Paróquia Santuário São Judas Tadeu</strong>
         </p>
         <p>Sistema MESC - Ministros Extraordinários da Sagrada Comunhão</p>
         <p className="mt-2">Em conformidade com a LGPD (Lei 13.709/2018)</p>
         <p className="text-xs mt-4">
-          Documento gerado em: {new Date().toLocaleDateString('pt-BR')}
+          Versão 1.0 - Janeiro de 2025
         </p>
       </div>
     </div>
