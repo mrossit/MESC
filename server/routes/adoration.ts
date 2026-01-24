@@ -10,6 +10,31 @@ import { eq, and, inArray } from 'drizzle-orm';
 
 const router = Router();
 
+/**
+ * Helper function to validate and parse year/month from URL params
+ */
+function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ success: false, message: 'Ano e mês devem ser números válidos' });
+    return null;
+  }
+
+  if (month < 1 || month > 12) {
+    res.status(400).json({ success: false, message: 'Mês deve estar entre 1 e 12' });
+    return null;
+  }
+
+  if (year < 2024 || year > 2030) {
+    res.status(400).json({ success: false, message: 'Ano deve estar entre 2024 e 2030' });
+    return null;
+  }
+
+  return { year, month };
+}
+
 // Schema de validação para o sorteio
 const createDrawSchema = z.object({
   month: z.number().min(1).max(12),
@@ -252,8 +277,9 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
  */
 router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonthParams(req, res);
+    if (!params) return;
+    const { year, month } = params;
 
     const draws = await storage.getAdorationDraws(year, month);
     
@@ -335,7 +361,7 @@ router.delete('/draw/:drawId', authenticateToken, requireRole(['gestor', 'coorde
 
 // Schema de validação para troca de dia
 const swapDaySchema = z.object({
-  newMondayOfWeek: z.number().min(1).max(5)
+  newMondayOfWeek: z.number().int().min(1).max(5)
 });
 
 /**
@@ -427,8 +453,9 @@ router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res
  */
 router.get('/my-schedule/:year/:month', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonthParams(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userId = req.user?.id;
 
     if (!userId) {
