@@ -66,7 +66,7 @@ export const DebugPanel = memo(({ isConnected, renderCount = 0 }: DebugPanelProp
 
         // Track errors
         if (!response.ok && response.status !== 304) {
-          const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+          const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : args[0].toString());
           setApiErrors(prev => [
             {
               timestamp: Date.now(),
@@ -80,7 +80,7 @@ export const DebugPanel = memo(({ isConnected, renderCount = 0 }: DebugPanelProp
 
         return response;
       } catch (error: any) {
-        const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : args[0].toString());
         setApiErrors(prev => [
           {
             timestamp: Date.now(),

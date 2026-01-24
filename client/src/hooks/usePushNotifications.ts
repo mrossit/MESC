@@ -6,7 +6,7 @@ type PushConfig = {
   publicKey: string | null;
 };
 
-type PushStatus =
+export type PushStatus =
   | "idle"
   | "no-support"
   | "missing-key"
@@ -28,7 +28,19 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export function usePushNotifications() {
+export interface PushNotificationsState {
+  isSupported: boolean;
+  config: PushConfig | null;
+  status: PushStatus;
+  permission: NotificationPermission;
+  isSubscribed: boolean;
+  isBusy: boolean;
+  error: string | null;
+  subscribe: () => Promise<void>;
+  unsubscribe: () => Promise<void>;
+}
+
+export function usePushNotifications(): PushNotificationsState {
   const isSupported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -201,7 +213,7 @@ export function usePushNotifications() {
     }
   }, [isSupported]);
 
-  const state = useMemo(
+  const state: PushNotificationsState = useMemo(
     () => ({
       isSupported,
       config,

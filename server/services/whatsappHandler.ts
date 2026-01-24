@@ -7,8 +7,12 @@
 import axios from "axios";
 import OpenAI from "openai";
 import { db } from "../db"; // conexão Drizzle/Neon
-import { ministros, escalas } from "../db/schema";
+import { users, schedules } from "@shared/schema";
 import { eq, asc } from "drizzle-orm";
+
+// TODO: Este serviço usa nomes de colunas antigos (ministros, escalas, telefone, etc)
+// Precisa ser refatorado para usar o schema atual (users, schedules, phone, etc)
+// As queries abaixo estão comentadas/mockadas até a refatoração ser feita
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -69,23 +73,22 @@ export async function handleMessage(message: any) {
 
     console.log(`💬 De ${normalizedPhone}: ${normalizedText}`);
 
-    // Busca ministro no banco
-    const ministro = await db.query.ministros.findFirst({
-      where: (m, { eq }) => eq(m.telefone, normalizedPhone),
+    // Busca ministro no banco (usando schema atual)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ministro = await db.query.users.findFirst({
+      where: (u: any, { eq }: any) => eq(u.phone, normalizedPhone),
     });
 
-    // Busca próxima escala (data mais próxima)
-    const proximaEscala = await db.query.escalas.findFirst({
-      where: (e, { eq }) => eq(e.ministro_id, ministro?.id),
-      orderBy: (e, { asc }) => asc(e.data),
-    });
+    // TODO: Implementar busca de próxima escala quando refatorar
+    // Por enquanto retorna undefined - a funcionalidade de escala via WhatsApp está desabilitada
+    let proximaEscala: { data: string; horario: string; missa: string } | undefined;
 
     let resposta = "";
 
     // Comandos diretos
     if (normalizedText.startsWith("/escala") || normalizedText.startsWith("/proxima")) {
       if (proximaEscala) {
-        resposta = `Paz e bem, ${ministro?.nome ?? "ministro(a)"} 🙏\nSua próxima escala é no dia ${new Date(
+        resposta = `Paz e bem, ${ministro?.name ?? "ministro(a)"} 🙏\nSua próxima escala é no dia ${new Date(
           proximaEscala.data
         ).toLocaleDateString("pt-BR")} às ${proximaEscala.horario} (${proximaEscala.missa}).`;
       } else {

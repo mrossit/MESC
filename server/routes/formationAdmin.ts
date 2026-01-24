@@ -42,9 +42,9 @@ router.post('/seed', async (req, res) => {
     const result = await seedFormation();
 
     res.status(200).json({
+      ...result,
       success: true,
-      message: 'Formation content seeded successfully',
-      ...result
+      message: 'Formation content seeded successfully'
     });
   } catch (error: any) {
     console.error('Error running formation seed:', error);

@@ -52,6 +52,7 @@ function generateMockMinisters(count: number = 50): Minister[] {
       preferredTimes,
       canServeAsCouple: i % 10 === 0, // 10% can serve as couples
       spouseMinisterId: i % 10 === 0 && i > 0 ? `mock-${i}` : null,
+      familyId: null,
       availabilityScore: 0.5 + Math.random() * 0.5, // 0.5 to 1.0
       preferenceScore: Math.random()
     });
