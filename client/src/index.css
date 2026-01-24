@@ -258,6 +258,18 @@
 }
 
 @layer components {
+  /* Toast swipe otimizado para toque suave */
+  [data-radix-toast-viewport] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-state="open"][data-swipe-direction="up"] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y;
+  }
+
   /* Cor personalizada para cards */
   .custom-card-bg {
     background-color: rgb(var(--card)) !important;
