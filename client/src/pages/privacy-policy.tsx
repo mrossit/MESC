@@ -7,11 +7,22 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Lock, Database, AlertCircle, Mail, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Shield, Lock, Database, AlertCircle, Mail, FileText, ArrowLeft } from "lucide-react";
 
 export default function PrivacyPolicy() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
+      {/* Botão Voltar */}
+      <Button
+        variant="ghost"
+        onClick={() => window.history.back()}
+        className="mb-4 -ml-2"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Voltar
+      </Button>
+
       {/* Cabeçalho */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-[#8B0000] mb-2 flex items-center gap-3">
