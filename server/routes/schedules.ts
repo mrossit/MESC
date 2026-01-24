@@ -273,6 +273,11 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       const yearNum = parseInt(year as string);
       const monthNum = parseInt(month as string);
 
+      // Validate parsed values
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({ error: 'Invalid month or year parameter' });
+      }
+
       // Check cache first - but only use cache for admin users who can see all
       // For regular users, we need to filter by published status
       const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
@@ -627,6 +632,11 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
     const year = parseInt(match[1]);
     const month = parseInt(match[2]);
 
+    // Validate parsed values
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: 'Invalid month or year in schedule ID' });
+    }
+
     // Calculate date range for the month
     const startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
@@ -705,6 +715,11 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       // Month-based delete - delete ALL schedules for the month
       const year = parseInt(monthIdMatch[1]);
       const month = parseInt(monthIdMatch[2]);
+
+      // Validate parsed values
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ error: 'Invalid month or year in schedule ID' });
+      }
 
       console.log(`[DELETE_SCHEDULE] Month-based delete for ${month}/${year}`);
 
@@ -847,6 +862,12 @@ router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor'
 
     const year = parseInt(match[1]);
     const month = parseInt(match[2]);
+
+    // Validate parsed values
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: 'Invalid month or year in schedule ID' });
+    }
+
     console.log('[UNPUBLISH_API] Parsed year:', year, 'month:', month);
 
     // Calculate date range for the month

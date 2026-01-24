@@ -1432,18 +1432,25 @@ export default function Substitutions() {
             {requestType === "directed" && selectedScheduleForRequest && (
               <div>
                 <Label>Ministro Substituto</Label>
-                <Select value={selectedSubstituteId} onValueChange={setSelectedSubstituteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Escolha um ministro..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSubstitutes.map((minister) => (
-                      <SelectItem key={minister.id} value={minister.id}>
-                        {minister.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {availableSubstitutes.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
+                    Nenhum ministro disponível para esta data/horário.
+                    Considere criar uma solicitação aberta.
+                  </div>
+                ) : (
+                  <Select value={selectedSubstituteId} onValueChange={setSelectedSubstituteId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolha um ministro..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubstitutes.map((minister) => (
+                        <SelectItem key={minister.id} value={minister.id}>
+                          {minister.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
