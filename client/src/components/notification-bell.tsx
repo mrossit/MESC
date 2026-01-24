@@ -65,11 +65,11 @@ export function NotificationBell({ compact = false, showLabel = false, className
   });
 
   // Fetch unread count
-  // 🔥 EMERGENCY FIX: Disabled polling to prevent 502 spam
+  // Polling re-enabled with longer interval (60s) to reduce server load
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    refetchInterval: false, // DISABLED: Was causing 502 errors every 30s
-    // TODO: Re-enable after backend performance is fixed
+    refetchInterval: 60000, // Poll every 60 seconds
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
   // Check for new notifications
