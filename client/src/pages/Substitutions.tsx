@@ -85,7 +85,7 @@ interface SubstitutionRequest {
   };
   assignment: {
     id: string;
-    date: number;
+    date: string;
     massTime: string;
     position: number;
   };

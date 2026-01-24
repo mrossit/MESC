@@ -701,6 +701,18 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
+    // Verificar se a missa já passou
+    const scheduleDate = new Date(schedule.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (scheduleDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Não é possível aceitar substituição para missa que já passou"
+      });
+    }
+
     // Verificar se o usuário já está escalado naquela data/hora
     const conflictingSchedule = await db
       .select()
