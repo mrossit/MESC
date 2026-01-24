@@ -938,9 +938,13 @@ function calculateBalanceScore(schedules: GeneratedSchedule[]): number {
   });
 
   const counts = Object.values(ministerCounts);
+  if (counts.length === 0) return 0;
+
   const avg = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  if (avg === 0) return 0;
+
   const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / counts.length;
-  
+
   // Score de 0-1, onde 1 é perfeitamente balanceado
   return Math.max(0, 1 - Math.sqrt(variance) / avg);
 }
@@ -1007,10 +1011,12 @@ function calculateDistributionBalance(schedules: any[]): number {
 
   const counts = Object.values(ministerCounts);
   if (counts.length === 0) return 0;
-  
+
   const avg = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  if (avg === 0) return 0;
+
   const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / counts.length;
-  
+
   return Math.max(0, 1 - Math.sqrt(variance) / avg);
 }
 
