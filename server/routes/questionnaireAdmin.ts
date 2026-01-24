@@ -1039,8 +1039,15 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
     const questions = template.questions as any[];
     
     responses.forEach((response: any) => {
-      const parsedResponses = JSON.parse(response.responses as string);
-      
+      let parsedResponses: any[];
+      try {
+        parsedResponses = JSON.parse(response.responses as string);
+        if (!Array.isArray(parsedResponses)) return;
+      } catch {
+        console.warn('[QUESTIONNAIRE] Failed to parse response:', response.id);
+        return;
+      }
+
       parsedResponses.forEach((resp: any) => {
         if (!summary[resp.questionId]) {
           summary[resp.questionId] = {};
