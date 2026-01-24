@@ -261,6 +261,23 @@ export default function Login() {
                 </Link>
               </p>
             </div>
+
+            <div className="text-center pt-2 border-t border-border/30">
+              <p className="text-xs text-neutral-textMedium dark:text-gray-500">
+                Ao entrar, você concorda com nossos{" "}
+                <Link href="/terms-of-use">
+                  <span className="text-neutral-accentWarm hover:underline dark:text-dark-gold cursor-pointer">
+                    Termos de Uso
+                  </span>
+                </Link>
+                {" "}e{" "}
+                <Link href="/privacy-policy">
+                  <span className="text-neutral-accentWarm hover:underline dark:text-dark-gold cursor-pointer">
+                    Política de Privacidade
+                  </span>
+                </Link>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
