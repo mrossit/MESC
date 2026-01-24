@@ -21,11 +21,51 @@ import { QuestionnaireService } from '../services/questionnaireService';
 
 const router = Router();
 
+/**
+ * Helper function to validate and parse year/month parameters
+ * Returns null if validation fails (sends error response)
+ */
+function parseYearMonth(req: any, res: any): { year: number; month: number } | null {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+
+  if (isNaN(year) || isNaN(month)) {
+    res.status(400).json({ error: 'Ano e mês devem ser números válidos' });
+    return null;
+  }
+
+  if (month < 1 || month > 12) {
+    res.status(400).json({ error: 'Mês deve estar entre 1 e 12' });
+    return null;
+  }
+
+  if (year < 2020 || year > 2100) {
+    res.status(400).json({ error: 'Ano deve estar entre 2020 e 2100' });
+    return null;
+  }
+
+  return { year, month };
+}
+
 // Month names for Portuguese locale
 const monthNames = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
+
+/**
+ * Safely parse JSON with error handling
+ * Returns the parsed object or the original value if already an object
+ */
+function safeParseJSON<T>(value: string | T, fallback: T): T {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    console.error('[QUESTIONNAIRE] Failed to parse JSON:', error);
+    return fallback;
+  }
+}
 
 // Função auxiliar para analisar respostas e extrair disponibilidades
 function analyzeResponses(responses: any[]) {
@@ -310,8 +350,9 @@ router.post('/templates', requireAuth, requireRole(['coordenador', 'gestor']), a
 // Obter template de questionário para um mês específico
 router.get('/templates/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
 
     // If db is not available, generate template dynamically
     if (!db) {
@@ -592,9 +633,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
       // Armazenar dados para retorno posterior
       const responseData = {
         ...saved,
-        responses: typeof saved.responses === 'string'
-          ? JSON.parse(saved.responses)
-          : saved.responses
+        responses: safeParseJSON(saved.responses, [])
       };
 
       // Note: We can't easily determine if it was an insert or update with UPSERT
@@ -767,8 +806,9 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 // Obter resposta do ministro para um mês específico
 router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userId = req.user?.id!;
 
     // If db is not available, return null
@@ -837,9 +877,7 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
         console.log('[GET /responses] Tipo do campo responses:', typeof response.responses);
 
         // Parse JSON fields se necessário
-        const parsedResponses = typeof response.responses === 'string'
-          ? JSON.parse(response.responses)
-          : response.responses;
+        const parsedResponses = safeParseJSON(response.responses, []);
 
         const result = {
           id: response.id,
@@ -872,8 +910,9 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
 // Obter status das respostas para admin/coordenador
 router.get('/admin/responses-status/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
@@ -976,8 +1015,9 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
 // Obter resumo das respostas para admin/coordenador
 router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
@@ -1014,9 +1054,7 @@ router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: Aut
     const questions = questionnaire.questions as any[];
 
     responses.forEach((response: any) => {
-      const userResponses = typeof response.responses === 'string'
-        ? JSON.parse(response.responses)
-        : response.responses;
+      const userResponses = safeParseJSON(response.responses, []);
 
       if (Array.isArray(userResponses)) {
         userResponses.forEach((r: any) => {
@@ -1098,9 +1136,7 @@ router.get('/admin/responses/:templateId/:userId', requireAuth, async (req: Auth
     }
 
     // Processar respostas
-    const userResponses = typeof response.responses === 'string'
-      ? JSON.parse(response.responses)
-      : response.responses;
+    const userResponses = safeParseJSON(response.responses, []);
 
     res.json({
       user,
@@ -1125,8 +1161,9 @@ router.get('/admin/responses/:templateId/:userId', requireAuth, async (req: Auth
 // Obter todas as respostas para um mês (admin/coordenador)
 router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
@@ -1322,14 +1359,10 @@ router.get('/:questionnaireId/export/csv', requireAuth, requireRole(['coordenado
 // Export monthly responses as CSV
 router.get('/export/:year/:month/csv', requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res) => {
   try {
-    const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month);
+    const params = parseYearMonth(req, res);
+    if (!params) return;
+    const { year, month } = params;
     const { format = 'detailed' } = req.query as { format?: 'simple' | 'detailed' };
-
-    // Validate parameters
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-      return res.status(400).json({ error: 'Invalid month or year' });
-    }
 
     // Fetch and format data for CSV export
     const exportData = await getMonthlyResponsesForExport(month, year);
@@ -1399,9 +1432,7 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
     for (const response of allResponses) {
       try {
         // Parse responses se for string
-        const responsesArray = typeof response.responses === 'string'
-          ? JSON.parse(response.responses)
-          : response.responses;
+        const responsesArray = safeParseJSON(response.responses, []);
 
         // Get questionnaire to extract month/year
         const [questionnaire] = await db.select()

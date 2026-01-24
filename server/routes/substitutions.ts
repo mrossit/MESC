@@ -722,27 +722,45 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Atualizar solicitação como aprovada com o substituto
-    await db
-      .update(substitutionRequests)
-      .set({
-        status: 'approved',
-        substituteId: userId,
-        approvedBy: userId,
-        approvedAt: new Date(),
-        responseMessage: message || null,
-        updatedAt: new Date()
-      })
-      .where(eq(substitutionRequests.id, id));
+    // Wrap updates in transaction to ensure atomicity and prevent race conditions
+    await db.transaction(async (tx: any) => {
+      // Re-verify status inside transaction (optimistic locking)
+      const [currentRequest] = await tx
+        .select()
+        .from(substitutionRequests)
+        .where(eq(substitutionRequests.id, id))
+        .limit(1);
 
-    // Atualizar a escala com o novo ministro
-    await db
-      .update(schedules)
-      .set({
-        ministerId: userId,
-        substituteId: request.requesterId
-      })
-      .where(eq(schedules.id, request.scheduleId));
+      const stillAvailable = currentRequest &&
+        (currentRequest.status === 'available' ||
+         (currentRequest.status === 'pending' && !currentRequest.substituteId));
+
+      if (!stillAvailable) {
+        throw new Error('SUBSTITUTION_ALREADY_CLAIMED');
+      }
+
+      // Atualizar solicitação como aprovada com o substituto
+      await tx
+        .update(substitutionRequests)
+        .set({
+          status: 'approved',
+          substituteId: userId,
+          approvedBy: userId,
+          approvedAt: new Date(),
+          responseMessage: message || null,
+          updatedAt: new Date()
+        })
+        .where(eq(substitutionRequests.id, id));
+
+      // Atualizar a escala com o novo ministro
+      await tx
+        .update(schedules)
+        .set({
+          ministerId: userId,
+          substituteId: request.requesterId
+        })
+        .where(eq(schedules.id, request.scheduleId));
+    });
 
     // Invalidate cache for the affected schedule month
     scheduleCache.invalidateByDate(schedule.date);
@@ -753,7 +771,14 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       message: "Substituição aceita com sucesso!"
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    // Handle race condition - another user claimed it first
+    if (error?.message === 'SUBSTITUTION_ALREADY_CLAIMED') {
+      return res.status(409).json({
+        success: false,
+        message: "Esta solicitação já foi aceita por outro ministro"
+      });
+    }
     console.error("Erro ao reivindicar substituição:", error);
     res.status(500).json({
       success: false,

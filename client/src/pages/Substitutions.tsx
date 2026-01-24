@@ -74,9 +74,9 @@ const MINIMUM_MINISTERS: Record<string, number> = {
 interface SubstitutionRequest {
   request: {
     id: string;
-    assignmentId: string;
-    requestingMinisterId: string;
-    substituteMinisterId: string | null;
+    scheduleId: string;
+    requesterId: string;
+    substituteId: string | null;
     reason: string;
     status: "available" | "pending" | "approved" | "rejected" | "cancelled" | "auto_approved";
     urgency: "low" | "medium" | "high" | "critical";
@@ -694,8 +694,8 @@ export default function Substitutions() {
         {!isCollapsed && (
           <div className="space-y-4">
             {group.items.map(({ item, assignmentDate }) => {
-                  const isDirected = item.request.substituteMinisterId !== null;
-                  const isForMe = isDirected && item.request.substituteMinisterId === user?.id;
+                  const isDirected = item.request.substituteId !== null;
+                  const isForMe = isDirected && item.request.substituteId === user?.id;
                   const isMyRequest = item.requestingUser.id === user?.id;
 
                   return (
