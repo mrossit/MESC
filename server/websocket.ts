@@ -57,10 +57,23 @@ interface CriticalMassData {
   vacancies: number;
 }
 
-type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | undefined;
+interface UserNotificationData {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  actionUrl?: string | null;
+  createdAt: string;
+}
+
+interface UnreadCountData {
+  count: number;
+}
+
+type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | UserNotificationData | UnreadCountData | undefined;
 
 interface NotificationMessage {
-  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'PING';
+  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'USER_NOTIFICATION' | 'UNREAD_COUNT' | 'PING';
   data?: NotificationData;
   timestamp: string;
 }
@@ -290,4 +303,69 @@ export function notifyCriticalMass(massData: CriticalMassData) {
  */
 export function getWebSocketServer(): WebSocketServer | null {
   return wss;
+}
+
+/**
+ * Send notification to specific users via WebSocket
+ */
+export function notifyUsers(userIds: string[], notificationData: UserNotificationData) {
+  const message: NotificationMessage = {
+    type: 'USER_NOTIFICATION',
+    data: notificationData,
+    timestamp: new Date().toISOString()
+  };
+
+  const messageStr = JSON.stringify(message);
+  const userIdSet = new Set(userIds);
+
+  clients.forEach((client) => {
+    if (
+      client.readyState === WebSocket.OPEN &&
+      client.userId &&
+      userIdSet.has(client.userId)
+    ) {
+      client.send(messageStr);
+    }
+  });
+}
+
+/**
+ * Send updated unread count to a specific user
+ */
+export function notifyUnreadCount(userId: string, count: number) {
+  const message: NotificationMessage = {
+    type: 'UNREAD_COUNT',
+    data: { count },
+    timestamp: new Date().toISOString()
+  };
+
+  const messageStr = JSON.stringify(message);
+
+  clients.forEach((client) => {
+    if (
+      client.readyState === WebSocket.OPEN &&
+      client.userId === userId
+    ) {
+      client.send(messageStr);
+    }
+  });
+}
+
+/**
+ * Broadcast notification to all connected users
+ */
+export function broadcastNotification(notificationData: UserNotificationData) {
+  const message: NotificationMessage = {
+    type: 'USER_NOTIFICATION',
+    data: notificationData,
+    timestamp: new Date().toISOString()
+  };
+
+  const messageStr = JSON.stringify(message);
+
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client.userId) {
+      client.send(messageStr);
+    }
+  });
 }
