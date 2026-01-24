@@ -1020,8 +1020,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Schedule routes
   app.get('/api/schedules', authenticateToken, async (req, res) => {
     try {
-      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
-      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const monthParsed = req.query.month ? parseInt(req.query.month as string) : NaN;
+      const yearParsed = req.query.year ? parseInt(req.query.year as string) : NaN;
+      const month = isNaN(monthParsed) ? undefined : monthParsed;
+      const year = isNaN(yearParsed) ? undefined : yearParsed;
 
       const scheduleSummary = await storage.getSchedulesSummary(month, year);
       const assignments = await storage.getMonthAssignments(month, year);

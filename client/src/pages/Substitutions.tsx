@@ -246,8 +246,11 @@ export default function Substitutions() {
 
   // Função auxiliar para converter horário para minutos (para ordenação)
   const timeToMinutes = (time: string): number => {
+    if (!time) return 0;
     const parts = time.split(':');
-    return parseInt(parts[0]) * 60 + parseInt(parts[1] || '0');
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    return hours * 60 + minutes;
   };
 
   const groupedSubstitutionRequests = useMemo<{
