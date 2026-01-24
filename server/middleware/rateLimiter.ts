@@ -117,3 +117,33 @@ export const passwordResetRateLimiter = rateLimit({
     });
   }
 });
+
+/**
+ * Rate limiter para criação de notificações (coordenadores)
+ * Previne spam de notificações para os ministros
+ */
+export const notificationRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 10, // Máximo 10 notificações por hora por coordenador
+
+  validate: false,
+  keyGenerator: (req: Request) => {
+    // @ts-expect-error - user is added by auth middleware
+    const userId = req.user?.id || 'unknown';
+    return `notifications:${userId}`;
+  },
+
+  message: {
+    error: 'Limite de notificações excedido.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Limite de notificações excedido',
+      message: 'Você atingiu o limite de 10 notificações por hora. Aguarde antes de enviar mais.',
+      retryAfter: '1 hour'
+    });
+  }
+});

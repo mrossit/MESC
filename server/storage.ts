@@ -244,7 +244,10 @@ export interface IStorage {
   // Notification operations
   createNotification(notification: NotificationInput): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: string): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  deleteExpiredNotifications(): Promise<number>;
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
   getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined>;
   upsertPushSubscription(userId: string, subscription: { endpoint: string; keys: { auth: string; p256dh: string } }): Promise<PushSubscription>;
@@ -801,6 +804,39 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ read: true, readAt: new Date() })
       .where(eq(notifications.id, id));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.read, false)
+      ));
+    return result[0]?.count ?? 0;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ read: true, readAt: new Date() })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.read, false)
+      ));
+  }
+
+  async deleteExpiredNotifications(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .delete(notifications)
+      .where(and(
+        sql`${notifications.expiresAt} IS NOT NULL`,
+        sql`${notifications.expiresAt} < ${now}`
+      ))
+      .returning({ id: notifications.id });
+    return result.length;
   }
 
   async createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {

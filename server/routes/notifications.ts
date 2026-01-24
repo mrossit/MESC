@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { notificationRateLimiter } from "../middleware/rateLimiter";
 import { db } from "../db";
 import { storage } from "../storage";
 import { notifications, users } from "@shared/schema";
@@ -9,14 +10,34 @@ import { pushConfig, sendPushNotificationToUsers } from "../utils/pushNotificati
 
 const router = Router();
 
+// Validador de URL interna (relativa ou do mesmo domínio)
+const internalUrlSchema = z.string().refine(
+  (url) => {
+    // Permite URLs relativas (começam com /)
+    if (url.startsWith('/')) return true;
+    // Bloqueia URLs absolutas externas
+    try {
+      const parsed = new URL(url);
+      // Permite apenas se não tiver host (URL relativa) ou se for localhost/replit
+      return !parsed.host ||
+             parsed.host.includes('localhost') ||
+             parsed.host.includes('replit.app') ||
+             parsed.host.includes('replit.dev');
+    } catch {
+      return false;
+    }
+  },
+  { message: "URL deve ser relativa ou do mesmo domínio" }
+);
+
 // Schema para criar notificação
 const createNotificationSchema = z.object({
-  title: z.string().min(1, "Título é obrigatório"),
-  message: z.string().min(1, "Mensagem é obrigatória"),
+  title: z.string().min(1, "Título é obrigatório").max(255, "Título muito longo"),
+  message: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
   type: z.enum(["info", "warning", "success", "error"]).default("info"),
   recipientIds: z.array(z.string()).optional(), // IDs específicos ou vazio para todos
   recipientRole: z.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
-  actionUrl: z.string().url().optional(),
+  actionUrl: internalUrlSchema.optional(),
 });
 
 const rawPushSubscriptionSchema = z.object({
@@ -113,30 +134,16 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Contar notificações não lidas
+// Contar notificações não lidas (otimizado com COUNT no banco)
 router.get("/unread-count", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    // 🔥 EMERGENCY FIX: Add multiple safety layers
-
-    // Check if user exists
     if (!req.user || !req.user.id) {
-      console.warn('[NOTIFICATIONS] No user in request');
       return res.json({ count: 0 });
     }
 
-    // Storage doesn't have getUnreadNotificationCount, use getUserNotifications and filter
-    const allNotifications = await storage.getUserNotifications(req.user.id);
-
-    // Safely count unread
-    if (!allNotifications || !Array.isArray(allNotifications)) {
-      console.warn('[NOTIFICATIONS] Invalid notifications data');
-      return res.json({ count: 0 });
-    }
-
-    const count = allNotifications.filter(n => n && !n.read).length;
+    const count = await storage.getUnreadNotificationCount(req.user.id);
     res.json({ count });
   } catch (error) {
-    // Always return safe default on ANY error
     console.error('[NOTIFICATIONS] Error counting notifications:', error);
     res.json({ count: 0 });
   }
@@ -168,15 +175,10 @@ router.patch("/:id/read", requireAuth, async (req: AuthRequest, res: Response) =
   }
 });
 
-// Marcar todas as notificações como lidas
+// Marcar todas as notificações como lidas (otimizado com batch update)
 router.patch("/read-all", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    // Storage doesn't have markAllNotificationsAsRead, get all and mark each
-    const userNotifications = await storage.getUserNotifications(req.user!.id);
-    const unreadNotifications = userNotifications.filter(n => !n.read);
-    
-    await Promise.all(unreadNotifications.map(n => storage.markNotificationAsRead(n.id)));
-    
+    await storage.markAllNotificationsAsRead(req.user!.id);
     res.json({ message: "Todas as notificações foram marcadas como lidas" });
   } catch (error) {
     console.error('[NOTIFICATIONS] Error marking all as read:', error);
@@ -185,7 +187,8 @@ router.patch("/read-all", requireAuth, async (req: AuthRequest, res: Response) =
 });
 
 // Criar notificação de convite para missa (apenas coordenadores e reitores)
-router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
+// Rate limited: max 10 convites por hora por coordenador
+router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']), notificationRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { massId, date, time, location, message, urgencyLevel } = req.body;
     
@@ -263,7 +266,8 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
 });
 
 // Criar nova notificação (apenas coordenadores e reitores)
-router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
+// Rate limited: max 10 notificações por hora por coordenador
+router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificationRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const data = createNotificationSchema.parse(req.body);
 
@@ -425,6 +429,24 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('[NOTIFICATIONS] Error deleting notification:', error);
     res.status(500).json({ error: "Erro ao excluir notificação" });
+  }
+});
+
+// Limpar notificações expiradas (apenas coordenadores/gestores)
+// Endpoint administrativo para manutenção do banco
+router.delete("/cleanup/expired", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
+  try {
+    const deletedCount = await storage.deleteExpiredNotifications();
+
+    console.log(`[NOTIFICATIONS] Cleanup: ${deletedCount} expired notifications deleted by ${req.user!.id}`);
+
+    res.json({
+      message: `${deletedCount} notificações expiradas removidas`,
+      deletedCount
+    });
+  } catch (error) {
+    console.error('[NOTIFICATIONS] Error cleaning expired notifications:', error);
+    res.status(500).json({ error: "Erro ao limpar notificações expiradas" });
   }
 });
 
