@@ -7,13 +7,21 @@ export function UpdateNotifier() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const messageHandler = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'SW_UPDATED') {
+        setUpdateAvailable(true);
+      }
+    };
+
     if ('serviceWorker' in navigator) {
       // Listener para quando o SW encontrar uma atualização
       navigator.serviceWorker.ready.then((reg) => {
         setRegistration(reg);
 
         // Verificar por atualizações periodicamente (a cada 60 segundos)
-        setInterval(() => {
+        intervalId = setInterval(() => {
           reg.update();
         }, 60000);
 
@@ -32,11 +40,7 @@ export function UpdateNotifier() {
       });
 
       // Listener para mensagens do SW
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_UPDATED') {
-          setUpdateAvailable(true);
-        }
-      });
+      navigator.serviceWorker.addEventListener('message', messageHandler);
 
       // Verificar se já há um SW esperando para ativar
       navigator.serviceWorker.getRegistration().then((reg) => {
@@ -45,6 +49,16 @@ export function UpdateNotifier() {
         }
       });
     }
+
+    // Cleanup function
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', messageHandler);
+      }
+    };
   }, []);
 
   const handleUpdate = () => {
