@@ -1320,14 +1320,13 @@ export default function Schedules() {
     });
 
     if (!userSubstitutionRequest) {
-      // Also check if user is currently assigned (no substitution requested)
-      const userAssignment = dayAssignments.find(a => a.ministerId === currentMinister.id);
-      return userAssignment ? null : null;
+      return null;
     }
 
-
-    // Return status: 'pending' for red, 'approved' or 'auto_approved' for green
-    if (userSubstitutionRequest.status === 'pending') {
+    // Return status: 'pending' or 'available' for red (waiting), 'approved' or 'auto_approved' for yellow (done)
+    // 'available' means the user requested substitution without specifying a substitute (open for any minister)
+    // 'pending' means the user indicated a specific substitute (waiting for their acceptance)
+    if (userSubstitutionRequest.status === 'pending' || userSubstitutionRequest.status === 'available') {
       return 'pending';
     } else if (userSubstitutionRequest.status === 'approved' || userSubstitutionRequest.status === 'auto_approved') {
       return 'approved';
