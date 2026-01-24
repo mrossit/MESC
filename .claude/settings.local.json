@@ -45,7 +45,10 @@
       "Bash(for file in scheduleGeneratorV2 csvExporter liturgicalQuestionnaireGenerator activityLogger)",
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
-      "Bash(identify:*)"
+      "Bash(identify:*)",
+      "Bash(npm install:*)",
+      "Bash(npx pwa-asset-generator:*)",
+      "Bash(node scripts/generate-splash.mjs:*)"
     ],
     "deny": [],
     "ask": []
