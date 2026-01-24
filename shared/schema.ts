@@ -239,7 +239,12 @@ export const schedules = pgTable('schedules', {
     reason?: string;
   }[]>(),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => [
+  index('idx_schedules_date').on(table.date),
+  index('idx_schedules_minister').on(table.ministerId),
+  index('idx_schedules_date_time').on(table.date, table.time),
+  index('idx_schedules_status').on(table.status)
+]);
 
 // Mass Execution Logs (for auxiliary leaders)
 export const massExecutionLogs = pgTable('mass_execution_logs', {

@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
 import path from "path";
 
@@ -204,13 +205,8 @@ app.use("/api", apiRateLimiter);
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error(`❌ ${status} ${req.method} ${req.path}: ${message}`);
-    if (process.env.NODE_ENV === "development") console.error(err.stack);
-    if (!res.headersSent) res.status(status).json({ message });
-  });
+  // Use centralized error handler middleware
+  app.use(errorHandler);
 
   const isDevelopment = process.env.NODE_ENV === "development";
 
