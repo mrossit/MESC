@@ -1,13 +1,29 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
+import type { ScheduleAssignment } from "../types/schedules";
+
+// Query parameter validation schemas
+const ministerIdQuerySchema = z.object({
+  ministerId: z.string().uuid().optional()
+});
+
+const monthYearQuerySchema = z.object({
+  month: z.string().regex(/^\d{1,2}$/).transform(Number).pipe(z.number().min(1).max(12)).optional(),
+  year: z.string().regex(/^\d{4}$/).transform(Number).pipe(z.number().min(2024).max(2100)).optional()
+});
+
+const dateParamSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, 'Data deve estar no formato YYYY-MM-DD')
+});
 
 // Stub implementations for missing functions
-const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
+const logActivity = async (userId: string, action: string, description: string, metadata?: Record<string, unknown>) => {
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
 
@@ -31,8 +47,17 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       return res.status(401).json({ message: "Não autenticado" });
     }
 
+    // Validate query parameters
+    const queryValidation = ministerIdQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      return res.status(400).json({
+        message: "Parâmetros inválidos",
+        errors: queryValidation.error.errors
+      });
+    }
+
     // Allow filtering by ministerId (for family members view)
-    const targetMinisterId = req.query.ministerId as string || userId;
+    const targetMinisterId = queryValidation.data.ministerId || userId;
 
     // Note: ministers table doesn't exist in schema - ministers are users with role 'ministro'
     const minister = await db
@@ -86,7 +111,8 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .limit(10);
 
     // Transform to match expected format
-    const formattedAssignments = upcomingAssignments.map((assignment: any) => ({
+    type UpcomingAssignment = typeof upcomingAssignments[number];
+    const formattedAssignments = upcomingAssignments.map((assignment: UpcomingAssignment) => ({
       id: assignment.id,
       date: assignment.date,
       massTime: assignment.time,
@@ -107,7 +133,16 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
 // Get schedule assignments for a specific date
 router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { date } = req.params;
+    // Validate date parameter
+    const paramValidation = dateParamSchema.safeParse(req.params);
+    if (!paramValidation.success) {
+      return res.status(400).json({
+        message: "Data inválida. Use o formato YYYY-MM-DD",
+        errors: paramValidation.error.errors
+      });
+    }
+
+    const { date } = paramValidation.data;
     const userId = req.user?.id;
 
     // Check if user is coordinator/manager
@@ -251,7 +286,16 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
 // Obter escalas para um mês específico
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { month, year } = req.query;
+    // Validate query parameters
+    const queryValidation = monthYearQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      return res.status(400).json({
+        message: "Parâmetros inválidos",
+        errors: queryValidation.error.errors
+      });
+    }
+
+    const { month, year } = queryValidation.data;
     const userId = req.user?.id;
 
     // Check if user is coordinator/manager
@@ -268,15 +312,10 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     let query = db.select().from(schedules);
 
-    if (month && year) {
-      // Calculate date range for the month using string formatting to avoid timezone issues
-      const yearNum = parseInt(year as string);
-      const monthNum = parseInt(month as string);
-
-      // Validate parsed values
-      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-        return res.status(400).json({ error: 'Invalid month or year parameter' });
-      }
+    if (month !== undefined && year !== undefined) {
+      // Values are already validated and parsed by zod
+      const yearNum = year;
+      const monthNum = month;
 
       // Check cache first - but only use cache for admin users who can see all
       // For regular users, we need to filter by published status
@@ -459,7 +498,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       // Create monthly schedule metadata object
       // The frontend expects a Schedule object with month, year, status
       // Determine status: "published" if ANY schedule is published, "draft" otherwise
-      const hasPublishedSchedules = schedulesList.some((s: any) => s.status === "published");
+      const hasPublishedSchedules = schedulesList.some((s) => s.status === "published");
       const scheduleStatus = hasPublishedSchedules ? "published" : "draft";
 
       const monthlySchedule = schedulesList.length > 0 ? {
@@ -744,13 +783,14 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       }
 
       // Check if any schedule is published
-      const hasPublished = schedulesList.some((s: any) => s.status === "published");
+      type ScheduleListItem = typeof schedulesList[number];
+      const hasPublished = schedulesList.some((s: ScheduleListItem) => s.status === "published");
       if (hasPublished) {
         return res.status(400).json({ message: "Não é possível excluir escalas publicadas. Cancele a publicação primeiro." });
       }
 
       // Get all schedule IDs
-      const scheduleIds = schedulesList.map((s: any) => s.id);
+      const scheduleIds = schedulesList.map((s: ScheduleListItem) => s.id);
 
       // Delete related substitution requests first
       for (const scheduleId of scheduleIds) {

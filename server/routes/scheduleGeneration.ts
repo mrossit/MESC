@@ -10,13 +10,19 @@ import { and, gte, lte, eq, sql, ne, desc, inArray } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { scheduleCache } from '../services/scheduleCache';
+import type {
+  EmergencySaveScheduleInput,
+  ScheduleSaveResult,
+  ScheduleSaveError,
+  MinisterData
+} from '../types/schedules';
 
 const router = Router();
 
 /**
  * Helper function to validate and parse year/month from URL params
  */
-function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+function parseYearMonthParams(req: AuthRequest, res: import('express').Response): { year: number; month: number } | null {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
 
@@ -253,7 +259,7 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
 
         if (existingSchedules.length > 0) {
-          const scheduleIds = existingSchedules.map((s: any) => s.id);
+          const scheduleIds = existingSchedules.map((s: { id: string }) => s.id);
 
           // Delete substitution requests first (foreign key constraint)
           const deletedSubstitutions = await db.delete(substitutionRequests).where(
@@ -276,6 +282,22 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
       }
     }
 
+    // BATCH VALIDATION: Collect all unique minister IDs and validate in one query
+    const uniqueMinisterIds = [...new Set(
+      schedulesInput
+        .map((s: { ministerId?: string | null }) => s.ministerId)
+        .filter((id): id is string => id !== null && id !== undefined)
+    )];
+
+    const existingMinisterIds = new Set<string>();
+    if (uniqueMinisterIds.length > 0) {
+      const existingMinisters = await db.select({ id: users.id })
+        .from(users)
+        .where(inArray(users.id, uniqueMinisterIds));
+      existingMinisters.forEach((m: { id: string }) => existingMinisterIds.add(m.id));
+      console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
+    }
+
     // Try to insert each schedule individually
     for (let i = 0; i < schedulesInput.length; i++) {
       const schedule = schedulesInput[i];
@@ -286,16 +308,9 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
           throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
         }
 
-        // Validate ministerId if provided
-        if (schedule.ministerId) {
-          const [ministerExists] = await db.select({ id: users.id })
-            .from(users)
-            .where(eq(users.id, schedule.ministerId))
-            .limit(1);
-
-          if (!ministerExists) {
-            throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
-          }
+        // Validate ministerId using pre-fetched set (O(1) lookup instead of O(n) queries)
+        if (schedule.ministerId && !existingMinisterIds.has(schedule.ministerId)) {
+          throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
         }
 
         // Create the record with all required fields
@@ -518,7 +533,7 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
       console.log(`Found ${existingSchedules.length} existing schedules to delete`);
 
       if (existingSchedules.length > 0) {
-        const scheduleIds = existingSchedules.map((s: any) => s.id);
+        const scheduleIds = existingSchedules.map((s: { id: string }) => s.id);
         console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), '...');
 
         // Delete substitution requests before deleting schedules

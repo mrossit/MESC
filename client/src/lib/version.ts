@@ -236,8 +236,9 @@ export async function fetchServerVersion(): Promise<VersionInfo | null> {
 /**
  * Inicia polling periódico da versão do servidor
  * @param intervalMinutes Intervalo em minutos entre verificações
+ * @returns Função de cleanup para parar o polling e remover listeners
  */
-export function startVersionPolling(intervalMinutes: number = 15): void {
+export function startVersionPolling(intervalMinutes: number = 15): () => void {
   const checkForUpdate = async () => {
     const serverVersion = await fetchServerVersion();
 
@@ -276,17 +277,26 @@ export function startVersionPolling(intervalMinutes: number = 15): void {
   };
 
   // Initial check after 30s
-  setTimeout(checkForUpdate, 30000);
+  const initialTimeoutId = setTimeout(checkForUpdate, 30000);
 
   // Periodic checks
-  setInterval(checkForUpdate, intervalMinutes * 60 * 1000);
+  const intervalId = setInterval(checkForUpdate, intervalMinutes * 60 * 1000);
 
   // Check when page becomes visible
-  document.addEventListener('visibilitychange', () => {
+  const visibilityHandler = () => {
     if (document.visibilityState === 'visible') {
       checkForUpdate();
     }
-  });
+  };
+  document.addEventListener('visibilitychange', visibilityHandler);
 
   console.log(`[Version] Started version polling (every ${intervalMinutes} minutes)`);
+
+  // Return cleanup function
+  return () => {
+    clearTimeout(initialTimeoutId);
+    clearInterval(intervalId);
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    console.log('[Version] Stopped version polling');
+  };
 }

@@ -27,15 +27,17 @@ export function VersionChecker() {
   useEffect(() => {
     // Verificar versão na inicialização
     const hasNewVersion = checkVersion();
+    let initialBannerTimeout: ReturnType<typeof setTimeout> | null = null;
+
     if (hasNewVersion) {
       // Dar um tempo para a aplicação carregar antes de mostrar o banner
-      setTimeout(() => {
+      initialBannerTimeout = setTimeout(() => {
         setShowUpdateBanner(true);
       }, 2000);
     }
 
     // Registrar atividade do usuário
-    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const;
 
     const handleActivity = () => {
       recordActivity();
@@ -53,8 +55,8 @@ export function VersionChecker() {
       }
     }, 5 * 60 * 1000); // 5 minutos
 
-    // Iniciar polling de versão do servidor
-    startVersionPolling(15); // Verifica a cada 15 minutos
+    // Iniciar polling de versão do servidor e guardar função de cleanup
+    const stopVersionPolling = startVersionPolling(15); // Verifica a cada 15 minutos
 
     // Escutar evento de nova versão disponível
     const handleNewVersion = (event: CustomEvent) => {
@@ -71,12 +73,16 @@ export function VersionChecker() {
 
     window.addEventListener('new-version-available', handleNewVersion as EventListener);
 
-    // Cleanup
+    // Cleanup - remove all listeners and intervals
     return () => {
+      if (initialBannerTimeout) {
+        clearTimeout(initialBannerTimeout);
+      }
       activityEvents.forEach(event => {
         window.removeEventListener(event, handleActivity);
       });
       clearInterval(inactivityInterval);
+      stopVersionPolling(); // Properly cleanup version polling
       window.removeEventListener('new-version-available', handleNewVersion as EventListener);
     };
   }, [toast]);
