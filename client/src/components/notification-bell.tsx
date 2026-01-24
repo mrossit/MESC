@@ -237,7 +237,7 @@ export function NotificationBell({ compact = false, showLabel = false, className
                 <Button
                   size="xs"
                   onClick={() => enablePushNotifications()}
-                  disabled={pushBusy || pushStatus === "errored"}
+                  disabled={pushBusy}
                 >
                   {pushBusy ? "Ativando..." : "Ativar"}
                 </Button>

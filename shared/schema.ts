@@ -868,7 +868,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   experience: true,
   specialSkills: true,
   liturgicalTraining: true,
-  observations: true
+  observations: true,
+  extraActivities: true
 });
 
 export const insertQuestionnaireSchema = createInsertSchema(questionnaires).pick({

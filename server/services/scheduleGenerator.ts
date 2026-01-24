@@ -88,9 +88,6 @@ export class IntelligentScheduleGenerator {
     this.analyzeHistoricalSchedules();
   }
 
-  private month: number;
-  private year: number;
-
   private loadMinisterAvailability() {
     console.log(`\n[INTELLIGENT_GENERATOR] 📊 Loading ${this.ministersData.length} ministers...`);
 
