@@ -48,7 +48,8 @@
       "Bash(identify:*)",
       "Bash(npm install:*)",
       "Bash(npx pwa-asset-generator:*)",
-      "Bash(node scripts/generate-splash.mjs:*)"
+      "Bash(node scripts/generate-splash.mjs:*)",
+      "Bash(git status:*)"
     ],
     "deny": [],
     "ask": []
