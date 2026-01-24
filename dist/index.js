@@ -2204,169 +2204,6 @@ var init_saintNameMatching = __esm({
   }
 });
 
-// server/utils/octoberMassValidator.ts
-function validateOctoberMasses(masses) {
-  const errors = [];
-  masses.forEach((mass) => {
-    if (!mass.date) return;
-    const date2 = new Date(mass.date);
-    const month = date2.getMonth() + 1;
-    if (month !== 10) return;
-    const dayOfWeek = date2.getDay();
-    const dayOfMonth = date2.getDate();
-    if (dayOfWeek === 6) {
-      if (dayOfMonth > 7 && mass.time === "06:30" && mass.type === "missa_diaria") {
-        errors.push({
-          date: mass.date,
-          time: mass.time,
-          type: mass.type || "unknown",
-          error: `Regular Saturday ${dayOfMonth} should have NO morning mass (only 1st Saturday has 6:30)`,
-          severity: "ERROR"
-        });
-      }
-      if ((dayOfMonth === 11 || dayOfMonth === 18) && mass.time === "06:30") {
-        errors.push({
-          date: mass.date,
-          time: mass.time,
-          type: mass.type || "unknown",
-          error: `October ${dayOfMonth} is a regular Saturday - should have NO mass`,
-          severity: "ERROR"
-        });
-      }
-    }
-    if (dayOfMonth >= 20 && dayOfMonth <= 27) {
-      if (mass.time === "06:30") {
-        errors.push({
-          date: mass.date,
-          time: mass.time,
-          type: mass.type || "unknown",
-          error: `October ${dayOfMonth} during novena should NOT have 6:30 morning mass (only evening novena)`,
-          severity: "ERROR"
-        });
-      }
-      if (mass.type === "missa_sao_judas") {
-        if (dayOfWeek === 6 && mass.time !== "19:00") {
-          errors.push({
-            date: mass.date,
-            time: mass.time,
-            type: mass.type,
-            error: `Novena Saturday (${dayOfMonth}) should be at 19:00, not ${mass.time}`,
-            severity: "WARNING"
-          });
-        }
-        if (dayOfWeek >= 1 && dayOfWeek <= 5 && mass.time !== "19:30") {
-          errors.push({
-            date: mass.date,
-            time: mass.time,
-            type: mass.type,
-            error: `Novena weekday (${dayOfMonth}) should be at 19:30, not ${mass.time}`,
-            severity: "WARNING"
-          });
-        }
-      }
-    }
-    if (dayOfMonth === 28 && mass.type === "missa_diaria") {
-      errors.push({
-        date: mass.date,
-        time: mass.time,
-        type: mass.type,
-        error: `October 28 (St Jude Feast) should NOT have regular daily mass`,
-        severity: "ERROR"
-      });
-    }
-    if (dayOfWeek === 6 && dayOfMonth <= 7) {
-      if (mass.time === "06:30" && mass.type !== "missa_imaculado_coracao") {
-        errors.push({
-          date: mass.date,
-          time: mass.time,
-          type: mass.type || "unknown",
-          error: `1st Saturday should be Immaculate Heart mass, not ${mass.type}`,
-          severity: "WARNING"
-        });
-      }
-    }
-  });
-  return errors;
-}
-function validateAndLogOctoberMasses(masses, year) {
-  const octoberMasses = masses.filter((m) => {
-    if (!m.date) return false;
-    const date2 = new Date(m.date);
-    return date2.getMonth() + 1 === 10 && date2.getFullYear() === year;
-  });
-  if (octoberMasses.length === 0) {
-    console.log("[OCT_VALIDATION] No October masses to validate");
-    return true;
-  }
-  console.log(`
-[OCT_VALIDATION] \u{1F4CB} Validating ${octoberMasses.length} October masses...`);
-  const errors = validateOctoberMasses(octoberMasses);
-  if (errors.length === 0) {
-    console.log("[OCT_VALIDATION] \u2705 All October masses are VALID!");
-    return true;
-  }
-  console.log(`[OCT_VALIDATION] \u274C Found ${errors.length} validation issues:
-`);
-  const errorList = errors.filter((e) => e.severity === "ERROR");
-  const warningList = errors.filter((e) => e.severity === "WARNING");
-  if (errorList.length > 0) {
-    console.log(`[OCT_VALIDATION] \u{1F6A8} ERRORS (${errorList.length}):`);
-    errorList.forEach((err, idx) => {
-      console.log(`[OCT_VALIDATION]   ${idx + 1}. ${err.date} ${err.time} (${err.type})`);
-      console.log(`[OCT_VALIDATION]      ${err.error}`);
-    });
-    console.log("");
-  }
-  if (warningList.length > 0) {
-    console.log(`[OCT_VALIDATION] \u26A0\uFE0F  WARNINGS (${warningList.length}):`);
-    warningList.forEach((err, idx) => {
-      console.log(`[OCT_VALIDATION]   ${idx + 1}. ${err.date} ${err.time} (${err.type})`);
-      console.log(`[OCT_VALIDATION]      ${err.error}`);
-    });
-    console.log("");
-  }
-  return errorList.length === 0;
-}
-function printOctoberScheduleComparison(masses, year) {
-  const octoberMasses = masses.filter((m) => {
-    if (!m.date) return false;
-    const date2 = new Date(m.date);
-    return date2.getMonth() + 1 === 10 && date2.getFullYear() === year;
-  });
-  console.log("\n[OCT_VALIDATION] \u{1F4C5} OCTOBER SCHEDULE COMPARISON:");
-  console.log("[OCT_VALIDATION] ================================================\n");
-  const massesByDate = /* @__PURE__ */ new Map();
-  octoberMasses.forEach((mass) => {
-    if (!mass.date) return;
-    if (!massesByDate.has(mass.date)) {
-      massesByDate.set(mass.date, []);
-    }
-    massesByDate.get(mass.date).push(mass);
-  });
-  const sortedDates = Array.from(massesByDate.keys()).sort();
-  sortedDates.forEach((date2) => {
-    const masses2 = massesByDate.get(date2).sort((a, b) => a.time.localeCompare(b.time));
-    const dateObj = new Date(date2);
-    const day = dateObj.getDate();
-    const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "S\xE1b"][dateObj.getDay()];
-    console.log(`[OCT_VALIDATION] Oct ${day.toString().padStart(2, "0")} (${dayOfWeek}):`);
-    if (masses2.length === 0) {
-      console.log(`[OCT_VALIDATION]   (no masses)`);
-    } else {
-      masses2.forEach((mass) => {
-        const typeLabel = mass.type || "unknown";
-        console.log(`[OCT_VALIDATION]   ${mass.time} - ${typeLabel}`);
-      });
-    }
-  });
-  console.log("\n[OCT_VALIDATION] ================================================\n");
-}
-var init_octoberMassValidator = __esm({
-  "server/utils/octoberMassValidator.ts"() {
-    "use strict";
-  }
-});
-
 // server/utils/scheduleGenerator.ts
 var scheduleGenerator_exports = {};
 __export(scheduleGenerator_exports, {
@@ -2386,8 +2223,6 @@ var init_scheduleGenerator = __esm({
     init_logger();
     init_schema();
     await init_saintNameMatching();
-    init_octoberMassValidator();
-    console.log("\u{1F680} [SCHEDULE_GENERATOR] M\xD3DULO CARREGADO - VERS\xC3O COM FAIR ALGORITHM! Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
     ScheduleGenerator = class {
       ministers = [];
       availabilityData = /* @__PURE__ */ new Map();
@@ -2514,15 +2349,6 @@ ${"!".repeat(60)}`);
             console.error(`${"!".repeat(60)}
 `);
             throw error;
-          }
-          if (month === 10) {
-            console.log(`
-[SCHEDULE_GEN] \u{1F50D} Validating October mass schedule...`);
-            printOctoberScheduleComparison(monthlyMassTimes, year);
-            const isValid = validateAndLogOctoberMasses(monthlyMassTimes, year);
-            if (!isValid) {
-              console.log(`[SCHEDULE_GEN] \u26A0\uFE0F October validation found errors, but continuing with generation...`);
-            }
           }
           console.time("[PERF] Load all saints data");
           try {
@@ -3973,10 +3799,10 @@ ${"!".repeat(60)}`);
                       dateStr
                       // "05/10"
                     ];
-                    for (const format9 of possibleFormats) {
-                      if (availability.availableSundays.some((sunday) => sunday === format9)) {
+                    for (const format8 of possibleFormats) {
+                      if (availability.availableSundays.some((sunday) => sunday === format8)) {
                         availableForSunday = true;
-                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format9}`);
+                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format8}`);
                         break;
                       }
                     }
@@ -4633,7 +4459,7 @@ __export(websocket_exports, {
 });
 import { WebSocketServer, WebSocket } from "ws";
 import { eq as eq23, and as and17, gte as gte11, lte as lte10, sql as sql13, or as or7 } from "drizzle-orm";
-import { format as format7, addDays as addDays4 } from "date-fns";
+import { format as format6, addDays as addDays4 } from "date-fns";
 function initializeWebSocket(httpServer) {
   wss = new WebSocketServer({
     server: httpServer,
@@ -4704,8 +4530,8 @@ async function getCriticalAlerts() {
     vacancies: sql13`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
   }).from(schedules).where(
     and17(
-      gte11(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte10(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
+      gte11(schedules.date, format6(now, "yyyy-MM-dd")),
+      lte10(schedules.date, format6(next12Hours, "yyyy-MM-dd"))
     )
   ).groupBy(schedules.date, schedules.time).having(sql13`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
   const criticalWithHours = criticalMasses.map((m) => ({
@@ -4728,8 +4554,8 @@ async function getCriticalAlerts() {
         eq23(substitutionRequests.status, "pending"),
         eq23(substitutionRequests.status, "available")
       ),
-      gte11(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte10(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
+      gte11(schedules.date, format6(now, "yyyy-MM-dd")),
+      lte10(schedules.date, format6(next48Hours, "yyyy-MM-dd"))
     )
   ).orderBy(schedules.date);
   return {
@@ -10697,9 +10523,9 @@ router5.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
 router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { questionnaireId } = req.params;
-    const { format: format9 = "detailed" } = req.query;
+    const { format: format8 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
-    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format8 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -10715,9 +10541,9 @@ router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coorden
     const params = parseYearMonth(req, res);
     if (!params) return;
     const { year, month } = params;
-    const { format: format9 = "detailed" } = req.query;
+    const { format: format8 = "detailed" } = req.query;
     const exportData = await getMonthlyResponsesForExport(month, year);
-    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format8 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const monthName = monthNames[month - 1];
     const filename = `respostas_${monthName}_${year}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -12486,329 +12312,10 @@ async function getLiturgicalInfoForMonth(year, month) {
 }
 var smartScheduleGeneration_default = router7;
 
-// server/routes/testScheduleGeneration.ts
-import { Router as Router8 } from "express";
-await init_scheduleGenerator();
-import { addMonths } from "date-fns";
-var router8 = Router8();
-function generateMockMinisters(count9 = 50) {
-  const firstNames = [
-    "Jo\xE3o",
-    "Maria",
-    "Jos\xE9",
-    "Ana",
-    "Pedro",
-    "Paula",
-    "Carlos",
-    "Juliana",
-    "Rafael",
-    "Mariana",
-    "Lucas",
-    "Beatriz",
-    "Fernando",
-    "Camila",
-    "Roberto",
-    "Larissa",
-    "Marcos",
-    "Fernanda",
-    "Andr\xE9",
-    "Patr\xEDcia",
-    "Gabriel",
-    "Isabela",
-    "Thiago",
-    "Aline",
-    "Felipe",
-    "Cristina",
-    "Rodrigo",
-    "Vanessa",
-    "Bruno",
-    "Renata",
-    "Diego",
-    "Adriana",
-    "Gustavo",
-    "Simone",
-    "Leandro",
-    "Tatiana",
-    "Ricardo",
-    "Luciana",
-    "Marcelo",
-    "Daniela",
-    "Alexandre",
-    "Carla",
-    "F\xE1bio",
-    "Priscila",
-    "Vin\xEDcius",
-    "Amanda",
-    "Maur\xEDcio",
-    "Silvia",
-    "Leonardo",
-    "Bianca"
-  ];
-  const lastNames = [
-    "Silva",
-    "Santos",
-    "Oliveira",
-    "Souza",
-    "Rodrigues",
-    "Ferreira",
-    "Alves",
-    "Pereira",
-    "Lima",
-    "Gomes",
-    "Costa",
-    "Ribeiro",
-    "Martins",
-    "Carvalho",
-    "Rocha",
-    "Almeida",
-    "Nascimento",
-    "Ara\xFAjo",
-    "Melo",
-    "Barbosa",
-    "Cardoso",
-    "Correia",
-    "Dias",
-    "Teixeira",
-    "Cavalcanti",
-    "Monteiro",
-    "Freitas",
-    "Mendes"
-  ];
-  const ministers = [];
-  for (let i = 0; i < count9; i++) {
-    const firstName = firstNames[i % firstNames.length];
-    const lastName = lastNames[Math.floor(i / firstNames.length) % lastNames.length];
-    const name = `${firstName} ${lastName}`;
-    const experienceYears = Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? 1 : Math.random() < 0.7 ? 2 : 3;
-    const totalServices = Math.floor(Math.random() * 20) + experienceYears * 10;
-    const preferredTimes = [];
-    if (Math.random() > 0.5) preferredTimes.push("08:00");
-    if (Math.random() > 0.5) preferredTimes.push("10:00");
-    if (Math.random() > 0.3) preferredTimes.push("19:00");
-    ministers.push({
-      id: `mock-${i + 1}`,
-      name,
-      role: i < 5 ? "coordenador" : "ministro",
-      totalServices,
-      lastService: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1e3) : null,
-      preferredTimes,
-      canServeAsCouple: i % 10 === 0,
-      // 10% can serve as couples
-      spouseMinisterId: i % 10 === 0 && i > 0 ? `mock-${i}` : null,
-      familyId: null,
-      availabilityScore: 0.5 + Math.random() * 0.5,
-      // 0.5 to 1.0
-      preferenceScore: Math.random()
-    });
-  }
-  return ministers;
-}
-function generateMockAvailabilityData(ministers, month, year) {
-  const availabilityMap = /* @__PURE__ */ new Map();
-  for (const minister of ministers) {
-    if (!minister.id) continue;
-    const availableSundays = [];
-    const sundaysInMonth = 4 + (Math.random() > 0.7 ? 1 : 0);
-    for (let i = 1; i <= sundaysInMonth; i++) {
-      if (Math.random() > 0.2) {
-        availableSundays.push(i.toString());
-      }
-    }
-    const preferredMassTimes = [];
-    if (Math.random() > 0.3) preferredMassTimes.push("8h");
-    if (Math.random() > 0.4) preferredMassTimes.push("10h");
-    if (Math.random() > 0.5) preferredMassTimes.push("19h");
-    const alternativeTimes = [];
-    if (preferredMassTimes.length > 0 && Math.random() > 0.5) {
-      const allTimes = ["8h", "10h", "19h"];
-      for (const time2 of allTimes) {
-        if (!preferredMassTimes.includes(time2) && Math.random() > 0.6) {
-          alternativeTimes.push(time2);
-        }
-      }
-    }
-    const dailyMassAvailability = [];
-    const weekdays = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
-    for (const day of weekdays) {
-      if (Math.random() > 0.7) {
-        dailyMassAvailability.push(day);
-      }
-    }
-    availabilityMap.set(minister.id, {
-      ministerId: minister.id,
-      availableSundays,
-      preferredMassTimes,
-      alternativeTimes,
-      dailyMassAvailability,
-      canSubstitute: Math.random() > 0.4
-      // 60% can substitute
-    });
-  }
-  return availabilityMap;
-}
-router8.post("/test-generation", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
-  try {
-    const { ministerCount = 50 } = req.body;
-    const nextMonth = addMonths(/* @__PURE__ */ new Date(), 1);
-    const month = nextMonth.getMonth() + 1;
-    const year = nextMonth.getFullYear();
-    console.log(`[TEST_GEN] Generating test schedule for ${month}/${year} with ${ministerCount} mock ministers`);
-    const mockMinisters = generateMockMinisters(ministerCount);
-    const mockAvailability = generateMockAvailabilityData(mockMinisters, month, year);
-    console.log(`[TEST_GEN] Created ${mockMinisters.length} mock ministers`);
-    console.log(`[TEST_GEN] Created ${mockAvailability.size} availability records`);
-    const generator = new TestScheduleGenerator(mockMinisters, mockAvailability);
-    const schedules3 = await generator.generateScheduleForMonth(year, month, true);
-    console.log(`[TEST_GEN] Generated ${schedules3.length} mass schedules`);
-    const statistics = calculateTestStatistics(schedules3, mockMinisters);
-    const response = {
-      success: true,
-      message: `Teste gerado com sucesso para ${month}/${year}`,
-      data: {
-        month,
-        year,
-        mockData: {
-          ministerCount: mockMinisters.length,
-          ministers: mockMinisters.slice(0, 10).map((m) => ({ id: m.id, name: m.name, totalServices: m.totalServices })),
-          // Sample
-          availabilityCount: mockAvailability.size
-        },
-        schedules: schedules3.map((s) => ({
-          date: s.massTime.date,
-          time: s.massTime.time,
-          type: s.massTime.type,
-          ministersAssigned: s.ministers.length,
-          ministersRequired: s.massTime.minMinisters,
-          confidence: s.confidence,
-          ministers: s.ministers.map((m) => ({
-            id: m.id,
-            name: m.name,
-            position: m.position,
-            totalServices: m.totalServices
-          }))
-        })),
-        statistics
-      }
-    };
-    res.json(response);
-  } catch (error) {
-    console.error("[TEST_GEN] Error generating test schedule:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Erro ao gerar escala de teste",
-      error: process.env.NODE_ENV === "development" ? error.stack : void 0
-    });
-  }
-});
-var TestScheduleGenerator = class extends ScheduleGenerator {
-  mockMinisters;
-  mockAvailability;
-  constructor(ministers, availability) {
-    super();
-    this.mockMinisters = ministers;
-    this.mockAvailability = availability;
-  }
-  /**
-   * Override to use mock data instead of database
-   */
-  async generateScheduleForMonth(year, month, isPreview = true) {
-    console.log(`[TEST_GENERATOR] Using ${this.mockMinisters.length} mock ministers`);
-    this.ministers = this.mockMinisters;
-    this.availabilityData = this.mockAvailability;
-    this.dailyAssignments = /* @__PURE__ */ new Map();
-    this.saintBonusCache = /* @__PURE__ */ new Map();
-    this.db = null;
-    this.massTimes = [
-      { id: "1", dayOfWeek: 0, time: "08:00", minMinisters: 15, maxMinisters: 20 },
-      { id: "2", dayOfWeek: 0, time: "10:00", minMinisters: 20, maxMinisters: 28 },
-      { id: "3", dayOfWeek: 0, time: "19:00", minMinisters: 20, maxMinisters: 28 },
-      { id: "4", dayOfWeek: 1, time: "06:30", minMinisters: 5, maxMinisters: 8 },
-      { id: "5", dayOfWeek: 2, time: "06:30", minMinisters: 5, maxMinisters: 8 },
-      { id: "6", dayOfWeek: 3, time: "06:30", minMinisters: 5, maxMinisters: 8 },
-      { id: "7", dayOfWeek: 4, time: "06:30", minMinisters: 5, maxMinisters: 8 },
-      { id: "8", dayOfWeek: 5, time: "06:30", minMinisters: 5, maxMinisters: 8 },
-      { id: "9", dayOfWeek: 6, time: "06:30", minMinisters: 5, maxMinisters: 8 }
-    ];
-    const monthlyMassTimes = this.generateMonthlyMassTimes(year, month);
-    console.log(`[TEST_GENERATOR] Generated ${monthlyMassTimes.length} mass times for the month`);
-    const generatedSchedules = [];
-    for (const massTime of monthlyMassTimes) {
-      const schedule = await this.generateScheduleForMass(massTime);
-      generatedSchedules.push(schedule);
-    }
-    const incompleteSchedules = generatedSchedules.filter(
-      (s) => s.ministers.length < s.massTime.minMinisters
-    );
-    if (incompleteSchedules.length > 0) {
-      console.log(`[TEST_GENERATOR] \u26A0\uFE0F ${incompleteSchedules.length} incomplete schedules detected`);
-      incompleteSchedules.forEach((s) => {
-        console.log(`  - ${s.massTime.date} ${s.massTime.time}: ${s.ministers.length}/${s.massTime.minMinisters} ministers`);
-      });
-    } else {
-      console.log(`[TEST_GENERATOR] \u2705 All schedules have minimum ministers!`);
-    }
-    return generatedSchedules;
-  }
-};
-function calculateTestStatistics(schedules3, ministers) {
-  const assignmentsPerMinister = {};
-  let totalPositions = 0;
-  let filledPositions = 0;
-  let totalConfidence = 0;
-  for (const schedule of schedules3) {
-    totalPositions += schedule.massTime.minMinisters;
-    filledPositions += schedule.ministers.length;
-    totalConfidence += schedule.confidence;
-    for (const minister of schedule.ministers) {
-      if (!minister.id) continue;
-      assignmentsPerMinister[minister.id] = (assignmentsPerMinister[minister.id] || 0) + 1;
-    }
-  }
-  const coverage = totalPositions > 0 ? filledPositions / totalPositions * 100 : 0;
-  const averageConfidence = schedules3.length > 0 ? totalConfidence / schedules3.length : 0;
-  const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count9) => sum + count9, 0) / assignments.length : 0;
-  const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum, count9) => sum + Math.pow(count9 - avgAssignments, 2), 0) / assignments.length
-  ) : 0;
-  const fairness = Math.max(0, 1 - variance / (avgAssignments || 1));
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count9]) => count9 > 4 || count9 < 1).map(([ministerId, count9]) => ({
-    ministerId,
-    ministerName: ministers.find((m) => m.id === ministerId)?.name || "Unknown",
-    count: count9,
-    reason: count9 > 4 ? "too_many_assignments" : "too_few_assignments"
-  }));
-  const massTypes = {};
-  for (const schedule of schedules3) {
-    const type = schedule.massTime.type || "regular";
-    massTypes[type] = (massTypes[type] || 0) + 1;
-  }
-  return {
-    totalMasses: schedules3.length,
-    totalPositions,
-    filledPositions,
-    coverage: Math.round(coverage * 100) / 100,
-    averageConfidence: Math.round(averageConfidence * 100) / 100,
-    uniqueMinistersUsed: Object.keys(assignmentsPerMinister).length,
-    totalMinistersAvailable: ministers.length,
-    utilizationRate: Math.round(Object.keys(assignmentsPerMinister).length / ministers.length * 100),
-    averageAssignmentsPerMinister: Math.round(avgAssignments * 10) / 10,
-    distributionVariance: Math.round(variance * 100) / 100,
-    fairnessScore: Math.round(fairness * 100),
-    outliers,
-    massTypeBreakdown: massTypes,
-    incompleteSchedules: schedules3.filter((s) => s.ministers.length < s.massTime.minMinisters).length,
-    highConfidenceSchedules: schedules3.filter((s) => s.confidence >= 0.8).length,
-    mediumConfidenceSchedules: schedules3.filter((s) => s.confidence >= 0.6 && s.confidence < 0.8).length,
-    lowConfidenceSchedules: schedules3.filter((s) => s.confidence < 0.6).length
-  };
-}
-var testScheduleGeneration_default = router8;
-
 // server/routes/schedules.ts
 await init_db();
 init_schema();
-import { Router as Router9 } from "express";
+import { Router as Router8 } from "express";
 import { eq as eq17, and as and12, sql as sql9, gte as gte8, lte as lte7 } from "drizzle-orm";
 
 // server/services/scheduleComparisonService.ts
@@ -13279,8 +12786,8 @@ var isMissingSchedulesDateColumnError = (error) => {
   const message = error?.message?.toLowerCase() ?? "";
   return message.includes("does not exist") && message.includes('"date"') || message.includes("no such column: schedules.date") || message.includes("no such column: date");
 };
-var router9 = Router9();
-router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
+var router8 = Router8();
+router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -13329,7 +12836,7 @@ router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar pr\xF3ximas escalas" });
   }
 });
-router9.get("/by-date/:date", authenticateToken, async (req, res) => {
+router8.get("/by-date/:date", authenticateToken, async (req, res) => {
   try {
     const { date: date2 } = req.params;
     const userId = req.user?.id;
@@ -13431,7 +12938,7 @@ router9.get("/by-date/:date", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar escala para a data" });
   }
 });
-router9.get("/", authenticateToken, async (req, res) => {
+router8.get("/", authenticateToken, async (req, res) => {
   try {
     const { month, year } = req.query;
     const userId = req.user?.id;
@@ -13598,7 +13105,7 @@ router9.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar escalas" });
   }
 });
-router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
@@ -13647,7 +13154,7 @@ router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     res.status(500).json({ message: "Erro ao criar escala" });
   }
 });
-router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
@@ -13676,7 +13183,7 @@ router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
     res.status(500).json({ message: "Erro ao atualizar escala" });
   }
 });
-router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
@@ -13733,7 +13240,7 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     res.status(500).json({ message: "Erro ao publicar escala" });
   }
 });
-router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     console.log("DELETE schedule request for ID:", req.params.id);
     if (!req.user?.id) {
@@ -13815,7 +13322,7 @@ router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     res.status(500).json({ message: "Erro ao excluir escala" });
   }
 });
-router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     console.log("[UNPUBLISH_API] Received request for ID:", req.params.id);
     console.log("[UNPUBLISH_API] User ID:", req.user?.id);
@@ -13874,7 +13381,7 @@ router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
     res.status(500).json({ message: "Erro ao cancelar publica\xE7\xE3o" });
   }
 });
-router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
@@ -13929,15 +13436,15 @@ router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     res.status(500).json({ message: "Erro ao gerar escala inteligente" });
   }
 });
-var schedules_default = router9;
+var schedules_default = router8;
 
 // server/routes/auxiliaryPanel.ts
 await init_db();
 init_schema();
-import { Router as Router10 } from "express";
+import { Router as Router9 } from "express";
 import { eq as eq18, and as and13, inArray as inArray5, sql as sql10 } from "drizzle-orm";
-import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
-var router10 = Router10();
+import { format as format5, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
+var router9 = Router9();
 async function isAuxiliaryForMass(userId, scheduleId) {
   const assignment = await db.select().from(schedules).where(
     and13(
@@ -13960,7 +13467,7 @@ function isWithinAllowedWindow(massDate, massTime) {
     return false;
   }
 }
-router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
+router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const userId = req.user?.id;
@@ -13980,8 +13487,8 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       return res.status(403).json({
         message: "Painel do Auxiliar dispon\xEDvel apenas de 1h antes at\xE9 2h depois da missa",
         allowedWindow: {
-          start: format6(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
-          end: format6(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
+          start: format5(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
+          end: format5(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
         }
       });
     }
@@ -14067,7 +13574,7 @@ router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
+router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const userId = req.user?.id;
@@ -14118,7 +13625,7 @@ router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router10.post("/check-in", authenticateToken, async (req, res) => {
+router9.post("/check-in", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, ministerId, status, notes } = req.body;
     const userId = req.user?.id;
@@ -14173,7 +13680,7 @@ router10.post("/check-in", authenticateToken, async (req, res) => {
     });
   }
 });
-router10.put("/redistribute", authenticateToken, async (req, res) => {
+router9.put("/redistribute", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, changes } = req.body;
     const userId = req.user?.id;
@@ -14231,7 +13738,7 @@ router10.put("/redistribute", authenticateToken, async (req, res) => {
     });
   }
 });
-router10.post("/call-standby", authenticateToken, async (req, res) => {
+router9.post("/call-standby", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, ministerId, position } = req.body;
     const userId = req.user?.id;
@@ -14261,7 +13768,7 @@ router10.post("/call-standby", authenticateToken, async (req, res) => {
       userId: ministerId,
       type: "schedule",
       title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
-      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format6(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
+      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format5(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
       priority: "high",
       data: {
         scheduleId,
@@ -14283,7 +13790,7 @@ router10.post("/call-standby", authenticateToken, async (req, res) => {
     });
   }
 });
-router10.post("/mass-report", authenticateToken, async (req, res) => {
+router9.post("/mass-report", authenticateToken, async (req, res) => {
   try {
     const {
       scheduleId,
@@ -14363,16 +13870,16 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
     });
   }
 });
-var auxiliaryPanel_default = router10;
+var auxiliaryPanel_default = router9;
 
 // server/routes/upload.ts
 await init_db();
 init_schema();
-import { Router as Router11 } from "express";
+import { Router as Router10 } from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { eq as eq19 } from "drizzle-orm";
-var router11 = Router11();
+var router10 = Router10();
 var upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -14411,7 +13918,7 @@ var handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-router11.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
+router10.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
@@ -14460,7 +13967,7 @@ router11.post("/profile-photo", authenticateToken, upload.single("photo"), handl
     res.status(500).json({ error: "Erro interno ao processar a foto. Tente novamente." });
   }
 });
-router11.delete("/profile-photo", authenticateToken, async (req, res) => {
+router10.delete("/profile-photo", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     if (!db) {
@@ -14480,10 +13987,10 @@ router11.delete("/profile-photo", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro interno ao remover a foto. Tente novamente." });
   }
 });
-var upload_default = router11;
+var upload_default = router10;
 
 // server/routes/notifications.ts
-import { Router as Router12 } from "express";
+import { Router as Router11 } from "express";
 import { z as z5 } from "zod";
 await init_db();
 await init_storage();
@@ -14567,7 +14074,7 @@ async function sendPushNotificationToUsers(userIds, payload) {
 }
 
 // server/routes/notifications.ts
-var router12 = Router12();
+var router11 = Router11();
 var createNotificationSchema = z5.object({
   title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
   message: z5.string().min(1, "Mensagem \xE9 obrigat\xF3ria"),
@@ -14605,13 +14112,13 @@ function mapNotificationType(frontendType) {
       return "announcement";
   }
 }
-router12.get("/push/config", authenticateToken, (req, res) => {
+router11.get("/push/config", authenticateToken, (req, res) => {
   res.json({
     enabled: pushConfig.enabled,
     publicKey: pushConfig.publicKey
   });
 });
-router12.post("/push/subscribe", authenticateToken, async (req, res) => {
+router11.post("/push/subscribe", authenticateToken, async (req, res) => {
   try {
     if (!pushConfig.enabled) {
       return res.status(503).json({ error: "Notifica\xE7\xF5es push n\xE3o est\xE3o configuradas no servidor" });
@@ -14632,7 +14139,7 @@ router12.post("/push/subscribe", authenticateToken, async (req, res) => {
     }
   }
 });
-router12.post("/push/unsubscribe", authenticateToken, async (req, res) => {
+router11.post("/push/unsubscribe", authenticateToken, async (req, res) => {
   try {
     const { endpoint } = unsubscribeSchema.parse(req.body);
     await storage.removePushSubscription(req.user.id, endpoint);
@@ -14646,7 +14153,7 @@ router12.post("/push/unsubscribe", authenticateToken, async (req, res) => {
     }
   }
 });
-router12.get("/", authenticateToken, async (req, res) => {
+router11.get("/", authenticateToken, async (req, res) => {
   try {
     const notifications2 = await storage.getUserNotifications(req.user.id);
     res.json(notifications2);
@@ -14655,7 +14162,7 @@ router12.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
   }
 });
-router12.get("/unread-count", authenticateToken, async (req, res) => {
+router11.get("/unread-count", authenticateToken, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       console.warn("[NOTIFICATIONS] No user in request");
@@ -14673,7 +14180,7 @@ router12.get("/unread-count", authenticateToken, async (req, res) => {
     res.json({ count: 0 });
   }
 });
-router12.patch("/:id/read", authenticateToken, async (req, res) => {
+router11.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const notification = await db.select().from(notifications).where(and14(
@@ -14690,7 +14197,7 @@ router12.patch("/:id/read", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router12.patch("/read-all", authenticateToken, async (req, res) => {
+router11.patch("/read-all", authenticateToken, async (req, res) => {
   try {
     const userNotifications = await storage.getUserNotifications(req.user.id);
     const unreadNotifications = userNotifications.filter((n) => !n.read);
@@ -14701,7 +14208,7 @@ router12.patch("/read-all", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { massId, date: date2, time: time2, location, message, urgencyLevel } = req.body;
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
@@ -14755,7 +14262,7 @@ router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
     res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : "Unknown error" });
   }
 });
-router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     console.log("[NOTIFICA\xC7\xD5ES] Dados recebidos:", {
@@ -14843,7 +14350,7 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     }
   }
 });
-router12.delete("/:id", authenticateToken, async (req, res) => {
+router11.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await storage.getUser(req.user.id);
@@ -14872,12 +14379,12 @@ router12.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
-var notifications_default = router12;
+var notifications_default = router11;
 
 // server/routes/reports.ts
 await init_db();
 init_schema();
-import { Router as Router13 } from "express";
+import { Router as Router12 } from "express";
 import { eq as eq21, sql as sql11, and as and15, gte as gte10, lte as lte9, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
 
 // server/utils/activityLogger.ts
@@ -14911,8 +14418,8 @@ function createActivityLogger(req) {
 }
 
 // server/routes/reports.ts
-var router13 = Router13();
-router13.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+var router12 = Router12();
+router12.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "availability" });
   try {
@@ -14945,7 +14452,7 @@ router13.get("/availability", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch availability metrics" });
   }
 });
-router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "substitutions" });
   try {
@@ -14993,7 +14500,7 @@ router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
     res.status(500).json({ error: "Failed to fetch substitution metrics" });
   }
 });
-router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "engagement" });
   try {
@@ -15042,7 +14549,7 @@ router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
     res.status(500).json({ error: "Failed to fetch engagement metrics" });
   }
 });
-router13.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "formation" });
   try {
@@ -15074,7 +14581,7 @@ router13.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
     res.status(500).json({ error: "Failed to fetch formation metrics" });
   }
 });
-router13.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "families" });
   try {
@@ -15097,13 +14604,13 @@ router13.get("/families", authenticateToken, requireRole(["gestor", "coordenador
     res.status(500).json({ error: "Failed to fetch family metrics" });
   }
 });
-router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "summary" });
   try {
     const now = /* @__PURE__ */ new Date();
-    const startOfMonth5 = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth5 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfMonth4 = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth4 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq21(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count4(),
@@ -15112,15 +14619,15 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
         `.as("approved")
     }).from(substitutionRequests).where(
       and15(
-        gte10(substitutionRequests.createdAt, startOfMonth5),
-        lte9(substitutionRequests.createdAt, endOfMonth5)
+        gte10(substitutionRequests.createdAt, startOfMonth4),
+        lte9(substitutionRequests.createdAt, endOfMonth4)
       )
     );
     const formationThisMonth = await db.select({ count: count4() }).from(formationProgress).where(
       and15(
         eq21(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte10(formationProgress.completedAt, startOfMonth5) : sql11`false`,
-        formationProgress.completedAt ? lte9(formationProgress.completedAt, endOfMonth5) : sql11`false`
+        formationProgress.completedAt ? gte10(formationProgress.completedAt, startOfMonth4) : sql11`false`,
+        formationProgress.completedAt ? lte9(formationProgress.completedAt, endOfMonth4) : sql11`false`
       )
     );
     const avgAvailability = await db.select({
@@ -15133,8 +14640,8 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
         `.as("avg_days")
     }).from(questionnaireResponses).where(
       and15(
-        gte10(questionnaireResponses.submittedAt, startOfMonth5),
-        lte9(questionnaireResponses.submittedAt, endOfMonth5)
+        gte10(questionnaireResponses.submittedAt, startOfMonth4),
+        lte9(questionnaireResponses.submittedAt, endOfMonth4)
       )
     );
     res.json({
@@ -15155,12 +14662,12 @@ router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch summary metrics" });
   }
 });
-var reports_default = router13;
+var reports_default = router12;
 
 // server/routes/ministers.ts
 await init_db();
 init_schema();
-import { Router as Router14 } from "express";
+import { Router as Router13 } from "express";
 import { eq as eq22, and as and16, sql as sql12 } from "drizzle-orm";
 
 // server/utils/formatters.ts
@@ -15180,8 +14687,8 @@ function formatMinisterName(name) {
 }
 
 // server/routes/ministers.ts
-var router14 = Router14();
-router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
+var router13 = Router13();
+router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const ministersList = await db.select().from(users).where(
       sql12`${users.role} IN ('ministro', 'coordenador')`
@@ -15192,7 +14699,7 @@ router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
     res.status(500).json({ message: "Erro ao buscar ministros" });
   }
 });
-router14.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
+router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const minister = await db.select().from(users).where(and16(
       eq22(users.id, req.params.id),
@@ -15207,7 +14714,7 @@ router14.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), asy
     res.status(500).json({ message: "Erro ao buscar ministro" });
   }
 });
-router14.patch("/:id", authenticateToken, async (req, res) => {
+router13.patch("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.params.id;
     const currentUser = req.user;
@@ -15275,7 +14782,7 @@ router14.patch("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao atualizar ministro" });
   }
 });
-router14.get("/:id/stats", authenticateToken, async (req, res) => {
+router13.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
     const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and16(
@@ -15297,14 +14804,14 @@ router14.get("/:id/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar estat\xEDsticas" });
   }
 });
-var ministers_default = router14;
+var ministers_default = router13;
 
 // server/routes/substitutions.ts
 await init_db();
 init_schema();
-import { Router as Router15 } from "express";
+import { Router as Router14 } from "express";
 import { eq as eq24, and as and18, sql as sql14, gte as gte12, desc as desc7, count as count5, notInArray, inArray as inArray6 } from "drizzle-orm";
-var router15 = Router15();
+var router14 = Router14();
 function calculateUrgency(massDateStr, massTime) {
   if (!massDateStr || !massTime) return "low";
   const now = /* @__PURE__ */ new Date();
@@ -15338,7 +14845,7 @@ async function countMonthlySubstitutions(requesterId) {
   );
   return result[0]?.count || 0;
 }
-router15.post("/", authenticateToken, async (req, res) => {
+router14.post("/", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user.id;
@@ -15469,7 +14976,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router15.get("/", authenticateToken, async (req, res) => {
+router14.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -15536,7 +15043,7 @@ router15.get("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
+router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
@@ -15582,7 +15089,7 @@ router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router15.post("/:id/respond", authenticateToken, async (req, res) => {
+router14.post("/:id/respond", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { response, responseMessage } = req.body;
@@ -15649,7 +15156,7 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
     });
   }
 });
-router15.post("/:id/claim", authenticateToken, async (req, res) => {
+router14.post("/:id/claim", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -15743,7 +15250,7 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
     });
   }
 });
-router15.delete("/:id", authenticateToken, async (req, res) => {
+router14.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -15789,14 +15296,14 @@ router15.delete("/:id", authenticateToken, async (req, res) => {
     });
   }
 });
-var substitutions_default = router15;
+var substitutions_default = router14;
 
 // server/routes/mass-pendencies.ts
 await init_db();
 init_schema();
-import { Router as Router16 } from "express";
+import { Router as Router15 } from "express";
 import { eq as eq25, and as and19, gte as gte13, lte as lte11, sql as sql15 } from "drizzle-orm";
-var router16 = Router16();
+var router15 = Router15();
 var MINIMUM_MINISTERS = {
   "08:00:00": 12,
   // Missa das 8h - 12 ministros
@@ -15811,14 +15318,14 @@ var MINIMUM_MINISTERS = {
   "18:00:00": 10
   // Missa da tarde - 10 ministros
 };
-router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfMonth5 = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth5 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const startDateStr = startOfMonth5.toISOString().split("T")[0];
-    const endDateStr = endOfMonth5.toISOString().split("T")[0];
+    const startOfMonth4 = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth4 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startDateStr = startOfMonth4.toISOString().split("T")[0];
+    const endDateStr = endOfMonth4.toISOString().split("T")[0];
     const monthSchedules = await db.select({
       date: schedules.date,
       time: schedules.time,
@@ -15957,14 +15464,14 @@ router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     res.status(500).json({ message: "Erro ao buscar pend\xEAncias" });
   }
 });
-var mass_pendencies_default = router16;
+var mass_pendencies_default = router15;
 
 // server/routes/formationAdmin.ts
 await init_db();
 init_schema();
-import { Router as Router17 } from "express";
+import { Router as Router16 } from "express";
 import { eq as eq27, asc as asc2 } from "drizzle-orm";
-var router17 = Router17();
+var router16 = Router16();
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
     return res.status(403).json({
@@ -15974,8 +15481,8 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-router17.use(authenticateToken, requireAdmin);
-router17.post("/seed", async (req, res) => {
+router16.use(authenticateToken, requireAdmin);
+router16.post("/seed", async (req, res) => {
   try {
     const { default: seedFormation2 } = await init_formation_seed().then(() => formation_seed_exports);
     const result = await seedFormation2();
@@ -15993,7 +15500,7 @@ router17.post("/seed", async (req, res) => {
     });
   }
 });
-router17.get("/tracks", async (req, res) => {
+router16.get("/tracks", async (req, res) => {
   try {
     const tracks = await db.select().from(formationTracks).orderBy(asc2(formationTracks.orderIndex));
     res.json({ tracks });
@@ -16005,7 +15512,7 @@ router17.get("/tracks", async (req, res) => {
     });
   }
 });
-router17.get("/tracks/:id", async (req, res) => {
+router16.get("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const track = await db.select().from(formationTracks).where(eq27(formationTracks.id, id)).limit(1);
@@ -16024,7 +15531,7 @@ router17.get("/tracks/:id", async (req, res) => {
     });
   }
 });
-router17.post("/tracks", async (req, res) => {
+router16.post("/tracks", async (req, res) => {
   try {
     const trackData = req.body;
     const newTrack = await db.insert(formationTracks).values(trackData).returning();
@@ -16040,7 +15547,7 @@ router17.post("/tracks", async (req, res) => {
     });
   }
 });
-router17.patch("/tracks/:id", async (req, res) => {
+router16.patch("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -16063,7 +15570,7 @@ router17.patch("/tracks/:id", async (req, res) => {
     });
   }
 });
-router17.delete("/tracks/:id", async (req, res) => {
+router16.delete("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const modules = await db.select().from(formationModules).where(eq27(formationModules.trackId, id));
@@ -16092,7 +15599,7 @@ router17.delete("/tracks/:id", async (req, res) => {
     });
   }
 });
-router17.get("/tracks/:trackId/modules", async (req, res) => {
+router16.get("/tracks/:trackId/modules", async (req, res) => {
   try {
     const { trackId } = req.params;
     const modules = await db.select().from(formationModules).where(eq27(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
@@ -16105,7 +15612,7 @@ router17.get("/tracks/:trackId/modules", async (req, res) => {
     });
   }
 });
-router17.get("/modules/:id", async (req, res) => {
+router16.get("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const module = await db.select().from(formationModules).where(eq27(formationModules.id, id)).limit(1);
@@ -16124,7 +15631,7 @@ router17.get("/modules/:id", async (req, res) => {
     });
   }
 });
-router17.post("/modules", async (req, res) => {
+router16.post("/modules", async (req, res) => {
   try {
     const moduleData = req.body;
     const newModule = await db.insert(formationModules).values(moduleData).returning();
@@ -16140,7 +15647,7 @@ router17.post("/modules", async (req, res) => {
     });
   }
 });
-router17.patch("/modules/:id", async (req, res) => {
+router16.patch("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -16163,7 +15670,7 @@ router17.patch("/modules/:id", async (req, res) => {
     });
   }
 });
-router17.delete("/modules/:id", async (req, res) => {
+router16.delete("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const lessons = await db.select().from(formationLessons).where(eq27(formationLessons.moduleId, id));
@@ -16192,7 +15699,7 @@ router17.delete("/modules/:id", async (req, res) => {
     });
   }
 });
-router17.get("/modules/:moduleId/lessons", async (req, res) => {
+router16.get("/modules/:moduleId/lessons", async (req, res) => {
   try {
     const { moduleId } = req.params;
     const lessons = await db.select().from(formationLessons).where(eq27(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
@@ -16205,7 +15712,7 @@ router17.get("/modules/:moduleId/lessons", async (req, res) => {
     });
   }
 });
-router17.get("/lessons/:id", async (req, res) => {
+router16.get("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const lesson = await db.select().from(formationLessons).where(eq27(formationLessons.id, id)).limit(1);
@@ -16224,7 +15731,7 @@ router17.get("/lessons/:id", async (req, res) => {
     });
   }
 });
-router17.post("/lessons", async (req, res) => {
+router16.post("/lessons", async (req, res) => {
   try {
     const lessonData = req.body;
     const newLesson = await db.insert(formationLessons).values(lessonData).returning();
@@ -16240,7 +15747,7 @@ router17.post("/lessons", async (req, res) => {
     });
   }
 });
-router17.patch("/lessons/:id", async (req, res) => {
+router16.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -16263,7 +15770,7 @@ router17.patch("/lessons/:id", async (req, res) => {
     });
   }
 });
-router17.delete("/lessons/:id", async (req, res) => {
+router16.delete("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const sections = await db.select().from(formationLessonSections).where(eq27(formationLessonSections.lessonId, id));
@@ -16292,7 +15799,7 @@ router17.delete("/lessons/:id", async (req, res) => {
     });
   }
 });
-router17.get("/lessons/:lessonId/sections", async (req, res) => {
+router16.get("/lessons/:lessonId/sections", async (req, res) => {
   try {
     const { lessonId } = req.params;
     const sections = await db.select().from(formationLessonSections).where(eq27(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
@@ -16305,7 +15812,7 @@ router17.get("/lessons/:lessonId/sections", async (req, res) => {
     });
   }
 });
-router17.get("/sections/:id", async (req, res) => {
+router16.get("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const section = await db.select().from(formationLessonSections).where(eq27(formationLessonSections.id, id)).limit(1);
@@ -16324,7 +15831,7 @@ router17.get("/sections/:id", async (req, res) => {
     });
   }
 });
-router17.post("/sections", async (req, res) => {
+router16.post("/sections", async (req, res) => {
   try {
     const sectionData = req.body;
     const newSection = await db.insert(formationLessonSections).values(sectionData).returning();
@@ -16340,7 +15847,7 @@ router17.post("/sections", async (req, res) => {
     });
   }
 });
-router17.patch("/sections/:id", async (req, res) => {
+router16.patch("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -16363,7 +15870,7 @@ router17.patch("/sections/:id", async (req, res) => {
     });
   }
 });
-router17.delete("/sections/:id", async (req, res) => {
+router16.delete("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const deleted = await db.delete(formationLessonSections).where(eq27(formationLessonSections.id, id)).returning();
@@ -16385,7 +15892,7 @@ router17.delete("/sections/:id", async (req, res) => {
     });
   }
 });
-router17.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
+router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
   try {
     const { lessonId } = req.params;
     const { sectionIds } = req.body;
@@ -16410,30 +15917,30 @@ router17.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
     });
   }
 });
-var formationAdmin_default = router17;
+var formationAdmin_default = router16;
 
 // server/routes/version.ts
-import { Router as Router18 } from "express";
-var router18 = Router18();
+import { Router as Router17 } from "express";
+var router17 = Router17();
 var SYSTEM_VERSION = "5.4.2";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
-router18.get("/", (req, res) => {
+router17.get("/", (req, res) => {
   res.json({
     version: SYSTEM_VERSION,
     buildTime: BUILD_TIME,
     timestamp: Date.now()
   });
 });
-var version_default = router18;
+var version_default = router17;
 
 // server/routes/dashboard.ts
 await init_db();
 init_schema();
-import { Router as Router19 } from "express";
+import { Router as Router18 } from "express";
 import { eq as eq28, and as and20, gte as gte14, lte as lte12, sql as sql16, or as or8, isNull, count as count6, desc as desc9 } from "drizzle-orm";
-import { format as format8, addDays as addDays5, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
-var router19 = Router19();
-router19.get("/urgent-alerts", async (req, res) => {
+import { format as format7, addDays as addDays5, subDays, startOfMonth as startOfMonth3, endOfMonth as endOfMonth3 } from "date-fns";
+var router18 = Router18();
+router18.get("/urgent-alerts", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next48Hours = addDays5(now, 2);
@@ -16447,8 +15954,8 @@ router19.get("/urgent-alerts", async (req, res) => {
     }).from(schedules).where(
       and20(
         eq28(schedules.status, "published"),
-        gte14(schedules.date, format8(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format8(next7Days, "yyyy-MM-dd"))
+        gte14(schedules.date, format7(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format7(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql16`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
     const criticalMasses = incompleteMasses.filter((mass) => {
@@ -16482,7 +15989,7 @@ router19.get("/urgent-alerts", async (req, res) => {
           eq28(substitutionRequests.status, "pending"),
           eq28(substitutionRequests.status, "available")
         ),
-        gte14(schedules.date, format8(now, "yyyy-MM-dd"))
+        gte14(schedules.date, format7(now, "yyyy-MM-dd"))
       )
     ).orderBy(schedules.date);
     const urgentSubstitutions = pendingSubstitutions.filter((sub) => {
@@ -16511,7 +16018,7 @@ router19.get("/urgent-alerts", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch urgent alerts" });
   }
 });
-router19.get("/next-week-masses", async (req, res) => {
+router18.get("/next-week-masses", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next7Days = addDays5(now, 7);
@@ -16534,8 +16041,8 @@ router19.get("/next-week-masses", async (req, res) => {
     }).from(schedules).where(
       and20(
         eq28(schedules.status, "published"),
-        gte14(schedules.date, format8(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format8(next7Days, "yyyy-MM-dd"))
+        gte14(schedules.date, format7(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format7(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).orderBy(schedules.date, schedules.time);
     const massesWithStatus = masses.map((mass) => {
@@ -16565,12 +16072,12 @@ router19.get("/next-week-masses", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch next week masses" });
   }
 });
-router19.get("/ministry-stats", async (req, res) => {
+router18.get("/ministry-stats", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const thirtyDaysAgo = subDays(now, 30);
-    const thisMonthStart = startOfMonth4(now);
-    const thisMonthEnd = endOfMonth4(now);
+    const thisMonthStart = startOfMonth3(now);
+    const thisMonthEnd = endOfMonth3(now);
     const [activeMinistersResult] = await db.select({ count: count6() }).from(users).where(
       and20(
         eq28(users.status, "active"),
@@ -16612,8 +16119,8 @@ router19.get("/ministry-stats", async (req, res) => {
     }).from(schedules).where(
       and20(
         eq28(schedules.status, "published"),
-        gte14(schedules.date, format8(thisMonthStart, "yyyy-MM-dd")),
-        lte12(schedules.date, format8(thisMonthEnd, "yyyy-MM-dd"))
+        gte14(schedules.date, format7(thisMonthStart, "yyyy-MM-dd")),
+        lte12(schedules.date, format7(thisMonthEnd, "yyyy-MM-dd"))
       )
     );
     const [currentQuestionnaire] = await db.select({
@@ -16657,7 +16164,7 @@ router19.get("/ministry-stats", async (req, res) => {
     }).from(schedules).where(
       and20(
         eq28(schedules.status, "published"),
-        gte14(schedules.date, format8(now, "yyyy-MM-dd")),
+        gte14(schedules.date, format7(now, "yyyy-MM-dd")),
         isNull(schedules.ministerId)
       )
     );
@@ -16683,7 +16190,7 @@ router19.get("/ministry-stats", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch ministry stats" });
   }
 });
-router19.get("/incomplete", async (req, res) => {
+router18.get("/incomplete", async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const now = /* @__PURE__ */ new Date();
@@ -16701,8 +16208,8 @@ router19.get("/incomplete", async (req, res) => {
     }).from(schedules).where(
       and20(
         eq28(schedules.status, "published"),
-        gte14(schedules.date, format8(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format8(futureDate, "yyyy-MM-dd"))
+        gte14(schedules.date, format7(now, "yyyy-MM-dd")),
+        lte12(schedules.date, format7(futureDate, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql16`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
     res.json({
@@ -16720,13 +16227,13 @@ router19.get("/incomplete", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch incomplete schedules" });
   }
 });
-var dashboard_default = router19;
+var dashboard_default = router18;
 
 // server/routes/pushSubscriptions.ts
 await init_storage();
-import { Router as Router20 } from "express";
+import { Router as Router19 } from "express";
 import { z as z6 } from "zod";
-var router20 = Router20();
+var router19 = Router19();
 var pushSubscriptionSchema2 = z6.object({
   endpoint: z6.string().url(),
   keys: z6.object({
@@ -16734,13 +16241,13 @@ var pushSubscriptionSchema2 = z6.object({
     auth: z6.string()
   })
 });
-router20.get("/vapid-public-key", (req, res) => {
+router19.get("/vapid-public-key", (req, res) => {
   if (!pushConfig.enabled || !pushConfig.publicKey) {
     return res.status(503).json({ error: "Push notifications not configured" });
   }
   res.json({ publicKey: pushConfig.publicKey });
 });
-router20.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
+router19.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     if (!pushConfig.enabled) {
       return res.status(503).json({ error: "Push notifications not available" });
@@ -16775,7 +16282,7 @@ router20.post("/subscribe", csrfProtection, authenticateToken, async (req, res) 
     res.status(500).json({ error: "Failed to subscribe" });
   }
 });
-router20.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
+router19.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     const { endpoint } = req.body;
     if (!endpoint) {
@@ -16788,7 +16295,7 @@ router20.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res
     res.status(500).json({ error: "Failed to unsubscribe" });
   }
 });
-router20.get("/subscriptions", authenticateToken, async (req, res) => {
+router19.get("/subscriptions", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const subscriptions = await storage.getPushSubscriptionsByUserIds([userId]);
@@ -16803,15 +16310,15 @@ router20.get("/subscriptions", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to get subscriptions" });
   }
 });
-var pushSubscriptions_default = router20;
+var pushSubscriptions_default = router19;
 
 // server/routes/whatsapp-api.ts
 await init_db();
 init_schema();
-import { Router as Router21 } from "express";
+import { Router as Router20 } from "express";
 import { eq as eq29, and as and21, gte as gte15, desc as desc10, asc as asc3 } from "drizzle-orm";
 import { sql as sql17 } from "drizzle-orm";
-var router21 = Router21();
+var router20 = Router20();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
   const validApiKey = process.env.WHATSAPP_API_KEY;
@@ -16827,7 +16334,7 @@ var authenticateAPIKey = (req, res, next) => {
   }
   next();
 };
-router21.get("/health", (req, res) => {
+router20.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "MESC WhatsApp API",
@@ -16836,7 +16343,7 @@ router21.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router21.get("/webhook", (req, res) => {
+router20.get("/webhook", (req, res) => {
   res.json({
     status: "ok",
     message: "Webhook WhatsApp MESC est\xE1 ativo",
@@ -16847,7 +16354,7 @@ router21.get("/webhook", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router21.post("/webhook", async (req, res) => {
+router20.post("/webhook", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
   try {
     const message = req.body;
@@ -16861,7 +16368,7 @@ router21.post("/webhook", async (req, res) => {
     res.sendStatus(200);
   }
 });
-router21.use(authenticateAPIKey);
+router20.use(authenticateAPIKey);
 function normalizePhone(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
 }
@@ -16894,7 +16401,7 @@ function getDayOfWeek(dateStr) {
   const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
   return days[date2.getDay()];
 }
-router21.post("/escala", async (req, res) => {
+router20.post("/escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, data } = req.body;
@@ -16953,7 +16460,7 @@ router21.post("/escala", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/proximas", async (req, res) => {
+router20.post("/proximas", async (req, res) => {
   try {
     const { telefone } = req.body;
     if (!telefone) {
@@ -17007,7 +16514,7 @@ router21.post("/proximas", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/colegas", async (req, res) => {
+router20.post("/colegas", async (req, res) => {
   try {
     const { data, horario } = req.body;
     if (!data || !horario) {
@@ -17056,7 +16563,7 @@ router21.post("/colegas", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.get("/substituicoes-abertas", async (req, res) => {
+router20.get("/substituicoes-abertas", async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 5, 20);
     const openSubstitutions = await db.select({
@@ -17103,7 +16610,7 @@ router21.get("/substituicoes-abertas", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/aceitar-substituicao", async (req, res) => {
+router20.post("/aceitar-substituicao", async (req, res) => {
   try {
     const { telefone, id_substituicao, mensagem } = req.body;
     if (!telefone || !id_substituicao) {
@@ -17172,7 +16679,7 @@ router21.post("/aceitar-substituicao", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/minhas-substituicoes", async (req, res) => {
+router20.post("/minhas-substituicoes", async (req, res) => {
   try {
     const { telefone, tipo = "todas" } = req.body;
     if (!telefone) {
@@ -17243,7 +16750,7 @@ router21.post("/minhas-substituicoes", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/proxima-escala", async (req, res) => {
+router20.post("/proxima-escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /proxima-escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone } = req.body;
@@ -17312,7 +16819,7 @@ router21.post("/proxima-escala", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-router21.post("/escala-mes", async (req, res) => {
+router20.post("/escala-mes", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala-mes] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, mes, ano } = req.body;
@@ -17396,15 +16903,15 @@ router21.post("/escala-mes", async (req, res) => {
     return res.status(500).json({ erro: err.message });
   }
 });
-var whatsapp_api_default = router21;
+var whatsapp_api_default = router20;
 
 // server/routes/metrics.ts
-import { Router as Router22 } from "express";
+import { Router as Router21 } from "express";
 await init_db();
 init_schema();
 import { eq as eq30, count as count7, gte as gte16 } from "drizzle-orm";
 import os from "os";
-var router22 = Router22();
+var router21 = Router21();
 var metrics = {
   total: 0,
   success: 0,
@@ -17461,7 +16968,7 @@ function updateMetrics(statusCode, responseTime, route, method, errorMessage) {
     metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;
   }
 }
-router22.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router21.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
@@ -17550,7 +17057,7 @@ router22.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
-router22.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router21.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const errors = [...metrics.errorLogs].reverse().map((error) => ({
       ...error,
@@ -17565,7 +17072,7 @@ router22.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch error logs" });
   }
 });
-router22.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router21.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const routes = Array.from(metrics.routeStats.entries()).map(([route, stats]) => ({
       route,
@@ -17584,7 +17091,7 @@ router22.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch slow routes" });
   }
 });
-router22.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router21.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   metrics.total = 0;
   metrics.success = 0;
   metrics.errors = 0;
@@ -17595,7 +17102,7 @@ router22.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, 
   metrics.lastReset = /* @__PURE__ */ new Date();
   res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
 });
-router22.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router21.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
     const cacheStats = scheduleCache.getStats();
     scheduleCache.clear();
@@ -17625,15 +17132,15 @@ function formatUptime(seconds) {
   parts.push(`${secs}s`);
   return parts.join(" ");
 }
-var metrics_default = router22;
+var metrics_default = router21;
 
 // server/routes/reliabilityMetrics.ts
-import { Router as Router23 } from "express";
+import { Router as Router22 } from "express";
 await init_db();
 init_schema();
 import { eq as eq31 } from "drizzle-orm";
-var router23 = Router23();
-router23.get(
+var router22 = Router22();
+router22.get(
   "/metrics",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17661,7 +17168,7 @@ router23.get(
     }
   }
 );
-router23.get(
+router22.get(
   "/low",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17690,7 +17197,7 @@ router23.get(
     }
   }
 );
-router23.get(
+router22.get(
   "/minister/:ministerId",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17723,7 +17230,7 @@ router23.get(
     }
   }
 );
-router23.post(
+router22.post(
   "/minister/:ministerId/recalculate",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17751,7 +17258,7 @@ router23.post(
     }
   }
 );
-router23.post(
+router22.post(
   "/minister/:ministerId/reset",
   authenticateToken,
   requireRole(["gestor"]),
@@ -17799,7 +17306,7 @@ router23.post(
     }
   }
 );
-router23.post(
+router22.post(
   "/minister/:ministerId/note",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17847,7 +17354,7 @@ ${newNote}` : newNote;
     }
   }
 );
-router23.get(
+router22.get(
   "/stats",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17913,12 +17420,12 @@ router23.get(
     }
   }
 );
-var reliabilityMetrics_default = router23;
+var reliabilityMetrics_default = router22;
 
 // server/routes/cron.ts
-import { Router as Router24 } from "express";
+import { Router as Router23 } from "express";
 init_logger();
-var router24 = Router24();
+var router23 = Router23();
 function verifyCronKey(req, res, next) {
   const cronKey = req.headers["x-cron-key"] || req.query.key;
   const expectedKey = process.env.CRON_API_KEY || "development-cron-key";
@@ -17934,7 +17441,7 @@ function verifyCronKey(req, res, next) {
   }
   next();
 }
-router24.post("/reliability-check", verifyCronKey, async (req, res) => {
+router23.post("/reliability-check", verifyCronKey, async (req, res) => {
   try {
     logger.info("[CRON] \u{1F550} Starting scheduled reliability check...");
     const result = await checkAndAlertLowReliability();
@@ -17955,17 +17462,17 @@ router24.post("/reliability-check", verifyCronKey, async (req, res) => {
     });
   }
 });
-router24.get("/health", (req, res) => {
+router23.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Cron endpoints are healthy",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-var cron_default = router24;
+var cron_default = router23;
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-import { Router as Router25 } from "express";
+import { Router as Router24 } from "express";
 
 // server/escala-alternativa/services/pythonScheduleService.ts
 init_logger();
@@ -18173,31 +17680,31 @@ async function verificarPython(req, res) {
 }
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-var router25 = Router25();
-router25.get("/check-python", authenticateToken, verificarPython);
-router25.post(
+var router24 = Router24();
+router24.get("/check-python", authenticateToken, verificarPython);
+router24.post(
   "/gerar",
   authenticateToken,
   requireRole(["coordenador", "gestor"]),
   gerarEscalaAlternativa
 );
-router25.post(
+router24.post(
   "/comparar",
   authenticateToken,
   requireRole(["gestor"]),
   compararAlgoritmos
 );
-var escalaRoutes_default = router25;
+var escalaRoutes_default = router24;
 
 // server/routes/adoration.ts
-import { Router as Router26 } from "express";
+import { Router as Router25 } from "express";
 import { z as z7 } from "zod";
 await init_storage();
 init_logger();
 await init_db();
 init_schema();
 import { eq as eq33, and as and23, inArray as inArray7 } from "drizzle-orm";
-var router26 = Router26();
+var router25 = Router25();
 function parseYearMonthParams3(req, res) {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -18221,7 +17728,7 @@ var createDrawSchema = z7.object({
   totalMinistersToDraw: z7.number().min(1).max(100).optional()
   // Opcional, será calculado automaticamente
 });
-router26.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router25.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { month, year, totalMinistersToDraw } = createDrawSchema.parse(req.body);
     if (!req.user?.id) {
@@ -18380,7 +17887,7 @@ router26.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     });
   }
 });
-router26.get("/results/:year/:month", authenticateToken, async (req, res) => {
+router25.get("/results/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -18427,7 +17934,7 @@ router26.get("/results/:year/:month", authenticateToken, async (req, res) => {
     });
   }
 });
-router26.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router25.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { drawId } = req.params;
     await storage.deleteAdorationDraw(drawId);
@@ -18447,7 +17954,7 @@ router26.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coor
 var swapDaySchema = z7.object({
   newMondayOfWeek: z7.number().int().min(1).max(5)
 });
-router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
+router25.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
     const { newMondayOfWeek } = swapDaySchema.parse(req.body);
@@ -18510,7 +18017,7 @@ router26.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     });
   }
 });
-router26.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
+router25.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -18620,7 +18127,7 @@ async function getVoluntaryMinistersForAdoration(year, month) {
     return [];
   }
 }
-var adoration_default = router26;
+var adoration_default = router25;
 
 // server/routes.ts
 init_schema();
@@ -19365,7 +18872,6 @@ async function registerRoutes(app2) {
   app2.use("/api/schedules", csrfProtection, schedules_default);
   app2.use("/api/schedules", csrfProtection, scheduleGeneration_default);
   app2.use("/api/schedules", csrfProtection, smartScheduleGeneration_default);
-  app2.use("/api/schedules", csrfProtection, testScheduleGeneration_default);
   app2.use("/api/auxiliary", csrfProtection, auxiliaryPanel_default);
   app2.use("/api/upload", csrfProtection, upload_default);
   app2.use("/api/notifications", csrfProtection, notifications_default);
