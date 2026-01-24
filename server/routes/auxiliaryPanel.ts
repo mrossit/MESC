@@ -176,7 +176,7 @@ router.get("/panel/:scheduleId", requireAuth, async (req: AuthRequest, res: Resp
         },
         currentPhase,
         minutesUntilMass,
-        assignments: allAssignments.map(a => ({
+        assignments: allAssignments.map((a: any) => ({
           id: a.id,
           ministerId: a.ministerId,
           ministerName: a.ministerName,
@@ -184,16 +184,16 @@ router.get("/panel/:scheduleId", requireAuth, async (req: AuthRequest, res: Resp
           whatsapp: a.ministerWhatsapp,
           position: a.position,
           onSiteAdjustments: a.onSiteAdjustments,
-          checkInStatus: checkIns.find(c => c.ministerId === a.ministerId)?.status || 'not-checked-in',
-          checkInTime: checkIns.find(c => c.ministerId === a.ministerId)?.checkedInAt
+          checkInStatus: checkIns.find((c: any) => c.ministerId === a.ministerId)?.status || 'not-checked-in',
+          checkInTime: checkIns.find((c: any) => c.ministerId === a.ministerId)?.checkedInAt
         })),
         standbyMinisters: standbyList,
         executionLog: executionLog.length > 0 ? executionLog[0] : null,
         statistics: {
           totalPositions: allAssignments.length,
-          checkedIn: checkIns.filter(c => c.status === 'present').length,
-          absent: checkIns.filter(c => c.status === 'absent').length,
-          standbyCalled: standbyList.filter(s => s.calledAt !== null).length
+          checkedIn: checkIns.filter((c: any) => c.status === 'present').length,
+          absent: checkIns.filter((c: any) => c.status === 'absent').length,
+          standbyCalled: standbyList.filter((s: any) => s.calledAt !== null).length
         }
       }
     });
@@ -271,8 +271,8 @@ router.get("/standby/:scheduleId", requireAuth, async (req: AuthRequest, res: Re
         )
       );
 
-    const assignedIds = new Set(assignedMinisters.map(a => a.ministerId).filter(Boolean));
-    const standbyOptions = availableStandby.filter(m => !assignedIds.has(m.ministerId));
+    const assignedIds = new Set(assignedMinisters.map((a: any) => a.ministerId).filter(Boolean));
+    const standbyOptions = availableStandby.filter((m: any) => !assignedIds.has(m.ministerId));
 
     res.json({
       success: true,

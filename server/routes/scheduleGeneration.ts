@@ -228,7 +228,7 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
 
         if (existingSchedules.length > 0) {
-          const scheduleIds = existingSchedules.map(s => s.id);
+          const scheduleIds = existingSchedules.map((s: any) => s.id);
 
           // Delete substitution requests first (foreign key constraint)
           const deletedSubstitutions = await db.delete(substitutionRequests).where(
@@ -389,15 +389,28 @@ router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coo
     }
 
     // Analyze the data
-    const analysis = {
+    const analysis: {
+      total: number;
+      sample: any[];
+      ministerIds: any[];
+      uniqueDates: any[];
+      uniqueTimes: any[];
+      missingDate: number;
+      missingTime: number;
+      missingMinisterId: number;
+      dataTypes: any;
+      ministerIdsInDb?: number;
+      ministerIdsRequested?: number;
+      missingMinisterIds?: any[];
+    } = {
       total: schedulesInput.length,
       sample: schedulesInput.slice(0, 3),
-      ministerIds: [...new Set(schedulesInput.map(s => s.ministerId).filter(Boolean))],
-      uniqueDates: [...new Set(schedulesInput.map(s => s.date))],
-      uniqueTimes: [...new Set(schedulesInput.map(s => s.time))],
-      missingDate: schedulesInput.filter(s => !s.date).length,
-      missingTime: schedulesInput.filter(s => !s.time).length,
-      missingMinisterId: schedulesInput.filter(s => !s.ministerId).length,
+      ministerIds: [...new Set(schedulesInput.map((s: any) => s.ministerId).filter(Boolean))],
+      uniqueDates: [...new Set(schedulesInput.map((s: any) => s.date))],
+      uniqueTimes: [...new Set(schedulesInput.map((s: any) => s.time))],
+      missingDate: schedulesInput.filter((s: any) => !s.date).length,
+      missingTime: schedulesInput.filter((s: any) => !s.time).length,
+      missingMinisterId: schedulesInput.filter((s: any) => !s.ministerId).length,
       dataTypes: {
         date: typeof schedulesInput[0]?.date,
         time: typeof schedulesInput[0]?.time,
@@ -416,7 +429,7 @@ router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coo
       analysis.ministerIdsRequested = analysis.ministerIds.length;
 
       // Find missing minister IDs
-      const existingIds = new Set(existingMinisters.map(m => m.id));
+      const existingIds = new Set(existingMinisters.map((m: any) => m.id));
       analysis.missingMinisterIds = analysis.ministerIds.filter(id => !existingIds.has(id)).slice(0, 10);
     }
 
@@ -480,7 +493,7 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
       console.log(`Found ${existingSchedules.length} existing schedules to delete`);
 
       if (existingSchedules.length > 0) {
-        const scheduleIds = existingSchedules.map(s => s.id);
+        const scheduleIds = existingSchedules.map((s: any) => s.id);
         console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), '...');
 
         // Delete substitution requests before deleting schedules
@@ -559,7 +572,7 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
     const uniqueMonths = new Set<string>();
     
     // Extract months from successfully saved schedules
-    saved.forEach(schedule => {
+    saved.forEach((schedule: any) => {
       const scheduleDate = new Date(schedule.date);
       const year = scheduleDate.getFullYear();
       const month = scheduleDate.getMonth() + 1;
@@ -818,7 +831,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
   if (!db) return 0;
 
   // Phase 1 - Data Integrity: Wrap entire operation in transaction
-  return await db.transaction(async (tx) => {
+  return await db.transaction(async (tx: any) => {
     let savedCount = 0;
 
     for (const schedule of generatedSchedules) {
@@ -1124,10 +1137,10 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       return res.status(503).json({ message: 'Database unavailable' });
     }
 
-    // Verificar duplicação apenas se não for uma edição/substituição
-    if (!data.skipDuplicateCheck) {
+    // Verificar duplicação apenas se não for uma edição/substituição e ministerId existir
+    if (!data.skipDuplicateCheck && data.ministerId) {
       logger.info(`[ADD_MINISTER] 🔍 Verificando duplicação: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
-      
+
       const [existing] = await db
         .select()
         .from(schedules)

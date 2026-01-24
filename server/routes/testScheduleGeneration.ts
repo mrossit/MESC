@@ -169,7 +169,7 @@ router.post("/test-generation", requireAuth, requireRole(['coordenador', 'gestor
           ministersAssigned: s.ministers.length,
           ministersRequired: s.massTime.minMinisters,
           confidence: s.confidence,
-          ministers: s.ministers.map(m => ({
+          ministers: s.ministers.map((m: any) => ({
             id: m.id,
             name: m.name,
             position: m.position,

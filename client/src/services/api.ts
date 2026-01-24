@@ -8,7 +8,7 @@ interface RequestOptions extends RequestInit {
 
 class ApiService {
   private baseURL: string;
-  private defaultHeaders: HeadersInit;
+  private defaultHeaders: Record<string, string>;
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
@@ -63,9 +63,9 @@ class ApiService {
     const token = this.getAuthToken();
     const url = this.buildURL(endpoint, params);
 
-    const requestHeaders: HeadersInit = {
+    const requestHeaders: Record<string, string> = {
       ...this.defaultHeaders,
-      ...headers,
+      ...(headers as Record<string, string>),
     };
 
     if (token) {

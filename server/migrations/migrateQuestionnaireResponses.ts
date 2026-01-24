@@ -60,15 +60,11 @@ async function migrateQuestionnaireResponses(options: MigrationOptions): Promise
     // Step 1: Find all legacy responses (no version or version != '2.0')
     console.log('[STEP 1] 🔍 Finding legacy responses...');
 
+    // Note: version column was planned but not added to schema
+    // This migration selects all responses - in practice, we check the responses format
     const legacyResponses = await db.select()
       .from(questionnaireResponses)
-      .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
-      .where(
-        or(
-          isNull(questionnaireResponses.version),
-          ne(questionnaireResponses.version as any, '2.0')
-        )
-      );
+      .leftJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id));
 
     result.total = legacyResponses.length;
     console.log(`✅ Found ${result.total} legacy responses to migrate\n`);

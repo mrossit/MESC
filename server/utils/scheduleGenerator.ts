@@ -59,6 +59,8 @@ export interface MassTime {
   maxMinisters: number;
   date?: string; // Para missas específicas
   type?: string; // Tipo da missa (missa_diaria, missa_dominical, etc)
+  location?: string; // Local da missa (para missas especiais)
+  description?: string; // Descrição adicional
 }
 
 export interface GeneratedSchedule {
@@ -448,10 +450,10 @@ export class ScheduleGenerator {
       
       console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
       
-    } catch (queryError) {
+    } catch (queryError: any) {
       console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR:`, queryError);
-      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR STACK:`, queryError.stack);
-      throw new Error(`Erro na consulta de ministros: ${queryError.message || queryError}`);
+      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR STACK:`, queryError?.stack);
+      throw new Error(`Erro na consulta de ministros: ${queryError?.message || queryError}`);
     }
 
     this.ministers = ministersData.map((m: any) => ({
@@ -2999,17 +3001,17 @@ export class ScheduleGenerator {
       }
 
       // 3. Get full minister data
-      const ministerIds = results.map(r => r.ministerId);
+      const ministerIds = results.map((r: any) => r.ministerId);
       const ministersData = await this.db
         .select()
         .from(users)
         .where(and(
-          users.id in ministerIds,
+          inArray(users.id, ministerIds),
           eq(users.status, 'active')
         ));
 
       // 4. Convert to Minister objects
-      const ministers: Minister[] = ministersData.map(m => ({
+      const ministers: Minister[] = ministersData.map((m: any) => ({
         id: m.id,
         name: m.name,
         role: m.role,
@@ -3024,7 +3026,7 @@ export class ScheduleGenerator {
         monthlyAssignmentCount: 0
       }));
 
-      const voluntaryCount = results.filter(r => r.isVoluntary).length;
+      const voluntaryCount = results.filter((r: any) => r.isVoluntary).length;
       const mandatoryCount = results.length - voluntaryCount;
 
       console.log(`[ADORATION] Found ${ministers.length} ministers for week ${mondayOfWeek}: ${voluntaryCount} voluntary, ${mandatoryCount} mandatory`);

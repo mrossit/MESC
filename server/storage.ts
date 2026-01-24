@@ -1633,7 +1633,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.familyId, user.familyId));
 
-    return familyMembers.map(m => m.id);
+    return familyMembers.map((m: { id: string }) => m.id);
   }
 }
 
