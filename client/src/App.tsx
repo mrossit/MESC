@@ -27,6 +27,7 @@ const LoadingFallback = () => (
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import PrivacyPolicy from "@/pages/privacy-policy";
+import TermsOfUse from "@/pages/terms-of-use";
 
 // Protected pages - lazy load to reduce initial bundle
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -65,6 +66,7 @@ function RouterWithHooks() {
         <Route path="/login" component={() => <Login />} />
         <Route path="/register" component={() => <Register />} />
         <Route path="/privacy-policy" component={() => <PrivacyPolicy />} />
+        <Route path="/terms-of-use" component={() => <TermsOfUse />} />
 
         {/* Protected routes - lazy loaded */}
         <Route path="/change-password" component={() => <ChangePassword />} />
