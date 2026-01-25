@@ -162,7 +162,9 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const responseData = await response.json();
+        // Handle paginated response format { data: [], total, hasMore }
+        const data = responseData.data ?? responseData;
         setUsers(data);
       } else {
         toast({

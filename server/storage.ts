@@ -207,6 +207,8 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
+  getUsersPaginated(options: { limit: number; offset: number; status?: string }): Promise<{ data: User[]; total: number; hasMore: boolean }>;
+  getUsersByStatusPaginated(status: string, options: { limit: number; offset: number }): Promise<{ data: User[]; total: number; hasMore: boolean }>;
 
   // Questionnaire operations
   createQuestionnaire(questionnaire: InsertQuestionnaire & { createdById: string }): Promise<Questionnaire>;
@@ -244,6 +246,7 @@ export interface IStorage {
   // Notification operations
   createNotification(notification: NotificationInput): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
+  getUserNotificationsPaginated(userId: string, options: { limit: number; offset: number }): Promise<{ data: Notification[]; total: number; hasMore: boolean }>;
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: string): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
@@ -444,6 +447,51 @@ export class DatabaseStorage implements IStorage {
   async getUsersByRole(role: string): Promise<User[]> {
     return await db.select().from(users)
       .where(eq(users.role, role as any));
+  }
+
+  async getUsersPaginated(options: { limit: number; offset: number; status?: string }): Promise<{ data: User[]; total: number; hasMore: boolean }> {
+    const { limit, offset, status } = options;
+
+    const whereCondition = status ? eq(users.status, status as any) : undefined;
+
+    const [data, countResult] = await Promise.all([
+      whereCondition
+        ? db.select().from(users).where(whereCondition).orderBy(desc(users.createdAt)).limit(limit).offset(offset)
+        : db.select().from(users).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+      whereCondition
+        ? db.select({ count: count() }).from(users).where(whereCondition)
+        : db.select({ count: count() }).from(users)
+    ]);
+
+    const total = countResult[0]?.count ?? 0;
+
+    return {
+      data,
+      total,
+      hasMore: offset + data.length < total
+    };
+  }
+
+  async getUsersByStatusPaginated(status: string, options: { limit: number; offset: number }): Promise<{ data: User[]; total: number; hasMore: boolean }> {
+    const { limit, offset } = options;
+
+    const [data, countResult] = await Promise.all([
+      db.select().from(users)
+        .where(eq(users.status, status as any))
+        .orderBy(desc(users.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: count() }).from(users)
+        .where(eq(users.status, status as any))
+    ]);
+
+    const total = countResult[0]?.count ?? 0;
+
+    return {
+      data,
+      total,
+      hasMore: offset + data.length < total
+    };
   }
 
   // Questionnaire operations
@@ -797,6 +845,33 @@ export class DatabaseStorage implements IStorage {
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt));
+  }
+
+  async getUserNotificationsPaginated(userId: string, options: { limit: number; offset: number }): Promise<{ data: Notification[]; total: number; hasMore: boolean }> {
+    const { limit, offset } = options;
+
+    // Get paginated data and total count in parallel
+    const [data, countResult] = await Promise.all([
+      db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.userId, userId))
+        .orderBy(desc(notifications.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: count() })
+        .from(notifications)
+        .where(eq(notifications.userId, userId))
+    ]);
+
+    const total = countResult[0]?.count ?? 0;
+
+    return {
+      data,
+      total,
+      hasMore: offset + data.length < total
+    };
   }
 
   async markNotificationAsRead(id: string): Promise<void> {

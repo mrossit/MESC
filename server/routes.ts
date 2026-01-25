@@ -406,9 +406,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/users/active', authenticateToken, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      const activeUsers = users.filter(u => u.status === 'active');
-      res.json(activeUsers);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+      const result = await storage.getUsersByStatusPaginated('active', { limit, offset });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuários ativos");
       res.status(errorResponse.status).json(errorResponse);
@@ -417,9 +419,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/users/pending', authenticateToken, requireRole(['gestor', 'coordenador']), async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      const pendingUsers = users.filter(u => u.status === 'pending');
-      res.json(pendingUsers);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+      const result = await storage.getUsersByStatusPaginated('pending', { limit, offset });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuários pendentes");
       res.status(errorResponse.status).json(errorResponse);
@@ -447,9 +451,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Expires': '0',
         'Surrogate-Control': 'no-store'
       });
-      
-      const users = await storage.getAllUsers();
-      res.json(users);
+
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+      const status = req.query.status as string | undefined;
+
+      const result = await storage.getUsersPaginated({ limit, offset, status });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar lista de usuários");
       res.status(errorResponse.status).json(errorResponse);

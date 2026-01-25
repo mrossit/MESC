@@ -13,7 +13,7 @@ import { Link } from "wouter";
 export function PendingApprovals() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error, refetch } = useQuery<UserType[]>({
+  const { data, isLoading, error, refetch } = useQuery<{ data: UserType[]; total: number; hasMore: boolean }>({
     queryKey: ["/api/users/pending"],
     refetchInterval: 30000, // Refetch a cada 30 segundos
     staleTime: 10000, // Considera stale após 10 segundos
@@ -21,8 +21,8 @@ export function PendingApprovals() {
     retryDelay: 1000,
   });
 
-  // Garantir que pendingUsers seja sempre um array
-  const pendingUsers = Array.isArray(data) ? data : [];
+  // Garantir que pendingUsers seja sempre um array (handle both old and new format)
+  const pendingUsers = Array.isArray(data) ? data : (data?.data ?? []);
 
   // Refetch quando o componente monta
   React.useEffect(() => {
