@@ -249,6 +249,25 @@ export default function Reports() {
     }
   });
 
+  // Fetch attendance data
+  const { data: attendance, isLoading: attendanceLoading } = useQuery({
+    queryKey: ["/api/reports/attendance", dateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate || '',
+        endDate: dateRange.endDate || ''
+      });
+      const response = await fetch(`/api/reports/attendance?${params}`, {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch attendance");
+      return response.json();
+    }
+  });
+
   // Format data for charts
   const availabilityChartData = availability?.topAvailable?.map((item: any) => ({
     name: item.userName?.split(" ")[0] || "N/A",
@@ -272,7 +291,7 @@ export default function Reports() {
   // Check for any loading or error state
   const isAnyLoading = summaryLoading || availabilityLoading || substitutionsLoading ||
                        engagementLoading || formationLoading || familiesLoading ||
-                       trendsLoading || patternsLoading;
+                       trendsLoading || patternsLoading || attendanceLoading;
 
   // Export function
   const handleExport = async (reportType: string, format: 'xlsx' | 'pdf' | 'csv') => {
@@ -556,10 +575,14 @@ export default function Reports() {
           <CardContent className="p-2 sm:p-6">
             <Tabs defaultValue="trends" className="space-y-4">
               <div className="overflow-x-auto pb-2">
-                <TabsList className="inline-flex h-auto w-max lg:w-full lg:grid lg:grid-cols-6 gap-1 p-1">
+                <TabsList className="inline-flex h-auto w-max lg:w-full lg:grid lg:grid-cols-7 gap-1 p-1">
                   <TabsTrigger value="trends" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">
                     <TrendingUp className="h-3 w-3 mr-1" />
                     Tendências
+                  </TabsTrigger>
+                  <TabsTrigger value="attendance" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">
+                    <UserCheck className="h-3 w-3 mr-1" />
+                    Presença
                   </TabsTrigger>
                   <TabsTrigger value="availability" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Disponibilidade</TabsTrigger>
                   <TabsTrigger value="substitutions" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Substituições</TabsTrigger>
@@ -747,6 +770,217 @@ export default function Reports() {
                     ) : (
                       <div className="flex items-center justify-center h-48 text-muted-foreground">
                         <p>Sem dados disponíveis</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Attendance Tab */}
+              <TabsContent value="attendance" className="space-y-4 mt-4">
+                {/* Attendance Summary Cards */}
+                {attendance?.summary && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-green-600">{attendance.summary.periodStats.present}</p>
+                          <p className="text-xs text-muted-foreground">Presenças</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-yellow-600">{attendance.summary.periodStats.late}</p>
+                          <p className="text-xs text-muted-foreground">Atrasos</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-red-600">{attendance.summary.periodStats.absent}</p>
+                          <p className="text-xs text-muted-foreground">Ausências</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold">
+                            {attendance.summary.periodStats.attendanceRate !== null
+                              ? `${attendance.summary.periodStats.attendanceRate}%`
+                              : '-'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Taxa de Presença</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Attendance Pie Chart */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Distribuição de Presença</CardTitle>
+                      <CardDescription>Status de presença no período</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {attendanceLoading ? (
+                        <div className="flex items-center justify-center h-48">
+                          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : attendance?.summary?.periodStats?.total > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Presentes', value: attendance.summary.periodStats.present, color: '#22c55e' },
+                                { name: 'Atrasados', value: attendance.summary.periodStats.late, color: '#eab308' },
+                                { name: 'Ausentes', value: attendance.summary.periodStats.absent, color: '#ef4444' }
+                              ]}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={40}
+                              outerRadius={80}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, value }) => `${name}: ${value}`}
+                            >
+                              <Cell fill="#22c55e" />
+                              <Cell fill="#eab308" />
+                              <Cell fill="#ef4444" />
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-muted-foreground">
+                          <p>Sem dados de presença no período</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Reliable Ministers */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Ministros Mais Assíduos</CardTitle>
+                      <CardDescription>Maior total de serviços realizados</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {attendanceLoading ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3, 4, 5].map(i => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                          ))}
+                        </div>
+                      ) : attendance?.ministers?.length > 0 ? (
+                        <div className="space-y-2">
+                          {attendance.ministers
+                            .filter((m: any) => m.status === 'active')
+                            .slice(0, 5)
+                            .map((minister: any, index: number) => (
+                              <div key={minister.odministerIdl} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                    index === 0 ? 'bg-yellow-500 text-white' :
+                                    index === 1 ? 'bg-gray-400 text-white' :
+                                    index === 2 ? 'bg-orange-600 text-white' :
+                                    'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {index + 1}
+                                  </div>
+                                  <span className="font-medium text-sm">{minister.ministerName}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary">{minister.totalServices} serviços</Badge>
+                                  {minister.noShowCount > 0 && (
+                                    <Badge variant="destructive" className="text-xs">{minister.noShowCount} faltas</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-muted-foreground">
+                          <p>Nenhum dado disponível</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Full Ministers Table */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Lista Completa de Presença</CardTitle>
+                        <CardDescription>Todos os ministros e suas estatísticas</CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExport('attendance', 'xlsx')}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Exportar
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {attendanceLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map(i => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                      </div>
+                    ) : attendance?.ministers?.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-2 font-medium">Nome</th>
+                              <th className="text-center py-2 px-2 font-medium">Total</th>
+                              <th className="text-center py-2 px-2 font-medium text-green-600">Pres.</th>
+                              <th className="text-center py-2 px-2 font-medium text-yellow-600">Atra.</th>
+                              <th className="text-center py-2 px-2 font-medium text-red-600">Aus.</th>
+                              <th className="text-center py-2 px-2 font-medium">Taxa</th>
+                              <th className="text-center py-2 px-2 font-medium">Conf.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attendance.ministers
+                              .filter((m: any) => m.status === 'active')
+                              .map((minister: any) => (
+                                <tr key={minister.odministerIdl} className="border-b hover:bg-muted/50">
+                                  <td className="py-2 px-2">{minister.ministerName}</td>
+                                  <td className="text-center py-2 px-2">{minister.totalServices}</td>
+                                  <td className="text-center py-2 px-2 text-green-600">{minister.periodStats.present}</td>
+                                  <td className="text-center py-2 px-2 text-yellow-600">{minister.periodStats.late}</td>
+                                  <td className="text-center py-2 px-2 text-red-600">{minister.periodStats.absent}</td>
+                                  <td className="text-center py-2 px-2">
+                                    {minister.periodStats.attendanceRate !== null
+                                      ? `${minister.periodStats.attendanceRate}%`
+                                      : '-'}
+                                  </td>
+                                  <td className="text-center py-2 px-2">
+                                    <Badge variant={minister.reliabilityScore >= 80 ? 'default' : minister.reliabilityScore >= 50 ? 'secondary' : 'destructive'}>
+                                      {minister.reliabilityScore}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                        <UserCheck className="h-12 w-12 mb-2" />
+                        <p>Nenhum dado de presença disponível</p>
                       </div>
                     )}
                   </CardContent>
