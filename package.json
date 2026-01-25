@@ -20,6 +20,8 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "test:load": "tsx test/load/runner.ts",
+    "test:load:pwa": "tsx test/load/pwa-load.test.ts",
     "version:update": "bash scripts/update-version.sh",
     "bmad:refresh": "bmad-method install -f -i codex",
     "bmad:list": "bmad-method list:agents",
