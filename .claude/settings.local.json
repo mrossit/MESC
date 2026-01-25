@@ -63,7 +63,8 @@
       "Bash(else echo \"VAPID_SUBJECT: NOT SET\")",
       "Bash(git checkout:*)",
       "Bash(npm run db:push:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(printenv:*)"
     ],
     "deny": [],
     "ask": []
