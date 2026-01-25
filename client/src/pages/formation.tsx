@@ -30,7 +30,9 @@ import {
   ArrowLeft,
   Circle,
   AlertCircle,
-  Video
+  Video,
+  Download,
+  Loader2
 } from "lucide-react";
 import { useParams, useLocation } from "wouter";
 import { useState, useMemo, useEffect } from "react";
@@ -150,6 +152,28 @@ type LessonDetailResponse = {
   progress: LessonProgress;
 };
 
+type CertificateStatus = {
+  trackId: string;
+  trackTitle: string;
+  trackCategory: 'liturgia' | 'espiritualidade' | 'pratica';
+  totalLessons: number;
+  completedLessons: number;
+  totalDurationMinutes: number;
+  isCompleted: boolean;
+  completionDate?: string;
+  hasCertificate: boolean;
+  certificateId?: string;
+};
+
+type Certificate = {
+  id: string;
+  certificateNumber: string;
+  trackTitle: string;
+  trackCategory: string;
+  issuedAt: string;
+  verificationCode: string;
+};
+
 type CategoryMeta = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -239,6 +263,12 @@ const fetchLessonDetail = (trackId: string, moduleId: string, lessonNumber: stri
     `/api/formation/${encodeURIComponent(trackId)}/${encodeURIComponent(moduleId)}/${encodeURIComponent(lessonNumber)}`,
     "Não foi possível carregar os detalhes da aula."
   );
+
+const fetchCertificateStatus = () =>
+  fetchJson<CertificateStatus[]>("/api/certificates/status", "Não foi possível carregar status dos certificados.");
+
+const fetchUserCertificates = () =>
+  fetchJson<Certificate[]>("/api/certificates", "Não foi possível carregar certificados.");
 
 interface ModuleDetailProps {
   track: TrackOverview;
@@ -723,8 +753,87 @@ export default function Formation() {
     queryFn: fetchFormationOverview
   });
 
+  const {
+    data: certificateStatus,
+    isLoading: certificateStatusLoading
+  } = useQuery<CertificateStatus[]>({
+    queryKey: ['/api/certificates/status'],
+    queryFn: fetchCertificateStatus,
+    enabled: !!overview
+  });
+
   const tracks = overview?.tracks ?? [];
   const summary = overview?.summary;
+
+  // Helper to get certificate status for a track
+  const getCertificateStatusForTrack = (trackId: string) => {
+    return certificateStatus?.find(s => s.trackId === trackId);
+  };
+
+  const { csrfToken } = useCsrfToken();
+  const queryClientInstance = useQueryClient();
+
+  // Mutation to issue certificate
+  const issueCertificateMutation = useMutation({
+    mutationFn: async (trackId: string) => {
+      const response = await fetch('/api/certificates/issue', {
+        method: 'POST',
+        credentials: 'include',
+        headers: addCsrfHeader({ 'Content-Type': 'application/json' }, csrfToken),
+        body: JSON.stringify({ trackId })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao emitir certificado');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ['/api/certificates/status'] });
+      toast({
+        title: 'Certificado emitido!',
+        description: 'Seu certificado foi gerado com sucesso.'
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao emitir certificado',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Function to download certificate PDF
+  const downloadCertificate = async (certificateId: string, trackTitle: string) => {
+    try {
+      const response = await fetch(`/api/certificates/${certificateId}/pdf`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Erro ao baixar certificado');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificado-${trackTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'Download iniciado',
+        description: 'Seu certificado está sendo baixado.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro no download',
+        description: 'Não foi possível baixar o certificado.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   const selectedTrack = trackParam ? tracks.find((t) => t.id === trackParam) : undefined;
   const selectedModule = selectedTrack && moduleParam
@@ -953,29 +1062,76 @@ export default function Formation() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <p className="text-muted-foreground">
-                Complete todas as trilhas obrigatórias para habilitar a emissão de certificados de formação.
+                Complete as trilhas para emitir certificados de formação.
               </p>
               <div className="grid gap-3">
-                {tracks.map((track) => (
-                  <div key={track.id} className="flex items-start gap-3">
-                    {track.stats.completedLessons === track.stats.totalLessons && track.stats.totalLessons > 0 ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-amber-500 mt-0.5" />
-                    )}
-                    <div>
-                      <p className="font-medium">{track.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {track.stats.completedLessons}/{track.stats.totalLessons} aulas concluídas
-                      </p>
+                {tracks.map((track) => {
+                  const certStatus = getCertificateStatusForTrack(track.id);
+                  const isCompleted = track.stats.completedLessons === track.stats.totalLessons && track.stats.totalLessons > 0;
+                  const hasCertificate = certStatus?.hasCertificate;
+                  const isIssuingThis = issueCertificateMutation.isPending &&
+                    issueCertificateMutation.variables === track.id;
+
+                  return (
+                    <div key={track.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        {hasCertificate ? (
+                          <Award className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        ) : isCompleted ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{track.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {hasCertificate ? (
+                              <span className="text-amber-600">Certificado emitido</span>
+                            ) : isCompleted ? (
+                              <span className="text-green-600">Pronto para certificar</span>
+                            ) : (
+                              `${track.stats.completedLessons}/${track.stats.totalLessons} aulas`
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {hasCertificate && certStatus?.certificateId ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            onClick={() => downloadCertificate(certStatus.certificateId!, track.title)}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            PDF
+                          </Button>
+                        ) : isCompleted ? (
+                          <Button
+                            size="sm"
+                            className="h-8 bg-amber-600 hover:bg-amber-700"
+                            disabled={isIssuingThis}
+                            onClick={() => issueCertificateMutation.mutate(track.id)}
+                          >
+                            {isIssuingThis ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Award className="h-3 w-3 mr-1" />
+                            )}
+                            Emitir
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <Button variant="outline" className="w-full" disabled>
-                <Award className="h-4 w-4 mr-2" />
-                Baixar certificados (em breve)
-              </Button>
+              {certificateStatusLoading && (
+                <div className="flex items-center justify-center py-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Carregando status...
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
