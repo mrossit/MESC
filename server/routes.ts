@@ -166,6 +166,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint para obter token CSRF
   app.get('/api/csrf-token', getCsrfToken);
 
+  // Health check endpoint for PWA connectivity checks
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+  app.head('/api/health', (req, res) => {
+    res.status(200).end();
+  });
+
   // Auth routes com rate limiting específico
   app.use('/api/auth', authRateLimiter, authRoutes);
 
