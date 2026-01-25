@@ -72,7 +72,13 @@
       "Bash(npx vite-node:*)",
       "Bash(npm run test:run:*)",
       "Bash(lsof:*)",
-      "Bash(npm run test:coverage:*)"
+      "Bash(npm run test:coverage:*)",
+      "Bash(__NEW_LINE_f50f9dbf385d4da4__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\" -o -name \"*.test.tsx\")",
+      "Bash(__NEW_LINE_93020e73a42c4554__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
+      "Bash(__NEW_LINE_699a2d047f2e9582__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
+      "Bash(__NEW_LINE_b752b8e5f3168e92__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
+      "Bash(__NEW_LINE_610daf952e3be8ae__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

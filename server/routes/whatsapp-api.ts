@@ -1,13 +1,20 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { schedules, users, substitutionRequests } from "@shared/schema";
 import { eq, and, gte, desc, asc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
+// Helper to get error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 const router = Router();
 
 // Middleware de autenticação por API Key
-const authenticateAPIKey = (req: any, res: any, next: any) => {
+const authenticateAPIKey = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'] || req.query.api_key;
   
   // API key deve estar nas variáveis de ambiente
@@ -82,7 +89,7 @@ router.post("/webhook", async (req, res) => {
     // Responder imediatamente ao webhook (200 OK)
     res.sendStatus(200);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[WHATSAPP_WEBHOOK] Erro no webhook:", error);
     // Mesmo com erro, retornar 200 para não gerar retry no webhook
     res.sendStatus(200);
@@ -220,9 +227,9 @@ router.post("/escala", async (req, res) => {
     console.log("✅ [WHATSAPP_API /escala] Resposta enviada:", responseData);
     return res.json(responseData);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ [WHATSAPP_API /escala] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -287,7 +294,8 @@ router.post("/proximas", async (req, res) => {
       });
     }
 
-    const missas = upcomingSchedules.map((s: any) => ({
+    type ScheduleRow = typeof upcomingSchedules[number];
+    const missas = upcomingSchedules.map((s: ScheduleRow) => ({
       data: formatDateBR(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
@@ -304,9 +312,9 @@ router.post("/proximas", async (req, res) => {
       proximasMissas: missas
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[WHATSAPP_API] Erro em /proximas:', err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -361,7 +369,8 @@ router.post("/colegas", async (req, res) => {
       });
     }
 
-    const colegas = ministersInMass.map((m: any) => ({
+    type MinisterRow = typeof ministersInMass[number];
+    const colegas = ministersInMass.map((m: MinisterRow) => ({
       nome: m.ministerName,
       funcao: getPositionName(m.position || 0),
       telefone: m.ministerPhone || m.ministerWhatsapp || null,
@@ -377,9 +386,9 @@ router.post("/colegas", async (req, res) => {
       ministros: colegas
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[WHATSAPP_API] Erro em /colegas:', err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -425,7 +434,8 @@ router.get("/substituicoes-abertas", async (req, res) => {
       });
     }
 
-    const vagas = openSubstitutions.map((s: any) => ({
+    type SubstitutionRow = typeof openSubstitutions[number];
+    const vagas = openSubstitutions.map((s: SubstitutionRow) => ({
       id: s.substitutionId,
       data: formatDateBR(s.date),
       diaSemana: getDayOfWeek(s.date),
@@ -445,9 +455,9 @@ router.get("/substituicoes-abertas", async (req, res) => {
       vagas
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[WHATSAPP_API] Erro em /substituicoes-abertas:', err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -555,9 +565,9 @@ router.post("/aceitar-substituicao", async (req, res) => {
       proximoPasso: "O coordenador será notificado e aprovará sua substituição em breve."
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[WHATSAPP_API] Erro em /aceitar-substituicao:', err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -638,7 +648,8 @@ router.post("/minhas-substituicoes", async (req, res) => {
       });
     }
 
-    const substituicoes = mySubstitutions.map((s: any) => ({
+    type MySubstitutionRow = typeof mySubstitutions[number];
+    const substituicoes = mySubstitutions.map((s: MySubstitutionRow) => ({
       id: s.substitutionId,
       data: formatDateBR(s.date),
       diaSemana: getDayOfWeek(s.date),
@@ -664,9 +675,9 @@ router.post("/minhas-substituicoes", async (req, res) => {
       substituicoes
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[WHATSAPP_API] Erro em /minhas-substituicoes:', err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -767,9 +778,9 @@ router.post("/proxima-escala", async (req, res) => {
     console.log("✅ [WHATSAPP_API /proxima-escala] Resposta enviada:", responseData);
     return res.json(responseData);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ [WHATSAPP_API /proxima-escala] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 
@@ -846,7 +857,8 @@ router.post("/escala-mes", async (req, res) => {
 
     console.log("📊 [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
 
-    const escalas = monthSchedules.map((s: any) => ({
+    type MonthScheduleRow = typeof monthSchedules[number];
+    const escalas = monthSchedules.map((s: MonthScheduleRow) => ({
       date: s.date,
       data: formatDateBR(s.date),
       diaSemana: getDayOfWeek(s.date),
@@ -877,9 +889,9 @@ router.post("/escala-mes", async (req, res) => {
     console.log("✅ [WHATSAPP_API /escala-mes] Resposta enviada:", escalas.length, "escalas");
     return res.json(responseData);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ [WHATSAPP_API /escala-mes] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage(err) });
   }
 });
 

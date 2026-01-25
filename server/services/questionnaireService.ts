@@ -24,7 +24,7 @@ interface StandardizedResponse {
     first_friday?: boolean;
     first_saturday?: boolean;
     healing_liberation?: boolean;
-    [key: string]: any; // Allow dynamic event names
+    [key: string]: boolean | string[] | Record<string, boolean> | undefined;
   };
   weekdays?: {
     monday: boolean;
@@ -45,19 +45,21 @@ interface StandardizedResponse {
 
 interface LegacyResponseItem {
   questionId: string;
-  answer: any;
+  answer: unknown;
   question?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
+}
+
+interface UnmappedResponse {
+  questionId: string;
+  question?: string;
+  answer: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 interface ProcessingResult {
   standardized: StandardizedResponse;
-  unmappedResponses: Array<{
-    questionId: string;
-    question?: string;
-    answer: any;
-    metadata?: any;
-  }>;
+  unmappedResponses: UnmappedResponse[];
   warnings: string[];
 }
 
@@ -66,15 +68,28 @@ export class QuestionnaireService {
    * 🛡️ SAFETY NET: Standardize responses WITH tracking of unmapped responses
    * This ensures NO response is ever lost, even if the code doesn't know how to process it
    */
-  static standardizeResponseWithTracking(rawResponse: any, month?: number, year?: number): ProcessingResult {
-    const unmappedResponses: Array<{questionId: string; question?: string; answer: any; metadata?: any}> = [];
+  static standardizeResponseWithTracking(rawResponse: unknown, month?: number, year?: number): ProcessingResult {
+    const unmappedResponses: UnmappedResponse[] = [];
     const warnings: string[] = [];
     const processedQuestionIds = new Set<string>();
 
+    // Type guard for v2.0 format
+    const isV2Format = (resp: unknown): resp is StandardizedResponse => {
+      return resp !== null && typeof resp === 'object' &&
+             'format_version' in resp && (resp as StandardizedResponse).format_version === '2.0';
+    };
+
+    // Type guard for responses wrapper
+    interface ResponsesWrapper { responses: LegacyResponseItem[] }
+    const isResponsesWrapper = (resp: unknown): resp is ResponsesWrapper => {
+      return resp !== null && typeof resp === 'object' &&
+             'responses' in resp && Array.isArray((resp as ResponsesWrapper).responses);
+    };
+
     // If already v2.0 format, validate and return
-    if (rawResponse.format_version === '2.0') {
+    if (isV2Format(rawResponse)) {
       return {
-        standardized: this.validateV2Format(rawResponse),
+        standardized: this.validateV2Format(rawResponse as unknown as Record<string, unknown>),
         unmappedResponses: [],
         warnings: []
       };
@@ -98,10 +113,11 @@ export class QuestionnaireService {
 
     // Handle October 2025 legacy format (array)
     if (Array.isArray(rawResponse)) {
-      this.parseLegacyArrayFormatWithTracking(rawResponse, standardized, processedQuestionIds, month, year);
-      
+      const legacyItems = rawResponse as LegacyResponseItem[];
+      this.parseLegacyArrayFormatWithTracking(legacyItems, standardized, processedQuestionIds, month, year);
+
       // Find unmapped responses
-      for (const item of rawResponse) {
+      for (const item of legacyItems) {
         if (!processedQuestionIds.has(item.questionId)) {
           unmappedResponses.push({
             questionId: item.questionId,
@@ -113,28 +129,27 @@ export class QuestionnaireService {
         }
       }
     }
-    // Handle possible object format
-    else if (typeof rawResponse === 'object') {
-      // Check if it's a responses wrapper
-      if (rawResponse.responses && Array.isArray(rawResponse.responses)) {
-        this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
-        
-        // Find unmapped responses
-        for (const item of rawResponse.responses) {
-          if (!processedQuestionIds.has(item.questionId)) {
-            unmappedResponses.push({
-              questionId: item.questionId,
-              question: item.question,
-              answer: item.answer,
-              metadata: item.metadata
-            });
-            warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
-          }
+    // Handle possible object format with responses wrapper
+    else if (isResponsesWrapper(rawResponse)) {
+      // It's a responses wrapper
+      this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
+
+      // Find unmapped responses
+      for (const item of rawResponse.responses) {
+        if (!processedQuestionIds.has(item.questionId)) {
+          unmappedResponses.push({
+            questionId: item.questionId,
+            question: item.question,
+            answer: item.answer,
+            metadata: item.metadata
+          });
+          warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
         }
-      } else {
-        // Try to parse as direct v2.0-like structure
-        Object.assign(standardized, rawResponse);
       }
+    }
+    // Handle other object format - try to parse as direct v2.0-like structure
+    else if (rawResponse !== null && typeof rawResponse === 'object') {
+      Object.assign(standardized, rawResponse);
     }
 
     return {
@@ -148,7 +163,7 @@ export class QuestionnaireService {
    * Legacy method - kept for backward compatibility
    * Use standardizeResponseWithTracking for new code
    */
-  static standardizeResponse(rawResponse: any, month?: number, year?: number): StandardizedResponse {
+  static standardizeResponse(rawResponse: unknown, month?: number, year?: number): StandardizedResponse {
     return this.standardizeResponseWithTracking(rawResponse, month, year).standardized;
   }
 
@@ -228,12 +243,13 @@ export class QuestionnaireService {
       }
       // Map custom special events (Finados, etc.)
       else if (questionId.startsWith('special_event_')) {
-        const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
+        const metadataEventName = item.metadata?.eventName;
+        const eventName = typeof metadataEventName === 'string' ? metadataEventName.toLowerCase() : questionId;
         const normalizedName = eventName
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .replace(/[^a-z0-9]/g, '_');
-        (standardized.special_events as any)[normalizedName] = this.normalizeValue(answer);
+        standardized.special_events[normalizedName] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       }
       // 🔥 CRITICAL FIX: Map custom_ questions (Natal, Ano Novo, etc.)
@@ -241,7 +257,7 @@ export class QuestionnaireService {
       // Store as BOOLEAN to maintain compatibility with schedule generator consumers
       else if (questionId.startsWith('custom_')) {
         const normalizedAnswer = this.normalizeValue(answer);
-        (standardized.special_events as any)[questionId] = normalizedAnswer;
+        standardized.special_events[questionId] = normalizedAnswer;
         processedQuestionIds.add(questionId);
         console.log(`[QUESTIONNAIRE_SERVICE] ✅ Mapped custom question: ${questionId} = ${normalizedAnswer}`);
       }
@@ -289,16 +305,19 @@ export class QuestionnaireService {
         // Extract alternative times from yes_no_with_options response
         if (answer && answer !== 'Não') {
           // Handle object format: { answer: "Sim", selectedOptions: ["8h", "10h", ...] }
-          if (typeof answer === 'object' && answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-            (standardized as any)._alternativeTimes = answer.selectedOptions;
+          if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+            const answerObj = answer as Record<string, unknown>;
+            if (Array.isArray(answerObj.selectedOptions)) {
+              standardized._alternativeTimes = answerObj.selectedOptions as string[];
+            }
           }
           // Handle legacy array format: ["8h", "10h"]
           else if (Array.isArray(answer)) {
-            (standardized as any)._alternativeTimes = answer;
+            standardized._alternativeTimes = answer as string[];
           }
           // Handle string format: "8h" (single value)
           else if (typeof answer === 'string' && answer !== 'Sim') {
-            (standardized as any)._alternativeTimes = [answer];
+            standardized._alternativeTimes = [answer];
           }
         }
         processedQuestionIds.add(questionId);
@@ -366,7 +385,7 @@ export class QuestionnaireService {
   /**
    * Parse novena array like ["Terça 20/10 às 19h30", "Quinta 22/10 às 19h30"]
    */
-  private static parseNovenaArray(novenaAnswers: any): string[] {
+  private static parseNovenaArray(novenaAnswers: unknown): string[] {
     if (!Array.isArray(novenaAnswers)) {
       return [];
     }
@@ -401,7 +420,7 @@ export class QuestionnaireService {
   /**
    * Parse daily mass availability
    */
-  private static parseDailyMassAvailability(answer: any, standardized: StandardizedResponse): void {
+  private static parseDailyMassAvailability(answer: unknown, standardized: StandardizedResponse): void {
     if (!standardized.weekdays) {
       standardized.weekdays = {
         monday: false,
@@ -420,12 +439,15 @@ export class QuestionnaireService {
       standardized.weekdays.wednesday = true;
       standardized.weekdays.thursday = true;
       standardized.weekdays.friday = true;
-    } 
+    }
     // 🔥 CRITICAL FIX: Handle yes_no_with_options format
-    else if (typeof answer === 'object' && answer.answer === 'Apenas em alguns dias') {
-      // Process selectedOptions immediately (don't wait for separate daily_mass_days question)
-      if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-        this.parseDailyMassDays(answer.selectedOptions, standardized);
+    else if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+      const answerObj = answer as Record<string, unknown>;
+      if (answerObj.answer === 'Apenas em alguns dias') {
+        // Process selectedOptions immediately (don't wait for separate daily_mass_days question)
+        if (Array.isArray(answerObj.selectedOptions)) {
+          this.parseDailyMassDays(answerObj.selectedOptions as string[], standardized);
+        }
       }
     }
     // Handle legacy "Apenas em alguns dias" as string (will be filled by daily_mass_days question)
@@ -496,7 +518,7 @@ export class QuestionnaireService {
   /**
    * Normalize time format to 24h HH:MM
    */
-  private static normalizeTime(time: any): string {
+  private static normalizeTime(time: unknown): string {
     if (typeof time !== 'string') {
       return '10:00'; // Default
     }
@@ -515,7 +537,7 @@ export class QuestionnaireService {
   /**
    * Normalize all values to boolean
    */
-  static normalizeValue(value: any): boolean {
+  static normalizeValue(value: unknown): boolean {
     if (typeof value === 'boolean') {
       return value;
     }
@@ -540,7 +562,7 @@ export class QuestionnaireService {
   /**
    * Normalize family serve preference
    */
-  private static normalizeFamilyPreference(value: any): 'together' | 'separately' | 'flexible' {
+  private static normalizeFamilyPreference(value: unknown): 'together' | 'separately' | 'flexible' {
     if (typeof value === 'string') {
       const normalized = value.toLowerCase();
       if (normalized.includes('juntos') || normalized === 'together') {
@@ -556,12 +578,20 @@ export class QuestionnaireService {
   /**
    * Validate v2.0 format structure
    */
-  private static validateV2Format(response: any): StandardizedResponse {
-    // Ensure all required fields exist
-    if (!response.masses) response.masses = {};
-    if (!response.special_events) response.special_events = {};
-    if (!response.weekdays) {
-      response.weekdays = {
+  private static validateV2Format(response: Record<string, unknown>): StandardizedResponse {
+    // Build a properly typed result
+    const result: StandardizedResponse = {
+      format_version: '2.0',
+      masses: (response.masses as StandardizedResponse['masses']) || {},
+      special_events: (response.special_events as StandardizedResponse['special_events']) || {},
+      can_substitute: false
+    };
+
+    // Copy weekdays if present, otherwise initialize
+    if (response.weekdays && typeof response.weekdays === 'object') {
+      result.weekdays = response.weekdays as StandardizedResponse['weekdays'];
+    } else {
+      result.weekdays = {
         monday: false,
         tuesday: false,
         wednesday: false,
@@ -570,31 +600,37 @@ export class QuestionnaireService {
       };
     }
 
+    // Copy optional fields
+    if (response.family) result.family = response.family as StandardizedResponse['family'];
+    if (response.notes) result.notes = response.notes as string;
+    if (response.alternative_times) result.alternative_times = response.alternative_times as string[];
+    if (response._alternativeTimes) result._alternativeTimes = response._alternativeTimes as string[];
+
     // 🔥 FIX: Handle can_substitute properly
     // If it's a string like 'yes', 'sundays_only', convert to boolean
     if (typeof response.can_substitute === 'string') {
       const normalized = response.can_substitute.toLowerCase().trim();
-      response.can_substitute =
+      result.can_substitute =
         normalized === 'yes' ||
         normalized === 'sundays_only' ||
         normalized === 'sim' ||
         normalized === 'true';
-    } else if (typeof response.can_substitute !== 'boolean') {
-      response.can_substitute = false;
+    } else if (typeof response.can_substitute === 'boolean') {
+      result.can_substitute = response.can_substitute;
     }
 
     // Migrate alternative_times to internal _alternativeTimes for extraction
-    if (response.alternative_times && Array.isArray(response.alternative_times)) {
-      response._alternativeTimes = response.alternative_times;
+    if (result.alternative_times && result.alternative_times.length > 0) {
+      result._alternativeTimes = result.alternative_times;
 
       // 🔥 FIX: If alternative_times has values, minister CAN substitute
-      if (response.alternative_times.length > 0 && !response.can_substitute) {
+      if (!result.can_substitute) {
         console.log(`[QUESTIONNAIRE_SERVICE] 🔄 V2.0: Auto-setting can_substitute=true because alternative_times has values`);
-        response.can_substitute = true;
+        result.can_substitute = true;
       }
     }
 
-    return response as StandardizedResponse;
+    return result;
   }
 
   /**
@@ -606,7 +642,7 @@ export class QuestionnaireService {
     preferredMassTimes: string[] | null;
     alternativeTimes: string[] | null;
     dailyMassAvailability: string[] | null;
-    specialEvents: any;
+    specialEvents: StandardizedResponse['special_events'];
     canSubstitute: boolean;
     notes: string | null;
   } {

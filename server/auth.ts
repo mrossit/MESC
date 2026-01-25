@@ -328,18 +328,20 @@ export async function resetPassword(email: string) {
       })
       .where(eq(users.id, user.id));
 
-    // TODO: Implementar envio de email com a senha temporária
-    // Em desenvolvimento, loga com aviso de segurança (senha não é logada em produção)
-    if (process.env.NODE_ENV === 'development') {
-      // Use structured logging - password only visible in dev server logs
-      console.log('[DEV ONLY] Password reset requested', {
-        email,
-        timestamp: new Date().toISOString(),
-        // SECURITY: Never log passwords in production
-        tempPasswordHint: `${tempPassword.substring(0, 2)}***${tempPassword.substring(tempPassword.length - 2)}`
-      });
-      // Full password only in debug level (not shown by default)
-      console.debug(`[DEV DEBUG] Full temp password for ${email}: ${tempPassword}`);
+    // Envia email com a senha temporária
+    const { sendPasswordResetEmail, getEmailProviderName } = await import('./services/emailService');
+
+    const emailResult = await sendPasswordResetEmail(
+      user.email,
+      user.name,
+      tempPassword
+    );
+
+    if (!emailResult.success) {
+      // Log error but don't reveal to user for security
+      console.error('[AUTH] Failed to send password reset email:', emailResult.error);
+    } else {
+      console.log(`[AUTH] Password reset email sent via ${getEmailProviderName()} to ${email}`);
     }
 
     return { message: 'Se o email existir em nosso sistema, você receberá instruções para redefinir sua senha.' };

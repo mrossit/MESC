@@ -26,7 +26,7 @@ export interface SpecialEvents {
   saint_judas_feast?: Record<string, boolean>;
   first_friday?: boolean;
   first_saturday?: boolean;
-  [key: string]: any;
+  [key: string]: boolean | string[] | Record<string, boolean> | undefined;
 }
 
 export interface DayAvailability {
@@ -62,6 +62,40 @@ export interface ParsedCustomQuestion {
   date: string;      // '2026-01-28'
   time: string;      // '07:00'
   category: string;
+}
+
+/**
+ * V1 Array format item
+ */
+interface V1ArrayItem {
+  questionId: string;
+  answer: unknown;
+  question?: string;
+}
+
+/**
+ * V2 format data structure
+ */
+interface V2FormatData {
+  format_version: '2.0';
+  masses?: Record<string, Record<string, boolean>>;
+  weekdays?: WeekdayAvailability;
+  special_events?: SpecialEvents;
+  can_substitute?: boolean;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Legacy format response
+ */
+interface LegacyFormatResponse {
+  responses?: unknown;
+  availableSundays?: string[];
+  dailyMassAvailability?: string[];
+  canSubstitute?: boolean;
+  notes?: string;
+  [key: string]: unknown;
 }
 
 // ===== MAIN SERVICE =====
@@ -154,17 +188,24 @@ export class ResponseCompiler {
    * Works with ANY category: custom, special_event, special, etc.
    * Works with ANY ID format: custom_*, special_event_*, etc.
    */
-  private static parseCustomQuestions(questions: any, year: number): ParsedCustomQuestion[] {
+  private static parseCustomQuestions(questions: unknown, year: number): ParsedCustomQuestion[] {
     const parsed: ParsedCustomQuestion[] = [];
 
     if (!questions || !Array.isArray(questions)) {
       return parsed;
     }
 
+    interface QuestionItem {
+      id?: string;
+      question?: string;
+      category?: string;
+    }
+
     // Categories that may contain specific date/time questions
     const relevantCategories = ['custom', 'special_event', 'special'];
 
-    for (const q of questions) {
+    for (const item of questions) {
+      const q = item as QuestionItem;
       const category = q.category || '';
 
       // Skip regular/daily categories - they don't have specific dates
@@ -188,7 +229,7 @@ export class ResponseCompiler {
       // Try to extract time: "às 7h", "às 15h", "às 19h30", "às 19:30", "ás 15h"
       const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
 
-      if (dateMatch && timeMatch) {
+      if (dateMatch && timeMatch && q.id) {
         const day = dateMatch[1].padStart(2, '0');
         const month = dateMatch[2].padStart(2, '0');
         const extractedYear = dateMatch[3] || year.toString();
@@ -215,8 +256,8 @@ export class ResponseCompiler {
    * Compila resposta individual detectando formato automaticamente
    */
   private static compileUserResponse(
-    response: any,
-    user: any,
+    response: { responses: unknown },
+    user: { id: string; name: string; preferredPosition?: number; familyId?: string },
     month: number,
     year: number,
     customQuestions: ParsedCustomQuestion[] = []  // 🔧 FIX: Accept custom questions
@@ -256,15 +297,15 @@ export class ResponseCompiler {
     // Processar baseado no formato
     switch (format) {
       case 'V2_STANDARD':
-        compiled = this.processV2Format(rawData, compiled);
+        compiled = this.processV2Format(rawData as V2FormatData, compiled);
         break;
 
       case 'V1_ARRAY':
-        compiled = this.processV1ArrayFormat(rawData, compiled, month, year);
+        compiled = this.processV1ArrayFormat(rawData as V1ArrayItem[], compiled, month, year);
         break;
 
       case 'LEGACY_FIELDS':
-        compiled = this.processLegacyFormat(response, compiled, month, year);
+        compiled = this.processLegacyFormat(response as LegacyFormatResponse, compiled, month, year);
         break;
 
       default:
@@ -292,8 +333,8 @@ export class ResponseCompiler {
    * 3. Array format: [{questionId, answer}] - V1.0
    */
   private static processCustomQuestions(
-    rawData: any,
-    fullResponse: any,
+    rawData: unknown,
+    fullResponse: { responses: unknown },
     base: CompiledAvailability,
     customQuestions: ParsedCustomQuestion[],
     userName: string
@@ -301,19 +342,21 @@ export class ResponseCompiler {
 
     let processedCount = 0;
     let notFoundCount = 0;
+    const rawDataObj = rawData as Record<string, unknown> | null;
 
     for (const customQ of customQuestions) {
-      let answer: any = null;
+      let answer: unknown = null;
       let foundIn: string = '';
 
       // ========================================
       // FORMATO V2.0 - VERIFICAR PRIMEIRO!
       // As respostas estão em rawData.special_events
       // ========================================
-      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+      if (rawDataObj && typeof rawDataObj === 'object' && !Array.isArray(rawDataObj)) {
         // 1. PRINCIPAL: Procurar em special_events (onde V2.0 salva custom events)
-        if (rawData.special_events && typeof rawData.special_events === 'object') {
-          const seValue = rawData.special_events[customQ.id];
+        const specialEvents = rawDataObj.special_events as Record<string, unknown> | undefined;
+        if (specialEvents && typeof specialEvents === 'object') {
+          const seValue = specialEvents[customQ.id];
           if (seValue !== null && seValue !== undefined) {
             answer = seValue;
             foundIn = 'rawData.special_events';
@@ -322,7 +365,7 @@ export class ResponseCompiler {
 
         // 2. Fallback: acesso direto no rawData (caso legado)
         if (answer === null || answer === undefined) {
-          const directValue = rawData[customQ.id];
+          const directValue = rawDataObj[customQ.id];
           if (directValue !== null && directValue !== undefined) {
             answer = directValue;
             foundIn = 'rawData (direct)';
@@ -334,7 +377,7 @@ export class ResponseCompiler {
       // FORMATO V1.0 ARRAY - [{questionId, answer}]
       // ========================================
       if ((answer === null || answer === undefined) && Array.isArray(rawData)) {
-        const found = rawData.find((item: any) => item.questionId === customQ.id);
+        const found = rawData.find((item: V1ArrayItem) => item.questionId === customQ.id);
         if (found) {
           answer = found.answer;
           foundIn = 'rawData array';
@@ -380,7 +423,7 @@ export class ResponseCompiler {
   /**
    * 🔧 FIX: Parse answer to boolean
    */
-  private static parseAnswer(answer: any): boolean {
+  private static parseAnswer(answer: unknown): boolean {
     if (typeof answer === 'boolean') {
       return answer;
     }
@@ -397,7 +440,7 @@ export class ResponseCompiler {
    * Processa formato V2.0 (padrão novo)
    * Format: { format_version: '2.0', masses: { '2025-10-28': { '07:00': true } } }
    */
-  private static processV2Format(data: any, base: CompiledAvailability): CompiledAvailability {
+  private static processV2Format(data: V2FormatData, base: CompiledAvailability): CompiledAvailability {
     console.log(`    🔄 Processando formato V2.0`);
 
     // Processar missas regulares
@@ -438,7 +481,7 @@ export class ResponseCompiler {
    * Format: [{questionId: 'saint_judas_feast_7h', answer: 'Sim'}]
    */
   private static processV1ArrayFormat(
-    data: any[],
+    data: V1ArrayItem[],
     base: CompiledAvailability,
     month: number,
     year: number
@@ -469,7 +512,8 @@ export class ResponseCompiler {
           '10h': '10:00',
           '19h': '19:00'
         };
-        mainServiceTime = timeMap[item.answer] || '10:00';
+        const answerKey = typeof item.answer === 'string' ? item.answer : '';
+        mainServiceTime = timeMap[answerKey] || '10:00';
         console.log(`      📌 Horário principal detectado: ${mainServiceTime}`);
         break;
       }
@@ -573,7 +617,7 @@ export class ResponseCompiler {
       }
 
       else if (questionId === 'notes') {
-        base.metadata.notes = answer;
+        base.metadata.notes = typeof answer === 'string' ? answer : undefined;
       }
     }
 
@@ -585,7 +629,7 @@ export class ResponseCompiler {
    * Processa formato Legacy (campos diretos)
    */
   private static processLegacyFormat(
-    response: any,
+    response: LegacyFormatResponse,
     base: CompiledAvailability,
     month: number,
     year: number
@@ -632,10 +676,13 @@ export class ResponseCompiler {
   /**
    * Detecta o formato dos dados
    */
-  private static detectFormat(data: any): string {
-    if (data.format_version === '2.0') return 'V2_STANDARD';
+  private static detectFormat(data: unknown): string {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const dataObj = data as Record<string, unknown>;
+      if (dataObj.format_version === '2.0') return 'V2_STANDARD';
+      if (dataObj.available_sundays || dataObj.daily_mass_availability) return 'LEGACY_FIELDS';
+    }
     if (Array.isArray(data)) return 'V1_ARRAY';
-    if (data.available_sundays || data.daily_mass_availability) return 'LEGACY_FIELDS';
     return 'UNKNOWN';
   }
 

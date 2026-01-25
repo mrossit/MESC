@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Response } from "express";
 import { z } from "zod";
 import { db } from "../db";
 import {
@@ -15,7 +15,7 @@ import {
   massTimesConfig
 } from "@shared/schema";
 import { eq, sql, and, gte, lte, desc, asc, count, avg } from "drizzle-orm";
-import { authenticateToken, requireRole } from "../auth";
+import { authenticateToken, requireRole, AuthRequest } from "../auth";
 import { createActivityLogger } from "../utils/activityLogger";
 import {
   exportToExcel,
@@ -36,10 +36,25 @@ function parseQueryDate(dateStr: unknown): Date | null {
   return parsed;
 }
 
+// Helper to safely extract string from query parameter
+function getQueryString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
+// Helper to safely extract number from query parameter
+function getQueryNumber(value: unknown, defaultValue: number): number {
+  const strValue = getQueryString(value);
+  if (!strValue) return defaultValue;
+  const num = parseInt(strValue, 10);
+  return isNaN(num) ? defaultValue : num;
+}
+
 const router = Router();
 
 // Get minister availability metrics
-router.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "availability" });
 
@@ -85,7 +100,7 @@ router.get("/availability", authenticateToken, requireRole(["gestor", "coordenad
 });
 
 // Get substitution metrics
-router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "substitutions" });
 
@@ -156,7 +171,7 @@ router.get("/substitutions", authenticateToken, requireRole(["gestor", "coordena
 });
 
 // Get engagement metrics
-router.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "engagement" });
 
@@ -224,7 +239,7 @@ router.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador
 });
 
 // Get formation metrics
-router.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "formation" });
 
@@ -272,7 +287,7 @@ router.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"
 });
 
 // Get family engagement metrics
-router.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "families" });
 
@@ -307,7 +322,7 @@ router.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]
 });
 
 // Get dashboard summary
-router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "summary" });
 
@@ -394,7 +409,7 @@ router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"])
 // ============================================
 
 // Get attendance summary for all ministers
-router.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "attendance" });
 
@@ -513,7 +528,7 @@ router.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador
 });
 
 // Get attendance history for a specific minister
-router.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "attendance_detail", ministerId: req.params.ministerId });
 
@@ -653,7 +668,7 @@ router.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", 
 });
 
 // Export attendance report
-router.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
     const { startDate, endDate } = req.query;
@@ -767,13 +782,12 @@ router.get("/export/attendance", authenticateToken, requireRole(["gestor", "coor
 // ============================================
 
 // Get monthly trends data for the last N months
-router.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "trends" });
 
   try {
-    const { months = 6 } = req.query;
-    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
 
     // Generate array of last N months
     const now = new Date();
@@ -892,7 +906,7 @@ router.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]),
 });
 
 // Get availability patterns (by day of week and time)
-router.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "availability_patterns" });
 
@@ -997,15 +1011,17 @@ function formatDateBR(date: Date): string {
 }
 
 // Helper to format period
-function formatPeriod(startDate?: string, endDate?: string): string {
-  if (!startDate && !endDate) return 'Todo o período';
-  const start = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : 'início';
-  const end = endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'hoje';
-  return `${start} a ${end}`;
+function formatPeriod(startDate: unknown, endDate: unknown): string {
+  const start = getQueryString(startDate);
+  const end = getQueryString(endDate);
+  if (!start && !end) return 'Todo o período';
+  const startFormatted = start ? new Date(start).toLocaleDateString('pt-BR') : 'início';
+  const endFormatted = end ? new Date(end).toLocaleDateString('pt-BR') : 'hoje';
+  return `${startFormatted} a ${endFormatted}`;
 }
 
 // Export availability report
-router.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
     const { startDate, endDate } = req.query;
@@ -1078,7 +1094,7 @@ router.get("/export/availability", authenticateToken, requireRole(["gestor", "co
 });
 
 // Export substitutions report
-router.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
     const { startDate, endDate } = req.query;
@@ -1157,7 +1173,7 @@ router.get("/export/substitutions", authenticateToken, requireRole(["gestor", "c
 });
 
 // Export engagement report
-router.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
     const { startDate, endDate } = req.query;
@@ -1226,7 +1242,7 @@ router.get("/export/engagement", authenticateToken, requireRole(["gestor", "coor
 });
 
 // Export formation report
-router.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
 
@@ -1289,7 +1305,7 @@ router.get("/export/formation", authenticateToken, requireRole(["gestor", "coord
 });
 
 // Export complete summary report
-router.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const format = exportFormatSchema.parse(req.query.format || 'xlsx');
 
@@ -1363,13 +1379,12 @@ router.get("/export/summary", authenticateToken, requireRole(["gestor", "coorden
 // ============================================
 
 // Get comprehensive availability analysis
-router.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("view_reports", { type: "availability_analysis" });
 
   try {
-    const { months = 6 } = req.query;
-    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
 
     // Calculate date range
     const endDate = new Date();
@@ -1650,11 +1665,10 @@ router.get("/availability-analysis", authenticateToken, requireRole(["gestor", "
 });
 
 // Get detailed availability by mass time
-router.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   try {
     const { timeId } = req.params;
-    const { months = 3 } = req.query;
-    const numMonths = Math.min(Math.max(parseInt(months) || 3, 1), 12);
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 3), 1), 12);
 
     const endDate = new Date();
     const startDate = new Date();
@@ -1776,18 +1790,18 @@ router.get("/availability-analysis/by-time/:timeId", authenticateToken, requireR
 });
 
 // Export availability analysis
-router.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res: Response) => {
   const logActivity = createActivityLogger(req);
   await logActivity("export_report", { type: "availability_analysis" });
 
   try {
-    const { format = 'xlsx', months = 6 } = req.query;
+    const format = getQueryString(req.query.format) || 'xlsx';
 
     if (!['xlsx', 'pdf', 'csv'].includes(format)) {
       return res.status(400).json({ error: "Invalid format" });
     }
 
-    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - numMonths);

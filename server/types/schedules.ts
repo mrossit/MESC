@@ -164,3 +164,92 @@ export interface MonthlyScheduleResponse {
     reason: string | null;
   }>;
 }
+
+/**
+ * Schedule joined with user data (from left join)
+ */
+export interface ScheduleWithUserJoin {
+  schedules: Schedule;
+  users: User | null;
+}
+
+/**
+ * Substitution request joined with schedule
+ */
+export interface SubstitutionWithScheduleJoin {
+  substitution_requests: {
+    id: string;
+    scheduleId: string;
+    requesterId: string;
+    substituteId: string | null;
+    status: string;
+    urgency: string;
+    reason: string | null;
+    approvedBy: string | null;
+    approvedAt: Date | null;
+    responseMessage: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+  };
+  schedules: Schedule;
+}
+
+/**
+ * Weekly grouped schedules
+ */
+export interface WeeklyGroupedSchedules {
+  [weekKey: string]: {
+    weekNumber: number;
+    startDate: string;
+    endDate: string;
+    schedules: import('../utils/scheduleGenerator').GeneratedSchedule[];
+  };
+}
+
+/**
+ * Schedule validation diagnostics
+ */
+export interface ScheduleValidationDiagnostics {
+  totalReceived: number;
+  sample: ScheduleInput[];
+  ministerIds: string[];
+  uniqueDates: string[];
+  uniqueTimes: string[];
+  missingDate: number;
+  missingTime: number;
+  missingMinisterId: number;
+  dataTypes: Record<string, string>;
+  rawInput?: unknown;
+  missingMinisterIds?: string[];
+}
+
+/**
+ * Distribution balance metrics
+ */
+export interface DistributionMetrics {
+  totalSchedules: number;
+  uniqueMinisters: number;
+  averageSchedulesPerMinister: number;
+  distributionBalance: number;
+  coverageByDay: Record<string, number>;
+  substitutionRate: number;
+  totalSubstitutions: number;
+  completedSubstitutions: number;
+}
+
+/**
+ * Helper type for extracting error message
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+/**
+ * Helper type for extracting error stack
+ */
+export function getErrorStack(error: unknown): string | undefined {
+  if (error instanceof Error) return error.stack;
+  return undefined;
+}

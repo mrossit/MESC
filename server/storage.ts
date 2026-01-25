@@ -234,6 +234,7 @@ export interface IStorage {
   // Substitution request operations
   createSubstitutionRequest(request: SubstitutionRequestInput): Promise<SubstitutionRequest>;
   getSubstitutionRequests(scheduleId: string): Promise<SubstitutionRequest[]>;
+  getMonthSubstitutions(month?: number, year?: number): Promise<SubstitutionRequest[]>;
   updateSubstitutionRequest(id: string, request: Partial<SubstitutionRequestInput>): Promise<SubstitutionRequest>;
   deleteSubstitutionRequest(id: string): Promise<void>;
 
@@ -746,10 +747,42 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getMonthSubstitutions(month?: number, year?: number): Promise<any[]> {
-    // Por enquanto, retornar array vazio
-    // TODO: Implementar query correta quando houver pedidos de substituição
-    return [];
+  async getMonthSubstitutions(month?: number, year?: number): Promise<SubstitutionRequest[]> {
+    // Se não especificado, usa o mês atual
+    const targetDate = new Date();
+    const targetMonth = month ?? (targetDate.getMonth() + 1);
+    const targetYear = year ?? targetDate.getFullYear();
+
+    // Calcular primeiro e último dia do mês
+    const firstDay = new Date(targetYear, targetMonth - 1, 1);
+    const lastDay = new Date(targetYear, targetMonth, 0);
+
+    // Buscar substituições do mês através do scheduleId -> schedules.date
+    const substitutions = await db
+      .select({
+        id: substitutionRequests.id,
+        scheduleId: substitutionRequests.scheduleId,
+        requesterId: substitutionRequests.requesterId,
+        substituteId: substitutionRequests.substituteId,
+        reason: substitutionRequests.reason,
+        status: substitutionRequests.status,
+        urgency: substitutionRequests.urgency,
+        approvedBy: substitutionRequests.approvedBy,
+        approvedAt: substitutionRequests.approvedAt,
+        responseMessage: substitutionRequests.responseMessage,
+        createdAt: substitutionRequests.createdAt,
+        updatedAt: substitutionRequests.updatedAt
+      })
+      .from(substitutionRequests)
+      .innerJoin(schedules, eq(substitutionRequests.scheduleId, schedules.id))
+      .where(
+        and(
+          gte(schedules.date, firstDay.toISOString().split('T')[0]),
+          lte(schedules.date, lastDay.toISOString().split('T')[0])
+        )
+      );
+
+    return substitutions as SubstitutionRequest[];
   }
 
   async getScheduleById(id: string): Promise<Schedule | undefined> {
