@@ -443,7 +443,7 @@ async function checkMinisterAvailability(
   ministerId: string,
   date: string,
   time: string
-): Promise<{ available: boolean; reason?: string }> {
+): Promise<{ available: boolean; reason?: string; preferredTimes?: string[]; canSubstitute?: boolean }> {
   // Get minister data
   const minister = await db
     .select()
@@ -476,10 +476,62 @@ async function checkMinisterAvailability(
     return { available: true, reason: "Sem resposta de questionário (assumindo disponível)" };
   }
 
-  // TODO: Check specific availability based on response data
-  // For now, assume available if they responded
+  const response = responses[0].questionnaire_responses;
+  const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 6 = Saturday
 
-  return { available: true };
+  // Check Sunday availability
+  if (dayOfWeek === 0) {
+    const availableSundays = response.availableSundays || [];
+    const formattedDate = format(dateObj, 'yyyy-MM-dd');
+
+    if (availableSundays.length > 0 && !availableSundays.includes(formattedDate)) {
+      return { available: false, reason: "Ministro não disponível neste domingo" };
+    }
+  }
+
+  // Check daily mass availability (weekdays)
+  if (dayOfWeek >= 1 && dayOfWeek <= 6) {
+    const dailyAvailability: string[] = response.dailyMassAvailability || [];
+    const dayNames = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    const dayName = dayNames[dayOfWeek];
+
+    if (dailyAvailability.length > 0 && !dailyAvailability.some((d: string) => d.toLowerCase().includes(dayName))) {
+      return { available: false, reason: `Ministro não disponível às ${dayName}s` };
+    }
+  }
+
+  // Check preferred or alternative times if a specific time is needed
+  const preferredTimes: string[] = response.preferredMassTimes || [];
+  const alternativeTimes: string[] = response.alternativeTimes || [];
+  const allTimes: string[] = [...preferredTimes, ...alternativeTimes];
+
+  // If minister specified time preferences, check if requested time matches
+  if (allTimes.length > 0 && time) {
+    // Normalize time for comparison (remove seconds, handle 24h format)
+    const normalizedRequestedTime = time.slice(0, 5); // HH:MM
+    const timeMatches = allTimes.some((t: string) => {
+      const normalizedAvailableTime = t.slice(0, 5);
+      return normalizedAvailableTime === normalizedRequestedTime;
+    });
+
+    if (!timeMatches) {
+      // Check if it's in alternative times (less preferred but still available)
+      const isAlternative = alternativeTimes.some((t: string) => t.slice(0, 5) === normalizedRequestedTime);
+      if (!isAlternative) {
+        return {
+          available: false,
+          reason: `Ministro não disponível às ${time}. Horários preferidos: ${preferredTimes.join(', ')}`
+        };
+      }
+    }
+  }
+
+  // Minister is available
+  return {
+    available: true,
+    preferredTimes,
+    canSubstitute: response.canSubstitute || false
+  };
 }
 
 /**
@@ -694,22 +746,85 @@ async function sendMinisterNotifications(
   month: number,
   year: number
 ): Promise<{ sent: number; failed: number }> {
-  // TODO: Implement actual notification sending
-  // For now, just count unique ministers
+  const { sendPushNotificationToUsers } = await import("../utils/pushNotifications");
+  const { notifications } = await import("@shared/schema");
+
+  // Collect unique ministers
   const uniqueMinisters = new Set<string>();
+  const ministerSchedules: Record<string, any[]> = {};
 
   for (const schedule of scheduleData) {
     const ministers = schedule.ministers || schedule.assignments || [];
     for (const minister of ministers) {
       const id = minister.id || minister.ministerId;
-      if (id) uniqueMinisters.add(id);
+      if (id) {
+        uniqueMinisters.add(id);
+        if (!ministerSchedules[id]) {
+          ministerSchedules[id] = [];
+        }
+        ministerSchedules[id].push({
+          date: schedule.date,
+          time: schedule.time,
+          position: minister.position || schedule.position
+        });
+      }
     }
   }
 
-  return {
-    sent: uniqueMinisters.size,
-    failed: 0
-  };
+  const ministerIds = Array.from(uniqueMinisters);
+
+  if (ministerIds.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  // Create notifications for each minister
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const monthName = monthNames[month - 1];
+
+  for (const ministerId of ministerIds) {
+    try {
+      const scheduleCount = ministerSchedules[ministerId]?.length || 0;
+
+      // Create in-app notification
+      await db.insert(notifications).values({
+        userId: ministerId,
+        type: 'schedule',
+        title: `📅 Escala de ${monthName}/${year}`,
+        message: `Sua escala foi publicada! Você tem ${scheduleCount} missa(s) agendada(s) este mês.`,
+        priority: 'medium',
+        actionUrl: `/schedules?month=${month}&year=${year}`,
+        data: {
+          month,
+          year,
+          scheduleCount,
+          schedules: ministerSchedules[ministerId]
+        }
+      });
+
+      sent++;
+    } catch (error) {
+      console.error(`[SMART_SCHEDULE] Failed to create notification for minister ${ministerId}:`, error);
+      failed++;
+    }
+  }
+
+  // Send push notifications in bulk
+  try {
+    await sendPushNotificationToUsers(ministerIds, {
+      title: `📅 Escala de ${monthName}/${year}`,
+      body: 'Sua escala foi publicada! Clique para ver suas missas.',
+      url: `/schedules?month=${month}&year=${year}`,
+      data: { month, year }
+    });
+  } catch (error) {
+    console.error('[SMART_SCHEDULE] Failed to send push notifications:', error);
+  }
+
+  return { sent, failed };
 }
 
 /**

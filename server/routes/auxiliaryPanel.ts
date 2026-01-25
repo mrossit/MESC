@@ -359,8 +359,28 @@ router.post("/check-in", requireAuth, async (req: AuthRequest, res: Response) =>
       });
     }
 
-    // Broadcast update via WebSocket
-    // TODO: Implement WebSocket broadcast
+    // Broadcast update via WebSocket for real-time sync
+    try {
+      const { broadcastAuxiliaryPanelUpdate } = await import("../websocket");
+
+      // Get minister name for the broadcast
+      const [minister] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, ministerId))
+        .limit(1);
+
+      broadcastAuxiliaryPanelUpdate({
+        scheduleId,
+        updateType: 'check_in',
+        ministerId,
+        ministerName: minister?.name || 'Ministro',
+        position,
+        status
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_CHECKIN] WebSocket broadcast error:", wsError);
+    }
 
     res.json({
       success: true,
@@ -450,6 +470,18 @@ router.put("/redistribute", requireAuth, async (req: AuthRequest, res: Response)
       });
     }
 
+    // Broadcast redistribute update via WebSocket
+    try {
+      const { broadcastAuxiliaryPanelUpdate } = await import("../websocket");
+      broadcastAuxiliaryPanelUpdate({
+        scheduleId,
+        updateType: 'redistribute',
+        changes: appliedChanges
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_REDISTRIBUTE] WebSocket broadcast error:", wsError);
+    }
+
     res.json({
       success: true,
       message: `${appliedChanges.length} mudanças aplicadas com sucesso`
@@ -531,7 +563,81 @@ router.post("/call-standby", requireAuth, async (req: AuthRequest, res: Response
       }
     });
 
-    // TODO: Send push notification and WhatsApp message
+    // Send push notification
+    try {
+      const { sendPushNotificationToUsers } = await import("../utils/pushNotifications");
+      await sendPushNotificationToUsers([ministerId], {
+        title: '🚨 Chamada Urgente de Suplência',
+        body: `${auxiliaryName} precisa de você AGORA para a missa de ${format(parseISO(date), 'dd/MM')} às ${time}`,
+        url: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
+        tag: `standby-${scheduleId}`,
+        data: {
+          scheduleId,
+          position,
+          urgency: 'critical',
+          massDate: date,
+          massTime: time
+        }
+      });
+    } catch (pushError) {
+      console.error("[AUXILIARY_CALL_STANDBY] Push notification error:", pushError);
+    }
+
+    // Send WhatsApp message if configured
+    try {
+      const ministerInfo = await db
+        .select({ whatsapp: users.whatsapp, phone: users.phone, name: users.name })
+        .from(users)
+        .where(eq(users.id, ministerId))
+        .limit(1);
+
+      const whatsappNumber = ministerInfo[0]?.whatsapp || ministerInfo[0]?.phone;
+
+      if (whatsappNumber && process.env.ZAPI_INSTANCE && process.env.ZAPI_TOKEN) {
+        const axios = (await import('axios')).default;
+        const instance = process.env.ZAPI_INSTANCE;
+        const token = process.env.ZAPI_TOKEN;
+        const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+
+        const normalizedPhone = whatsappNumber.replace(/\D/g, '');
+        const message = `🚨 *CHAMADA URGENTE DE SUPLÊNCIA*\n\n` +
+          `Olá ${ministerInfo[0]?.name}!\n\n` +
+          `${auxiliaryName} está precisando de você para a missa:\n` +
+          `📅 Data: ${format(parseISO(date), 'dd/MM/yyyy')}\n` +
+          `⏰ Horário: ${time}\n` +
+          `📍 Posição: ${position}\n\n` +
+          `Por favor, responda o mais rápido possível!`;
+
+        await axios.post(
+          `https://api.z-api.io/instances/${instance}/token/${token}/send-text`,
+          { phone: normalizedPhone, message },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Client-Token': clientToken || ''
+            }
+          }
+        );
+        console.log("[AUXILIARY_CALL_STANDBY] WhatsApp message sent to:", normalizedPhone);
+      }
+    } catch (whatsappError) {
+      console.error("[AUXILIARY_CALL_STANDBY] WhatsApp error:", whatsappError);
+    }
+
+    // Notify via WebSocket for real-time update
+    try {
+      const { notifyUsers } = await import("../websocket");
+      notifyUsers([ministerId], {
+        id: `standby-${scheduleId}-${Date.now()}`,
+        title: '🚨 Chamada Urgente de Suplência',
+        message: `Você foi convocado para a missa de ${format(parseISO(date), 'dd/MM')} às ${time}`,
+        type: 'schedule',
+        actionUrl: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
+        createdAt: new Date().toISOString()
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_CALL_STANDBY] WebSocket error:", wsError);
+    }
 
     res.json({
       success: true,

@@ -70,10 +70,20 @@ interface UnreadCountData {
   count: number;
 }
 
-type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | UserNotificationData | UnreadCountData | undefined;
+interface AuxiliaryPanelUpdate {
+  scheduleId: string;
+  updateType: 'check_in' | 'redistribute' | 'standby_call' | 'report';
+  ministerId?: string;
+  ministerName?: string;
+  position?: string;
+  status?: string;
+  changes?: any;
+}
+
+type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | UserNotificationData | UnreadCountData | AuxiliaryPanelUpdate | undefined;
 
 interface NotificationMessage {
-  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'USER_NOTIFICATION' | 'UNREAD_COUNT' | 'PING';
+  type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'USER_NOTIFICATION' | 'UNREAD_COUNT' | 'AUXILIARY_PANEL_UPDATE' | 'PING';
   data?: NotificationData;
   timestamp: string;
 }
@@ -365,6 +375,30 @@ export function broadcastNotification(notificationData: UserNotificationData) {
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN && client.userId) {
+      client.send(messageStr);
+    }
+  });
+}
+
+/**
+ * Broadcast auxiliary panel updates for real-time sync
+ * Sends updates to coordinators, managers, and relevant auxiliaries
+ */
+export function broadcastAuxiliaryPanelUpdate(updateData: AuxiliaryPanelUpdate) {
+  const message: NotificationMessage = {
+    type: 'AUXILIARY_PANEL_UPDATE',
+    data: updateData,
+    timestamp: new Date().toISOString()
+  };
+
+  const messageStr = JSON.stringify(message);
+
+  clients.forEach((client) => {
+    if (
+      client.readyState === WebSocket.OPEN &&
+      client.userId &&
+      (client.userRole === 'coordenador' || client.userRole === 'gestor' || client.userRole === 'auxiliar')
+    ) {
       client.send(messageStr);
     }
   });
