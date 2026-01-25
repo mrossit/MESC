@@ -9,7 +9,8 @@ import {
   formationProgress,
   activityLogs,
   families,
-  familyRelationships
+  familyRelationships,
+  ministerCheckIns
 } from "@shared/schema";
 import { eq, sql, and, gte, lte, desc, asc, count, avg } from "drizzle-orm";
 import { authenticateToken, requireRole } from "../auth";
@@ -383,6 +384,379 @@ router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"])
   } catch (error) {
     console.error("Error fetching summary metrics:", error);
     res.status(500).json({ error: "Failed to fetch summary metrics" });
+  }
+});
+
+// ============================================
+// ATTENDANCE/PRESENCE ENDPOINTS
+// ============================================
+
+// Get attendance summary for all ministers
+router.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("view_reports", { type: "attendance" });
+
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Get all ministers with their attendance stats
+    const attendanceData = await db
+      .select({
+        odministerIdl: users.id,
+        ministerName: users.name,
+        ministerEmail: users.email,
+        totalServices: users.totalServices,
+        lastService: users.lastService,
+        noShowCount: users.noShowCount,
+        reliabilityScore: users.reliabilityScore,
+        status: users.status
+      })
+      .from(users)
+      .where(eq(users.role, 'ministro'))
+      .orderBy(desc(users.totalServices));
+
+    // Get check-in statistics for the period
+    const checkInStats = await db
+      .select({
+        ministerId: ministerCheckIns.ministerId,
+        totalCheckIns: count(),
+        presentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as('present_count'),
+        lateCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as('late_count'),
+        absentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as('absent_count')
+      })
+      .from(ministerCheckIns)
+      .leftJoin(schedules, eq(ministerCheckIns.scheduleId, schedules.id))
+      .where(
+        and(
+          parseQueryDate(startDate) ? gte(schedules.date, parseQueryDate(startDate)!.toISOString().split('T')[0]) : sql`true`,
+          parseQueryDate(endDate) ? lte(schedules.date, parseQueryDate(endDate)!.toISOString().split('T')[0]) : sql`true`
+        )
+      )
+      .groupBy(ministerCheckIns.ministerId);
+
+    // Merge the data
+    interface CheckInStat {
+      ministerId: string;
+      totalCheckIns: number;
+      presentCount: number;
+      lateCount: number;
+      absentCount: number;
+    }
+    const checkInMap = new Map<string, CheckInStat>(checkInStats.map((c: CheckInStat) => [c.ministerId, c]));
+
+    interface MinisterData {
+      odministerIdl: string;
+      ministerName: string | null;
+      ministerEmail: string | null;
+      totalServices: number | null;
+      lastService: Date | null;
+      noShowCount: number | null;
+      reliabilityScore: number | null;
+      status: string | null;
+    }
+    const result = attendanceData.map((minister: MinisterData) => {
+      const checkIn = checkInMap.get(minister.odministerIdl);
+      const presentCount = checkIn?.presentCount || 0;
+      const lateCount = checkIn?.lateCount || 0;
+      const absentCount = checkIn?.absentCount || 0;
+      const totalMarked = presentCount + lateCount + absentCount;
+
+      return {
+        odministerIdl: minister.odministerIdl,
+        ministerName: minister.ministerName,
+        ministerEmail: minister.ministerEmail,
+        totalServices: minister.totalServices || 0,
+        lastService: minister.lastService,
+        noShowCount: minister.noShowCount || 0,
+        reliabilityScore: minister.reliabilityScore || 100,
+        status: minister.status,
+        periodStats: {
+          present: presentCount,
+          late: lateCount,
+          absent: absentCount,
+          total: totalMarked,
+          attendanceRate: totalMarked > 0 ? Math.round(((presentCount + lateCount) / totalMarked) * 100) : null
+        }
+      };
+    });
+
+    // Calculate global stats
+    type ResultItem = typeof result[number];
+    const totalMinisters = result.length;
+    const activeMinisters = result.filter((m: ResultItem) => m.status === 'active').length;
+    const totalPresent = result.reduce((acc: number, m: ResultItem) => acc + m.periodStats.present, 0);
+    const totalLate = result.reduce((acc: number, m: ResultItem) => acc + m.periodStats.late, 0);
+    const totalAbsent = result.reduce((acc: number, m: ResultItem) => acc + m.periodStats.absent, 0);
+    const totalMarked = totalPresent + totalLate + totalAbsent;
+
+    res.json({
+      ministers: result,
+      summary: {
+        totalMinisters,
+        activeMinisters,
+        periodStats: {
+          present: totalPresent,
+          late: totalLate,
+          absent: totalAbsent,
+          total: totalMarked,
+          attendanceRate: totalMarked > 0 ? Math.round(((totalPresent + totalLate) / totalMarked) * 100) : null
+        }
+      },
+      period: { startDate, endDate }
+    });
+  } catch (error) {
+    console.error("Error fetching attendance data:", error);
+    res.status(500).json({ error: "Failed to fetch attendance data" });
+  }
+});
+
+// Get attendance history for a specific minister
+router.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("view_reports", { type: "attendance_detail", ministerId: req.params.ministerId });
+
+  try {
+    const { ministerId } = req.params;
+    const { startDate, endDate, limit = 50 } = req.query;
+
+    // Get minister info
+    const [minister] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        totalServices: users.totalServices,
+        lastService: users.lastService,
+        noShowCount: users.noShowCount,
+        reliabilityScore: users.reliabilityScore
+      })
+      .from(users)
+      .where(eq(users.id, ministerId))
+      .limit(1);
+
+    if (!minister) {
+      return res.status(404).json({ error: "Minister not found" });
+    }
+
+    // Get scheduled masses for this minister
+    const scheduledMasses = await db
+      .select({
+        scheduleId: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        position: schedules.position,
+        location: schedules.location,
+        status: schedules.status
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.ministerId, ministerId),
+          eq(schedules.status, 'published'),
+          parseQueryDate(startDate) ? gte(schedules.date, parseQueryDate(startDate)!.toISOString().split('T')[0]) : sql`true`,
+          parseQueryDate(endDate) ? lte(schedules.date, parseQueryDate(endDate)!.toISOString().split('T')[0]) : sql`true`
+        )
+      )
+      .orderBy(desc(schedules.date), desc(schedules.time))
+      .limit(Number(limit));
+
+    // Get check-ins for these schedules
+    interface ScheduledMass {
+      scheduleId: string;
+      date: string;
+      time: string | null;
+      position: number | null;
+      location: string | null;
+      status: string | null;
+    }
+    const scheduleIds = scheduledMasses.map((s: ScheduledMass) => s.scheduleId);
+
+    interface CheckInRecord {
+      scheduleId: string;
+      checkedInAt: Date | null;
+      status: string | null;
+      notes: string | null;
+    }
+    const checkIns: CheckInRecord[] = scheduleIds.length > 0 ? await db
+      .select({
+        scheduleId: ministerCheckIns.scheduleId,
+        checkedInAt: ministerCheckIns.checkedInAt,
+        status: ministerCheckIns.status,
+        notes: ministerCheckIns.notes
+      })
+      .from(ministerCheckIns)
+      .where(
+        and(
+          eq(ministerCheckIns.ministerId, ministerId),
+          sql`${ministerCheckIns.scheduleId} = ANY(${scheduleIds})`
+        )
+      ) : [];
+
+    // Merge scheduled masses with check-in status
+    const checkInMap = new Map(checkIns.map((c: CheckInRecord) => [c.scheduleId, c]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const history = scheduledMasses.map((mass: ScheduledMass) => {
+      const checkIn = checkInMap.get(mass.scheduleId);
+      const massDate = new Date(mass.date + 'T00:00:00');
+      const isPast = massDate < today;
+
+      let attendanceStatus: 'present' | 'late' | 'absent' | 'pending' | 'scheduled' = 'scheduled';
+
+      if (checkIn) {
+        attendanceStatus = checkIn.status as 'present' | 'late' | 'absent';
+      } else if (isPast) {
+        attendanceStatus = 'pending'; // Past mass without check-in record
+      }
+
+      return {
+        scheduleId: mass.scheduleId,
+        date: mass.date,
+        time: mass.time,
+        position: mass.position,
+        location: mass.location,
+        attendanceStatus,
+        checkedInAt: checkIn?.checkedInAt || null,
+        notes: checkIn?.notes || null
+      };
+    });
+
+    // Calculate statistics
+    type HistoryItem = typeof history[number];
+    const presentCount = history.filter((h: HistoryItem) => h.attendanceStatus === 'present').length;
+    const lateCount = history.filter((h: HistoryItem) => h.attendanceStatus === 'late').length;
+    const absentCount = history.filter((h: HistoryItem) => h.attendanceStatus === 'absent').length;
+    const pendingCount = history.filter((h: HistoryItem) => h.attendanceStatus === 'pending').length;
+    const totalPast = presentCount + lateCount + absentCount + pendingCount;
+
+    res.json({
+      minister,
+      history,
+      statistics: {
+        present: presentCount,
+        late: lateCount,
+        absent: absentCount,
+        pending: pendingCount,
+        scheduled: history.filter((h: HistoryItem) => h.attendanceStatus === 'scheduled').length,
+        totalPast,
+        attendanceRate: totalPast > 0 ? Math.round(((presentCount + lateCount) / totalPast) * 100) : null
+      },
+      period: { startDate, endDate }
+    });
+  } catch (error) {
+    console.error("Error fetching minister attendance:", error);
+    res.status(500).json({ error: "Failed to fetch minister attendance" });
+  }
+});
+
+// Export attendance report
+router.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+    const { startDate, endDate } = req.query;
+
+    // Get attendance data
+    const attendanceData = await db
+      .select({
+        odministerIdl: users.id,
+        ministerName: users.name,
+        ministerEmail: users.email,
+        totalServices: users.totalServices,
+        noShowCount: users.noShowCount,
+        reliabilityScore: users.reliabilityScore,
+        lastService: users.lastService
+      })
+      .from(users)
+      .where(eq(users.role, 'ministro'))
+      .orderBy(desc(users.totalServices));
+
+    // Get check-in stats
+    const checkInStats = await db
+      .select({
+        ministerId: ministerCheckIns.ministerId,
+        presentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as('present_count'),
+        lateCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as('late_count'),
+        absentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as('absent_count')
+      })
+      .from(ministerCheckIns)
+      .leftJoin(schedules, eq(ministerCheckIns.scheduleId, schedules.id))
+      .where(
+        and(
+          parseQueryDate(startDate) ? gte(schedules.date, parseQueryDate(startDate)!.toISOString().split('T')[0]) : sql`true`,
+          parseQueryDate(endDate) ? lte(schedules.date, parseQueryDate(endDate)!.toISOString().split('T')[0]) : sql`true`
+        )
+      )
+      .groupBy(ministerCheckIns.ministerId);
+
+    interface CheckInStat {
+      ministerId: string;
+      totalCheckIns: number;
+      presentCount: number;
+      lateCount: number;
+      absentCount: number;
+    }
+    const checkInMap = new Map<string, CheckInStat>(checkInStats.map((c: CheckInStat) => [c.ministerId, c]));
+
+    interface MinisterData {
+      odministerIdl: string;
+      ministerName: string | null;
+      ministerEmail: string | null;
+      totalServices: number | null;
+      lastService: Date | null;
+      noShowCount: number | null;
+      reliabilityScore: number | null;
+      status: string | null;
+    }
+
+    const reportData: ReportData = {
+      title: 'Relatório de Presença',
+      subtitle: 'Controle de presença dos ministros',
+      generatedAt: formatDateBR(new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ['Nome', 'Email', 'Total Serviços', 'Presenças', 'Atrasos', 'Ausências', 'Taxa (%)', 'Confiabilidade'],
+      rows: (attendanceData as MinisterData[]).map((minister: MinisterData) => {
+        const stats = checkInMap.get(minister.odministerIdl);
+        const present = stats?.presentCount || 0;
+        const late = stats?.lateCount || 0;
+        const absent = stats?.absentCount || 0;
+        const total = present + late + absent;
+        const rate = total > 0 ? Math.round(((present + late) / total) * 100) : '-';
+
+        return [
+          minister.ministerName || 'N/A',
+          minister.ministerEmail || 'N/A',
+          minister.totalServices || 0,
+          present,
+          late,
+          absent,
+          rate,
+          minister.reliabilityScore || 100
+        ];
+      }),
+      summary: [
+        { label: 'Total de Ministros', value: attendanceData.length },
+        { label: 'Total de Serviços', value: (attendanceData as MinisterData[]).reduce((acc: number, m: MinisterData) => acc + (m.totalServices || 0), 0) }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `presenca_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting attendance report:", error);
+    res.status(500).json({ error: "Failed to export report" });
   }
 });
 
