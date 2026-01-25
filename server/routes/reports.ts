@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   users,
+  questionnaires,
   questionnaireResponses,
   substitutionRequests,
   schedules,
@@ -10,7 +11,8 @@ import {
   activityLogs,
   families,
   familyRelationships,
-  ministerCheckIns
+  ministerCheckIns,
+  massTimesConfig
 } from "@shared/schema";
 import { eq, sql, and, gte, lte, desc, asc, count, avg } from "drizzle-orm";
 import { authenticateToken, requireRole } from "../auth";
@@ -1352,6 +1354,553 @@ router.get("/export/summary", authenticateToken, requireRole(["gestor", "coorden
 
   } catch (error) {
     console.error("Error exporting summary report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+
+// ============================================
+// AVAILABILITY ANALYSIS ENDPOINTS (FR-8.3)
+// ============================================
+
+// Get comprehensive availability analysis
+router.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("view_reports", { type: "availability_analysis" });
+
+  try {
+    const { months = 6 } = req.query;
+    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+
+    // Get all questionnaire responses in the period
+    const responses = await db
+      .select({
+        id: questionnaireResponses.id,
+        userId: questionnaireResponses.userId,
+        userName: users.name,
+        preferredMassTimes: questionnaireResponses.preferredMassTimes,
+        alternativeTimes: questionnaireResponses.alternativeTimes,
+        availableSundays: questionnaireResponses.availableSundays,
+        canSubstitute: questionnaireResponses.canSubstitute,
+        month: questionnaires.month,
+        year: questionnaires.year
+      })
+      .from(questionnaireResponses)
+      .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+      .where(
+        and(
+          gte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+          lte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+        )
+      );
+
+    // Get all active mass times
+    const massTimes = await db
+      .select()
+      .from(massTimesConfig)
+      .where(eq(massTimesConfig.isActive, true));
+
+    // Day of week mapping
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+    // Type for responses
+    interface ResponseData {
+      id: string;
+      userId: string;
+      userName: string | null;
+      preferredMassTimes: string[] | null;
+      alternativeTimes: string[] | null;
+      availableSundays: string[] | null;
+      canSubstitute: boolean | null;
+      month: number;
+      year: number;
+    }
+
+    // Type for mass times
+    interface MassTimeData {
+      id: string;
+      dayOfWeek: number;
+      time: string;
+      minMinisters: number;
+      maxMinisters: number;
+      isActive: boolean | null;
+      specialEvent: boolean | null;
+      eventName: string | null;
+      createdAt: Date | null;
+      updatedAt: Date | null;
+    }
+
+    // Analyze availability by mass time
+    interface TimeAvailability {
+      dayOfWeek: number;
+      dayName: string;
+      time: string;
+      preferredCount: number;
+      alternativeCount: number;
+      totalAvailable: number;
+      minRequired: number;
+      coverage: number;
+      status: 'critical' | 'warning' | 'ok' | 'excellent';
+    }
+    const timeAnalysis: TimeAvailability[] = (massTimes as MassTimeData[]).map((mt: MassTimeData) => {
+      const timeStr = mt.time;
+      let preferredCount = 0;
+      let alternativeCount = 0;
+
+      (responses as ResponseData[]).forEach((r: ResponseData) => {
+        const preferred = r.preferredMassTimes || [];
+        const alternative = r.alternativeTimes || [];
+
+        if (preferred.includes(timeStr)) preferredCount++;
+        else if (alternative.includes(timeStr)) alternativeCount++;
+      });
+
+      const totalAvailable = preferredCount + alternativeCount;
+      const coverage = mt.minMinisters > 0 ? (totalAvailable / mt.minMinisters) * 100 : 100;
+
+      let status: 'critical' | 'warning' | 'ok' | 'excellent';
+      if (coverage < 100) status = 'critical';
+      else if (coverage < 150) status = 'warning';
+      else if (coverage < 200) status = 'ok';
+      else status = 'excellent';
+
+      return {
+        dayOfWeek: mt.dayOfWeek,
+        dayName: dayNames[mt.dayOfWeek] || 'N/A',
+        time: timeStr,
+        preferredCount,
+        alternativeCount,
+        totalAvailable,
+        minRequired: mt.minMinisters,
+        coverage: Math.round(coverage),
+        status
+      };
+    }).sort((a: TimeAvailability, b: TimeAvailability) => a.coverage - b.coverage);
+
+    // Analyze availability by minister
+    interface MinisterAvailability {
+      odministerIdl: string;
+      name: string;
+      totalResponses: number;
+      avgAvailableDays: number;
+      canSubstitute: boolean;
+      preferredTimesCount: number;
+      reliabilityScore: number;
+    }
+    const ministerMap = new Map<string, {
+      name: string;
+      responses: number;
+      totalDays: number;
+      canSubstitute: boolean;
+      preferredTimes: Set<string>;
+    }>();
+
+    (responses as ResponseData[]).forEach((r: ResponseData) => {
+      const existing = ministerMap.get(r.userId);
+      const availableDays = r.availableSundays?.length || 0;
+      const preferred = r.preferredMassTimes || [];
+
+      if (existing) {
+        existing.responses++;
+        existing.totalDays += availableDays;
+        if (r.canSubstitute) existing.canSubstitute = true;
+        preferred.forEach((t: string) => existing.preferredTimes.add(t));
+      } else {
+        ministerMap.set(r.userId, {
+          name: r.userName || 'N/A',
+          responses: 1,
+          totalDays: availableDays,
+          canSubstitute: r.canSubstitute || false,
+          preferredTimes: new Set(preferred)
+        });
+      }
+    });
+
+    const ministerAnalysis: MinisterAvailability[] = Array.from(ministerMap.entries())
+      .map(([id, data]) => ({
+        odministerIdl: id,
+        name: data.name,
+        totalResponses: data.responses,
+        avgAvailableDays: data.responses > 0 ? Math.round(data.totalDays / data.responses * 10) / 10 : 0,
+        canSubstitute: data.canSubstitute,
+        preferredTimesCount: data.preferredTimes.size,
+        reliabilityScore: Math.min(100, Math.round((data.responses / numMonths) * 100))
+      }))
+      .sort((a, b) => b.avgAvailableDays - a.avgAvailableDays);
+
+    // Calculate trends by month
+    interface MonthTrend {
+      month: string;
+      year: number;
+      monthNum: number;
+      totalResponses: number;
+      avgAvailability: number;
+      substitutesAvailable: number;
+    }
+    const monthTrendsMap = new Map<string, { total: number; days: number; substitutes: number }>();
+
+    (responses as ResponseData[]).forEach((r: ResponseData) => {
+      const key = `${r.year}-${String(r.month).padStart(2, '0')}`;
+      const existing = monthTrendsMap.get(key);
+      const days = r.availableSundays?.length || 0;
+
+      if (existing) {
+        existing.total++;
+        existing.days += days;
+        if (r.canSubstitute) existing.substitutes++;
+      } else {
+        monthTrendsMap.set(key, {
+          total: 1,
+          days,
+          substitutes: r.canSubstitute ? 1 : 0
+        });
+      }
+    });
+
+    const monthTrends: MonthTrend[] = Array.from(monthTrendsMap.entries())
+      .map(([key, data]) => {
+        const [year, month] = key.split('-').map(Number);
+        const date = new Date(year, month - 1);
+        return {
+          month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+          year,
+          monthNum: month,
+          totalResponses: data.total,
+          avgAvailability: data.total > 0 ? Math.round(data.days / data.total * 10) / 10 : 0,
+          substitutesAvailable: data.substitutes
+        };
+      })
+      .sort((a, b) => a.year - b.year || a.monthNum - b.monthNum);
+
+    // Generate recommendations
+    const recommendations: string[] = [];
+
+    const criticalTimes = timeAnalysis.filter(t => t.status === 'critical');
+    if (criticalTimes.length > 0) {
+      recommendations.push(
+        `⚠️ ${criticalTimes.length} horário(s) com cobertura crítica: ${criticalTimes.map(t => `${t.dayName} ${t.time}`).join(', ')}. Considere recrutar mais ministros ou revisar os requisitos mínimos.`
+      );
+    }
+
+    const lowResponseMinisters = ministerAnalysis.filter(m => m.reliabilityScore < 50);
+    if (lowResponseMinisters.length > 0) {
+      recommendations.push(
+        `📋 ${lowResponseMinisters.length} ministro(s) com baixa taxa de resposta aos questionários. Considere entrar em contato para verificar a situação.`
+      );
+    }
+
+    const avgSubstitutes = ministerAnalysis.filter(m => m.canSubstitute).length;
+    const substitutePct = ministerAnalysis.length > 0 ? (avgSubstitutes / ministerAnalysis.length) * 100 : 0;
+    if (substitutePct < 30) {
+      recommendations.push(
+        `🔄 Apenas ${Math.round(substitutePct)}% dos ministros estão disponíveis como suplentes. Incentive mais ministros a se disponibilizarem para substituições.`
+      );
+    }
+
+    const recentTrend = monthTrends.slice(-3);
+    if (recentTrend.length >= 2) {
+      const first = recentTrend[0].avgAvailability;
+      const last = recentTrend[recentTrend.length - 1].avgAvailability;
+      if (last < first * 0.8) {
+        recommendations.push(
+          `📉 A disponibilidade média caiu ${Math.round((1 - last / first) * 100)}% nos últimos meses. Verifique se há algum problema afetando a participação.`
+        );
+      } else if (last > first * 1.2) {
+        recommendations.push(
+          `📈 A disponibilidade média aumentou ${Math.round((last / first - 1) * 100)}% nos últimos meses. Ótimo progresso!`
+        );
+      }
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push('✅ A disponibilidade geral está em níveis saudáveis. Continue monitorando regularmente.');
+    }
+
+    // Summary statistics
+    const summary = {
+      totalMinisters: ministerAnalysis.length,
+      totalResponses: responses.length,
+      avgResponseRate: ministerAnalysis.length > 0
+        ? Math.round(ministerAnalysis.reduce((sum, m) => sum + m.reliabilityScore, 0) / ministerAnalysis.length)
+        : 0,
+      criticalTimeSlots: criticalTimes.length,
+      warningTimeSlots: timeAnalysis.filter(t => t.status === 'warning').length,
+      availableSubstitutes: avgSubstitutes,
+      periodMonths: numMonths
+    };
+
+    res.json({
+      summary,
+      timeAnalysis,
+      ministerAnalysis: ministerAnalysis.slice(0, 20), // Top 20
+      leastAvailable: ministerAnalysis.slice(-10).reverse(), // Bottom 10
+      monthTrends,
+      recommendations
+    });
+
+  } catch (error) {
+    console.error("Error fetching availability analysis:", error);
+    res.status(500).json({ error: "Failed to fetch availability analysis" });
+  }
+});
+
+// Get detailed availability by mass time
+router.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const { timeId } = req.params;
+    const { months = 3 } = req.query;
+    const numMonths = Math.min(Math.max(parseInt(months) || 3, 1), 12);
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+
+    // Get the mass time config
+    const [massTime] = await db
+      .select()
+      .from(massTimesConfig)
+      .where(eq(massTimesConfig.id, timeId));
+
+    if (!massTime) {
+      return res.status(404).json({ error: "Mass time not found" });
+    }
+
+    // Get all ministers who selected this time
+    const responses = await db
+      .select({
+        userId: questionnaireResponses.userId,
+        userName: users.name,
+        preferredMassTimes: questionnaireResponses.preferredMassTimes,
+        alternativeTimes: questionnaireResponses.alternativeTimes,
+        canSubstitute: questionnaireResponses.canSubstitute,
+        month: questionnaires.month,
+        year: questionnaires.year
+      })
+      .from(questionnaireResponses)
+      .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+      .where(
+        and(
+          gte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+          lte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+        )
+      );
+
+    const timeStr = massTime.time;
+
+    interface TimeResponseData {
+      userId: string;
+      userName: string | null;
+      preferredMassTimes: string[] | null;
+      alternativeTimes: string[] | null;
+      canSubstitute: boolean | null;
+      month: number;
+      year: number;
+    }
+
+    interface MinisterInfo {
+      id: string;
+      name: string;
+      isPreferred: boolean;
+      isAlternative: boolean;
+      canSubstitute: boolean;
+      responseCount: number;
+    }
+    const ministersForTime: MinisterInfo[] = [];
+    const ministerSet = new Map<string, MinisterInfo>();
+
+    (responses as TimeResponseData[]).forEach((r: TimeResponseData) => {
+      const preferred = r.preferredMassTimes || [];
+      const alternative = r.alternativeTimes || [];
+      const isPreferred = preferred.includes(timeStr);
+      const isAlternative = alternative.includes(timeStr);
+
+      if (isPreferred || isAlternative) {
+        const existing = ministerSet.get(r.userId);
+        if (existing) {
+          existing.responseCount++;
+          if (isPreferred) existing.isPreferred = true;
+          if (isAlternative && !existing.isPreferred) existing.isAlternative = true;
+          if (r.canSubstitute) existing.canSubstitute = true;
+        } else {
+          ministerSet.set(r.userId, {
+            id: r.userId,
+            name: r.userName || 'N/A',
+            isPreferred,
+            isAlternative: !isPreferred && isAlternative,
+            canSubstitute: r.canSubstitute || false,
+            responseCount: 1
+          });
+        }
+      }
+    });
+
+    ministersForTime.push(...Array.from(ministerSet.values()));
+    ministersForTime.sort((a, b) => {
+      if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
+      return b.responseCount - a.responseCount;
+    });
+
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+    res.json({
+      massTime: {
+        id: massTime.id,
+        dayOfWeek: massTime.dayOfWeek,
+        dayName: dayNames[massTime.dayOfWeek] || 'N/A',
+        time: massTime.time,
+        minMinisters: massTime.minMinisters,
+        maxMinisters: massTime.maxMinisters
+      },
+      ministers: ministersForTime,
+      summary: {
+        preferred: ministersForTime.filter(m => m.isPreferred).length,
+        alternative: ministersForTime.filter(m => m.isAlternative).length,
+        total: ministersForTime.length,
+        substitutes: ministersForTime.filter(m => m.canSubstitute).length,
+        coverage: massTime.minMinisters > 0
+          ? Math.round((ministersForTime.length / massTime.minMinisters) * 100)
+          : 100
+      }
+    });
+
+  } catch (error) {
+    console.error("Error fetching time availability:", error);
+    res.status(500).json({ error: "Failed to fetch time availability" });
+  }
+});
+
+// Export availability analysis
+router.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("export_report", { type: "availability_analysis" });
+
+  try {
+    const { format = 'xlsx', months = 6 } = req.query;
+
+    if (!['xlsx', 'pdf', 'csv'].includes(format)) {
+      return res.status(400).json({ error: "Invalid format" });
+    }
+
+    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+
+    // Get responses
+    const responses = await db
+      .select({
+        userId: questionnaireResponses.userId,
+        userName: users.name,
+        preferredMassTimes: questionnaireResponses.preferredMassTimes,
+        alternativeTimes: questionnaireResponses.alternativeTimes,
+        availableSundays: questionnaireResponses.availableSundays,
+        canSubstitute: questionnaireResponses.canSubstitute,
+        month: questionnaires.month,
+        year: questionnaires.year
+      })
+      .from(questionnaireResponses)
+      .innerJoin(questionnaires, eq(questionnaireResponses.questionnaireId, questionnaires.id))
+      .innerJoin(users, eq(questionnaireResponses.userId, users.id))
+      .where(
+        and(
+          gte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+          lte(sql`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+        )
+      );
+
+    // Aggregate by minister
+    interface ExportResponseData {
+      userId: string;
+      userName: string | null;
+      preferredMassTimes: string[] | null;
+      alternativeTimes: string[] | null;
+      availableSundays: string[] | null;
+      canSubstitute: boolean | null;
+      month: number;
+      year: number;
+    }
+
+    interface MinisterAgg {
+      name: string;
+      responses: number;
+      totalDays: number;
+      canSubstitute: boolean;
+      preferredTimes: Set<string>;
+    }
+    const ministerMap = new Map<string, MinisterAgg>();
+
+    (responses as ExportResponseData[]).forEach((r: ExportResponseData) => {
+      const existing = ministerMap.get(r.userId);
+      const availableDays = r.availableSundays?.length || 0;
+      const preferred = r.preferredMassTimes || [];
+
+      if (existing) {
+        existing.responses++;
+        existing.totalDays += availableDays;
+        if (r.canSubstitute) existing.canSubstitute = true;
+        preferred.forEach((t: string) => existing.preferredTimes.add(t));
+      } else {
+        ministerMap.set(r.userId, {
+          name: r.userName || 'N/A',
+          responses: 1,
+          totalDays: availableDays,
+          canSubstitute: r.canSubstitute || false,
+          preferredTimes: new Set(preferred)
+        });
+      }
+    });
+
+    const rows: (string | number)[][] = Array.from(ministerMap.entries()).map(([id, data]) => [
+      data.name,
+      data.responses,
+      data.responses > 0 ? Math.round(data.totalDays / data.responses * 10) / 10 : 0,
+      data.preferredTimes.size,
+      data.canSubstitute ? 'Sim' : 'Não',
+      Math.min(100, Math.round((data.responses / numMonths) * 100))
+    ]).sort((a, b) => (b[2] as number) - (a[2] as number));
+
+    const totalMinisters = ministerMap.size;
+    const avgAvailability = rows.length > 0
+      ? Math.round(rows.reduce((sum, r) => sum + (r[2] as number), 0) / rows.length * 10) / 10
+      : 0;
+    const substitutesAvailable = Array.from(ministerMap.values()).filter(m => m.canSubstitute).length;
+
+    const reportData: ReportData = {
+      title: 'Análise de Disponibilidade',
+      subtitle: 'Padrões de disponibilidade dos ministros',
+      generatedAt: formatDateBR(new Date()),
+      period: `Últimos ${numMonths} meses`,
+      headers: ['Nome', 'Respostas', 'Média Dias', 'Horários Preferidos', 'Suplente', 'Taxa Resposta (%)'],
+      rows,
+      summary: [
+        { label: 'Total de Ministros', value: totalMinisters },
+        { label: 'Média de Disponibilidade', value: `${avgAvailability} dias` },
+        { label: 'Suplentes Disponíveis', value: substitutesAvailable }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `analise_disponibilidade_${new Date().toISOString().split('T')[0]}.${getFileExtension(format as ExportFormat)}`;
+    res.setHeader('Content-Type', getMimeType(format as ExportFormat));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting availability analysis:", error);
     res.status(500).json({ error: "Failed to export report" });
   }
 });

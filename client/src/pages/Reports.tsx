@@ -268,6 +268,21 @@ export default function Reports() {
     }
   });
 
+  // Fetch comprehensive availability analysis (FR-8.3)
+  const { data: availabilityAnalysis, isLoading: availabilityAnalysisLoading } = useQuery({
+    queryKey: ["/api/reports/availability-analysis"],
+    queryFn: async () => {
+      const response = await fetch("/api/reports/availability-analysis?months=6", {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch availability analysis");
+      return response.json();
+    }
+  });
+
   // Format data for charts
   const availabilityChartData = availability?.topAvailable?.map((item: any) => ({
     name: item.userName?.split(" ")[0] || "N/A",
@@ -291,7 +306,7 @@ export default function Reports() {
   // Check for any loading or error state
   const isAnyLoading = summaryLoading || availabilityLoading || substitutionsLoading ||
                        engagementLoading || formationLoading || familiesLoading ||
-                       trendsLoading || patternsLoading || attendanceLoading;
+                       trendsLoading || patternsLoading || attendanceLoading || availabilityAnalysisLoading;
 
   // Export function
   const handleExport = async (reportType: string, format: 'xlsx' | 'pdf' | 'csv') => {
@@ -987,47 +1002,285 @@ export default function Reports() {
                 </Card>
               </TabsContent>
 
-              {/* Availability Tab */}
+              {/* Availability Analysis Tab (FR-8.3) */}
               <TabsContent value="availability" className="space-y-4 mt-4">
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-base sm:text-lg">Top 10 Ministros Mais Disponíveis</CardTitle>
-                    <CardDescription>
-                      Ministros com maior número de dias disponíveis no período
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-2 sm:p-6">
-                    {availabilityLoading ? (
-                      <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Carregando dados...</p>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ministros Ativos</p>
+                          <p className="text-2xl font-bold">{availabilityAnalysis?.summary?.totalMinisters || 0}</p>
                         </div>
+                        <Users className="h-8 w-8 text-primary/20" />
                       </div>
-                    ) : availabilityChartData.length > 0 ? (
-                      <div className="w-full overflow-x-auto">
-                        <div className="min-w-[400px]">
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Taxa de Resposta</p>
+                          <p className="text-2xl font-bold">{availabilityAnalysis?.summary?.avgResponseRate || 0}%</p>
+                        </div>
+                        <Activity className="h-8 w-8 text-primary/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Horários Críticos</p>
+                          <p className="text-2xl font-bold text-red-500">{availabilityAnalysis?.summary?.criticalTimeSlots || 0}</p>
+                        </div>
+                        <AlertCircle className="h-8 w-8 text-red-200" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Suplentes Disponíveis</p>
+                          <p className="text-2xl font-bold">{availabilityAnalysis?.summary?.availableSubstitutes || 0}</p>
+                        </div>
+                        <RefreshCw className="h-8 w-8 text-primary/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Recommendations */}
+                {availabilityAnalysis?.recommendations && availabilityAnalysis.recommendations.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5" />
+                        Recomendações
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {availabilityAnalysis.recommendations.map((rec: string, idx: number) => (
+                          <Alert key={idx} variant={rec.includes('⚠️') || rec.includes('📉') ? 'destructive' : 'default'}>
+                            <AlertDescription className="text-sm">{rec}</AlertDescription>
+                          </Alert>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Time Analysis Chart */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base sm:text-lg">Cobertura por Horário</CardTitle>
+                          <CardDescription>Disponibilidade de ministros por horário de missa</CardDescription>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4 mr-1" />
+                              Exportar
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleExport('availability-analysis', 'xlsx')}>
+                              <FileSpreadsheet className="h-4 w-4 mr-2" />
+                              Excel (.xlsx)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport('availability-analysis', 'pdf')}>
+                              <FileDown className="h-4 w-4 mr-2" />
+                              PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport('availability-analysis', 'csv')}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              CSV
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {availabilityAnalysisLoading ? (
+                        <div className="flex items-center justify-center h-64">
+                          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : availabilityAnalysis?.timeAnalysis?.length > 0 ? (
+                        <div className="w-full overflow-x-auto">
                           <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={availabilityChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <BarChart
+                              data={availabilityAnalysis.timeAnalysis.slice(0, 10).map((t: any) => ({
+                                name: `${t.dayName?.substring(0, 3)} ${t.time}`,
+                                cobertura: t.coverage,
+                                preferidos: t.preferredCount,
+                                alternativos: t.alternativeCount,
+                                minimo: t.minRequired
+                              }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 60 }}
+                            >
                               <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} fontSize={12} />
                               <YAxis />
                               <Tooltip />
                               <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                              <Bar dataKey="dias" fill="#D4AF37" name="Dias Disponíveis" />
-                              <Bar dataKey="respostas" fill="#B87333" name="Questionários Respondidos" />
+                              <Bar dataKey="preferidos" stackId="a" fill="#D4AF37" name="Preferido" />
+                              <Bar dataKey="alternativos" stackId="a" fill="#B87333" name="Alternativo" />
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                          <Clock className="h-12 w-12 mb-2" />
+                          <p className="text-center">Nenhum dado de horário disponível</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Trend Chart */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base sm:text-lg">Tendência de Disponibilidade</CardTitle>
+                      <CardDescription>Evolução mensal da disponibilidade</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {availabilityAnalysisLoading ? (
+                        <div className="flex items-center justify-center h-64">
+                          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : availabilityAnalysis?.monthTrends?.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <AreaChart data={availabilityAnalysis.monthTrends}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Area
+                              type="monotone"
+                              dataKey="avgAvailability"
+                              stroke="#D4AF37"
+                              fill="#D4AF37"
+                              fillOpacity={0.3}
+                              name="Média de Dias"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="substitutesAvailable"
+                              stroke="#B87333"
+                              fill="#B87333"
+                              fillOpacity={0.3}
+                              name="Suplentes"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                          <TrendingUp className="h-12 w-12 mb-2" />
+                          <p className="text-center">Nenhum dado de tendência disponível</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Ministers Table */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base sm:text-lg">Ranking de Disponibilidade</CardTitle>
+                    <CardDescription>Top ministros por disponibilidade média</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {availabilityAnalysisLoading ? (
+                      <div className="flex items-center justify-center h-32">
+                        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : availabilityAnalysis?.ministerAnalysis?.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2">Ministro</th>
+                              <th className="text-center p-2">Média Dias</th>
+                              <th className="text-center p-2">Horários</th>
+                              <th className="text-center p-2">Suplente</th>
+                              <th className="text-center p-2">Taxa Resposta</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {availabilityAnalysis.ministerAnalysis.slice(0, 10).map((minister: any, idx: number) => (
+                              <tr key={minister.odministerIdl || idx} className="border-b hover:bg-muted/50">
+                                <td className="p-2 font-medium">{minister.name}</td>
+                                <td className="text-center p-2">{minister.avgAvailableDays}</td>
+                                <td className="text-center p-2">{minister.preferredTimesCount}</td>
+                                <td className="text-center p-2">
+                                  {minister.canSubstitute ? (
+                                    <Badge variant="default" className="bg-green-100 text-green-800">Sim</Badge>
+                                  ) : (
+                                    <Badge variant="secondary">Não</Badge>
+                                  )}
+                                </td>
+                                <td className="text-center p-2">
+                                  <Badge
+                                    variant={minister.reliabilityScore >= 80 ? 'default' : minister.reliabilityScore >= 50 ? 'secondary' : 'destructive'}
+                                    className={minister.reliabilityScore >= 80 ? 'bg-green-100 text-green-800' : ''}
+                                  >
+                                    {minister.reliabilityScore}%
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                        <FileText className="h-12 w-12 mb-2" />
-                        <p className="text-center">Nenhum dado disponível para o período selecionado</p>
+                      <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                        <Users className="h-8 w-8 mb-2" />
+                        <p className="text-center text-sm">Nenhum dado de ministro disponível</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Critical Time Slots */}
+                {availabilityAnalysis?.timeAnalysis?.filter((t: any) => t.status === 'critical' || t.status === 'warning').length > 0 && (
+                  <Card className="border-orange-200 bg-orange-50/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-orange-700">
+                        <AlertCircle className="h-5 w-5" />
+                        Horários com Atenção
+                      </CardTitle>
+                      <CardDescription>Horários com cobertura abaixo do ideal</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {availabilityAnalysis.timeAnalysis
+                          .filter((t: any) => t.status === 'critical' || t.status === 'warning')
+                          .map((t: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium">{t.dayName} {t.time}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t.totalAvailable} disponíveis / {t.minRequired} mínimo
+                                  </p>
+                                </div>
+                                <Badge variant={t.status === 'critical' ? 'destructive' : 'secondary'}>
+                                  {t.coverage}%
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               {/* Substitutions Tab */}
