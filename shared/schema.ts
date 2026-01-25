@@ -135,10 +135,17 @@ export const users = pgTable("users", {
   approvedAt: timestamp('approved_at'),
   approvedById: varchar('approved_by_id'),
   rejectionReason: text('rejection_reason'),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
-});
+}, (table) => [
+  // Filter users by status (pending, active, inactive)
+  index('idx_users_status').on(table.status),
+  // Filter by role and status (e.g., active ministers)
+  index('idx_users_role_status').on(table.role, table.status),
+  // Quick email lookup for authentication
+  index('idx_users_email').on(table.email)
+]);
 
 // Families table
 export const families = pgTable('families', {
@@ -212,12 +219,18 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   // Soft delete fields (Phase 1 - Data Integrity)
   deletedAt: timestamp("deleted_at"),
   isDeleted: boolean("is_deleted").notNull().default(false),
-}, (table) => ({
+}, (table) => [
   // Global unique constraint for UPSERT - one response per user per questionnaire (regardless of soft delete status)
   // Soft delete is just a flag - UPSERT always updates the same record and resurrects it
-  userQuestionnaireUnique: unique('questionnaire_responses_user_questionnaire_key')
+  unique('questionnaire_responses_user_questionnaire_key')
     .on(table.userId, table.questionnaireId),
-}));
+  // Get all responses for a questionnaire (report generation)
+  index('idx_questionnaire_responses_questionnaire').on(table.questionnaireId),
+  // Get all responses for a user
+  index('idx_questionnaire_responses_user').on(table.userId),
+  // Filter deleted responses
+  index('idx_questionnaire_responses_deleted').on(table.isDeleted)
+]);
 
 // Schedules
 export const schedules = pgTable('schedules', {
@@ -243,7 +256,11 @@ export const schedules = pgTable('schedules', {
   index('idx_schedules_date').on(table.date),
   index('idx_schedules_minister').on(table.ministerId),
   index('idx_schedules_date_time').on(table.date, table.time),
-  index('idx_schedules_status').on(table.status)
+  index('idx_schedules_status').on(table.status),
+  // Minister schedule lookup by date (my schedules)
+  index('idx_schedules_minister_date').on(table.ministerId, table.date),
+  // Published schedules filtering
+  index('idx_schedules_date_status').on(table.date, table.status)
 ]);
 
 // Mass Execution Logs (for auxiliary leaders)
@@ -336,7 +353,11 @@ export const substitutionRequests = pgTable('substitution_requests', {
   index('idx_substitution_requester').on(table.requesterId),
   index('idx_substitution_substitute').on(table.substituteId),
   index('idx_substitution_status').on(table.status),
-  index('idx_substitution_schedule').on(table.scheduleId)
+  index('idx_substitution_schedule').on(table.scheduleId),
+  // Check substitution status for a schedule
+  index('idx_substitution_schedule_status').on(table.scheduleId, table.status),
+  // User's substitution history ordered by date
+  index('idx_substitution_requester_created').on(table.requesterId, table.createdAt)
 ]);
 
 // Notifications
@@ -353,7 +374,14 @@ export const notifications = pgTable('notifications', {
   priority: varchar('priority', { length: 10 }).default('normal'),
   expiresAt: timestamp('expires_at'),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => [
+  // Critical: fetching unread notifications for a user
+  index('idx_notifications_user_read').on(table.userId, table.read),
+  // Listing notifications by user ordered by creation
+  index('idx_notifications_user_created').on(table.userId, table.createdAt),
+  // Cleanup expired notifications
+  index('idx_notifications_expires').on(table.expiresAt)
+]);
 
 // Push notification subscriptions
 export const pushSubscriptions = pgTable('push_subscriptions', {
@@ -365,7 +393,9 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [
-  uniqueIndex('push_subscriptions_endpoint_idx').on(table.endpoint)
+  uniqueIndex('push_subscriptions_endpoint_idx').on(table.endpoint),
+  // Find all subscriptions for a user (sending push notifications)
+  index('idx_push_subscriptions_user').on(table.userId)
 ]);
 
 // Formation tracks (tracks like liturgia, espiritualidade, pratica)
@@ -404,7 +434,14 @@ export const formationProgress = pgTable('formation_progress', {
   progressPercentage: integer('progress_percentage').default(0),
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => [
+  // Get all progress for a user
+  index('idx_formation_progress_user').on(table.userId),
+  // Get all progress for a module
+  index('idx_formation_progress_module').on(table.moduleId),
+  // Unique progress per user/module combination
+  index('idx_formation_progress_user_module').on(table.userId, table.moduleId)
+]);
 
 // Formation lessons (individual lessons within modules)
 export const formationLessons = pgTable('formation_lessons', {
@@ -454,7 +491,14 @@ export const formationLessonProgress = pgTable('formation_lesson_progress', {
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
-});
+}, (table) => [
+  // Get all lesson progress for a user
+  index('idx_formation_lesson_progress_user').on(table.userId),
+  // Get all progress for a lesson
+  index('idx_formation_lesson_progress_lesson').on(table.lessonId),
+  // Unique progress per user/lesson combination
+  index('idx_formation_lesson_progress_user_lesson').on(table.userId, table.lessonId)
+]);
 
 // Mass times configuration
 export const massTimesConfig = pgTable('mass_times_config', {
@@ -481,7 +525,12 @@ export const passwordResetRequests = pgTable('password_reset_requests', {
   processedAt: timestamp('processed_at'),
   adminNotes: text('admin_notes'),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => [
+  // Filter requests by status (pending requests queue)
+  index('idx_password_reset_status').on(table.status),
+  // Get requests for a user
+  index('idx_password_reset_user').on(table.userId)
+]);
 
 // Adoration draws - tracks sorteios para adoração ao Santíssimo
 export const adorationDraws = pgTable('adoration_draws', {

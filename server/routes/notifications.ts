@@ -124,11 +124,14 @@ router.post("/push/unsubscribe", requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
-// Listar notificações do usuário
+// Listar notificações do usuário (paginado)
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const notifications = await storage.getUserNotifications(req.user!.id);
-    res.json(notifications);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+    const result = await storage.getUserNotificationsPaginated(req.user!.id, { limit, offset });
+    res.json(result);
   } catch (error) {
     console.error('[NOTIFICATIONS] Error fetching notifications:', error);
     res.status(500).json({ error: "Erro ao buscar notificações" });

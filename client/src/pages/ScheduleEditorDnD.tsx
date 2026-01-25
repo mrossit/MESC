@@ -121,7 +121,9 @@ export default function ScheduleEditorDnD() {
       // Buscar ministros
       const ministersResponse = await fetch('/api/users/active', { credentials: 'include' });
       if (ministersResponse.ok) {
-        const ministersData = await ministersResponse.json();
+        const response = await ministersResponse.json();
+        // Handle paginated response format { data: [], total, hasMore }
+        const ministersData = response.data ?? response;
         const formattedMinisters: Minister[] = ministersData
           .filter((u: any) => u.role === 'ministro' && u.status === 'active')
           .map((u: any) => ({

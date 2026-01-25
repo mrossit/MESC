@@ -115,7 +115,9 @@ export default function Profile() {
     queryFn: async () => {
       const res = await fetch('/api/users/active', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch users');
-      return res.json();
+      const response = await res.json();
+      // Handle paginated response format { data: [], total, hasMore }
+      return response.data ?? response;
     },
     enabled: showAddFamily
   });

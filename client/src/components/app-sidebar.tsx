@@ -103,19 +103,19 @@ export function AppSidebar() {
   });
 
   // Fetch pending users count for coordinators
-  const { data: pendingUsersData } = useQuery({
+  const { data: pendingUsersData } = useQuery<{ data: any[]; total: number; hasMore: boolean }>({
     queryKey: ["/api/users/pending"],
     queryFn: async () => {
       const response = await fetch("/api/users/pending", {
         credentials: "include"
       });
-      if (!response.ok) return { users: [] };
+      if (!response.ok) return { data: [], total: 0, hasMore: false };
       return response.json();
     },
     enabled: !!user && (user.role === "coordenador" || user.role === "gestor"),
   });
 
-  const pendingUsersCount = pendingUsersData?.users?.length || 0;
+  const pendingUsersCount = pendingUsersData?.total ?? pendingUsersData?.data?.length ?? 0;
 
   const handleLogout = async () => {
     await authAPI.logout();

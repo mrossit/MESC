@@ -13,13 +13,12 @@ import type { User as UserType } from "@/lib/types";
 export default function Approvals() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery<UserType[]>({
+  const { data, isLoading, error } = useQuery<{ data: UserType[]; total: number; hasMore: boolean }>({
     queryKey: ["/api/users/pending"],
-    initialData: [], // Começar com array vazio
   });
 
-  // Garantir que pendingUsers seja sempre um array, mesmo que data seja null/undefined
-  const pendingUsers = Array.isArray(data) ? data : [];
+  // Garantir que pendingUsers seja sempre um array (handle both old and new format)
+  const pendingUsers = Array.isArray(data) ? data : (data?.data ?? []);
 
   const updateUserStatusMutation = useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: string }) => {

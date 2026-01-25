@@ -89,7 +89,9 @@ export default function MinistersDirectory() {
         throw new Error(`Failed to fetch ministers: ${res.status}`);
       }
 
-      const data = await res.json();
+      const response = await res.json();
+      // Handle paginated response format { data: [], total, hasMore }
+      const data = response.data ?? response;
 
       // Filtrar ministros, coordenadores e gestores ativos
       const filtered = data.filter((user: Minister) =>

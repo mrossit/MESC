@@ -78,11 +78,12 @@ export function NotificationBell({ compact = false, showLabel = false, className
     enabled: true
   });
 
-  // Fetch notifications
-  const { data: notifications = [], refetch: refetchNotifications } = useQuery<Notification[]>({
+  // Fetch notifications (paginated)
+  const { data: notificationsResponse, refetch: refetchNotifications } = useQuery<{ data: Notification[]; total: number; hasMore: boolean }>({
     queryKey: ["/api/notifications"],
     enabled: open, // Only fetch when popover is open
   });
+  const notifications = notificationsResponse?.data ?? [];
 
   // Fetch unread count - polling as fallback, WebSocket provides instant updates
   const { data: unreadCount } = useQuery<{ count: number }>({
