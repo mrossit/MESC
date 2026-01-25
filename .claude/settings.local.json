@@ -70,7 +70,8 @@
       "Bash(LOAD_TEST_URL=http://localhost:5000 npm run test:load:*)",
       "Bash(yes:*)",
       "Bash(npx vite-node:*)",
-      "Bash(npm run test:run:*)"
+      "Bash(npm run test:run:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []
