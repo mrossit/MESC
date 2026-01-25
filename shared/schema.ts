@@ -676,6 +676,153 @@ export const activityLogs = pgTable('activity_logs', {
   index('idx_activity_logs_created').on(table.createdAt)
 ]);
 
+// ============================================
+// GAMIFICATION SYSTEM TABLES
+// ============================================
+
+// Badge categories enum
+export const badgeCategoryEnum = pgEnum('badge_category', [
+  'participation',    // Participacao em missas
+  'formation',        // Formacao e aprendizado
+  'community',        // Comunidade e ajuda
+  'streak',           // Sequencias e consistencia
+  'milestone',        // Marcos importantes
+  'special'           // Eventos especiais
+]);
+
+// Badge rarity enum
+export const badgeRarityEnum = pgEnum('badge_rarity', [
+  'common',           // Comum - facil de obter
+  'uncommon',         // Incomum
+  'rare',             // Raro
+  'epic',             // Epico
+  'legendary'         // Lendario - muito dificil
+]);
+
+// Badge definitions
+export const badges = pgTable('badges', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 50 }).notNull().unique(), // Unique identifier
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  category: badgeCategoryEnum('category').notNull(),
+  rarity: badgeRarityEnum('rarity').notNull().default('common'),
+  iconName: varchar('icon_name', { length: 50 }), // Lucide icon name
+  iconColor: varchar('icon_color', { length: 20 }), // Tailwind color class
+  pointsAwarded: integer('points_awarded').default(0),
+  requirement: jsonb('requirement').$type<{
+    type: string;
+    value: number;
+    description: string;
+  }>(),
+  isActive: boolean('is_active').default(true),
+  isSecret: boolean('is_secret').default(false), // Hidden until earned
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_badges_category').on(table.category),
+  index('idx_badges_active').on(table.isActive)
+]);
+
+// User badges - badges earned by users
+export const userBadges = pgTable('user_badges', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  badgeId: uuid('badge_id').notNull().references(() => badges.id, { onDelete: 'cascade' }),
+  earnedAt: timestamp('earned_at').defaultNow(),
+  isFeatured: boolean('is_featured').default(false), // Displayed prominently on profile
+  progress: integer('progress').default(100), // For partial progress badges
+  metadata: jsonb('metadata') // Additional context
+}, (table) => [
+  index('idx_user_badges_user').on(table.userId),
+  index('idx_user_badges_badge').on(table.badgeId),
+  unique('unique_user_badge').on(table.userId, table.badgeId)
+]);
+
+// User points summary
+export const userPoints = pgTable('user_points', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  totalPoints: integer('total_points').default(0),
+  currentStreak: integer('current_streak').default(0), // Consecutive weeks serving
+  longestStreak: integer('longest_streak').default(0),
+  level: integer('level').default(1),
+  levelProgress: integer('level_progress').default(0), // Points towards next level
+  massesServed: integer('masses_served').default(0),
+  substitutionsHelped: integer('substitutions_helped').default(0),
+  materialsCompleted: integer('materials_completed').default(0),
+  quizzesCompleted: integer('quizzes_completed').default(0),
+  lastActivityAt: timestamp('last_activity_at'),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_user_points_total').on(table.totalPoints),
+  index('idx_user_points_level').on(table.level)
+]);
+
+// Point action types enum
+export const pointActionEnum = pgEnum('point_action', [
+  'mass_served',           // Serviu em missa
+  'substitution_offered',  // Ofereceu substituicao
+  'substitution_accepted', // Aceitou substituir alguem
+  'material_completed',    // Completou material de formacao
+  'quiz_completed',        // Completou quiz
+  'quiz_perfect',          // Quiz com 100%
+  'streak_bonus',          // Bonus de sequencia
+  'badge_earned',          // Ganhou badge
+  'login_bonus',           // Bonus de login diario
+  'first_action',          // Primeira acao (boas vindas)
+  'community_help',        // Ajudou na comunidade
+  'special_event'          // Evento especial
+]);
+
+// Point transactions history
+export const pointTransactions = pgTable('point_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: pointActionEnum('action').notNull(),
+  points: integer('points').notNull(), // Positive for earned, negative for spent
+  description: text('description'),
+  relatedEntityType: varchar('related_entity_type', { length: 50 }), // schedule, material, badge, etc
+  relatedEntityId: varchar('related_entity_id', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_point_transactions_user').on(table.userId),
+  index('idx_point_transactions_action').on(table.action),
+  index('idx_point_transactions_created').on(table.createdAt)
+]);
+
+// Leaderboard cache (updated periodically)
+export const leaderboardCache = pgTable('leaderboard_cache', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  period: varchar('period', { length: 20 }).notNull(), // weekly, monthly, yearly, alltime
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  rank: integer('rank').notNull(),
+  points: integer('points').notNull(),
+  level: integer('level').default(1),
+  userName: varchar('user_name', { length: 255 }),
+  userPhotoUrl: text('user_photo_url'),
+  calculatedAt: timestamp('calculated_at').defaultNow()
+}, (table) => [
+  index('idx_leaderboard_period').on(table.period),
+  index('idx_leaderboard_rank').on(table.period, table.rank),
+  unique('unique_leaderboard_entry').on(table.period, table.userId)
+]);
+
+// Level definitions
+export const levelDefinitions = pgTable('level_definitions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  level: integer('level').notNull().unique(),
+  name: varchar('name', { length: 100 }).notNull(),
+  minPoints: integer('min_points').notNull(),
+  maxPoints: integer('max_points'),
+  iconName: varchar('icon_name', { length: 50 }),
+  color: varchar('color', { length: 20 }),
+  benefits: jsonb('benefits').$type<string[]>(),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_level_definitions_level').on(table.level),
+  index('idx_level_definitions_points').on(table.minPoints)
+]);
+
 // Liturgical Calendar Tables
 export const liturgicalYears = pgTable('liturgical_years', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1172,3 +1319,17 @@ export type StandbyMinister = typeof standbyMinisters.$inferSelect;
 export type InsertStandbyMinister = typeof standbyMinisters.$inferInsert;
 export type MinisterCheckIn = typeof ministerCheckIns.$inferSelect;
 export type InsertMinisterCheckIn = typeof ministerCheckIns.$inferInsert;
+
+// Gamification types
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = typeof badges.$inferInsert;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = typeof userBadges.$inferInsert;
+export type UserPoints = typeof userPoints.$inferSelect;
+export type InsertUserPoints = typeof userPoints.$inferInsert;
+export type PointTransaction = typeof pointTransactions.$inferSelect;
+export type InsertPointTransaction = typeof pointTransactions.$inferInsert;
+export type LeaderboardEntry = typeof leaderboardCache.$inferSelect;
+export type InsertLeaderboardEntry = typeof leaderboardCache.$inferInsert;
+export type LevelDefinition = typeof levelDefinitions.$inferSelect;
+export type InsertLevelDefinition = typeof levelDefinitions.$inferInsert;

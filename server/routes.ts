@@ -37,6 +37,7 @@ import cronRoutes from "./routes/cron";
 import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
 import adorationRoutes from "./routes/adoration";
 import activityRoutes from "./routes/activity";
+import gamificationRoutes from "./routes/gamification";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -264,6 +265,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Activity logs routes
   app.use('/api/activity', activityRoutes);
+
+  // Gamification routes
+  app.use('/api/gamification', gamificationRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
