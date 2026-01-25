@@ -6,6 +6,7 @@ import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { createSession } from './routes/session';
 import { auditLog, AuditAction, auditLoginAttempt, logAudit } from './middleware/auditLogger';
+import { logActivity } from './utils/activityLogger';
 
 const router = Router();
 
@@ -48,6 +49,9 @@ router.post('/login', async (req, res) => {
 
     // AUDITORIA: Log login bem-sucedido
     await auditLoginAttempt(email, true, req, undefined, result.user.id);
+
+    // Log de atividade para o sistema de logs
+    await logActivity(result.user.id, 'login', { email }, req);
 
     // Define cookie com o token JWT
     res.cookie('token', result.token, {
@@ -292,6 +296,9 @@ router.post('/logout', authenticateToken, async (req: AuthRequest, res) => {
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
+
+    // Log de atividade para o sistema de logs
+    await logActivity(req.user.id, 'logout', { email: req.user.email }, req);
   }
 
   // NOVO: Marca sessão como inativa

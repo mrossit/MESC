@@ -186,6 +186,12 @@ export function AppSidebar() {
       icon: Activity,
       roles: ["gestor", "coordenador"]
     },
+    {
+      title: "Logs de Atividade",
+      href: "/activity-logs",
+      icon: FileText,
+      roles: ["gestor", "coordenador"]
+    },
   ];
 
   const filteredMenuItems = menuItems.filter(item => 
