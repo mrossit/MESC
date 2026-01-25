@@ -29,6 +29,7 @@ import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
 import certificatesRoutes from "./routes/certificates";
 import insightsRoutes from "./routes/insights";
+import materialsRoutes from "./routes/materials";
 import whatsappApiRoutes from "./routes/whatsapp-api";
 import metricsRoutes from "./routes/metrics";
 import reliabilityMetricsRoutes from "./routes/reliabilityMetrics";
@@ -245,6 +246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Predictive insights routes (coordenador/gestor only)
   app.use('/api/insights', insightsRoutes);
+
+  // Formation materials library routes
+  app.use('/api/materials', materialsRoutes);
 
   // Metrics routes (apenas para gestor/coordenador, apenas leitura)
   app.use('/api/metrics', metricsRoutes);
