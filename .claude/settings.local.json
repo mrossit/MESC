@@ -71,7 +71,8 @@
       "Bash(yes:*)",
       "Bash(npx vite-node:*)",
       "Bash(npm run test:run:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(npm run test:coverage:*)"
     ],
     "deny": [],
     "ask": []
