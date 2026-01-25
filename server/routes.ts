@@ -33,6 +33,7 @@ import reliabilityMetricsRoutes from "./routes/reliabilityMetrics";
 import cronRoutes from "./routes/cron";
 import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
 import adorationRoutes from "./routes/adoration";
+import activityRoutes from "./routes/activity";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -240,6 +241,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Adoration draw routes (coordenador/gestor only, com proteção CSRF)
   app.use('/api/adoration', csrfProtection, adorationRoutes);
+
+  // Activity logs routes
+  app.use('/api/activity', activityRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
