@@ -219,6 +219,36 @@ export default function Reports() {
     }
   });
 
+  // Fetch trends data
+  const { data: trends, isLoading: trendsLoading } = useQuery({
+    queryKey: ["/api/reports/trends"],
+    queryFn: async () => {
+      const response = await fetch("/api/reports/trends?months=6", {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch trends");
+      return response.json();
+    }
+  });
+
+  // Fetch availability patterns
+  const { data: patterns, isLoading: patternsLoading } = useQuery({
+    queryKey: ["/api/reports/trends/availability-patterns"],
+    queryFn: async () => {
+      const response = await fetch("/api/reports/trends/availability-patterns", {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch patterns");
+      return response.json();
+    }
+  });
+
   // Format data for charts
   const availabilityChartData = availability?.topAvailable?.map((item: any) => ({
     name: item.userName?.split(" ")[0] || "N/A",
@@ -241,7 +271,8 @@ export default function Reports() {
 
   // Check for any loading or error state
   const isAnyLoading = summaryLoading || availabilityLoading || substitutionsLoading ||
-                       engagementLoading || formationLoading || familiesLoading;
+                       engagementLoading || formationLoading || familiesLoading ||
+                       trendsLoading || patternsLoading;
 
   // Export function
   const handleExport = async (reportType: string, format: 'xlsx' | 'pdf' | 'csv') => {
@@ -523,9 +554,13 @@ export default function Reports() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-2 sm:p-6">
-            <Tabs defaultValue="availability" className="space-y-4">
+            <Tabs defaultValue="trends" className="space-y-4">
               <div className="overflow-x-auto pb-2">
-                <TabsList className="inline-flex h-auto w-max lg:w-full lg:grid lg:grid-cols-5 gap-1 p-1">
+                <TabsList className="inline-flex h-auto w-max lg:w-full lg:grid lg:grid-cols-6 gap-1 p-1">
+                  <TabsTrigger value="trends" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    Tendências
+                  </TabsTrigger>
                   <TabsTrigger value="availability" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Disponibilidade</TabsTrigger>
                   <TabsTrigger value="substitutions" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Substituições</TabsTrigger>
                   <TabsTrigger value="engagement" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Engajamento</TabsTrigger>
@@ -533,6 +568,190 @@ export default function Reports() {
                   <TabsTrigger value="families" className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm">Famílias</TabsTrigger>
                 </TabsList>
               </div>
+
+              {/* Trends Tab */}
+              <TabsContent value="trends" className="space-y-4 mt-4">
+                {/* Growth Indicators */}
+                {trends?.growth && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Substituições</p>
+                            <p className="text-lg font-semibold">{trends.growth.substitutions > 0 ? '+' : ''}{trends.growth.substitutions}%</p>
+                          </div>
+                          <TrendingUp className={`h-5 w-5 ${trends.growth.substitutions >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Respostas</p>
+                            <p className="text-lg font-semibold">{trends.growth.responses > 0 ? '+' : ''}{trends.growth.responses}%</p>
+                          </div>
+                          <TrendingUp className={`h-5 w-5 ${trends.growth.responses >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Atividades</p>
+                            <p className="text-lg font-semibold">{trends.growth.activities > 0 ? '+' : ''}{trends.growth.activities}%</p>
+                          </div>
+                          <Activity className={`h-5 w-5 ${trends.growth.activities >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Usuários Ativos</p>
+                            <p className="text-lg font-semibold">{trends.growth.activeUsers > 0 ? '+' : ''}{trends.growth.activeUsers}%</p>
+                          </div>
+                          <Users className={`h-5 w-5 ${trends.growth.activeUsers >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Main Trends Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Evolução Mensal</CardTitle>
+                    <CardDescription>
+                      Comparativo dos últimos 6 meses
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-6">
+                    {trendsLoading ? (
+                      <div className="flex items-center justify-center h-64">
+                        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : trends?.trends?.length > 0 ? (
+                      <div className="w-full overflow-x-auto">
+                        <div className="min-w-[500px]">
+                          <ResponsiveContainer width="100%" height={350}>
+                            <LineChart data={trends.trends} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="substitutions" stroke="#D4AF37" strokeWidth={2} name="Substituições" dot={{ r: 4 }} />
+                              <Line type="monotone" dataKey="responses" stroke="#B87333" strokeWidth={2} name="Respostas" dot={{ r: 4 }} />
+                              <Line type="monotone" dataKey="activeUsers" stroke="#8B5A2B" strokeWidth={2} name="Usuários Ativos" dot={{ r: 4 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                        <TrendingUp className="h-12 w-12 mb-2" />
+                        <p>Dados insuficientes para análise de tendências</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Patterns Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Schedules by Day of Week */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Escalas por Dia da Semana</CardTitle>
+                      <CardDescription>Distribuição de escalas publicadas</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {patternsLoading ? (
+                        <div className="flex items-center justify-center h-48">
+                          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : patterns?.byDayOfWeek?.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={patterns.byDayOfWeek} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="schedules" fill="#D4AF37" name="Escalas" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-muted-foreground">
+                          <p>Sem dados disponíveis</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Schedules by Time */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Escalas por Horário</CardTitle>
+                      <CardDescription>Distribuição por horário de missa</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {patternsLoading ? (
+                        <div className="flex items-center justify-center h-48">
+                          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : patterns?.byTime?.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={patterns.byTime} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="schedules" fill="#B87333" name="Escalas" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-muted-foreground">
+                          <p>Sem dados disponíveis</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Activity Trend */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Atividade do Sistema</CardTitle>
+                    <CardDescription>Total de ações e formações concluídas por mês</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-6">
+                    {trendsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : trends?.trends?.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <AreaChart data={trends.trends} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Area type="monotone" dataKey="activities" stroke="#CC7766" fill="#CC7766" fillOpacity={0.3} name="Atividades" />
+                          <Area type="monotone" dataKey="formationCompleted" stroke="#8B4513" fill="#8B4513" fillOpacity={0.3} name="Formações Concluídas" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        <p>Sem dados disponíveis</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               {/* Availability Tab */}
               <TabsContent value="availability" className="space-y-4 mt-4">

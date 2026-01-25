@@ -387,6 +387,186 @@ router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"])
 });
 
 // ============================================
+// TRENDS ENDPOINTS
+// ============================================
+
+// Get monthly trends data for the last N months
+router.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("view_reports", { type: "trends" });
+
+  try {
+    const { months = 6 } = req.query;
+    const numMonths = Math.min(Math.max(parseInt(months) || 6, 3), 12);
+
+    // Generate array of last N months
+    const now = new Date();
+    const monthsArray: { year: number; month: number; label: string }[] = [];
+
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthsArray.push({
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        label: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      });
+    }
+
+    // Fetch trends data for each month
+    const trendsData = await Promise.all(monthsArray.map(async ({ year, month, label }) => {
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+
+      // Substitutions count
+      const [substitutionsResult] = await db
+        .select({
+          total: count(),
+          approved: sql<number>`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as('approved')
+        })
+        .from(substitutionRequests)
+        .where(and(
+          gte(substitutionRequests.createdAt, startOfMonth),
+          lte(substitutionRequests.createdAt, endOfMonth)
+        ));
+
+      // Schedules count (published)
+      const [schedulesResult] = await db
+        .select({ total: count() })
+        .from(schedules)
+        .where(and(
+          eq(schedules.status, 'published'),
+          gte(schedules.createdAt, startOfMonth),
+          lte(schedules.createdAt, endOfMonth)
+        ));
+
+      // Questionnaire responses count
+      const [responsesResult] = await db
+        .select({ total: count() })
+        .from(questionnaireResponses)
+        .where(and(
+          gte(questionnaireResponses.submittedAt, startOfMonth),
+          lte(questionnaireResponses.submittedAt, endOfMonth)
+        ));
+
+      // Activity logs count
+      const [activityResult] = await db
+        .select({
+          total: count(),
+          uniqueUsers: sql<number>`COUNT(DISTINCT ${activityLogs.userId})`.as('unique_users')
+        })
+        .from(activityLogs)
+        .where(and(
+          gte(activityLogs.createdAt, startOfMonth),
+          lte(activityLogs.createdAt, endOfMonth)
+        ));
+
+      // Formation completions
+      const [formationResult] = await db
+        .select({ total: count() })
+        .from(formationProgress)
+        .where(and(
+          eq(formationProgress.status, 'completed'),
+          formationProgress.completedAt ? gte(formationProgress.completedAt, startOfMonth) : sql`false`,
+          formationProgress.completedAt ? lte(formationProgress.completedAt, endOfMonth) : sql`false`
+        ));
+
+      return {
+        month: label,
+        year,
+        monthNum: month,
+        substitutions: substitutionsResult?.total || 0,
+        substitutionsApproved: substitutionsResult?.approved || 0,
+        schedules: schedulesResult?.total || 0,
+        responses: responsesResult?.total || 0,
+        activities: activityResult?.total || 0,
+        activeUsers: activityResult?.uniqueUsers || 0,
+        formationCompleted: formationResult?.total || 0
+      };
+    }));
+
+    // Calculate growth percentages (current vs previous month)
+    const current = trendsData[trendsData.length - 1];
+    const previous = trendsData[trendsData.length - 2];
+
+    const calculateGrowth = (curr: number, prev: number): number => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Math.round(((curr - prev) / prev) * 100);
+    };
+
+    const growth = previous ? {
+      substitutions: calculateGrowth(current.substitutions, previous.substitutions),
+      responses: calculateGrowth(current.responses, previous.responses),
+      activities: calculateGrowth(current.activities, previous.activities),
+      activeUsers: calculateGrowth(current.activeUsers, previous.activeUsers)
+    } : null;
+
+    res.json({
+      trends: trendsData,
+      growth,
+      period: {
+        months: numMonths,
+        from: monthsArray[0].label,
+        to: monthsArray[monthsArray.length - 1].label
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching trends data:", error);
+    res.status(500).json({ error: "Failed to fetch trends data" });
+  }
+});
+
+// Get availability patterns (by day of week and time)
+router.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  const logActivity = createActivityLogger(req);
+  await logActivity("view_reports", { type: "availability_patterns" });
+
+  try {
+    // Get schedule distribution by day of week
+    const dayOfWeekData = await db
+      .select({
+        dayOfWeek: sql<number>`EXTRACT(DOW FROM ${schedules.date}::date)`.as('day_of_week'),
+        total: count()
+      })
+      .from(schedules)
+      .where(eq(schedules.status, 'published'))
+      .groupBy(sql`EXTRACT(DOW FROM ${schedules.date}::date)`)
+      .orderBy(sql`day_of_week`);
+
+    // Map day numbers to names
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const byDayOfWeek = dayOfWeekData.map((item: { dayOfWeek: number; total: number }) => ({
+      day: dayNames[item.dayOfWeek] || 'N/A',
+      dayNum: item.dayOfWeek,
+      schedules: item.total
+    }));
+
+    // Get schedule distribution by time
+    const timeData = await db
+      .select({
+        time: schedules.time,
+        total: count()
+      })
+      .from(schedules)
+      .where(eq(schedules.status, 'published'))
+      .groupBy(schedules.time)
+      .orderBy(schedules.time);
+
+    const byTime = timeData.map((item: { time: string | null; total: number }) => ({
+      time: item.time || 'N/A',
+      schedules: item.total
+    }));
+
+    res.json({
+      byDayOfWeek,
+      byTime
+    });
+  } catch (error) {
+    console.error("Error fetching availability patterns:", error);
+    res.status(500).json({ error: "Failed to fetch availability patterns" });
+  }
+});
+
+// ============================================
 // EXPORT ENDPOINTS
 // ============================================
 
