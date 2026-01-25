@@ -43,11 +43,14 @@ export default defineConfig({
 
     // Excluir
     exclude: [
-      'node_modules',
-      'dist',
-      '.idea',
-      '.git',
-      '.cache',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.idea/**',
+      '**/.git/**',
+      '**/.cache/**',
+      '**/.config/**',
+      '**/MESC/**',
+      '**/test/load/**',
     ],
 
     // Timeouts
