@@ -12,6 +12,7 @@ import { db } from '../db';
 import { formationMaterials, materialAccessLogs, formationTracks, users } from '@shared/schema';
 import { eq, desc, and, ilike, or, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
+import { analyzeUploadedContent, generateQuizFromContent } from '../services/aiContentAnalyzer';
 
 const router = Router();
 
@@ -364,13 +365,44 @@ router.post('/', requireRole(['coordenador', 'gestor']), csrfProtection, upload.
       isPublished: isPublished === 'true' || isPublished === true
     }).returning();
 
+    // Trigger AI analysis in background (don't wait for it)
+    if (req.file && process.env.ANTHROPIC_API_KEY) {
+      analyzeUploadedContent(req.file.buffer, fileName, mimeType, title)
+        .then(async (analysis) => {
+          if (analysis.success) {
+            await db.update(formationMaterials)
+              .set({
+                aiAnalyzed: true,
+                aiSummary: analysis.summary,
+                aiSuggestedCategory: analysis.suggestedCategory,
+                aiSuggestedTags: analysis.suggestedTags,
+                aiKeyTopics: analysis.keyTopics,
+                aiContentQuality: analysis.contentQuality,
+                aiQualityNotes: analysis.qualityNotes,
+                aiQuizQuestions: analysis.quizQuestions,
+                aiAnalyzedAt: new Date(),
+                // Auto-apply suggestions if no category was set
+                category: category || analysis.suggestedCategory,
+                tags: parsedTags.length > 0 ? parsedTags : analysis.suggestedTags,
+                description: description || analysis.suggestedDescription || analysis.summary
+              })
+              .where(eq(formationMaterials.id, material.id));
+            console.log(`AI analysis completed for material ${material.id}`);
+          }
+        })
+        .catch((err) => {
+          console.error(`AI analysis failed for material ${material.id}:`, err);
+        });
+    }
+
     res.status(201).json({
       id: material.id,
       title: material.title,
       type: material.type,
       fileName: material.fileName,
       fileSize: material.fileSize,
-      createdAt: material.createdAt
+      createdAt: material.createdAt,
+      aiAnalysisPending: !!req.file && !!process.env.ANTHROPIC_API_KEY
     });
   } catch (error) {
     console.error('Error uploading material:', error);
@@ -487,6 +519,237 @@ router.get('/stats/overview', requireRole(['coordenador', 'gestor']), async (req
   } catch (error) {
     console.error('Error fetching stats:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+/**
+ * POST /api/materials/:id/analyze
+ * Manually trigger AI analysis for a material (coordinators/managers only)
+ */
+router.post('/:id/analyze', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: 'Servico de IA nao configurado' });
+    }
+
+    const [material] = await db
+      .select()
+      .from(formationMaterials)
+      .where(eq(formationMaterials.id, id));
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
+    }
+
+    if (!material.fileData) {
+      return res.status(400).json({ error: 'Material nao possui arquivo para analise' });
+    }
+
+    // Perform AI analysis
+    const fileBuffer = Buffer.from(material.fileData, 'base64');
+    const analysis = await analyzeUploadedContent(
+      fileBuffer,
+      material.fileName,
+      material.mimeType,
+      material.title
+    );
+
+    if (!analysis.success) {
+      return res.status(500).json({ error: analysis.error || 'Falha na analise' });
+    }
+
+    // Update material with analysis results
+    await db.update(formationMaterials)
+      .set({
+        aiAnalyzed: true,
+        aiSummary: analysis.summary,
+        aiSuggestedCategory: analysis.suggestedCategory,
+        aiSuggestedTags: analysis.suggestedTags,
+        aiKeyTopics: analysis.keyTopics,
+        aiContentQuality: analysis.contentQuality,
+        aiQualityNotes: analysis.qualityNotes,
+        aiQuizQuestions: analysis.quizQuestions,
+        aiAnalyzedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(formationMaterials.id, id));
+
+    res.json({
+      success: true,
+      analysis: {
+        summary: analysis.summary,
+        suggestedCategory: analysis.suggestedCategory,
+        suggestedTags: analysis.suggestedTags,
+        keyTopics: analysis.keyTopics,
+        contentQuality: analysis.contentQuality,
+        qualityNotes: analysis.qualityNotes,
+        quizQuestions: analysis.quizQuestions?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error analyzing material:', error);
+    res.status(500).json({ error: 'Erro ao analisar material' });
+  }
+});
+
+/**
+ * GET /api/materials/:id/analysis
+ * Get AI analysis results for a material
+ */
+router.get('/:id/analysis', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const [material] = await db
+      .select({
+        id: formationMaterials.id,
+        title: formationMaterials.title,
+        aiAnalyzed: formationMaterials.aiAnalyzed,
+        aiSummary: formationMaterials.aiSummary,
+        aiSuggestedCategory: formationMaterials.aiSuggestedCategory,
+        aiSuggestedTags: formationMaterials.aiSuggestedTags,
+        aiKeyTopics: formationMaterials.aiKeyTopics,
+        aiContentQuality: formationMaterials.aiContentQuality,
+        aiQualityNotes: formationMaterials.aiQualityNotes,
+        aiQuizQuestions: formationMaterials.aiQuizQuestions,
+        aiAnalyzedAt: formationMaterials.aiAnalyzedAt
+      })
+      .from(formationMaterials)
+      .where(eq(formationMaterials.id, id));
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
+    }
+
+    if (!material.aiAnalyzed) {
+      return res.json({
+        analyzed: false,
+        message: 'Material ainda nao foi analisado pela IA'
+      });
+    }
+
+    res.json({
+      analyzed: true,
+      summary: material.aiSummary,
+      suggestedCategory: material.aiSuggestedCategory,
+      suggestedTags: material.aiSuggestedTags,
+      keyTopics: material.aiKeyTopics,
+      contentQuality: material.aiContentQuality,
+      qualityNotes: material.aiQualityNotes,
+      quizQuestions: material.aiQuizQuestions,
+      analyzedAt: material.aiAnalyzedAt
+    });
+  } catch (error) {
+    console.error('Error fetching analysis:', error);
+    res.status(500).json({ error: 'Erro ao buscar analise' });
+  }
+});
+
+/**
+ * POST /api/materials/:id/apply-suggestions
+ * Apply AI suggestions to material metadata (coordinators/managers only)
+ */
+router.post('/:id/apply-suggestions', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { applyCategory, applyTags, applyDescription } = req.body;
+
+    const [material] = await db
+      .select()
+      .from(formationMaterials)
+      .where(eq(formationMaterials.id, id));
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
+    }
+
+    if (!material.aiAnalyzed) {
+      return res.status(400).json({ error: 'Material ainda nao foi analisado' });
+    }
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+
+    if (applyCategory && material.aiSuggestedCategory) {
+      updates.category = material.aiSuggestedCategory;
+    }
+
+    if (applyTags && material.aiSuggestedTags) {
+      updates.tags = material.aiSuggestedTags;
+    }
+
+    if (applyDescription && material.aiSummary) {
+      updates.description = material.aiSummary;
+    }
+
+    await db.update(formationMaterials)
+      .set(updates)
+      .where(eq(formationMaterials.id, id));
+
+    res.json({ success: true, appliedUpdates: Object.keys(updates).filter(k => k !== 'updatedAt') });
+  } catch (error) {
+    console.error('Error applying suggestions:', error);
+    res.status(500).json({ error: 'Erro ao aplicar sugestoes' });
+  }
+});
+
+/**
+ * POST /api/materials/:id/generate-quiz
+ * Generate quiz questions from material content (coordinators/managers only)
+ */
+router.post('/:id/generate-quiz', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { numQuestions = 5 } = req.body;
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: 'Servico de IA nao configurado' });
+    }
+
+    const [material] = await db
+      .select()
+      .from(formationMaterials)
+      .where(eq(formationMaterials.id, id));
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
+    }
+
+    if (!material.fileData) {
+      return res.status(400).json({ error: 'Material nao possui conteudo para gerar quiz' });
+    }
+
+    // Extract text content
+    const fileBuffer = Buffer.from(material.fileData, 'base64');
+    const textContent = fileBuffer.toString('utf-8').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
+
+    if (textContent.length < 100) {
+      return res.status(400).json({ error: 'Conteudo insuficiente para gerar quiz' });
+    }
+
+    const questions = await generateQuizFromContent(textContent, numQuestions);
+
+    if (questions.length === 0) {
+      return res.status(500).json({ error: 'Nao foi possivel gerar perguntas' });
+    }
+
+    // Save quiz questions to material
+    await db.update(formationMaterials)
+      .set({
+        aiQuizQuestions: questions,
+        updatedAt: new Date()
+      })
+      .where(eq(formationMaterials.id, id));
+
+    res.json({
+      success: true,
+      questionsGenerated: questions.length,
+      questions
+    });
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    res.status(500).json({ error: 'Erro ao gerar quiz' });
   }
 });
 

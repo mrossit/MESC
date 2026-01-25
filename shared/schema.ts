@@ -547,6 +547,21 @@ export const formationMaterials = pgTable('formation_materials', {
   downloadCount: integer('download_count').default(0),
   isPublished: boolean('is_published').default(true),
   isActive: boolean('is_active').default(true),
+  // AI Analysis fields
+  aiAnalyzed: boolean('ai_analyzed').default(false),
+  aiSummary: text('ai_summary'),
+  aiSuggestedCategory: formationCategoryEnum('ai_suggested_category'),
+  aiSuggestedTags: jsonb('ai_suggested_tags').$type<string[]>(),
+  aiKeyTopics: jsonb('ai_key_topics').$type<string[]>(),
+  aiContentQuality: varchar('ai_content_quality', { length: 20 }),
+  aiQualityNotes: jsonb('ai_quality_notes').$type<string[]>(),
+  aiQuizQuestions: jsonb('ai_quiz_questions').$type<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }[]>(),
+  aiAnalyzedAt: timestamp('ai_analyzed_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [
