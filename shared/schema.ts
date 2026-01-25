@@ -40,6 +40,7 @@ export const notificationTypeEnum = pgEnum('notification_type', ['schedule', 'su
 export const formationCategoryEnum = pgEnum('formation_category', ['liturgia', 'espiritualidade', 'pratica']);
 export const formationStatusEnum = pgEnum('formation_status', ['not_started', 'in_progress', 'completed']);
 export const lessonContentTypeEnum = pgEnum('lesson_content_type', ['text', 'video', 'audio', 'document', 'quiz', 'interactive']);
+export const materialTypeEnum = pgEnum('material_type', ['pdf', 'document', 'video', 'audio', 'image', 'presentation', 'other']);
 export const liturgicalCycleEnum = pgEnum('liturgical_cycle', ['A', 'B', 'C']);
 export const liturgicalColorEnum = pgEnum('liturgical_color', ['white', 'red', 'green', 'purple', 'rose', 'black']);
 export const celebrationRankEnum = pgEnum('celebration_rank', ['SOLEMNITY', 'FEAST', 'MEMORIAL', 'OPTIONAL_MEMORIAL', 'FERIAL']);
@@ -527,6 +528,46 @@ export const formationCertificates = pgTable('formation_certificates', {
   index('idx_certificates_verification').on(table.verificationCode)
 ]);
 
+// Formation Materials Library - uploaded files for training
+export const formationMaterials = pgTable('formation_materials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  type: materialTypeEnum('type').notNull().default('pdf'),
+  category: formationCategoryEnum('category'), // Optional - links to track category
+  trackId: varchar('track_id').references(() => formationTracks.id, { onDelete: 'set null' }), // Optional link to track
+  fileName: varchar('file_name', { length: 255 }).notNull(),
+  fileSize: integer('file_size').notNull(), // Size in bytes
+  mimeType: varchar('mime_type', { length: 100 }).notNull(),
+  fileData: text('file_data'), // Base64 encoded file content (for smaller files)
+  externalUrl: varchar('external_url', { length: 512 }), // URL for external/large files
+  thumbnailData: text('thumbnail_data'), // Base64 thumbnail for previews
+  tags: jsonb('tags').$type<string[]>().default([]),
+  uploadedBy: varchar('uploaded_by').notNull().references(() => users.id, { onDelete: 'set null' }),
+  downloadCount: integer('download_count').default(0),
+  isPublished: boolean('is_published').default(true),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_materials_category').on(table.category),
+  index('idx_materials_track').on(table.trackId),
+  index('idx_materials_type').on(table.type),
+  index('idx_materials_uploaded_by').on(table.uploadedBy)
+]);
+
+// Material access logs for analytics
+export const materialAccessLogs = pgTable('material_access_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  materialId: uuid('material_id').notNull().references(() => formationMaterials.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: varchar('action', { length: 20 }).notNull(), // 'view', 'download'
+  accessedAt: timestamp('accessed_at').defaultNow()
+}, (table) => [
+  index('idx_material_access_material').on(table.materialId),
+  index('idx_material_access_user').on(table.userId)
+]);
+
 // Mass times configuration
 export const massTimesConfig = pgTable('mass_times_config', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -924,6 +965,29 @@ export const formationLessonProgressRelations = relations(formationLessonProgres
   })
 }));
 
+export const formationMaterialsRelations = relations(formationMaterials, ({ one, many }) => ({
+  track: one(formationTracks, {
+    fields: [formationMaterials.trackId],
+    references: [formationTracks.id]
+  }),
+  uploader: one(users, {
+    fields: [formationMaterials.uploadedBy],
+    references: [users.id]
+  }),
+  accessLogs: many(materialAccessLogs)
+}));
+
+export const materialAccessLogsRelations = relations(materialAccessLogs, ({ one }) => ({
+  material: one(formationMaterials, {
+    fields: [materialAccessLogs.materialId],
+    references: [formationMaterials.id]
+  }),
+  user: one(users, {
+    fields: [materialAccessLogs.userId],
+    references: [users.id]
+  })
+}));
+
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
     fields: [notifications.userId],
@@ -1020,6 +1084,24 @@ export const insertFormationLessonProgressSchema = createInsertSchema(formationL
   lastAccessedAt: true
 });
 
+// Formation materials schema
+export const insertFormationMaterialSchema = createInsertSchema(formationMaterials).pick({
+  title: true,
+  description: true,
+  type: true,
+  category: true,
+  trackId: true,
+  fileName: true,
+  fileSize: true,
+  mimeType: true,
+  fileData: true,
+  externalUrl: true,
+  thumbnailData: true,
+  tags: true,
+  uploadedBy: true,
+  isPublished: true
+});
+
 // Adoration schemas
 export const insertAdorationDrawSchema = createInsertSchema(adorationDraws).pick({
   month: true,
@@ -1063,6 +1145,10 @@ export type FormationLessonProgress = typeof formationLessonProgress.$inferSelec
 export type InsertFormationLessonProgress = z.infer<typeof insertFormationLessonProgressSchema>;
 export type FormationCertificate = typeof formationCertificates.$inferSelect;
 export type InsertFormationCertificate = typeof formationCertificates.$inferInsert;
+export type FormationMaterial = typeof formationMaterials.$inferSelect;
+export type InsertFormationMaterial = z.infer<typeof insertFormationMaterialSchema>;
+export type MaterialAccessLog = typeof materialAccessLogs.$inferSelect;
+export type InsertMaterialAccessLog = typeof materialAccessLogs.$inferInsert;
 export type Saint = typeof saints.$inferSelect;
 export type InsertSaint = typeof saints.$inferInsert;
 export type MassExecutionLog = typeof massExecutionLogs.$inferSelect;
