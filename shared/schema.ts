@@ -44,6 +44,7 @@ export const materialTypeEnum = pgEnum('material_type', ['pdf', 'document', 'vid
 export const liturgicalCycleEnum = pgEnum('liturgical_cycle', ['A', 'B', 'C']);
 export const liturgicalColorEnum = pgEnum('liturgical_color', ['white', 'red', 'green', 'purple', 'rose', 'black']);
 export const celebrationRankEnum = pgEnum('celebration_rank', ['SOLEMNITY', 'FEAST', 'MEMORIAL', 'OPTIONAL_MEMORIAL', 'FERIAL']);
+export const confirmationStatusEnum = pgEnum('confirmation_status', ['pending', 'confirmed', 'declined', 'no_response', 'no_show']);
 
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
@@ -334,6 +335,29 @@ export const ministerCheckIns = pgTable('minister_check_ins', {
 }, (table) => [
   index('idx_minister_check_ins_schedule').on(table.scheduleId),
   index('idx_minister_check_ins_minister').on(table.ministerId)
+]);
+
+// Schedule Confirmations (minister attendance confirmation)
+export const scheduleConfirmations = pgTable('schedule_confirmations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  ministerId: varchar('minister_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: confirmationStatusEnum('status').notNull().default('pending'),
+  requestedAt: timestamp('requested_at').defaultNow(),
+  respondedAt: timestamp('responded_at'),
+  reminderSentAt: timestamp('reminder_sent_at'),
+  reminderCount: integer('reminder_count').default(0),
+  declineReason: text('decline_reason'),
+  notes: text('notes'),
+  requestedBy: varchar('requested_by').references(() => users.id), // Coordinator who requested
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_schedule_confirmations_schedule').on(table.scheduleId),
+  index('idx_schedule_confirmations_minister').on(table.ministerId),
+  index('idx_schedule_confirmations_status').on(table.status),
+  // Unique constraint: one confirmation per minister per schedule
+  uniqueIndex('idx_schedule_confirmations_unique').on(table.scheduleId, table.ministerId)
 ]);
 
 // Substitution requests
@@ -1319,6 +1343,8 @@ export type StandbyMinister = typeof standbyMinisters.$inferSelect;
 export type InsertStandbyMinister = typeof standbyMinisters.$inferInsert;
 export type MinisterCheckIn = typeof ministerCheckIns.$inferSelect;
 export type InsertMinisterCheckIn = typeof ministerCheckIns.$inferInsert;
+export type ScheduleConfirmation = typeof scheduleConfirmations.$inferSelect;
+export type InsertScheduleConfirmation = typeof scheduleConfirmations.$inferInsert;
 
 // Gamification types
 export type Badge = typeof badges.$inferSelect;
