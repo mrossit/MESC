@@ -68,7 +68,9 @@
       "Bash(npm test:*)",
       "Bash(npm run test:load:pwa:*)",
       "Bash(LOAD_TEST_URL=http://localhost:5000 npm run test:load:*)",
-      "Bash(yes:*)"
+      "Bash(yes:*)",
+      "Bash(npx vite-node:*)",
+      "Bash(npm run test:run:*)"
     ],
     "deny": [],
     "ask": []
