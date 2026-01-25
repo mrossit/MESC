@@ -7,6 +7,9 @@ import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
 import type { ScheduleAssignment } from "../types/schedules";
+import { sendPushNotificationToUsers } from "../utils/pushNotifications";
+import { storage } from "../storage";
+import { notifyUsers } from "../websocket";
 
 // Query parameter validation schemas
 const ministerIdQuerySchema = z.object({
@@ -737,7 +740,54 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
       // Don't fail the publish if learning analysis fails
     }
 
-    // TODO: Send notifications to all ministers
+    // Notificar todos os ministros escalados (push + in-app)
+    try {
+      // Buscar ministros únicos que estão escalados neste mês
+      const uniqueMinisterIds = [...new Set(result.map((s: typeof schedules.$inferSelect) => s.ministerId).filter(Boolean))] as string[];
+
+      if (uniqueMinisterIds.length > 0) {
+        const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                           'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        const monthName = monthNames[month - 1];
+
+        const notificationTitle = '📅 Nova Escala Publicada';
+        const notificationMessage = `A escala de ${monthName}/${year} foi publicada. Confira suas escalas e fique atento aos horários.`;
+
+        // Criar notificações in-app para todos os ministros
+        await Promise.all(uniqueMinisterIds.map(ministerId =>
+          storage.createNotification({
+            userId: ministerId,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: 'schedule',
+            read: false,
+            actionUrl: '/schedules'
+          })
+        ));
+
+        // Enviar push notifications
+        await sendPushNotificationToUsers(uniqueMinisterIds, {
+          title: notificationTitle,
+          body: notificationMessage,
+          url: '/schedules'
+        });
+
+        // Notificar via WebSocket para atualização em tempo real
+        notifyUsers(uniqueMinisterIds, {
+          id: 'schedule-published-' + month + '-' + year,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'info',
+          actionUrl: '/schedules',
+          createdAt: new Date().toISOString()
+        });
+
+        console.log(`[PUSH] Notificação de escala publicada enviada para ${uniqueMinisterIds.length} ministros`);
+      }
+    } catch (notifError) {
+      console.error("[SCHEDULES] Erro ao enviar notificações de escala publicada:", notifError);
+      // Não falhar a publicação se as notificações falharem
+    }
 
     res.json({
       message: `Escala publicada com sucesso! ${result.length} escalas atualizadas.`,

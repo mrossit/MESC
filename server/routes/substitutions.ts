@@ -5,6 +5,9 @@ import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { scheduleCache } from "../services/scheduleCache";
 import { trackSubstitutionRequest, trackSubstitutionFulfillment } from "../services/reliabilityScoreService";
+import { sendPushNotificationToUsers } from "../utils/pushNotifications";
+import { storage } from "../storage";
+import { notifyUsers } from "../websocket";
 
 const router = Router();
 
@@ -367,6 +370,43 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1000 * 60 * 60))
     });
 
+    // Notificar o substituto indicado (push + in-app)
+    if (finalSubstituteId) {
+      const requesterName = requestWithDetails.requestingUser?.name || 'Um ministro';
+      const formattedDate = schedule.date ?
+        new Date(schedule.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) :
+        'data não definida';
+
+      // Criar notificação in-app
+      await storage.createNotification({
+        userId: finalSubstituteId,
+        title: '📋 Pedido de Substituição',
+        message: `${requesterName} solicitou que você o substitua na missa de ${formattedDate} às ${schedule.time || 'horário não definido'}. Responda o mais breve possível.`,
+        type: 'substitution',
+        read: false,
+        actionUrl: '/substitutions'
+      });
+
+      // Enviar push notification
+      await sendPushNotificationToUsers([finalSubstituteId], {
+        title: '📋 Pedido de Substituição',
+        body: `${requesterName} solicitou que você o substitua na missa de ${formattedDate} às ${schedule.time || ''}`,
+        url: '/substitutions'
+      });
+
+      // Notificar via WebSocket para atualização em tempo real
+      notifyUsers([finalSubstituteId], {
+        id: 'sub-request-' + newRequest.id,
+        title: '📋 Pedido de Substituição',
+        message: `${requesterName} solicitou que você o substitua na missa de ${formattedDate} às ${schedule.time || ''}`,
+        type: 'warning',
+        actionUrl: '/substitutions',
+        createdAt: new Date().toISOString()
+      });
+
+      console.log(`[PUSH] Notificação de substituição enviada para ${finalSubstituteId}`);
+    }
+
     // Invalidate cache for the affected schedule month
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after creating substitution request for ${schedule.date}`);
@@ -653,6 +693,54 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
       console.log(`[CACHE] Invalidated cache after responding to substitution for ${schedule.date}`);
     }
 
+    // Notificar o solicitante sobre a resposta (push + in-app)
+    const [substituteUser] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const substituteName = substituteUser?.name || 'O ministro';
+    const formattedDate = schedule?.date ?
+      new Date(schedule.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) :
+      'data não definida';
+
+    const notificationTitle = newStatus === "approved"
+      ? '✅ Substituição Aceita'
+      : '❌ Substituição Recusada';
+    const notificationMessage = newStatus === "approved"
+      ? `${substituteName} aceitou substituir você na missa de ${formattedDate}. Você está liberado desta escala.`
+      : `${substituteName} não pode substituir você na missa de ${formattedDate}. Procure outro substituto.`;
+
+    // Criar notificação in-app
+    await storage.createNotification({
+      userId: request.requesterId,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: 'substitution',
+      read: false,
+      actionUrl: '/substitutions'
+    });
+
+    // Enviar push notification
+    await sendPushNotificationToUsers([request.requesterId], {
+      title: notificationTitle,
+      body: notificationMessage,
+      url: '/substitutions'
+    });
+
+    // Notificar via WebSocket
+    notifyUsers([request.requesterId], {
+      id: 'sub-response-' + id,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: newStatus === "approved" ? 'success' : 'warning',
+      actionUrl: '/substitutions',
+      createdAt: new Date().toISOString()
+    });
+
+    console.log(`[PUSH] Notificação de resposta de substituição enviada para ${request.requesterId}`);
+
     res.json({
       success: true,
       message: response === "accepted"
@@ -800,6 +888,50 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
     // Invalidate cache for the affected schedule month
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
+
+    // Notificar o solicitante que alguém se ofereceu (push + in-app)
+    const [claimerUser] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const claimerName = claimerUser?.name || 'Um ministro';
+    const formattedDate = schedule?.date ?
+      new Date(schedule.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) :
+      'data não definida';
+
+    const notificationTitle = '✅ Substituto Encontrado!';
+    const notificationMessage = `${claimerName} se ofereceu para substituir você na missa de ${formattedDate} às ${schedule.time || ''}. Você está liberado desta escala.`;
+
+    // Criar notificação in-app
+    await storage.createNotification({
+      userId: request.requesterId,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: 'substitution',
+      read: false,
+      actionUrl: '/substitutions'
+    });
+
+    // Enviar push notification
+    await sendPushNotificationToUsers([request.requesterId], {
+      title: notificationTitle,
+      body: notificationMessage,
+      url: '/substitutions'
+    });
+
+    // Notificar via WebSocket
+    notifyUsers([request.requesterId], {
+      id: 'sub-claimed-' + id,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: 'success',
+      actionUrl: '/substitutions',
+      createdAt: new Date().toISOString()
+    });
+
+    console.log(`[PUSH] Notificação de claim de substituição enviada para ${request.requesterId}`);
 
     res.json({
       success: true,
