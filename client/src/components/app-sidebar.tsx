@@ -21,7 +21,8 @@ import {
   Move,
   Activity,
   Shuffle,
-  Lightbulb
+  Lightbulb,
+  Trophy
 } from "lucide-react";
 import {
   Sidebar,
@@ -152,6 +153,12 @@ export function AppSidebar() {
         { title: "Espiritualidade", href: "/formation/spirituality", roles: ["gestor", "coordenador", "ministro"] },
         { title: "Biblioteca", href: "/formation/library", roles: ["gestor", "coordenador"] },
       ]
+    },
+    {
+      title: "Conquistas",
+      href: "/gamification",
+      icon: Trophy,
+      roles: ["gestor", "coordenador", "ministro"]
     },
     {
       title: "Gestão de Usuários",
