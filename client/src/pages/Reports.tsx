@@ -52,8 +52,19 @@ import {
   BookOpen,
   UserCheck,
   AlertCircle,
-  FileText
+  FileText,
+  FileSpreadsheet,
+  FileDown
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -232,6 +243,56 @@ export default function Reports() {
   const isAnyLoading = summaryLoading || availabilityLoading || substitutionsLoading ||
                        engagementLoading || formationLoading || familiesLoading;
 
+  // Export function
+  const handleExport = async (reportType: string, format: 'xlsx' | 'pdf' | 'csv') => {
+    try {
+      const params = new URLSearchParams({
+        format,
+        startDate: dateRange.startDate || '',
+        endDate: dateRange.endDate || ''
+      });
+
+      const response = await fetch(`/api/reports/export/${reportType}?${params}`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao gerar relatório');
+      }
+
+      // Get filename from Content-Disposition header or generate one
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `relatorio_${reportType}_${new Date().toISOString().split('T')[0]}.${format}`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Relatório exportado",
+        description: `O arquivo ${filename} foi baixado com sucesso.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Erro ao exportar",
+        description: "Não foi possível gerar o relatório. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Handle error state
   if (summaryError) {
     return (
@@ -284,14 +345,60 @@ export default function Reports() {
                     <RefreshCw className="h-4 w-4" />
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    title="Exportar relatório"
-                    disabled
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" title="Exportar relatórios">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Exportar Relatórios</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Resumo Geral</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleExport('summary', 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        Resumo (Excel)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('summary', 'pdf')}>
+                        <FileDown className="h-4 w-4 mr-2 text-red-600" />
+                        Resumo (PDF)
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Disponibilidade</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleExport('availability', 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        Disponibilidade (Excel)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('availability', 'pdf')}>
+                        <FileDown className="h-4 w-4 mr-2 text-red-600" />
+                        Disponibilidade (PDF)
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Substituições</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleExport('substitutions', 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        Substituições (Excel)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('substitutions', 'pdf')}>
+                        <FileDown className="h-4 w-4 mr-2 text-red-600" />
+                        Substituições (PDF)
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Outros</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleExport('engagement', 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        Engajamento (Excel)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('formation', 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        Formação (Excel)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>

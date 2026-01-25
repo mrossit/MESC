@@ -14,6 +14,15 @@ import {
 import { eq, sql, and, gte, lte, desc, asc, count, avg } from "drizzle-orm";
 import { authenticateToken, requireRole } from "../auth";
 import { createActivityLogger } from "../utils/activityLogger";
+import {
+  exportToExcel,
+  exportToPDF,
+  exportToCSV,
+  getMimeType,
+  getFileExtension,
+  type ReportData,
+  type ExportFormat
+} from "../utils/reportExporter";
 
 // Helper to safely parse date strings
 function parseQueryDate(dateStr: unknown): Date | null {
@@ -374,6 +383,422 @@ router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"])
   } catch (error) {
     console.error("Error fetching summary metrics:", error);
     res.status(500).json({ error: "Failed to fetch summary metrics" });
+  }
+});
+
+// ============================================
+// EXPORT ENDPOINTS
+// ============================================
+
+const exportFormatSchema = z.enum(['xlsx', 'pdf', 'csv']);
+
+// Types for report data
+interface AvailabilityRow {
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  totalResponses: number;
+  availableDays: number;
+}
+
+interface SubstitutionRow {
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  totalRequests: number;
+  approvedRequests: number;
+  pendingRequests: number;
+  rejectedRequests: number;
+}
+
+interface EngagementRow {
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  totalActions: number;
+  lastActivity: Date | null;
+  uniqueDays: number;
+}
+
+interface FormationRow {
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  completedModules: number;
+  inProgressModules: number;
+  avgProgress: string | null;
+}
+
+// Helper to format date for display
+function formatDateBR(date: Date): string {
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// Helper to format period
+function formatPeriod(startDate?: string, endDate?: string): string {
+  if (!startDate && !endDate) return 'Todo o período';
+  const start = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : 'início';
+  const end = endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'hoje';
+  return `${start} a ${end}`;
+}
+
+// Export availability report
+router.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+    const { startDate, endDate } = req.query;
+
+    // Fetch data
+    const availabilityData = await db
+      .select({
+        userId: questionnaireResponses.userId,
+        userName: users.name,
+        userEmail: users.email,
+        totalResponses: count(questionnaireResponses.id),
+        availableDays: sql<number>`
+          COALESCE(
+            SUM(
+              jsonb_array_length(
+                COALESCE(${questionnaireResponses.responses}->>'availableDays', '[]')::jsonb
+              )
+            ), 0
+          )
+        `.as('available_days')
+      })
+      .from(questionnaireResponses)
+      .leftJoin(users, eq(users.id, questionnaireResponses.userId))
+      .where(
+        and(
+          parseQueryDate(startDate) ? gte(questionnaireResponses.submittedAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(questionnaireResponses.submittedAt, parseQueryDate(endDate)!) : sql`true`
+        )
+      )
+      .groupBy(questionnaireResponses.userId, users.name, users.email)
+      .orderBy(desc(sql`available_days`));
+
+    const reportData: ReportData = {
+      title: 'Relatório de Disponibilidade',
+      subtitle: 'Ministros com maior disponibilidade no período',
+      generatedAt: formatDateBR(new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ['Posição', 'Nome', 'Email', 'Dias Disponíveis', 'Questionários Respondidos'],
+      rows: availabilityData.map((item: AvailabilityRow, index: number) => [
+        index + 1,
+        item.userName || 'N/A',
+        item.userEmail || 'N/A',
+        item.availableDays || 0,
+        item.totalResponses || 0
+      ]),
+      summary: [
+        { label: 'Total de Ministros', value: availabilityData.length },
+        { label: 'Média de Dias Disponíveis', value: Math.round(availabilityData.reduce((acc: number, item: AvailabilityRow) => acc + (item.availableDays || 0), 0) / (availabilityData.length || 1)) }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `disponibilidade_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting availability report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+
+// Export substitutions report
+router.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+    const { startDate, endDate } = req.query;
+
+    // Fetch data
+    const substitutionsData = await db
+      .select({
+        userId: substitutionRequests.requesterId,
+        userName: users.name,
+        userEmail: users.email,
+        totalRequests: count(substitutionRequests.id),
+        approvedRequests: sql<number>`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
+        `.as('approved_requests'),
+        pendingRequests: sql<number>`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
+        `.as('pending_requests'),
+        rejectedRequests: sql<number>`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'rejected' THEN 1 END)
+        `.as('rejected_requests')
+      })
+      .from(substitutionRequests)
+      .leftJoin(users, eq(users.id, substitutionRequests.requesterId))
+      .where(
+        and(
+          parseQueryDate(startDate) ? gte(substitutionRequests.createdAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(substitutionRequests.createdAt, parseQueryDate(endDate)!) : sql`true`
+        )
+      )
+      .groupBy(substitutionRequests.requesterId, users.name, users.email)
+      .orderBy(desc(count(substitutionRequests.id)));
+
+    const totalRequests = substitutionsData.reduce((acc: number, item: SubstitutionRow) => acc + (item.totalRequests || 0), 0);
+    const totalApproved = substitutionsData.reduce((acc: number, item: SubstitutionRow) => acc + (item.approvedRequests || 0), 0);
+
+    const reportData: ReportData = {
+      title: 'Relatório de Substituições',
+      subtitle: 'Solicitações de substituição por ministro',
+      generatedAt: formatDateBR(new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ['Posição', 'Nome', 'Email', 'Total', 'Aprovadas', 'Pendentes', 'Rejeitadas'],
+      rows: substitutionsData.map((item: SubstitutionRow, index: number) => [
+        index + 1,
+        item.userName || 'N/A',
+        item.userEmail || 'N/A',
+        item.totalRequests || 0,
+        item.approvedRequests || 0,
+        item.pendingRequests || 0,
+        item.rejectedRequests || 0
+      ]),
+      summary: [
+        { label: 'Total de Solicitações', value: totalRequests },
+        { label: 'Aprovadas', value: totalApproved },
+        { label: 'Taxa de Aprovação', value: `${totalRequests > 0 ? Math.round((totalApproved / totalRequests) * 100) : 0}%` }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `substituicoes_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting substitutions report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+
+// Export engagement report
+router.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+    const { startDate, endDate } = req.query;
+
+    // Fetch data
+    const engagementData = await db
+      .select({
+        userId: activityLogs.userId,
+        userName: users.name,
+        userEmail: users.email,
+        totalActions: count(activityLogs.id),
+        lastActivity: sql<Date>`MAX(${activityLogs.createdAt})`.as('last_activity'),
+        uniqueDays: sql<number>`
+          COUNT(DISTINCT DATE(${activityLogs.createdAt}))
+        `.as('unique_days')
+      })
+      .from(activityLogs)
+      .leftJoin(users, eq(users.id, activityLogs.userId))
+      .where(
+        and(
+          parseQueryDate(startDate) ? gte(activityLogs.createdAt, parseQueryDate(startDate)!) : sql`true`,
+          parseQueryDate(endDate) ? lte(activityLogs.createdAt, parseQueryDate(endDate)!) : sql`true`
+        )
+      )
+      .groupBy(activityLogs.userId, users.name, users.email)
+      .orderBy(desc(count(activityLogs.id)));
+
+    const reportData: ReportData = {
+      title: 'Relatório de Engajamento',
+      subtitle: 'Atividade dos ministros no sistema',
+      generatedAt: formatDateBR(new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ['Posição', 'Nome', 'Email', 'Total de Ações', 'Dias Ativos', 'Última Atividade'],
+      rows: engagementData.map((item: EngagementRow, index: number) => [
+        index + 1,
+        item.userName || 'N/A',
+        item.userEmail || 'N/A',
+        item.totalActions || 0,
+        item.uniqueDays || 0,
+        item.lastActivity ? new Date(item.lastActivity).toLocaleDateString('pt-BR') : 'N/A'
+      ]),
+      summary: [
+        { label: 'Total de Usuários Ativos', value: engagementData.length },
+        { label: 'Total de Ações', value: engagementData.reduce((acc: number, item: EngagementRow) => acc + (item.totalActions || 0), 0) }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `engajamento_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting engagement report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+
+// Export formation report
+router.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+
+    // Fetch data
+    const formationData = await db
+      .select({
+        userId: formationProgress.userId,
+        userName: users.name,
+        userEmail: users.email,
+        completedModules: sql<number>`
+          COUNT(CASE WHEN ${formationProgress.status} = 'completed' THEN 1 END)
+        `.as('completed_modules'),
+        inProgressModules: sql<number>`
+          COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
+        `.as('in_progress_modules'),
+        avgProgress: avg(formationProgress.progressPercentage)
+      })
+      .from(formationProgress)
+      .leftJoin(users, eq(users.id, formationProgress.userId))
+      .groupBy(formationProgress.userId, users.name, users.email)
+      .orderBy(desc(sql`completed_modules`));
+
+    const reportData: ReportData = {
+      title: 'Relatório de Formação',
+      subtitle: 'Progresso dos ministros nos módulos de formação',
+      generatedAt: formatDateBR(new Date()),
+      headers: ['Posição', 'Nome', 'Email', 'Módulos Concluídos', 'Em Andamento', 'Progresso Médio (%)'],
+      rows: formationData.map((item: FormationRow, index: number) => [
+        index + 1,
+        item.userName || 'N/A',
+        item.userEmail || 'N/A',
+        item.completedModules || 0,
+        item.inProgressModules || 0,
+        Math.round(Number(item.avgProgress) || 0)
+      ]),
+      summary: [
+        { label: 'Total de Ministros em Formação', value: formationData.length },
+        { label: 'Módulos Concluídos (Total)', value: formationData.reduce((acc: number, item: FormationRow) => acc + (item.completedModules || 0), 0) }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `formacao_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting formation report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+
+// Export complete summary report
+router.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+  try {
+    const format = exportFormatSchema.parse(req.query.format || 'xlsx');
+
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Fetch all summary data
+    const [activeMinistersResult] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.status, "active"));
+
+    const [substitutionsResult] = await db
+      .select({
+        total: count(),
+        approved: sql<number>`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as('approved')
+      })
+      .from(substitutionRequests)
+      .where(and(gte(substitutionRequests.createdAt, startOfMonth), lte(substitutionRequests.createdAt, endOfMonth)));
+
+    const [formationResult] = await db
+      .select({ count: count() })
+      .from(formationProgress)
+      .where(eq(formationProgress.status, "completed"));
+
+    const monthName = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+    const reportData: ReportData = {
+      title: 'Relatório Resumo Mensal',
+      subtitle: `MESC - Santuário São Judas Tadeu`,
+      generatedAt: formatDateBR(new Date()),
+      period: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+      headers: ['Métrica', 'Valor'],
+      rows: [
+        ['Ministros Ativos', activeMinistersResult?.count || 0],
+        ['Substituições no Mês', substitutionsResult?.total || 0],
+        ['Substituições Aprovadas', substitutionsResult?.approved || 0],
+        ['Taxa de Aprovação', `${substitutionsResult?.total ? Math.round((substitutionsResult.approved / substitutionsResult.total) * 100) : 0}%`],
+        ['Módulos de Formação Concluídos', formationResult?.count || 0]
+      ],
+      summary: [
+        { label: 'Período', value: monthName.charAt(0).toUpperCase() + monthName.slice(1) },
+        { label: 'Data de Geração', value: formatDateBR(new Date()) }
+      ]
+    };
+
+    let content: Buffer | string;
+    if (format === 'xlsx') {
+      content = exportToExcel(reportData);
+    } else if (format === 'pdf') {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+
+    const filename = `resumo_mensal_${new Date().toISOString().split('T')[0]}.${getFileExtension(format)}`;
+    res.setHeader('Content-Type', getMimeType(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+  } catch (error) {
+    console.error("Error exporting summary report:", error);
+    res.status(500).json({ error: "Failed to export report" });
   }
 });
 
