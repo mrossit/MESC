@@ -12,6 +12,13 @@ import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { format, addHours, subHours, isWithinInterval, parseISO } from 'date-fns';
 
+// Helper to get error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 const router = Router();
 
 /**
@@ -176,33 +183,42 @@ router.get("/panel/:scheduleId", requireAuth, async (req: AuthRequest, res: Resp
         },
         currentPhase,
         minutesUntilMass,
-        assignments: allAssignments.map((a: any) => ({
-          id: a.id,
-          ministerId: a.ministerId,
-          ministerName: a.ministerName,
-          phone: a.ministerPhone,
-          whatsapp: a.ministerWhatsapp,
-          position: a.position,
-          onSiteAdjustments: a.onSiteAdjustments,
-          checkInStatus: checkIns.find((c: any) => c.ministerId === a.ministerId)?.status || 'not-checked-in',
-          checkInTime: checkIns.find((c: any) => c.ministerId === a.ministerId)?.checkedInAt
-        })),
+        assignments: (() => {
+          type AssignmentRow = typeof allAssignments[number];
+          type CheckInRow = typeof checkIns[number];
+          type StandbyRow = typeof standbyList[number];
+          return allAssignments.map((a: AssignmentRow) => ({
+            id: a.id,
+            ministerId: a.ministerId,
+            ministerName: a.ministerName,
+            phone: a.ministerPhone,
+            whatsapp: a.ministerWhatsapp,
+            position: a.position,
+            onSiteAdjustments: a.onSiteAdjustments,
+            checkInStatus: checkIns.find((c: CheckInRow) => c.ministerId === a.ministerId)?.status || 'not-checked-in',
+            checkInTime: checkIns.find((c: CheckInRow) => c.ministerId === a.ministerId)?.checkedInAt
+          }));
+        })(),
         standbyMinisters: standbyList,
         executionLog: executionLog.length > 0 ? executionLog[0] : null,
-        statistics: {
-          totalPositions: allAssignments.length,
-          checkedIn: checkIns.filter((c: any) => c.status === 'present').length,
-          absent: checkIns.filter((c: any) => c.status === 'absent').length,
-          standbyCalled: standbyList.filter((s: any) => s.calledAt !== null).length
-        }
+        statistics: (() => {
+          type CheckInRow = typeof checkIns[number];
+          type StandbyRow = typeof standbyList[number];
+          return {
+            totalPositions: allAssignments.length,
+            checkedIn: checkIns.filter((c: CheckInRow) => c.status === 'present').length,
+            absent: checkIns.filter((c: CheckInRow) => c.status === 'absent').length,
+            standbyCalled: standbyList.filter((s: StandbyRow) => s.calledAt !== null).length
+          };
+        })()
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_PANEL] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao carregar painel do auxiliar"
+      message: getErrorMessage(error) || "Erro ao carregar painel do auxiliar"
     });
   }
 });
@@ -271,19 +287,21 @@ router.get("/standby/:scheduleId", requireAuth, async (req: AuthRequest, res: Re
         )
       );
 
-    const assignedIds = new Set(assignedMinisters.map((a: any) => a.ministerId).filter(Boolean));
-    const standbyOptions = availableStandby.filter((m: any) => !assignedIds.has(m.ministerId));
+    type AssignedRow = typeof assignedMinisters[number];
+    type StandbyRow = typeof availableStandby[number];
+    const assignedIds = new Set(assignedMinisters.map((a: AssignedRow) => a.ministerId).filter(Boolean));
+    const standbyOptions = availableStandby.filter((m: StandbyRow) => !assignedIds.has(m.ministerId));
 
     res.json({
       success: true,
       data: standbyOptions.slice(0, 10) // Top 10 most suitable
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_STANDBY] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao buscar ministros suplentes"
+      message: getErrorMessage(error) || "Erro ao buscar ministros suplentes"
     });
   }
 });
@@ -387,11 +405,11 @@ router.post("/check-in", requireAuth, async (req: AuthRequest, res: Response) =>
       message: `Ministro marcado como ${status}`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_CHECKIN] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao registrar presença"
+      message: getErrorMessage(error) || "Erro ao registrar presença"
     });
   }
 });
@@ -487,11 +505,11 @@ router.put("/redistribute", requireAuth, async (req: AuthRequest, res: Response)
       message: `${appliedChanges.length} mudanças aplicadas com sucesso`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_REDISTRIBUTE] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao redistribuir posições"
+      message: getErrorMessage(error) || "Erro ao redistribuir posições"
     });
   }
 });
@@ -644,11 +662,11 @@ router.post("/call-standby", requireAuth, async (req: AuthRequest, res: Response
       message: "Suplente convocado com sucesso"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_CALL_STANDBY] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao convocar suplente"
+      message: getErrorMessage(error) || "Erro ao convocar suplente"
     });
   }
 });
@@ -760,11 +778,11 @@ router.post("/mass-report", requireAuth, async (req: AuthRequest, res: Response)
       message: "Relatório enviado com sucesso"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AUXILIARY_REPORT] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao enviar relatório"
+      message: getErrorMessage(error) || "Erro ao enviar relatório"
     });
   }
 });

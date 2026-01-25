@@ -1,10 +1,39 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { questionnaires, questionnaireResponses, users, notifications, schedules } from '@shared/schema';
 import { eq, and, or, ne, gte, lte } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
-import { authenticateToken as requireAuth, requireRole } from '../auth';
+import { authenticateToken as requireAuth, requireRole, AuthRequest } from '../auth';
+import { storage } from '../storage';
+import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
+import { logger } from '../utils/logger';
+
+// Types for questionnaire data
+interface QuestionnaireQuestion {
+  id: string;
+  type: string;
+  title: string;
+  options?: string[];
+  required?: boolean;
+  canEdit?: boolean;
+  modified?: boolean;
+}
+
+interface QuestionnaireResponse {
+  questionId: string;
+  value: string | string[] | boolean;
+}
+
+interface MinisterWithResponse {
+  id: string;
+  name: string;
+  email: string;
+  responded: boolean;
+  responseDate?: string;
+  availableSundays?: string[];
+  dailyMassAvailability?: string[];
+}
 
 const router = Router();
 
@@ -18,7 +47,7 @@ function getMonthName(month: number): string {
 /**
  * Helper function to validate and parse year/month from URL params
  */
-function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+function parseYearMonthParams(req: AuthRequest, res: Response): { year: number; month: number } | null {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
 
@@ -45,7 +74,7 @@ function parseYearMonthParams(req: any, res: any): { year: number; month: number
 // router.use(requireRole(['gestor', 'coordenador'])); // Aplicado individualmente nas rotas
 
 // Obter questionário atual (mês corrente)
-router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const month = now.getMonth() + 1;
@@ -86,7 +115,7 @@ router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), asyn
 });
 
 // Obter template com perguntas editáveis
-router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -102,7 +131,7 @@ router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coord
     if (template) {
       // Parse questions from JSON string and add edit flags
       const parsedQuestions = template.questions as any[];
-      const questionsWithEditFlag = parsedQuestions.map((q: any) => ({
+      const questionsWithEditFlag = parsedQuestions.map((q: QuestionnaireQuestion) => ({
         ...q,
         editable: true, // Permitir edição de todas as perguntas
         modified: q.modified || false // Flag para indicar se foi modificada
@@ -122,7 +151,7 @@ router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coord
 });
 
 // Gerar novo template E SALVAR na base de dados
-router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
       month: z.number().min(1).max(12),
@@ -142,7 +171,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
 
     if (existingTemplate) {
       // Retornar template existente
-      const questionsWithEditFlag = (existingTemplate.questions as any[]).map((q: any) => ({
+      const questionsWithEditFlag = (existingTemplate.questions as any[]).map((q: QuestionnaireQuestion) => ({
         ...q,
         editable: true,
         modified: q.modified || false
@@ -193,7 +222,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
 });
 
 // Salvar ou atualizar template
-router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
       id: z.string().optional(),
@@ -277,7 +306,7 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
 });
 
 // Adicionar pergunta customizada a um template existente
-router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -333,7 +362,7 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
 });
 
 // Atualizar pergunta específica
-router.put('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.put('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -392,7 +421,7 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
 
 // Deletar qualquer pergunta (customizada ou padrão)
 // Isso permite flexibilidade para meses com peculiaridades (ex: Janeiro com missas já no questionário de Dezembro)
-router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -444,7 +473,7 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
 });
 
 // Enviar ou reenviar questionário para todos os ministros (por year/month)
-router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -508,7 +537,7 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
     console.log('[SEND] Verificações passaram, processando envio/reenvio...');
     
     // Se é reenvio, registrar a data de reenvio
-    const updateData: any = {
+    const updateData: { status: 'sent'; updatedAt: Date } = {
       status: 'sent',
       updatedAt: new Date()
     };
@@ -577,7 +606,7 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
 });
 
 // Enviar questionário para todos os ministros (por ID - mantido para compatibilidade)
-router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const templateId = req.params.id;
     
@@ -603,10 +632,50 @@ router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordena
       .where(eq(questionnaires.id, templateId))
       .returning();
     
-    // TODO: Enviar notificações para todos os ministros
-    // Isso seria feito através de um sistema de notificações
-    
-    res.json({ 
+    // Enviar notificações para todos os ministros ativos
+    try {
+      const activeUsers = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(eq(users.status, 'active'));
+
+      const questionnaireMonth = updated.targetMonth;
+      const questionnaireYear = updated.targetYear;
+      const monthName = getMonthName(questionnaireMonth);
+
+      // Criar notificação no banco para cada usuário
+      const notificationPromises = activeUsers.map((user: { id: string; name: string }) =>
+        storage.createNotification({
+          userId: user.id,
+          title: 'Novo Questionário de Disponibilidade',
+          message: `O questionário de disponibilidade para ${monthName}/${questionnaireYear} foi publicado. Por favor, preencha suas disponibilidades.`,
+          type: 'announcement',
+          read: false,
+          actionUrl: '/questionnaires'
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      logger.info(`Criadas ${activeUsers.length} notificações para questionário ${templateId}`);
+
+      // Enviar push notifications se habilitado
+      if (pushConfig.enabled) {
+        await sendPushNotificationToUsers(
+          activeUsers.map((u: { id: string }) => u.id),
+          {
+            title: 'Novo Questionário de Disponibilidade',
+            body: `Preencha suas disponibilidades para ${monthName}/${questionnaireYear}`,
+            url: '/questionnaires',
+            tag: `questionnaire-${templateId}`
+          }
+        );
+      }
+    } catch (notificationError) {
+      logger.error('Erro ao enviar notificações do questionário:', notificationError);
+      // Não falha a requisição, apenas loga o erro
+    }
+
+    res.json({
       message: 'Questionário enviado com sucesso!',
       template: {
         ...updated,
@@ -620,7 +689,7 @@ router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordena
 });
 
 // Encerrar questionário (fechar para novas respostas)
-router.patch('/templates/:id/close', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.patch('/templates/:id/close', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const templateId = req.params.id;
     
@@ -660,7 +729,7 @@ router.patch('/templates/:id/close', requireAuth, requireRole(['gestor', 'coorde
 });
 
 // Reabrir questionário
-router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const templateId = req.params.id;
     
@@ -737,7 +806,7 @@ router.patch('/templates/:id/reopen', requireAuth, requireRole(['gestor', 'coord
 });
 
 // Deletar template completo - funcionalidade para produção
-router.delete('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.delete('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -804,7 +873,7 @@ router.delete('/templates/:year/:month', requireAuth, requireRole(['gestor', 'co
 });
 
 // Obter status das respostas dos ministros para um mês específico
-router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -861,22 +930,27 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
     }).from(questionnaireResponses)
       .where(eq(questionnaireResponses.questionnaireId, template.id));
     
+    // Types for response data
+    type MinisterInfo = { id: string; name: string; email: string; phone?: string | null };
+    type ResponseInfo = { userId: string; submittedAt: Date | null; responses: unknown };
+    type ParsedResponse = { questionId: string; answer: string | { answer: string } };
+
     // Mapear ministros com suas respostas
-    const ministersWithResponses = allMinisters.map((minister: any) => {
-      const response = responses.find((r: any) => r.userId === minister.id);
-      
+    const ministersWithResponses = (allMinisters as MinisterInfo[]).map(minister => {
+      const response = (responses as ResponseInfo[]).find(r => r.userId === minister.id);
+
       if (response) {
         // Parse responses to get availability answer
         let availability = 'Não informado';
         try {
-          const parsedResponses = JSON.parse(response.responses as string);
+          const parsedResponses = JSON.parse(response.responses as string) as ParsedResponse[];
           // Nova estrutura: monthly_availability com objeto {answer, selectedOptions}
-          const monthlyAvailability = parsedResponses.find((r: any) => r.questionId === 'monthly_availability');
+          const monthlyAvailability = parsedResponses.find(r => r.questionId === 'monthly_availability');
           if (monthlyAvailability) {
             // Se a resposta é um objeto com 'answer'
             if (typeof monthlyAvailability.answer === 'object' && monthlyAvailability.answer.answer) {
               availability = monthlyAvailability.answer.answer === 'Sim' ? 'Disponível' : 'Indisponível';
-            } 
+            }
             // Se a resposta é uma string direta
             else if (typeof monthlyAvailability.answer === 'string') {
               availability = monthlyAvailability.answer === 'Sim' ? 'Disponível' : 'Indisponível';
@@ -884,17 +958,17 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
           }
           // Fallback para estrutura antiga (questionId: 'availability')
           else {
-            const oldAvailability = parsedResponses.find((r: any) => r.questionId === 'availability');
-            if (oldAvailability) {
-              availability = oldAvailability.answer === 'yes' || oldAvailability.answer === 'Disponível' ? 'Disponível' : 
-                           oldAvailability.answer === 'no' || oldAvailability.answer === 'Indisponível' ? 'Indisponível' : 
+            const oldAvailability = parsedResponses.find(r => r.questionId === 'availability');
+            if (oldAvailability && typeof oldAvailability.answer === 'string') {
+              availability = oldAvailability.answer === 'yes' || oldAvailability.answer === 'Disponível' ? 'Disponível' :
+                           oldAvailability.answer === 'no' || oldAvailability.answer === 'Indisponível' ? 'Indisponível' :
                            oldAvailability.answer;
             }
           }
         } catch (e) {
           console.error('Error parsing responses:', e);
         }
-        
+
         return {
           id: minister.id,
           name: minister.name,
@@ -905,7 +979,7 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
           availability
         };
       }
-      
+
       return {
         id: minister.id,
         name: minister.name,
@@ -913,19 +987,19 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
         phone: minister.phone,
         responded: false,
         respondedAt: null,
-        availability: null
+        availability: null as string | null
       };
     });
-    
+
     // Ordenar: não respondidos primeiro, depois por nome
-    ministersWithResponses.sort((a: any, b: any) => {
+    ministersWithResponses.sort((a, b) => {
       if (a.responded !== b.responded) {
         return a.responded ? 1 : -1; // Não respondidos primeiro
       }
       return a.name.localeCompare(b.name);
     });
-    
-    const respondedCount = ministersWithResponses.filter((m: any) => m.responded).length;
+
+    const respondedCount = ministersWithResponses.filter(m => m.responded).length;
     const totalMinisters = allMinisters.length;
     
     res.json({
@@ -948,7 +1022,7 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
 });
 
 // Obter respostas detalhadas de um ministro específico
-router.get('/responses/:templateId/:ministerId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/responses/:templateId/:ministerId', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const { templateId, ministerId } = req.params;
     
@@ -1008,7 +1082,7 @@ router.get('/responses/:templateId/:ministerId', requireAuth, requireRole(['gest
 });
 
 // Obter resumo acumulado de todas as respostas
-router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   const params = parseYearMonthParams(req, res);
   if (!params) return;
   const { year, month } = params;
@@ -1035,11 +1109,16 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
       .where(eq(questionnaireResponses.questionnaireId, template.id));
     
     // Processar e acumular respostas
+    type ParsedResponseItem = {
+      questionId: string;
+      answer: string | string[] | { answer: string; sub?: string; selectedOptions?: string[] };
+    };
     const summary: Record<string, Record<string, number>> = {};
-    const questions = template.questions as any[];
-    
-    responses.forEach((response: any) => {
-      let parsedResponses: any[];
+    const questions = template.questions as QuestionnaireQuestion[];
+
+    type ResponseRow = typeof responses[number];
+    responses.forEach((response: ResponseRow) => {
+      let parsedResponses: ParsedResponseItem[];
       try {
         parsedResponses = JSON.parse(response.responses as string);
         if (!Array.isArray(parsedResponses)) return;
@@ -1048,45 +1127,47 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
         return;
       }
 
-      parsedResponses.forEach((resp: any) => {
+      parsedResponses.forEach(resp => {
         if (!summary[resp.questionId]) {
           summary[resp.questionId] = {};
         }
-        
+
+        const answer = resp.answer;
+
         // Processar diferentes tipos de resposta
-        if (typeof resp.answer === 'object' && resp.answer.answer) {
+        if (typeof answer === 'object' && !Array.isArray(answer) && 'answer' in answer) {
           // Respostas com sub-perguntas
-          const mainAnswer = resp.answer.answer;
+          const mainAnswer = answer.answer;
           if (!summary[resp.questionId][mainAnswer]) {
             summary[resp.questionId][mainAnswer] = 0;
           }
           summary[resp.questionId][mainAnswer]++;
-          
+
           // Sub-resposta
-          if (resp.answer.sub) {
+          if (answer.sub) {
             const subKey = `${resp.questionId}_sub`;
             if (!summary[subKey]) {
               summary[subKey] = {};
             }
-            if (!summary[subKey][resp.answer.sub]) {
-              summary[subKey][resp.answer.sub] = 0;
+            if (!summary[subKey][answer.sub]) {
+              summary[subKey][answer.sub] = 0;
             }
-            summary[subKey][resp.answer.sub]++;
+            summary[subKey][answer.sub]++;
           }
-        } else if (Array.isArray(resp.answer)) {
+        } else if (Array.isArray(answer)) {
           // Checkbox responses
-          resp.answer.forEach((option: string) => {
+          answer.forEach((option: string) => {
             if (!summary[resp.questionId][option]) {
               summary[resp.questionId][option] = 0;
             }
             summary[resp.questionId][option]++;
           });
-        } else if (typeof resp.answer === 'string') {
+        } else if (typeof answer === 'string') {
           // Simple responses
-          if (!summary[resp.questionId][resp.answer]) {
-            summary[resp.questionId][resp.answer] = 0;
+          if (!summary[resp.questionId][answer]) {
+            summary[resp.questionId][answer] = 0;
           }
-          summary[resp.questionId][resp.answer]++;
+          summary[resp.questionId][answer]++;
         }
       });
     });
@@ -1108,7 +1189,7 @@ router.get('/responses-summary/:year/:month', requireAuth, requireRole(['gestor'
 // ========================================
 
 // POST /api/questionnaires/open - Manually open a questionnaire
-router.post('/open', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.post('/open', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
       month: z.number().min(1).max(12),
@@ -1160,7 +1241,7 @@ router.post('/open', requireAuth, requireRole(['gestor', 'coordenador']), async 
 });
 
 // GET /api/questionnaires/current-status - Check if questionnaire should auto-close
-router.get('/current-status', requireAuth, async (req: any, res) => {
+router.get('/current-status', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const currentDay = now.getDate();
@@ -1242,7 +1323,7 @@ router.get('/current-status', requireAuth, async (req: any, res) => {
 });
 
 // GET /api/questionnaires/stats - Get real response count and rate
-router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async (req: any, res) => {
+router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
     const { month, year } = req.query;
 
@@ -1314,17 +1395,19 @@ router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async 
     const pendingResponses = totalActiveUsers - totalResponses;
 
     // Count available vs unavailable
+    type StatsResponseItem = { questionId: string; answer: string | { answer: string } };
+    type StatsResponseRow = typeof responses[number];
     let availableCount = 0;
     let unavailableCount = 0;
 
-    responses.forEach((response: any) => {
+    responses.forEach((response: StatsResponseRow) => {
       try {
-        const parsedResponses = typeof response.responses === 'string'
+        const parsedResponses: StatsResponseItem[] = typeof response.responses === 'string'
           ? JSON.parse(response.responses)
           : response.responses;
 
         // Check for monthly_availability question
-        const monthlyAvailability = parsedResponses.find((r: any) => r.questionId === 'monthly_availability');
+        const monthlyAvailability = parsedResponses.find(r => r.questionId === 'monthly_availability');
 
         if (monthlyAvailability) {
           const answer = typeof monthlyAvailability.answer === 'object'
@@ -1339,8 +1422,8 @@ router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async 
         }
         // Fallback to old structure
         else {
-          const oldAvailability = parsedResponses.find((r: any) => r.questionId === 'availability');
-          if (oldAvailability) {
+          const oldAvailability = parsedResponses.find(r => r.questionId === 'availability');
+          if (oldAvailability && typeof oldAvailability.answer === 'string') {
             if (oldAvailability.answer === 'yes' || oldAvailability.answer === 'Disponível') {
               availableCount++;
             } else if (oldAvailability.answer === 'no' || oldAvailability.answer === 'Indisponível') {

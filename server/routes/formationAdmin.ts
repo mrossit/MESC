@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { db } from '../db';
 import {
   formationTracks,
@@ -10,12 +10,24 @@ import {
   type InsertFormationLessonSection
 } from '@shared/schema';
 import { eq, desc, asc } from 'drizzle-orm';
-import { authenticateToken } from '../auth';
+import { authenticateToken, AuthRequest } from '../auth';
 
 const router = Router();
 
+// Helper function to extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return getErrorMessage(error);
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+function getErrorStack(error: unknown): string | undefined {
+  if (error instanceof Error) return error.stack;
+  return undefined;
+}
+
 // Middleware to check if user is gestor or coordenador
-function requireAdmin(req: any, res: any, next: any) {
+function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user || (req.user.role !== 'gestor' && req.user.role !== 'coordenador')) {
     return res.status(403).json({
       error: 'Acesso negado',
@@ -46,12 +58,12 @@ router.post('/seed', async (req, res) => {
       success: true,
       message: 'Formation content seeded successfully'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error running formation seed:', error);
     res.status(500).json({
       error: 'Erro ao popular banco de dados',
-      message: error.message,
-      details: error.stack
+      message: getErrorMessage(error),
+      details: getErrorStack(error)
     });
   }
 });
@@ -69,11 +81,11 @@ router.get('/tracks', async (req, res) => {
       .orderBy(asc(formationTracks.orderIndex));
 
     res.json({ tracks });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation tracks:', error);
     res.status(500).json({
       error: 'Erro ao buscar trilhas de formação',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -97,11 +109,11 @@ router.get('/tracks/:id', async (req, res) => {
     }
 
     res.json({ track: track[0] });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation track:', error);
     res.status(500).json({
       error: 'Erro ao buscar trilha de formação',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -120,11 +132,11 @@ router.post('/tracks', async (req, res) => {
       message: 'Trilha criada com sucesso',
       track: newTrack[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating formation track:', error);
     res.status(500).json({
       error: 'Erro ao criar trilha de formação',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -152,11 +164,11 @@ router.patch('/tracks/:id', async (req, res) => {
       message: 'Trilha atualizada com sucesso',
       track: updated[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating formation track:', error);
     res.status(500).json({
       error: 'Erro ao atualizar trilha de formação',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -195,11 +207,11 @@ router.delete('/tracks/:id', async (req, res) => {
       message: 'Trilha deletada com sucesso',
       track: deleted[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting formation track:', error);
     res.status(500).json({
       error: 'Erro ao deletar trilha de formação',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -220,11 +232,11 @@ router.get('/tracks/:trackId/modules', async (req, res) => {
       .orderBy(asc(formationModules.orderIndex));
 
     res.json({ modules });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation modules:', error);
     res.status(500).json({
       error: 'Erro ao buscar módulos',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -248,11 +260,11 @@ router.get('/modules/:id', async (req, res) => {
     }
 
     res.json({ module: module[0] });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation module:', error);
     res.status(500).json({
       error: 'Erro ao buscar módulo',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -271,11 +283,11 @@ router.post('/modules', async (req, res) => {
       message: 'Módulo criado com sucesso',
       module: newModule[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating formation module:', error);
     res.status(500).json({
       error: 'Erro ao criar módulo',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -303,11 +315,11 @@ router.patch('/modules/:id', async (req, res) => {
       message: 'Módulo atualizado com sucesso',
       module: updated[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating formation module:', error);
     res.status(500).json({
       error: 'Erro ao atualizar módulo',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -346,11 +358,11 @@ router.delete('/modules/:id', async (req, res) => {
       message: 'Módulo deletado com sucesso',
       module: deleted[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting formation module:', error);
     res.status(500).json({
       error: 'Erro ao deletar módulo',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -371,11 +383,11 @@ router.get('/modules/:moduleId/lessons', async (req, res) => {
       .orderBy(asc(formationLessons.orderIndex));
 
     res.json({ lessons });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation lessons:', error);
     res.status(500).json({
       error: 'Erro ao buscar lições',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -399,11 +411,11 @@ router.get('/lessons/:id', async (req, res) => {
     }
 
     res.json({ lesson: lesson[0] });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching formation lesson:', error);
     res.status(500).json({
       error: 'Erro ao buscar lição',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -422,11 +434,11 @@ router.post('/lessons', async (req, res) => {
       message: 'Lição criada com sucesso',
       lesson: newLesson[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating formation lesson:', error);
     res.status(500).json({
       error: 'Erro ao criar lição',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -454,11 +466,11 @@ router.patch('/lessons/:id', async (req, res) => {
       message: 'Lição atualizada com sucesso',
       lesson: updated[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating formation lesson:', error);
     res.status(500).json({
       error: 'Erro ao atualizar lição',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -497,11 +509,11 @@ router.delete('/lessons/:id', async (req, res) => {
       message: 'Lição deletada com sucesso',
       lesson: deleted[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting formation lesson:', error);
     res.status(500).json({
       error: 'Erro ao deletar lição',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -522,11 +534,11 @@ router.get('/lessons/:lessonId/sections', async (req, res) => {
       .orderBy(asc(formationLessonSections.orderIndex));
 
     res.json({ sections });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching lesson sections:', error);
     res.status(500).json({
       error: 'Erro ao buscar seções',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -550,11 +562,11 @@ router.get('/sections/:id', async (req, res) => {
     }
 
     res.json({ section: section[0] });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching lesson section:', error);
     res.status(500).json({
       error: 'Erro ao buscar seção',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -573,11 +585,11 @@ router.post('/sections', async (req, res) => {
       message: 'Seção criada com sucesso',
       section: newSection[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating lesson section:', error);
     res.status(500).json({
       error: 'Erro ao criar seção',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -605,11 +617,11 @@ router.patch('/sections/:id', async (req, res) => {
       message: 'Seção atualizada com sucesso',
       section: updated[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating lesson section:', error);
     res.status(500).json({
       error: 'Erro ao atualizar seção',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -635,11 +647,11 @@ router.delete('/sections/:id', async (req, res) => {
       message: 'Seção deletada com sucesso',
       section: deleted[0]
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting lesson section:', error);
     res.status(500).json({
       error: 'Erro ao deletar seção',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });
@@ -670,11 +682,11 @@ router.post('/lessons/:lessonId/sections/reorder', async (req, res) => {
     res.json({
       message: 'Ordem das seções atualizada com sucesso'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error reordering sections:', error);
     res.status(500).json({
       error: 'Erro ao reordenar seções',
-      message: error.message
+      message: getErrorMessage(error)
     });
   }
 });

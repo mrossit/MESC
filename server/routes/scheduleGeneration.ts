@@ -14,8 +14,14 @@ import type {
   EmergencySaveScheduleInput,
   ScheduleSaveResult,
   ScheduleSaveError,
-  MinisterData
+  MinisterData,
+  ScheduleWithUserJoin,
+  SubstitutionWithScheduleJoin,
+  WeeklyGroupedSchedules,
+  ScheduleValidationDiagnostics,
+  ScheduleInput
 } from '../types/schedules';
+import { getErrorMessage, getErrorStack } from '../types/schedules';
 
 const router = Router();
 
@@ -183,10 +189,10 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
     try {
       generatedSchedules = await generateAutomaticSchedule(year, month, false);
       console.log('[ROUTE] ✅ Generated schedules count:', generatedSchedules.length);
-    } catch (genError: any) {
+    } catch (genError: unknown) {
       console.error('[ROUTE] ❌ ERRO NA FUNÇÃO generateAutomaticSchedule:', genError);
-      console.error('[ROUTE] ❌ genError.message:', genError.message);
-      console.error('[ROUTE] ❌ genError.stack:', genError.stack);
+      console.error('[ROUTE] ❌ genError.message:', getErrorMessage(genError));
+      console.error('[ROUTE] ❌ genError.stack:', getErrorStack(genError));
       throw genError; // Re-throw para ser capturado pelo catch principal
     }
 
@@ -226,29 +232,34 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
 
     res.json(response);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error);
+    const errorStack = getErrorStack(error);
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    const errorCode = (error as { code?: string })?.code;
+
     console.error('❌ [ROUTE] ERRO DETALHADO NO GENERATE:', error);
-    console.error('❌ [ROUTE] ERRO STACK:', error.stack);
-    console.error('❌ [ROUTE] ERRO NAME:', error.name);
-    console.error('❌ [ROUTE] ERRO MESSAGE:', error.message);
+    console.error('❌ [ROUTE] ERRO STACK:', errorStack);
+    console.error('❌ [ROUTE] ERRO NAME:', errorName);
+    console.error('❌ [ROUTE] ERRO MESSAGE:', errorMsg);
     logger.error('Erro ao gerar escalas automáticas:', error);
-    
+
     // Return error details only in development
     const errorResponse: { success: false; message: string; errorCode?: string; errorDetails?: object } = {
       success: false,
-      message: error.message || 'Falha na geração automática de escalas',
+      message: errorMsg || 'Falha na geração automática de escalas',
     };
 
     // Only expose error details in development for debugging
     if (process.env.NODE_ENV === 'development') {
       errorResponse.errorDetails = {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
+        message: errorMsg,
+        name: errorName,
+        stack: errorStack
       };
     } else {
       // In production, only include error code if available
-      errorResponse.errorCode = error.code || 'GENERATION_ERROR';
+      errorResponse.errorCode = errorCode || 'GENERATION_ERROR';
     }
 
     res.status(500).json(errorResponse);
@@ -329,7 +340,7 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
           );
           console.log(`Deleted ${existingSchedules.length} schedules`);
         }
-      } catch (deleteErr: any) {
+      } catch (deleteErr: unknown) {
         console.error('Error deleting existing schedules:', deleteErr);
         // Continue anyway - maybe there were no schedules to delete
       }
@@ -389,22 +400,23 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
           index: i
         });
 
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const dbErr = err as { message?: string; code?: string; detail?: string; constraint?: string; name?: string; stack?: string };
         console.error(`[${i}] ❌ Failed to insert schedule:`, err);
         console.error(`[${i}] Error type:`, typeof err);
-        console.error(`[${i}] Error message:`, err?.message);
-        console.error(`[${i}] Error code:`, err?.code);
-        console.error(`[${i}] Error stack:`, err?.stack);
-        console.error(`[${i}] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        console.error(`[${i}] Error message:`, dbErr?.message);
+        console.error(`[${i}] Error code:`, dbErr?.code);
+        console.error(`[${i}] Error stack:`, dbErr?.stack);
+        console.error(`[${i}] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
 
         errors.push({
           success: false,
-          error: err?.message || String(err),
-          code: err?.code,
-          detail: err?.detail,
-          constraint: err?.constraint,
-          errorType: err?.name,
-          fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+          error: dbErr?.message || String(err),
+          code: dbErr?.code,
+          detail: dbErr?.detail,
+          constraint: dbErr?.constraint,
+          errorType: dbErr?.name,
+          fullError: JSON.stringify(err, Object.getOwnPropertyNames(err as object)),
           index: i,
           schedule: {
             date: schedule.date,
@@ -452,16 +464,16 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('=== EMERGENCY SAVE CRITICAL ERROR ===');
     console.error('Error:', error);
-    console.error('Stack:', error.stack);
+    console.error('Stack:', getErrorStack(error));
 
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro crítico no emergency save',
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      message: getErrorMessage(error) || 'Erro crítico no emergency save',
+      error: getErrorMessage(error),
+      stack: process.env.NODE_ENV === 'development' ? getErrorStack(error) : undefined
     });
   }
 });
@@ -482,33 +494,26 @@ router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coo
     }
 
     // Analyze the data
-    const analysis: {
-      total: number;
-      sample: any[];
-      ministerIds: any[];
-      uniqueDates: any[];
-      uniqueTimes: any[];
-      missingDate: number;
-      missingTime: number;
-      missingMinisterId: number;
-      dataTypes: any;
+    type InputSchedule = { date?: string; time?: string; ministerId?: string | null; position?: number };
+    const typedInput = schedulesInput as InputSchedule[];
+
+    const analysis: ScheduleValidationDiagnostics & {
       ministerIdsInDb?: number;
       ministerIdsRequested?: number;
-      missingMinisterIds?: any[];
     } = {
-      total: schedulesInput.length,
-      sample: schedulesInput.slice(0, 3),
-      ministerIds: [...new Set(schedulesInput.map((s: any) => s.ministerId).filter(Boolean))],
-      uniqueDates: [...new Set(schedulesInput.map((s: any) => s.date))],
-      uniqueTimes: [...new Set(schedulesInput.map((s: any) => s.time))],
-      missingDate: schedulesInput.filter((s: any) => !s.date).length,
-      missingTime: schedulesInput.filter((s: any) => !s.time).length,
-      missingMinisterId: schedulesInput.filter((s: any) => !s.ministerId).length,
+      totalReceived: typedInput.length,
+      sample: typedInput.slice(0, 3) as ScheduleInput[],
+      ministerIds: [...new Set(typedInput.map(s => s.ministerId).filter((id): id is string => !!id))],
+      uniqueDates: [...new Set(typedInput.map(s => s.date).filter((d): d is string => !!d))],
+      uniqueTimes: [...new Set(typedInput.map(s => s.time).filter((t): t is string => !!t))],
+      missingDate: typedInput.filter(s => !s.date).length,
+      missingTime: typedInput.filter(s => !s.time).length,
+      missingMinisterId: typedInput.filter(s => !s.ministerId).length,
       dataTypes: {
-        date: typeof schedulesInput[0]?.date,
-        time: typeof schedulesInput[0]?.time,
-        ministerId: typeof schedulesInput[0]?.ministerId,
-        position: typeof schedulesInput[0]?.position
+        date: typeof typedInput[0]?.date,
+        time: typeof typedInput[0]?.time,
+        ministerId: typeof typedInput[0]?.ministerId,
+        position: typeof typedInput[0]?.position
       }
     };
 
@@ -522,7 +527,7 @@ router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coo
       analysis.ministerIdsRequested = analysis.ministerIds.length;
 
       // Find missing minister IDs
-      const existingIds = new Set(existingMinisters.map((m: any) => m.id));
+      const existingIds = new Set(existingMinisters.map((m: { id: string }) => m.id));
       analysis.missingMinisterIds = analysis.ministerIds.filter(id => !existingIds.has(id)).slice(0, 10);
     }
 
@@ -531,11 +536,11 @@ router.post('/inspect-save-data', authenticateToken, requireRole(['gestor', 'coo
       analysis
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({
       success: false,
-      message: error.message,
-      stack: error.stack
+      message: getErrorMessage(error),
+      stack: getErrorStack(error)
     });
   }
 });
@@ -665,7 +670,7 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
     const uniqueMonths = new Set<string>();
     
     // Extract months from successfully saved schedules
-    saved.forEach((schedule: any) => {
+    saved.forEach((schedule: { date: string }) => {
       const scheduleDate = new Date(schedule.date);
       const year = scheduleDate.getFullYear();
       const month = scheduleDate.getMonth() + 1;
@@ -700,24 +705,25 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const dbErr = error as { name?: string; message?: string; code?: string; detail?: string; constraint?: string; stack?: string };
     console.error('=== SAVE-GENERATED ERROR ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error detail:', error.detail);
-    console.error('Error constraint:', error.constraint);
-    console.error('Error stack:', error.stack);
+    console.error('Error name:', dbErr.name);
+    console.error('Error message:', dbErr.message);
+    console.error('Error code:', dbErr.code);
+    console.error('Error detail:', dbErr.detail);
+    console.error('Error constraint:', dbErr.constraint);
+    console.error('Error stack:', dbErr.stack);
     console.error('Full error object:', JSON.stringify(error, null, 2));
 
     logger.error('Erro ao salvar escalas:', error);
 
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao salvar escalas',
-      errorCode: error.code,
-      errorDetail: error.detail,
-      constraint: error.constraint
+      message: getErrorMessage(error) || 'Erro ao salvar escalas',
+      errorCode: dbErr.code,
+      errorDetail: dbErr.detail,
+      constraint: dbErr.constraint
     });
   }
 });
@@ -777,11 +783,11 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao gerar preview:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao gerar preview'
+      message: getErrorMessage(error) || 'Erro ao gerar preview'
     });
   }
 });
@@ -849,12 +855,12 @@ router.get('/debug/:year/:month', authenticateToken, requireRole(['gestor', 'coo
         }
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro no debug:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
-      stack: error.stack
+      message: getErrorMessage(error),
+      stack: getErrorStack(error)
     });
   }
 });
@@ -887,13 +893,40 @@ router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['ges
         )
       );
 
+    // Calcular taxa de substituição
+    // Buscar substitution requests do mês (approved + auto_approved = substituições realizadas)
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+
+    const substitutions = await db
+      .select()
+      .from(substitutionRequests)
+      .innerJoin(schedules, eq(substitutionRequests.scheduleId, schedules.id))
+      .where(
+        and(
+          gte(schedules.date, firstDay.toISOString().split('T')[0]),
+          lte(schedules.date, lastDay.toISOString().split('T')[0])
+        )
+      );
+
+    const completedSubstitutions = substitutions.filter(
+      (s: SubstitutionWithScheduleJoin) => s.substitution_requests.status === 'approved' || s.substitution_requests.status === 'auto_approved'
+    ).length;
+
+    const substitutionRate = existingSchedules.length > 0
+      ? Math.round((completedSubstitutions / existingSchedules.length) * 100)
+      : 0;
+
+    const typedSchedules = existingSchedules as ScheduleWithUserJoin[];
     const metrics = {
       totalSchedules: existingSchedules.length,
-      uniqueMinisters: new Set(existingSchedules.map((s: any) => s.schedules.ministerId)).size,
-      averageSchedulesPerMinister: existingSchedules.length / new Set(existingSchedules.map((s: any) => s.schedules.ministerId)).size,
-      distributionBalance: calculateDistributionBalance(existingSchedules),
-      coverageByDay: calculateCoverageByDay(existingSchedules),
-      substitutionRate: 0 // TODO: calcular com base em substituições
+      uniqueMinisters: new Set(typedSchedules.map(s => s.schedules.ministerId)).size,
+      averageSchedulesPerMinister: existingSchedules.length / new Set(typedSchedules.map(s => s.schedules.ministerId)).size,
+      distributionBalance: calculateDistributionBalance(existingSchedules as ScheduleWithUserJoin[]),
+      coverageByDay: calculateCoverageByDay(existingSchedules as ScheduleWithUserJoin[]),
+      substitutionRate, // Percentual de escalas que tiveram substituição
+      totalSubstitutions: substitutions.length,
+      completedSubstitutions
     };
 
     res.json({
@@ -906,11 +939,11 @@ router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['ges
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao calcular métricas:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao calcular métricas'
+      message: getErrorMessage(error) || 'Erro ao calcular métricas'
     });
   }
 });
@@ -920,7 +953,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
   if (!db) return 0;
 
   // Phase 1 - Data Integrity: Wrap entire operation in transaction
-  return await db.transaction(async (tx: any) => {
+  return await db.transaction(async (tx: typeof db) => {
     let savedCount = 0;
 
     for (const schedule of generatedSchedules) {
@@ -941,13 +974,14 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
       // Inserir ministros escalados com posição para manter a ordem
       for (let i = 0; i < schedule.ministers.length; i++) {
         const minister = schedule.ministers[i];
+        const ministerPosition = (minister as { position?: number }).position;
         await tx.insert(schedules).values({
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: 'missa',
           location: null,
           ministerId: minister.id, // Pode ser null para VACANTE
-          position: (minister as any).position || (i + 1), // Usar position do ministro ou index + 1
+          position: ministerPosition || (i + 1), // Usar position do ministro ou index + 1
           status: 'scheduled',
           notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
         });
@@ -965,8 +999,8 @@ function calculateAverageConfidence(schedules: GeneratedSchedule[]): number {
   return Math.round((sum / schedules.length) * 100) / 100;
 }
 
-function groupSchedulesByWeek(schedules: GeneratedSchedule[]): any {
-  const weeks: { [key: string]: GeneratedSchedule[] } = {};
+function groupSchedulesByWeek(schedules: GeneratedSchedule[]): Record<string, GeneratedSchedule[]> {
+  const weeks: Record<string, GeneratedSchedule[]> = {};
   
   schedules.forEach(schedule => {
     if (schedule.massTime.date) {
@@ -1067,9 +1101,9 @@ function calculateScheduleQuality(schedule: GeneratedSchedule): string {
   return 'Baixa';
 }
 
-function calculateDistributionBalance(schedules: any[]): number {
-  const ministerCounts: { [id: string]: number } = {};
-  
+function calculateDistributionBalance(schedules: ScheduleWithUserJoin[]): number {
+  const ministerCounts: Record<string, number> = {};
+
   schedules.forEach(s => {
     const ministerId = s.schedules.ministerId;
     if (ministerId) {
@@ -1088,9 +1122,9 @@ function calculateDistributionBalance(schedules: any[]): number {
   return Math.max(0, 1 - Math.sqrt(variance) / avg);
 }
 
-function calculateCoverageByDay(schedules: any[]) {
-  const coverage: { [day: string]: number } = {};
-  
+function calculateCoverageByDay(schedules: ScheduleWithUserJoin[]): Record<string, number> {
+  const coverage: Record<string, number> = {};
+
   schedules.forEach(s => {
     const date = s.schedules.date;
     if (date) {
@@ -1135,7 +1169,20 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
       .orderBy(schedules.time, schedules.position);
 
     // Map assignments to expected format (massTime instead of time)
-    const formattedAssignments = assignments.map((a: any) => ({
+    type AssignmentResult = {
+      id: string;
+      date: string;
+      time: string;
+      type: string | null;
+      location: string | null;
+      ministerId: string | null;
+      position: number | null;
+      status: string;
+      notes: string | null;
+      ministerName: string | null;
+      scheduleDisplayName: string | null;
+    };
+    const formattedAssignments = (assignments as AssignmentResult[]).map(a => ({
       id: a.id,
       date: a.date,
       massTime: a.time, // Frontend expects 'massTime' field
@@ -1158,7 +1205,7 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
     }
 
     res.json({ assignments: formattedAssignments });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching schedule by date:', error);
     res.status(500).json({ error: 'Failed to fetch schedule' });
   }
@@ -1201,7 +1248,7 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
       time,
       ministers: scheduledMinisters
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching schedule:', error);
     res.status(500).json({ error: 'Failed to fetch schedule' });
   }
@@ -1297,10 +1344,10 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
 
     logger.info(`[ADD_MINISTER] ✅ Ministro adicionado com sucesso: id=${newSchedule.id}, position=${newSchedule.position}`);
     res.json(newSchedule);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[ADD_MINISTER] ❌ Erro ao adicionar ministro:', error);
-    logger.error('[ADD_MINISTER] ❌ Stack:', error.stack);
-    res.status(500).json({ message: error.message || 'Erro ao adicionar ministro na escala' });
+    logger.error('[ADD_MINISTER] ❌ Stack:', getErrorStack(error));
+    res.status(500).json({ message: getErrorMessage(error) || 'Erro ao adicionar ministro na escala' });
   }
 });
 
@@ -1321,7 +1368,7 @@ router.delete('/:id', authenticateToken, requireRole(['gestor', 'coordenador']),
       .where(eq(schedules.id, id));
 
     res.json({ success: true, message: 'Ministro removido da escala' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error removing minister from schedule:', error);
     res.status(500).json({ error: 'Failed to remove minister from schedule' });
   }
@@ -1448,10 +1495,10 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
 
     console.log('[batch-update] Success! Updated schedule');
     res.json({ success: true, message: 'Escala atualizada com sucesso' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[batch-update] Error:', error);
     logger.error('Error batch updating schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule', details: error.message });
+    res.status(500).json({ error: 'Failed to update schedule', details: getErrorMessage(error) });
   }
 });
 

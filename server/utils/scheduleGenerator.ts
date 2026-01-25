@@ -33,7 +33,7 @@ export interface Minister {
   lastAssignedDate?: string; // Last date this minister was assigned (YYYY-MM-DD)
   // V2.0 questionnaire response data
   questionnaireResponse?: {
-    responses: any;
+    responses: unknown;
   };
 }
 
@@ -66,14 +66,43 @@ export interface GeneratedSchedule {
   confidence: number; // 0-1 score de confiança na escalação
 }
 
+// Type for saints data
+interface SaintInfo {
+  name: string;
+  date: string;
+  rank?: string;
+}
+
+// Type for v2.0 questionnaire responses
+interface V2QuestionnaireData {
+  format_version: '2.0';
+  masses: Record<string, Record<string, boolean | string | number>>;
+  weekdays?: unknown;
+  special_events?: Record<string, boolean>;
+  alternative_times?: string[];
+  can_substitute?: boolean;
+  availability?: Record<string, unknown>;
+  [key: string]: unknown; // Allow dynamic legacy keys
+}
+
+// Type guard for v2.0 questionnaire data
+function isV2QuestionnaireData(data: unknown): data is V2QuestionnaireData {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'format_version' in data &&
+    (data as V2QuestionnaireData).format_version === '2.0'
+  );
+}
+
 export class ScheduleGenerator {
   private ministers: Minister[] = [];
   private availabilityData: Map<string, AvailabilityData> = new Map();
   private massTimes: MassTime[] = [];
-  private db: any;
+  private db: typeof import('../db').db;
   private dailyAssignments: Map<string, Set<string>> = new Map(); // Rastrear ministros já escalados por dia
   private saintBonusCache: Map<string, number> = new Map(); // Cache de bônus de santo: "ministerId:date" -> score
-  private saintsData: Map<string, any[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
+  private saintsData: Map<string, SaintInfo[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
   private familyGroups: Map<string, string[]> = new Map(); // Family ID -> list of minister IDs
   private familyPreferences: Map<string, boolean> = new Map(); // Family ID -> prefer_serve_together
 
@@ -435,20 +464,32 @@ export class ScheduleGenerator {
       
       console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
       
-    } catch (queryError: any) {
+    } catch (queryError: unknown) {
       console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR:`, queryError);
-      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR STACK:`, queryError?.stack);
-      throw new Error(`Erro na consulta de ministros: ${queryError?.message || queryError}`);
+      const errorStack = queryError instanceof Error ? queryError.stack : undefined;
+      const errorMessage = queryError instanceof Error ? queryError.message : String(queryError);
+      console.error(`[SCHEDULE_GEN] ❌ QUERY ERROR STACK:`, errorStack);
+      throw new Error(`Erro na consulta de ministros: ${errorMessage}`);
     }
 
-    this.ministers = ministersData.map((m: any) => ({
-        ...m,
+    type MinisterRow = typeof ministersData[number];
+    this.ministers = ministersData.map((m: MinisterRow) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
         totalServices: m.totalServices || 0,
-        preferredTimes: m.preferredTimes || [],
+        lastService: m.lastService,
+        preferredTimes: (m.preferredTimes as string[]) || [],
         canServeAsCouple: m.canServeAsCouple || false,
+        spouseMinisterId: m.spouseMinisterId,
         familyId: m.familyId || null,
-        preferredPositions: m.preferredPositions || [],
-        avoidPositions: m.avoidPositions || [],
+        preferredPositions: (m.preferredPositions as number[]) || [],
+        avoidPositions: (m.avoidPositions as number[]) || [],
+        reliabilityScore: m.reliabilityScore ?? undefined,
+        substitutionRequestCount: m.substitutionRequestCount ?? undefined,
+        substitutionFulfilledCount: m.substitutionFulfilledCount ?? undefined,
+        manualRemovalCount: m.manualRemovalCount ?? undefined,
+        noShowCount: m.noShowCount ?? undefined,
         availabilityScore: this.calculateAvailabilityScore(m),
         preferenceScore: this.calculatePreferenceScore(m),
         // 🔥 FAIR ALGORITHM: Initialize monthly counters
@@ -527,27 +568,27 @@ export class ScheduleGenerator {
    * This adapter reads the existing October data WITHOUT modifying the database
    */
   private adaptQuestionnaireResponse(
-    response: any,
+    response: { userId: string; responses: unknown; availableSundays?: unknown; preferredMassTimes?: unknown },
     questionnaireYear: number,
     questionnaireMonth: number
   ): {
-    availableSundays: any[];
-    preferredMassTimes: any[];
-    alternativeTimes: any[];
-    dailyMassAvailability: any[];
+    availableSundays: string[];
+    preferredMassTimes: string[];
+    alternativeTimes: string[];
+    dailyMassAvailability: string[];
     canSubstitute: boolean;
-    specialEvents: Record<string, any>;
+    specialEvents: Record<string, boolean | string | string[]>;
     weekdayMasses: string[];
   } {
     console.log(`[COMPATIBILITY_LAYER] Adapting response for ${questionnaireMonth}/${questionnaireYear}`);
 
     // Default empty structure
-    let availableSundays: any[] = [];
-    let preferredMassTimes: any[] = [];
-    let alternativeTimes: any[] = [];
-    let dailyMassAvailability: any[] = [];
+    let availableSundays: string[] = [];
+    let preferredMassTimes: string[] = [];
+    let alternativeTimes: string[] = [];
+    let dailyMassAvailability: string[] = [];
     let canSubstitute = false;
-    let specialEvents: Record<string, any> = {};
+    let specialEvents: Record<string, boolean | string | string[]> = {};
     const weekdayMasses: string[] = [];
 
     // 🎯 VERSION DETECTION: Check for v2.0 format FIRST (works for Oct 2025 onwards)
@@ -561,10 +602,8 @@ export class ScheduleGenerator {
       }
     }
 
-    const isV2Format = responsesData && typeof responsesData === 'object' && responsesData.format_version === '2.0';
-
     // Handle v2.0 format (available from Oct/2025 onwards, but may appear in later months/years)
-    if (isV2Format) {
+    if (isV2QuestionnaireData(responsesData)) {
       console.log(`[COMPATIBILITY_LAYER] 🎯 Processing v2.0 STANDARDIZED format for ${questionnaireMonth}/${questionnaireYear}`);
 
       try {
@@ -590,7 +629,7 @@ export class ScheduleGenerator {
 
         Object.entries(masses).forEach(([date, times]) => {
           if (times && typeof times === 'object') {
-            Object.entries(times as Record<string, any>).forEach(([time, available]) => {
+            Object.entries(times as Record<string, unknown>).forEach(([time, available]) => {
               const isAvailable = available === true || available === 'Sim' || available === 'sim' || available === 'true' || available === 1;
               if (!isAvailable) return;
 
@@ -610,9 +649,9 @@ export class ScheduleGenerator {
 
         // Extract preferred times from masses (most common times)
         const timeCount: Record<string, number> = {};
-        Object.values(masses).forEach((timesForDate: any) => {
+        Object.values(masses).forEach((timesForDate) => {
           if (timesForDate && typeof timesForDate === 'object') {
-            Object.entries(timesForDate).forEach(([time, available]) => {
+            Object.entries(timesForDate as Record<string, unknown>).forEach(([time, available]) => {
               if (available === true || available === 'Sim' || available === 'sim' || available === 'true' || available === 1) {
                 timeCount[time] = (timeCount[time] || 0) + 1;
               }
@@ -678,9 +717,9 @@ export class ScheduleGenerator {
           }
         };
 
-        const processWeekdayStructure = (value: any, keyHint?: string) => {
+        const processWeekdayStructure = (value: unknown, keyHint?: string): void => {
           if (Array.isArray(value)) {
-            value.forEach(entry => addWeekdayAvailability(entry));
+            value.forEach(entry => addWeekdayAvailability(entry as string | null | undefined));
             return;
           }
 
@@ -702,13 +741,14 @@ export class ScheduleGenerator {
           }
 
           if (value && typeof value === 'object') {
-            if (Array.isArray((value as any).selectedOptions)) {
-              (value as any).selectedOptions.forEach((entry: any) => addWeekdayAvailability(entry));
+            const valueObj = value as Record<string, unknown>;
+            if (Array.isArray(valueObj.selectedOptions)) {
+              valueObj.selectedOptions.forEach((entry) => addWeekdayAvailability(entry as string | null | undefined));
             }
-            if (Array.isArray((value as any).options)) {
-              (value as any).options.forEach((entry: any) => addWeekdayAvailability(entry));
+            if (Array.isArray(valueObj.options)) {
+              valueObj.options.forEach((entry) => addWeekdayAvailability(entry as string | null | undefined));
             }
-            Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+            Object.entries(valueObj).forEach(([nestedKey, nestedValue]) => {
               processWeekdayStructure(nestedValue, nestedKey);
             });
           }
@@ -749,7 +789,7 @@ export class ScheduleGenerator {
         // 🔥 FIX: Parse substitution - also consider alternative_times
         // If can_substitute is true OR has alternative_times, minister can substitute
         canSubstitute = data.can_substitute === true ||
-          (data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0);
+          Boolean(data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0);
 
         console.log(`[COMPATIBILITY_LAYER] ✅ v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events, canSubstitute=${canSubstitute}, altTimes=${alternativeTimes.length}`);
       } catch (error) {
@@ -762,50 +802,65 @@ export class ScheduleGenerator {
         console.log(`[COMPATIBILITY_LAYER] ✅ October 2025 using LEGACY array format`);
 
           // Process October 2025 array format: [{questionId: "...", answer: "..."}]
-          const responsesArray = responsesData;
-          responsesArray.forEach((item: any) => {
+          type LegacyArrayItem = {
+            questionId: string;
+            answer: unknown;
+          };
+          type AnswerWithOptions = { selectedOptions?: string[] };
+          const getSelectedOptions = (answer: unknown): string[] | null => {
+            if (answer && typeof answer === 'object' && 'selectedOptions' in answer) {
+              const opts = (answer as AnswerWithOptions).selectedOptions;
+              return Array.isArray(opts) ? opts : null;
+            }
+            return null;
+          };
+          const responsesArray = responsesData as LegacyArrayItem[];
+          responsesArray.forEach((item) => {
+            const answer = item.answer;
             switch(item.questionId) {
               case 'available_sundays':
-                availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                availableSundays = Array.isArray(answer) ? answer as string[] : [];
                 break;
               case 'main_service_time':
-                preferredMassTimes = item.answer ? [item.answer] : [];
+                preferredMassTimes = answer ? [String(answer)] : [];
                 break;
               case 'other_times_available':
-                if (item.answer && item.answer !== 'Não') {
-                  if (typeof item.answer === 'object' && item.answer.selectedOptions) {
-                    alternativeTimes = item.answer.selectedOptions;
-                  } else if (Array.isArray(item.answer)) {
-                    alternativeTimes = item.answer;
-                  } else if (typeof item.answer === 'string') {
-                    alternativeTimes = [item.answer];
+                if (answer && answer !== 'Não') {
+                  const selectedOpts = getSelectedOptions(answer);
+                  if (selectedOpts) {
+                    alternativeTimes = selectedOpts;
+                  } else if (Array.isArray(answer)) {
+                    alternativeTimes = answer as string[];
+                  } else if (typeof answer === 'string') {
+                    alternativeTimes = [answer];
                   }
                 }
                 break;
               case 'can_substitute':
-                canSubstitute = item.answer === 'Sim' || item.answer === true;
+                canSubstitute = answer === 'Sim' || answer === true;
                 break;
               case 'daily_mass_availability':
-                if (item.answer && item.answer !== 'Não posso' && item.answer !== 'Não') {
-                  if (typeof item.answer === 'object' && item.answer.selectedOptions) {
-                    dailyMassAvailability = item.answer.selectedOptions;
-                  } else if (item.answer === 'Sim') {
+                if (answer && answer !== 'Não posso' && answer !== 'Não') {
+                  const selectedOpts = getSelectedOptions(answer);
+                  if (selectedOpts) {
+                    dailyMassAvailability = selectedOpts;
+                  } else if (answer === 'Sim') {
                     dailyMassAvailability = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-                  } else if (Array.isArray(item.answer)) {
-                    dailyMassAvailability = item.answer;
-                  } else if (typeof item.answer === 'string') {
-                    dailyMassAvailability = [item.answer];
+                  } else if (Array.isArray(answer)) {
+                    dailyMassAvailability = answer as string[];
+                  } else if (typeof answer === 'string') {
+                    dailyMassAvailability = [answer];
                   }
                 }
                 break;
               // Novena de São Judas
               case 'saint_judas_novena':
-                if (Array.isArray(item.answer)) {
-                  specialEvents[item.questionId] = item.answer;
-                } else if (item.answer === 'Nenhum dia') {
+                if (Array.isArray(answer)) {
+                  specialEvents[item.questionId] = answer as string[];
+                } else if (answer === 'Nenhum dia') {
                   specialEvents[item.questionId] = [];
                 } else {
-                  specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                  specialEvents[item.questionId] = answer ? [String(answer)] : [];
                 }
                 break;
               // Special event masses
@@ -819,7 +874,7 @@ export class ScheduleGenerator {
               case 'saint_judas_feast_17h':
               case 'saint_judas_feast_evening':
               case 'adoration_monday':
-                specialEvents[item.questionId] = item.answer;
+                specialEvents[item.questionId] = answer as boolean | string | string[];
                 break;
             }
           });
@@ -974,7 +1029,8 @@ export class ScheduleGenerator {
     console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
     console.log(`[SCHEDULE_GEN] 🔄 Using COMPATIBILITY LAYER for ${year}/${month}`);
 
-    responses.forEach((r: any, index: number) => {
+    type ResponseRow = typeof responses[number];
+    responses.forEach((r: ResponseRow) => {
       // 🔄 USE COMPATIBILITY LAYER: Adapter handles all format variations
       const adapted = this.adaptQuestionnaireResponse(r, year, month);
 
@@ -1134,10 +1190,12 @@ export class ScheduleGenerator {
    * 🔧 NORMALIZAÇÃO: Converte valores booleanos em strings para eventos especiais
    * false → "Não", true → "Sim"
    */
-  private normalizeSpecialEvents(events: any): any {
-    if (!events || typeof events !== 'object') return events;
+  private normalizeSpecialEvents(
+    events: Record<string, boolean | string | string[]>
+  ): Record<string, string | string[]> {
+    if (!events || typeof events !== 'object') return {};
 
-    const normalized: any = {};
+    const normalized: Record<string, string | string[]> = {};
 
     for (const [key, value] of Object.entries(events)) {
       if (typeof value === 'boolean') {
@@ -1208,7 +1266,8 @@ export class ScheduleGenerator {
     const config = await this.db.select().from(massTimesConfig)
       .where(eq(massTimesConfig.isActive, true));
 
-    this.massTimes = config.map((c: any) => ({
+    type ConfigRow = typeof config[number];
+    this.massTimes = config.map((c: ConfigRow) => ({
       id: c.id,
       dayOfWeek: c.dayOfWeek,
       time: c.time,
@@ -2855,12 +2914,17 @@ export class ScheduleGenerator {
   /**
    * Funções auxiliares
    */
-  private calculateAvailabilityScore(minister: any): number {
+  private calculateAvailabilityScore(minister: { totalServices: number | null }): number {
     return minister.totalServices || 0;
   }
 
-  private calculatePreferenceScore(minister: any): number {
-    const basePreference = (minister.preferredTimes?.length || 0) + (minister.canServeAsCouple ? 2 : 0);
+  private calculatePreferenceScore(minister: {
+    preferredTimes?: string[] | unknown;
+    canServeAsCouple?: boolean | null;
+    reliabilityScore?: number | null
+  }): number {
+    const preferredTimes = Array.isArray(minister.preferredTimes) ? minister.preferredTimes : [];
+    const basePreference = preferredTimes.length + (minister.canServeAsCouple ? 2 : 0);
 
     // 🤖 ADAPTIVE LEARNING: Include reliability score (normalized to 0-10 scale)
     const reliabilityBonus = Math.floor((minister.reliabilityScore || 100) / 10);
@@ -2990,7 +3054,8 @@ export class ScheduleGenerator {
       }
 
       // 3. Get full minister data
-      const ministerIds = results.map((r: any) => r.ministerId);
+      type DrawResult = typeof results[number];
+      const ministerIds = results.map((r: DrawResult) => r.ministerId);
       const ministersData = await this.db
         .select()
         .from(users)
@@ -3000,7 +3065,8 @@ export class ScheduleGenerator {
         ));
 
       // 4. Convert to Minister objects
-      const ministers: Minister[] = ministersData.map((m: any) => ({
+      type MinisterRow = typeof ministersData[number];
+      const ministers: Minister[] = ministersData.map((m: MinisterRow) => ({
         id: m.id,
         name: m.name,
         role: m.role,
@@ -3015,7 +3081,7 @@ export class ScheduleGenerator {
         monthlyAssignmentCount: 0
       }));
 
-      const voluntaryCount = results.filter((r: any) => r.isVoluntary).length;
+      const voluntaryCount = results.filter((r: DrawResult) => r.isVoluntary).length;
       const mandatoryCount = results.length - voluntaryCount;
 
       console.log(`[ADORATION] Found ${ministers.length} ministers for week ${mondayOfWeek}: ${voluntaryCount} voluntary, ${mandatoryCount} mandatory`);
