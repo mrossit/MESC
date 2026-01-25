@@ -20,7 +20,8 @@ import {
   ChartBar,
   Move,
   Activity,
-  Shuffle
+  Shuffle,
+  Lightbulb
 } from "lucide-react";
 import {
   Sidebar,
@@ -190,6 +191,12 @@ export function AppSidebar() {
       title: "Logs de Atividade",
       href: "/activity-logs",
       icon: FileText,
+      roles: ["gestor", "coordenador"]
+    },
+    {
+      title: "Insights Preditivos",
+      href: "/insights",
+      icon: Lightbulb,
       roles: ["gestor", "coordenador"]
     },
   ];
