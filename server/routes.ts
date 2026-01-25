@@ -27,6 +27,7 @@ import formationAdminRoutes from "./routes/formationAdmin";
 import versionRoutes from "./routes/version";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
+import certificatesRoutes from "./routes/certificates";
 import whatsappApiRoutes from "./routes/whatsapp-api";
 import metricsRoutes from "./routes/metrics";
 import reliabilityMetricsRoutes from "./routes/reliabilityMetrics";
@@ -237,7 +238,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Push notification subscription routes (read endpoints sem CSRF, write endpoints com CSRF)
   app.use('/api/push-subscriptions', pushSubscriptionsRoutes);
-  
+
+  // Formation certificates routes
+  app.use('/api/certificates', certificatesRoutes);
+
   // Metrics routes (apenas para gestor/coordenador, apenas leitura)
   app.use('/api/metrics', metricsRoutes);
 

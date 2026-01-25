@@ -64,7 +64,11 @@
       "Bash(git checkout:*)",
       "Bash(npm run db:push:*)",
       "Bash(node -e:*)",
-      "Bash(printenv:*)"
+      "Bash(printenv:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:load:pwa:*)",
+      "Bash(LOAD_TEST_URL=http://localhost:5000 npm run test:load:*)",
+      "Bash(yes:*)"
     ],
     "deny": [],
     "ask": []
