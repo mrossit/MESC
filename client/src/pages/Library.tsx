@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -28,8 +31,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useCsrfToken, addCsrfHeader } from "@/hooks/useCsrfToken";
 import { authAPI } from "@/lib/auth";
@@ -43,16 +53,24 @@ import {
   Upload,
   Download,
   Search,
-  Filter,
   MoreVertical,
   Trash2,
   Edit,
-  Eye,
   ExternalLink,
   Calendar,
-  User,
   HardDrive,
-  Link as LinkIcon
+  Sparkles,
+  Brain,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Tag,
+  BookOpen,
+  RefreshCw,
+  Wand2,
+  HelpCircle,
+  Star,
+  Loader2
 } from "lucide-react";
 
 interface Material {
@@ -71,6 +89,7 @@ interface Material {
   isPublished: boolean;
   createdAt: string;
   uploaderName: string | null;
+  aiAnalyzed?: boolean;
 }
 
 interface MaterialsResponse {
@@ -86,6 +105,24 @@ interface CategoriesResponse {
     title: string;
     category: string;
   }>;
+}
+
+interface AIAnalysis {
+  analyzed: boolean;
+  summary?: string;
+  suggestedCategory?: string;
+  suggestedTags?: string[];
+  keyTopics?: string[];
+  contentQuality?: string;
+  qualityNotes?: string[];
+  quizQuestions?: Array<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }>;
+  analyzedAt?: string;
+  message?: string;
 }
 
 // File type icons
@@ -125,12 +162,37 @@ const formatDate = (dateString: string) => {
   });
 };
 
+// Quality badge color
+const getQualityColor = (quality: string) => {
+  switch (quality) {
+    case 'excellent':
+      return 'bg-green-100 text-green-800 border-green-200';
+    case 'good':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'acceptable':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'needs_review':
+      return 'bg-red-100 text-red-800 border-red-200';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
+const qualityLabels: Record<string, string> = {
+  excellent: 'Excelente',
+  good: 'Bom',
+  acceptable: 'Aceitavel',
+  needs_review: 'Precisa Revisao'
+};
+
 export default function Library() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [analyzingMaterial, setAnalyzingMaterial] = useState<Material | null>(null);
+  const [selectedQuizQuestion, setSelectedQuizQuestion] = useState<number>(0);
 
   const { toast } = useToast();
   const { csrfToken } = useCsrfToken();
@@ -173,6 +235,20 @@ export default function Library() {
     }
   });
 
+  // Fetch AI analysis for selected material
+  const { data: aiAnalysis, isLoading: isLoadingAnalysis, refetch: refetchAnalysis } = useQuery<AIAnalysis>({
+    queryKey: ['/api/materials/analysis', analyzingMaterial?.id],
+    queryFn: async () => {
+      if (!analyzingMaterial) return { analyzed: false };
+      const response = await fetch(`/api/materials/${analyzingMaterial.id}/analysis`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch analysis');
+      return response.json();
+    },
+    enabled: !!analyzingMaterial
+  });
+
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -188,8 +264,11 @@ export default function Library() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: 'Material enviado com sucesso!' });
+    onSuccess: (data) => {
+      toast({
+        title: 'Material enviado com sucesso!',
+        description: data.aiAnalysisPending ? 'Analise de IA em andamento...' : undefined
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/materials'] });
       setIsUploadOpen(false);
     },
@@ -240,6 +319,73 @@ export default function Library() {
     }
   });
 
+  // Trigger AI analysis mutation
+  const analyzeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/materials/${id}/analyze`, {
+        method: 'POST',
+        headers: addCsrfHeader({}, csrfToken),
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Analysis failed');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Analise concluida!' });
+      refetchAnalysis();
+      queryClient.invalidateQueries({ queryKey: ['/api/materials'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro na analise', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  // Apply AI suggestions mutation
+  const applySuggestionsMutation = useMutation({
+    mutationFn: async ({ id, suggestions }: { id: string; suggestions: { applyCategory?: boolean; applyTags?: boolean; applyDescription?: boolean } }) => {
+      const response = await fetch(`/api/materials/${id}/apply-suggestions`, {
+        method: 'POST',
+        headers: addCsrfHeader({ 'Content-Type': 'application/json' }, csrfToken),
+        credentials: 'include',
+        body: JSON.stringify(suggestions)
+      });
+      if (!response.ok) throw new Error('Apply failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Sugestoes aplicadas!' });
+      queryClient.invalidateQueries({ queryKey: ['/api/materials'] });
+      setAnalyzingMaterial(null);
+    },
+    onError: () => {
+      toast({ title: 'Erro ao aplicar sugestoes', variant: 'destructive' });
+    }
+  });
+
+  // Generate quiz mutation
+  const generateQuizMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/materials/${id}/generate-quiz`, {
+        method: 'POST',
+        headers: addCsrfHeader({ 'Content-Type': 'application/json' }, csrfToken),
+        credentials: 'include',
+        body: JSON.stringify({ numQuestions: 5 })
+      });
+      if (!response.ok) throw new Error('Quiz generation failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Quiz gerado com sucesso!' });
+      refetchAnalysis();
+    },
+    onError: () => {
+      toast({ title: 'Erro ao gerar quiz', variant: 'destructive' });
+    }
+  });
+
   // Handle upload form submit
   const handleUpload = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -276,7 +422,7 @@ export default function Library() {
                 <DialogHeader>
                   <DialogTitle>Enviar Novo Material</DialogTitle>
                   <DialogDescription>
-                    Faca upload de arquivos ou adicione links externos
+                    Faca upload de arquivos. A IA analisara o conteudo automaticamente.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleUpload} className="space-y-4">
@@ -286,16 +432,16 @@ export default function Library() {
                   </div>
 
                   <div>
-                    <Label htmlFor="description">Descricao</Label>
-                    <Textarea id="description" name="description" placeholder="Descricao do material" rows={2} />
+                    <Label htmlFor="description">Descricao (opcional - IA pode sugerir)</Label>
+                    <Textarea id="description" name="description" placeholder="Deixe em branco para sugestao da IA" rows={2} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="category">Categoria</Label>
+                      <Label htmlFor="category">Categoria (opcional)</Label>
                       <Select name="category">
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecionar" />
+                          <SelectValue placeholder="IA sugere" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="liturgia">Liturgia</SelectItem>
@@ -325,16 +471,15 @@ export default function Library() {
                   <div>
                     <Label htmlFor="file">Arquivo (max 10MB)</Label>
                     <Input id="file" name="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.mp3,.mp4,.webm" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <Sparkles className="h-3 w-3 inline mr-1" />
+                      A IA analisara PDFs e documentos de texto
+                    </p>
                   </div>
 
                   <div>
                     <Label htmlFor="externalUrl">Ou URL Externa</Label>
                     <Input id="externalUrl" name="externalUrl" type="url" placeholder="https://..." />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="tags">Tags (separadas por virgula)</Label>
-                    <Input id="tags" name="tags" placeholder="formacao, liturgia, video" />
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -434,10 +579,15 @@ export default function Library() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setAnalyzingMaterial(material)}>
+                                <Brain className="h-4 w-4 mr-2" />
+                                Ver Analise IA
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setEditingMaterial(material)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={() => deleteMutation.mutate(material.id)}
@@ -462,6 +612,12 @@ export default function Library() {
                         {!material.isPublished && (
                           <Badge variant="outline" className="text-xs text-yellow-600">
                             Rascunho
+                          </Badge>
+                        )}
+                        {material.aiAnalyzed && (
+                          <Badge variant="outline" className="text-xs text-purple-600 border-purple-200">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            IA
                           </Badge>
                         )}
                       </div>
@@ -502,6 +658,16 @@ export default function Library() {
                             </>
                           )}
                         </Button>
+                        {isCoordinator && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAnalyzingMaterial(material)}
+                            title="Ver analise IA"
+                          >
+                            <Brain className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -524,6 +690,267 @@ export default function Library() {
             </CardContent>
           </Card>
         )}
+
+        {/* AI Analysis Dialog */}
+        <Dialog open={!!analyzingMaterial} onOpenChange={() => setAnalyzingMaterial(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-purple-600" />
+                Analise de IA
+              </DialogTitle>
+              <DialogDescription>
+                {analyzingMaterial?.title}
+              </DialogDescription>
+            </DialogHeader>
+
+            <ScrollArea className="max-h-[60vh]">
+              {isLoadingAnalysis ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                </div>
+              ) : !aiAnalysis?.analyzed ? (
+                <div className="text-center py-8">
+                  <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-medium mb-2">Material ainda nao analisado</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Clique abaixo para iniciar a analise com IA
+                  </p>
+                  <Button
+                    onClick={() => analyzingMaterial && analyzeMutation.mutate(analyzingMaterial.id)}
+                    disabled={analyzeMutation.isPending}
+                  >
+                    {analyzeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analisando...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Analisar com IA
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Quality Badge */}
+                  {aiAnalysis.contentQuality && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">Qualidade:</span>
+                      <Badge className={getQualityColor(aiAnalysis.contentQuality)}>
+                        <Star className="h-3 w-3 mr-1" />
+                        {qualityLabels[aiAnalysis.contentQuality] || aiAnalysis.contentQuality}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  {aiAnalysis.summary && (
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        Resumo
+                      </h4>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                        {aiAnalysis.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Suggested Category */}
+                  {aiAnalysis.suggestedCategory && (
+                    <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium">Categoria sugerida:</span>
+                        <Badge variant="outline" className="ml-2 capitalize">
+                          {aiAnalysis.suggestedCategory}
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => analyzingMaterial && applySuggestionsMutation.mutate({
+                          id: analyzingMaterial.id,
+                          suggestions: { applyCategory: true }
+                        })}
+                        disabled={applySuggestionsMutation.isPending}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Aplicar
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Key Topics */}
+                  {aiAnalysis.keyTopics && aiAnalysis.keyTopics.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Topicos Principais
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {aiAnalysis.keyTopics.map((topic, i) => (
+                          <Badge key={i} variant="secondary">
+                            {topic}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suggested Tags */}
+                  {aiAnalysis.suggestedTags && aiAnalysis.suggestedTags.length > 0 && (
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Tags sugeridas:</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => analyzingMaterial && applySuggestionsMutation.mutate({
+                            id: analyzingMaterial.id,
+                            suggestions: { applyTags: true }
+                          })}
+                          disabled={applySuggestionsMutation.isPending}
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Aplicar
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {aiAnalysis.suggestedTags.map((tag, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quality Notes */}
+                  {aiAnalysis.qualityNotes && aiAnalysis.qualityNotes.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Observacoes
+                      </h4>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        {aiAnalysis.qualityNotes.map((note, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-purple-600">•</span>
+                            {note}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Quiz Questions */}
+                  {aiAnalysis.quizQuestions && aiAnalysis.quizQuestions.length > 0 && (
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="quiz">
+                        <AccordionTrigger>
+                          <div className="flex items-center gap-2">
+                            <HelpCircle className="h-4 w-4" />
+                            Quiz Gerado ({aiAnalysis.quizQuestions.length} perguntas)
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-4 pt-2">
+                            {aiAnalysis.quizQuestions.map((q, i) => (
+                              <div key={i} className="border rounded-lg p-3">
+                                <p className="font-medium text-sm mb-2">
+                                  {i + 1}. {q.question}
+                                </p>
+                                <div className="space-y-1">
+                                  {q.options.map((opt, j) => (
+                                    <div
+                                      key={j}
+                                      className={`text-sm p-2 rounded ${
+                                        j === q.correctIndex
+                                          ? 'bg-green-100 dark:bg-green-950/30 text-green-800 dark:text-green-200'
+                                          : 'bg-muted/50'
+                                      }`}
+                                    >
+                                      {String.fromCharCode(65 + j)}) {opt}
+                                      {j === q.correctIndex && (
+                                        <CheckCircle2 className="h-3 w-3 inline ml-2" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {q.explanation && (
+                                  <p className="text-xs text-muted-foreground mt-2 italic">
+                                    {q.explanation}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  )}
+
+                  {/* Generate Quiz Button */}
+                  {(!aiAnalysis.quizQuestions || aiAnalysis.quizQuestions.length === 0) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => analyzingMaterial && generateQuizMutation.mutate(analyzingMaterial.id)}
+                      disabled={generateQuizMutation.isPending}
+                      className="w-full"
+                    >
+                      {generateQuizMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Gerando quiz...
+                        </>
+                      ) : (
+                        <>
+                          <HelpCircle className="h-4 w-4 mr-2" />
+                          Gerar Quiz com IA
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Analyzed Date */}
+                  {aiAnalysis.analyzedAt && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Analisado em {formatDate(aiAnalysis.analyzedAt)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </ScrollArea>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              {aiAnalysis?.analyzed && (
+                <Button
+                  variant="outline"
+                  onClick={() => analyzingMaterial && analyzeMutation.mutate(analyzingMaterial.id)}
+                  disabled={analyzeMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${analyzeMutation.isPending ? 'animate-spin' : ''}`} />
+                  Re-analisar
+                </Button>
+              )}
+              {aiAnalysis?.analyzed && (
+                <Button
+                  onClick={() => analyzingMaterial && applySuggestionsMutation.mutate({
+                    id: analyzingMaterial.id,
+                    suggestions: { applyCategory: true, applyTags: true, applyDescription: true }
+                  })}
+                  disabled={applySuggestionsMutation.isPending}
+                >
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Aplicar Todas Sugestoes
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={!!editingMaterial} onOpenChange={() => setEditingMaterial(null)}>
