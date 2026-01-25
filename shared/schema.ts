@@ -500,6 +500,33 @@ export const formationLessonProgress = pgTable('formation_lesson_progress', {
   index('idx_formation_lesson_progress_user_lesson').on(table.userId, table.lessonId)
 ]);
 
+// Formation Certificates - issued when user completes a track
+export const formationCertificates = pgTable('formation_certificates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  trackId: varchar('track_id').notNull().references(() => formationTracks.id, { onDelete: 'cascade' }),
+  certificateNumber: varchar('certificate_number', { length: 50 }).notNull().unique(),
+  userName: varchar('user_name', { length: 255 }).notNull(), // Snapshot of name at issuance
+  trackTitle: varchar('track_title', { length: 255 }).notNull(), // Snapshot of track title
+  trackCategory: formationCategoryEnum('track_category').notNull(),
+  totalLessons: integer('total_lessons').notNull(),
+  totalHours: integer('total_hours').notNull(), // Total duration in minutes / 60
+  issuedAt: timestamp('issued_at').defaultNow().notNull(),
+  issuedBy: varchar('issued_by').references(() => users.id, { onDelete: 'set null' }), // Coordinator who issued
+  validUntil: timestamp('valid_until'), // Optional expiration
+  verificationCode: varchar('verification_code', { length: 20 }).notNull().unique(), // For QR code verification
+  metadata: jsonb('metadata').$type<{
+    lessonsCompleted: string[];
+    completionDate: string;
+    averageScore?: number;
+  }>(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => [
+  index('idx_certificates_user').on(table.userId),
+  index('idx_certificates_track').on(table.trackId),
+  index('idx_certificates_verification').on(table.verificationCode)
+]);
+
 // Mass times configuration
 export const massTimesConfig = pgTable('mass_times_config', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1034,6 +1061,8 @@ export type FormationLessonSection = typeof formationLessonSections.$inferSelect
 export type InsertFormationLessonSection = z.infer<typeof insertFormationLessonSectionSchema>;
 export type FormationLessonProgress = typeof formationLessonProgress.$inferSelect;
 export type InsertFormationLessonProgress = z.infer<typeof insertFormationLessonProgressSchema>;
+export type FormationCertificate = typeof formationCertificates.$inferSelect;
+export type InsertFormationCertificate = typeof formationCertificates.$inferInsert;
 export type Saint = typeof saints.$inferSelect;
 export type InsertSaint = typeof saints.$inferInsert;
 export type MassExecutionLog = typeof massExecutionLogs.$inferSelect;
