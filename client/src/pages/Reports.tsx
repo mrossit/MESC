@@ -68,6 +68,90 @@ import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Report data types
+interface AvailabilityItem {
+  userName?: string;
+  availableDays?: number;
+  totalResponses?: number;
+}
+
+interface SubstitutionRequestItem {
+  totalRequests: number;
+  approvedRequests: number;
+  pendingRequests: number;
+}
+
+interface FormationPerformer {
+  userName?: string;
+  completedModules?: number;
+  inProgressModules?: number;
+  avgProgress?: number;
+}
+
+interface MinisterStats {
+  ministerId?: string;
+  ministerName?: string;
+  userName?: string;
+  status?: string;
+  totalServices?: number;
+  totalAssignments?: number;
+  noShowCount?: number;
+  reliabilityScore?: number;
+  substitutionRequests?: number;
+  periodStats?: {
+    scheduled?: number;
+    attended?: number;
+    present?: number;
+    late?: number;
+    absent?: number;
+    missed?: number;
+    attendanceRate?: number;
+    substitutionsRequested?: number;
+  };
+}
+
+interface TimeAnalysisItem {
+  time?: string;
+  dayName?: string;
+  avgAvailability?: number;
+  coverage?: number;
+  preferredCount?: number;
+  alternativeCount?: number;
+  totalAvailable?: number;
+  minRequired?: number;
+  status?: 'critical' | 'warning' | 'good';
+  message?: string;
+}
+
+interface MinisterAnalysisItem {
+  ministerId?: string;
+  ministerName?: string;
+  name?: string;
+  avgAvailability?: number;
+  avgAvailableDays?: number;
+  preferredTimesCount?: number;
+  canSubstitute?: boolean;
+  reliabilityScore?: number;
+  trend?: string;
+}
+
+interface EngagementUser {
+  userName?: string;
+  activityScore?: number;
+  lastActivity?: string;
+  totalActions?: number;
+  uniqueDays?: number;
+}
+
+interface FamilyItem {
+  familyName?: string;
+  memberCount?: number;
+  totalMembers?: number;
+  activeMembers?: number;
+  servicesThisMonth?: number;
+  totalServices?: number;
+}
+
 // Color palette for charts
 const COLORS = ["#D4AF37", "#B87333", "#CC7766", "#8B4513", "#8B5A2B", "#8B6914"];
 
@@ -284,19 +368,19 @@ export default function Reports() {
   });
 
   // Format data for charts
-  const availabilityChartData = availability?.topAvailable?.map((item: any) => ({
+  const availabilityChartData = availability?.topAvailable?.map((item: AvailabilityItem) => ({
     name: item.userName?.split(" ")[0] || "N/A",
     dias: item.availableDays || 0,
     respostas: item.totalResponses || 0
   })) || [];
 
   const substitutionPieData = [
-    { name: "Solicitadas", value: substitutions?.mostRequests?.reduce((acc: number, curr: any) => acc + curr.totalRequests, 0) || 0 },
-    { name: "Aprovadas", value: substitutions?.mostRequests?.reduce((acc: number, curr: any) => acc + curr.approvedRequests, 0) || 0 },
-    { name: "Pendentes", value: substitutions?.mostRequests?.reduce((acc: number, curr: any) => acc + curr.pendingRequests, 0) || 0 }
+    { name: "Solicitadas", value: substitutions?.mostRequests?.reduce((acc: number, curr: SubstitutionRequestItem) => acc + curr.totalRequests, 0) || 0 },
+    { name: "Aprovadas", value: substitutions?.mostRequests?.reduce((acc: number, curr: SubstitutionRequestItem) => acc + curr.approvedRequests, 0) || 0 },
+    { name: "Pendentes", value: substitutions?.mostRequests?.reduce((acc: number, curr: SubstitutionRequestItem) => acc + curr.pendingRequests, 0) || 0 }
   ];
 
-  const formationChartData = formation?.topPerformers?.map((item: any) => ({
+  const formationChartData = formation?.topPerformers?.map((item: FormationPerformer) => ({
     name: item.userName?.split(" ")[0] || "N/A",
     completados: item.completedModules || 0,
     emAndamento: item.inProgressModules || 0,
@@ -895,10 +979,10 @@ export default function Reports() {
                       ) : attendance?.ministers?.length > 0 ? (
                         <div className="space-y-2">
                           {attendance.ministers
-                            .filter((m: any) => m.status === 'active')
+                            .filter((m: MinisterStats) => m.status === 'active')
                             .slice(0, 5)
-                            .map((minister: any, index: number) => (
-                              <div key={minister.odministerIdl} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                            .map((minister: MinisterStats, index: number) => (
+                              <div key={minister.ministerId} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
                                 <div className="flex items-center gap-2">
                                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                                     index === 0 ? 'bg-yellow-500 text-white' :
@@ -912,7 +996,7 @@ export default function Reports() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge variant="secondary">{minister.totalServices} serviços</Badge>
-                                  {minister.noShowCount > 0 && (
+                                  {(minister.noShowCount ?? 0) > 0 && (
                                     <Badge variant="destructive" className="text-xs">{minister.noShowCount} faltas</Badge>
                                   )}
                                 </div>
@@ -969,22 +1053,22 @@ export default function Reports() {
                           </thead>
                           <tbody>
                             {attendance.ministers
-                              .filter((m: any) => m.status === 'active')
-                              .map((minister: any) => (
-                                <tr key={minister.odministerIdl} className="border-b hover:bg-muted/50">
+                              .filter((m: MinisterStats) => m.status === 'active')
+                              .map((minister: MinisterStats) => (
+                                <tr key={minister.ministerId} className="border-b hover:bg-muted/50">
                                   <td className="py-2 px-2">{minister.ministerName}</td>
                                   <td className="text-center py-2 px-2">{minister.totalServices}</td>
-                                  <td className="text-center py-2 px-2 text-green-600">{minister.periodStats.present}</td>
-                                  <td className="text-center py-2 px-2 text-yellow-600">{minister.periodStats.late}</td>
-                                  <td className="text-center py-2 px-2 text-red-600">{minister.periodStats.absent}</td>
+                                  <td className="text-center py-2 px-2 text-green-600">{minister.periodStats?.present ?? 0}</td>
+                                  <td className="text-center py-2 px-2 text-yellow-600">{minister.periodStats?.late ?? 0}</td>
+                                  <td className="text-center py-2 px-2 text-red-600">{minister.periodStats?.absent ?? 0}</td>
                                   <td className="text-center py-2 px-2">
-                                    {minister.periodStats.attendanceRate !== null
+                                    {minister.periodStats?.attendanceRate != null
                                       ? `${minister.periodStats.attendanceRate}%`
                                       : '-'}
                                   </td>
                                   <td className="text-center py-2 px-2">
-                                    <Badge variant={minister.reliabilityScore >= 80 ? 'default' : minister.reliabilityScore >= 50 ? 'secondary' : 'destructive'}>
-                                      {minister.reliabilityScore}
+                                    <Badge variant={(minister.reliabilityScore ?? 0) >= 80 ? 'default' : (minister.reliabilityScore ?? 0) >= 50 ? 'secondary' : 'destructive'}>
+                                      {minister.reliabilityScore ?? 0}
                                     </Badge>
                                   </td>
                                 </tr>
@@ -1115,7 +1199,7 @@ export default function Reports() {
                         <div className="w-full overflow-x-auto">
                           <ResponsiveContainer width="100%" height={300}>
                             <BarChart
-                              data={availabilityAnalysis.timeAnalysis.slice(0, 10).map((t: any) => ({
+                              data={availabilityAnalysis.timeAnalysis.slice(0, 10).map((t: TimeAnalysisItem) => ({
                                 name: `${t.dayName?.substring(0, 3)} ${t.time}`,
                                 cobertura: t.coverage,
                                 preferidos: t.preferredCount,
@@ -1214,8 +1298,8 @@ export default function Reports() {
                             </tr>
                           </thead>
                           <tbody>
-                            {availabilityAnalysis.ministerAnalysis.slice(0, 10).map((minister: any, idx: number) => (
-                              <tr key={minister.odministerIdl || idx} className="border-b hover:bg-muted/50">
+                            {availabilityAnalysis.ministerAnalysis.slice(0, 10).map((minister: MinisterAnalysisItem, idx: number) => (
+                              <tr key={minister.ministerId || idx} className="border-b hover:bg-muted/50">
                                 <td className="p-2 font-medium">{minister.name}</td>
                                 <td className="text-center p-2">{minister.avgAvailableDays}</td>
                                 <td className="text-center p-2">{minister.preferredTimesCount}</td>
@@ -1228,10 +1312,10 @@ export default function Reports() {
                                 </td>
                                 <td className="text-center p-2">
                                   <Badge
-                                    variant={minister.reliabilityScore >= 80 ? 'default' : minister.reliabilityScore >= 50 ? 'secondary' : 'destructive'}
-                                    className={minister.reliabilityScore >= 80 ? 'bg-green-100 text-green-800' : ''}
+                                    variant={(minister.reliabilityScore ?? 0) >= 80 ? 'default' : (minister.reliabilityScore ?? 0) >= 50 ? 'secondary' : 'destructive'}
+                                    className={(minister.reliabilityScore ?? 0) >= 80 ? 'bg-green-100 text-green-800' : ''}
                                   >
-                                    {minister.reliabilityScore}%
+                                    {minister.reliabilityScore ?? 0}%
                                   </Badge>
                                 </td>
                               </tr>
@@ -1249,7 +1333,7 @@ export default function Reports() {
                 </Card>
 
                 {/* Critical Time Slots */}
-                {availabilityAnalysis?.timeAnalysis?.filter((t: any) => t.status === 'critical' || t.status === 'warning').length > 0 && (
+                {availabilityAnalysis?.timeAnalysis?.filter((t: TimeAnalysisItem) => t.status === 'critical' || t.status === 'warning').length > 0 && (
                   <Card className="border-orange-200 bg-orange-50/50">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-orange-700">
@@ -1261,8 +1345,8 @@ export default function Reports() {
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {availabilityAnalysis.timeAnalysis
-                          .filter((t: any) => t.status === 'critical' || t.status === 'warning')
-                          .map((t: any, idx: number) => (
+                          .filter((t: TimeAnalysisItem) => t.status === 'critical' || t.status === 'warning')
+                          .map((t: TimeAnalysisItem, idx: number) => (
                             <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -1345,7 +1429,7 @@ export default function Reports() {
                         </div>
                       ) : substitutions?.reliableServers?.length > 0 ? (
                         <div className="space-y-2">
-                          {substitutions.reliableServers.slice(0, 5).map((minister: any, index: number) => (
+                          {substitutions.reliableServers.slice(0, 5).map((minister: MinisterStats, index: number) => (
                             <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
                               <div className="flex items-center gap-2">
                                 <Trophy className={`h-5 w-5 ${
@@ -1397,7 +1481,7 @@ export default function Reports() {
                         </div>
                       ) : engagement?.mostActive?.length > 0 ? (
                         <div className="space-y-2">
-                          {engagement.mostActive.map((user: any, index: number) => (
+                          {engagement.mostActive.map((user: EngagementUser, index: number) => (
                             <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                               <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -1544,7 +1628,7 @@ export default function Reports() {
                       </div>
                     ) : families?.activeFamilies?.length > 0 ? (
                       <div className="space-y-2">
-                        {families.activeFamilies.map((family: any, index: number) => (
+                        {families.activeFamilies.map((family: FamilyItem, index: number) => (
                           <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                             <div className="flex items-center gap-3">
                               <Heart className={`h-5 w-5 ${

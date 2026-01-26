@@ -47,7 +47,7 @@ export function ScheduleEditDialog({
   const ministersListRef = useRef<HTMLDivElement>(null);
 
   // Buscar lista de todos os ministros disponíveis
-  const { data: allMinisters, isLoading: loadingMinisters, error: ministersError } = useQuery({
+  const { data: allMinisters, isLoading: loadingMinisters, error: ministersError } = useQuery<Minister[]>({
     queryKey: ['/api/ministers'],
     enabled: open
   });
@@ -183,7 +183,7 @@ export function ScheduleEditDialog({
 
   // Filtrar ministros baseado na busca
   const filteredMinisters = Array.isArray(allMinisters)
-    ? allMinisters.filter((m: any) =>
+    ? allMinisters.filter((m) =>
         m.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
@@ -210,11 +210,11 @@ export function ScheduleEditDialog({
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'], exact: false });
       onSave();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('[ScheduleEditDialog] Erro ao salvar:', error);
       toast({
         title: "Erro ao salvar",
-        description: error.message || "Ocorreu um erro ao salvar as alterações.",
+        description: error instanceof Error ? error.message : "Ocorreu um erro ao salvar as alterações.",
         variant: "destructive"
       });
     } finally {
@@ -365,10 +365,10 @@ export function ScheduleEditDialog({
                         {searchQuery ? 'Nenhum ministro encontrado.' : 'Digite para buscar um ministro.'}
                       </p>
                     ) : (
-                      filteredMinisters.map((minister: any) => (
+                      filteredMinisters.filter((m) => m.id !== null).map((minister) => (
                         <button
                           key={minister.id}
-                          onClick={() => handleAddMinisterAtPosition(minister, insertPosition)}
+                          onClick={() => handleAddMinisterAtPosition({ id: minister.id!, name: minister.name }, insertPosition)}
                           className={`
                             w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors
                             ${selectedMinisterId === minister.id ? 'bg-accent' : ''}

@@ -12,20 +12,31 @@ interface MassOption {
   type: 'sunday' | 'weekday' | 'special';
 }
 
+interface QuestionOption {
+  id: string;
+  date?: string;
+  time?: string;
+  label: string;
+  value?: string;
+}
+
 interface QuestionnaireQuestion {
   id: string;
   type: string;
   question: string;
   description?: string;
-  options: any[];
+  options: QuestionOption[];
   required: boolean;
   section?: string;
 }
 
+// Responses can be: Record for checkbox groups, string[] for multi-select, boolean for single toggle, string for radio
+type ResponseValue = Record<string, boolean> | string[] | boolean | string;
+
 interface LiturgicalMassCalendarProps {
   questions: QuestionnaireQuestion[];
-  responses: Record<string, any>;
-  onChange: (questionId: string, value: any) => void;
+  responses: Record<string, ResponseValue | undefined>;
+  onChange: (questionId: string, value: ResponseValue) => void;
 }
 
 export function LiturgicalMassCalendar({
@@ -62,14 +73,15 @@ export function LiturgicalMassCalendar({
   // Group Sunday masses by date
   const groupedSundayMasses: Record<string, MassOption[]> = {};
   if (sundayQuestion) {
-    sundayQuestion.options.forEach((option: any) => {
-      if (!groupedSundayMasses[option.date]) {
-        groupedSundayMasses[option.date] = [];
+    sundayQuestion.options.forEach((option) => {
+      const date = option.date || '';
+      if (!groupedSundayMasses[date]) {
+        groupedSundayMasses[date] = [];
       }
-      groupedSundayMasses[option.date].push({
+      groupedSundayMasses[date].push({
         id: option.id,
-        date: option.date,
-        time: option.time,
+        date,
+        time: option.time || '',
         label: option.label,
         type: 'sunday'
       });
@@ -77,7 +89,7 @@ export function LiturgicalMassCalendar({
   }
 
   const handleSundayMassToggle = (massId: string, checked: boolean) => {
-    const currentSelections = responses.sunday_masses || {};
+    const currentSelections = (responses.sunday_masses as Record<string, boolean>) || {};
     onChange('sunday_masses', {
       ...currentSelections,
       [massId]: checked
@@ -85,16 +97,16 @@ export function LiturgicalMassCalendar({
   };
 
   const handleWeekdayToggle = (day: string, checked: boolean) => {
-    const currentSelections = responses.weekday_masses || [];
+    const currentSelections = (responses.weekday_masses as string[]) || [];
     if (checked) {
       onChange('weekday_masses', [...currentSelections, day]);
     } else {
-      onChange('weekday_masses', currentSelections.filter((d: string) => d !== day));
+      onChange('weekday_masses', currentSelections.filter((d) => d !== day));
     }
   };
 
   const handleSpecialMassToggle = (massId: string, checked: boolean) => {
-    const currentSelections = responses.special_masses || {};
+    const currentSelections = (responses.special_masses as Record<string, boolean>) || {};
     onChange('special_masses', {
       ...currentSelections,
       [massId]: checked
@@ -173,7 +185,8 @@ export function LiturgicalMassCalendar({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {masses.map((mass) => {
-                    const isChecked = responses.sunday_masses?.[mass.id] === true;
+                    const sundayMasses = responses.sunday_masses as Record<string, boolean> | undefined;
+                    const isChecked = sundayMasses?.[mass.id] === true;
                     return (
                       <div
                         key={mass.id}
@@ -221,28 +234,30 @@ export function LiturgicalMassCalendar({
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {weekdayQuestion.options.map((option: any) => {
-              const isChecked = responses.weekday_masses?.includes(option.value);
+            {weekdayQuestion.options.map((option) => {
+              const weekdayMasses = responses.weekday_masses;
+              const optionValue = option.value || option.id;
+              const isChecked = Array.isArray(weekdayMasses) && weekdayMasses.includes(optionValue);
               return (
                 <div
-                  key={option.value}
+                  key={optionValue}
                   className={`flex items-center space-x-3 p-3 rounded-md border-2 transition-all cursor-pointer ${
                     isChecked
                       ? 'bg-green-50 border-green-500'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => handleWeekdayToggle(option.value, !isChecked)}
+                  onClick={() => handleWeekdayToggle(optionValue, !isChecked)}
                 >
                   <Checkbox
-                    id={option.value}
+                    id={optionValue}
                     checked={isChecked}
                     onCheckedChange={(checked) =>
-                      handleWeekdayToggle(option.value, checked === true)
+                      handleWeekdayToggle(optionValue, checked === true)
                     }
                     onClick={(e) => e.stopPropagation()}
                   />
                   <label
-                    htmlFor={option.value}
+                    htmlFor={optionValue}
                     className={`text-sm font-medium cursor-pointer flex-1 ${
                       isChecked ? 'text-green-900' : 'text-gray-700'
                     }`}
@@ -267,8 +282,9 @@ export function LiturgicalMassCalendar({
           )}
 
           <div className="space-y-3">
-            {specialQuestion.options.map((option: any) => {
-              const isChecked = responses.special_masses?.[option.id] === true;
+            {specialQuestion.options.map((option) => {
+              const specialMasses = responses.special_masses as Record<string, boolean> | undefined;
+              const isChecked = specialMasses?.[option.id] === true;
               return (
                 <div
                   key={option.id}
@@ -313,29 +329,30 @@ export function LiturgicalMassCalendar({
           )}
 
           <div className="space-y-3">
-            {substituteQuestion.options.map((option: any) => {
-              const isSelected = responses.can_substitute === option.value;
+            {substituteQuestion.options.map((option) => {
+              const optionValue = option.value || option.id;
+              const isSelected = responses.can_substitute === optionValue;
               return (
                 <div
-                  key={option.value}
+                  key={optionValue}
                   className={`flex items-center space-x-3 p-4 rounded-md border-2 transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-blue-50 border-blue-500'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => handleSubstituteChange(option.value)}
+                  onClick={() => handleSubstituteChange(optionValue)}
                 >
                   <input
                     type="radio"
-                    id={option.value}
+                    id={optionValue}
                     name="can_substitute"
                     checked={isSelected}
-                    onChange={() => handleSubstituteChange(option.value)}
+                    onChange={() => handleSubstituteChange(optionValue)}
                     className="w-4 h-4 text-blue-600 cursor-pointer"
                     onClick={(e) => e.stopPropagation()}
                   />
                   <label
-                    htmlFor={option.value}
+                    htmlFor={optionValue}
                     className={`text-sm font-medium cursor-pointer flex-1 ${
                       isSelected ? 'text-blue-900' : 'text-gray-700'
                     }`}

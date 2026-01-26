@@ -103,9 +103,9 @@ export const authAPI = {
       }
 
       return data;
-    } catch (error: any) {
+    } catch (error) {
       // Extrair mensagem do JSON se possível
-      const errorMessage = error.message || "Erro ao fazer login";
+      const errorMessage = error instanceof Error ? error.message : "Erro ao fazer login";
       
       // Se o erro contém JSON no formato "status: {json}", extrair a mensagem
       if (errorMessage.includes('{"success":false,"message":')) {

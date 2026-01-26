@@ -40,6 +40,6 @@ export interface Activity {
   userId: string;
   action: string;
   description: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }

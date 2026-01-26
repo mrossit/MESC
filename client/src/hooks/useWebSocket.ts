@@ -8,9 +8,26 @@ import { useQuery } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
+interface SubstitutionData {
+  requestId?: string;
+  [key: string]: unknown;
+}
+
+interface CriticalMassData {
+  massId?: string;
+  [key: string]: unknown;
+}
+
+interface AlertUpdateData {
+  alerts?: unknown[];
+  [key: string]: unknown;
+}
+
+type WebSocketData = SubstitutionData | CriticalMassData | AlertUpdateData | UserNotification | number | unknown;
+
 interface WebSocketMessage {
   type: 'SUBSTITUTION_REQUEST' | 'CRITICAL_MASS' | 'ALERT_UPDATE' | 'USER_NOTIFICATION' | 'UNREAD_COUNT' | 'PING';
-  data?: any;
+  data?: WebSocketData;
   timestamp: string;
 }
 
@@ -24,9 +41,9 @@ interface UserNotification {
 }
 
 interface UseWebSocketOptions {
-  onSubstitutionRequest?: (data: any) => void;
-  onCriticalMass?: (data: any) => void;
-  onAlertUpdate?: (data: any) => void;
+  onSubstitutionRequest?: (data: SubstitutionData) => void;
+  onCriticalMass?: (data: CriticalMassData) => void;
+  onAlertUpdate?: (data: AlertUpdateData) => void;
   onUserNotification?: (data: UserNotification) => void;
   onUnreadCountUpdate?: (count: number) => void;
   enabled?: boolean;
@@ -117,54 +134,61 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
           switch (message.type) {
             case 'SUBSTITUTION_REQUEST':
-              if (onSubstitutionRequest) {
-                onSubstitutionRequest(message.data);
+              if (onSubstitutionRequest && message.data) {
+                const data = message.data as SubstitutionData & { requestingUser?: { name?: string } };
+                onSubstitutionRequest(data);
+                // Show toast notification
+                if (user.role === 'coordenador' || user.role === 'gestor') {
+                  toast({
+                    title: "Nova Solicitação de Substituição",
+                    description: `${data.requestingUser?.name || 'Ministro'} solicitou substituição`,
+                    variant: "default",
+                  });
+                }
               }
-              // Show toast notification
-              if (user.role === 'coordenador' || user.role === 'gestor') {
+              break;
+
+            case 'CRITICAL_MASS':
+              if (onCriticalMass && message.data) {
+                const data = message.data as CriticalMassData & { hoursUntil?: number };
+                onCriticalMass(data);
+                // Show critical toast
+                if (user.role === 'coordenador' || user.role === 'gestor') {
+                  toast({
+                    title: "Atenção: Missa Crítica",
+                    description: `Missa em ${data.hoursUntil || '?'}h sem ministros`,
+                    variant: "destructive",
+                  });
+                }
+              }
+              break;
+
+            case 'ALERT_UPDATE':
+              if (onAlertUpdate && message.data) {
+                onAlertUpdate(message.data as AlertUpdateData);
+              }
+              break;
+
+            case 'USER_NOTIFICATION':
+              if (message.data) {
+                const data = message.data as UserNotification;
+                if (onUserNotification) {
+                  onUserNotification(data);
+                }
+                // Show toast for new notification
                 toast({
-                  title: "Nova Solicitação de Substituição",
-                  description: `${message.data.requestingUser.name} solicitou substituição`,
+                  title: data.title,
+                  description: data.message,
                   variant: "default",
                 });
               }
               break;
 
-            case 'CRITICAL_MASS':
-              if (onCriticalMass) {
-                onCriticalMass(message.data);
-              }
-              // Show critical toast
-              if (user.role === 'coordenador' || user.role === 'gestor') {
-                toast({
-                  title: "Atenção: Missa Crítica",
-                  description: `Missa em ${message.data.hoursUntil}h sem ministros`,
-                  variant: "destructive",
-                });
-              }
-              break;
-
-            case 'ALERT_UPDATE':
-              if (onAlertUpdate) {
-                onAlertUpdate(message.data);
-              }
-              break;
-
-            case 'USER_NOTIFICATION':
-              if (onUserNotification) {
-                onUserNotification(message.data);
-              }
-              // Show toast for new notification
-              toast({
-                title: message.data.title,
-                description: message.data.message,
-                variant: "default",
-              });
-              break;
-
             case 'UNREAD_COUNT':
-              if (onUnreadCountUpdate && message.data?.count !== undefined) {
-                onUnreadCountUpdate(message.data.count);
+              if (onUnreadCountUpdate && typeof message.data === 'number') {
+                onUnreadCountUpdate(message.data);
+              } else if (onUnreadCountUpdate && message.data && typeof (message.data as { count?: number }).count === 'number') {
+                onUnreadCountUpdate((message.data as { count: number }).count);
               }
               break;
 
@@ -234,7 +258,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     reconnectAttemptsRef.current = 0; // Reset attempts on manual disconnect
   }, []);
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
     }

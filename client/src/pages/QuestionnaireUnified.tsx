@@ -59,7 +59,7 @@ type QuestionnaireTemplate = {
 type Response = {
   questionId: string;
   answer: string | string[] | boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 };
 
 export default function QuestionnaireUnified() {
@@ -106,7 +106,7 @@ export default function QuestionnaireUnified() {
     email: string;
     relationshipType: string;
     hasResponded: boolean;
-    responseData?: any;
+    responseData?: Record<string, unknown>;
   }>>([]);
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
   const [loadingFamilyMembers, setLoadingFamilyMembers] = useState(false);
@@ -199,7 +199,7 @@ export default function QuestionnaireUnified() {
         setFamilyMembers(members);
         
         // Analisar cenário para determinar validação
-        const respondedMembers = members.filter((m: any) => m.hasResponded);
+        const respondedMembers = members.filter((m: { hasResponded?: boolean }) => m.hasResponded);
         
         if (members.length === 0) {
           // Não há familiares cadastrados
@@ -560,7 +560,7 @@ export default function QuestionnaireUnified() {
     }
   };
 
-  const handleResponseChange = (questionId: string, value: any) => {
+  const handleResponseChange = (questionId: string, value: string | string[] | boolean | Record<string, unknown>) => {
     setResponses(prev => {
       const newResponses = {
         ...prev,
@@ -1127,7 +1127,7 @@ export default function QuestionnaireUnified() {
     } else {
       const baseConfig = statusConfig[template.status as keyof typeof statusConfig];
       if (!baseConfig || typeof baseConfig !== 'object' || !('color' in baseConfig)) return null;
-      config = baseConfig as { color: string; label: string; icon: any };
+      config = baseConfig as { color: string; label: string; icon: React.ElementType };
     }
     
     if (!config || !('icon' in config)) return null;
@@ -2245,6 +2245,18 @@ export default function QuestionnaireUnified() {
   );
 }
 
+// Props for QuestionAdminCard component
+interface QuestionAdminCardProps {
+  question: Question;
+  index: number;
+  totalQuestions: number;
+  onEdit: (question: Question) => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  getCategoryBadge: (category: string, modified?: boolean) => React.ReactNode;
+}
+
 // Componente para card de pergunta no modo admin
 function QuestionAdminCard({
   question,
@@ -2255,7 +2267,7 @@ function QuestionAdminCard({
   onMoveUp,
   onMoveDown,
   getCategoryBadge
-}: any) {
+}: QuestionAdminCardProps) {
   const canEdit = true;
   // Permitir deletar qualquer pergunta - coordenadores têm controle total
   // Isso é necessário para meses com peculiaridades (ex: Janeiro com missas já no questionário de Dezembro)
@@ -2332,10 +2344,17 @@ function QuestionAdminCard({
   );
 }
 
+// Props for EditQuestionDialog component
+interface EditQuestionDialogProps {
+  question: Question;
+  onSave: (question: Question) => void;
+  onClose: () => void;
+}
+
 // Dialog para editar pergunta
-function EditQuestionDialog({ question, onSave, onClose }: any) {
-  const [editedQuestion, setEditedQuestion] = useState(question);
-  
+function EditQuestionDialog({ question, onSave, onClose }: EditQuestionDialogProps) {
+  const [editedQuestion, setEditedQuestion] = useState<Question>(question);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -2347,7 +2366,7 @@ function EditQuestionDialog({ question, onSave, onClose }: any) {
             <Label>Pergunta</Label>
             <Textarea
               value={editedQuestion.question}
-              onChange={(e) => setEditedQuestion((prev: any) => ({ ...prev, question: e.target.value }))}
+              onChange={(e) => setEditedQuestion((prev: Question) => ({ ...prev, question: e.target.value }))}
             />
           </div>
         </div>

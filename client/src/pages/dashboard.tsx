@@ -29,6 +29,71 @@ import { useToast } from "@/hooks/use-toast";
 import { APP_VERSION } from "@/lib/queryClient";
 import { parseScheduleDate } from "@/lib/utils";
 
+// Browser compatibility for Safari's AudioContext
+interface WindowWithWebkit extends Window {
+  webkitAudioContext?: typeof AudioContext;
+}
+
+// Alert data structures
+interface CriticalMass {
+  scheduleId: string;
+  date: string;
+  massTime: string;
+  vacancies: number;
+  hoursUntil: number;
+}
+
+interface UrgentSubstitution {
+  id: string;
+  requesterName: string;
+  massDate: string;
+  hoursUntil: number;
+}
+
+interface AlertsData {
+  criticalMasses?: CriticalMass[];
+  urgentSubstitutions?: UrgentSubstitution[];
+  incompleteMasses?: { length: number }[];
+  pendingSubstitutions?: { length: number }[];
+  totalAlerts?: number;
+}
+
+interface NextWeekMass {
+  id: string;
+  date: string;
+  massTime: string;
+  status: 'critical' | 'warning' | 'full';
+  totalAssigned: number;
+  requiredMinisters: number;
+  totalVacancies: number;
+  hasPendingSubstitutions: boolean;
+  staffingRate: number;
+}
+
+interface InactiveMinister {
+  id: string;
+  name: string;
+  daysSinceService?: number;
+}
+
+interface StatsData {
+  activeMinisters?: number;
+  responseRate?: number;
+  questionnaireStatus?: string;
+  hasResponded?: boolean;
+  monthCoverage?: {
+    fullyStaffed?: number;
+    total?: number;
+    percentage?: number;
+  };
+  pendingActions?: number;
+  inactiveMinisters?: InactiveMinister[];
+}
+
+interface DashboardAlertData {
+  criticalMasses?: CriticalMass[];
+}
+
 // Memoized connection status indicator to prevent unnecessary re-renders
 const ConnectionStatus = memo(({ isConnected }: { isConnected: boolean }) => (
   <div className="group relative inline-flex items-center">
@@ -87,11 +152,18 @@ export default function Dashboard() {
     try {
       // Reuse or create AudioContext
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log('[AUDIO] AudioContext created');
+        const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+        if (AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+          console.log('[AUDIO] AudioContext created');
+        }
       }
 
       const audioContext = audioContextRef.current;
+      if (!audioContext) {
+        console.warn('[AUDIO] AudioContext not available');
+        return;
+      }
 
       // Resume context if suspended (browser autoplay policy)
       if (audioContext.state === 'suspended') {
@@ -135,11 +207,12 @@ export default function Dashboard() {
     setUnreadAlerts(prev => prev + 1);
   }, [playSoundAlert, refetchAlerts]);
 
-  const handleAlertUpdate = useCallback((data: any) => {
+  const handleAlertUpdate = useCallback((data: Record<string, unknown>) => {
     console.log('[WS CALLBACK] Alert update received');
     // Check for critical masses (< 12h)
-    if (data.criticalMasses?.length > 0) {
-      const hasCriticalMass = data.criticalMasses.some((mass: any) => mass.hoursUntil < 12);
+    const alertData = data as DashboardAlertData;
+    if (alertData.criticalMasses?.length && alertData.criticalMasses.length > 0) {
+      const hasCriticalMass = alertData.criticalMasses.some((mass) => mass.hoursUntil < 12);
       if (hasCriticalMass) {
         playSoundAlert();
       }
@@ -228,9 +301,9 @@ export default function Dashboard() {
     );
   }
 
-  const alerts = (alertsData as any)?.data;
-  const nextWeek = (nextWeekData as any)?.data || [];
-  const stats = (statsData as any)?.data;
+  const alerts = (alertsData as { data?: AlertsData } | undefined)?.data;
+  const nextWeek: NextWeekMass[] = (nextWeekData as { data?: NextWeekMass[] } | undefined)?.data || [];
+  const stats = (statsData as { data?: StatsData } | undefined)?.data;
 
   const hasCriticalAlerts = (alerts?.criticalMasses?.length || 0) > 0 || (alerts?.urgentSubstitutions?.length || 0) > 0;
 
@@ -258,7 +331,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-5 w-5" />
             <AlertTitle className="text-lg font-bold">Atenção Urgente - Ação Necessária!</AlertTitle>
             <AlertDescription className="mt-2 space-y-3">
-              {alerts?.criticalMasses?.map((mass: any) => (
+              {alerts?.criticalMasses?.map((mass) => (
                 <div
                   key={mass.scheduleId}
                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
@@ -279,7 +352,7 @@ export default function Dashboard() {
                 </div>
               ))}
 
-              {alerts?.urgentSubstitutions?.map((sub: any) => (
+              {alerts?.urgentSubstitutions?.map((sub) => (
                 <div
                   key={sub.id}
                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-white/10 rounded-md cursor-pointer hover:bg-white/20 transition-colors"
@@ -433,7 +506,7 @@ export default function Dashboard() {
                   Nenhuma missa programada para os próximos 7 dias
                 </p>
               ) : (
-                nextWeek.map((mass: any) => (
+                nextWeek.map((mass) => (
                   <div
                     key={mass.id}
                     className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border cursor-pointer hover:bg-accent/50 transition-colors gap-3 ${
@@ -510,7 +583,7 @@ export default function Dashboard() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {stats?.inactiveMinisters?.slice(0, 5).map((minister: any) => (
+                  {stats?.inactiveMinisters?.slice(0, 5).map((minister) => (
                     <div
                       key={minister.id}
                       className="flex items-center justify-between gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50"
@@ -568,16 +641,16 @@ export default function Dashboard() {
                 </Alert>
               )}
 
-              {stats?.responseRate < 80 && stats?.questionnaireStatus !== 'closed' && (
+              {(stats?.responseRate ?? 0) < 80 && stats?.questionnaireStatus !== 'closed' && (
                 <Alert className="cursor-pointer hover:bg-accent/50" onClick={() => setLocation('/questionnaire-responses')}>
                   <FileQuestion className="h-4 w-4 flex-shrink-0" />
                   <AlertDescription className="text-xs sm:text-sm break-words">
-                    Taxa de resposta baixa: <span className="font-semibold">{stats?.responseRate}%</span>
+                    Taxa de resposta baixa: <span className="font-semibold">{stats?.responseRate ?? 0}%</span>
                   </AlertDescription>
                 </Alert>
               )}
 
-              {!(alerts?.incompleteMasses?.length || 0) && !(alerts?.pendingSubstitutions?.length || 0) && stats?.responseRate >= 80 && (
+              {!(alerts?.incompleteMasses?.length || 0) && !(alerts?.pendingSubstitutions?.length || 0) && (stats?.responseRate ?? 0) >= 80 && (
                 <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-700 dark:text-green-400">

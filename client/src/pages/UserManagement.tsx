@@ -271,7 +271,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error & { shouldBlock?: boolean }) => {
       if (error.shouldBlock && userToDelete) {
         blockUserMutation.mutate(userToDelete.id);
         return;

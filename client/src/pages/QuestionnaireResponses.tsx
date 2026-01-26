@@ -68,6 +68,31 @@ interface ResponseStatus {
   responses: MinisterResponse[];
 }
 
+interface QuestionResponseItem {
+  questionId: string;
+  answer: string | string[] | boolean | Record<string, unknown>;
+}
+
+interface AvailabilityItem {
+  date: string;
+  time?: string;
+  available?: boolean;
+}
+
+interface QuestionItem {
+  id: string;
+  question: string;
+  text?: string;
+  type: string;
+  options?: string[];
+  category?: string;
+  required?: boolean;
+  conditional?: {
+    questionId: string;
+    value?: string;
+  };
+}
+
 interface DetailedResponse {
   user: {
     name: string;
@@ -76,11 +101,11 @@ interface DetailedResponse {
   };
   response: {
     submittedAt: string;
-    responses: any[];
-    availabilities: any[];
+    responses: QuestionResponseItem[];
+    availabilities: AvailabilityItem[];
   };
   template: {
-    questions: any[];
+    questions: QuestionItem[];
     month: number;
     year: number;
   };
@@ -88,7 +113,7 @@ interface DetailedResponse {
 
 interface ResponseSummary {
   totalResponses: number;
-  questions: any[];
+  questions: QuestionItem[];
   summary: Record<string, Record<string, number>>;
 }
 
@@ -329,21 +354,24 @@ export default function QuestionnaireResponses() {
     }
   };
 
-  const formatAnswer = (answer: any): string => {
+  const formatAnswer = (answer: unknown): string => {
     // Verificar null/undefined primeiro
     if (answer === null || answer === undefined) {
       return 'Não respondido';
     }
-    
+
     // Verificar se é objeto (mas não array)
-    if (typeof answer === 'object' && !Array.isArray(answer) && answer.answer) {
-      let result = answer.answer;
-      if (answer.sub) {
-        result += ` (${answer.sub})`;
+    if (typeof answer === 'object' && !Array.isArray(answer)) {
+      const answerObj = answer as Record<string, unknown>;
+      if (answerObj.answer) {
+        let result = String(answerObj.answer);
+        if (answerObj.sub) {
+          result += ` (${answerObj.sub})`;
+        }
+        return result;
       }
-      return result;
     }
-    
+
     // Se for array
     if (Array.isArray(answer)) {
       return answer.join(', ');
@@ -1006,7 +1034,7 @@ export default function QuestionnaireResponses() {
                       }
 
                       // Converter respostas para formato de objeto se estiverem em array
-                      let responsesObj: Record<string, any> = {};
+                      let responsesObj: Record<string, unknown> = {};
                       const rawResponses = detailedResponse?.response?.responses;
 
                       console.log('[PREVIEW] Raw responses:', rawResponses);
@@ -1014,7 +1042,7 @@ export default function QuestionnaireResponses() {
 
                       if (Array.isArray(rawResponses)) {
                         // Se for array de objetos {questionId, answer}
-                        rawResponses.forEach((r: any) => {
+                        rawResponses.forEach((r: QuestionResponseItem) => {
                           if (r.questionId) {
                             responsesObj[r.questionId] = r.answer;
                           }
@@ -1028,7 +1056,7 @@ export default function QuestionnaireResponses() {
 
                       // Mapear todas as perguntas com suas respostas
                       const questionElements = detailedResponse.template.questions
-                        .map((question: any, i: number) => {
+                        .map((question: QuestionItem, i: number) => {
                           // Usar question.id para buscar a resposta
                           const answer = responsesObj[question.id];
 

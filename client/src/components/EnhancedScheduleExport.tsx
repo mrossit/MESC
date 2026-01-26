@@ -93,7 +93,7 @@ export function EnhancedScheduleExport({
   };
 
   const exportExcelHorizontal = () => {
-    const data: any[][] = [];
+    const data: (string | number | null)[][] = [];
 
     // Linha 1: Título
     data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized}`]);
@@ -181,7 +181,7 @@ export function EnhancedScheduleExport({
   };
 
   const exportExcelVertical = () => {
-    const data: any[][] = [];
+    const data: (string | number | null)[][] = [];
 
     // Título
     data.push([`ESCALA DE MISSAS - ${monthNameCapitalized.toUpperCase()}`]);

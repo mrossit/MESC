@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ZodError, type ZodIssue } from 'zod';
 import { logger } from '../utils/logger';
+import { AuthRequest } from '../auth';
 
 // Database error interface (PostgreSQL/Drizzle)
 interface DatabaseError {
@@ -85,7 +86,7 @@ interface ErrorResponse {
  */
 export function errorHandler(
   err: Error | ApiError,
-  req: Request,
+  req: AuthRequest,
   res: Response,
   _next: NextFunction
 ): void {
@@ -102,13 +103,13 @@ export function errorHandler(
       message: err.message,
       stack: err.stack,
       statusCode,
-      userId: (req as any).user?.id,
+      userId: req.user?.id,
       body: req.body,
     });
   } else {
     logger.warn(`[WARN] ${req.method} ${req.path}: ${err.message}`, {
       statusCode,
-      userId: (req as any).user?.id,
+      userId: req.user?.id,
     });
   }
 

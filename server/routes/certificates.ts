@@ -4,8 +4,8 @@
  * API endpoints for certificate management.
  */
 
-import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../auth';
+import { Router, Response } from 'express';
+import { authenticateToken, AuthRequest } from '../auth';
 import {
   getTrackCompletionStatus,
   issueCertificate,
@@ -21,9 +21,9 @@ const router = Router();
  * GET /api/certificates/status
  * Get track completion status for current user
  */
-router.get('/status', authenticateToken, async (req: Request, res: Response) => {
+router.get('/status', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Usuario nao autenticado' });
     }
@@ -42,9 +42,9 @@ router.get('/status', authenticateToken, async (req: Request, res: Response) => 
  * GET /api/certificates
  * Get all certificates for current user
  */
-router.get('/', authenticateToken, async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Usuario nao autenticado' });
     }
@@ -61,9 +61,9 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
  * POST /api/certificates/issue
  * Issue a certificate for a completed track
  */
-router.post('/issue', authenticateToken, async (req: Request, res: Response) => {
+router.post('/issue', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Usuario nao autenticado' });
     }
@@ -90,9 +90,9 @@ router.post('/issue', authenticateToken, async (req: Request, res: Response) => 
  * GET /api/certificates/:id
  * Get certificate details by ID
  */
-router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const { id } = req.params;
 
     const certificate = await getCertificateById(id);
@@ -102,7 +102,7 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
     }
 
     // Only allow user to view their own certificates (unless coordinator)
-    const userRole = (req as any).user?.role;
+    const userRole = req.user?.role;
     if (certificate.userId !== userId && userRole !== 'coordenador' && userRole !== 'gestor') {
       return res.status(403).json({ error: 'Acesso negado' });
     }
@@ -118,9 +118,9 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
  * GET /api/certificates/:id/pdf
  * Download certificate as PDF
  */
-router.get('/:id/pdf', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:id/pdf', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const { id } = req.params;
 
     // Get certificate to verify ownership
@@ -131,7 +131,7 @@ router.get('/:id/pdf', authenticateToken, async (req: Request, res: Response) =>
     }
 
     // Only allow user to download their own certificates (unless coordinator)
-    const userRole = (req as any).user?.role;
+    const userRole = req.user?.role;
     if (certificate.userId !== userId && userRole !== 'coordenador' && userRole !== 'gestor') {
       return res.status(403).json({ error: 'Acesso negado' });
     }
@@ -159,7 +159,7 @@ router.get('/:id/pdf', authenticateToken, async (req: Request, res: Response) =>
  * GET /api/certificates/verify/:code
  * Verify a certificate by verification code (public endpoint)
  */
-router.get('/verify/:code', async (req: Request, res: Response) => {
+router.get('/verify/:code', async (req: AuthRequest, res: Response) => {
   try {
     const { code } = req.params;
 
@@ -200,10 +200,10 @@ router.get('/verify/:code', async (req: Request, res: Response) => {
  * POST /api/certificates/issue-for-user
  * Issue certificate for another user (coordinator only)
  */
-router.post('/issue-for-user', authenticateToken, async (req: Request, res: Response) => {
+router.post('/issue-for-user', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const issuerId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const issuerId = req.user?.id;
+    const userRole = req.user?.role;
 
     if (userRole !== 'coordenador' && userRole !== 'gestor') {
       return res.status(403).json({ error: 'Apenas coordenadores podem emitir certificados para outros usuarios' });

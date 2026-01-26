@@ -64,7 +64,7 @@ export const useDebugRender = (componentName: string) => {
 /**
  * Log to console only in development
  */
-export const debugLog = (...args: any[]) => {
+export const debugLog = (...args: unknown[]) => {
   if (isDev) {
     console.log('[DEBUG]', ...args);
   }

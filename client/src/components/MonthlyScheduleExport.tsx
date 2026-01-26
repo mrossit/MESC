@@ -114,7 +114,7 @@ export function MonthlyScheduleExport({
       });
 
       // Preparar dados para o Excel
-      const data: any[][] = [];
+      const data: (string | number | null)[][] = [];
 
       // Linha 1: Título
       data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized}`]);

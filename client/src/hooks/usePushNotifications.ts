@@ -174,9 +174,9 @@ export function usePushNotifications(): PushNotificationsState {
       setPermission("granted");
       setIsSubscribed(true);
       hasSyncedRef.current = true;
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Push] Failed to subscribe:", err);
-      setError(err?.message ?? "Não foi possível ativar as notificações push.");
+      setError(err instanceof Error ? err.message : "Não foi possível ativar as notificações push.");
     } finally {
       setIsBusy(false);
     }
@@ -205,9 +205,9 @@ export function usePushNotifications(): PushNotificationsState {
       });
 
       setIsSubscribed(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Push] Failed to unsubscribe:", err);
-      setError(err?.message ?? "Não foi possível desativar as notificações push.");
+      setError(err instanceof Error ? err.message : "Não foi possível desativar as notificações push.");
     } finally {
       setIsBusy(false);
     }

@@ -79,13 +79,13 @@ export const DebugPanel = memo(({ isConnected, renderCount = 0 }: DebugPanelProp
         }
 
         return response;
-      } catch (error: any) {
-        const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : args[0].toString());
+      } catch (error) {
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : String(args[0]));
         setApiErrors(prev => [
           {
             timestamp: Date.now(),
             url,
-            message: error.message || 'Network error',
+            message: error instanceof Error ? error.message : 'Network error',
           },
           ...prev.slice(0, 9),
         ]);

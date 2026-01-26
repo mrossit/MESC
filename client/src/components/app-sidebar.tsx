@@ -105,7 +105,12 @@ export function AppSidebar() {
   });
 
   // Fetch pending users count for coordinators
-  const { data: pendingUsersData } = useQuery<{ data: any[]; total: number; hasMore: boolean }>({
+  interface PendingUsersResponse {
+    data: { id: string }[];
+    total: number;
+    hasMore: boolean;
+  }
+  const { data: pendingUsersData } = useQuery<PendingUsersResponse>({
     queryKey: ["/api/users/pending"],
     queryFn: async () => {
       const response = await fetch("/api/users/pending", {

@@ -383,7 +383,7 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
         const recordToInsert = {
           date: schedule.date,
           time: schedule.time,
-          type: (schedule.type as any) || 'missa',
+          type: (schedule.type as 'missa' | 'celebracao' | 'evento') || 'missa',
           location: schedule.location || null,
           ministerId: schedule.ministerId || null,
           position: schedule.position !== undefined ? schedule.position : (i + 1),
@@ -646,7 +646,7 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
       return {
         date: s.date,
         time: s.time,
-        type: s.type as any,
+        type: s.type as 'missa' | 'celebracao' | 'evento',
         location: s.location || null,
         ministerId: s.ministerId, // Drizzle will map this to minister_id
         position: s.position ?? positionInGroup, // Use provided position or calculated group position
