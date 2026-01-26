@@ -61,9 +61,9 @@ router.post("/subscribe", csrfProtection, requireAuth, async (req: AuthRequest, 
     });
 
     res.json({ success: true, message: "Subscribed to push notifications" });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PUSH API] Subscribe error:", error);
-    if (error.name === "ZodError") {
+    if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid subscription data" });
     }
     res.status(500).json({ error: "Failed to subscribe" });

@@ -1,6 +1,18 @@
 import { db } from "../db";
 import { activityLogs } from "@shared/schema";
 import { Request } from "express";
+import { AuthRequest } from "../auth";
+
+// Activity log insert data type
+interface ActivityLogData {
+  userId: string;
+  action: string;
+  details: string | null;
+  createdAt: Date;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  sessionId?: string | null;
+}
 
 export type ActivityAction =
   | "login"
@@ -25,11 +37,11 @@ export type ActivityAction =
 export async function logActivity(
   userId: string,
   action: ActivityAction,
-  details?: any,
+  details?: Record<string, unknown>,
   req?: Request
 ) {
   try {
-    const activityData: any = {
+    const activityData: ActivityLogData = {
       userId,
       action,
       details: details ? JSON.stringify(details) : null,
@@ -38,9 +50,10 @@ export async function logActivity(
 
     // Add request metadata if available
     if (req) {
-      activityData.ipAddress = req.ip || req.socket.remoteAddress;
-      activityData.userAgent = req.get('user-agent');
-      activityData.sessionId = (req.session as any)?.id;
+      activityData.ipAddress = req.ip || req.socket.remoteAddress || null;
+      activityData.userAgent = req.get('user-agent') || null;
+      // Session ID is not typically available on standard Request
+      activityData.sessionId = null;
     }
 
     await db.insert(activityLogs).values(activityData);
@@ -51,9 +64,9 @@ export async function logActivity(
 }
 
 // Helper function to log activities with automatic user extraction
-export function createActivityLogger(req: Request) {
-  return (action: ActivityAction, details?: any) => {
-    const userId = (req as any).user?.id;
+export function createActivityLogger(req: Request | AuthRequest) {
+  return (action: ActivityAction, details?: Record<string, unknown>) => {
+    const userId = (req as AuthRequest).user?.id;
     if (userId) {
       return logActivity(userId, action, details, req);
     }

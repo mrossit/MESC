@@ -1,10 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 
+// Session data interface for CSRF
+interface SessionData {
+  csrfToken?: string;
+  [key: string]: unknown;
+}
+
 // Extend Express Request type to include session with csrfToken
 declare module 'express-serve-static-core' {
   interface Request {
-    session?: any; // Using any to avoid complex session typing issues
+    session?: SessionData;
   }
 }
 

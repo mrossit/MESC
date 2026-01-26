@@ -7,9 +7,37 @@ import { logger } from "../../utils/logger";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+// User data for Python schedule generation
+interface PythonUserInput {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  preferred_positions: string[];
+  avoid_positions: string[];
+}
+
+// Response data for Python schedule generation
+interface PythonResponseInput {
+  user_id: string;
+  questionnaire_id: string;
+  available_sundays: string[];
+  preferred_times: string[];
+  daily_mass_availability: string[];
+  weekdays: Record<string, unknown>;
+  responses: Record<string, unknown>;
+}
+
 export interface PythonScheduleInput {
-  users: any[];
-  responses: any[];
+  users: PythonUserInput[];
+  responses: PythonResponseInput[];
 }
 
 export interface PythonScheduleResult {
@@ -82,10 +110,10 @@ export class PythonScheduleService {
 
             // Retornar resultado válido
             resolve(result as PythonScheduleResult[]);
-          } catch (parseError: any) {
-            logger.error(`Failed to parse Python output: ${parseError.message}`);
+          } catch (parseError: unknown) {
+            logger.error(`Failed to parse Python output: ${getErrorMessage(parseError)}`);
             logger.error(`stdout: ${stdout}`);
-            reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+            reject(new Error(`Failed to parse Python output: ${getErrorMessage(parseError)}`));
           }
         });
 
@@ -100,8 +128,8 @@ export class PythonScheduleService {
         pythonProcess.stdin.write(inputJson);
         pythonProcess.stdin.end();
 
-      } catch (error: any) {
-        logger.error(`Error in generateSchedule: ${error.message}`);
+      } catch (error: unknown) {
+        logger.error(`Error in generateSchedule: ${getErrorMessage(error)}`);
         reject(error);
       }
     });

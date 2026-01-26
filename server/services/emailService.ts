@@ -16,6 +16,13 @@
 
 import { logger } from '../utils/logger';
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 interface EmailOptions {
   to: string;
   subject: string;
@@ -98,9 +105,9 @@ async function sendViaResend(options: EmailOptions): Promise<EmailResult> {
     }
 
     return { success: true, messageId: data.id };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Resend email error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -132,9 +139,9 @@ async function sendViaSendGrid(options: EmailOptions): Promise<EmailResult> {
     }
 
     return { success: true, messageId: response.headers.get('x-message-id') || undefined };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('SendGrid email error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -164,9 +171,9 @@ async function sendViaSMTP(options: EmailOptions): Promise<EmailResult> {
     });
 
     return { success: true, messageId: info.messageId };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('SMTP email error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 

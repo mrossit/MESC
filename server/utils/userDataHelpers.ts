@@ -34,7 +34,7 @@ export interface UserData extends UserReligiousData {
   photo?: string | null;
   role?: string;
   status?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -133,13 +133,12 @@ export function decryptUsersList(users: Partial<UserData>[]): Partial<UserData>[
  * @returns Dados sem campos sensíveis (senha, tokens, etc)
  */
 export function sanitizeUserData(userData: Partial<UserData>): Partial<UserData> {
-  const {
-    passwordHash,
-    password,
-    ...sanitized
-  }: any = userData;
-
-  return sanitized;
+  const userDataRecord = userData as Record<string, unknown>;
+  const { passwordHash, password, ...sanitized } = userDataRecord;
+  // passwordHash and password are intentionally destructured to exclude them
+  void passwordHash;
+  void password;
+  return sanitized as Partial<UserData>;
 }
 
 /**
@@ -165,8 +164,10 @@ export function prepareUserDataForDb(
   }
 
   // Remover campos que não devem ser salvos
-  delete (prepared as any).password;
-  delete (prepared as any).id; // ID não deve ser alterado manualmente
+  const preparedRecord = prepared as Record<string, unknown>;
+  delete preparedRecord.password;
+  delete preparedRecord.id; // ID não deve ser alterado manualmente
+  prepared = preparedRecord as Partial<UserData>;
 
   return prepared;
 }

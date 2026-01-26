@@ -6,6 +6,13 @@ import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 const router = Router();
 
+// Type alias for minister query result
+type MinisterRow = {
+  id: string;
+  name: string;
+  lastService: Date | null;
+};
+
 // Configuração de mínimos de ministros por horário de missa
 const MINIMUM_MINISTERS: Record<string, number> = {
   "08:00:00": 12,  // Missa das 8h - 12 ministros
@@ -78,7 +85,8 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
       .orderBy(schedules.date, schedules.time);
 
     // Buscar substituições pendentes ou aprovadas que afetam estas missas
-    const scheduleIds = monthSchedules.map((s: any) => s.id);
+    type ScheduleRow = typeof monthSchedules[number];
+    const scheduleIds = monthSchedules.map((s: ScheduleRow) => s.id);
     const activeSubstitutions = scheduleIds.length > 0
       ? await db
           .select({
@@ -100,14 +108,15 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
       : [];
 
     // Criar um mapa de substituições por scheduleId
-    const substitutionsMap = new Map<string, typeof activeSubstitutions[0]>();
-    activeSubstitutions.forEach((sub: any) => {
+    type SubstitutionRow = typeof activeSubstitutions[number];
+    const substitutionsMap = new Map<string, SubstitutionRow>();
+    activeSubstitutions.forEach((sub: SubstitutionRow) => {
       substitutionsMap.set(sub.scheduleId, sub);
     });
 
     // Agrupar por data e horário
-    const massesByDateTime = new Map<string, typeof monthSchedules>();
-    monthSchedules.forEach((schedule: any) => {
+    const massesByDateTime = new Map<string, ScheduleRow[]>();
+    monthSchedules.forEach((schedule: ScheduleRow) => {
       const key = `${schedule.date}-${schedule.time}`;
       if (!massesByDateTime.has(key)) {
         massesByDateTime.set(key, []);
@@ -154,7 +163,7 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
       let totalPositions = scheduleGroup.length; // Total de posições na escala
       const confirmedMinisters: MassPendency['confirmedMinisters'] = [];
 
-      scheduleGroup.forEach((schedule: any) => {
+      scheduleGroup.forEach((schedule: ScheduleRow) => {
         // Verificar se tem substituição ativa
         const substitution = substitutionsMap.get(schedule.id);
 
@@ -202,14 +211,14 @@ router.get("/", authenticateToken, requireRole(['coordenador', 'gestor']), async
         // Sugerir ministros disponíveis (que não estão escalados nesta data)
         const scheduledMinisterIds = new Set(
           scheduleGroup
-            .filter((s: any) => s.ministerId)
-            .map((s: any) => s.ministerId!)
+            .filter((s: ScheduleRow) => s.ministerId)
+            .map((s: ScheduleRow) => s.ministerId!)
         );
 
         const availableMinisters = allMinisters
-          .filter((m: any) => !scheduledMinisterIds.has(m.id))
+          .filter((m: MinisterRow) => !scheduledMinisterIds.has(m.id))
           .slice(0, 10) // Limitar a 10 sugestões
-          .map((m: any) => ({
+          .map((m: MinisterRow) => ({
             id: m.id,
             name: m.name,
             lastServed: m.lastService ? new Date(m.lastService).toISOString().split('T')[0] : undefined

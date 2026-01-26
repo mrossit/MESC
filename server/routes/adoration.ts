@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireRole } from '../auth';
 import type { AuthRequest } from '../auth';
@@ -10,10 +10,17 @@ import { eq, and, inArray } from 'drizzle-orm';
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 /**
  * Helper function to validate and parse year/month from URL params
  */
-function parseYearMonthParams(req: any, res: any): { year: number; month: number } | null {
+function parseYearMonthParams(req: Request, res: Response): { year: number; month: number } | null {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
 
@@ -123,7 +130,8 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
     }
 
     const voluntaryMinisters = await getVoluntaryMinistersForAdoration(year, month);
-    const voluntaryMinisterIds = new Set(voluntaryMinisters.map((m: any) => m.id));
+    type VoluntaryMinister = typeof voluntaryMinisters[number];
+    const voluntaryMinisterIds = new Set(voluntaryMinisters.map((m: VoluntaryMinister) => m.id));
 
     const drawUnits: DrawUnit[] = [];
 
@@ -255,7 +263,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao executar sorteio de adoração:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -266,7 +274,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
     }
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao executar sorteio'
+      message: getErrorMessage(error) || 'Erro ao executar sorteio'
     });
   }
 });
@@ -301,10 +309,11 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
       .from(users)
       .where(inArray(users.id, ministerIds));
 
-    const ministerMap = new Map(ministers.map((m: any) => [m.id, m]));
+    type MinisterRow = typeof ministers[number];
+    const ministerMap = new Map<string, MinisterRow>(ministers.map((m: MinisterRow) => [m.id, m]));
 
     const enrichedResults = results.map(result => {
-      const minister = ministerMap.get(result.ministerId) as any;
+      const minister = ministerMap.get(result.ministerId);
       return {
         minister_id: result.ministerId,
         minister_name: minister?.name || 'Desconhecido',
@@ -326,11 +335,11 @@ router.get('/results/:year/:month', authenticateToken, async (req: AuthRequest, 
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao buscar resultados de adoração:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao buscar resultados'
+      message: getErrorMessage(error) || 'Erro ao buscar resultados'
     });
   }
 });
@@ -350,11 +359,11 @@ router.delete('/draw/:drawId', authenticateToken, requireRole(['gestor', 'coorde
       success: true,
       message: 'Sorteio deletado com sucesso'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao deletar sorteio:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao deletar sorteio'
+      message: getErrorMessage(error) || 'Erro ao deletar sorteio'
     });
   }
 });
@@ -431,7 +440,7 @@ router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao trocar dia de adoração:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -442,7 +451,7 @@ router.post('/swap-day/:drawId', authenticateToken, async (req: AuthRequest, res
     }
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao trocar dia'
+      message: getErrorMessage(error) || 'Erro ao trocar dia'
     });
   }
 });
@@ -525,11 +534,11 @@ router.get('/my-schedule/:year/:month', authenticateToken, async (req: AuthReque
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Erro ao buscar escalação de adoração:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao buscar escalação'
+      message: getErrorMessage(error) || 'Erro ao buscar escalação'
     });
   }
 });
@@ -579,16 +588,21 @@ async function getVoluntaryMinistersForAdoration(year: number, month: number) {
       .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
 
     // 3. Filtrar ministros que disseram "sim" para adoração (mondayAdoration)
+    type QuestionnaireResponseRow = typeof responses[number];
+    interface QuestionnaireResponseData {
+      extra_activities?: { mondayAdoration?: string | boolean };
+      mondayAdoration?: string | boolean;
+    }
     const voluntaryMinisterIds = responses
-      .filter((response: any) => {
-        const resp = response.response as any;
+      .filter((response: QuestionnaireResponseRow) => {
+        const resp = response.responses as QuestionnaireResponseData | null;
         // Verificar se respondeu sim para mondayAdoration em qualquer formato
         return resp?.extra_activities?.mondayAdoration === 'yes' ||
                resp?.extra_activities?.mondayAdoration === true ||
                resp?.mondayAdoration === 'yes' ||
                resp?.mondayAdoration === true;
       })
-      .map((r: any) => r.userId);
+      .map((r: QuestionnaireResponseRow) => r.userId);
 
     if (voluntaryMinisterIds.length === 0) {
       return [];

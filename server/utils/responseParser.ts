@@ -10,6 +10,20 @@ import {
 } from '../../shared/validators/questionnaireValidator';
 import { logger } from './logger';
 
+// Response item interface for parsing legacy formats
+interface LegacyResponseItem {
+  questionId: string;
+  answer: unknown;
+}
+
+// Generic response type that can be either V2 or legacy
+interface GenericResponse {
+  responses?: unknown;
+  availableSundays?: string[];
+  preferredMassTimes?: string[];
+  [key: string]: unknown;
+}
+
 /**
  * RESPONSE PARSER
  *
@@ -22,7 +36,7 @@ export class ResponseParser {
   /**
    * Main entry point: Parse any response format
    */
-  static parseResponse(response: any, year?: number, month?: number): ParsedAvailability {
+  static parseResponse(response: GenericResponse, year?: number, month?: number): ParsedAvailability {
     const version = detectResponseVersion(response);
 
     console.log(`[RESPONSE_PARSER] Detected format version: ${version}`);
@@ -47,7 +61,7 @@ export class ResponseParser {
   /**
    * Parse V2.0 format (current standard)
    */
-  static parseV2(response: any): ParsedAvailability {
+  static parseV2(response: GenericResponse): ParsedAvailability {
     console.log('[RESPONSE_PARSER] Using V2.0 parser');
 
     const availability: ParsedAvailability = {};
@@ -124,13 +138,13 @@ export class ResponseParser {
   /**
    * Parse V1.0 legacy format (October 2025 current format)
    */
-  static parseV1Legacy(response: any): ParsedAvailability {
+  static parseV1Legacy(response: GenericResponse): ParsedAvailability {
     console.log('[RESPONSE_PARSER] Using V1.0 legacy parser (basic)');
 
     const availability: ParsedAvailability = {};
 
     try {
-      let responsesArray = response.responses;
+      let responsesArray: unknown = response.responses;
 
       // Handle string-encoded JSON
       if (typeof responsesArray === 'string') {
@@ -143,10 +157,10 @@ export class ResponseParser {
       }
 
       // Process each question-answer pair
-      responsesArray.forEach((item: any) => {
+      responsesArray.forEach((item: LegacyResponseItem) => {
         // Novena responses
         if (item.questionId === 'saint_judas_novena' && Array.isArray(item.answer)) {
-          item.answer.forEach((dateStr: string) => {
+          (item.answer as string[]).forEach((dateStr: string) => {
             // Store with original text format for now
             // Will be converted when year/month provided
             availability[`legacy_novena_${dateStr}`] = true;
@@ -156,7 +170,7 @@ export class ResponseParser {
 
         // Sunday availability
         if (item.questionId === 'available_sundays' && Array.isArray(item.answer)) {
-          item.answer.forEach((dateStr: string) => {
+          (item.answer as string[]).forEach((dateStr: string) => {
             availability[`legacy_sunday_${dateStr}`] = true;
             console.log(`[RESPONSE_PARSER V1] Legacy Sunday: ${dateStr}`);
           });
@@ -164,7 +178,7 @@ export class ResponseParser {
 
         // Preferred times
         if (item.questionId === 'main_service_time') {
-          availability[`legacy_preferred_${item.answer}`] = true;
+          availability[`legacy_preferred_${String(item.answer)}`] = true;
           console.log(`[RESPONSE_PARSER V1] Legacy preferred time: ${item.answer}`);
         }
       });
@@ -180,13 +194,13 @@ export class ResponseParser {
   /**
    * Parse V1.0 format WITH conversion to V2.0 keys
    */
-  static parseV1LegacyWithConversion(response: any, year: number, month: number): ParsedAvailability {
+  static parseV1LegacyWithConversion(response: GenericResponse, year: number, month: number): ParsedAvailability {
     console.log(`[RESPONSE_PARSER] Using V1.0 parser WITH conversion (${month}/${year})`);
 
     const availability: ParsedAvailability = {};
 
     try {
-      let responsesArray = response.responses;
+      let responsesArray: unknown = response.responses;
 
       // Handle string-encoded JSON
       if (typeof responsesArray === 'string') {
@@ -198,11 +212,11 @@ export class ResponseParser {
       }
 
       // Process each question-answer pair
-      responsesArray.forEach((item: any) => {
+      responsesArray.forEach((item: LegacyResponseItem) => {
         switch (item.questionId) {
           case 'saint_judas_novena':
             if (Array.isArray(item.answer)) {
-              item.answer.forEach((legacyStr: string) => {
+              (item.answer as string[]).forEach((legacyStr: string) => {
                 // Parse "Terça 20/10 às 19h30" → "2025-10-20_19:30"
                 const converted = this.convertLegacyNovenaString(legacyStr, year, month);
                 if (converted) {
@@ -217,7 +231,7 @@ export class ResponseParser {
 
           case 'available_sundays':
             if (Array.isArray(item.answer)) {
-              item.answer.forEach((legacyStr: string) => {
+              (item.answer as string[]).forEach((legacyStr: string) => {
                 // Parse "Domingo 05/10" → "2025-10-05"
                 const date = convertLegacyDateToISO(legacyStr, year, month);
                 if (date) {
@@ -255,7 +269,7 @@ export class ResponseParser {
   /**
    * Auto-parse unknown format
    */
-  static parseAuto(response: any, year?: number, month?: number): ParsedAvailability {
+  static parseAuto(response: GenericResponse, year?: number, month?: number): ParsedAvailability {
     console.log('[RESPONSE_PARSER] Attempting auto-parse');
 
     // Try direct field access (very old format)
@@ -305,7 +319,7 @@ export class ResponseParser {
    * Convert legacy response to V2.0 format
    */
   static convertLegacyToV2(
-    legacyResponse: any,
+    legacyResponse: GenericResponse,
     year: number,
     month: number
   ): QuestionnaireResponseV2 | null {
@@ -335,11 +349,11 @@ export class ResponseParser {
       };
 
       // Convert each response
-      validated.responses.forEach((item: any) => {
+      validated.responses.forEach((item: LegacyResponseItem) => {
         switch (item.questionId) {
           case 'saint_judas_novena':
             if (Array.isArray(item.answer) && item.answer[0] !== 'Nenhum dia') {
-              v2Response.responses.special_events!.saint_judas_novena = item.answer
+              v2Response.responses.special_events!.saint_judas_novena = (item.answer as string[])
                 .map((str: string) => this.convertLegacyNovenaString(str, year, month))
                 .filter((x: string | null): x is string => x !== null);
             }
@@ -347,7 +361,7 @@ export class ResponseParser {
 
           case 'available_sundays':
             if (Array.isArray(item.answer)) {
-              item.answer.forEach((legacyStr: string) => {
+              (item.answer as string[]).forEach((legacyStr: string) => {
                 const date = convertLegacyDateToISO(legacyStr, year, month);
                 if (date) {
                   v2Response.responses.masses![date] = {
@@ -361,7 +375,7 @@ export class ResponseParser {
             break;
 
           case 'main_service_time':
-            const time24h = convertLegacyTimeTo24h(item.answer);
+            const time24h = convertLegacyTimeTo24h(item.answer as string);
             if (time24h && v2Response.responses.masses) {
               // Mark preferred time as true for all selected Sundays
               Object.keys(v2Response.responses.masses).forEach(date => {

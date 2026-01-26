@@ -42,8 +42,9 @@ async function sendWhatsappMessage(phone: string, message: string) {
     );
 
     console.log("🟢 Mensagem enviada com sucesso:", response.data);
-  } catch (err: any) {
-    console.error("🔴 Erro ao enviar mensagem via Z-API:", err.response?.data || err.message);
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: unknown }; message?: string };
+    console.error("🔴 Erro ao enviar mensagem via Z-API:", axiosError.response?.data || axiosError.message);
   }
 }
 
@@ -139,8 +140,20 @@ async function getAvailableSubstitutions() {
   return substitutions;
 }
 
+// WhatsApp message type from webhook
+interface WhatsAppMessage {
+  phone?: string;
+  from?: string;
+  remoteJid?: string;
+  number?: string;
+  body?: string;
+  message?: string;
+  text?: string;
+  msg?: string;
+}
+
 // Tratamento principal de mensagens recebidas pelo webhook
-export async function handleMessage(message: any) {
+export async function handleMessage(message: WhatsAppMessage) {
   try {
     console.log("📩 Mensagem recebida:", message);
 

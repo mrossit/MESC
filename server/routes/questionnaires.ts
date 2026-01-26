@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import {
@@ -21,11 +21,37 @@ import { QuestionnaireService } from '../services/questionnaireService';
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+// Response item interface for parsing
+interface ResponseItem {
+  questionId: string;
+  answer: unknown;
+}
+
+// Availabilities structure
+interface Availabilities {
+  sundays: string[];
+  massTimes: string[];
+  dailyMass: boolean;
+  dailyMassDays: string[];
+  alternativeTimes: string[];
+  specialEvents: string[];
+}
+
+// Special events type
+type SpecialEventsData = Record<string, boolean | string | string[]>;
+
 /**
  * Helper function to validate and parse year/month parameters
  * Returns null if validation fails (sends error response)
  */
-function parseYearMonth(req: any, res: any): { year: number; month: number } | null {
+function parseYearMonth(req: Request, res: Response): { year: number; month: number } | null {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
 
@@ -68,8 +94,8 @@ function safeParseJSON<T>(value: string | T, fallback: T): T {
 }
 
 // Função auxiliar para analisar respostas e extrair disponibilidades
-function analyzeResponses(responses: any[]) {
-  const availabilities: any = {
+function analyzeResponses(responses: ResponseItem[]) {
+  const availabilities: Availabilities = {
     sundays: [],
     massTimes: [],
     dailyMass: false,
@@ -108,8 +134,11 @@ function analyzeResponses(responses: any[]) {
     
     // Horários alternativos (pergunta yes_no_with_options)
     if (questionId === 'other_times_available') {
-      if (typeof answer === 'object' && answer.answer === 'Sim' && answer.selectedOptions) {
-        availabilities.alternativeTimes = answer.selectedOptions;
+      if (typeof answer === 'object' && answer !== null) {
+        const answerObj = answer as { answer?: string; selectedOptions?: string[] };
+        if (answerObj.answer === 'Sim' && answerObj.selectedOptions) {
+          availabilities.alternativeTimes = answerObj.selectedOptions;
+        }
       }
     }
     
@@ -123,13 +152,13 @@ function analyzeResponses(responses: any[]) {
 }
 
 // Nova função para extrair dados estruturados das respostas do questionário
-function extractQuestionnaireData(responses: any[]) {
+function extractQuestionnaireData(responses: ResponseItem[]) {
   const data: {
     availableSundays: string[] | null;
     preferredMassTimes: string[] | null;
     alternativeTimes: string[] | null;
     dailyMassAvailability: string[] | null;
-    specialEvents: any;
+    specialEvents: SpecialEventsData | null;
     canSubstitute: boolean | null;
     notes: string | null;
   } = {
@@ -167,10 +196,13 @@ function extractQuestionnaireData(responses: any[]) {
 
       case 'other_times_available':
       case 'alternative_times':
-        if (typeof answer === 'object' && answer.answer === 'Sim' && answer.selectedOptions) {
-          data.alternativeTimes = answer.selectedOptions;
+        if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+          const answerObj = answer as { answer?: string; selectedOptions?: string[] };
+          if (answerObj.answer === 'Sim' && answerObj.selectedOptions) {
+            data.alternativeTimes = answerObj.selectedOptions;
+          }
         } else if (Array.isArray(answer)) {
-          data.alternativeTimes = answer;
+          data.alternativeTimes = answer as string[];
         } else if (answer === 'Sim') {
           // Se respondeu sim mas não selecionou opções, deixar vazio
           data.alternativeTimes = [];
@@ -185,10 +217,13 @@ function extractQuestionnaireData(responses: any[]) {
         } else if (answer === 'Não' || answer === false) {
           // Explicitamente NÃO pode em missas diárias
           data.dailyMassAvailability = ['Não posso'];
-        } else if (typeof answer === 'object' && answer.selectedOptions) {
-          data.dailyMassAvailability = answer.selectedOptions;
+        } else if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+          const answerObj = answer as { selectedOptions?: string[] };
+          if (answerObj.selectedOptions) {
+            data.dailyMassAvailability = answerObj.selectedOptions;
+          }
         } else if (Array.isArray(answer)) {
-          data.dailyMassAvailability = answer;
+          data.dailyMassAvailability = answer as string[];
         }
         break;
 
@@ -208,8 +243,8 @@ function extractQuestionnaireData(responses: any[]) {
         break;
 
       case 'special_events':
-        if (answer) {
-          data.specialEvents = answer;
+        if (answer && typeof answer === 'object') {
+          data.specialEvents = answer as SpecialEventsData;
         }
         break;
     }
@@ -240,8 +275,8 @@ function extractQuestionnaireData(responses: any[]) {
         data.specialEvents[specialEventMappings[questionId]] = false;
       } else if (Array.isArray(answer)) {
         // Para novenas e outros eventos com múltiplas datas
-        data.specialEvents[specialEventMappings[questionId]] = answer;
-      } else if (answer) {
+        data.specialEvents[specialEventMappings[questionId]] = answer as string[];
+      } else if (typeof answer === 'string') {
         data.specialEvents[specialEventMappings[questionId]] = answer;
       }
     }
@@ -599,7 +634,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
     console.log('[RESPONSES] Data being sent for UPSERT:', JSON.stringify(responseValues, null, 2));
 
-    let result: { responseData: any; isUpdate: boolean };
+    let result: { responseData: Record<string, unknown>; isUpdate: boolean };
 
     try {
       // UPSERT: INSERT ... ON CONFLICT DO UPDATE (atomic operation)
@@ -972,9 +1007,11 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
       .where(eq(questionnaireResponses.questionnaireId, questionnaire.id));
 
     // Mapear ministros com suas respostas
-    const responseMap = new Map(responses.map((r: any) => [r.userId, r]));
+    type ResponseRow = typeof responses[number];
+    type MinisterRow = typeof ministers[number];
+    const responseMap = new Map<string, ResponseRow>(responses.map((r: ResponseRow) => [r.userId, r]));
 
-    const ministerResponses = ministers.map((minister: any) => {
+    const ministerResponses = ministers.map((minister: MinisterRow) => {
       const response = responseMap.get(minister.id);
       return {
         id: minister.id,
@@ -982,7 +1019,7 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
         email: minister.email,
         phone: minister.phone || '',
         responded: responseMap.has(minister.id),
-        respondedAt: response && (response as any).submittedAt ? new Date((response as any).submittedAt).toISOString() : null,
+        respondedAt: response?.submittedAt ? new Date(response.submittedAt).toISOString() : null,
         availability: null // Pode ser expandido para incluir disponibilidade
       };
     });
@@ -1051,13 +1088,14 @@ router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: Aut
 
     // Processar resumo das respostas
     const summary: Record<string, Record<string, number>> = {};
-    const questions = questionnaire.questions as any[];
+    const questions = questionnaire.questions as unknown[];
 
-    responses.forEach((response: any) => {
+    type SummaryResponseRow = typeof responses[number];
+    responses.forEach((response: SummaryResponseRow) => {
       const userResponses = safeParseJSON(response.responses, []);
 
       if (Array.isArray(userResponses)) {
-        userResponses.forEach((r: any) => {
+        userResponses.forEach((r: ResponseItem) => {
           if (!summary[r.questionId]) {
             summary[r.questionId] = {};
           }
@@ -1482,8 +1520,8 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
           .where(eq(questionnaireResponses.id, response.id));
 
         updated++;
-      } catch (error: any) {
-        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
+      } catch (error: unknown) {
+        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, getErrorMessage(error));
         errors++;
       }
     }
@@ -1500,11 +1538,11 @@ router.post('/admin/reprocess-responses', requireAuth, requireRole(['gestor', 'c
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[REPROCESS] Erro geral:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Erro ao reprocessar respostas'
+      message: getErrorMessage(error)
     });
   }
 });

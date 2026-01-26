@@ -11,6 +11,18 @@ import { notifyUsers } from "../websocket";
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+function getErrorStack(error: unknown): string | undefined {
+  if (error instanceof Error) return error.stack;
+  return undefined;
+}
+
 // Calcular urgência baseada no tempo até a missa
 function calculateUrgency(massDateStr: string, massTime: string): "low" | "medium" | "high" | "critical" {
   if (!massDateStr || !massTime) return "low";
@@ -105,9 +117,10 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
         )
       );
 
+    type ScheduledMinisterRow = typeof scheduledMinisters[number];
     const scheduledMinisterIds = scheduledMinisters
-      .map((s: any) => s.ministerId)
-      .filter((id: any) => id !== null) as string[];
+      .map((s: ScheduledMinisterRow) => s.ministerId)
+      .filter((id: string | null): id is string => id !== null);
 
     // 3. Buscar respostas de ministros que indicaram disponibilidade
     // Converter data para formato do domingo (YYYY-MM-DD)
@@ -138,7 +151,8 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
       .where(and(...baseConditions));
 
     // 4. Filtrar ministros que indicaram disponibilidade para aquela data
-    const eligibleMinisters = availableResponses.filter((response: any) => {
+    type AvailableResponseRow = typeof availableResponses[number];
+    const eligibleMinisters = availableResponses.filter((response: AvailableResponseRow) => {
       // Verificar se o ministro marcou disponibilidade para aquele domingo
       const availableSundays = response.availableSundays as string[] || [];
       const isDateAvailable = availableSundays.includes(massDate);
@@ -157,7 +171,7 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
     // 5. Priorizar por:
     // - Menos serviços recentes (lastService mais antigo ou null)
     // - Que preferiu este horário
-    eligibleMinisters.sort((a: any, b: any) => {
+    eligibleMinisters.sort((a: AvailableResponseRow, b: AvailableResponseRow) => {
       // Primeiro, verificar se preferiu o horário
       const aPreferredTimes = (a.preferredMassTimes as string[]) || [];
       const bPreferredTimes = (b.preferredMassTimes as string[]) || [];
@@ -179,9 +193,9 @@ async function findAvailableSubstitute(massDate: string, massTime: string): Prom
 
     return selectedSubstitute.userId;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Erro ao buscar suplente disponível:', error);
-    console.error('Stack trace:', error.stack);
+    console.error('Stack trace:', getErrorStack(error));
     console.error('Params:', { massDate, massTime });
     return null;
   }
@@ -418,16 +432,16 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       monthlyCount: monthlyCount + 1
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Substitutions] Erro ao criar solicitação de substituição:", error);
-    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Stack trace:", getErrorStack(error));
     console.error("[Substitutions] Request body:", req.body);
     console.error("[Substitutions] User:", req.user);
     res.status(500).json({
       success: false,
       message: "Erro ao criar solicitação de substituição",
-      error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: getErrorMessage(error),
+      details: process.env.NODE_ENV === 'development' ? getErrorStack(error) : undefined
     });
   }
 });
@@ -486,39 +500,41 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Enriquecer com dados dos substitutos
+    type RequestRow = typeof requests[number];
     const enrichedRequests = await Promise.all(
-      requests.map(async (req: any) => {
+      requests.map(async (reqRow: RequestRow) => {
         let substituteUser = null;
-        
+
         // Se há um substituto, buscar os dados dele
-        if (req.request.substituteId) {
+        if (reqRow.request.substituteId) {
           const [substitute] = await db
             .select({
               id: users.id,
               name: users.name
             })
             .from(users)
-            .where(eq(users.id, req.request.substituteId))
+            .where(eq(users.id, reqRow.request.substituteId))
             .limit(1);
-          
+
           if (substitute) {
             substituteUser = substitute;
           }
         }
 
         return {
-          ...req,
+          ...reqRow,
           substituteUser
         };
       })
     );
 
     // Mapear 'time' para 'massTime' para compatibilidade com o frontend
-    const mappedRequests = enrichedRequests.map((req: any) => ({
-      ...req,
+    type EnrichedRequestRow = typeof enrichedRequests[number];
+    const mappedRequests = enrichedRequests.map((reqRow: EnrichedRequestRow) => ({
+      ...reqRow,
       assignment: {
-        ...req.assignment,
-        massTime: req.assignment.time
+        ...reqRow.assignment,
+        massTime: reqRow.assignment.time
       }
     }));
 
@@ -589,13 +605,13 @@ router.get("/available/:scheduleId", requireAuth, async (req: AuthRequest, res) 
       data: availableSubstitutes
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Substitutions] Erro ao buscar substitutos disponíveis:", error);
-    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Stack trace:", getErrorStack(error));
     res.status(500).json({
       success: false,
       message: "Erro ao buscar substitutos disponíveis",
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 });
@@ -656,7 +672,7 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
       .limit(1);
 
     // Phase 1 - Data Integrity: Wrap in transaction to ensure atomicity
-    await db.transaction(async (tx: any) => {
+    await db.transaction(async (tx: typeof db) => {
       // Atualizar solicitação
       await tx
         .update(substitutionRequests)
@@ -846,7 +862,7 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Wrap updates in transaction to ensure atomicity and prevent race conditions
-    await db.transaction(async (tx: any) => {
+    await db.transaction(async (tx: typeof db) => {
       // Re-verify status inside transaction (optimistic locking)
       const [currentRequest] = await tx
         .select()
@@ -938,9 +954,9 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       message: "Substituição aceita com sucesso!"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle race condition - another user claimed it first
-    if (error?.message === 'SUBSTITUTION_ALREADY_CLAIMED') {
+    if (error instanceof Error && error.message === 'SUBSTITUTION_ALREADY_CLAIMED') {
       return res.status(409).json({
         success: false,
         message: "Esta solicitação já foi aceita por outro ministro"

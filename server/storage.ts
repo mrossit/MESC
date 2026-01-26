@@ -523,7 +523,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuestionnaire(id: string, questionnaireData: Partial<InsertQuestionnaire>): Promise<Questionnaire> {
-    const updateData: any = {
+    const updateData: Partial<InsertQuestionnaire> & { updatedAt: Date } = {
       updatedAt: new Date(),
     };
     if (questionnaireData.title) updateData.title = questionnaireData.title;
@@ -648,11 +648,11 @@ export class DatabaseStorage implements IStorage {
     return months[month - 1] || 'Mês';
   }
 
-  private formatMassTime(time: any): string {
+  private formatMassTime(time: unknown): string {
     // Converter do formato HH:mm:ss ou Time object para "HHh" ou "HHhMM"
     if (!time) return '';
 
-    const timeStr = typeof time === 'string' ? time : time.toString();
+    const timeStr = typeof time === 'string' ? time : String(time);
     const [hours, minutes] = timeStr.split(':').map(Number);
 
     if (minutes === 0 || minutes === undefined) {
@@ -683,7 +683,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schedules.time, schedules.position);
 
     // Mapear para o formato esperado pelo frontend
-    return assignments.map((a: any) => ({
+    type AssignmentRow = typeof assignments[number];
+    return assignments.map((a: AssignmentRow) => ({
       id: a.id,
       date: a.date,
       massTime: this.formatMassTime(a.time),
@@ -732,7 +733,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schedules.date, schedules.time, schedules.position);
 
     // Mapear para o formato esperado pelo frontend
-    return rawAssignments.map((a: any) => ({
+    type RawAssignmentRow = typeof rawAssignments[number];
+    return rawAssignments.map((a: RawAssignmentRow) => ({
       id: a.id,
       scheduleId,
       ministerId: a.ministerId,
@@ -1194,7 +1196,7 @@ export class DatabaseStorage implements IStorage {
     email: string;
     relationshipType: string;
     hasResponded: boolean;
-    responseData?: any;
+    responseData?: QuestionnaireResponse | null;
   }>> {
     // Get family members
     const relationships = await db
@@ -1203,8 +1205,9 @@ export class DatabaseStorage implements IStorage {
       .where(eq(familyRelationships.userId, userId));
 
     // Get family members with their response status
+    type RelationshipRow = typeof relationships[number];
     const familyMembers = await Promise.all(
-      relationships.map(async (rel: any) => {
+      relationships.map(async (rel: RelationshipRow) => {
         const user = await this.getUser(rel.relatedUserId);
         if (!user) return null;
 
@@ -1238,7 +1241,7 @@ export class DatabaseStorage implements IStorage {
       email: string;
       relationshipType: string;
       hasResponded: boolean;
-      responseData?: any;
+      responseData?: QuestionnaireResponse | null;
     }>;
   }
 
@@ -1715,8 +1718,15 @@ export class DatabaseStorage implements IStorage {
       };
     });
 
+    interface TrackTotals {
+      totalModules: number;
+      totalLessons: number;
+      completedLessons: number;
+      inProgressLessons: number;
+    }
+    type TrackOverview = typeof trackOverviews[number];
     const totals = trackOverviews.reduce(
-      (acc: any, track: any) => {
+      (acc: TrackTotals, track: TrackOverview) => {
         acc.totalModules += track.stats.totalModules;
         acc.totalLessons += track.stats.totalLessons;
         acc.completedLessons += track.stats.completedLessons;

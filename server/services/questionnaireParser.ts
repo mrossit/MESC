@@ -18,7 +18,7 @@ export class QuestionnaireParser {
    * Parse responses regardless of format (v1 array or v2 object)
    */
   static parseMinisterAvailability(
-    response: any,
+    response: unknown,
     month: number,
     year: number
   ): ParsedAvailability {
@@ -36,19 +36,24 @@ export class QuestionnaireParser {
     };
 
     // Handle V2 format (object with format_version)
-    if (response?.format_version === '2.0') {
+    const responseObj = response as Record<string, unknown> | null | undefined;
+    if (responseObj?.format_version === '2.0') {
       return {
-        masses: response.masses || {},
-        weekdays: response.weekdays || parsed.weekdays,
-        specialEvents: response.special_events || {},
-        canSubstitute: response.can_substitute || false,
-        notes: response.notes
+        masses: (responseObj.masses as Record<string, Record<string, boolean>>) || {},
+        weekdays: (responseObj.weekdays as Record<string, boolean>) || parsed.weekdays,
+        specialEvents: (responseObj.special_events as Record<string, boolean>) || {},
+        canSubstitute: Boolean(responseObj.can_substitute) || false,
+        notes: responseObj.notes as string | undefined
       };
     }
 
+    // V1 item type
+    type V1ResponseItem = { questionId?: string; answer?: unknown };
+
     // Handle V1 format (array of {questionId, answer})
     if (Array.isArray(response)) {
-      response.forEach(item => {
+      const responseArray = response as V1ResponseItem[];
+      responseArray.forEach(item => {
         // Parse October 28 responses
         if (item.questionId?.startsWith('saint_judas_feast_')) {
           const timeMap: Record<string, string> = {
@@ -80,8 +85,8 @@ export class QuestionnaireParser {
                 parsed.masses[date] = {};
               }
               // Use main_service_time if available
-              const mainTime = response.find((r: any) => r.questionId === 'main_service_time')?.answer;
-              if (mainTime) {
+              const mainTime = responseArray.find((r: V1ResponseItem) => r.questionId === 'main_service_time')?.answer;
+              if (mainTime && typeof mainTime === 'string') {
                 const normalizedTime = this.normalizeTime(mainTime);
                 parsed.masses[date][normalizedTime] = true;
               }
@@ -94,7 +99,7 @@ export class QuestionnaireParser {
           if (item.answer === 'Sim') {
             // All weekdays available
             Object.keys(parsed.weekdays).forEach(day => {
-              (parsed.weekdays as any)[day] = true;
+              parsed.weekdays[day as keyof typeof parsed.weekdays] = true;
             });
           } else if (Array.isArray(item.answer)) {
             // Specific days selected
@@ -125,7 +130,7 @@ export class QuestionnaireParser {
         }
 
         // Parse notes
-        if (item.questionId === 'notes' && item.answer) {
+        if (item.questionId === 'notes' && item.answer && typeof item.answer === 'string') {
           parsed.notes = item.answer;
         }
       });

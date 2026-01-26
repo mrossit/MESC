@@ -77,7 +77,7 @@ interface AuxiliaryPanelUpdate {
   ministerName?: string;
   position?: string;
   status?: string;
-  changes?: any;
+  changes?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 type NotificationData = AlertData | SubstitutionRequestData | CriticalMassData | UserNotificationData | UnreadCountData | AuxiliaryPanelUpdate | undefined;

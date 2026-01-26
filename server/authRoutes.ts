@@ -10,6 +10,13 @@ import { logActivity } from './utils/activityLogger';
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 // Schema de validação para login
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -84,11 +91,11 @@ router.post('/login', async (req, res) => {
       sessionToken, // Retorna para o frontend armazenar em localStorage
       user: result.user
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // AUDITORIA: Log login falho
     const email = req.body?.email;
     if (email) {
-      await auditLoginAttempt(email, false, req, error.message || 'Credenciais inválidas');
+      await auditLoginAttempt(email, false, req, getErrorMessage(error) || 'Credenciais inválidas');
     }
 
     if (error instanceof z.ZodError) {
@@ -101,7 +108,7 @@ router.post('/login', async (req, res) => {
 
     res.status(401).json({
       success: false,
-      message: error.message || 'Erro ao fazer login'
+      message: getErrorMessage(error) || 'Erro ao fazer login'
     });
   }
 });
@@ -134,7 +141,7 @@ router.post('/register', async (req, res) => {
       message: 'Cadastro realizado com sucesso! Aguarde a aprovação do coordenador.',
       user: newUser
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -145,7 +152,7 @@ router.post('/register', async (req, res) => {
 
     res.status(400).json({
       success: false,
-      message: error.message || 'Erro ao criar usuário'
+      message: getErrorMessage(error) || 'Erro ao criar usuário'
     });
   }
 });
@@ -193,7 +200,7 @@ router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coorde
       message: 'Usuário criado com sucesso',
       user: newUser
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -204,7 +211,7 @@ router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coorde
 
     res.status(400).json({
       success: false,
-      message: error.message || 'Erro ao criar usuário'
+      message: getErrorMessage(error) || 'Erro ao criar usuário'
     });
   }
 });
@@ -366,7 +373,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
       success: true,
       message: result.message
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.log('❌ DEBUG: Erro na rota /change-password:', error);
     if (error instanceof z.ZodError) {
       console.log('❌ DEBUG: Erro de validação Zod:', error.errors);
@@ -379,7 +386,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
 
     res.status(400).json({
       success: false,
-      message: error.message || 'Erro ao trocar senha'
+      message: getErrorMessage(error) || 'Erro ao trocar senha'
     });
   }
 });
@@ -458,7 +465,7 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
       success: true,
       message: 'Senha resetada com sucesso. O usuário precisará criar uma nova senha no próximo login.'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
@@ -511,7 +518,7 @@ router.post('/reset-password', async (req, res) => {
       success: true,
       ...result
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao resetar senha por email:', error);
     res.status(500).json({
       success: false,

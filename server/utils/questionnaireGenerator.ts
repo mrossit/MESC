@@ -559,11 +559,34 @@ function getSpecialEvents(month: number, year: number): SpecialEvent[] {
   return events;
 }
 
+// Response item interface for analysis
+interface ResponseItem {
+  questionId: string;
+  answer: unknown;
+}
+
+// Response analysis input
+interface ResponseAnalysisInput {
+  responses?: ResponseItem[];
+  [key: string]: unknown;
+}
+
+// Response analysis result
+interface ResponseAnalysis {
+  totalResponses: number;
+  responsesByQuestion: Record<string, Record<string, number>>;
+  availability: {
+    available: number;
+    unavailable: number;
+    partial: number;
+  };
+}
+
 // Função para analisar respostas
-export function analyzeResponses(responses: any[]): any {
-  const analysis = {
+export function analyzeResponses(responses: ResponseAnalysisInput[]): ResponseAnalysis {
+  const analysis: ResponseAnalysis = {
     totalResponses: responses.length,
-    responsesByQuestion: {} as any,
+    responsesByQuestion: {},
     availability: {
       available: 0,
       unavailable: 0,
@@ -573,7 +596,7 @@ export function analyzeResponses(responses: any[]): any {
 
   responses.forEach(response => {
     // Analisar disponibilidade
-    const monthlyAvailability = response.responses?.find((r: any) => r.questionId === 'monthly_availability');
+    const monthlyAvailability = response.responses?.find((r: ResponseItem) => r.questionId === 'monthly_availability');
     if (monthlyAvailability) {
       if (monthlyAvailability.answer === 'Sim') {
         analysis.availability.available++;
@@ -586,7 +609,7 @@ export function analyzeResponses(responses: any[]): any {
 
     // Analisar outras respostas
     if (response.responses && Array.isArray(response.responses)) {
-      response.responses.forEach((r: any) => {
+      response.responses.forEach((r: ResponseItem) => {
         if (!analysis.responsesByQuestion[r.questionId]) {
           analysis.responsesByQuestion[r.questionId] = {};
         }
@@ -600,9 +623,9 @@ export function analyzeResponses(responses: any[]): any {
             }
             analysis.responsesByQuestion[r.questionId][option]++;
           });
-        } else if (typeof answer === 'object' && answer.answer) {
+        } else if (typeof answer === 'object' && answer !== null && 'answer' in answer) {
           // Para yes_no_with_options
-          const mainAnswer = answer.answer;
+          const mainAnswer = String((answer as { answer: unknown }).answer);
           if (!analysis.responsesByQuestion[r.questionId][mainAnswer]) {
             analysis.responsesByQuestion[r.questionId][mainAnswer] = 0;
           }
