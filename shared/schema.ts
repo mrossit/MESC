@@ -203,8 +203,8 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
   unmappedResponses: jsonb('unmapped_responses').$type<Array<{
     questionId: string;
     question?: string;
-    answer: any;
-    metadata?: any;
+    answer: unknown;
+    metadata?: Record<string, unknown>;
   }>>(),
   
   // Processing warnings/info for debugging
