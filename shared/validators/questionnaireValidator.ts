@@ -152,21 +152,33 @@ export function validateLegacyResponse(data: unknown): z.infer<typeof Questionna
 /**
  * Auto-detect response format version
  */
-export function detectResponseVersion(data: any): '2.0' | '1.0' | 'unknown' {
+export function detectResponseVersion(data: unknown): '2.0' | '1.0' | 'unknown' {
+  if (!data || typeof data !== 'object') {
+    return 'unknown';
+  }
+
+  const obj = data as Record<string, unknown>;
+
   // Check for explicit version field
-  if (data.version === '2.0' || data.responses?.format_version === '2.0') {
+  if (obj.version === '2.0') {
+    return '2.0';
+  }
+
+  const responses = obj.responses as Record<string, unknown> | unknown[] | undefined;
+  if (responses && typeof responses === 'object' && !Array.isArray(responses) && responses.format_version === '2.0') {
     return '2.0';
   }
 
   // Check for V1.0 structure (array of question-answer pairs)
-  if (Array.isArray(data.responses) && data.responses.length > 0) {
-    if (data.responses[0].questionId && 'answer' in data.responses[0]) {
+  if (Array.isArray(responses) && responses.length > 0) {
+    const firstResponse = responses[0] as Record<string, unknown> | undefined;
+    if (firstResponse && firstResponse.questionId && 'answer' in firstResponse) {
       return '1.0';
     }
   }
 
   // Check for legacy direct field access
-  if (data.availableSundays || data.preferredMassTimes) {
+  if (obj.availableSundays || obj.preferredMassTimes) {
     return '1.0';
   }
 
@@ -178,7 +190,7 @@ export function detectResponseVersion(data: any): '2.0' | '1.0' | 'unknown' {
  */
 export function validateAnyFormat(data: unknown): {
   version: '2.0' | '1.0' | 'unknown';
-  data: any;
+  data: QuestionnaireResponseV2 | QuestionnaireResponseV1 | null;
   isValid: boolean;
   errors?: string[];
 } {
