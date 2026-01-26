@@ -6,18 +6,34 @@ import {
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
+// Response item for formatted responses
+interface FormattedResponse {
+  questionId: string;
+  questionText: string;
+  questionType: string;
+  answer: unknown;
+}
+
 interface CSVExportData {
   ministerId: string;
   ministerName: string;
   ministerEmail: string;
   questionnaireTitle: string;
   submittedAt: Date | null;
-  responses: Array<{
-    questionId: string;
-    questionText: string;
-    questionType: string;
-    answer: any;
-  }>;
+  responses: FormattedResponse[];
+}
+
+// Response data interface for JSON responses
+interface ResponseItem {
+  questionId: string;
+  answer: unknown;
+}
+
+// Availability structure in old format
+interface AvailabilityData {
+  sundays?: string[];
+  preferences?: string[];
+  [key: string]: unknown;
 }
 
 /**
@@ -125,7 +141,7 @@ export function createDetailedCSV(data: CSVExportData[]): string {
 /**
  * Formats answer based on question type
  */
-function formatAnswer(answer: any, questionType: string): string {
+function formatAnswer(answer: unknown, questionType: string): string {
   if (answer === null || answer === undefined) {
     return '';
   }
@@ -143,9 +159,10 @@ function formatAnswer(answer: any, questionType: string): string {
 
     case 'yes_no_with_options':
       if (typeof answer === 'object' && answer !== null) {
-        const mainAnswer = answer.answer === 'Sim' ? 'Sim' : 'Não';
-        if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-          return `${mainAnswer}: ${answer.selectedOptions.join('; ')}`;
+        const answerObj = answer as { answer?: string; selectedOptions?: string[] };
+        const mainAnswer = answerObj.answer === 'Sim' ? 'Sim' : 'Não';
+        if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          return `${mainAnswer}: ${answerObj.selectedOptions.join('; ')}`;
         }
         return mainAnswer;
       }
@@ -203,8 +220,9 @@ export async function getQuestionnaireResponsesForExport(
     .where(eq(questionnaireResponses.questionnaireId, questionnaireId));
 
   // Format data for CSV export
-  const exportData: CSVExportData[] = responsesWithUsers.map(({ response, user }: { response: any; user: any }) => {
-    const formattedResponses: any[] = [];
+  type ResponseWithUser = typeof responsesWithUsers[number];
+  const exportData: CSVExportData[] = responsesWithUsers.map(({ response, user }: ResponseWithUser) => {
+    const formattedResponses: FormattedResponse[] = [];
 
     // Priority 1: Use structured columns if they have data
     if (response.availableSundays && response.availableSundays.length > 0) {
@@ -274,7 +292,7 @@ export async function getQuestionnaireResponsesForExport(
     if (formattedResponses.length === 0 && response.responses) {
       // Se responses é um array (novo formato)
       if (Array.isArray(response.responses)) {
-        response.responses.forEach((r: any) => {
+        (response.responses as ResponseItem[]).forEach((r: ResponseItem) => {
           const { questionId, answer } = r;
 
           // Mapear questionIds para textos legíveis
@@ -299,7 +317,7 @@ export async function getQuestionnaireResponsesForExport(
             questionType = 'checkbox';
           } else if (typeof answer === 'boolean' || answer === 'Sim' || answer === 'Não') {
             questionType = 'yes_no';
-          } else if (typeof answer === 'object' && answer.answer) {
+          } else if (typeof answer === 'object' && answer !== null && 'answer' in answer) {
             questionType = 'yes_no_with_options';
           }
 
@@ -313,7 +331,7 @@ export async function getQuestionnaireResponsesForExport(
       }
       // Se responses é um objeto (formato antigo ou mal formatado)
       else if (typeof response.responses === 'object') {
-        const responseObj = response.responses as any;
+        const responseObj = response.responses as Record<string, unknown> & { availability?: AvailabilityData };
 
         // Handle nested availability object
         if (responseObj.availability && typeof responseObj.availability === 'object') {
@@ -366,7 +384,7 @@ export async function getQuestionnaireResponsesForExport(
   });
 
   // Also include ministers who haven't responded yet
-  const respondedUserIds = new Set(responsesWithUsers.map((r: any) => r.user.id));
+  const respondedUserIds = new Set(responsesWithUsers.map((r: ResponseWithUser) => r.user.id));
 
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
     const nonRespondents = await db
@@ -374,9 +392,10 @@ export async function getQuestionnaireResponsesForExport(
       .from(users)
       .where(eq(users.role, 'ministro'));
 
+    type UserRow = typeof nonRespondents[number];
     nonRespondents
-      .filter((user: any) => !respondedUserIds.has(user.id))
-      .forEach((user: any) => {
+      .filter((user: UserRow) => !respondedUserIds.has(user.id))
+      .forEach((user: UserRow) => {
         exportData.push({
           ministerId: user.id,
           ministerName: user.name,

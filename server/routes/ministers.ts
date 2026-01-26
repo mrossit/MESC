@@ -70,7 +70,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
       'observations', 'active', 'scheduleDisplayName'
     ];
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         // Handle different field types correctly

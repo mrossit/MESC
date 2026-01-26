@@ -63,6 +63,32 @@ interface MinisterLearningProfile {
   lastDates: string[];
 }
 
+// Input data interfaces
+interface MinisterInputData {
+  id: string;
+  name: string;
+  status: string;
+  preferredPosition?: number;
+  preferred_position?: number;
+  preferredPositions?: number[];
+  preferred_positions?: number[];
+  avoidPositions?: number[];
+  avoid_positions?: number[];
+  familyId?: string;
+  family_id?: string;
+  [key: string]: unknown;
+}
+
+interface ResponseInputData {
+  userId?: string;
+  user_id?: string;
+  responses?: string | Record<string, unknown>;
+  dailyMassAvailability?: string[];
+  preferredMassTimes?: string[];
+  canSubstitute?: boolean;
+  [key: string]: unknown;
+}
+
 export class IntelligentScheduleGenerator {
   private ministers: MinisterWithAvailability[] = [];
   private maxAssignmentsPerMonth = 25;
@@ -76,8 +102,8 @@ export class IntelligentScheduleGenerator {
   constructor(
     month: number | string,
     year: number | string,
-    private ministersData: any[],
-    private responsesData: any[],
+    private ministersData: MinisterInputData[],
+    private responsesData: ResponseInputData[],
     historicalSchedules: HistoricalScheduleSnapshot[] = []
   ) {
     // Normalize month and year to numbers (handles both string and number inputs)
@@ -152,16 +178,20 @@ export class IntelligentScheduleGenerator {
         return {
           id: minister.id,
           name: minister.name,
-          preferredPosition: minister.preferredPosition || minister.preferred_position,
-          preferredPositions: Array.isArray(minister.preferredPositions || minister.preferred_positions)
-            ? (minister.preferredPositions || minister.preferred_positions)
-            : [],
-          avoidPositions: Array.isArray(minister.avoidPositions || minister.avoid_positions)
-            ? (minister.avoidPositions || minister.avoid_positions)
-            : [],
+          preferredPosition: minister.preferredPosition ?? minister.preferred_position,
+          preferredPositions: Array.isArray(minister.preferredPositions)
+            ? minister.preferredPositions
+            : Array.isArray(minister.preferred_positions)
+            ? minister.preferred_positions
+            : undefined,
+          avoidPositions: Array.isArray(minister.avoidPositions)
+            ? minister.avoidPositions
+            : Array.isArray(minister.avoid_positions)
+            ? minister.avoid_positions
+            : undefined,
           availability,
           assignmentCount: 0,
-          familyId: minister.familyId || minister.family_id
+          familyId: minister.familyId ?? minister.family_id
         };
       });
 
@@ -605,7 +635,7 @@ export class IntelligentScheduleGenerator {
     return positionMap[key] || [1, 2, 3, 4, 5];
   }
 
-  private getFamilyPreference(familyId: string): any {
+  private getFamilyPreference(familyId: string): { preferServeTogether: boolean } {
     // Query family_relationships table for preference
     // Default to serving together
     return { preferServeTogether: true };

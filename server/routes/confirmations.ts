@@ -17,6 +17,16 @@ import { notifyUsers } from "../websocket";
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+// Confirmation status type
+type ConfirmationStatus = 'pending' | 'confirmed' | 'declined' | 'no_response' | 'no_show';
+
 // Schemas
 const createConfirmationSchema = z.object({
   scheduleId: z.string().uuid(),
@@ -88,7 +98,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     }
 
     if (status) {
-      conditions.push(eq(scheduleConfirmations.status, status as any));
+      conditions.push(eq(scheduleConfirmations.status, status as ConfirmationStatus));
     }
 
     if (startDate) {
@@ -107,9 +117,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     res.json(confirmationsList);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_LIST] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao listar confirmações" });
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 });
 
@@ -152,9 +162,9 @@ router.get("/pending", requireAuth, async (req: AuthRequest, res: Response) => {
 
     res.json(pendingConfirmations);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_PENDING] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao buscar confirmações pendentes" });
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 });
 
@@ -196,9 +206,9 @@ router.get("/schedule/:scheduleId", requireAuth, async (req: AuthRequest, res: R
 
     res.json({ confirmations, summary });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_SCHEDULE] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao buscar confirmações da escala" });
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 });
 
@@ -294,9 +304,9 @@ router.post("/", requireAuth, requireRole(['gestor', 'coordenador']), async (req
       message: "Confirmação criada e notificação enviada"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_CREATE] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao criar confirmação" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao criar confirmação" });
   }
 });
 
@@ -395,9 +405,9 @@ router.post("/bulk", requireAuth, requireRole(['gestor', 'coordenador']), async 
       message: `${created.length} confirmações criadas`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_BULK] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao criar confirmações em lote" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao criar confirmações em lote" });
   }
 });
 
@@ -481,9 +491,9 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       message: status === 'confirmed' ? 'Presença confirmada!' : 'Presença recusada'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_RESPOND] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao responder confirmação" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao responder confirmação" });
   }
 });
 
@@ -543,9 +553,9 @@ router.post("/:id/reminder", requireAuth, requireRole(['gestor', 'coordenador'])
       message: "Lembrete enviado"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_REMINDER] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao enviar lembrete" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao enviar lembrete" });
   }
 });
 
@@ -636,9 +646,9 @@ router.post("/send-reminders", requireAuth, requireRole(['gestor', 'coordenador'
       message: `Lembretes enviados para ${sent} ministro(s)`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_SEND_REMINDERS] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao enviar lembretes" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao enviar lembretes" });
   }
 });
 
@@ -684,9 +694,9 @@ router.get("/stats", requireAuth, requireRole(['gestor', 'coordenador']), async 
 
     res.json(result);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_STATS] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao buscar estatísticas" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao buscar estatísticas" });
   }
 });
 
@@ -705,9 +715,9 @@ router.delete("/:id", requireAuth, requireRole(['gestor', 'coordenador']), async
       message: "Confirmação removida"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CONFIRMATIONS_DELETE] Error:", error);
-    res.status(500).json({ message: error.message || "Erro ao remover confirmação" });
+    res.status(500).json({ message: getErrorMessage(error) || "Erro ao remover confirmação" });
   }
 });
 

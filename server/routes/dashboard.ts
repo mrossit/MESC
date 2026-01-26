@@ -187,7 +187,8 @@ router.get('/next-week-masses', async (req, res) => {
       .groupBy(schedules.date, schedules.time)
       .orderBy(schedules.date, schedules.time);
 
-    const massesWithStatus = masses.map((mass: any) => {
+    type MassRow = typeof masses[number];
+    const massesWithStatus = masses.map((mass: MassRow) => {
       const staffingRate = mass.requiredMinisters > 0
         ? (mass.totalAssigned / mass.requiredMinisters) * 100
         : 0;
@@ -428,7 +429,7 @@ router.get('/incomplete', async (req, res) => {
 
     res.json({
       success: true,
-      data: incomplete.map((item: any) => ({
+      data: incomplete.map((item: typeof incomplete[number]) => ({
         ...item,
         id: `${item.date}-${item.massTime}`,
         title: `Missa ${item.massTime}`,

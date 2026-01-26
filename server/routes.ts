@@ -382,8 +382,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       });
-    } catch (error: any) {
-      if (error.message === 'Relationship already exists') {
+    } catch (error: unknown) {
+      const errorObj = error as { message?: string };
+      if (errorObj.message === 'Relationship already exists') {
         return res.status(409).json({ error: 'This family relationship already exists' });
       }
       const errorResponse = handleApiError(error, "adicionar familiar");

@@ -1,5 +1,8 @@
 import * as schema from "@shared/schema";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Using any for dynamic database type (PostgreSQL via Neon or SQLite via better-sqlite3)
+// The actual type is determined at runtime based on DATABASE_URL environment variable
 let db: any;
 let pool: any;
 

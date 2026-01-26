@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db";
 import { activityLogs, users } from "@shared/schema";
 import { eq, sql, and, gte, lte, desc, count, like, or } from "drizzle-orm";
-import { authenticateToken, requireRole } from "../auth";
+import { authenticateToken, requireRole, AuthRequest } from "../auth";
 import { createActivityLogger } from "../utils/activityLogger";
 import {
   exportToExcel,
@@ -151,21 +151,19 @@ const actionCategories: Record<string, string[]> = {
 // ============================================
 
 // Get activity logs with filtering and pagination
-router.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res) => {
   try {
-    const {
-      page = 1,
-      limit = 50,
-      userId,
-      action,
-      category,
-      startDate,
-      endDate,
-      search
-    } = req.query;
+    const pageStr = typeof req.query.page === 'string' ? req.query.page : '1';
+    const limitStr = typeof req.query.limit === 'string' ? req.query.limit : '50';
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+    const action = typeof req.query.action === 'string' ? req.query.action : undefined;
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+    const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
 
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const pageNum = Math.max(1, parseInt(pageStr) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
     const offset = (pageNum - 1) * limitNum;
 
     // Build conditions
@@ -182,7 +180,7 @@ router.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async
     if (category && actionCategories[category]) {
       const categoryActions = actionCategories[category];
       conditions.push(
-        or(...categoryActions.map(a => eq(activityLogs.action, a)))
+        or(...categoryActions.map((a: string) => eq(activityLogs.action, a)))
       );
     }
 
@@ -264,10 +262,10 @@ router.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async
 });
 
 // Get activity summary/stats
-router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res) => {
   try {
-    const { days = 7 } = req.query;
-    const numDays = Math.min(90, Math.max(1, parseInt(days) || 7));
+    const daysStr = typeof req.query.days === 'string' ? req.query.days : '7';
+    const numDays = Math.min(90, Math.max(1, parseInt(daysStr) || 7));
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - numDays);
 
@@ -358,10 +356,10 @@ router.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"])
 });
 
 // Get recent activities (for dashboard widget)
-router.get("/recent", authenticateToken, async (req: any, res) => {
+router.get("/recent", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { limit = 10 } = req.query;
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit) || 10));
+    const limitStr = typeof req.query.limit === 'string' ? req.query.limit : '10';
+    const limitNum = Math.min(50, Math.max(1, parseInt(limitStr) || 10));
 
     // For non-admin users, only show their own activities
     const isAdmin = req.user?.role === 'gestor' || req.user?.role === 'coordenador';
@@ -378,7 +376,7 @@ router.get("/recent", authenticateToken, async (req: any, res) => {
       })
       .from(activityLogs)
       .leftJoin(users, eq(activityLogs.userId, users.id))
-      .where(isAdmin ? undefined : eq(activityLogs.userId, userId))
+      .where(isAdmin || !userId ? undefined : eq(activityLogs.userId, userId))
       .orderBy(desc(activityLogs.createdAt))
       .limit(limitNum);
 
@@ -401,26 +399,29 @@ router.get("/recent", authenticateToken, async (req: any, res) => {
 });
 
 // Get user-specific activity log
-router.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: any, res) => {
+router.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
-    const { page = 1, limit = 50, startDate, endDate } = req.query;
+    const pageStr = typeof req.query.page === 'string' ? req.query.page : '1';
+    const limitStr = typeof req.query.limit === 'string' ? req.query.limit : '50';
+    const startDateStr = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+    const endDateStr = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
 
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const pageNum = Math.max(1, parseInt(pageStr) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
     const offset = (pageNum - 1) * limitNum;
 
     const conditions = [eq(activityLogs.userId, userId)];
 
-    if (startDate) {
-      const start = new Date(startDate);
+    if (startDateStr) {
+      const start = new Date(startDateStr);
       if (!isNaN(start.getTime())) {
         conditions.push(gte(activityLogs.createdAt, start));
       }
     }
 
-    if (endDate) {
-      const end = new Date(endDate);
+    if (endDateStr) {
+      const end = new Date(endDateStr);
       if (!isNaN(end.getTime())) {
         end.setHours(23, 59, 59, 999);
         conditions.push(lte(activityLogs.createdAt, end));
@@ -483,12 +484,16 @@ router.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenad
 });
 
 // Export activity logs
-router.get("/export", authenticateToken, requireRole(["gestor"]), async (req: any, res) => {
+router.get("/export", authenticateToken, requireRole(["gestor"]), async (req: AuthRequest, res) => {
   const logActivity = createActivityLogger(req);
   await logActivity("export_report", { type: "activity_logs" });
 
   try {
-    const { format = 'xlsx', startDate, endDate, category, userId } = req.query;
+    const format = typeof req.query.format === 'string' ? req.query.format : 'xlsx';
+    const startDateStr = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+    const endDateStr = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
 
     if (!['xlsx', 'pdf', 'csv'].includes(format)) {
       return res.status(400).json({ error: "Invalid format" });
@@ -503,19 +508,19 @@ router.get("/export", authenticateToken, requireRole(["gestor"]), async (req: an
     if (category && actionCategories[category]) {
       const categoryActions = actionCategories[category];
       conditions.push(
-        or(...categoryActions.map(a => eq(activityLogs.action, a)))
+        or(...categoryActions.map((a: string) => eq(activityLogs.action, a)))
       );
     }
 
-    if (startDate) {
-      const start = new Date(startDate);
+    if (startDateStr) {
+      const start = new Date(startDateStr);
       if (!isNaN(start.getTime())) {
         conditions.push(gte(activityLogs.createdAt, start));
       }
     }
 
-    if (endDate) {
-      const end = new Date(endDate);
+    if (endDateStr) {
+      const end = new Date(endDateStr);
       if (!isNaN(end.getTime())) {
         end.setHours(23, 59, 59, 999);
         conditions.push(lte(activityLogs.createdAt, end));
@@ -523,7 +528,7 @@ router.get("/export", authenticateToken, requireRole(["gestor"]), async (req: an
     }
 
     // Default to last 30 days if no date specified
-    if (!startDate && !endDate) {
+    if (!startDateStr && !endDateStr) {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       conditions.push(gte(activityLogs.createdAt, thirtyDaysAgo));
@@ -553,8 +558,8 @@ router.get("/export", authenticateToken, requireRole(["gestor"]), async (req: an
       title: 'Logs de Atividade',
       subtitle: 'Registro de ações no sistema',
       generatedAt: formatDateBR(new Date()),
-      period: startDate && endDate
-        ? `${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}`
+      period: startDateStr && endDateStr
+        ? `${new Date(startDateStr).toLocaleDateString('pt-BR')} a ${new Date(endDateStr).toLocaleDateString('pt-BR')}`
         : 'Últimos 30 dias',
       headers: ['Data/Hora', 'Usuário', 'Ação', 'Descrição', 'IP'],
       rows: typedLogs.map((log: ExportLogRow) => [

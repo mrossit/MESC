@@ -154,10 +154,14 @@ export type FormationOverviewResponse = {
   };
 };
 
-const parseRows = <T>(result: any): T[] => {
+type QueryResult = { rows?: unknown[] } | unknown[] | null | undefined;
+
+const parseRows = <T>(result: QueryResult): T[] => {
   if (!result) return [];
   if (Array.isArray(result)) return result as T[];
-  if (Array.isArray(result.rows)) return result.rows as T[];
+  if (result && typeof result === 'object' && 'rows' in result && Array.isArray(result.rows)) {
+    return result.rows as T[];
+  }
   return [];
 };
 
@@ -663,7 +667,7 @@ export async function markLessonCompleted(params: {
               await db.execute(sql`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)
-            ).rows.map((row: any) => row.id)
+            ).rows.map((row: { id: string }) => row.id)
           : []),
       ])
     ),

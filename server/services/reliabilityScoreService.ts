@@ -320,7 +320,8 @@ export async function getAllReliabilityMetrics(): Promise<ReliabilityMetrics[]> 
       .from(users)
       .where(eq(users.status, 'active'));
 
-    return ministers.map((m: any) => {
+    type MinisterRow = typeof ministers[number];
+    return ministers.map((m: MinisterRow) => {
       const score = m.reliabilityScore || 100;
       return {
         ministerId: m.id,

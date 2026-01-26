@@ -81,7 +81,7 @@ interface AuditMetadata {
   targetUserId?: string;
   targetResource?: string;
   resourceId?: string;
-  changes?: Record<string, any>;
+  changes?: Record<string, unknown> | string[];
   reason?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -89,13 +89,13 @@ interface AuditMetadata {
   path?: string;
   statusCode?: number;
   duration?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
  * Sanitiza dados sensíveis antes de salvar no log de auditoria
  */
-function sanitizeAuditData(data: any): any {
+function sanitizeAuditData(data: unknown): unknown {
   if (!data || typeof data !== 'object') {
     return data;
   }
@@ -112,15 +112,16 @@ function sanitizeAuditData(data: any): any {
     'privateKey'
   ];
 
-  const sanitized: any = {};
+  const sanitized: Record<string, unknown> = {};
+  const dataObj = data as Record<string, unknown>;
 
-  for (const key of Object.keys(data)) {
+  for (const key of Object.keys(dataObj)) {
     if (sensitiveFields.includes(key.toLowerCase())) {
       sanitized[key] = '[REDACTED]';
-    } else if (typeof data[key] === 'object' && data[key] !== null) {
-      sanitized[key] = sanitizeAuditData(data[key]);
+    } else if (typeof dataObj[key] === 'object' && dataObj[key] !== null) {
+      sanitized[key] = sanitizeAuditData(dataObj[key]);
     } else {
-      sanitized[key] = data[key];
+      sanitized[key] = dataObj[key];
     }
   }
 
@@ -180,7 +181,7 @@ export async function logAudit(
  */
 export function auditLog(
   action: AuditAction | string,
-  extractMetadata?: (req: AuthRequest) => Record<string, any>
+  extractMetadata?: (req: AuthRequest) => Record<string, unknown>
 ) {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     const startTime = Date.now();
@@ -241,7 +242,7 @@ export function auditPersonalDataAccess(
  */
 export function auditDataModification(
   action: AuditAction,
-  getChanges?: (req: AuthRequest) => Record<string, any>
+  getChanges?: (req: AuthRequest) => Record<string, unknown>
 ) {
   return auditLog(action, (req) => {
     const changes = getChanges ? getChanges(req) : req.body;
@@ -259,7 +260,7 @@ export function auditDataModification(
 export async function auditSecurityEvent(
   event: AuditAction,
   req: Request,
-  metadata: Record<string, any> = {}
+  metadata: Record<string, unknown> = {}
 ): Promise<void> {
   await logAudit(event, {
     ipAddress: req.ip,

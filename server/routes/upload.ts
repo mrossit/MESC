@@ -16,7 +16,7 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
-  fileFilter: (req: any, file: any, cb: any) => {
+  fileFilter: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     // Aceitar apenas imagens específicas
     const allowedTypes = [
       'image/jpeg',
@@ -35,11 +35,16 @@ const upload = multer({
   },
 });
 
+// Multer error interface
+interface MulterError extends Error {
+  code?: string;
+}
+
 // Middleware para tratar erros do Multer
-const handleMulterError = (err: any, req: Request, res: Response, next: NextFunction) => {
+const handleMulterError = (err: MulterError | null, req: Request, res: Response, next: NextFunction) => {
   if (err) {
     console.error('Multer error:', err);
-    
+
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'A imagem deve ter no máximo 5MB' });
     }

@@ -100,17 +100,24 @@ async function compareSchedule(scheduleId: string): Promise<ScheduleComparison |
   };
 }
 
+// Minister data item interface for extraction
+interface MinisterDataItem {
+  id?: string;
+  ministerId?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Extract minister IDs from ministers JSON field
  */
-function extractMinisterIds(ministersData: any): string[] {
+function extractMinisterIds(ministersData: unknown): string[] {
   if (!ministersData) return [];
 
   // Handle both array of objects and direct array formats
   if (Array.isArray(ministersData)) {
     return ministersData
-      .filter(m => m && (m.id || m.ministerId))
-      .map(m => m.id || m.ministerId);
+      .filter((m: unknown): m is MinisterDataItem => m !== null && typeof m === 'object' && ((m as MinisterDataItem).id !== undefined || (m as MinisterDataItem).ministerId !== undefined))
+      .map((m: MinisterDataItem) => m.id || m.ministerId || '');
   }
 
   return [];
@@ -234,7 +241,8 @@ export async function analyzeMonthlyPatterns(
   const frequentlyRemovedMinisters = await getMinisterDetails(removalCounts);
   const addedMinistersRaw = await getMinisterDetails(additionCounts);
   // Map removalCount to additionCount for the added ministers
-  const frequentlyAddedMinisters = addedMinistersRaw.map((m: any) => ({
+  type MinisterDetailRow = Awaited<ReturnType<typeof getMinisterDetails>>[number];
+  const frequentlyAddedMinisters = addedMinistersRaw.map((m: MinisterDetailRow) => ({
     ministerId: m.ministerId,
     ministerName: m.ministerName,
     additionCount: m.removalCount, // The function returns removalCount but we need additionCount
@@ -319,14 +327,16 @@ async function getMinisterDetails(
     .where(sql`${users.id} IN ${sql.raw(`('${ministerIds.join("','")}')`)}`)
     .execute();
 
+  type MinisterRow = typeof ministers[number];
+  type MappedResult = { ministerId: string; ministerName: string; removalCount: number; reliabilityScore: number };
   return ministers
-    .map((m: any) => ({
+    .map((m: MinisterRow): MappedResult => ({
       ministerId: m.id,
       ministerName: m.name,
       removalCount: counts.get(m.id) || 0,
       reliabilityScore: m.reliabilityScore || 100,
     }))
-    .sort((a: any, b: any) => b.removalCount - a.removalCount)
+    .sort((a: MappedResult, b: MappedResult) => b.removalCount - a.removalCount)
     .slice(0, 10); // Top 10
 }
 

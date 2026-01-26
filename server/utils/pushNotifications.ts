@@ -8,7 +8,20 @@ type PushPayload = {
   data?: Record<string, unknown>;
 };
 
-let webpush: any = null;
+// Interface for web-push module
+interface WebPushModule {
+  setVapidDetails: (subject: string, publicKey: string, privateKey: string) => void;
+  sendNotification: (subscription: { endpoint: string; keys: { auth: string; p256dh: string } }, payload: string) => Promise<void>;
+}
+
+// Interface for push notification errors
+interface PushError {
+  statusCode?: number;
+  code?: number;
+  message?: string;
+}
+
+let webpush: WebPushModule | null = null;
 try {
   // @ts-expect-error - web-push module has no type declarations
   const module = await import("web-push");
@@ -78,8 +91,9 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
         await webpush.sendNotification(pushSubscription, notificationPayload);
         console.log('[PUSH] Notificação enviada com sucesso para userId:', subscription.userId);
         return { success: true, userId: subscription.userId };
-      } catch (error: any) {
-        const statusCode = error?.statusCode ?? error?.code;
+      } catch (error: unknown) {
+        const pushError = error as PushError;
+        const statusCode = pushError?.statusCode ?? pushError?.code;
         if (statusCode === 404 || statusCode === 410) {
           console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, 'userId:', subscription.userId);
           await storage.removePushSubscriptionByEndpoint(subscription.endpoint);

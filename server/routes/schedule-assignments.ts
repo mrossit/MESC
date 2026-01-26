@@ -3,7 +3,14 @@ import { db } from "../db";
 import { schedules, users } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
-const logActivity = async (userId: string, action: string, description: string, metadata?: any) => {
+
+// Update data type for schedule updates
+interface ScheduleUpdateData {
+  ministerId?: string | null;
+  notes?: string | null;
+}
+
+const logActivity = async (userId: string, action: string, description: string, metadata?: Record<string, unknown>) => {
   // Log simples por enquanto - pode ser expandido depois
   console.log(`Activity: ${userId} - ${action}: ${description}`, metadata);
 };
@@ -49,8 +56,9 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
           )
         );
 
+      type ScheduleRow = typeof userAssignmentsForThisMass[number];
       isAuxiliar1or2ForThisMass = userAssignmentsForThisMass.some(
-        (a: any) => a.position === 1 || a.position === 2
+        (a: ScheduleRow) => a.position === 1 || a.position === 2
       );
     }
 
@@ -78,7 +86,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     // Auxiliar 1/2 can edit any assignment in their mass
     if (isAuxiliar1or2ForThisMass && !isCoordOrGestor) {
       // Update assignment (minister and/or notes)
-      const updateData: any = {};
+      const updateData: ScheduleUpdateData = {};
       if (ministerId !== undefined) updateData.ministerId = ministerId;
       if (notes !== undefined) updateData.notes = notes;
 
@@ -104,7 +112,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
     }
 
-    const updateData: any = {};
+    const updateData: ScheduleUpdateData = {};
     if (ministerId !== undefined) updateData.ministerId = ministerId;
     if (notes !== undefined) updateData.notes = notes;
 

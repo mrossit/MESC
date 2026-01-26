@@ -6,6 +6,13 @@ import { eq, and } from "drizzle-orm";
 import { logger } from "../../utils/logger";
 import { AuthRequest } from "../../auth";
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
 /**
  * Gera escala usando o algoritmo alternativo Python
  */
@@ -65,7 +72,8 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
 
     // 4. Formatar dados para o Python
-    const formattedUsers = ministersData.map((m: any) => ({
+    type MinisterRow = typeof ministersData[number];
+    const formattedUsers = ministersData.map((m: MinisterRow) => ({
       id: m.id,
       name: m.name,
       email: m.email,
@@ -74,13 +82,14 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       avoid_positions: []
     }));
 
-    const formattedResponses = responses.map((r: any) => ({
+    type ResponseRow = typeof responses[number];
+    const formattedResponses = responses.map((r: ResponseRow) => ({
       user_id: r.userId,
       questionnaire_id: r.questionnaireId,
       available_sundays: r.availableSundays || [],
       preferred_times: r.preferredMassTimes || [],
       daily_mass_availability: r.dailyMassAvailability || [],
-      weekdays: r.responses?.weekdays || {},
+      weekdays: (r.responses as { weekdays?: Record<string, unknown> } | null)?.weekdays || {},
       responses: r.responses || {}
     }));
 
@@ -121,12 +130,12 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       }
     });
 
-  } catch (error: any) {
-    logger.error(`Erro ao gerar escala alternativa: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`Erro ao gerar escala alternativa: ${getErrorMessage(error)}`);
     return res.status(500).json({
       success: false,
       message: "Erro interno ao gerar escala alternativa",
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }
@@ -151,12 +160,12 @@ export async function compararAlgoritmos(req: AuthRequest, res: Response) {
       algorithms: ["current", "python-alternative"]
     });
 
-  } catch (error: any) {
-    logger.error(`Erro ao comparar algoritmos: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`Erro ao comparar algoritmos: ${getErrorMessage(error)}`);
     return res.status(500).json({
       success: false,
       message: "Erro ao comparar algoritmos",
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }
@@ -176,11 +185,11 @@ export async function verificarPython(req: Request, res: Response) {
         : "Python3 não foi encontrado no sistema"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return res.status(500).json({
       success: false,
       message: "Erro ao verificar Python",
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }

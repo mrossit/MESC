@@ -9,6 +9,49 @@ import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 
 const router = Router();
 
+// Helper function to safely extract error message
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+}
+
+// Minister assignment interface
+interface MinisterAssignment {
+  id?: string;
+  ministerId?: string;
+  position?: number;
+}
+
+// Mass time details interface
+interface MassTimeDetails {
+  date?: string;
+  time?: string;
+  type?: string;
+  minMinisters?: number;
+}
+
+// Schedule data item interface (supports multiple formats)
+interface ScheduleDataItem {
+  id?: string;
+  ministerId?: string;
+  date?: string;
+  time?: string;
+  position?: number;
+  type?: string;
+  massTime?: MassTimeDetails;
+  ministers?: MinisterAssignment[];
+  assignments?: MinisterAssignment[];
+  [key: string]: unknown;
+}
+
+// Minister schedule entry for notifications
+interface MinisterScheduleEntry {
+  date: string;
+  time: string;
+  position: number;
+}
+
 interface GenerationOptions {
   prioritizeVeterans: boolean;
   allowFamiliesOnSameDay: boolean;
@@ -95,11 +138,11 @@ router.post("/generate-smart", requireAuth, requireRole(['coordenador', 'gestor'
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[SMART_GEN] Error generating smart schedule:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao gerar escala inteligente"
+      message: getErrorMessage(error) || "Erro ao gerar escala inteligente"
     });
   }
 });
@@ -145,11 +188,11 @@ router.post("/preview", requireAuth, requireRole(['coordenador', 'gestor']), asy
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PREVIEW] Error generating preview:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao gerar preview"
+      message: getErrorMessage(error) || "Erro ao gerar preview"
     });
   }
 });
@@ -246,11 +289,11 @@ router.put("/manual-adjustment", requireAuth, requireRole(['coordenador', 'gesto
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[MANUAL_ADJUST] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao realizar ajuste manual"
+      message: getErrorMessage(error) || "Erro ao realizar ajuste manual"
     });
   }
 });
@@ -303,11 +346,11 @@ router.post("/publish", requireAuth, requireRole(['coordenador', 'gestor']), asy
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PUBLISH] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao publicar escala"
+      message: getErrorMessage(error) || "Erro ao publicar escala"
     });
   }
 });
@@ -343,11 +386,11 @@ router.get("/validation/:year/:month", requireAuth, requireRole(['coordenador', 
       data: validation
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[VALIDATION] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao validar escala"
+      message: getErrorMessage(error) || "Erro ao validar escala"
     });
   }
 });
@@ -592,7 +635,7 @@ async function calculateFairnessImpact(
  * Validate schedule before publishing
  */
 async function validateScheduleBeforePublish(
-  scheduleData: any[],
+  scheduleData: ScheduleDataItem[],
   month: number,
   year: number
 ): Promise<{
@@ -611,7 +654,9 @@ async function validateScheduleBeforePublish(
 
   // Check 1: All Sundays have minimum ministers
   const sundays = scheduleData.filter(s => {
-    const date = new Date(s.date || s.massTime?.date);
+    const dateStr = s.date || s.massTime?.date;
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
     return date.getDay() === 0; // Sunday
   });
 
@@ -691,7 +736,7 @@ async function validateScheduleBeforePublish(
  * Save schedule to database
  */
 async function saveScheduleToDatabase(
-  scheduleData: any[],
+  scheduleData: ScheduleDataItem[],
   month: number,
   year: number
 ): Promise<number> {
@@ -702,6 +747,9 @@ async function saveScheduleToDatabase(
     const time = schedule.time || schedule.massTime?.time;
     const type = schedule.type || schedule.massTime?.type || 'missa';
     const ministers = schedule.ministers || schedule.assignments || [];
+
+    // Skip if date or time is missing
+    if (!date || !time) continue;
 
     for (const minister of ministers) {
       const ministerId = minister.id || minister.ministerId;
@@ -725,7 +773,7 @@ async function saveScheduleToDatabase(
         await db.insert(schedules).values({
           date,
           time,
-          type: type as any,
+          type: type as 'missa_dominical' | 'missa_diaria' | 'missa' | 'adoracao' | 'novena' | 'festa' | 'outro',
           ministerId,
           position,
           status: 'scheduled'
@@ -742,7 +790,7 @@ async function saveScheduleToDatabase(
  * Send notifications to ministers
  */
 async function sendMinisterNotifications(
-  scheduleData: any[],
+  scheduleData: ScheduleDataItem[],
   month: number,
   year: number
 ): Promise<{ sent: number; failed: number }> {
@@ -751,10 +799,16 @@ async function sendMinisterNotifications(
 
   // Collect unique ministers
   const uniqueMinisters = new Set<string>();
-  const ministerSchedules: Record<string, any[]> = {};
+  const ministerSchedules: Record<string, MinisterScheduleEntry[]> = {};
 
   for (const schedule of scheduleData) {
     const ministers = schedule.ministers || schedule.assignments || [];
+    const scheduleDate = schedule.date || schedule.massTime?.date;
+    const scheduleTime = schedule.time || schedule.massTime?.time;
+
+    // Skip if date or time is missing
+    if (!scheduleDate || !scheduleTime) continue;
+
     for (const minister of ministers) {
       const id = minister.id || minister.ministerId;
       if (id) {
@@ -763,9 +817,9 @@ async function sendMinisterNotifications(
           ministerSchedules[id] = [];
         }
         ministerSchedules[id].push({
-          date: schedule.date,
-          time: schedule.time,
-          position: minister.position || schedule.position
+          date: scheduleDate,
+          time: scheduleTime,
+          position: minister.position || schedule.position || 0
         });
       }
     }

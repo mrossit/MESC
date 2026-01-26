@@ -40,7 +40,7 @@ class Logger {
   /**
    * Sanitiza dados sensíveis antes de logar
    */
-  private sanitize(data: any): any {
+  private sanitize(data: unknown): unknown {
     if (data === null || data === undefined) {
       return data;
     }
@@ -53,24 +53,25 @@ class Logger {
       return data.map(item => this.sanitize(item));
     }
 
-    const sanitized: any = {};
-    for (const key of Object.keys(data)) {
+    const dataObj = data as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const key of Object.keys(dataObj)) {
       const lowerKey = key.toLowerCase();
       const isSensitive = SENSITIVE_KEYS.some(sk => lowerKey.includes(sk.toLowerCase()));
 
       if (isSensitive) {
         sanitized[key] = '[REDACTED]';
-      } else if (typeof data[key] === 'object' && data[key] !== null) {
-        sanitized[key] = this.sanitize(data[key]);
+      } else if (typeof dataObj[key] === 'object' && dataObj[key] !== null) {
+        sanitized[key] = this.sanitize(dataObj[key]);
       } else {
-        sanitized[key] = data[key];
+        sanitized[key] = dataObj[key];
       }
     }
 
     return sanitized;
   }
 
-  private formatMessage(level: string, message: string, context?: any): string {
+  private formatMessage(level: string, message: string, context?: unknown): string {
     const timestamp = new Date().toISOString();
     const baseMessage = `[${timestamp}] [${level}] ${message}`;
 
@@ -82,32 +83,32 @@ class Logger {
     return baseMessage;
   }
 
-  error(message: string, error?: any): void {
+  error(message: string, error?: unknown): void {
     if (this.shouldLog(LogLevel.ERROR)) {
       console.error(this.formatMessage('ERROR', message, error));
     }
   }
 
-  warn(message: string, context?: any): void {
+  warn(message: string, context?: unknown): void {
     if (this.shouldLog(LogLevel.WARN)) {
       console.warn(this.formatMessage('WARN', message, context));
     }
   }
 
-  info(message: string, context?: any): void {
+  info(message: string, context?: unknown): void {
     if (this.shouldLog(LogLevel.INFO)) {
       console.log(this.formatMessage('INFO', message, context));
     }
   }
 
-  debug(message: string, context?: any): void {
+  debug(message: string, context?: unknown): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
       console.log(this.formatMessage('DEBUG', message, context));
     }
   }
 
   // Método específico para desenvolvimento
-  dev(message: string, context?: any): void {
+  dev(message: string, context?: unknown): void {
     if (process.env.NODE_ENV === 'development') {
       console.log(this.formatMessage('DEV', message, context));
     }

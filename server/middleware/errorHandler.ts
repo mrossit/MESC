@@ -1,5 +1,14 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { ZodError, type ZodIssue } from 'zod';
 import { logger } from '../utils/logger';
+
+// Database error interface (PostgreSQL/Drizzle)
+interface DatabaseError {
+  code?: string;
+  constraint?: string;
+  column?: string;
+  message?: string;
+}
 
 /**
  * Custom API Error class with status codes and error codes
@@ -149,12 +158,30 @@ export function notFoundHandler(req: Request, res: Response, next: NextFunction)
   next(ApiError.notFound(`Rota não encontrada: ${req.method} ${req.path}`));
 }
 
+// Type guard for ZodError-like objects (for testing and duck-typing)
+interface ZodErrorLike {
+  name: string;
+  errors: Array<{ path: (string | number)[]; message: string }>;
+}
+
+function isZodErrorLike(error: unknown): error is ZodErrorLike {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'name' in error &&
+    (error as { name: unknown }).name === 'ZodError' &&
+    'errors' in error &&
+    Array.isArray((error as { errors: unknown }).errors)
+  );
+}
+
 /**
  * Validation error handler for Zod errors
  */
-export function handleZodError(error: any): ApiError {
-  if (error.name === 'ZodError') {
-    const details = error.errors?.map((e: any) => ({
+export function handleZodError(error: unknown): ApiError {
+  if (error instanceof ZodError || isZodErrorLike(error)) {
+    const zodError = error as ZodErrorLike;
+    const details = zodError.errors.map((e) => ({
       field: e.path.join('.'),
       message: e.message,
     }));
@@ -166,32 +193,34 @@ export function handleZodError(error: any): ApiError {
 /**
  * Database error handler for common Drizzle/PostgreSQL errors
  */
-export function handleDatabaseError(error: any): ApiError {
+export function handleDatabaseError(error: unknown): ApiError {
+  const dbError = error as DatabaseError;
+
   // Unique constraint violation
-  if (error.code === '23505') {
+  if (dbError.code === '23505') {
     return ApiError.conflict('Registro já existe', 'DUPLICATE_ENTRY', {
-      constraint: error.constraint,
+      constraint: dbError.constraint,
     });
   }
 
   // Foreign key violation
-  if (error.code === '23503') {
+  if (dbError.code === '23503') {
     return ApiError.badRequest('Referência inválida', 'FOREIGN_KEY_VIOLATION', {
-      constraint: error.constraint,
+      constraint: dbError.constraint,
     });
   }
 
   // Not null violation
-  if (error.code === '23502') {
+  if (dbError.code === '23502') {
     return ApiError.badRequest('Campo obrigatório não informado', 'NOT_NULL_VIOLATION', {
-      column: error.column,
+      column: dbError.column,
     });
   }
 
   // Check constraint violation
-  if (error.code === '23514') {
+  if (dbError.code === '23514') {
     return ApiError.badRequest('Valor inválido', 'CHECK_VIOLATION', {
-      constraint: error.constraint,
+      constraint: dbError.constraint,
     });
   }
 

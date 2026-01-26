@@ -501,7 +501,7 @@ export async function updateUserStats(
 ): Promise<void> {
   await initializeUserPoints(userId);
 
-  const updateData: any = { updatedAt: new Date() };
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (updates.massesServed !== undefined) {
     updateData.massesServed = sql`COALESCE(masses_served, 0) + ${updates.massesServed}`;

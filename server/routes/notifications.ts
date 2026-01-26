@@ -235,7 +235,7 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
 
     if (pushConfig.enabled) {
       await sendPushNotificationToUsers(
-        ministers.map((minister: any) => minister.id),
+        ministers.map((minister: { id: string; name: string; role: string }) => minister.id),
         {
           title,
           body: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
@@ -311,7 +311,7 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
         console.log('[NOTIFICAÇÕES] Buscou usuários com role', data.recipientRole, ':', recipients.length);
       }
 
-      recipientUserIds = recipients.map((r: any) => r.id);
+      recipientUserIds = recipients.map((r: { id: string }) => r.id);
       console.log('[NOTIFICAÇÕES] IDs dos destinatários:', recipientUserIds);
     } else {
       // Por padrão, enviar para todos os ministros ativos
@@ -321,7 +321,7 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
           eq(users.role, "ministro"),
           eq(users.status, "active")
         ));
-      recipientUserIds = recipients.map((r: any) => r.id);
+      recipientUserIds = recipients.map((r: { id: string }) => r.id);
       console.log('[NOTIFICAÇÕES] Sem filtro, usando ministros ativos por padrão:', recipientUserIds.length);
     }
 

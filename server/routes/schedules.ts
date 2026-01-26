@@ -7,6 +7,7 @@ import { eq, and, sql, gte, lte, count } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
 import type { ScheduleAssignment } from "../types/schedules";
+import type { Schedule } from "@shared/schema";
 import { sendPushNotificationToUsers } from "../utils/pushNotifications";
 import { storage } from "../storage";
 import { notifyUsers } from "../websocket";
@@ -194,7 +195,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
       .orderBy(schedules.time, schedules.position);
 
     // 🕊️ INCLUSÃO DE ADORAÇÃO: Verificar se a data é uma segunda-feira e buscar sorteio
-    let adorationAssignments: any[] = [];
+    let adorationAssignments: ScheduleAssignment[] = [];
     try {
       const targetDate = new Date(targetDateStr + 'T12:00:00');
       const isMonday = targetDate.getDay() === 1;
@@ -256,7 +257,8 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
               eq(adorationDrawResults.mondayOfWeek, mondayOfWeek)
             ));
 
-          adorationAssignments = drawResults.map((res: any) => ({
+          type DrawResultRow = typeof drawResults[number];
+          adorationAssignments = drawResults.map((res: DrawResultRow) => ({
             id: `adoracao-${res.id}`,
             scheduleId: `adoracao-${res.id}`,
             ministerId: res.ministerId,
@@ -353,7 +355,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
 
-      let schedulesList: any[] = [];
+      let schedulesList: Schedule[] = [];
       try {
         // IMPORTANT: Ministers can only see PUBLISHED schedules
         // Coordinators/Managers can see all schedules
@@ -442,7 +444,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             .where(
               and(
                 sql`${substitutionRequests.scheduleId} IN (${sql.join(
-                  schedulesList.map((s: any) => sql`${s.id}`),
+                  schedulesList.map((s: Schedule) => sql`${s.id}`),
                   sql`, `
                 )})`,
                 sql`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
@@ -451,7 +453,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         : [];
 
       // 🕊️ INCLUSÃO DE ADORAÇÃO: Buscar resultados do sorteio de adoração para o mês
-      let adorationAssignments: any[] = [];
+      let adorationAssignments: ScheduleAssignment[] = [];
       try {
         const { adorationDraws, adorationDrawResults, users } = await import('@shared/schema');
         const draws = await db
@@ -488,7 +490,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
           const mondaysInMonth = getMondaysInMonth(yearNum, monthNum);
 
-          adorationAssignments = drawResults.map((res: any) => {
+          type DrawResultRow = typeof drawResults[number];
+          adorationAssignments = drawResults.map((res: DrawResultRow) => {
             const mondayDate = mondaysInMonth[res.mondayOfWeek - 1];
             return {
               id: `adoracao-${res.id}`,
