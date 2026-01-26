@@ -83,7 +83,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const conditions = [eq(formationMaterials.isActive, true)];
 
     if (category && category !== 'all') {
-      conditions.push(eq(formationMaterials.category, category as any));
+      conditions.push(eq(formationMaterials.category, category as 'liturgia' | 'espiritualidade' | 'pratica'));
     }
 
     if (trackId) {
@@ -91,7 +91,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     if (type && type !== 'all') {
-      conditions.push(eq(formationMaterials.type, type as any));
+      conditions.push(eq(formationMaterials.type, type as 'pdf' | 'document' | 'video' | 'audio' | 'image' | 'presentation' | 'other'));
     }
 
     // AI status filter
@@ -444,7 +444,7 @@ router.put('/:id', requireRole(['coordenador', 'gestor']), csrfProtection, async
     const { id } = req.params;
     const { title, description, category, trackId, tags, isPublished } = req.body;
 
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date()
     };
 
@@ -755,7 +755,7 @@ router.post('/:id/apply-suggestions', requireRole(['coordenador', 'gestor']), cs
       return res.status(400).json({ error: 'Material ainda nao foi analisado' });
     }
 
-    const updates: Record<string, any> = { updatedAt: new Date() };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (applyCategory && material.aiSuggestedCategory) {
       updates.category = material.aiSuggestedCategory;

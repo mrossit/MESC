@@ -71,6 +71,57 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Type definitions for API responses
+interface ActivityLog {
+  id: string;
+  createdAt: string;
+  userName?: string;
+  userEmail?: string;
+  action: string;
+  description?: string;
+  ipAddress?: string;
+}
+
+interface CategoryStat {
+  category: string;
+  count: number;
+}
+
+interface TopUser {
+  userId: string;
+  userName?: string;
+  count: number;
+}
+
+interface DailyStat {
+  date: string;
+  count: number;
+}
+
+interface LogsData {
+  logs: ActivityLog[];
+  categories?: string[];
+  pagination?: {
+    page: number;
+    totalPages: number;
+    total: number;
+  };
+}
+
+interface SummaryData {
+  byCategory?: CategoryStat[];
+  topUsers?: TopUser[];
+  daily?: DailyStat[];
+  byDay?: DailyStat[];
+  total?: number;
+  totalActivities?: number;
+  loginStats?: {
+    logins?: number;
+    logouts?: number;
+    failedLogins?: number;
+  };
+}
+
 const COLORS = ["#D4AF37", "#B87333", "#CC7766", "#8B4513", "#8B5A2B", "#8B6914", "#6B8E23", "#2E8B57"];
 
 const categoryLabels: Record<string, string> = {
@@ -124,7 +175,7 @@ export default function ActivityLogs() {
   };
 
   // Fetch activity logs
-  const { data: logsData, isLoading: logsLoading, refetch } = useQuery({
+  const { data: logsData, isLoading: logsLoading, refetch } = useQuery<LogsData>({
     queryKey: ["/api/activity", page, debouncedSearch, category, startDate, endDate],
     queryFn: async () => {
       const response = await fetch(`/api/activity?${buildParams()}`, {
@@ -136,7 +187,7 @@ export default function ActivityLogs() {
   });
 
   // Fetch summary stats
-  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+  const { data: summaryData, isLoading: summaryLoading } = useQuery<SummaryData>({
     queryKey: ["/api/activity/summary"],
     queryFn: async () => {
       const response = await fetch("/api/activity/summary?days=7", {
@@ -298,7 +349,7 @@ export default function ActivityLogs() {
             <CardContent>
               {summaryLoading ? (
                 <Skeleton className="h-[200px] w-full" />
-              ) : summaryData?.byDay?.length > 0 ? (
+              ) : summaryData?.byDay && summaryData.byDay.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={summaryData.byDay}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -342,11 +393,11 @@ export default function ActivityLogs() {
             <CardContent>
               {summaryLoading ? (
                 <Skeleton className="h-[200px] w-full" />
-              ) : summaryData?.byCategory?.length > 0 ? (
+              ) : summaryData?.byCategory && summaryData.byCategory.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
-                      data={summaryData.byCategory.map((c: any) => ({
+                      data={summaryData.byCategory.map((c) => ({
                         name: categoryLabels[c.category] || c.category,
                         value: c.count
                       }))}
@@ -357,7 +408,7 @@ export default function ActivityLogs() {
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {summaryData.byCategory.map((_: any, index: number) => (
+                      {summaryData.byCategory.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -458,7 +509,7 @@ export default function ActivityLogs() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : logsData?.logs?.length > 0 ? (
+            ) : logsData?.logs && logsData.logs.length > 0 ? (
               <>
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
@@ -472,7 +523,7 @@ export default function ActivityLogs() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {logsData.logs.map((log: any) => (
+                      {logsData.logs.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="font-mono text-xs">
                             {formatDate(log.createdAt)}
@@ -503,7 +554,7 @@ export default function ActivityLogs() {
                 </div>
 
                 {/* Pagination */}
-                {logsData.pagination?.totalPages > 1 && (
+                {logsData?.pagination && logsData.pagination.totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-muted-foreground">
                       Página {logsData.pagination.page} de {logsData.pagination.totalPages}
@@ -521,8 +572,8 @@ export default function ActivityLogs() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setPage(Math.min(logsData.pagination.totalPages, page + 1))}
-                        disabled={page === logsData.pagination.totalPages}
+                        onClick={() => setPage(Math.min(logsData.pagination?.totalPages ?? 1, page + 1))}
+                        disabled={page === (logsData.pagination?.totalPages ?? 1)}
                       >
                         Próxima
                         <ChevronRight className="h-4 w-4" />
@@ -542,7 +593,7 @@ export default function ActivityLogs() {
         </Card>
 
         {/* Top Users */}
-        {summaryData?.topUsers?.length > 0 && (
+        {summaryData?.topUsers && summaryData.topUsers.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Usuários Mais Ativos</CardTitle>
@@ -550,7 +601,7 @@ export default function ActivityLogs() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                {summaryData.topUsers.slice(0, 5).map((user: any, index: number) => (
+                {summaryData.topUsers.slice(0, 5).map((user, index) => (
                   <div key={user.userId} className="text-center p-3 bg-muted/50 rounded-lg">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
                       <span className="text-lg font-bold text-primary">{index + 1}</span>

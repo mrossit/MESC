@@ -4,6 +4,7 @@
  */
 
 import { Router } from 'express';
+import { AuthRequest } from '../auth';
 import { db } from '../db';
 import {
   schedules,
@@ -227,7 +228,7 @@ router.get('/next-week-masses', async (req, res) => {
  * GET /api/dashboard/ministry-stats
  * Returns ministry health indicators and statistics
  */
-router.get('/ministry-stats', async (req, res) => {
+router.get('/ministry-stats', async (req: AuthRequest, res) => {
   try {
     const now = new Date();
     const thirtyDaysAgo = subDays(now, 30);
@@ -326,7 +327,7 @@ router.get('/ministry-stats', async (req, res) => {
       );
 
       // Check if current user (minister) has responded
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       if (userId) {
         const [userResponse] = await db
           .select()

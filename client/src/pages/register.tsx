@@ -42,7 +42,7 @@ export default function Register() {
       });
       navigate("/login");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const errorMessage = error.message || "Falha ao criar conta";
       
       // Verifica se é erro de email duplicado

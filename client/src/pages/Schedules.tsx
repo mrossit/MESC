@@ -99,6 +99,16 @@ const normalizeMassTime = (time: string): string => {
   return time;
 };
 
+interface Minister {
+  id: string;
+  name: string;
+  active?: boolean;
+  photoUrl?: string;
+  familyId?: string;
+  isVoluntary?: boolean;
+  preferredPosition?: number;
+}
+
 interface PositionGroup {
   name: string;
   positions: number[];
@@ -231,7 +241,7 @@ export default function Schedules() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [substitutions, setSubstitutions] = useState<SubstitutionRequest[]>([]);
-  const [ministers, setMinisters] = useState<any[]>([]);
+  const [ministers, setMinisters] = useState<Minister[]>([]);
   const [adorationData, setAdorationData] = useState<{
     results: Array<{
       minister_id: string;
@@ -358,7 +368,7 @@ export default function Schedules() {
         const data = await response.json();
         // Carregar TODOS os ministros (não filtrar por ativo) para permitir edição completa
         // Ordenar: ativos primeiro, depois alfabeticamente
-        const sortedMinisters = data.sort((a: any, b: any) => {
+        const sortedMinisters = (data as Minister[]).sort((a, b) => {
           if (a.active && !b.active) return -1;
           if (!a.active && b.active) return 1;
           return a.name.localeCompare(b.name);
@@ -979,7 +989,7 @@ export default function Schedules() {
         });
       } else {
         // Exportar para Excel
-        const data: any[][] = [];
+        const data: (string | number | null)[][] = [];
 
         // Título
         data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}`]);
@@ -1216,10 +1226,10 @@ export default function Schedules() {
 
       // Recarregar escalas (incluindo substituições para atualizar legendas)
       await fetchSchedules();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao criar solicitação de substituição",
+        description: error instanceof Error ? error.message : "Erro ao criar solicitação de substituição",
         variant: "destructive",
       });
     } finally {
@@ -2454,10 +2464,10 @@ export default function Schedules() {
                                                   const error = await response.json();
                                                   throw new Error(error.message || "Erro ao salvar");
                                                 }
-                                              } catch (error: any) {
+                                              } catch (error) {
                                                 toast({
                                                   title: "Erro",
-                                                  description: error.message || "Erro ao salvar observações",
+                                                  description: error instanceof Error ? error.message : "Erro ao salvar observações",
                                                   variant: "destructive"
                                                 });
                                               } finally {

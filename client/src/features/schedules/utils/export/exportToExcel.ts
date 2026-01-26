@@ -19,7 +19,7 @@ export async function exportToExcel(
   const end = endOfMonth(currentMonth);
   const allDays = eachDayOfInterval({ start, end });
 
-  const data: any[][] = [];
+  const data: (string | number | null)[][] = [];
 
   // Título
   data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}`]);

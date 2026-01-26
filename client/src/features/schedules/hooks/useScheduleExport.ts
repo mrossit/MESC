@@ -27,11 +27,11 @@ export function useScheduleExport() {
         title: 'Sucesso',
         description: formatLabels[format]
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error exporting:', error);
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao exportar',
+        description: error instanceof Error ? error.message : 'Erro ao exportar',
         variant: 'destructive'
       });
     } finally {

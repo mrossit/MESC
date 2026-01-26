@@ -177,7 +177,7 @@ export function SelectiveScheduleExport({
   }, [filteredAssignments, selectedMasses]);
 
   const exportExcelHorizontal = () => {
-    const data: any[][] = [];
+    const data: (string | number | null)[][] = [];
 
     data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized}`]);
     data.push([]);
@@ -246,7 +246,7 @@ export function SelectiveScheduleExport({
   };
 
   const exportExcelVertical = () => {
-    const data: any[][] = [];
+    const data: (string | number | null)[][] = [];
 
     data.push([`ESCALA DE MISSAS - ${monthNameCapitalized.toUpperCase()}`]);
     data.push([]);

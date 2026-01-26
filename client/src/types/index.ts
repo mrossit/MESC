@@ -32,11 +32,16 @@ export interface Schedule {
 }
 
 // Tipos de questionário
+export interface QuestionnaireResponseItem {
+  questionId: string;
+  answer: string | string[] | boolean | Record<string, unknown>;
+}
+
 export interface QuestionnaireResponse {
   id: string;
   userId: string;
   questionnaireId: string;
-  responses: any[];
+  responses: QuestionnaireResponseItem[];
   submittedAt: string;
   createdAt?: string;
   updatedAt?: string;
@@ -76,13 +81,20 @@ export interface FormationProgress {
   score?: number;
 }
 
+// Tipos de erro da API
+export interface ApiError {
+  field?: string;
+  message: string;
+  code?: string;
+}
+
 // Tipos de API Response
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
   error?: string;
-  errors?: any[];
+  errors?: ApiError[];
 }
 
 // Tipos de filtros e paginação
@@ -102,6 +114,16 @@ export interface FilterParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+// Tipos de validação de formulário
+export interface FormValidation {
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  message?: string;
+}
+
 // Tipos de formulário
 export interface FormField {
   name: string;
@@ -110,5 +132,5 @@ export interface FormField {
   required?: boolean;
   placeholder?: string;
   options?: { value: string; label: string }[];
-  validation?: any;
+  validation?: FormValidation;
 }

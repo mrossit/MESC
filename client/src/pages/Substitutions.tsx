@@ -340,8 +340,13 @@ export default function Substitutions() {
   }, [substitutionRequests]);
 
   // Respond to substitution request mutation
+  interface SubstitutionResponse {
+    requestId: string;
+    accept: boolean;
+    message?: string;
+  }
   const respondToSubstitutionMutation = useMutation({
-    mutationFn: async ({ requestId, accept, message }: any) => {
+    mutationFn: async ({ requestId, accept, message }: SubstitutionResponse) => {
       const response = await fetch(`/api/substitutions/${requestId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1238,8 +1243,9 @@ export default function Substitutions() {
             <Button
               variant="outline"
               onClick={() => {
+                if (!selectedRequest?.request.id) return;
                 respondToSubstitutionMutation.mutate({
-                  requestId: selectedRequest?.request.id,
+                  requestId: selectedRequest.request.id,
                   accept: false,
                   message: responseMessage
                 });
@@ -1250,8 +1256,9 @@ export default function Substitutions() {
             </Button>
             <Button
               onClick={() => {
+                if (!selectedRequest?.request.id) return;
                 respondToSubstitutionMutation.mutate({
-                  requestId: selectedRequest?.request.id,
+                  requestId: selectedRequest.request.id,
                   accept: true,
                   message: responseMessage
                 });

@@ -2,8 +2,9 @@ import { ApiResponse } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-interface RequestOptions extends RequestInit {
-  params?: Record<string, any>;
+interface RequestOptions extends Omit<RequestInit, 'body'> {
+  params?: object;
+  body?: object;
 }
 
 class ApiService {
@@ -21,13 +22,14 @@ class ApiService {
     return localStorage.getItem('token');
   }
 
-  private buildURL(endpoint: string, params?: Record<string, any>): string {
+  private buildURL(endpoint: string, params?: object): string {
     const url = new URL(`${this.baseURL}${endpoint}`, window.location.origin);
 
     if (params) {
-      Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && params[key] !== null) {
-          url.searchParams.append(key, params[key].toString());
+      const paramsRecord = params as Record<string, unknown>;
+      Object.keys(paramsRecord).forEach(key => {
+        if (paramsRecord[key] !== undefined && paramsRecord[key] !== null) {
+          url.searchParams.append(key, String(paramsRecord[key]));
         }
       });
     }
@@ -96,15 +98,15 @@ class ApiService {
     return this.request<T>('GET', endpoint, options);
   }
 
-  post<T>(endpoint: string, data?: any, options?: RequestOptions) {
+  post<T>(endpoint: string, data?: object, options?: RequestOptions) {
     return this.request<T>('POST', endpoint, { ...options, body: data });
   }
 
-  put<T>(endpoint: string, data?: any, options?: RequestOptions) {
+  put<T>(endpoint: string, data?: object, options?: RequestOptions) {
     return this.request<T>('PUT', endpoint, { ...options, body: data });
   }
 
-  patch<T>(endpoint: string, data?: any, options?: RequestOptions) {
+  patch<T>(endpoint: string, data?: object, options?: RequestOptions) {
     return this.request<T>('PATCH', endpoint, { ...options, body: data });
   }
 

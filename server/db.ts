@@ -1,10 +1,13 @@
 import * as schema from "@shared/schema";
+import type { Pool } from '@neondatabase/serverless';
+import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-// Using any for dynamic database type (PostgreSQL via Neon or SQLite via better-sqlite3)
-// The actual type is determined at runtime based on DATABASE_URL environment variable
-let db: any;
-let pool: any;
+// Database type - declared as NeonDatabase for consistent API typing across consumers.
+// At runtime, may be either PostgreSQL (Neon) or SQLite (better-sqlite3) based on
+// DATABASE_URL environment variable. Both backends share compatible Drizzle query APIs.
+// Using type assertion at assignment to handle the runtime-determined type.
+let db: NeonDatabase<typeof schema>;
+let pool: Pool | undefined;
 
 // Melhor detecção do ambiente
 const isProduction = process.env.NODE_ENV === 'production' ||
@@ -45,7 +48,8 @@ if (process.env.DATABASE_URL) {
   const { drizzle } = await import('drizzle-orm/better-sqlite3');
 
   const sqlite = new (Database.default)('local.db');
-  db = drizzle(sqlite, { schema });
+  // Cast to NeonDatabase - SQLite shares compatible Drizzle query API at runtime
+  db = drizzle(sqlite, { schema }) as unknown as NeonDatabase<typeof schema>;
 } else {
   // Fallback para ambientes sem DATABASE_URL
   console.warn('⚠️ No DATABASE_URL found - using SQLite fallback');
@@ -54,7 +58,8 @@ if (process.env.DATABASE_URL) {
   const { drizzle } = await import('drizzle-orm/better-sqlite3');
 
   const sqlite = new (Database.default)('local.db');
-  db = drizzle(sqlite, { schema });
+  // Cast to NeonDatabase - SQLite shares compatible Drizzle query API at runtime
+  db = drizzle(sqlite, { schema }) as unknown as NeonDatabase<typeof schema>;
 }
 
 export { db, pool };

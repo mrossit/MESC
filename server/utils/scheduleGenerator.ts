@@ -6,6 +6,15 @@ import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
 import { isAvailableForMass } from './ministerAvailabilityChecker.js';
 
+// Question types from questionnaires
+interface QuestionnaireQuestionItem {
+  id: string;
+  question: string;
+  category?: string;
+  type?: string;
+  options?: unknown[];
+}
+
 export interface Minister {
   id: string | null; // null = VACANTE
   name: string;
@@ -35,6 +44,10 @@ export interface Minister {
   questionnaireResponse?: {
     responses: unknown;
   };
+  // Incomplete schedule tracking
+  scheduleIncomplete?: boolean;
+  requiredCount?: number;
+  actualCount?: number;
 }
 
 export interface AvailabilityData {
@@ -45,6 +58,7 @@ export interface AvailabilityData {
   canSubstitute: boolean;
   dailyMassAvailability: string[];
   weekdayMasses?: string[];
+  specialEvents?: Record<string, string | boolean | number>;
 }
 
 export interface MassTime {
@@ -380,14 +394,14 @@ export class ScheduleGenerator {
       console.log(`Failed After: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
       console.log(`\n🔍 ERROR DETAILS:`);
       console.log(`  Type: ${typeof error}`);
-      console.log(`  Name: ${(error as any)?.name || 'Unknown'}`);
-      console.log(`  Message: ${(error as any)?.message || 'No message'}`);
+      console.log(`  Name: ${error instanceof Error ? error.name : 'Unknown'}`);
+      console.log(`  Message: ${error instanceof Error ? error.message : 'No message'}`);
       console.log(`\n📊 DATA STATE WHEN FAILED:`);
       console.log(`  Ministers loaded: ${this.ministers?.length || 0}`);
       console.log(`  Questionnaire responses: ${this.availabilityData?.size || 0}`);
       console.log(`  Mass times config: ${this.massTimes?.length || 0}`);
       console.log(`\n📚 STACK TRACE:`);
-      console.log((error as any)?.stack || 'No stack trace available');
+      console.log(error instanceof Error ? error.stack : 'No stack trace available');
       console.log(`${'!'.repeat(60)}\n`);
 
       console.timeEnd('[PERF] Total generation time');
@@ -1567,7 +1581,7 @@ export class ScheduleGenerator {
       }
 
       // Filtrar perguntas de categoria "custom" e "special_event"
-      const customQuestions = (questions as any[]).filter(
+      const customQuestions = (questions as QuestionnaireQuestionItem[]).filter(
         q => q.category === 'custom' || q.category === 'special_event'
       );
 
@@ -2298,7 +2312,7 @@ export class ScheduleGenerator {
     }
 
     // 🔥 CHECK FOR CUSTOM EVENTS: If massType starts with "custom_" or is a known special event ID, check directly
-    const specialEvents = (availability as any).specialEvents;
+    const specialEvents = availability.specialEvents;
 
     // If this is a custom event, check directly in specialEvents
     if (massType.startsWith('custom_') || massType.startsWith('healing_liberation') ||
@@ -2747,9 +2761,9 @@ export class ScheduleGenerator {
 
         // Mark as incomplete
         selected.forEach(m => {
-          (m as any).scheduleIncomplete = true;
-          (m as any).requiredCount = targetCount;
-          (m as any).actualCount = selected.length;
+          m.scheduleIncomplete = true;
+          m.requiredCount = targetCount;
+          m.actualCount = selected.length;
         });
       }
     } else {

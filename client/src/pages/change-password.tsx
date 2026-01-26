@@ -50,7 +50,7 @@ export default function ChangePassword() {
       // Mostrar tela de sucesso
       setShowSuccess(true);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Erro ao alterar senha",
         description: error.message || "Ocorreu um erro ao alterar a senha",

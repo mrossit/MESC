@@ -51,6 +51,31 @@ interface Schedule {
   status: 'draft' | 'published' | 'completed';
 }
 
+// Raw assignment data from API
+interface ApiAssignment {
+  id: string;
+  scheduleId: string;
+  ministerId: string;
+  ministerName?: string;
+  user?: { name?: string; email?: string; photoUrl?: string };
+  date: string;
+  massTime?: string;
+  time?: string;
+  position?: number;
+  confirmed?: boolean;
+}
+
+// Raw user data from API
+interface ApiUser {
+  id: string;
+  name: string;
+  email: string;
+  photoUrl?: string;
+  preferredPosition?: number;
+  role: string;
+  status: string;
+}
+
 export default function ScheduleEditorDnD() {
   const [, setLocation] = useLocation();
 
@@ -100,8 +125,8 @@ export default function ScheduleEditorDnD() {
           setSchedule(scheduleData.schedules[0]);
 
           // Converter assignments para formato compatível
-          const formattedAssignments: ScheduleAssignment[] = scheduleData.assignments.map(
-            (a: any) => ({
+          const formattedAssignments: ScheduleAssignment[] = (scheduleData.assignments as ApiAssignment[]).map(
+            (a) => ({
               id: a.id,
               scheduleId: a.scheduleId,
               ministerId: a.ministerId,
@@ -109,7 +134,7 @@ export default function ScheduleEditorDnD() {
               ministerEmail: a.user?.email,
               ministerPhoto: a.user?.photoUrl,
               date: a.date,
-              massTime: a.massTime || a.time,
+              massTime: a.massTime || a.time || '',
               position: a.position || 0,
               confirmed: a.confirmed || false,
             })
@@ -123,17 +148,17 @@ export default function ScheduleEditorDnD() {
       if (ministersResponse.ok) {
         const response = await ministersResponse.json();
         // Handle paginated response format { data: [], total, hasMore }
-        const ministersData = response.data ?? response;
+        const ministersData: ApiUser[] = response.data ?? response;
         const formattedMinisters: Minister[] = ministersData
-          .filter((u: any) => u.role === 'ministro' && u.status === 'active')
-          .map((u: any) => ({
+          .filter((u) => u.role === 'ministro' && u.status === 'active')
+          .map((u) => ({
             id: u.id,
             name: u.name,
             email: u.email,
             photoUrl: u.photoUrl,
             preferredPosition: u.preferredPosition,
           }))
-          .sort((a: Minister, b: Minister) => a.name.localeCompare(b.name));
+          .sort((a, b) => a.name.localeCompare(b.name));
 
         setAllMinisters(formattedMinisters);
       }

@@ -477,7 +477,7 @@ function LessonContent({
       queryClientInstance.invalidateQueries({ queryKey: ['/api/formation/overview'] });
       queryClientInstance.invalidateQueries({ queryKey: ['/api/formation', trackId, moduleId, lessonNumber] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       const message = err?.message || "Não foi possível registrar o progresso. Tente novamente.";
       toast({
         title: "Erro",

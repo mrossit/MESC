@@ -59,7 +59,7 @@ export default function Login() {
       setShowForgotPassword(false);
       setForgotPasswordEmail("");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Erro",
         description: error.message || "Erro ao processar solicitação",
@@ -92,7 +92,7 @@ export default function Login() {
         navigate("/dashboard");
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       // Verifica se é erro de conta pendente
       if (error.message === "Account pending approval") {
         setPendingUserEmail(credentials.email);

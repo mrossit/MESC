@@ -130,7 +130,7 @@ router.get('/templates/:year/:month', requireAuth, requireRole(['gestor', 'coord
 
     if (template) {
       // Parse questions from JSON string and add edit flags
-      const parsedQuestions = template.questions as any[];
+      const parsedQuestions = template.questions as QuestionnaireQuestion[];
       const questionsWithEditFlag = parsedQuestions.map((q: QuestionnaireQuestion) => ({
         ...q,
         editable: true, // Permitir edição de todas as perguntas
@@ -171,7 +171,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
 
     if (existingTemplate) {
       // Retornar template existente
-      const questionsWithEditFlag = (existingTemplate.questions as any[]).map((q: QuestionnaireQuestion) => ({
+      const questionsWithEditFlag = (existingTemplate.questions as QuestionnaireQuestion[]).map((q: QuestionnaireQuestion) => ({
         ...q,
         editable: true,
         modified: q.modified || false
@@ -340,7 +340,7 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       modified: false
     };
 
-    const updatedQuestions = [...(template.questions as any[]), newQuestion];
+    const updatedQuestions = [...(template.questions as QuestionnaireQuestion[]), newQuestion];
 
     const [updated] = await db
       .update(questionnaires)
@@ -388,7 +388,7 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
       return res.status(404).json({ error: 'Template not found' });
     }
 
-    const updatedQuestions = (template.questions as any[]).map(q => {
+    const updatedQuestions = (template.questions as QuestionnaireQuestion[]).map(q => {
       if (q.id === questionId) {
         // Permitir edição de qualquer pergunta e marcar como modificada
         return { 
@@ -440,7 +440,7 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
     }
 
     // Encontrar a pergunta que será deletada para registro
-    const questionToDelete = (template.questions as any[]).find(q => q.id === questionId);
+    const questionToDelete = (template.questions as QuestionnaireQuestion[]).find(q => q.id === questionId);
 
     if (!questionToDelete) {
       return res.status(404).json({ error: 'Question not found' });
@@ -448,7 +448,7 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
 
     // Permitir deletar qualquer pergunta (customizada ou padrão)
     // Coordenadores têm controle total sobre o questionário
-    const updatedQuestions = (template.questions as any[]).filter(q => q.id !== questionId);
+    const updatedQuestions = (template.questions as QuestionnaireQuestion[]).filter(q => q.id !== questionId);
 
     console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question}" (categoria: ${questionToDelete.category}) do questionário ${month}/${year}`);
 

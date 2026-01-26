@@ -24,6 +24,28 @@ import { ScheduleCard } from '@/components/schedule-generation/ScheduleCard';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import type { TestResult, EditingSchedule } from '@/types/schedule';
 
+// Interface for outliers in test results
+interface Outlier {
+  ministerName: string;
+  count: number;
+  reason: 'too_many_assignments' | 'too_few_assignments';
+}
+
+// Interface for test schedule sample
+interface TestScheduleItem {
+  date: string;
+  time: string;
+  ministersAssigned: number;
+  ministersRequired: number;
+  ministers: Array<{ id: string; name: string }>;
+}
+
+// Interface for updated minister data from API
+interface UpdatedMinister {
+  ministerId: string;
+  ministerName: string;
+}
+
 export default function AutoScheduleGeneration() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -90,10 +112,10 @@ export default function AutoScheduleGeneration() {
       // Invalidar cache para forçar recarga dos dados
       queryClient.invalidateQueries({ queryKey: ['/api/questionnaires'] });
 
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro ao atualizar respostas",
-        description: error.message || "Ocorreu um erro ao processar as respostas.",
+        description: error instanceof Error ? error.message : "Ocorreu um erro ao processar as respostas.",
         variant: "destructive"
       });
     } finally {
@@ -127,10 +149,10 @@ export default function AutoScheduleGeneration() {
         throw new Error(result.message || 'Erro ao gerar escala de teste');
       }
 
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro ao gerar escala de teste",
-        description: error.message || "Ocorreu um erro inesperado.",
+        description: error instanceof Error ? error.message : "Ocorreu um erro inesperado.",
         variant: "destructive"
       });
     } finally {
@@ -382,7 +404,7 @@ export default function AutoScheduleGeneration() {
                   <AlertDescription>
                     {testResults.statistics.outliers.length} ministros com distribuição irregular:
                     <ul className="mt-2 text-xs">
-                      {testResults.statistics.outliers.slice(0, 5).map((outlier: any, idx: number) => (
+                      {(testResults.statistics.outliers as Outlier[]).slice(0, 5).map((outlier, idx) => (
                         <li key={idx}>
                           • {outlier.ministerName}: {outlier.count} atribuições ({outlier.reason === 'too_many_assignments' ? 'muitas' : 'poucas'})
                         </li>
@@ -399,7 +421,7 @@ export default function AutoScheduleGeneration() {
               <div className="space-y-2">
                 <h4 className="font-semibold text-sm">Amostra de Escalas (primeiras 5)</h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {testResults.schedules.slice(0, 5).map((schedule: any, idx: number) => (
+                  {(testResults.schedules as TestScheduleItem[]).slice(0, 5).map((schedule, idx) => (
                     <div key={idx} className="border p-2 rounded text-sm">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-medium">{schedule.date} - {schedule.time}</span>
@@ -408,7 +430,7 @@ export default function AutoScheduleGeneration() {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {schedule.ministers.slice(0, 3).map((m: any) => m.name).join(', ')}
+                        {schedule.ministers.slice(0, 3).map((m) => m.name).join(', ')}
                         {schedule.ministers.length > 3 && ` +${schedule.ministers.length - 3} mais`}
                       </div>
                     </div>
@@ -475,7 +497,7 @@ export default function AutoScheduleGeneration() {
                       s.date === editingSchedule.date && s.time === editingSchedule.time
                         ? {
                             ...s,
-                            ministers: updatedSchedule.ministers.map((m: any) => ({
+                            ministers: (updatedSchedule.ministers as UpdatedMinister[]).map((m) => ({
                               id: m.ministerId,
                               name: m.ministerName,
                               role: '',

@@ -93,9 +93,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false, // Desabilita refetch ao focar janela
       staleTime: 5 * 60 * 1000, // 5 minutos - dados frescos
       gcTime: 10 * 60 * 1000, // 10 minutos - garbage collection mais agressiva
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error) => {
         // Don't retry on 401 (unauthorized)
-        if (error?.message?.startsWith("401")) {
+        if (error instanceof Error && error.message?.startsWith("401")) {
           return false;
         }
         // Retry up to 2 times for other errors

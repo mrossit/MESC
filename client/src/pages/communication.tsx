@@ -72,12 +72,21 @@ export default function Communication() {
   });
 
   // Send notification mutation
+  interface NotificationPayload {
+    title: string;
+    message: string;
+    type: string;
+    recipientRole?: string;
+  }
+  interface NotificationResponse {
+    recipientCount?: number;
+  }
   const sendNotificationMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: NotificationPayload) => {
       const response = await apiRequest("POST", "/api/notifications", data);
-      return await response.json();
+      return await response.json() as NotificationResponse;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: NotificationResponse) => {
       const count = data.recipientCount || 0;
       toast({
         title: "Comunicado enviado com sucesso",
@@ -95,7 +104,7 @@ export default function Communication() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Erro ao enviar comunicado",
         description: error.message || "Tente novamente mais tarde",
@@ -336,7 +345,7 @@ export default function Communication() {
                   {/* Recipient Selection */}
                   <div className="space-y-3">
                     <Label>Destinatários</Label>
-                    <RadioGroup value={recipientRole} onValueChange={(value: any) => setRecipientRole(value)}>
+                    <RadioGroup value={recipientRole} onValueChange={(value) => setRecipientRole(value as "all" | "ministro" | "coordenador" | "gestor")}>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="ministro" id="ministro" />
                         <Label htmlFor="ministro" className="font-normal cursor-pointer">
@@ -372,7 +381,7 @@ export default function Communication() {
                   {/* Message Type */}
                   <div className="space-y-3">
                     <Label>Tipo de Mensagem</Label>
-                    <RadioGroup value={type} onValueChange={(value: any) => setType(value)}>
+                    <RadioGroup value={type} onValueChange={(value) => setType(value as "info" | "warning" | "success" | "error")}>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="info" id="info" />

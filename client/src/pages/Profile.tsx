@@ -55,6 +55,14 @@ type FamilyPreference = {
   familyName?: string;
 };
 
+type AvailableUser = {
+  id: string;
+  name: string;
+  email?: string;
+  role?: string;
+  photoUrl?: string;
+};
+
 const relationshipTypes = [
   { value: 'spouse', label: 'Cônjuge' },
   { value: 'father', label: 'Pai' },
@@ -75,7 +83,7 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [originalProfile, setOriginalProfile] = useState<UserProfile | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,7 +118,7 @@ export default function Profile() {
   });
   
   // Buscar usuários disponíveis para adicionar como familiares
-  const { data: usersData } = useQuery({
+  const { data: usersData } = useQuery<AvailableUser[]>({
     queryKey: ['/api/users/active'],
     queryFn: async () => {
       const res = await fetch('/api/users/active', { credentials: 'include' });
@@ -173,7 +181,7 @@ export default function Profile() {
     if (usersData) {
       // Filtrar usuários que já são familiares
       const familyIds = familyMembers.map(f => f.user?.id).filter(Boolean);
-      const filtered = usersData.filter((u: any) => 
+      const filtered = usersData.filter((u) =>
         u.id !== profile?.id && !familyIds.includes(u.id)
       );
       setAvailableUsers(filtered);
@@ -893,7 +901,7 @@ export default function Profile() {
                               <SelectValue placeholder="Selecione uma pessoa..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableUsers.map((user: any) => (
+                              {availableUsers.map((user) => (
                                 <SelectItem key={user.id} value={user.id}>
                                   {user.name}
                                 </SelectItem>
