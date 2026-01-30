@@ -27,6 +27,7 @@ Thumbs.db
 .env.test
 .env.production
 .env.*.local
+.env.databases
 
 # Bancos de dados (podem conter dados pessoais - LGPD)
 *.db
