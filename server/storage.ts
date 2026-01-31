@@ -680,7 +680,7 @@ export class DatabaseStorage implements IStorage {
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(eq(schedules.date, dateOnly))
-      .orderBy(schedules.time, schedules.position);
+      .orderBy(schedules.time, schedules.position, schedules.id);
 
     // Mapear para o formato esperado pelo frontend
     type AssignmentRow = typeof assignments[number];
@@ -730,7 +730,7 @@ export class DatabaseStorage implements IStorage {
         gte(schedules.date, startDate),
         lte(schedules.date, endDate)
       ))
-      .orderBy(schedules.date, schedules.time, schedules.position);
+      .orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
 
     // Mapear para o formato esperado pelo frontend
     type RawAssignmentRow = typeof rawAssignments[number];
