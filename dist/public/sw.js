@@ -1,7 +1,7 @@
 // AUTO-INJECTED: These values are automatically updated during build by scripts/inject-version.js
 const VERSION = '5.4.2'; // Injected from package.json
-const BUILD_TIME = '2026-01-24T02:33:18.306Z'; // Injected at build time
-const BUILD_TIMESTAMP = 1769221998308; // Injected at build time (used for cache busting)
+const BUILD_TIME = '2026-01-30T19:17:58.996Z'; // Injected at build time
+const BUILD_TIMESTAMP = 1769800678996; // Injected at build time (used for cache busting)
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
@@ -9,8 +9,12 @@ const urlsToCache = [
   '/manifest.json',
   '/images/icon-192.png',
   '/images/icon-512.png',
-  '/version.json'
+  '/version.json',
+  '/offline.html'
 ];
+
+// Offline page for navigation requests
+const OFFLINE_PAGE = '/offline.html';
 
 // Build info for debugging
 const BUILD_INFO = {
@@ -125,6 +129,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Handle navigation requests (HTML pages) - show offline page if network fails
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .catch(() => {
+          console.log('[SW] Navigation failed, serving offline page');
+          return caches.match(OFFLINE_PAGE);
+        })
+    );
+    return;
+  }
+
   // Cache-first for images and other static resources
   event.respondWith(
     caches.match(request)
@@ -132,19 +148,27 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(request).then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+        return fetch(request)
+          .then((response) => {
+            // Don't cache non-successful responses
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+
             return response;
-          }
-
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
+          })
+          .catch(() => {
+            // For images, return a placeholder or nothing
+            if (request.destination === 'image') {
+              return new Response('', { status: 404, statusText: 'Not Found' });
+            }
+            return new Response('', { status: 503, statusText: 'Network Unavailable' });
           });
-
-          return response;
-        });
       })
   );
 });

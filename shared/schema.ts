@@ -46,6 +46,29 @@ export const liturgicalColorEnum = pgEnum('liturgical_color', ['white', 'red', '
 export const celebrationRankEnum = pgEnum('celebration_rank', ['SOLEMNITY', 'FEAST', 'MEMORIAL', 'OPTIONAL_MEMORIAL', 'FERIAL']);
 export const confirmationStatusEnum = pgEnum('confirmation_status', ['pending', 'confirmed', 'declined', 'no_response', 'no_show']);
 
+// Mass configuration enums
+export const recurrenceTypeEnum = pgEnum('recurrence_type', ['weekly', 'monthly', 'yearly', 'one_time']);
+export const massTypeEnum = pgEnum('mass_type', [
+  'missa_diaria',
+  'missa_dominical',
+  'missa_cura_libertacao',
+  'missa_sagrado_coracao',
+  'missa_imaculado_coracao',
+  'missa_sao_judas',
+  'adoracao',
+  'novena',
+  'festa_padroeiro',
+  'finados',
+  'evento_especial'
+]);
+export const learnedPatternTypeEnum = pgEnum('learned_pattern_type', [
+  'minister_removal',
+  'minister_addition',
+  'position_preference',
+  'time_preference',
+  'mass_type_preference'
+]);
+
 // User storage table for Replit Auth + MESC data
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -607,7 +630,7 @@ export const materialAccessLogs = pgTable('material_access_logs', {
   index('idx_material_access_user').on(table.userId)
 ]);
 
-// Mass times configuration
+// Mass times configuration (legacy - kept for compatibility)
 export const massTimesConfig = pgTable('mass_times_config', {
   id: uuid('id').primaryKey().defaultRandom(),
   dayOfWeek: integer('day_of_week').notNull(),
@@ -620,6 +643,152 @@ export const massTimesConfig = pgTable('mass_times_config', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
+
+// ============================================
+// DYNAMIC MASS CONFIGURATION SYSTEM
+// ============================================
+
+// Mass Configurations - Recurring mass settings (replaces hardcoded rules)
+export const massConfigurations = pgTable('mass_configurations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+
+  // Recurrence settings
+  recurrenceType: recurrenceTypeEnum('recurrence_type').notNull(),
+  dayOfWeek: integer('day_of_week'), // 0=Sunday, 1=Monday, ..., 6=Saturday (for weekly)
+  dayOfMonth: integer('day_of_month'), // 1-31 (for monthly by day)
+  month: integer('month'), // 1-12 (for yearly)
+  occurrenceInMonth: integer('occurrence_in_month'), // 1=first, 2=second, -1=last (for "first Thursday of month")
+
+  // Time settings
+  time: time('time').notNull(),
+  durationMinutes: integer('duration_minutes').default(60),
+
+  // Minister requirements
+  minMinisters: integer('min_ministers').notNull().default(3),
+  maxMinisters: integer('max_ministers').notNull().default(6),
+
+  // Classification
+  massType: massTypeEnum('mass_type').notNull(),
+  location: varchar('location', { length: 255 }),
+
+  // Validity and exceptions
+  excludedDates: jsonb('excluded_dates').$type<string[]>().default([]), // ISO date strings
+  validFrom: date('valid_from'),
+  validUntil: date('valid_until'),
+
+  // Priority for conflict resolution (higher = takes precedence)
+  priority: integer('priority').default(0),
+
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_mass_configurations_type').on(table.massType),
+  index('idx_mass_configurations_recurrence').on(table.recurrenceType),
+  index('idx_mass_configurations_active').on(table.isActive),
+  index('idx_mass_configurations_day_of_week').on(table.dayOfWeek)
+]);
+
+// Special Events - Non-recurring events (novenas, feasts, etc.)
+export const specialEvents = pgTable('special_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+
+  // Event timing
+  eventDate: date('event_date').notNull(),
+  eventTime: time('event_time').notNull(),
+  durationMinutes: integer('duration_minutes').default(60),
+
+  // Minister requirements
+  minMinisters: integer('min_ministers').notNull().default(3),
+  maxMinisters: integer('max_ministers').notNull().default(6),
+
+  // Classification
+  massType: massTypeEnum('mass_type').notNull(),
+  location: varchar('location', { length: 255 }),
+
+  // Priority (special events generally have higher priority than regular masses)
+  priority: integer('priority').default(100),
+
+  // Which regular masses this event suppresses (if any)
+  suppressesMassTypes: jsonb('suppresses_mass_types').$type<string[]>().default([]),
+
+  isActive: boolean('is_active').default(true),
+  createdBy: varchar('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_special_events_date').on(table.eventDate),
+  index('idx_special_events_type').on(table.massType),
+  index('idx_special_events_active').on(table.isActive)
+]);
+
+// Question-Mass Mappings - Explicit mapping from custom questions to masses
+// This replaces the fragile regex parsing of question text
+export const questionMassMappings = pgTable('question_mass_mappings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  questionnaireId: uuid('questionnaire_id').notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  questionId: varchar('question_id', { length: 100 }).notNull(), // The question's ID within the questionnaire
+
+  // Target: either a configuration, special event, or explicit date/time
+  massConfigurationId: uuid('mass_configuration_id').references(() => massConfigurations.id, { onDelete: 'set null' }),
+  specialEventId: uuid('special_event_id').references(() => specialEvents.id, { onDelete: 'set null' }),
+  targetDate: date('target_date'), // For explicit date mapping
+  targetTime: time('target_time'), // For explicit time mapping
+
+  // Override minister counts (optional - inherits from config/event if not specified)
+  minMinisters: integer('min_ministers'),
+  maxMinisters: integer('max_ministers'),
+
+  // Metadata
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_question_mass_mappings_questionnaire').on(table.questionnaireId),
+  index('idx_question_mass_mappings_config').on(table.massConfigurationId),
+  index('idx_question_mass_mappings_event').on(table.specialEventId),
+  unique('unique_question_mapping').on(table.questionnaireId, table.questionId)
+]);
+
+// Learned Patterns - Patterns learned from coordinator edits to improve future generations
+export const learnedPatterns = pgTable('learned_patterns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Pattern classification
+  patternType: learnedPatternTypeEnum('pattern_type').notNull(),
+
+  // Context of the pattern
+  ministerId: varchar('minister_id').references(() => users.id, { onDelete: 'cascade' }),
+  massType: massTypeEnum('mass_type'),
+  dayOfWeek: integer('day_of_week'), // 0-6
+  timeSlot: time('time_slot'),
+
+  // Pattern strength
+  occurrenceCount: integer('occurrence_count').default(1),
+  confidence: integer('confidence').default(50), // 0-100 percentage
+
+  // Weight adjustment to apply (-100 to +100, representing percentage adjustment)
+  weightAdjustment: integer('weight_adjustment').default(0),
+
+  // Tracking
+  lastOccurrence: timestamp('last_occurrence').defaultNow(),
+  notes: text('notes'),
+
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_learned_patterns_minister').on(table.ministerId),
+  index('idx_learned_patterns_type').on(table.patternType),
+  index('idx_learned_patterns_mass_type').on(table.massType),
+  index('idx_learned_patterns_active').on(table.isActive),
+  // Composite index for pattern lookup during schedule generation
+  index('idx_learned_patterns_lookup').on(table.ministerId, table.massType, table.dayOfWeek, table.timeSlot)
+]);
 
 // Password reset requests
 export const passwordResetRequests = pgTable('password_reset_requests', {
@@ -845,6 +1014,27 @@ export const levelDefinitions = pgTable('level_definitions', {
 }, (table) => [
   index('idx_level_definitions_level').on(table.level),
   index('idx_level_definitions_points').on(table.minPoints)
+]);
+
+// Schedule Generations - stores each schedule generation for comparison and learning
+export const scheduleGenerationStatusEnum = pgEnum('schedule_generation_status', ['draft', 'published']);
+
+export const scheduleGenerations = pgTable('schedule_generations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  month: integer('month').notNull(),
+  year: integer('year').notNull(),
+  status: scheduleGenerationStatusEnum('status').notNull().default('draft'),
+  originalSchedule: jsonb('original_schedule').notNull(), // Schedule generated by algorithm (full JSON)
+  finalSchedule: jsonb('final_schedule'), // Schedule after edits (filled on publish)
+  differences: jsonb('differences'), // Calculated differences between original and final
+  generationMetrics: jsonb('generation_metrics'), // Generation metrics (confidence, etc)
+  createdAt: timestamp('created_at').defaultNow(),
+  publishedAt: timestamp('published_at'),
+  createdById: varchar('created_by_id').references(() => users.id, { onDelete: 'set null' })
+}, (table) => [
+  index('idx_schedule_generations_month_year').on(table.month, table.year),
+  index('idx_schedule_generations_status').on(table.status),
+  index('idx_schedule_generations_created_by').on(table.createdById)
 ]);
 
 // Liturgical Calendar Tables
@@ -1181,6 +1371,48 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   })
 }));
 
+export const scheduleGenerationsRelations = relations(scheduleGenerations, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [scheduleGenerations.createdById],
+    references: [users.id]
+  })
+}));
+
+// Mass Configuration System Relations
+export const massConfigurationsRelations = relations(massConfigurations, ({ many }) => ({
+  questionMappings: many(questionMassMappings)
+}));
+
+export const specialEventsRelations = relations(specialEvents, ({ one, many }) => ({
+  createdByUser: one(users, {
+    fields: [specialEvents.createdBy],
+    references: [users.id]
+  }),
+  questionMappings: many(questionMassMappings)
+}));
+
+export const questionMassMappingsRelations = relations(questionMassMappings, ({ one }) => ({
+  questionnaire: one(questionnaires, {
+    fields: [questionMassMappings.questionnaireId],
+    references: [questionnaires.id]
+  }),
+  massConfiguration: one(massConfigurations, {
+    fields: [questionMassMappings.massConfigurationId],
+    references: [massConfigurations.id]
+  }),
+  specialEvent: one(specialEvents, {
+    fields: [questionMassMappings.specialEventId],
+    references: [specialEvents.id]
+  })
+}));
+
+export const learnedPatternsRelations = relations(learnedPatterns, ({ one }) => ({
+  minister: one(users, {
+    fields: [learnedPatterns.ministerId],
+    references: [users.id]
+  })
+}));
+
 // Schema exports for forms
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -1300,6 +1532,69 @@ export type AdorationDraw = typeof adorationDraws.$inferSelect;
 export type InsertAdorationDraw = z.infer<typeof insertAdorationDrawSchema>;
 export type AdorationDrawResult = typeof adorationDrawResults.$inferSelect;
 
+// Mass Configuration schemas
+export const insertMassConfigurationSchema = createInsertSchema(massConfigurations).pick({
+  name: true,
+  description: true,
+  recurrenceType: true,
+  dayOfWeek: true,
+  dayOfMonth: true,
+  month: true,
+  occurrenceInMonth: true,
+  time: true,
+  durationMinutes: true,
+  minMinisters: true,
+  maxMinisters: true,
+  massType: true,
+  location: true,
+  excludedDates: true,
+  validFrom: true,
+  validUntil: true,
+  priority: true,
+  isActive: true
+});
+
+export const insertSpecialEventSchema = createInsertSchema(specialEvents).pick({
+  name: true,
+  description: true,
+  eventDate: true,
+  eventTime: true,
+  durationMinutes: true,
+  minMinisters: true,
+  maxMinisters: true,
+  massType: true,
+  location: true,
+  priority: true,
+  suppressesMassTypes: true,
+  isActive: true,
+  createdBy: true
+});
+
+export const insertQuestionMassMappingSchema = createInsertSchema(questionMassMappings).pick({
+  questionnaireId: true,
+  questionId: true,
+  massConfigurationId: true,
+  specialEventId: true,
+  targetDate: true,
+  targetTime: true,
+  minMinisters: true,
+  maxMinisters: true,
+  notes: true
+});
+
+export const insertLearnedPatternSchema = createInsertSchema(learnedPatterns).pick({
+  patternType: true,
+  ministerId: true,
+  massType: true,
+  dayOfWeek: true,
+  timeSlot: true,
+  occurrenceCount: true,
+  confidence: true,
+  weightAdjustment: true,
+  notes: true,
+  isActive: true
+});
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1346,6 +1641,10 @@ export type InsertMinisterCheckIn = typeof ministerCheckIns.$inferInsert;
 export type ScheduleConfirmation = typeof scheduleConfirmations.$inferSelect;
 export type InsertScheduleConfirmation = typeof scheduleConfirmations.$inferInsert;
 
+// Schedule Generation types
+export type ScheduleGeneration = typeof scheduleGenerations.$inferSelect;
+export type InsertScheduleGeneration = typeof scheduleGenerations.$inferInsert;
+
 // Gamification types
 export type Badge = typeof badges.$inferSelect;
 export type InsertBadge = typeof badges.$inferInsert;
@@ -1359,3 +1658,13 @@ export type LeaderboardEntry = typeof leaderboardCache.$inferSelect;
 export type InsertLeaderboardEntry = typeof leaderboardCache.$inferInsert;
 export type LevelDefinition = typeof levelDefinitions.$inferSelect;
 export type InsertLevelDefinition = typeof levelDefinitions.$inferInsert;
+
+// Mass Configuration types
+export type MassConfiguration = typeof massConfigurations.$inferSelect;
+export type InsertMassConfiguration = z.infer<typeof insertMassConfigurationSchema>;
+export type SpecialEvent = typeof specialEvents.$inferSelect;
+export type InsertSpecialEvent = z.infer<typeof insertSpecialEventSchema>;
+export type QuestionMassMapping = typeof questionMassMappings.$inferSelect;
+export type InsertQuestionMassMapping = z.infer<typeof insertQuestionMassMappingSchema>;
+export type LearnedPattern = typeof learnedPatterns.$inferSelect;
+export type InsertLearnedPattern = z.infer<typeof insertLearnedPatternSchema>;

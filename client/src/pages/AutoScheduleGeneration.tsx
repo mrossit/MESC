@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,13 +6,27 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   AlertTriangle,
   Info,
   Shuffle,
   Save,
   Eye,
   Zap,
-  Calendar
+  Calendar,
+  Send,
+  CheckCircle2,
+  Clock,
+  FileEdit
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +36,7 @@ import { PeriodSelector, MONTHS } from '@/components/schedule-generation/PeriodS
 import { GenerationMetrics } from '@/components/schedule-generation/GenerationMetrics';
 import { ScheduleCard } from '@/components/schedule-generation/ScheduleCard';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
+import { usePageLeaveWarning } from '@/hooks/usePageLeaveWarning';
 import type { TestResult, EditingSchedule } from '@/types/schedule';
 
 // Interface for outliers in test results
@@ -53,30 +68,84 @@ export default function AutoScheduleGeneration() {
   const [editingSchedule, setEditingSchedule] = useState<EditingSchedule | null>(null);
   const [testResults, setTestResults] = useState<TestResult | null>(null);
   const [showTestResults, setShowTestResults] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'generate' | 'preview'; preview: boolean } | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { generatedData, setGeneratedData, hasUnsavedChanges, setHasUnsavedChanges, generateMutation, saveMutation } = useScheduleGeneration();
+  const {
+    generatedData,
+    setGeneratedData,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    generateMutation,
+    saveMutation,
+    publishMutation,
+    generationId,
+    generationStatus,
+    loadExistingGeneration,
+    handleExistingGenerationLoaded,
+    publishGeneration,
+    isLoadingExisting,
+    existingGenerationData
+  } = useScheduleGeneration();
+
+  // Warn before leaving if there are unsaved changes
+  usePageLeaveWarning(hasUnsavedChanges);
+
+  // Load existing generation when month/year changes
+  useEffect(() => {
+    loadExistingGeneration(selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, loadExistingGeneration]);
+
+  // Handle loaded data
+  useEffect(() => {
+    if (existingGenerationData !== undefined) {
+      handleExistingGenerationLoaded({ success: true, data: existingGenerationData });
+    }
+  }, [existingGenerationData, handleExistingGenerationLoaded]);
+
+  const handleGenerateRequest = (preview: boolean = false) => {
+    // If there's already a generation (draft or published), show confirmation
+    if (generatedData && generationId) {
+      setPendingAction({ type: preview ? 'preview' : 'generate', preview });
+      setShowRegenerateConfirm(true);
+      return;
+    }
+
+    handleGenerate(preview);
+  };
 
   const handleGenerate = (preview: boolean = false) => {
     setIsGenerating(true);
     setEditingSchedule(null);
     setShowTestResults(false);
     setTestResults(null);
-    generateMutation.mutate({ 
-      month: selectedMonth, 
-      year: selectedYear, 
-      preview 
+    generateMutation.mutate({
+      month: selectedMonth,
+      year: selectedYear,
+      preview
     }, {
       onSettled: () => setIsGenerating(false)
     });
   };
 
+  const handleConfirmRegenerate = () => {
+    setShowRegenerateConfirm(false);
+    if (pendingAction) {
+      handleGenerate(pendingAction.preview);
+      setPendingAction(null);
+    }
+  };
 
   const handleSave = () => {
     if (generatedData?.schedules) {
       saveMutation.mutate(generatedData.schedules);
     }
+  };
+
+  const handlePublish = async () => {
+    await publishGeneration();
   };
 
   const handleReprocessResponses = async () => {
@@ -160,11 +229,32 @@ export default function AutoScheduleGeneration() {
     }
   };
 
+  // Get status badge info
+  const getStatusBadge = () => {
+    if (!generationStatus) return null;
+
+    if (generationStatus === 'published') {
+      return (
+        <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Publicada
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+        <Clock className="h-3 w-3 mr-1" />
+        Rascunho
+      </Badge>
+    );
+  };
+
 
   return (
     <Layout title="Geração Automática de Escalas" subtitle="Sistema inteligente de distribuição de ministros">
       <div className="space-y-6">
-        
+
         {/* Seleção de período */}
         <Card>
           <CardHeader>
@@ -184,10 +274,27 @@ export default function AutoScheduleGeneration() {
               onYearChange={setSelectedYear}
             />
 
-            <div className="flex gap-3">
+            {/* Status indicator */}
+            {isLoadingExisting ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                <span>Carregando geração existente...</span>
+              </div>
+            ) : generationStatus && (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                {getStatusBadge()}
+                <span className="text-sm text-muted-foreground">
+                  {generationStatus === 'published'
+                    ? 'Esta escala já foi publicada e está visível para os ministros.'
+                    : 'Esta escala está em rascunho. Edite e publique quando estiver pronta.'}
+                </span>
+              </div>
+            )}
+
+            <div className="flex gap-3 flex-wrap">
               <Button
-                onClick={() => handleGenerate(true)}
-                disabled={isGenerating}
+                onClick={() => handleGenerateRequest(true)}
+                disabled={isGenerating || isLoadingExisting}
                 variant="outline"
                 data-testid="button-preview"
               >
@@ -196,8 +303,8 @@ export default function AutoScheduleGeneration() {
               </Button>
 
               <Button
-                onClick={() => handleGenerate(false)}
-                disabled={isGenerating}
+                onClick={() => handleGenerateRequest(false)}
+                disabled={isGenerating || isLoadingExisting}
                 data-testid="button-generate"
               >
                 {isGenerating ? (
@@ -208,14 +315,14 @@ export default function AutoScheduleGeneration() {
                 ) : (
                   <>
                     <Zap className="h-4 w-4 mr-2" />
-                    Gerar Escala Completa
+                    {generatedData ? 'Regenerar Escala' : 'Gerar Escala Completa'}
                   </>
                 )}
               </Button>
             </div>
-            
+
             <Separator className="my-4" />
-            
+
             <Alert>
               <Info className="h-4 w-4" />
               <AlertTitle>Primeira vez gerando escalas?</AlertTitle>
@@ -262,16 +369,19 @@ export default function AutoScheduleGeneration() {
         {generatedData?.schedules && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Escalas Geradas - {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}</CardTitle>
-                <CardDescription>
-                  {generatedData.schedules.length} horários de missa organizados com algoritmo inteligente
-                </CardDescription>
+              <div className="flex items-center gap-3">
+                <div>
+                  <CardTitle>Escalas Geradas - {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}</CardTitle>
+                  <CardDescription>
+                    {generatedData.schedules.length} horários de missa organizados com algoritmo inteligente
+                  </CardDescription>
+                </div>
+                {getStatusBadge()}
               </div>
-              
-              <div className="flex gap-2">
+
+              <div className="flex gap-2 flex-wrap">
                 <Button
-                  onClick={() => handleGenerate(true)}
+                  onClick={() => handleGenerateRequest(true)}
                   variant="outline"
                   size="sm"
                   disabled={isGenerating}
@@ -282,38 +392,77 @@ export default function AutoScheduleGeneration() {
                 </Button>
 
                 {hasUnsavedChanges && (
-                  <>
-                    <Button
-                      onClick={handleSave}
-                      disabled={saveMutation.isPending}
-                      data-testid="button-save"
-                    >
-                      {saveMutation.isPending ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Salvando...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Salvar Escalas
-                        </>
-                      )}
-                    </Button>
-                  </>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending}
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-save"
+                  >
+                    {saveMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Salvar Alterações
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {generationStatus === 'draft' && (
+                  <Button
+                    onClick={handlePublish}
+                    disabled={publishMutation.isPending}
+                    data-testid="button-publish"
+                  >
+                    {publishMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                        Publicando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Publicar Escala
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {generationStatus === 'published' && (
+                  <Badge variant="outline" className="py-2 px-4">
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                    Escala Publicada
+                  </Badge>
                 )}
               </div>
             </CardHeader>
-            
+
             <CardContent className="space-y-4">
+              {/* Status alerts */}
+              {generationStatus === 'draft' && (
+                <Alert>
+                  <FileEdit className="h-4 w-4" />
+                  <AlertTitle>Escala em Rascunho</AlertTitle>
+                  <AlertDescription>
+                    Esta escala está salva mas ainda não foi publicada.
+                    Faça as edições necessárias e clique em "Publicar Escala" quando estiver pronta.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Alertas de qualidade */}
               {generatedData.qualityMetrics.lowConfidenceSchedules > 0 && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Atenção</AlertTitle>
                   <AlertDescription>
-                    {generatedData.qualityMetrics.lowConfidenceSchedules} escalas têm baixa confiança. 
-                    Revise os horários marcados com baixa qualidade antes de salvar.
+                    {generatedData.qualityMetrics.lowConfidenceSchedules} escalas têm baixa confiança.
+                    Revise os horários marcados com baixa qualidade antes de publicar.
                   </AlertDescription>
                 </Alert>
               )}
@@ -452,7 +601,7 @@ export default function AutoScheduleGeneration() {
         )}
 
         {/* Instruções para primeira geração */}
-        {!generatedData && !isGenerating && !showTestResults && (
+        {!generatedData && !isGenerating && !showTestResults && !isLoadingExisting && (
           <Card className="border-dashed">
             <CardContent className="text-center py-8">
               <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -462,11 +611,11 @@ export default function AutoScheduleGeneration() {
                 de forma inteligente, considerando disponibilidade, histórico de serviços e balanceamento de carga.
               </p>
               <div className="flex justify-center gap-2">
-                <Button onClick={() => handleGenerate(true)} variant="outline">
+                <Button onClick={() => handleGenerateRequest(true)} variant="outline">
                   <Eye className="h-4 w-4 mr-2" />
                   Fazer Preview
                 </Button>
-                <Button onClick={() => handleGenerate(false)}>
+                <Button onClick={() => handleGenerateRequest(false)}>
                   <Zap className="h-4 w-4 mr-2" />
                   Gerar Escalas
                 </Button>
@@ -474,7 +623,7 @@ export default function AutoScheduleGeneration() {
             </CardContent>
           </Card>
         )}
-        
+
         {/* Dialog de edição de escala */}
         {editingSchedule && (
           <ScheduleEditDialog
@@ -517,6 +666,27 @@ export default function AutoScheduleGeneration() {
             }}
           />
         )}
+
+        {/* Confirm regenerate dialog */}
+        <AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Regenerar Escala?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Já existe uma geração para {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}.
+                {generationStatus === 'published'
+                  ? ' A escala já foi publicada. Regenerar irá criar uma nova versão em rascunho.'
+                  : ' Regenerar irá substituir a escala atual e todas as edições serão perdidas.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingAction(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmRegenerate}>
+                Regenerar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

@@ -1,10 +1,12 @@
 import { logger } from './logger.js';
-import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families, adorationDrawResults, adorationDraws } from '@shared/schema';
-import { eq, and, or, gte, lte, desc, sql, ne, count, inArray } from 'drizzle-orm';
+import { users, questionnaireResponses, questionnaires, schedules, massTimesConfig, families, adorationDrawResults, adorationDraws, massConfigurations, specialEvents, learnedPatterns } from '@shared/schema';
+import { eq, and, or, gte, lte, desc, sql, ne, count, inArray, isNull } from 'drizzle-orm';
 import { format, addDays, startOfMonth, endOfMonth, getDay, getDate, isSaturday, isFriday, isThursday, isSunday, isMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatching.js';
 import { isAvailableForMass } from './ministerAvailabilityChecker.js';
+import { massConfigService, type MassInstance } from '../services/massConfigService';
+import { learningService } from '../services/learningService';
 
 // Question types from questionnaires
 interface QuestionnaireQuestionItem {
@@ -119,6 +121,10 @@ export class ScheduleGenerator {
   private saintsData: Map<string, SaintInfo[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
   private familyGroups: Map<string, string[]> = new Map(); // Family ID -> list of minister IDs
   private familyPreferences: Map<string, boolean> = new Map(); // Family ID -> prefer_serve_together
+
+  // Feature flag: Use database-driven configuration instead of hardcoded rules
+  // Set to true to enable dynamic configuration from mass_configurations and special_events tables
+  private useDatabaseConfig: boolean = process.env.USE_DATABASE_MASS_CONFIG === 'true';
 
   /**
    * Gera escalas automaticamente para um mês específico
@@ -1291,13 +1297,65 @@ export class ScheduleGenerator {
   }
 
   /**
-   * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
+   * Gera horários de missa usando configurações do banco de dados
+   * (Nova abordagem dinâmica - substitui as regras hardcoded)
+   */
+  private async generateMonthlyMassTimesFromDatabase(year: number, month: number): Promise<MassTime[]> {
+    console.log(`[SCHEDULE_GEN] 🗄️ Gerando horários de ${month}/${year} a partir do BANCO DE DADOS`);
+
+    try {
+      const instances = await massConfigService.generateMonthlyMassInstances(year, month);
+      console.log(`[SCHEDULE_GEN] 📊 Carregadas ${instances.length} instâncias de missa do banco`);
+
+      // Convert MassInstance to MassTime format
+      const massTimes: MassTime[] = instances.map(instance => ({
+        id: instance.id,
+        dayOfWeek: instance.dayOfWeek,
+        time: instance.time,
+        date: instance.date,
+        minMinisters: instance.minMinisters,
+        maxMinisters: instance.maxMinisters,
+        type: instance.type,
+        location: instance.location
+      }));
+
+      // Also load custom questions from questionnaire (for backwards compatibility)
+      const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
+      massTimes.push(...specialMasses);
+
+      // Resolve conflicts (same logic as hardcoded approach)
+      const filteredTimes = this.resolveTimeConflicts(massTimes);
+      console.log(`[SCHEDULE_GEN] ✅ Total: ${massTimes.length} horários → ${filteredTimes.length} após filtro de conflitos`);
+
+      return filteredTimes.sort((a, b) =>
+        a.date!.localeCompare(b.date!) || a.time.localeCompare(b.time)
+      );
+    } catch (error) {
+      console.error('[SCHEDULE_GEN] ❌ Erro ao carregar configurações do banco:', error);
+      console.log('[SCHEDULE_GEN] ⚠️ Fallback para regras hardcoded...');
+      return this.generateMonthlyMassTimesHardcoded(year, month);
+    }
+  }
+
+  /**
+   * Wrapper que escolhe entre geração por banco de dados ou hardcoded
    */
   private async generateMonthlyMassTimes(year: number, month: number): Promise<MassTime[]> {
+    if (this.useDatabaseConfig) {
+      return this.generateMonthlyMassTimesFromDatabase(year, month);
+    }
+    return this.generateMonthlyMassTimesHardcoded(year, month);
+  }
+
+  /**
+   * Gera horários de missa para todas as datas do mês seguindo as regras estabelecidas
+   * (Abordagem original hardcoded - mantida como fallback)
+   */
+  private async generateMonthlyMassTimesHardcoded(year: number, month: number): Promise<MassTime[]> {
     const monthlyTimes: MassTime[] = [];
     const startDate = startOfMonth(new Date(year, month - 1));
     const endDate = endOfMonth(new Date(year, month - 1));
-    
+
     console.log(`[SCHEDULE_GEN] 🕐 Gerando horários para ${month}/${year} com REGRAS ANTI-CONFLITO!`);
 
     let currentDate = startDate;
@@ -1620,6 +1678,8 @@ export class ScheduleGenerator {
 
   /**
    * Extrai informações de data e horário de uma pergunta de missa especial
+   *
+   * 🔧 FIX 2026-01-30: Suporta anos com 2 ou 4 dígitos (ex: "18/02/26" ou "18/02/2026")
    */
   private extractMassInfoFromQuestion(question: string, year: number, month: number): {
     date: string;
@@ -1630,20 +1690,31 @@ export class ScheduleGenerator {
   } | null {
     // Padrões de regex para extrair data e hora
     // Ex: "dia 08/12/2025 às 19h30" ou "quinta feira 01/01/2026 às 19h"
+    // 🔧 FIX: Também suporta "dia 18/02/26 às 7h" (ano com 2 dígitos)
 
-    // Extrair data DD/MM/YYYY
-    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    // Extrair data DD/MM/YY ou DD/MM/YYYY (suporta 2 ou 4 dígitos no ano)
+    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (!dateMatch) {
+      console.log(`[EXTRACT_MASS_INFO] ⚠️ No date found in: ${question.substring(0, 80)}...`);
       return null;
     }
 
     const day = parseInt(dateMatch[1]);
     const monthFromQuestion = parseInt(dateMatch[2]);
-    const yearFromQuestion = parseInt(dateMatch[3]);
+    let yearFromQuestion = parseInt(dateMatch[3]);
+
+    // 🔧 FIX: Converter ano de 2 dígitos para 4 dígitos
+    // Ex: 26 → 2026, 25 → 2025
+    if (yearFromQuestion < 100) {
+      // Assumir século 21 para anos entre 00-99
+      yearFromQuestion = 2000 + yearFromQuestion;
+      console.log(`[EXTRACT_MASS_INFO] 📅 Converted 2-digit year: ${dateMatch[3]} → ${yearFromQuestion}`);
+    }
 
     // Extrair horário (HH:MM ou HHh ou HHhMM)
-    const timeMatch = question.match(/(?:às|as)\s+(\d{1,2})(?:h|:)(\d{2})?/i);
+    const timeMatch = question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{2})?/i);
     if (!timeMatch) {
+      console.log(`[EXTRACT_MASS_INFO] ⚠️ No time found in: ${question.substring(0, 80)}...`);
       return null;
     }
 
@@ -1657,6 +1728,8 @@ export class ScheduleGenerator {
     // Calcular dia da semana
     const dateObj = new Date(yearFromQuestion, monthFromQuestion - 1, day);
     const dayOfWeek = dateObj.getDay();
+
+    console.log(`[EXTRACT_MASS_INFO] ✅ Extracted: ${date} ${time} (dayOfWeek: ${dayOfWeek}) from question`);
 
     return {
       date,
@@ -1898,6 +1971,15 @@ export class ScheduleGenerator {
     // 1. Filtrar ministros disponíveis
     const availableMinsters = this.getAvailableMinistersForMass(massTime);
     console.log(`[SCHEDULE_GEN] Available ministers for this mass: ${availableMinsters.length}`);
+
+    // 1.5. 🤖 ADAPTIVE LEARNING: Pre-load pattern adjustments for this mass context
+    if (massTime.type && massTime.date) {
+      await this.loadLearnedPatternAdjustments(
+        massTime.type,
+        getDay(new Date(massTime.date)),
+        massTime.time
+      );
+    }
 
     // 2. Aplicar algoritmo de seleção inteligente
     const selectedMinisters = this.selectOptimalMinisters(availableMinsters, massTime);
@@ -2879,7 +2961,71 @@ export class ScheduleGenerator {
       }
     }
 
+    // 7. 🤖 ADAPTIVE LEARNING: Apply learned pattern adjustments (15% do peso)
+    // This uses patterns learned from coordinator edits to future generations
+    if (this.useDatabaseConfig && minister.id && massTime) {
+      const patternScore = this.learnedPatternAdjustments.get(minister.id) || 0;
+      if (patternScore !== 0) {
+        const adjustedScore = patternScore * 0.15; // 15% weight for learned patterns
+        score += adjustedScore;
+        if (Math.abs(adjustedScore) > 0.01) {
+          console.log(`[SCHEDULE_GEN] 🤖 Ajuste de aprendizado para ${minister.name}: ${adjustedScore > 0 ? '+' : ''}${adjustedScore.toFixed(2)}`);
+        }
+      }
+    }
+
     return score;
+  }
+
+  // Cache for learned pattern adjustments (loaded once per generation)
+  private learnedPatternAdjustments: Map<string, number> = new Map();
+
+  /**
+   * Pre-load learned pattern adjustments for all ministers
+   * Called once at the start of schedule generation
+   */
+  private async loadLearnedPatternAdjustments(massType: string, dayOfWeek: number, time: string): Promise<void> {
+    if (!this.useDatabaseConfig) return;
+
+    try {
+      const patterns = await this.db.select()
+        .from(learnedPatterns)
+        .where(
+          and(
+            eq(learnedPatterns.isActive, true),
+            or(
+              eq(learnedPatterns.massType, massType as typeof learnedPatterns.massType.enumValues[number]),
+              isNull(learnedPatterns.massType)
+            )
+          )
+        );
+
+      this.learnedPatternAdjustments.clear();
+
+      for (const pattern of patterns) {
+        if (!pattern.ministerId) continue;
+
+        // Check if pattern applies to this context
+        let applies = true;
+        if (pattern.dayOfWeek !== null && pattern.dayOfWeek !== undefined && pattern.dayOfWeek !== dayOfWeek) {
+          applies = false;
+        }
+        if (pattern.timeSlot && pattern.timeSlot !== time) {
+          applies = false;
+        }
+
+        if (applies && pattern.weightAdjustment !== null && pattern.weightAdjustment !== undefined) {
+          const confidenceWeight = (pattern.confidence ?? 50) / 100;
+          const adjustment = (pattern.weightAdjustment / 100) * confidenceWeight; // Convert percentage to decimal
+          const current = this.learnedPatternAdjustments.get(pattern.ministerId) || 0;
+          this.learnedPatternAdjustments.set(pattern.ministerId, current + adjustment);
+        }
+      }
+
+      console.log(`[SCHEDULE_GEN] 🤖 Carregados ${patterns.length} padrões de aprendizado para ${this.learnedPatternAdjustments.size} ministros`);
+    } catch (error) {
+      console.error('[SCHEDULE_GEN] ⚠️ Erro ao carregar padrões de aprendizado:', error);
+    }
   }
 
   /**
