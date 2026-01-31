@@ -2,7 +2,7 @@
 // IMPORTANT: Version is automatically injected from package.json during build
 // DO NOT manually edit APP_VERSION - it's synced with package.json
 
-export const APP_VERSION = '5.4.2'; // Auto-synced with package.json by build script
+export const APP_VERSION = '5.4.3'; // Auto-synced with package.json by build script
 export const BUILD_DATE = new Date().toISOString();
 
 // Gera um hash único baseado na versão e data de build
