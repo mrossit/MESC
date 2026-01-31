@@ -111,7 +111,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
           isAdmin ? undefined : eq(schedules.status, 'published')
         )
       )
-      .orderBy(schedules.date)
+      .orderBy(schedules.date, schedules.time, schedules.id)
       .limit(10);
 
     // Transform to match expected format
@@ -192,7 +192,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
           isAdmin ? undefined : eq(schedules.status, 'published')
         )
       )
-      .orderBy(schedules.time, schedules.position);
+      .orderBy(schedules.time, schedules.position, schedules.id);
 
     // 🕊️ INCLUSÃO DE ADORAÇÃO: Verificar se a data é uma segunda-feira e buscar sorteio
     let adorationAssignments: ScheduleAssignment[] = [];
@@ -424,7 +424,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
               isAdmin ? undefined : eq(schedules.status, 'published')
             )
           )
-          .orderBy(schedules.date, schedules.time, schedules.position);
+          .orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
       }
 
       // Get substitution requests for these schedules

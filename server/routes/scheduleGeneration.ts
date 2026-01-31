@@ -933,7 +933,7 @@ router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor',
           lte(schedules.date, endDate)
         )
       )
-      .orderBy(schedules.date, schedules.time, schedules.position);
+      .orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
 
     // Group schedules by date+time
     const groupedSchedules: Record<string, typeof currentSchedules> = {};
@@ -1054,7 +1054,7 @@ router.post('/generation/:id/publish', authenticateToken, requireRole(['gestor',
           lte(schedules.date, endDate)
         )
       )
-      .orderBy(schedules.date, schedules.time, schedules.position);
+      .orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
 
     // Build final schedule JSON
     const groupedSchedules: Record<string, typeof currentSchedules> = {};
@@ -1669,7 +1669,7 @@ router.get('/by-date/:date', authenticateToken, async (req: AuthRequest, res) =>
       .from(schedules)
       .leftJoin(users, eq(schedules.ministerId, users.id))
       .where(eq(schedules.date, dateOnly))
-      .orderBy(schedules.time, schedules.position);
+      .orderBy(schedules.time, schedules.position, schedules.id);
 
     // Map assignments to expected format (massTime instead of time)
     type AssignmentResult = {
@@ -1744,7 +1744,7 @@ router.get('/:date/:time', authenticateToken, async (req: AuthRequest, res) => {
         eq(schedules.date, date),
         eq(schedules.time, time)
       ))
-      .orderBy(schedules.position);
+      .orderBy(schedules.position, schedules.id);
 
     res.json({
       date,
