@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
+import { scheduleCache } from "./services/scheduleCache";
 import path from "path";
 
 // =============================================
@@ -231,6 +232,10 @@ app.use("/api", apiRateLimiter);
     }
     process.exit(1);
   });
+
+  // Clear schedule cache on startup to ensure fresh data after deployments
+  await scheduleCache.clear();
+  console.log("🧹 Schedule cache cleared on startup");
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`✅ Server started on port ${port} (${process.env.NODE_ENV})`);

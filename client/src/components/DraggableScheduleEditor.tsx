@@ -168,7 +168,7 @@ interface MassTimeColumnProps {
 
 // Coluna de horário de missa com drag & drop
 function MassTimeColumn({ slot, onReorder, onRemove, onAdd }: MassTimeColumnProps) {
-  const sortedAssignments = [...slot.assignments].sort((a, b) => a.position - b.position);
+  const sortedAssignments = [...slot.assignments].sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''));
 
   return (
     <Card className="h-full">
