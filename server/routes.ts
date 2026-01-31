@@ -38,6 +38,10 @@ import escalaAlternativaRoutes from "./escala-alternativa/routes/escalaRoutes";
 import adorationRoutes from "./routes/adoration";
 import activityRoutes from "./routes/activity";
 import gamificationRoutes from "./routes/gamification";
+import massConfigRoutes from "./routes/massConfig";
+import specialEventsRoutes from "./routes/specialEvents";
+import questionMappingsRoutes from "./routes/questionMappings";
+import learningPatternsRoutes from "./routes/learningPatterns";
 import { insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -268,6 +272,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Gamification routes
   app.use('/api/gamification', gamificationRoutes);
+
+  // Mass Configuration System routes (Dynamic mass settings)
+  app.use('/api/mass-config', csrfProtection, authenticateToken, requireRole(['coordenador', 'gestor']), massConfigRoutes);
+  app.use('/api/special-events', csrfProtection, authenticateToken, requireRole(['coordenador', 'gestor']), specialEventsRoutes);
+  app.use('/api/question-mappings', csrfProtection, authenticateToken, requireRole(['coordenador', 'gestor']), questionMappingsRoutes);
+  app.use('/api/learning', csrfProtection, authenticateToken, requireRole(['coordenador', 'gestor']), learningPatternsRoutes);
 
   // Get current user (compatível com novo sistema)
   app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {

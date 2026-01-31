@@ -29,6 +29,13 @@
       "when": 1769310387020,
       "tag": "0003_add_materials_library",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769817619761,
+      "tag": "0004_conscious_prowler",
+      "breakpoints": true
     }
   ]
 }

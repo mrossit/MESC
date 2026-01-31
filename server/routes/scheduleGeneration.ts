@@ -5,11 +5,12 @@ import type { AuthRequest } from '../auth';
 import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator';
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
-import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses, substitutionRequests } from '@shared/schema';
+import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses, substitutionRequests, scheduleGenerations } from '@shared/schema';
 import { and, gte, lte, eq, sql, ne, desc, inArray } from 'drizzle-orm';
 import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { scheduleCache } from '../services/scheduleCache';
+import { learningService } from '../services/learningService';
 import type {
   EmergencySaveScheduleInput,
   ScheduleSaveResult,
@@ -70,8 +71,8 @@ const generateScheduleSchema = z.object({
     { message: 'Ano fora do intervalo permitido' }
   ),
   month: z.number().min(1).max(12),
-  saveToDatabase: z.boolean().default(false),
-  replaceExisting: z.boolean().default(false)
+  saveToDatabase: z.boolean().default(true), // Now defaults to true - always save
+  replaceExisting: z.boolean().default(true) // Now defaults to true
 });
 
 // Schema para salvar escalas aprovadas
@@ -196,30 +197,108 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
       throw genError; // Re-throw para ser capturado pelo catch principal
     }
 
-    // Salvar no banco se solicitado
+    // ALWAYS save to database and create schedule_generation record
     let savedCount = 0;
-    if (saveToDatabase && db) {
+    let generationId: string | null = null;
+
+    if (db) {
+      // Save schedules to database
       savedCount = await saveGeneratedSchedules(generatedSchedules, replaceExisting);
+
+      // Build the original schedule JSON for learning/comparison
+      const originalScheduleJson = {
+        month,
+        year,
+        generatedAt: new Date().toISOString(),
+        totalMasses: generatedSchedules.length,
+        schedules: generatedSchedules.map(schedule => ({
+          date: schedule.massTime.date,
+          time: schedule.massTime.time,
+          type: schedule.massTime.type || 'missa',
+          ministers: schedule.ministers.map((m, idx) => ({
+            id: m.id,
+            name: m.name,
+            position: m.position || (idx + 1)
+          })),
+          confidence: schedule.confidence
+        }))
+      };
+
+      const qualityMetrics = calculateQualityMetrics(generatedSchedules);
+      const generationMetrics = {
+        averageConfidence: calculateAverageConfidence(generatedSchedules),
+        totalSchedules: generatedSchedules.length,
+        savedCount,
+        uniqueMinistersUsed: qualityMetrics.uniqueMinistersUsed,
+        balanceScore: qualityMetrics.balanceScore,
+        highConfidenceSchedules: qualityMetrics.highConfidenceSchedules,
+        lowConfidenceSchedules: qualityMetrics.lowConfidenceSchedules
+      };
+
+      // Check if there's an existing draft for this month/year
+      const [existingGeneration] = await db.select()
+        .from(scheduleGenerations)
+        .where(
+          and(
+            eq(scheduleGenerations.month, month),
+            eq(scheduleGenerations.year, year),
+            eq(scheduleGenerations.status, 'draft')
+          )
+        )
+        .limit(1);
+
+      if (existingGeneration) {
+        // Update existing draft
+        await db.update(scheduleGenerations)
+          .set({
+            originalSchedule: originalScheduleJson,
+            generationMetrics,
+            createdAt: new Date(),
+            createdById: req.user?.id || null
+          })
+          .where(eq(scheduleGenerations.id, existingGeneration.id));
+
+        generationId = existingGeneration.id;
+        logger.info(`Updated existing schedule_generation: ${generationId}`);
+      } else {
+        // Create new generation record
+        const [newGeneration] = await db.insert(scheduleGenerations)
+          .values({
+            month,
+            year,
+            status: 'draft',
+            originalSchedule: originalScheduleJson,
+            generationMetrics,
+            createdById: req.user?.id || null
+          })
+          .returning();
+
+        generationId = newGeneration.id;
+        logger.info(`Created new schedule_generation: ${generationId}`);
+      }
     }
 
     // Preparar resposta com dados úteis para interface
+    const qualityMetricsData = calculateQualityMetrics(generatedSchedules);
     const response = {
       success: true,
       message: `Escalas geradas com sucesso para ${month}/${year}`,
       data: {
         month,
         year,
+        generationId, // NEW: return the generation ID
+        generationStatus: 'draft' as const, // NEW: return current status
         totalSchedules: generatedSchedules.length,
-        savedToDatabase: saveToDatabase,
+        savedToDatabase: true,
         savedCount,
         averageConfidence: calculateAverageConfidence(generatedSchedules),
         schedulesByWeek: groupSchedulesByWeek(generatedSchedules),
-        qualityMetrics: calculateQualityMetrics(generatedSchedules),
+        qualityMetrics: qualityMetricsData,
         schedules: formatSchedulesForAPI(generatedSchedules)
       }
     };
 
-    logger.info(`Geração concluída: ${generatedSchedules.length} escalas, confidence média: ${response.data.averageConfidence}`);
+    logger.info(`Geração concluída: ${generatedSchedules.length} escalas, confidence média: ${response.data.averageConfidence}, generationId: ${generationId}`);
     
     // DEBUG: Log da estrutura da resposta
     console.log('[RESPONSE_DEBUG] Estrutura da resposta:', {
@@ -791,6 +870,430 @@ router.get('/preview/:year/:month', authenticateToken, requireRole(['gestor', 'c
     });
   }
 });
+
+/**
+ * Get existing generation for a month/year
+ * GET /api/schedules/generation/:year/:month
+ */
+router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const params = parseYearMonthParams(req, res);
+    if (!params) return;
+    const { year, month } = params;
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Serviço de banco de dados indisponível'
+      });
+    }
+
+    // Find the most recent generation for this month/year (prefer draft over published)
+    const [generation] = await db.select()
+      .from(scheduleGenerations)
+      .where(
+        and(
+          eq(scheduleGenerations.month, month),
+          eq(scheduleGenerations.year, year)
+        )
+      )
+      .orderBy(desc(scheduleGenerations.createdAt))
+      .limit(1);
+
+    if (!generation) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Nenhuma geração encontrada para este período'
+      });
+    }
+
+    // Get current schedules from database for this month
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const currentSchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName
+    })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(
+        and(
+          gte(schedules.date, startDate),
+          lte(schedules.date, endDate)
+        )
+      )
+      .orderBy(schedules.date, schedules.time, schedules.position);
+
+    // Group schedules by date+time
+    const groupedSchedules: Record<string, typeof currentSchedules> = {};
+    currentSchedules.forEach(schedule => {
+      const key = `${schedule.date}_${schedule.time}`;
+      if (!groupedSchedules[key]) {
+        groupedSchedules[key] = [];
+      }
+      groupedSchedules[key].push(schedule);
+    });
+
+    // Format as GeneratedSchedule-like structure
+    const formattedSchedules = Object.entries(groupedSchedules).map(([key, ministers]) => {
+      const [date, time] = key.split('_');
+      return {
+        date,
+        time,
+        dayOfWeek: new Date(date).getDay(),
+        ministers: ministers.map(m => ({
+          id: m.ministerId,
+          name: m.scheduleDisplayName || m.ministerName || 'VACANTE',
+          role: '',
+          totalServices: 0,
+          availabilityScore: 0,
+          position: m.position
+        })),
+        backupMinisters: [],
+        confidence: 1.0,
+        qualityScore: 'Excelente'
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        generationId: generation.id,
+        generationStatus: generation.status,
+        month: generation.month,
+        year: generation.year,
+        createdAt: generation.createdAt,
+        publishedAt: generation.publishedAt,
+        originalSchedule: generation.originalSchedule,
+        finalSchedule: generation.finalSchedule,
+        differences: generation.differences,
+        generationMetrics: generation.generationMetrics,
+        // Current state from database
+        totalSchedules: formattedSchedules.length,
+        schedules: formattedSchedules,
+        currentSchedulesCount: currentSchedules.length
+      }
+    });
+
+  } catch (error: unknown) {
+    logger.error('Erro ao carregar geração:', error);
+    res.status(500).json({
+      success: false,
+      message: getErrorMessage(error) || 'Erro ao carregar geração'
+    });
+  }
+});
+
+/**
+ * Publish a schedule generation
+ * POST /api/schedules/generation/:id/publish
+ */
+router.post('/generation/:id/publish', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Serviço de banco de dados indisponível'
+      });
+    }
+
+    // Find the generation
+    const [generation] = await db.select()
+      .from(scheduleGenerations)
+      .where(eq(scheduleGenerations.id, id))
+      .limit(1);
+
+    if (!generation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Geração não encontrada'
+      });
+    }
+
+    if (generation.status === 'published') {
+      return res.status(400).json({
+        success: false,
+        message: 'Esta geração já foi publicada'
+      });
+    }
+
+    const { month, year } = generation;
+
+    // Get current schedules from database (final state after edits)
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const currentSchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      ministerName: users.name
+    })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(
+        and(
+          gte(schedules.date, startDate),
+          lte(schedules.date, endDate)
+        )
+      )
+      .orderBy(schedules.date, schedules.time, schedules.position);
+
+    // Build final schedule JSON
+    const groupedSchedules: Record<string, typeof currentSchedules> = {};
+    currentSchedules.forEach(schedule => {
+      const key = `${schedule.date}_${schedule.time}`;
+      if (!groupedSchedules[key]) {
+        groupedSchedules[key] = [];
+      }
+      groupedSchedules[key].push(schedule);
+    });
+
+    const finalScheduleJson = {
+      month,
+      year,
+      publishedAt: new Date().toISOString(),
+      totalMasses: Object.keys(groupedSchedules).length,
+      schedules: Object.entries(groupedSchedules).map(([key, ministers]) => {
+        const [date, time] = key.split('_');
+        return {
+          date,
+          time,
+          type: ministers[0]?.type || 'missa',
+          ministers: ministers.map((m, idx) => ({
+            id: m.ministerId,
+            name: m.ministerName || 'VACANTE',
+            position: m.position || (idx + 1)
+          }))
+        };
+      })
+    };
+
+    // Calculate differences between original and final
+    const originalSchedule = generation.originalSchedule as {
+      schedules: Array<{
+        date: string;
+        time: string;
+        ministers: Array<{ id: string | null; name: string; position: number }>;
+      }>;
+    };
+
+    const differences = calculateScheduleDifferences(originalSchedule, finalScheduleJson);
+
+    // 🤖 ADAPTIVE LEARNING: Learn from coordinator edits
+    // This analyzes the differences and creates patterns for future schedule generation
+    if (differences.summary.totalChanges > 0 && process.env.USE_DATABASE_MASS_CONFIG === 'true') {
+      try {
+        // Convert differences to learning format
+        const learningDiffs = differences.changes
+          .filter(c => c.type === 'minister_removed' || c.type === 'minister_added')
+          .map(c => ({
+            type: c.type === 'minister_removed' ? 'minister_removed' as const : 'minister_added' as const,
+            ministerId: (c.type === 'minister_removed' ? c.original?.id : c.final?.id) || '',
+            ministerName: (c.type === 'minister_removed' ? c.original?.name : c.final?.name) || '',
+            date: c.date,
+            time: c.time,
+            massType: 'missa_dominical' // Would need to be extracted from schedule context
+          }))
+          .filter(d => d.ministerId); // Filter out VACANTE entries
+
+        await learningService.learnFromDifferences(learningDiffs);
+        logger.info(`🤖 Learned from ${learningDiffs.length} schedule edits`);
+      } catch (learningError) {
+        // Learning failure should not block publishing
+        logger.warn('⚠️ Failed to learn from schedule differences:', learningError);
+      }
+    }
+
+    // Update schedules status to 'published'
+    await db.update(schedules)
+      .set({ status: 'published' })
+      .where(
+        and(
+          gte(schedules.date, startDate),
+          lte(schedules.date, endDate)
+        )
+      );
+
+    // Update generation record
+    await db.update(scheduleGenerations)
+      .set({
+        status: 'published',
+        finalSchedule: finalScheduleJson,
+        differences,
+        publishedAt: new Date()
+      })
+      .where(eq(scheduleGenerations.id, id));
+
+    // Invalidate cache
+    scheduleCache.invalidate(year, month);
+
+    logger.info(`Geração ${id} publicada com sucesso. Diferenças: ${differences.summary.totalChanges} alterações`);
+
+    res.json({
+      success: true,
+      message: `Escala de ${month}/${year} publicada com sucesso!`,
+      data: {
+        generationId: id,
+        generationStatus: 'published',
+        publishedAt: new Date().toISOString(),
+        differences,
+        schedulesPublished: currentSchedules.length
+      }
+    });
+
+  } catch (error: unknown) {
+    logger.error('Erro ao publicar geração:', error);
+    res.status(500).json({
+      success: false,
+      message: getErrorMessage(error) || 'Erro ao publicar geração'
+    });
+  }
+});
+
+/**
+ * Calculate differences between original and final schedule
+ */
+function calculateScheduleDifferences(
+  original: { schedules: Array<{ date: string; time: string; ministers: Array<{ id: string | null; name: string; position: number }> }> },
+  final: { schedules: Array<{ date: string; time: string; ministers: Array<{ id: string | null; name: string; position: number }> }> }
+) {
+  const changes: Array<{
+    date: string;
+    time: string;
+    type: 'minister_removed' | 'minister_added' | 'minister_replaced' | 'position_changed';
+    original: { id: string | null; name: string; position: number } | null;
+    final: { id: string | null; name: string; position: number } | null;
+    reason: string;
+  }> = [];
+
+  let ministersAdded = 0;
+  let ministersRemoved = 0;
+  let ministersReplaced = 0;
+  let positionsChanged = 0;
+
+  // Create lookup maps
+  const originalByKey = new Map<string, typeof original.schedules[0]>();
+  original.schedules.forEach(s => {
+    originalByKey.set(`${s.date}_${s.time}`, s);
+  });
+
+  const finalByKey = new Map<string, typeof final.schedules[0]>();
+  final.schedules.forEach(s => {
+    finalByKey.set(`${s.date}_${s.time}`, s);
+  });
+
+  // Check each original schedule against final
+  originalByKey.forEach((origSchedule, key) => {
+    const finalSchedule = finalByKey.get(key);
+    const [date, time] = key.split('_');
+
+    if (!finalSchedule) {
+      // Entire mass was removed
+      origSchedule.ministers.forEach(m => {
+        changes.push({
+          date, time,
+          type: 'minister_removed',
+          original: m,
+          final: null,
+          reason: 'mass_removed'
+        });
+        ministersRemoved++;
+      });
+      return;
+    }
+
+    // Compare ministers
+    const origMinistersById = new Map(origSchedule.ministers.map(m => [m.id, m]));
+    const finalMinistersById = new Map(finalSchedule.ministers.map(m => [m.id, m]));
+
+    // Check for removed ministers
+    origMinistersById.forEach((origMinister, id) => {
+      if (!finalMinistersById.has(id)) {
+        changes.push({
+          date, time,
+          type: 'minister_removed',
+          original: origMinister,
+          final: null,
+          reason: 'manual_edit'
+        });
+        ministersRemoved++;
+      } else {
+        // Check position change
+        const finalMinister = finalMinistersById.get(id)!;
+        if (origMinister.position !== finalMinister.position) {
+          changes.push({
+            date, time,
+            type: 'position_changed',
+            original: origMinister,
+            final: finalMinister,
+            reason: 'reordered'
+          });
+          positionsChanged++;
+        }
+      }
+    });
+
+    // Check for added ministers
+    finalMinistersById.forEach((finalMinister, id) => {
+      if (!origMinistersById.has(id)) {
+        changes.push({
+          date, time,
+          type: 'minister_added',
+          original: null,
+          final: finalMinister,
+          reason: 'manual_edit'
+        });
+        ministersAdded++;
+      }
+    });
+  });
+
+  // Check for new masses in final that weren't in original
+  finalByKey.forEach((finalSchedule, key) => {
+    if (!originalByKey.has(key)) {
+      const [date, time] = key.split('_');
+      finalSchedule.ministers.forEach(m => {
+        changes.push({
+          date, time,
+          type: 'minister_added',
+          original: null,
+          final: m,
+          reason: 'mass_added'
+        });
+        ministersAdded++;
+      });
+    }
+  });
+
+  return {
+    summary: {
+      totalChanges: changes.length,
+      ministersAdded,
+      ministersRemoved,
+      ministersReplaced,
+      positionsChanged
+    },
+    changes
+  };
+}
 
 /**
  * DEBUG: Verificar dados para geração

@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { questionnaireResponses, users, questionnaires } from '@shared/schema';
+import { questionnaireResponses, users, questionnaires, questionMassMappings, massConfigurations, specialEvents } from '@shared/schema';
 import { eq, and, isNotNull } from 'drizzle-orm';
 
 /**
@@ -181,6 +181,9 @@ export class ResponseCompiler {
   /**
    * 🔧 FIX: Parse ALL questions with date/time from questionnaire
    *
+   * NEW in V2.1: First checks for explicit mappings in question_mass_mappings table.
+   * Falls back to regex extraction from question text if no mapping exists.
+   *
    * Extracts date and time from ANY question text that contains them, like:
    * - "Você pode servir na Missa em honra à São Judas Tadeu - quarta feira, dia 28/01/2026 às 7h ?"
    * - "Você pode servir sexta-feira dia 28/11/2025 às 15h - Missa votiva..."
@@ -188,11 +191,59 @@ export class ResponseCompiler {
    * Works with ANY category: custom, special_event, special, etc.
    * Works with ANY ID format: custom_*, special_event_*, etc.
    */
-  private static parseCustomQuestions(questions: unknown, year: number): ParsedCustomQuestion[] {
+  private static async parseCustomQuestionsWithMappings(
+    questions: unknown,
+    year: number,
+    questionnaireId?: string
+  ): Promise<ParsedCustomQuestion[]> {
     const parsed: ParsedCustomQuestion[] = [];
 
     if (!questions || !Array.isArray(questions)) {
       return parsed;
+    }
+
+    // Load explicit mappings from database if questionnaire ID is available
+    const mappingsMap = new Map<string, { date: string; time: string }>();
+    if (questionnaireId) {
+      try {
+        const mappings = await db.select()
+          .from(questionMassMappings)
+          .where(eq(questionMassMappings.questionnaireId, questionnaireId));
+
+        for (const mapping of mappings) {
+          if (mapping.targetDate && mapping.targetTime) {
+            mappingsMap.set(mapping.questionId, {
+              date: mapping.targetDate,
+              time: mapping.targetTime
+            });
+          } else if (mapping.massConfigurationId) {
+            // Load from mass configuration
+            const [config] = await db.select()
+              .from(massConfigurations)
+              .where(eq(massConfigurations.id, mapping.massConfigurationId))
+              .limit(1);
+            if (config) {
+              // For configurations, we need the actual date - this is more complex
+              // Skip for now as configurations are recurring
+            }
+          } else if (mapping.specialEventId) {
+            // Load from special event
+            const [event] = await db.select()
+              .from(specialEvents)
+              .where(eq(specialEvents.id, mapping.specialEventId))
+              .limit(1);
+            if (event) {
+              mappingsMap.set(mapping.questionId, {
+                date: event.eventDate,
+                time: event.eventTime
+              });
+            }
+          }
+        }
+        console.log(`      🗄️ Loaded ${mappingsMap.size} explicit question mappings from database`);
+      } catch (error) {
+        console.log(`      ⚠️ Could not load question mappings: ${error}`);
+      }
     }
 
     interface QuestionItem {
@@ -221,18 +272,43 @@ export class ResponseCompiler {
         continue;
       }
 
+      if (!q.id) continue;
+
+      // PRIORITY 1: Check for explicit mapping in database
+      const explicitMapping = mappingsMap.get(q.id);
+      if (explicitMapping) {
+        parsed.push({
+          id: q.id,
+          question: q.question || '',
+          date: explicitMapping.date,
+          time: explicitMapping.time,
+          category: category
+        });
+        console.log(`      🗄️ Using explicit mapping: ${q.id} -> ${explicitMapping.date} às ${explicitMapping.time}`);
+        continue;
+      }
+
+      // PRIORITY 2: Fallback to regex extraction from question text
       const questionText = q.question || '';
 
-      // Try to extract date: "dia 28/01/2026" or "28/01/2026" or "28/01" or "dia 28/11"
-      const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/i);
+      // Try to extract date: "dia 28/01/2026" or "28/01/2026" or "28/01" or "dia 28/11" or "18/02/26"
+      // 🔧 FIX 2026-01-30: Suporta anos com 2, 4 dígitos ou sem ano
+      const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
 
       // Try to extract time: "às 7h", "às 15h", "às 19h30", "às 19:30", "ás 15h"
       const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
 
-      if (dateMatch && timeMatch && q.id) {
+      if (dateMatch && timeMatch) {
         const day = dateMatch[1].padStart(2, '0');
         const month = dateMatch[2].padStart(2, '0');
-        const extractedYear = dateMatch[3] || year.toString();
+
+        // 🔧 FIX: Converter ano de 2 dígitos para 4 dígitos
+        let extractedYear = dateMatch[3] || year.toString();
+        if (dateMatch[3] && dateMatch[3].length === 2) {
+          // Converter 26 → 2026, 25 → 2025, etc.
+          extractedYear = '20' + dateMatch[3];
+          console.log(`      🔧 Converted 2-digit year: ${dateMatch[3]} → ${extractedYear}`);
+        }
 
         const hour = timeMatch[1].padStart(2, '0');
         const minute = (timeMatch[2] || '00').padStart(2, '0');
@@ -245,7 +321,72 @@ export class ResponseCompiler {
           category: category
         });
 
-        console.log(`      📅 Parsed: ${q.id} -> ${extractedYear}-${month}-${day} às ${hour}:${minute}`);
+        console.log(`      📅 Parsed via regex: ${q.id} -> ${extractedYear}-${month}-${day} às ${hour}:${minute}`);
+      }
+    }
+
+    return parsed;
+  }
+
+  /**
+   * Sync wrapper for parseCustomQuestionsWithMappings (for backwards compatibility)
+   */
+  private static parseCustomQuestions(questions: unknown, year: number): ParsedCustomQuestion[] {
+    // This is now a sync wrapper that doesn't use database mappings
+    // For database mappings, use parseCustomQuestionsWithMappings directly
+    const parsed: ParsedCustomQuestion[] = [];
+
+    if (!questions || !Array.isArray(questions)) {
+      return parsed;
+    }
+
+    interface QuestionItem {
+      id?: string;
+      question?: string;
+      category?: string;
+    }
+
+    const relevantCategories = ['custom', 'special_event', 'special'];
+
+    for (const item of questions) {
+      const q = item as QuestionItem;
+      const category = q.category || '';
+
+      if (category === 'regular' || category === 'daily') {
+        continue;
+      }
+
+      const isRelevantCategory = relevantCategories.includes(category);
+      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event');
+
+      if (!isRelevantCategory && !isSpecialId) {
+        continue;
+      }
+
+      const questionText = q.question || '';
+
+      const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
+      const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+
+      if (dateMatch && timeMatch && q.id) {
+        const day = dateMatch[1].padStart(2, '0');
+        const month = dateMatch[2].padStart(2, '0');
+
+        let extractedYear = dateMatch[3] || year.toString();
+        if (dateMatch[3] && dateMatch[3].length === 2) {
+          extractedYear = '20' + dateMatch[3];
+        }
+
+        const hour = timeMatch[1].padStart(2, '0');
+        const minute = (timeMatch[2] || '00').padStart(2, '0');
+
+        parsed.push({
+          id: q.id,
+          question: questionText,
+          date: `${extractedYear}-${month}-${day}`,
+          time: `${hour}:${minute}`,
+          category: category
+        });
       }
     }
 

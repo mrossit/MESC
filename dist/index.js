@@ -23,17 +23,24 @@ __export(schema_exports, {
   activityLogsRelations: () => activityLogsRelations,
   adorationDrawResults: () => adorationDrawResults,
   adorationDraws: () => adorationDraws,
+  badgeCategoryEnum: () => badgeCategoryEnum,
+  badgeRarityEnum: () => badgeRarityEnum,
+  badges: () => badges,
   celebrationRankEnum: () => celebrationRankEnum,
+  confirmationStatusEnum: () => confirmationStatusEnum,
   families: () => families,
   familiesRelations: () => familiesRelations,
   familyRelationships: () => familyRelationships,
   formationCategoryEnum: () => formationCategoryEnum,
+  formationCertificates: () => formationCertificates,
   formationLessonProgress: () => formationLessonProgress,
   formationLessonProgressRelations: () => formationLessonProgressRelations,
   formationLessonSections: () => formationLessonSections,
   formationLessonSectionsRelations: () => formationLessonSectionsRelations,
   formationLessons: () => formationLessons,
   formationLessonsRelations: () => formationLessonsRelations,
+  formationMaterials: () => formationMaterials,
+  formationMaterialsRelations: () => formationMaterialsRelations,
   formationModules: () => formationModules,
   formationModulesRelations: () => formationModulesRelations,
   formationProgress: () => formationProgress,
@@ -45,11 +52,14 @@ __export(schema_exports, {
   insertFormationLessonProgressSchema: () => insertFormationLessonProgressSchema,
   insertFormationLessonSchema: () => insertFormationLessonSchema,
   insertFormationLessonSectionSchema: () => insertFormationLessonSectionSchema,
+  insertFormationMaterialSchema: () => insertFormationMaterialSchema,
   insertFormationTrackSchema: () => insertFormationTrackSchema,
   insertMassTimeSchema: () => insertMassTimeSchema,
   insertQuestionnaireSchema: () => insertQuestionnaireSchema,
   insertUserSchema: () => insertUserSchema,
+  leaderboardCache: () => leaderboardCache,
   lessonContentTypeEnum: () => lessonContentTypeEnum,
+  levelDefinitions: () => levelDefinitions,
   liturgicalCelebrations: () => liturgicalCelebrations,
   liturgicalColorEnum: () => liturgicalColorEnum,
   liturgicalCycleEnum: () => liturgicalCycleEnum,
@@ -59,18 +69,27 @@ __export(schema_exports, {
   massExecutionLogs: () => massExecutionLogs,
   massExecutionLogsRelations: () => massExecutionLogsRelations,
   massTimesConfig: () => massTimesConfig,
+  materialAccessLogs: () => materialAccessLogs,
+  materialAccessLogsRelations: () => materialAccessLogsRelations,
+  materialTypeEnum: () => materialTypeEnum,
   ministerCheckIns: () => ministerCheckIns,
   ministerCheckInsRelations: () => ministerCheckInsRelations,
   notificationTypeEnum: () => notificationTypeEnum,
   notifications: () => notifications,
   notificationsRelations: () => notificationsRelations,
   passwordResetRequests: () => passwordResetRequests,
+  pointActionEnum: () => pointActionEnum,
+  pointTransactions: () => pointTransactions,
   pushSubscriptions: () => pushSubscriptions,
   questionnaireResponses: () => questionnaireResponses,
   questionnaireResponsesRelations: () => questionnaireResponsesRelations,
   questionnaires: () => questionnaires,
   questionnairesRelations: () => questionnairesRelations,
   saints: () => saints,
+  scheduleConfirmations: () => scheduleConfirmations,
+  scheduleGenerationStatusEnum: () => scheduleGenerationStatusEnum,
+  scheduleGenerations: () => scheduleGenerations,
+  scheduleGenerationsRelations: () => scheduleGenerationsRelations,
   scheduleStatusEnum: () => scheduleStatusEnum,
   scheduleTypeEnum: () => scheduleTypeEnum,
   schedules: () => schedules,
@@ -82,6 +101,8 @@ __export(schema_exports, {
   substitutionRequestsRelations: () => substitutionRequestsRelations,
   substitutionStatusEnum: () => substitutionStatusEnum,
   urgencyLevelEnum: () => urgencyLevelEnum,
+  userBadges: () => userBadges,
+  userPoints: () => userPoints,
   userRoleEnum: () => userRoleEnum,
   userStatusEnum: () => userStatusEnum,
   users: () => users,
@@ -105,7 +126,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, massTimesConfig, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, notificationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertAdorationDrawSchema;
+var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, materialTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, confirmationStatusEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, scheduleConfirmations, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, formationCertificates, formationMaterials, materialAccessLogs, massTimesConfig, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, badgeCategoryEnum, badgeRarityEnum, badges, userBadges, userPoints, pointActionEnum, pointTransactions, leaderboardCache, levelDefinitions, scheduleGenerationStatusEnum, scheduleGenerations, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, formationMaterialsRelations, materialAccessLogsRelations, notificationsRelations, scheduleGenerationsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertFormationMaterialSchema, insertAdorationDrawSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -128,9 +149,11 @@ var init_schema = __esm({
     formationCategoryEnum = pgEnum("formation_category", ["liturgia", "espiritualidade", "pratica"]);
     formationStatusEnum = pgEnum("formation_status", ["not_started", "in_progress", "completed"]);
     lessonContentTypeEnum = pgEnum("lesson_content_type", ["text", "video", "audio", "document", "quiz", "interactive"]);
+    materialTypeEnum = pgEnum("material_type", ["pdf", "document", "video", "audio", "image", "presentation", "other"]);
     liturgicalCycleEnum = pgEnum("liturgical_cycle", ["A", "B", "C"]);
     liturgicalColorEnum = pgEnum("liturgical_color", ["white", "red", "green", "purple", "rose", "black"]);
     celebrationRankEnum = pgEnum("celebration_rank", ["SOLEMNITY", "FEAST", "MEMORIAL", "OPTIONAL_MEMORIAL", "FERIAL"]);
+    confirmationStatusEnum = pgEnum("confirmation_status", ["pending", "confirmed", "declined", "no_response", "no_show"]);
     users = pgTable("users", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
       email: varchar("email", { length: 255 }).unique().notNull(),
@@ -216,7 +239,14 @@ var init_schema = __esm({
       rejectionReason: text("rejection_reason"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
-    });
+    }, (table) => [
+      // Filter users by status (pending, active, inactive)
+      index("idx_users_status").on(table.status),
+      // Filter by role and status (e.g., active ministers)
+      index("idx_users_role_status").on(table.role, table.status),
+      // Quick email lookup for authentication
+      index("idx_users_email").on(table.email)
+    ]);
     families = pgTable("families", {
       id: uuid("id").primaryKey().defaultRandom(),
       name: varchar("name", { length: 255 }).notNull(),
@@ -273,11 +303,17 @@ var init_schema = __esm({
       // Soft delete fields (Phase 1 - Data Integrity)
       deletedAt: timestamp("deleted_at"),
       isDeleted: boolean("is_deleted").notNull().default(false)
-    }, (table) => ({
+    }, (table) => [
       // Global unique constraint for UPSERT - one response per user per questionnaire (regardless of soft delete status)
       // Soft delete is just a flag - UPSERT always updates the same record and resurrects it
-      userQuestionnaireUnique: unique("questionnaire_responses_user_questionnaire_key").on(table.userId, table.questionnaireId)
-    }));
+      unique("questionnaire_responses_user_questionnaire_key").on(table.userId, table.questionnaireId),
+      // Get all responses for a questionnaire (report generation)
+      index("idx_questionnaire_responses_questionnaire").on(table.questionnaireId),
+      // Get all responses for a user
+      index("idx_questionnaire_responses_user").on(table.userId),
+      // Filter deleted responses
+      index("idx_questionnaire_responses_deleted").on(table.isDeleted)
+    ]);
     schedules = pgTable("schedules", {
       id: uuid("id").primaryKey().defaultRandom(),
       date: date("date").notNull(),
@@ -292,7 +328,16 @@ var init_schema = __esm({
       notes: text("notes"),
       onSiteAdjustments: jsonb("on_site_adjustments").$type(),
       createdAt: timestamp("created_at").defaultNow()
-    });
+    }, (table) => [
+      index("idx_schedules_date").on(table.date),
+      index("idx_schedules_minister").on(table.ministerId),
+      index("idx_schedules_date_time").on(table.date, table.time),
+      index("idx_schedules_status").on(table.status),
+      // Minister schedule lookup by date (my schedules)
+      index("idx_schedules_minister_date").on(table.ministerId, table.date),
+      // Published schedules filtering
+      index("idx_schedules_date_status").on(table.date, table.status)
+    ]);
     massExecutionLogs = pgTable("mass_execution_logs", {
       id: uuid("id").primaryKey().defaultRandom(),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
@@ -343,6 +388,28 @@ var init_schema = __esm({
       index("idx_minister_check_ins_schedule").on(table.scheduleId),
       index("idx_minister_check_ins_minister").on(table.ministerId)
     ]);
+    scheduleConfirmations = pgTable("schedule_confirmations", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
+      ministerId: varchar("minister_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      status: confirmationStatusEnum("status").notNull().default("pending"),
+      requestedAt: timestamp("requested_at").defaultNow(),
+      respondedAt: timestamp("responded_at"),
+      reminderSentAt: timestamp("reminder_sent_at"),
+      reminderCount: integer("reminder_count").default(0),
+      declineReason: text("decline_reason"),
+      notes: text("notes"),
+      requestedBy: varchar("requested_by").references(() => users.id),
+      // Coordinator who requested
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_schedule_confirmations_schedule").on(table.scheduleId),
+      index("idx_schedule_confirmations_minister").on(table.ministerId),
+      index("idx_schedule_confirmations_status").on(table.status),
+      // Unique constraint: one confirmation per minister per schedule
+      uniqueIndex("idx_schedule_confirmations_unique").on(table.scheduleId, table.ministerId)
+    ]);
     substitutionRequests = pgTable("substitution_requests", {
       id: uuid("id").primaryKey().defaultRandom(),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
@@ -362,7 +429,11 @@ var init_schema = __esm({
       index("idx_substitution_requester").on(table.requesterId),
       index("idx_substitution_substitute").on(table.substituteId),
       index("idx_substitution_status").on(table.status),
-      index("idx_substitution_schedule").on(table.scheduleId)
+      index("idx_substitution_schedule").on(table.scheduleId),
+      // Check substitution status for a schedule
+      index("idx_substitution_schedule_status").on(table.scheduleId, table.status),
+      // User's substitution history ordered by date
+      index("idx_substitution_requester_created").on(table.requesterId, table.createdAt)
     ]);
     notifications = pgTable("notifications", {
       id: uuid("id").primaryKey().defaultRandom(),
@@ -377,7 +448,14 @@ var init_schema = __esm({
       priority: varchar("priority", { length: 10 }).default("normal"),
       expiresAt: timestamp("expires_at"),
       createdAt: timestamp("created_at").defaultNow()
-    });
+    }, (table) => [
+      // Critical: fetching unread notifications for a user
+      index("idx_notifications_user_read").on(table.userId, table.read),
+      // Listing notifications by user ordered by creation
+      index("idx_notifications_user_created").on(table.userId, table.createdAt),
+      // Cleanup expired notifications
+      index("idx_notifications_expires").on(table.expiresAt)
+    ]);
     pushSubscriptions = pgTable("push_subscriptions", {
       id: uuid("id").primaryKey().defaultRandom(),
       userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -387,7 +465,9 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     }, (table) => [
-      uniqueIndex("push_subscriptions_endpoint_idx").on(table.endpoint)
+      uniqueIndex("push_subscriptions_endpoint_idx").on(table.endpoint),
+      // Find all subscriptions for a user (sending push notifications)
+      index("idx_push_subscriptions_user").on(table.userId)
     ]);
     formationTracks = pgTable("formation_tracks", {
       id: varchar("id").primaryKey(),
@@ -420,7 +500,14 @@ var init_schema = __esm({
       progressPercentage: integer("progress_percentage").default(0),
       completedAt: timestamp("completed_at"),
       createdAt: timestamp("created_at").defaultNow()
-    });
+    }, (table) => [
+      // Get all progress for a user
+      index("idx_formation_progress_user").on(table.userId),
+      // Get all progress for a module
+      index("idx_formation_progress_module").on(table.moduleId),
+      // Unique progress per user/module combination
+      index("idx_formation_progress_user_module").on(table.userId, table.moduleId)
+    ]);
     formationLessons = pgTable("formation_lessons", {
       id: uuid("id").primaryKey().defaultRandom(),
       moduleId: uuid("module_id").notNull().references(() => formationModules.id),
@@ -464,7 +551,94 @@ var init_schema = __esm({
       completedAt: timestamp("completed_at"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
-    });
+    }, (table) => [
+      // Get all lesson progress for a user
+      index("idx_formation_lesson_progress_user").on(table.userId),
+      // Get all progress for a lesson
+      index("idx_formation_lesson_progress_lesson").on(table.lessonId),
+      // Unique progress per user/lesson combination
+      index("idx_formation_lesson_progress_user_lesson").on(table.userId, table.lessonId)
+    ]);
+    formationCertificates = pgTable("formation_certificates", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      trackId: varchar("track_id").notNull().references(() => formationTracks.id, { onDelete: "cascade" }),
+      certificateNumber: varchar("certificate_number", { length: 50 }).notNull().unique(),
+      userName: varchar("user_name", { length: 255 }).notNull(),
+      // Snapshot of name at issuance
+      trackTitle: varchar("track_title", { length: 255 }).notNull(),
+      // Snapshot of track title
+      trackCategory: formationCategoryEnum("track_category").notNull(),
+      totalLessons: integer("total_lessons").notNull(),
+      totalHours: integer("total_hours").notNull(),
+      // Total duration in minutes / 60
+      issuedAt: timestamp("issued_at").defaultNow().notNull(),
+      issuedBy: varchar("issued_by").references(() => users.id, { onDelete: "set null" }),
+      // Coordinator who issued
+      validUntil: timestamp("valid_until"),
+      // Optional expiration
+      verificationCode: varchar("verification_code", { length: 20 }).notNull().unique(),
+      // For QR code verification
+      metadata: jsonb("metadata").$type(),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_certificates_user").on(table.userId),
+      index("idx_certificates_track").on(table.trackId),
+      index("idx_certificates_verification").on(table.verificationCode)
+    ]);
+    formationMaterials = pgTable("formation_materials", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      title: varchar("title", { length: 255 }).notNull(),
+      description: text("description"),
+      type: materialTypeEnum("type").notNull().default("pdf"),
+      category: formationCategoryEnum("category"),
+      // Optional - links to track category
+      trackId: varchar("track_id").references(() => formationTracks.id, { onDelete: "set null" }),
+      // Optional link to track
+      fileName: varchar("file_name", { length: 255 }).notNull(),
+      fileSize: integer("file_size").notNull(),
+      // Size in bytes
+      mimeType: varchar("mime_type", { length: 100 }).notNull(),
+      fileData: text("file_data"),
+      // Base64 encoded file content (for smaller files)
+      externalUrl: varchar("external_url", { length: 512 }),
+      // URL for external/large files
+      thumbnailData: text("thumbnail_data"),
+      // Base64 thumbnail for previews
+      tags: jsonb("tags").$type().default([]),
+      uploadedBy: varchar("uploaded_by").notNull().references(() => users.id, { onDelete: "set null" }),
+      downloadCount: integer("download_count").default(0),
+      isPublished: boolean("is_published").default(true),
+      isActive: boolean("is_active").default(true),
+      // AI Analysis fields
+      aiAnalyzed: boolean("ai_analyzed").default(false),
+      aiSummary: text("ai_summary"),
+      aiSuggestedCategory: formationCategoryEnum("ai_suggested_category"),
+      aiSuggestedTags: jsonb("ai_suggested_tags").$type(),
+      aiKeyTopics: jsonb("ai_key_topics").$type(),
+      aiContentQuality: varchar("ai_content_quality", { length: 20 }),
+      aiQualityNotes: jsonb("ai_quality_notes").$type(),
+      aiQuizQuestions: jsonb("ai_quiz_questions").$type(),
+      aiAnalyzedAt: timestamp("ai_analyzed_at"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_materials_category").on(table.category),
+      index("idx_materials_track").on(table.trackId),
+      index("idx_materials_type").on(table.type),
+      index("idx_materials_uploaded_by").on(table.uploadedBy)
+    ]);
+    materialAccessLogs = pgTable("material_access_logs", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      materialId: uuid("material_id").notNull().references(() => formationMaterials.id, { onDelete: "cascade" }),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      action: varchar("action", { length: 20 }).notNull(),
+      // 'view', 'download'
+      accessedAt: timestamp("accessed_at").defaultNow()
+    }, (table) => [
+      index("idx_material_access_material").on(table.materialId),
+      index("idx_material_access_user").on(table.userId)
+    ]);
     massTimesConfig = pgTable("mass_times_config", {
       id: uuid("id").primaryKey().defaultRandom(),
       dayOfWeek: integer("day_of_week").notNull(),
@@ -488,7 +662,12 @@ var init_schema = __esm({
       processedAt: timestamp("processed_at"),
       adminNotes: text("admin_notes"),
       createdAt: timestamp("created_at").defaultNow()
-    });
+    }, (table) => [
+      // Filter requests by status (pending requests queue)
+      index("idx_password_reset_status").on(table.status),
+      // Get requests for a user
+      index("idx_password_reset_user").on(table.userId)
+    ]);
     adorationDraws = pgTable("adoration_draws", {
       id: uuid("id").primaryKey().defaultRandom(),
       month: integer("month").notNull(),
@@ -545,6 +724,184 @@ var init_schema = __esm({
       index("idx_activity_logs_user").on(table.userId),
       index("idx_activity_logs_action").on(table.action),
       index("idx_activity_logs_created").on(table.createdAt)
+    ]);
+    badgeCategoryEnum = pgEnum("badge_category", [
+      "participation",
+      // Participacao em missas
+      "formation",
+      // Formacao e aprendizado
+      "community",
+      // Comunidade e ajuda
+      "streak",
+      // Sequencias e consistencia
+      "milestone",
+      // Marcos importantes
+      "special"
+      // Eventos especiais
+    ]);
+    badgeRarityEnum = pgEnum("badge_rarity", [
+      "common",
+      // Comum - facil de obter
+      "uncommon",
+      // Incomum
+      "rare",
+      // Raro
+      "epic",
+      // Epico
+      "legendary"
+      // Lendario - muito dificil
+    ]);
+    badges = pgTable("badges", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      code: varchar("code", { length: 50 }).notNull().unique(),
+      // Unique identifier
+      name: varchar("name", { length: 100 }).notNull(),
+      description: text("description"),
+      category: badgeCategoryEnum("category").notNull(),
+      rarity: badgeRarityEnum("rarity").notNull().default("common"),
+      iconName: varchar("icon_name", { length: 50 }),
+      // Lucide icon name
+      iconColor: varchar("icon_color", { length: 20 }),
+      // Tailwind color class
+      pointsAwarded: integer("points_awarded").default(0),
+      requirement: jsonb("requirement").$type(),
+      isActive: boolean("is_active").default(true),
+      isSecret: boolean("is_secret").default(false),
+      // Hidden until earned
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_badges_category").on(table.category),
+      index("idx_badges_active").on(table.isActive)
+    ]);
+    userBadges = pgTable("user_badges", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      badgeId: uuid("badge_id").notNull().references(() => badges.id, { onDelete: "cascade" }),
+      earnedAt: timestamp("earned_at").defaultNow(),
+      isFeatured: boolean("is_featured").default(false),
+      // Displayed prominently on profile
+      progress: integer("progress").default(100),
+      // For partial progress badges
+      metadata: jsonb("metadata")
+      // Additional context
+    }, (table) => [
+      index("idx_user_badges_user").on(table.userId),
+      index("idx_user_badges_badge").on(table.badgeId),
+      unique("unique_user_badge").on(table.userId, table.badgeId)
+    ]);
+    userPoints = pgTable("user_points", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+      totalPoints: integer("total_points").default(0),
+      currentStreak: integer("current_streak").default(0),
+      // Consecutive weeks serving
+      longestStreak: integer("longest_streak").default(0),
+      level: integer("level").default(1),
+      levelProgress: integer("level_progress").default(0),
+      // Points towards next level
+      massesServed: integer("masses_served").default(0),
+      substitutionsHelped: integer("substitutions_helped").default(0),
+      materialsCompleted: integer("materials_completed").default(0),
+      quizzesCompleted: integer("quizzes_completed").default(0),
+      lastActivityAt: timestamp("last_activity_at"),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_user_points_total").on(table.totalPoints),
+      index("idx_user_points_level").on(table.level)
+    ]);
+    pointActionEnum = pgEnum("point_action", [
+      "mass_served",
+      // Serviu em missa
+      "substitution_offered",
+      // Ofereceu substituicao
+      "substitution_accepted",
+      // Aceitou substituir alguem
+      "material_completed",
+      // Completou material de formacao
+      "quiz_completed",
+      // Completou quiz
+      "quiz_perfect",
+      // Quiz com 100%
+      "streak_bonus",
+      // Bonus de sequencia
+      "badge_earned",
+      // Ganhou badge
+      "login_bonus",
+      // Bonus de login diario
+      "first_action",
+      // Primeira acao (boas vindas)
+      "community_help",
+      // Ajudou na comunidade
+      "special_event"
+      // Evento especial
+    ]);
+    pointTransactions = pgTable("point_transactions", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      action: pointActionEnum("action").notNull(),
+      points: integer("points").notNull(),
+      // Positive for earned, negative for spent
+      description: text("description"),
+      relatedEntityType: varchar("related_entity_type", { length: 50 }),
+      // schedule, material, badge, etc
+      relatedEntityId: varchar("related_entity_id", { length: 100 }),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_point_transactions_user").on(table.userId),
+      index("idx_point_transactions_action").on(table.action),
+      index("idx_point_transactions_created").on(table.createdAt)
+    ]);
+    leaderboardCache = pgTable("leaderboard_cache", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      period: varchar("period", { length: 20 }).notNull(),
+      // weekly, monthly, yearly, alltime
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      rank: integer("rank").notNull(),
+      points: integer("points").notNull(),
+      level: integer("level").default(1),
+      userName: varchar("user_name", { length: 255 }),
+      userPhotoUrl: text("user_photo_url"),
+      calculatedAt: timestamp("calculated_at").defaultNow()
+    }, (table) => [
+      index("idx_leaderboard_period").on(table.period),
+      index("idx_leaderboard_rank").on(table.period, table.rank),
+      unique("unique_leaderboard_entry").on(table.period, table.userId)
+    ]);
+    levelDefinitions = pgTable("level_definitions", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      level: integer("level").notNull().unique(),
+      name: varchar("name", { length: 100 }).notNull(),
+      minPoints: integer("min_points").notNull(),
+      maxPoints: integer("max_points"),
+      iconName: varchar("icon_name", { length: 50 }),
+      color: varchar("color", { length: 20 }),
+      benefits: jsonb("benefits").$type(),
+      createdAt: timestamp("created_at").defaultNow()
+    }, (table) => [
+      index("idx_level_definitions_level").on(table.level),
+      index("idx_level_definitions_points").on(table.minPoints)
+    ]);
+    scheduleGenerationStatusEnum = pgEnum("schedule_generation_status", ["draft", "published"]);
+    scheduleGenerations = pgTable("schedule_generations", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      month: integer("month").notNull(),
+      year: integer("year").notNull(),
+      status: scheduleGenerationStatusEnum("status").notNull().default("draft"),
+      originalSchedule: jsonb("original_schedule").notNull(),
+      // Schedule generated by algorithm (full JSON)
+      finalSchedule: jsonb("final_schedule"),
+      // Schedule after edits (filled on publish)
+      differences: jsonb("differences"),
+      // Calculated differences between original and final
+      generationMetrics: jsonb("generation_metrics"),
+      // Generation metrics (confidence, etc)
+      createdAt: timestamp("created_at").defaultNow(),
+      publishedAt: timestamp("published_at"),
+      createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" })
+    }, (table) => [
+      index("idx_schedule_generations_month_year").on(table.month, table.year),
+      index("idx_schedule_generations_status").on(table.status),
+      index("idx_schedule_generations_created_by").on(table.createdById)
     ]);
     liturgicalYears = pgTable("liturgical_years", {
       id: uuid("id").primaryKey().defaultRandom(),
@@ -819,9 +1176,36 @@ var init_schema = __esm({
         references: [formationLessons.id]
       })
     }));
+    formationMaterialsRelations = relations(formationMaterials, ({ one, many }) => ({
+      track: one(formationTracks, {
+        fields: [formationMaterials.trackId],
+        references: [formationTracks.id]
+      }),
+      uploader: one(users, {
+        fields: [formationMaterials.uploadedBy],
+        references: [users.id]
+      }),
+      accessLogs: many(materialAccessLogs)
+    }));
+    materialAccessLogsRelations = relations(materialAccessLogs, ({ one }) => ({
+      material: one(formationMaterials, {
+        fields: [materialAccessLogs.materialId],
+        references: [formationMaterials.id]
+      }),
+      user: one(users, {
+        fields: [materialAccessLogs.userId],
+        references: [users.id]
+      })
+    }));
     notificationsRelations = relations(notifications, ({ one }) => ({
       user: one(users, {
         fields: [notifications.userId],
+        references: [users.id]
+      })
+    }));
+    scheduleGenerationsRelations = relations(scheduleGenerations, ({ one }) => ({
+      createdBy: one(users, {
+        fields: [scheduleGenerations.createdById],
         references: [users.id]
       })
     }));
@@ -905,6 +1289,22 @@ var init_schema = __esm({
       timeSpentMinutes: true,
       completedSections: true,
       lastAccessedAt: true
+    });
+    insertFormationMaterialSchema = createInsertSchema(formationMaterials).pick({
+      title: true,
+      description: true,
+      type: true,
+      category: true,
+      trackId: true,
+      fileName: true,
+      fileSize: true,
+      mimeType: true,
+      fileData: true,
+      externalUrl: true,
+      thumbnailData: true,
+      tags: true,
+      uploadedBy: true,
+      isPublished: true
     });
     insertAdorationDrawSchema = createInsertSchema(adorationDraws).pick({
       month: true,
@@ -1045,8 +1445,9 @@ var init_storage = __esm({
         try {
           return await drizzleQuery();
         } catch (drizzleError) {
-          if (drizzleError.code === "SQLITE_ERROR" || drizzleError.message?.includes("SQLITE")) {
-            console.warn("[FALLBACK] Drizzle failed in dev, using SQLite directly:", drizzleError.message);
+          const err = drizzleError;
+          if (err.code === "SQLITE_ERROR" || err.message?.includes("SQLITE")) {
+            console.warn("[FALLBACK] Drizzle failed in dev, using SQLite directly:", err.message);
             const sqlite = this.getSQLiteDB();
             const result = sqlite.prepare(fallbackSQL).all();
             return result.map(fallbackMapper);
@@ -1061,7 +1462,8 @@ var init_storage = __esm({
         try {
           return await drizzleQuery();
         } catch (drizzleError) {
-          if (drizzleError.code === "SQLITE_ERROR" || drizzleError.message?.includes("SQLITE")) {
+          const err = drizzleError;
+          if (err.code === "SQLITE_ERROR" || err.message?.includes("SQLITE")) {
             const sqlite = this.getSQLiteDB();
             const result = sqlite.prepare(fallbackSQL).get();
             return result ? fallbackMapper(result) : void 0;
@@ -1162,6 +1564,33 @@ var init_storage = __esm({
       }
       async getUsersByRole(role) {
         return await db.select().from(users).where(eq2(users.role, role));
+      }
+      async getUsersPaginated(options) {
+        const { limit, offset, status } = options;
+        const whereCondition = status ? eq2(users.status, status) : void 0;
+        const [data, countResult] = await Promise.all([
+          whereCondition ? db.select().from(users).where(whereCondition).orderBy(desc(users.createdAt)).limit(limit).offset(offset) : db.select().from(users).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+          whereCondition ? db.select({ count: count() }).from(users).where(whereCondition) : db.select({ count: count() }).from(users)
+        ]);
+        const total = countResult[0]?.count ?? 0;
+        return {
+          data,
+          total,
+          hasMore: offset + data.length < total
+        };
+      }
+      async getUsersByStatusPaginated(status, options) {
+        const { limit, offset } = options;
+        const [data, countResult] = await Promise.all([
+          db.select().from(users).where(eq2(users.status, status)).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+          db.select({ count: count() }).from(users).where(eq2(users.status, status))
+        ]);
+        const total = countResult[0]?.count ?? 0;
+        return {
+          data,
+          total,
+          hasMore: offset + data.length < total
+        };
       }
       // Questionnaire operations
       async createQuestionnaire(questionnaireData) {
@@ -1291,7 +1720,7 @@ var init_storage = __esm({
       }
       formatMassTime(time2) {
         if (!time2) return "";
-        const timeStr = typeof time2 === "string" ? time2 : time2.toString();
+        const timeStr = typeof time2 === "string" ? time2 : String(time2);
         const [hours, minutes] = timeStr.split(":").map(Number);
         if (minutes === 0 || minutes === void 0) {
           return `${hours}h`;
@@ -1360,7 +1789,31 @@ var init_storage = __esm({
         }));
       }
       async getMonthSubstitutions(month, year) {
-        return [];
+        const targetDate = /* @__PURE__ */ new Date();
+        const targetMonth = month ?? targetDate.getMonth() + 1;
+        const targetYear = year ?? targetDate.getFullYear();
+        const firstDay = new Date(targetYear, targetMonth - 1, 1);
+        const lastDay = new Date(targetYear, targetMonth, 0);
+        const substitutions = await db.select({
+          id: substitutionRequests.id,
+          scheduleId: substitutionRequests.scheduleId,
+          requesterId: substitutionRequests.requesterId,
+          substituteId: substitutionRequests.substituteId,
+          reason: substitutionRequests.reason,
+          status: substitutionRequests.status,
+          urgency: substitutionRequests.urgency,
+          approvedBy: substitutionRequests.approvedBy,
+          approvedAt: substitutionRequests.approvedAt,
+          responseMessage: substitutionRequests.responseMessage,
+          createdAt: substitutionRequests.createdAt,
+          updatedAt: substitutionRequests.updatedAt
+        }).from(substitutionRequests).innerJoin(schedules, eq2(substitutionRequests.scheduleId, schedules.id)).where(
+          and(
+            gte(schedules.date, firstDay.toISOString().split("T")[0]),
+            lte(schedules.date, lastDay.toISOString().split("T")[0])
+          )
+        );
+        return substitutions;
       }
       async getScheduleById(id) {
         const [schedule] = await db.select().from(schedules).where(eq2(schedules.id, id));
@@ -1414,8 +1867,42 @@ var init_storage = __esm({
       async getUserNotifications(userId) {
         return await db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
       }
+      async getUserNotificationsPaginated(userId, options) {
+        const { limit, offset } = options;
+        const [data, countResult] = await Promise.all([
+          db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset),
+          db.select({ count: count() }).from(notifications).where(eq2(notifications.userId, userId))
+        ]);
+        const total = countResult[0]?.count ?? 0;
+        return {
+          data,
+          total,
+          hasMore: offset + data.length < total
+        };
+      }
       async markNotificationAsRead(id) {
         await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq2(notifications.id, id));
+      }
+      async getUnreadNotificationCount(userId) {
+        const result = await db.select({ count: count() }).from(notifications).where(and(
+          eq2(notifications.userId, userId),
+          eq2(notifications.read, false)
+        ));
+        return result[0]?.count ?? 0;
+      }
+      async markAllNotificationsAsRead(userId) {
+        await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and(
+          eq2(notifications.userId, userId),
+          eq2(notifications.read, false)
+        ));
+      }
+      async deleteExpiredNotifications() {
+        const now = /* @__PURE__ */ new Date();
+        const result = await db.delete(notifications).where(and(
+          sql2`${notifications.expiresAt} IS NOT NULL`,
+          sql2`${notifications.expiresAt} < ${now}`
+        )).returning({ id: notifications.id });
+        return result.length;
       }
       async createPushSubscription(subscription) {
         await this.ensurePushSubscriptionTable();
@@ -1631,8 +2118,8 @@ var init_storage = __esm({
             ...row,
             isActive: !!row.isActive,
             isRequired: !!row.isRequired,
-            createdAt: new Date(row.createdAt),
-            updatedAt: new Date(row.updatedAt)
+            createdAt: row.createdAt ? new Date(row.createdAt) : /* @__PURE__ */ new Date(),
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : /* @__PURE__ */ new Date()
           })
         );
       }
@@ -1647,8 +2134,8 @@ var init_storage = __esm({
           `SELECT * FROM formation_modules WHERE trackId = '${trackId}' ORDER BY orderIndex, title`,
           (row) => ({
             ...row,
-            createdAt: new Date(row.createdAt),
-            updatedAt: new Date(row.updatedAt)
+            createdAt: row.createdAt ? new Date(row.createdAt) : /* @__PURE__ */ new Date(),
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : /* @__PURE__ */ new Date()
           })
         );
       }
@@ -2025,16 +2512,17 @@ var init_logger = __esm({
         if (Array.isArray(data)) {
           return data.map((item) => this.sanitize(item));
         }
+        const dataObj = data;
         const sanitized = {};
-        for (const key of Object.keys(data)) {
+        for (const key of Object.keys(dataObj)) {
           const lowerKey = key.toLowerCase();
           const isSensitive = SENSITIVE_KEYS.some((sk) => lowerKey.includes(sk.toLowerCase()));
           if (isSensitive) {
             sanitized[key] = "[REDACTED]";
-          } else if (typeof data[key] === "object" && data[key] !== null) {
-            sanitized[key] = this.sanitize(data[key]);
+          } else if (typeof dataObj[key] === "object" && dataObj[key] !== null) {
+            sanitized[key] = this.sanitize(dataObj[key]);
           } else {
-            sanitized[key] = data[key];
+            sanitized[key] = dataObj[key];
           }
         }
         return sanitized;
@@ -2076,6 +2564,398 @@ var init_logger = __esm({
       }
     };
     logger = new Logger();
+  }
+});
+
+// server/services/emailService.ts
+var emailService_exports = {};
+__export(emailService_exports, {
+  getEmailProviderName: () => getEmailProviderName,
+  isEmailConfigured: () => isEmailConfigured,
+  sendEmail: () => sendEmail,
+  sendPasswordResetEmail: () => sendPasswordResetEmail,
+  sendScheduleNotificationEmail: () => sendScheduleNotificationEmail
+});
+function getErrorMessage(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+function getProvider() {
+  const provider = process.env.EMAIL_PROVIDER?.toLowerCase();
+  if (provider === "resend" && !process.env.RESEND_API_KEY) {
+    logger.warn("RESEND_API_KEY not configured, falling back to console");
+    return "console";
+  }
+  if (provider === "sendgrid" && !process.env.SENDGRID_API_KEY) {
+    logger.warn("SENDGRID_API_KEY not configured, falling back to console");
+    return "console";
+  }
+  if (provider === "smtp" && (!process.env.SMTP_HOST || !process.env.SMTP_USER)) {
+    logger.warn("SMTP not fully configured, falling back to console");
+    return "console";
+  }
+  if (!provider || provider === "console") {
+    if (process.env.NODE_ENV === "production") {
+      logger.warn("No email provider configured for production!");
+    }
+    return "console";
+  }
+  return provider;
+}
+function getFromEmail() {
+  return process.env.EMAIL_FROM || "noreply@mesc.app";
+}
+async function sendViaResend(options) {
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: getFromEmail(),
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to send email via Resend");
+    }
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    logger.error("Resend email error:", error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+async function sendViaSendGrid(options) {
+  try {
+    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.SENDGRID_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: options.to }] }],
+        from: { email: getFromEmail() },
+        subject: options.subject,
+        content: [
+          ...options.text ? [{ type: "text/plain", value: options.text }] : [],
+          ...options.html ? [{ type: "text/html", value: options.html }] : []
+        ]
+      })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || "Failed to send email via SendGrid");
+    }
+    return { success: true, messageId: response.headers.get("x-message-id") || void 0 };
+  } catch (error) {
+    logger.error("SendGrid email error:", error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+async function sendViaSMTP(options) {
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+    const info = await transporter.sendMail({
+      from: getFromEmail(),
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    logger.error("SMTP email error:", error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+async function sendViaConsole(options) {
+  console.log("============================================");
+  console.log("EMAIL (Console Mode - Not Actually Sent)");
+  console.log("============================================");
+  console.log(`To: ${options.to}`);
+  console.log(`Subject: ${options.subject}`);
+  console.log("--------------------------------------------");
+  console.log(options.text || options.html);
+  console.log("============================================");
+  return { success: true, messageId: `console-${Date.now()}` };
+}
+async function sendEmail(options) {
+  const provider = getProvider();
+  logger.info(`Sending email via ${provider}`, { to: options.to, subject: options.subject });
+  switch (provider) {
+    case "resend":
+      return sendViaResend(options);
+    case "sendgrid":
+      return sendViaSendGrid(options);
+    case "smtp":
+      return sendViaSMTP(options);
+    case "console":
+    default:
+      return sendViaConsole(options);
+  }
+}
+async function sendPasswordResetEmail(to, userName, tempPassword) {
+  const subject = "MESC - Redefini\xE7\xE3o de Senha";
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+    .password-box { background: #fff; border: 2px dashed #4F46E5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+    .password { font-size: 24px; font-family: monospace; color: #4F46E5; letter-spacing: 2px; }
+    .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; }
+    .footer { text-align: center; color: #6B7280; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Ministros da Sagrada Comunhao</h1>
+    </div>
+    <div class="content">
+      <p>Ola, <strong>${userName}</strong>!</p>
+
+      <p>Recebemos uma solicitacao para redefinir sua senha. Aqui esta sua senha temporaria:</p>
+
+      <div class="password-box">
+        <p style="margin: 0 0 10px 0; color: #6B7280;">Sua senha temporaria:</p>
+        <p class="password">${tempPassword}</p>
+      </div>
+
+      <div class="warning">
+        <strong>Importante:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Esta senha e temporaria e expira em 24 horas</li>
+          <li>Voce sera solicitado a criar uma nova senha no primeiro login</li>
+          <li>Se voce nao solicitou esta redefinicao, ignore este email</li>
+        </ul>
+      </div>
+
+      <p>Acesse o sistema em: <a href="${process.env.APP_URL || "https://mesc.app"}">${process.env.APP_URL || "https://mesc.app"}</a></p>
+
+      <p>Paz e bem,<br>Equipe MESC</p>
+    </div>
+    <div class="footer">
+      <p>Este e um email automatico. Por favor, nao responda.</p>
+      <p>Santuario Sao Judas Tadeu - Sorocaba/SP</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+  const text2 = `
+Ola, ${userName}!
+
+Recebemos uma solicitacao para redefinir sua senha.
+
+Sua senha temporaria: ${tempPassword}
+
+IMPORTANTE:
+- Esta senha e temporaria e expira em 24 horas
+- Voce sera solicitado a criar uma nova senha no primeiro login
+- Se voce nao solicitou esta redefinicao, ignore este email
+
+Acesse o sistema em: ${process.env.APP_URL || "https://mesc.app"}
+
+Paz e bem,
+Equipe MESC
+
+---
+Santuario Sao Judas Tadeu - Sorocaba/SP
+`;
+  return sendEmail({ to, subject, html, text: text2 });
+}
+async function sendScheduleNotificationEmail(to, userName, scheduleDate, scheduleTime, location) {
+  const subject = "MESC - Nova Escala Publicada";
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+    .schedule-box { background: #fff; border: 1px solid #E5E7EB; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    .schedule-item { display: flex; margin: 10px 0; }
+    .schedule-label { font-weight: bold; width: 100px; }
+    .footer { text-align: center; color: #6B7280; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Nova Escala</h1>
+    </div>
+    <div class="content">
+      <p>Ola, <strong>${userName}</strong>!</p>
+
+      <p>Voce foi escalado para a seguinte missa:</p>
+
+      <div class="schedule-box">
+        <div class="schedule-item">
+          <span class="schedule-label">Data:</span>
+          <span>${scheduleDate}</span>
+        </div>
+        <div class="schedule-item">
+          <span class="schedule-label">Horario:</span>
+          <span>${scheduleTime}</span>
+        </div>
+        <div class="schedule-item">
+          <span class="schedule-label">Local:</span>
+          <span>${location}</span>
+        </div>
+      </div>
+
+      <p>Por favor, confirme sua presenca no sistema ou entre em contato com a coordenacao caso nao possa comparecer.</p>
+
+      <p>Paz e bem,<br>Equipe MESC</p>
+    </div>
+    <div class="footer">
+      <p>Santuario Sao Judas Tadeu - Sorocaba/SP</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+  const text2 = `
+Ola, ${userName}!
+
+Voce foi escalado para a seguinte missa:
+
+Data: ${scheduleDate}
+Horario: ${scheduleTime}
+Local: ${location}
+
+Por favor, confirme sua presenca no sistema ou entre em contato com a coordenacao caso nao possa comparecer.
+
+Paz e bem,
+Equipe MESC
+`;
+  return sendEmail({ to, subject, html, text: text2 });
+}
+function isEmailConfigured() {
+  const provider = getProvider();
+  return provider !== "console" || process.env.NODE_ENV === "development";
+}
+function getEmailProviderName() {
+  return getProvider();
+}
+var init_emailService = __esm({
+  "server/services/emailService.ts"() {
+    "use strict";
+    init_logger();
+  }
+});
+
+// server/utils/pushNotifications.ts
+var pushNotifications_exports = {};
+__export(pushNotifications_exports, {
+  pushConfig: () => pushConfig,
+  sendPushNotificationToUsers: () => sendPushNotificationToUsers
+});
+async function sendPushNotificationToUsers(userIds, payload) {
+  console.log("[PUSH] Iniciando envio para", userIds.length, "userIds");
+  if (!pushConfig.enabled || !webpush) {
+    console.warn("[PUSH] Push desabilitado ou web-push n\xE3o dispon\xEDvel");
+    return;
+  }
+  if (!userIds || userIds.length === 0) {
+    console.warn("[PUSH] Nenhum userIds fornecido");
+    return;
+  }
+  const uniqueUserIds = Array.from(new Set(userIds));
+  console.log("[PUSH] UserIds \xFAnicos:", uniqueUserIds.length);
+  console.log("[PUSH] Lista de UserIds:", uniqueUserIds);
+  const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  console.log("[PUSH] Subscriptions encontradas:", subscriptions.length);
+  console.log("[PUSH] Subscriptions por userId:", subscriptions.map((s) => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + "..." })));
+  if (subscriptions.length === 0) {
+    console.warn("[PUSH] Nenhuma subscription encontrada para os userIds fornecidos");
+    return;
+  }
+  const notificationPayload = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url ?? payload.data?.url ?? "/communication",
+    tag: payload.tag,
+    data: payload.data ?? {}
+  });
+  const results = await Promise.all(
+    subscriptions.map(async (subscription) => {
+      const pushSubscription = {
+        endpoint: subscription.endpoint,
+        keys: {
+          auth: subscription.authKey,
+          p256dh: subscription.p256dhKey
+        }
+      };
+      try {
+        await webpush.sendNotification(pushSubscription, notificationPayload);
+        console.log("[PUSH] Notifica\xE7\xE3o enviada com sucesso para userId:", subscription.userId);
+        return { success: true, userId: subscription.userId };
+      } catch (error) {
+        const pushError = error;
+        const statusCode = pushError?.statusCode ?? pushError?.code;
+        if (statusCode === 404 || statusCode === 410) {
+          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, "userId:", subscription.userId);
+          await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
+        } else {
+          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
+        }
+        return { success: false, userId: subscription.userId, error: statusCode };
+      }
+    })
+  );
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
+  console.log("[PUSH] Resumo: Sucesso:", successCount, "| Falha:", failCount);
+}
+var webpush, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, pushConfig;
+var init_pushNotifications = __esm({
+  async "server/utils/pushNotifications.ts"() {
+    "use strict";
+    await init_storage();
+    webpush = null;
+    try {
+      const module = await import("web-push");
+      webpush = module.default ?? module;
+    } catch (error) {
+      console.warn("[PUSH] web-push module not available. Push notifications disabled.", error);
+    }
+    VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
+    VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
+    VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+    if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+      webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    }
+    pushConfig = {
+      enabled: Boolean(webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
+      publicKey: VAPID_PUBLIC_KEY || null
+    };
   }
 });
 
@@ -2212,6 +3092,9 @@ __export(scheduleGenerator_exports, {
 });
 import { eq as eq12, and as and7, or as or5, sql as sql4, ne as ne2, inArray as inArray2 } from "drizzle-orm";
 import { format as format2, addDays, startOfMonth, endOfMonth, getDay as getDay2, getDate, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
+function isV2QuestionnaireData(data) {
+  return data !== null && typeof data === "object" && "format_version" in data && data.format_version === "2.0";
+}
 async function generateAutomaticSchedule(year, month, isPreview = false) {
   const generator = new ScheduleGenerator();
   return await generator.generateScheduleForMonth(year, month, isPreview);
@@ -2430,11 +3313,11 @@ ${"=".repeat(60)}`);
 \u{1F3AF} FAIRNESS REPORT:`);
           const distributionMap = /* @__PURE__ */ new Map();
           this.ministers.forEach((m) => {
-            const count9 = m.monthlyAssignmentCount || 0;
-            if (!distributionMap.has(count9)) {
-              distributionMap.set(count9, []);
+            const count12 = m.monthlyAssignmentCount || 0;
+            if (!distributionMap.has(count12)) {
+              distributionMap.set(count12, []);
             }
-            distributionMap.get(count9).push(m);
+            distributionMap.get(count12).push(m);
           });
           console.log(`  Assignment Distribution:`);
           for (let i = 0; i <= 4; i++) {
@@ -2483,8 +3366,8 @@ ${"!".repeat(60)}`);
           console.log(`
 \u{1F50D} ERROR DETAILS:`);
           console.log(`  Type: ${typeof error}`);
-          console.log(`  Name: ${error?.name || "Unknown"}`);
-          console.log(`  Message: ${error?.message || "No message"}`);
+          console.log(`  Name: ${error instanceof Error ? error.name : "Unknown"}`);
+          console.log(`  Message: ${error instanceof Error ? error.message : "No message"}`);
           console.log(`
 \u{1F4CA} DATA STATE WHEN FAILED:`);
           console.log(`  Ministers loaded: ${this.ministers?.length || 0}`);
@@ -2492,7 +3375,7 @@ ${"!".repeat(60)}`);
           console.log(`  Mass times config: ${this.massTimes?.length || 0}`);
           console.log(`
 \u{1F4DA} STACK TRACE:`);
-          console.log(error?.stack || "No stack trace available");
+          console.log(error instanceof Error ? error.stack : "No stack trace available");
           console.log(`${"!".repeat(60)}
 `);
           console.timeEnd("[PERF] Total generation time");
@@ -2557,17 +3440,28 @@ ${"!".repeat(60)}`);
           console.log(`[SCHEDULE_GEN] Query successful, found ${ministersData.length} ministers`);
         } catch (queryError) {
           console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR:`, queryError);
-          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR STACK:`, queryError?.stack);
-          throw new Error(`Erro na consulta de ministros: ${queryError?.message || queryError}`);
+          const errorStack = queryError instanceof Error ? queryError.stack : void 0;
+          const errorMessage = queryError instanceof Error ? queryError.message : String(queryError);
+          console.error(`[SCHEDULE_GEN] \u274C QUERY ERROR STACK:`, errorStack);
+          throw new Error(`Erro na consulta de ministros: ${errorMessage}`);
         }
         this.ministers = ministersData.map((m) => ({
-          ...m,
+          id: m.id,
+          name: m.name,
+          role: m.role,
           totalServices: m.totalServices || 0,
+          lastService: m.lastService,
           preferredTimes: m.preferredTimes || [],
           canServeAsCouple: m.canServeAsCouple || false,
+          spouseMinisterId: m.spouseMinisterId,
           familyId: m.familyId || null,
           preferredPositions: m.preferredPositions || [],
           avoidPositions: m.avoidPositions || [],
+          reliabilityScore: m.reliabilityScore ?? void 0,
+          substitutionRequestCount: m.substitutionRequestCount ?? void 0,
+          substitutionFulfilledCount: m.substitutionFulfilledCount ?? void 0,
+          manualRemovalCount: m.manualRemovalCount ?? void 0,
+          noShowCount: m.noShowCount ?? void 0,
           availabilityScore: this.calculateAvailabilityScore(m),
           preferenceScore: this.calculatePreferenceScore(m),
           // 🔥 FAIR ALGORITHM: Initialize monthly counters
@@ -2608,7 +3502,7 @@ ${"!".repeat(60)}`);
           }
         }
         const familyCount = this.familyGroups.size;
-        const membersCount = Array.from(this.familyGroups.values()).reduce((sum, members) => sum + members.length, 0);
+        const membersCount = Array.from(this.familyGroups.values()).reduce((sum2, members) => sum2 + members.length, 0);
         console.log(`[FAMILY_SYSTEM] \u2705 Loaded ${familyCount} families with ${membersCount} total members`);
         for (const [familyId, memberIds] of this.familyGroups.entries()) {
           const memberNames = memberIds.map((id) => this.ministers.find((m) => m.id === id)?.name).filter(Boolean).join(", ");
@@ -2643,8 +3537,7 @@ ${"!".repeat(60)}`);
             responsesData = null;
           }
         }
-        const isV2Format = responsesData && typeof responsesData === "object" && responsesData.format_version === "2.0";
-        if (isV2Format) {
+        if (isV2QuestionnaireData(responsesData)) {
           console.log(`[COMPATIBILITY_LAYER] \u{1F3AF} Processing v2.0 STANDARDIZED format for ${questionnaireMonth}/${questionnaireYear}`);
           try {
             const data = responsesData;
@@ -2759,13 +3652,14 @@ ${"!".repeat(60)}`);
                 return;
               }
               if (value && typeof value === "object") {
-                if (Array.isArray(value.selectedOptions)) {
-                  value.selectedOptions.forEach((entry) => addWeekdayAvailability(entry));
+                const valueObj = value;
+                if (Array.isArray(valueObj.selectedOptions)) {
+                  valueObj.selectedOptions.forEach((entry) => addWeekdayAvailability(entry));
                 }
-                if (Array.isArray(value.options)) {
-                  value.options.forEach((entry) => addWeekdayAvailability(entry));
+                if (Array.isArray(valueObj.options)) {
+                  valueObj.options.forEach((entry) => addWeekdayAvailability(entry));
                 }
-                Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+                Object.entries(valueObj).forEach(([nestedKey, nestedValue]) => {
                   processWeekdayStructure(nestedValue, nestedKey);
                 });
               }
@@ -2793,7 +3687,7 @@ ${"!".repeat(60)}`);
             if (data.alternative_times && Array.isArray(data.alternative_times)) {
               alternativeTimes = data.alternative_times;
             }
-            canSubstitute = data.can_substitute === true || data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0;
+            canSubstitute = data.can_substitute === true || Boolean(data.alternative_times && Array.isArray(data.alternative_times) && data.alternative_times.length > 0);
             console.log(`[COMPATIBILITY_LAYER] \u2705 v2.0 parsed: ${availableSundays.length} sunday slots, ${weekdayMasses.length} weekday slots, ${Object.keys(specialEvents).length} special events, canSubstitute=${canSubstitute}, altTimes=${alternativeTimes.length}`);
           } catch (error) {
             console.error(`[COMPATIBILITY_LAYER] \u274C Error parsing v2.0:`, error);
@@ -2801,50 +3695,60 @@ ${"!".repeat(60)}`);
         } else if (questionnaireMonth === 10 && questionnaireYear === 2025 && Array.isArray(responsesData)) {
           try {
             console.log(`[COMPATIBILITY_LAYER] \u2705 October 2025 using LEGACY array format`);
+            const getSelectedOptions = (answer) => {
+              if (answer && typeof answer === "object" && "selectedOptions" in answer) {
+                const opts = answer.selectedOptions;
+                return Array.isArray(opts) ? opts : null;
+              }
+              return null;
+            };
             const responsesArray = responsesData;
             responsesArray.forEach((item) => {
+              const answer = item.answer;
               switch (item.questionId) {
                 case "available_sundays":
-                  availableSundays = Array.isArray(item.answer) ? item.answer : [];
+                  availableSundays = Array.isArray(answer) ? answer : [];
                   break;
                 case "main_service_time":
-                  preferredMassTimes = item.answer ? [item.answer] : [];
+                  preferredMassTimes = answer ? [String(answer)] : [];
                   break;
                 case "other_times_available":
-                  if (item.answer && item.answer !== "N\xE3o") {
-                    if (typeof item.answer === "object" && item.answer.selectedOptions) {
-                      alternativeTimes = item.answer.selectedOptions;
-                    } else if (Array.isArray(item.answer)) {
-                      alternativeTimes = item.answer;
-                    } else if (typeof item.answer === "string") {
-                      alternativeTimes = [item.answer];
+                  if (answer && answer !== "N\xE3o") {
+                    const selectedOpts = getSelectedOptions(answer);
+                    if (selectedOpts) {
+                      alternativeTimes = selectedOpts;
+                    } else if (Array.isArray(answer)) {
+                      alternativeTimes = answer;
+                    } else if (typeof answer === "string") {
+                      alternativeTimes = [answer];
                     }
                   }
                   break;
                 case "can_substitute":
-                  canSubstitute = item.answer === "Sim" || item.answer === true;
+                  canSubstitute = answer === "Sim" || answer === true;
                   break;
                 case "daily_mass_availability":
-                  if (item.answer && item.answer !== "N\xE3o posso" && item.answer !== "N\xE3o") {
-                    if (typeof item.answer === "object" && item.answer.selectedOptions) {
-                      dailyMassAvailability = item.answer.selectedOptions;
-                    } else if (item.answer === "Sim") {
+                  if (answer && answer !== "N\xE3o posso" && answer !== "N\xE3o") {
+                    const selectedOpts = getSelectedOptions(answer);
+                    if (selectedOpts) {
+                      dailyMassAvailability = selectedOpts;
+                    } else if (answer === "Sim") {
                       dailyMassAvailability = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
-                    } else if (Array.isArray(item.answer)) {
-                      dailyMassAvailability = item.answer;
-                    } else if (typeof item.answer === "string") {
-                      dailyMassAvailability = [item.answer];
+                    } else if (Array.isArray(answer)) {
+                      dailyMassAvailability = answer;
+                    } else if (typeof answer === "string") {
+                      dailyMassAvailability = [answer];
                     }
                   }
                   break;
                 // Novena de São Judas
                 case "saint_judas_novena":
-                  if (Array.isArray(item.answer)) {
-                    specialEvents[item.questionId] = item.answer;
-                  } else if (item.answer === "Nenhum dia") {
+                  if (Array.isArray(answer)) {
+                    specialEvents[item.questionId] = answer;
+                  } else if (answer === "Nenhum dia") {
                     specialEvents[item.questionId] = [];
                   } else {
-                    specialEvents[item.questionId] = item.answer ? [item.answer] : [];
+                    specialEvents[item.questionId] = answer ? [String(answer)] : [];
                   }
                   break;
                 // Special event masses
@@ -2858,7 +3762,7 @@ ${"!".repeat(60)}`);
                 case "saint_judas_feast_17h":
                 case "saint_judas_feast_evening":
                 case "adoration_monday":
-                  specialEvents[item.questionId] = item.answer;
+                  specialEvents[item.questionId] = answer;
                   break;
               }
             });
@@ -2971,7 +3875,7 @@ ${"!".repeat(60)}`);
         const responses = await this.db.select().from(questionnaireResponses).where(eq12(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         console.log(`[SCHEDULE_GEN] \u{1F504} Using COMPATIBILITY LAYER for ${year}/${month}`);
-        responses.forEach((r, index2) => {
+        responses.forEach((r) => {
           const adapted = this.adaptQuestionnaireResponse(r, year, month);
           let availableSundays = adapted.availableSundays;
           let preferredMassTimes = adapted.preferredMassTimes;
@@ -3085,7 +3989,7 @@ ${"!".repeat(60)}`);
        * false → "Não", true → "Sim"
        */
       normalizeSpecialEvents(events) {
-        if (!events || typeof events !== "object") return events;
+        if (!events || typeof events !== "object") return {};
         const normalized = {};
         for (const [key, value] of Object.entries(events)) {
           if (typeof value === "boolean") {
@@ -3407,17 +4311,25 @@ ${"!".repeat(60)}`);
       }
       /**
        * Extrai informações de data e horário de uma pergunta de missa especial
+       *
+       * 🔧 FIX 2026-01-30: Suporta anos com 2 ou 4 dígitos (ex: "18/02/26" ou "18/02/2026")
        */
       extractMassInfoFromQuestion(question, year, month) {
-        const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
         if (!dateMatch) {
+          console.log(`[EXTRACT_MASS_INFO] \u26A0\uFE0F No date found in: ${question.substring(0, 80)}...`);
           return null;
         }
         const day = parseInt(dateMatch[1]);
         const monthFromQuestion = parseInt(dateMatch[2]);
-        const yearFromQuestion = parseInt(dateMatch[3]);
-        const timeMatch = question.match(/(?:às|as)\s+(\d{1,2})(?:h|:)(\d{2})?/i);
+        let yearFromQuestion = parseInt(dateMatch[3]);
+        if (yearFromQuestion < 100) {
+          yearFromQuestion = 2e3 + yearFromQuestion;
+          console.log(`[EXTRACT_MASS_INFO] \u{1F4C5} Converted 2-digit year: ${dateMatch[3]} \u2192 ${yearFromQuestion}`);
+        }
+        const timeMatch = question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{2})?/i);
         if (!timeMatch) {
+          console.log(`[EXTRACT_MASS_INFO] \u26A0\uFE0F No time found in: ${question.substring(0, 80)}...`);
           return null;
         }
         const hour = parseInt(timeMatch[1]).toString().padStart(2, "0");
@@ -3426,6 +4338,7 @@ ${"!".repeat(60)}`);
         const date2 = `${yearFromQuestion}-${monthFromQuestion.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
         const dateObj = new Date(yearFromQuestion, monthFromQuestion - 1, day);
         const dayOfWeek = dateObj.getDay();
+        console.log(`[EXTRACT_MASS_INFO] \u2705 Extracted: ${date2} ${time2} (dayOfWeek: ${dayOfWeek}) from question`);
         return {
           date: date2,
           time: time2,
@@ -3799,10 +4712,10 @@ ${"!".repeat(60)}`);
                       dateStr
                       // "05/10"
                     ];
-                    for (const format8 of possibleFormats) {
-                      if (availability.availableSundays.some((sunday) => sunday === format8)) {
+                    for (const format9 of possibleFormats) {
+                      if (availability.availableSundays.some((sunday) => sunday === format9)) {
                         availableForSunday = true;
-                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format8}`);
+                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format9}`);
                         break;
                       }
                     }
@@ -4224,8 +5137,8 @@ ${"!".repeat(60)}`);
         }
         const distributionMap = /* @__PURE__ */ new Map();
         this.ministers.forEach((m) => {
-          const count9 = m.monthlyAssignmentCount || 0;
-          distributionMap.set(count9, (distributionMap.get(count9) || 0) + 1);
+          const count12 = m.monthlyAssignmentCount || 0;
+          distributionMap.set(count12, (distributionMap.get(count12) || 0) + 1);
         });
         console.log(`[FAIR_ALGORITHM] \u{1F4CA} Current monthly distribution:`);
         for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
@@ -4254,7 +5167,7 @@ ${"!".repeat(60)}`);
        */
       calculateMinisterScore(minister, massTime) {
         let score = 0;
-        const avgServices = this.ministers.length > 0 ? this.ministers.reduce((sum, m) => sum + m.totalServices, 0) / this.ministers.length : 0;
+        const avgServices = this.ministers.length > 0 ? this.ministers.reduce((sum2, m) => sum2 + m.totalServices, 0) / this.ministers.length : 0;
         const serviceBalance = Math.max(0, avgServices - minister.totalServices);
         score += serviceBalance * 0.4;
         if (minister.lastService) {
@@ -4316,7 +5229,7 @@ ${"!".repeat(60)}`);
           console.log(`[CONFIDENCE] \u26A0\uFE0F Escala incompleta: ${ministers.length}/${massTime.minMinisters} (${(fillRate * 100).toFixed(0)}%)`);
         }
         if (ministers.length > 0) {
-          const avgScore = ministers.reduce((sum, m) => sum + m.preferenceScore, 0) / ministers.length;
+          const avgScore = ministers.reduce((sum2, m) => sum2 + m.preferenceScore, 0) / ministers.length;
           confidence += Math.min(avgScore / 10, 0.25);
         }
         const serviceVariance = this.calculateServiceVariance(ministers);
@@ -4333,7 +5246,8 @@ ${"!".repeat(60)}`);
         return minister.totalServices || 0;
       }
       calculatePreferenceScore(minister) {
-        const basePreference = (minister.preferredTimes?.length || 0) + (minister.canServeAsCouple ? 2 : 0);
+        const preferredTimes = Array.isArray(minister.preferredTimes) ? minister.preferredTimes : [];
+        const basePreference = preferredTimes.length + (minister.canServeAsCouple ? 2 : 0);
         const reliabilityBonus = Math.floor((minister.reliabilityScore || 100) / 10);
         return basePreference + reliabilityBonus;
       }
@@ -4361,8 +5275,8 @@ ${"!".repeat(60)}`);
       calculateServiceVariance(ministers) {
         const services = ministers.map((m) => m.totalServices);
         if (services.length === 0) return 0;
-        const avg2 = services.reduce((sum, s) => sum + s, 0) / services.length;
-        const variance = services.reduce((sum, s) => sum + Math.pow(s - avg2, 2), 0) / services.length;
+        const avg3 = services.reduce((sum2, s) => sum2 + s, 0) / services.length;
+        const variance = services.reduce((sum2, s) => sum2 + Math.pow(s - avg3, 2), 0) / services.length;
         return Math.sqrt(variance);
       }
       getDayName(dayOfWeek) {
@@ -4452,14 +5366,18 @@ ${"!".repeat(60)}`);
 // server/websocket.ts
 var websocket_exports = {};
 __export(websocket_exports, {
+  broadcastAuxiliaryPanelUpdate: () => broadcastAuxiliaryPanelUpdate,
+  broadcastNotification: () => broadcastNotification,
   getWebSocketServer: () => getWebSocketServer,
   initializeWebSocket: () => initializeWebSocket,
   notifyCriticalMass: () => notifyCriticalMass,
-  notifySubstitutionRequest: () => notifySubstitutionRequest
+  notifySubstitutionRequest: () => notifySubstitutionRequest,
+  notifyUnreadCount: () => notifyUnreadCount,
+  notifyUsers: () => notifyUsers
 });
 import { WebSocketServer, WebSocket } from "ws";
-import { eq as eq23, and as and17, gte as gte11, lte as lte10, sql as sql13, or as or7 } from "drizzle-orm";
-import { format as format6, addDays as addDays4 } from "date-fns";
+import { eq as eq17, and as and12, gte as gte8, lte as lte7, sql as sql9, or as or7 } from "drizzle-orm";
+import { format as format5, addDays as addDays4 } from "date-fns";
 function initializeWebSocket(httpServer) {
   wss = new WebSocketServer({
     server: httpServer,
@@ -4527,15 +5445,17 @@ async function getCriticalAlerts() {
   const criticalMasses = await db.select({
     date: schedules.date,
     time: schedules.time,
-    vacancies: sql13`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+    vacancies: sql9`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
   }).from(schedules).where(
-    and17(
-      gte11(schedules.date, format6(now, "yyyy-MM-dd")),
-      lte10(schedules.date, format6(next12Hours, "yyyy-MM-dd"))
+    and12(
+      gte8(schedules.date, format5(now, "yyyy-MM-dd")),
+      lte7(schedules.date, format5(next12Hours, "yyyy-MM-dd"))
     )
-  ).groupBy(schedules.date, schedules.time).having(sql13`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+  ).groupBy(schedules.date, schedules.time).having(sql9`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
   const criticalWithHours = criticalMasses.map((m) => ({
-    ...m,
+    date: m.date,
+    time: m.time,
+    vacancies: m.vacancies,
     hoursUntil: Math.round((new Date(m.date).getTime() - now.getTime()) / (1e3 * 60 * 60)),
     massTime: m.time
   }));
@@ -4548,14 +5468,14 @@ async function getCriticalAlerts() {
     status: substitutionRequests.status,
     massDate: schedules.date,
     massTime: schedules.time
-  }).from(substitutionRequests).innerJoin(users, eq23(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq23(substitutionRequests.scheduleId, schedules.id)).where(
-    and17(
+  }).from(substitutionRequests).innerJoin(users, eq17(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq17(substitutionRequests.scheduleId, schedules.id)).where(
+    and12(
       or7(
-        eq23(substitutionRequests.status, "pending"),
-        eq23(substitutionRequests.status, "available")
+        eq17(substitutionRequests.status, "pending"),
+        eq17(substitutionRequests.status, "available")
       ),
-      gte11(schedules.date, format6(now, "yyyy-MM-dd")),
-      lte10(schedules.date, format6(next48Hours, "yyyy-MM-dd"))
+      gte8(schedules.date, format5(now, "yyyy-MM-dd")),
+      lte7(schedules.date, format5(next48Hours, "yyyy-MM-dd"))
     )
   ).orderBy(schedules.date);
   return {
@@ -4609,6 +5529,59 @@ function notifyCriticalMass(massData) {
 }
 function getWebSocketServer() {
   return wss;
+}
+function notifyUsers(userIds, notificationData) {
+  const message = {
+    type: "USER_NOTIFICATION",
+    data: notificationData,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const messageStr = JSON.stringify(message);
+  const userIdSet = new Set(userIds);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client.userId && userIdSet.has(client.userId)) {
+      client.send(messageStr);
+    }
+  });
+}
+function notifyUnreadCount(userId, count12) {
+  const message = {
+    type: "UNREAD_COUNT",
+    data: { count: count12 },
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const messageStr = JSON.stringify(message);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client.userId === userId) {
+      client.send(messageStr);
+    }
+  });
+}
+function broadcastNotification(notificationData) {
+  const message = {
+    type: "USER_NOTIFICATION",
+    data: notificationData,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const messageStr = JSON.stringify(message);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client.userId) {
+      client.send(messageStr);
+    }
+  });
+}
+function broadcastAuxiliaryPanelUpdate(updateData) {
+  const message = {
+    type: "AUXILIARY_PANEL_UPDATE",
+    data: updateData,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const messageStr = JSON.stringify(message);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client.userId && (client.userRole === "coordenador" || client.userRole === "gestor" || client.userRole === "auxiliar")) {
+      client.send(messageStr);
+    }
+  });
 }
 var wss, clients;
 var init_websocket = __esm({
@@ -6155,31 +7128,98 @@ var init_formation_seed = __esm({
 // server/services/whatsappHandler.ts
 var whatsappHandler_exports = {};
 __export(whatsappHandler_exports, {
-  handleMessage: () => handleMessage
+  handleMessage: () => handleMessage,
+  sendScheduleNotification: () => sendScheduleNotification,
+  sendSubstitutionAlert: () => sendSubstitutionAlert
 });
 import axios from "axios";
 import OpenAI from "openai";
+import { eq as eq32, and as and24, gte as gte16, asc as asc3, or as or10 } from "drizzle-orm";
+import { format as format8, startOfDay } from "date-fns";
+import { ptBR as ptBR3 } from "date-fns/locale";
 async function sendWhatsappMessage(phone, message) {
   try {
     const instance = process.env.ZAPI_INSTANCE;
     const token = process.env.ZAPI_TOKEN;
     const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+    if (!instance || !token) {
+      console.warn("\u26A0\uFE0F Z-API n\xE3o configurado (ZAPI_INSTANCE/ZAPI_TOKEN ausentes)");
+      return;
+    }
     const url = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
-    console.log("\u{1F7E1} Enviando mensagem via Z-API:", { phone, message });
+    console.log("\u{1F7E1} Enviando mensagem via Z-API:", { phone, message: message.substring(0, 50) + "..." });
     const response = await axios.post(
       url,
       { phone, message },
       {
         headers: {
           "Content-Type": "application/json",
-          "Client-Token": clientToken
+          "Client-Token": clientToken || ""
         }
       }
     );
     console.log("\u{1F7E2} Mensagem enviada com sucesso:", response.data);
   } catch (err) {
-    console.error("\u{1F534} Erro ao enviar mensagem via Z-API:", err.response?.data || err.message);
+    const axiosError = err;
+    console.error("\u{1F534} Erro ao enviar mensagem via Z-API:", axiosError.response?.data || axiosError.message);
   }
+}
+async function findMinisterByPhone(normalizedPhone) {
+  const [minister] = await db.select({
+    id: users.id,
+    name: users.name,
+    phone: users.phone,
+    whatsapp: users.whatsapp,
+    role: users.role,
+    status: users.status
+  }).from(users).where(
+    or10(
+      eq32(users.phone, normalizedPhone),
+      eq32(users.whatsapp, normalizedPhone)
+    )
+  ).limit(1);
+  return minister;
+}
+async function getNextSchedule(ministerId) {
+  const today = format8(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
+  const [nextSchedule] = await db.select({
+    id: schedules.id,
+    date: schedules.date,
+    time: schedules.time,
+    position: schedules.position,
+    location: schedules.location
+  }).from(schedules).where(
+    and24(
+      eq32(schedules.ministerId, ministerId),
+      gte16(schedules.date, today)
+    )
+  ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
+  if (!nextSchedule) {
+    return null;
+  }
+  return {
+    date: nextSchedule.date,
+    time: nextSchedule.time,
+    position: nextSchedule.position,
+    location: nextSchedule.location || "Igreja Matriz"
+  };
+}
+async function getAvailableSubstitutions() {
+  const today = format8(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
+  const substitutions = await db.select({
+    id: substitutionRequests.id,
+    scheduleId: substitutionRequests.scheduleId,
+    reason: substitutionRequests.reason,
+    requesterName: users.name,
+    date: schedules.date,
+    time: schedules.time
+  }).from(substitutionRequests).innerJoin(users, eq32(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq32(substitutionRequests.scheduleId, schedules.id)).where(
+    and24(
+      eq32(substitutionRequests.status, "available"),
+      gte16(schedules.date, today)
+    )
+  ).orderBy(asc3(schedules.date)).limit(5);
+  return substitutions;
 }
 async function handleMessage(message) {
   try {
@@ -6193,52 +7233,136 @@ async function handleMessage(message) {
     const normalizedPhone = phone.replace(/\D/g, "");
     const normalizedText = text2.trim().toLowerCase();
     console.log(`\u{1F4AC} De ${normalizedPhone}: ${normalizedText}`);
-    const ministro = await db.query.users.findFirst({
-      where: (u, { eq: eq35 }) => eq35(u.phone, normalizedPhone)
-    });
-    let proximaEscala;
+    const ministro = await findMinisterByPhone(normalizedPhone);
+    const proximaEscala = ministro ? await getNextSchedule(ministro.id) : null;
     let resposta = "";
     if (normalizedText.startsWith("/escala") || normalizedText.startsWith("/proxima")) {
       if (proximaEscala) {
+        const dataFormatada = format8(new Date(proximaEscala.date), "dd 'de' MMMM", { locale: ptBR3 });
         resposta = `Paz e bem, ${ministro?.name ?? "ministro(a)"} \u{1F64F}
-Sua pr\xF3xima escala \xE9 no dia ${new Date(
-          proximaEscala.data
-        ).toLocaleDateString("pt-BR")} \xE0s ${proximaEscala.horario} (${proximaEscala.missa}).`;
+
+Sua pr\xF3xima escala \xE9:
+\u{1F4C5} ${dataFormatada}
+\u23F0 ${proximaEscala.time}
+\u{1F4CD} ${proximaEscala.location}
+\u{1FA96} Posi\xE7\xE3o: ${proximaEscala.position || "A definir"}`;
+      } else if (ministro) {
+        resposta = `Paz e bem, ${ministro.name} \u{1F64F}
+
+N\xE3o encontrei nenhuma escala futura registrada para voc\xEA. Verifique o sistema ou fale com o coordenador.`;
       } else {
         resposta = `Paz e bem \u{1F64F}
-N\xE3o encontrei nenhuma escala futura registrada para o seu n\xFAmero.`;
+
+N\xE3o encontrei nenhum cadastro para este n\xFAmero de telefone. Por favor, entre em contato com a coordena\xE7\xE3o para atualizar seu cadastro.`;
       }
-    } else if (normalizedText.startsWith("/substituicoes")) {
-      resposta = "\u{1F4CB} No momento, n\xE3o h\xE1 substitui\xE7\xF5es abertas. Assim que houver, voc\xEA ser\xE1 avisado.";
+    } else if (normalizedText.startsWith("/substituicoes") || normalizedText.startsWith("/substituicao")) {
+      const substitutions = await getAvailableSubstitutions();
+      if (substitutions.length === 0) {
+        resposta = "\u{1F4CB} No momento, n\xE3o h\xE1 substitui\xE7\xF5es abertas. Assim que houver, voc\xEA ser\xE1 avisado.";
+      } else {
+        resposta = "\u{1F4CB} *Substitui\xE7\xF5es Dispon\xEDveis:*\n\n";
+        for (const sub of substitutions) {
+          const dataFormatada = format8(new Date(sub.date), "dd/MM", { locale: ptBR3 });
+          resposta += `\u2022 ${dataFormatada} \xE0s ${sub.time} (${sub.requesterName})
+  Motivo: ${sub.reason || "N\xE3o informado"}
+
+`;
+        }
+        resposta += "Para aceitar uma substitui\xE7\xE3o, acesse o sistema ou fale com o coordenador.";
+      }
     } else if (normalizedText.startsWith("/ajuda") || normalizedText.startsWith("/help")) {
-      resposta = `\u{1F4D6} Comandos dispon\xEDveis:
+      resposta = `\u{1F4D6} *Comandos dispon\xEDveis:*
 
 /escala \u2192 mostra sua pr\xF3xima escala
 /substituicoes \u2192 lista substitui\xE7\xF5es abertas
-/ajuda \u2192 exibe este menu`;
+/ajuda \u2192 exibe este menu
+
+\u{1F4A1} Voc\xEA tamb\xE9m pode fazer perguntas em linguagem natural!`;
     } else {
       const context = `
 Voc\xEA \xE9 o assistente virtual do Minist\xE9rio da Sagrada Comunh\xE3o do Santu\xE1rio S\xE3o Judas Tadeu de Sorocaba.
 Responda de forma acolhedora e espiritual, mas clara e objetiva.
 Use emojis suaves e linguagem pastoral.
+Nunca invente informa\xE7\xF5es sobre escalas ou datas - use apenas os dados fornecidos.
+Se n\xE3o souber algo, oriente o ministro a verificar no sistema ou falar com a coordena\xE7\xE3o.
 `;
       const prompt = `
-O ministro ${ministro?.nome ?? "desconhecido"} enviou: "${text2}".
+O ministro ${ministro?.name ?? "desconhecido"} enviou: "${text2}".
 Dados da pr\xF3xima escala: ${proximaEscala ? JSON.stringify(proximaEscala) : "nenhuma escala encontrada"}.
 Gere uma resposta gentil e informativa.
 `;
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: context },
-          { role: "user", content: prompt }
-        ]
-      });
-      resposta = completion.choices[0].message?.content || "Desculpe, n\xE3o entendi sua mensagem.";
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: context },
+            { role: "user", content: prompt }
+          ]
+        });
+        resposta = completion.choices[0].message?.content || "Desculpe, n\xE3o entendi sua mensagem. Digite /ajuda para ver os comandos dispon\xEDveis.";
+      } catch (aiError) {
+        console.error("\u26A0\uFE0F Erro na API do OpenAI:", aiError);
+        resposta = `Paz e bem \u{1F64F}
+
+Desculpe, n\xE3o consegui processar sua mensagem no momento. Tente novamente mais tarde ou use os comandos:
+/escala - ver sua pr\xF3xima escala
+/ajuda - ver todos os comandos`;
+      }
     }
     await sendWhatsappMessage(normalizedPhone, resposta);
   } catch (error) {
     console.error("\u274C Erro no handleMessage:", error);
+  }
+}
+async function sendScheduleNotification(ministerId, scheduleDate, scheduleTime, location, position) {
+  try {
+    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq32(users.id, ministerId)).limit(1);
+    if (!minister) {
+      console.warn(`\u26A0\uFE0F Ministro ${ministerId} n\xE3o encontrado para notifica\xE7\xE3o WhatsApp`);
+      return false;
+    }
+    const phoneNumber = minister.whatsapp || minister.phone;
+    if (!phoneNumber) {
+      console.warn(`\u26A0\uFE0F Ministro ${minister.name} n\xE3o possui n\xFAmero de telefone cadastrado`);
+      return false;
+    }
+    const dataFormatada = format8(new Date(scheduleDate), "dd 'de' MMMM", { locale: ptBR3 });
+    const message = `Paz e bem, ${minister.name}! \u{1F64F}
+
+\u{1F4C5} *Voc\xEA foi escalado para a missa:*
+
+\u{1F4C6} ${dataFormatada}
+\u23F0 ${scheduleTime}
+\u{1F4CD} ${location}${position ? `
+\u{1FA96} Posi\xE7\xE3o: ${position}` : ""}
+
+Por favor, confirme sua presen\xE7a no sistema. Deus aben\xE7oe!`;
+    await sendWhatsappMessage(phoneNumber.replace(/\D/g, ""), message);
+    return true;
+  } catch (error) {
+    console.error("\u274C Erro ao enviar notifica\xE7\xE3o de escala:", error);
+    return false;
+  }
+}
+async function sendSubstitutionAlert(ministerId, requesterName, scheduleDate, scheduleTime, reason) {
+  try {
+    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq32(users.id, ministerId)).limit(1);
+    if (!minister) return false;
+    const phoneNumber = minister.whatsapp || minister.phone;
+    if (!phoneNumber) return false;
+    const dataFormatada = format8(new Date(scheduleDate), "dd/MM", { locale: ptBR3 });
+    const message = `\u{1F6A8} *Pedido de Substitui\xE7\xE3o*
+
+${requesterName} precisa de substitui\xE7\xE3o:
+\u{1F4C5} ${dataFormatada} \xE0s ${scheduleTime}
+${reason ? `\u{1F4DD} Motivo: ${reason}
+` : ""}
+Por favor, verifique no sistema se pode ajudar!`;
+    await sendWhatsappMessage(phoneNumber.replace(/\D/g, ""), message);
+    return true;
+  } catch (error) {
+    console.error("\u274C Erro ao enviar alerta de substitui\xE7\xE3o:", error);
+    return false;
   }
 }
 var openai;
@@ -6246,6 +7370,7 @@ var init_whatsappHandler = __esm({
   async "server/services/whatsappHandler.ts"() {
     "use strict";
     await init_db();
+    init_schema();
     openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
 });
@@ -6323,19 +7448,19 @@ function authenticateToken(req, res, next) {
     if (!cookieToken) {
       return res.status(401).json({ message: "Token de autentica\xE7\xE3o n\xE3o fornecido" });
     }
-    jwt.verify(cookieToken, secret, async (err, user) => {
-      if (err) {
+    jwt.verify(cookieToken, secret, async (err, decoded) => {
+      if (err || !decoded) {
         return res.status(403).json({ message: "Token inv\xE1lido ou expirado" });
       }
-      await verifyAndCheckStatus(user);
+      await verifyAndCheckStatus(decoded);
     });
     return;
   }
-  jwt.verify(token, secret, async (err, user) => {
-    if (err) {
+  jwt.verify(token, secret, async (err, decoded) => {
+    if (err || !decoded) {
       return res.status(403).json({ message: "Token inv\xE1lido ou expirado" });
     }
-    await verifyAndCheckStatus(user);
+    await verifyAndCheckStatus(decoded);
   });
 }
 function requireRole(roles) {
@@ -6443,8 +7568,16 @@ async function resetPassword(email) {
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq3(users.id, user.id));
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV ONLY] Senha tempor\xE1ria para ${email}: ${tempPassword}`);
+    const { sendPasswordResetEmail: sendPasswordResetEmail2, getEmailProviderName: getEmailProviderName2 } = await Promise.resolve().then(() => (init_emailService(), emailService_exports));
+    const emailResult = await sendPasswordResetEmail2(
+      user.email,
+      user.name,
+      tempPassword
+    );
+    if (!emailResult.success) {
+      console.error("[AUTH] Failed to send password reset email:", emailResult.error);
+    } else {
+      console.log(`[AUTH] Password reset email sent via ${getEmailProviderName2()} to ${email}`);
     }
     return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
   } catch (error) {
@@ -6564,13 +7697,14 @@ function sanitizeAuditData(data) {
     "privateKey"
   ];
   const sanitized = {};
-  for (const key of Object.keys(data)) {
+  const dataObj = data;
+  for (const key of Object.keys(dataObj)) {
     if (sensitiveFields.includes(key.toLowerCase())) {
       sanitized[key] = "[REDACTED]";
-    } else if (typeof data[key] === "object" && data[key] !== null) {
-      sanitized[key] = sanitizeAuditData(data[key]);
+    } else if (typeof dataObj[key] === "object" && dataObj[key] !== null) {
+      sanitized[key] = sanitizeAuditData(dataObj[key]);
     } else {
-      sanitized[key] = data[key];
+      sanitized[key] = dataObj[key];
     }
   }
   return sanitized;
@@ -6663,8 +7797,43 @@ async function auditLoginAttempt(email, success, req, reason, userId) {
   );
 }
 
+// server/utils/activityLogger.ts
+await init_db();
+init_schema();
+async function logActivity(userId, action, details, req) {
+  try {
+    const activityData = {
+      userId,
+      action,
+      details: details ? JSON.stringify(details) : null,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    if (req) {
+      activityData.ipAddress = req.ip || req.socket.remoteAddress || null;
+      activityData.userAgent = req.get("user-agent") || null;
+      activityData.sessionId = null;
+    }
+    await db.insert(activityLogs).values(activityData);
+  } catch (error) {
+    console.error("Error logging activity:", error);
+  }
+}
+function createActivityLogger(req) {
+  return (action, details) => {
+    const userId = req.user?.id;
+    if (userId) {
+      return logActivity(userId, action, details, req);
+    }
+  };
+}
+
 // server/authRoutes.ts
 var router2 = Router2();
+function getErrorMessage2(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 var loginSchema = z.object({
   email: z.string().email("Email inv\xE1lido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres")
@@ -6692,6 +7861,7 @@ router2.post("/login", async (req, res) => {
     const { email, password } = loginSchema.parse(req.body);
     const result = await login(email, password);
     await auditLoginAttempt(email, true, req, void 0, result.user.id);
+    await logActivity(result.user.id, "login", { email }, req);
     res.cookie("token", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== "development",
@@ -6723,7 +7893,7 @@ router2.post("/login", async (req, res) => {
   } catch (error) {
     const email = req.body?.email;
     if (email) {
-      await auditLoginAttempt(email, false, req, error.message || "Credenciais inv\xE1lidas");
+      await auditLoginAttempt(email, false, req, getErrorMessage2(error) || "Credenciais inv\xE1lidas");
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -6734,7 +7904,7 @@ router2.post("/login", async (req, res) => {
     }
     res.status(401).json({
       success: false,
-      message: error.message || "Erro ao fazer login"
+      message: getErrorMessage2(error) || "Erro ao fazer login"
     });
   }
 });
@@ -6770,7 +7940,7 @@ router2.post("/register", async (req, res) => {
     }
     res.status(400).json({
       success: false,
-      message: error.message || "Erro ao criar usu\xE1rio"
+      message: getErrorMessage2(error) || "Erro ao criar usu\xE1rio"
     });
   }
 });
@@ -6818,7 +7988,7 @@ router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coord
     }
     res.status(400).json({
       success: false,
-      message: error.message || "Erro ao criar usu\xE1rio"
+      message: getErrorMessage2(error) || "Erro ao criar usu\xE1rio"
     });
   }
 });
@@ -6895,6 +8065,7 @@ router2.post("/logout", authenticateToken, async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.get("user-agent")
     });
+    await logActivity(req.user.id, "logout", { email: req.user.email }, req);
   }
   const sessionToken = req.cookies?.session_token;
   if (sessionToken) {
@@ -6959,7 +8130,7 @@ router2.post("/change-password", authenticateToken, async (req, res) => {
     }
     res.status(400).json({
       success: false,
-      message: error.message || "Erro ao trocar senha"
+      message: getErrorMessage2(error) || "Erro ao trocar senha"
     });
   }
 });
@@ -7366,6 +8537,30 @@ var passwordResetRateLimiter = rateLimit({
     res.status(429).json({
       error: "Limite de recupera\xE7\xE3o de senha excedido",
       message: "Voc\xEA excedeu o limite de tentativas de recupera\xE7\xE3o de senha. Aguarde 1 hora.",
+      retryAfter: "1 hour"
+    });
+  }
+});
+var notificationRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1e3,
+  // 1 hora
+  max: 10,
+  // Máximo 10 notificações por hora por coordenador
+  validate: false,
+  keyGenerator: (req) => {
+    const userId = req.user?.id || "unknown";
+    return `notifications:${userId}`;
+  },
+  message: {
+    error: "Limite de notifica\xE7\xF5es excedido."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Limite de notifica\xE7\xF5es excedido",
+      message: "Voc\xEA atingiu o limite de 10 notifica\xE7\xF5es por hora. Aguarde antes de enviar mais.",
       retryAfter: "1 hour"
     });
   }
@@ -7957,6 +9152,9 @@ function getSpecialEvents(month, year) {
 }
 
 // server/routes/questionnaireAdmin.ts
+await init_storage();
+await init_pushNotifications();
+init_logger();
 var router4 = Router4();
 function getMonthName(month) {
   const months = [
@@ -8407,6 +9605,37 @@ router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq8(questionnaires.id, templateId)).returning();
+    try {
+      const activeUsers = await db.select({ id: users.id, name: users.name }).from(users).where(eq8(users.status, "active"));
+      const questionnaireMonth = updated.targetMonth;
+      const questionnaireYear = updated.targetYear;
+      const monthName = getMonthName(questionnaireMonth);
+      const notificationPromises = activeUsers.map(
+        (user) => storage.createNotification({
+          userId: user.id,
+          title: "Novo Question\xE1rio de Disponibilidade",
+          message: `O question\xE1rio de disponibilidade para ${monthName}/${questionnaireYear} foi publicado. Por favor, preencha suas disponibilidades.`,
+          type: "announcement",
+          read: false,
+          actionUrl: "/questionnaires"
+        })
+      );
+      await Promise.all(notificationPromises);
+      logger.info(`Criadas ${activeUsers.length} notifica\xE7\xF5es para question\xE1rio ${templateId}`);
+      if (pushConfig.enabled) {
+        await sendPushNotificationToUsers(
+          activeUsers.map((u) => u.id),
+          {
+            title: "Novo Question\xE1rio de Disponibilidade",
+            body: `Preencha suas disponibilidades para ${monthName}/${questionnaireYear}`,
+            url: "/questionnaires",
+            tag: `questionnaire-${templateId}`
+          }
+        );
+      }
+    } catch (notificationError) {
+      logger.error("Erro ao enviar notifica\xE7\xF5es do question\xE1rio:", notificationError);
+    }
     res.json({
       message: "Question\xE1rio enviado com sucesso!",
       template: {
@@ -8597,7 +9826,7 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
             }
           } else {
             const oldAvailability = parsedResponses.find((r) => r.questionId === "availability");
-            if (oldAvailability) {
+            if (oldAvailability && typeof oldAvailability.answer === "string") {
               availability = oldAvailability.answer === "yes" || oldAvailability.answer === "Dispon\xEDvel" ? "Dispon\xEDvel" : oldAvailability.answer === "no" || oldAvailability.answer === "Indispon\xEDvel" ? "Indispon\xEDvel" : oldAvailability.answer;
             }
           }
@@ -8720,34 +9949,35 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
         if (!summary[resp.questionId]) {
           summary[resp.questionId] = {};
         }
-        if (typeof resp.answer === "object" && resp.answer.answer) {
-          const mainAnswer = resp.answer.answer;
+        const answer = resp.answer;
+        if (typeof answer === "object" && !Array.isArray(answer) && "answer" in answer) {
+          const mainAnswer = answer.answer;
           if (!summary[resp.questionId][mainAnswer]) {
             summary[resp.questionId][mainAnswer] = 0;
           }
           summary[resp.questionId][mainAnswer]++;
-          if (resp.answer.sub) {
+          if (answer.sub) {
             const subKey = `${resp.questionId}_sub`;
             if (!summary[subKey]) {
               summary[subKey] = {};
             }
-            if (!summary[subKey][resp.answer.sub]) {
-              summary[subKey][resp.answer.sub] = 0;
+            if (!summary[subKey][answer.sub]) {
+              summary[subKey][answer.sub] = 0;
             }
-            summary[subKey][resp.answer.sub]++;
+            summary[subKey][answer.sub]++;
           }
-        } else if (Array.isArray(resp.answer)) {
-          resp.answer.forEach((option) => {
+        } else if (Array.isArray(answer)) {
+          answer.forEach((option) => {
             if (!summary[resp.questionId][option]) {
               summary[resp.questionId][option] = 0;
             }
             summary[resp.questionId][option]++;
           });
-        } else if (typeof resp.answer === "string") {
-          if (!summary[resp.questionId][resp.answer]) {
-            summary[resp.questionId][resp.answer] = 0;
+        } else if (typeof answer === "string") {
+          if (!summary[resp.questionId][answer]) {
+            summary[resp.questionId][answer] = 0;
           }
-          summary[resp.questionId][resp.answer]++;
+          summary[resp.questionId][answer]++;
         }
       });
     });
@@ -8928,7 +10158,7 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
           }
         } else {
           const oldAvailability = parsedResponses.find((r) => r.questionId === "availability");
-          if (oldAvailability) {
+          if (oldAvailability && typeof oldAvailability.answer === "string") {
             if (oldAvailability.answer === "yes" || oldAvailability.answer === "Dispon\xEDvel") {
               availableCount++;
             } else if (oldAvailability.answer === "no" || oldAvailability.answer === "Indispon\xEDvel") {
@@ -9064,9 +10294,10 @@ function formatAnswer(answer, questionType) {
       return answer === true ? "Sim" : answer === false ? "N\xE3o" : String(answer);
     case "yes_no_with_options":
       if (typeof answer === "object" && answer !== null) {
-        const mainAnswer = answer.answer === "Sim" ? "Sim" : "N\xE3o";
-        if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-          return `${mainAnswer}: ${answer.selectedOptions.join("; ")}`;
+        const answerObj = answer;
+        const mainAnswer = answerObj.answer === "Sim" ? "Sim" : "N\xE3o";
+        if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          return `${mainAnswer}: ${answerObj.selectedOptions.join("; ")}`;
         }
         return mainAnswer;
       }
@@ -9177,7 +10408,7 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
             questionType = "checkbox";
           } else if (typeof answer === "boolean" || answer === "Sim" || answer === "N\xE3o") {
             questionType = "yes_no";
-          } else if (typeof answer === "object" && answer.answer) {
+          } else if (typeof answer === "object" && answer !== null && "answer" in answer) {
             questionType = "yes_no_with_options";
           }
           formattedResponses.push({
@@ -9271,7 +10502,13 @@ var QuestionnaireService = class {
     const unmappedResponses = [];
     const warnings = [];
     const processedQuestionIds = /* @__PURE__ */ new Set();
-    if (rawResponse.format_version === "2.0") {
+    const isV2Format = (resp) => {
+      return resp !== null && typeof resp === "object" && "format_version" in resp && resp.format_version === "2.0";
+    };
+    const isResponsesWrapper = (resp) => {
+      return resp !== null && typeof resp === "object" && "responses" in resp && Array.isArray(resp.responses);
+    };
+    if (isV2Format(rawResponse)) {
       return {
         standardized: this.validateV2Format(rawResponse),
         unmappedResponses: [],
@@ -9293,8 +10530,9 @@ var QuestionnaireService = class {
       can_substitute: false
     };
     if (Array.isArray(rawResponse)) {
-      this.parseLegacyArrayFormatWithTracking(rawResponse, standardized, processedQuestionIds, month, year);
-      for (const item of rawResponse) {
+      const legacyItems = rawResponse;
+      this.parseLegacyArrayFormatWithTracking(legacyItems, standardized, processedQuestionIds, month, year);
+      for (const item of legacyItems) {
         if (!processedQuestionIds.has(item.questionId)) {
           unmappedResponses.push({
             questionId: item.questionId,
@@ -9305,23 +10543,21 @@ var QuestionnaireService = class {
           warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
         }
       }
-    } else if (typeof rawResponse === "object") {
-      if (rawResponse.responses && Array.isArray(rawResponse.responses)) {
-        this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
-        for (const item of rawResponse.responses) {
-          if (!processedQuestionIds.has(item.questionId)) {
-            unmappedResponses.push({
-              questionId: item.questionId,
-              question: item.question,
-              answer: item.answer,
-              metadata: item.metadata
-            });
-            warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
-          }
+    } else if (isResponsesWrapper(rawResponse)) {
+      this.parseLegacyArrayFormatWithTracking(rawResponse.responses, standardized, processedQuestionIds, month, year);
+      for (const item of rawResponse.responses) {
+        if (!processedQuestionIds.has(item.questionId)) {
+          unmappedResponses.push({
+            questionId: item.questionId,
+            question: item.question,
+            answer: item.answer,
+            metadata: item.metadata
+          });
+          warnings.push(`Question '${item.questionId}' was not mapped to any field. Saved in unmappedResponses for manual review.`);
         }
-      } else {
-        Object.assign(standardized, rawResponse);
       }
+    } else if (rawResponse !== null && typeof rawResponse === "object") {
+      Object.assign(standardized, rawResponse);
     }
     return {
       standardized,
@@ -9397,7 +10633,8 @@ var QuestionnaireService = class {
         standardized.special_events.adoration_monday = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       } else if (questionId.startsWith("special_event_")) {
-        const eventName = item.metadata?.eventName?.toLowerCase() || questionId;
+        const metadataEventName = item.metadata?.eventName;
+        const eventName = typeof metadataEventName === "string" ? metadataEventName.toLowerCase() : questionId;
         const normalizedName = eventName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "_");
         standardized.special_events[normalizedName] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
@@ -9427,8 +10664,11 @@ var QuestionnaireService = class {
         processedQuestionIds.add(questionId);
       } else if (questionId === "other_times_available") {
         if (answer && answer !== "N\xE3o") {
-          if (typeof answer === "object" && answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-            standardized._alternativeTimes = answer.selectedOptions;
+          if (typeof answer === "object" && answer !== null && !Array.isArray(answer)) {
+            const answerObj = answer;
+            if (Array.isArray(answerObj.selectedOptions)) {
+              standardized._alternativeTimes = answerObj.selectedOptions;
+            }
           } else if (Array.isArray(answer)) {
             standardized._alternativeTimes = answer;
           } else if (typeof answer === "string" && answer !== "Sim") {
@@ -9520,9 +10760,12 @@ var QuestionnaireService = class {
       standardized.weekdays.wednesday = true;
       standardized.weekdays.thursday = true;
       standardized.weekdays.friday = true;
-    } else if (typeof answer === "object" && answer.answer === "Apenas em alguns dias") {
-      if (answer.selectedOptions && Array.isArray(answer.selectedOptions)) {
-        this.parseDailyMassDays(answer.selectedOptions, standardized);
+    } else if (typeof answer === "object" && answer !== null && !Array.isArray(answer)) {
+      const answerObj = answer;
+      if (answerObj.answer === "Apenas em alguns dias") {
+        if (Array.isArray(answerObj.selectedOptions)) {
+          this.parseDailyMassDays(answerObj.selectedOptions, standardized);
+        }
       }
     } else if (answer === "Apenas em alguns dias") {
     }
@@ -9631,10 +10874,16 @@ var QuestionnaireService = class {
    * Validate v2.0 format structure
    */
   static validateV2Format(response) {
-    if (!response.masses) response.masses = {};
-    if (!response.special_events) response.special_events = {};
-    if (!response.weekdays) {
-      response.weekdays = {
+    const result = {
+      format_version: "2.0",
+      masses: response.masses || {},
+      special_events: response.special_events || {},
+      can_substitute: false
+    };
+    if (response.weekdays && typeof response.weekdays === "object") {
+      result.weekdays = response.weekdays;
+    } else {
+      result.weekdays = {
         monday: false,
         tuesday: false,
         wednesday: false,
@@ -9642,20 +10891,24 @@ var QuestionnaireService = class {
         friday: false
       };
     }
+    if (response.family) result.family = response.family;
+    if (response.notes) result.notes = response.notes;
+    if (response.alternative_times) result.alternative_times = response.alternative_times;
+    if (response._alternativeTimes) result._alternativeTimes = response._alternativeTimes;
     if (typeof response.can_substitute === "string") {
       const normalized = response.can_substitute.toLowerCase().trim();
-      response.can_substitute = normalized === "yes" || normalized === "sundays_only" || normalized === "sim" || normalized === "true";
-    } else if (typeof response.can_substitute !== "boolean") {
-      response.can_substitute = false;
+      result.can_substitute = normalized === "yes" || normalized === "sundays_only" || normalized === "sim" || normalized === "true";
+    } else if (typeof response.can_substitute === "boolean") {
+      result.can_substitute = response.can_substitute;
     }
-    if (response.alternative_times && Array.isArray(response.alternative_times)) {
-      response._alternativeTimes = response.alternative_times;
-      if (response.alternative_times.length > 0 && !response.can_substitute) {
+    if (result.alternative_times && result.alternative_times.length > 0) {
+      result._alternativeTimes = result.alternative_times;
+      if (!result.can_substitute) {
         console.log(`[QUESTIONNAIRE_SERVICE] \u{1F504} V2.0: Auto-setting can_substitute=true because alternative_times has values`);
-        response.can_substitute = true;
+        result.can_substitute = true;
       }
     }
-    return response;
+    return result;
   }
   /**
    * Extract legacy structured data for backward compatibility
@@ -9713,6 +10966,11 @@ var QuestionnaireService = class {
 
 // server/routes/questionnaires.ts
 var router5 = Router5();
+function getErrorMessage3(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 function parseYearMonth(req, res) {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -10292,7 +11550,7 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
         email: minister.email,
         phone: minister.phone || "",
         responded: responseMap.has(minister.id),
-        respondedAt: response && response.submittedAt ? new Date(response.submittedAt).toISOString() : null,
+        respondedAt: response?.submittedAt ? new Date(response.submittedAt).toISOString() : null,
         availability: null
         // Pode ser expandido para incluir disponibilidade
       };
@@ -10523,9 +11781,9 @@ router5.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
 router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { questionnaireId } = req.params;
-    const { format: format8 = "detailed" } = req.query;
+    const { format: format9 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
-    const csvContent = format8 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -10541,9 +11799,9 @@ router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coorden
     const params = parseYearMonth(req, res);
     if (!params) return;
     const { year, month } = params;
-    const { format: format8 = "detailed" } = req.query;
+    const { format: format9 = "detailed" } = req.query;
     const exportData = await getMonthlyResponsesForExport(month, year);
-    const csvContent = format8 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format9 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const monthName = monthNames[month - 1];
     const filename = `respostas_${monthName}_${year}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -10615,7 +11873,7 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
         }).where(eq10(questionnaireResponses.id, response.id));
         updated++;
       } catch (error) {
-        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, error.message);
+        console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, getErrorMessage3(error));
         errors++;
       }
     }
@@ -10633,7 +11891,7 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     console.error("[REPROCESS] Erro geral:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao reprocessar respostas"
+      message: getErrorMessage3(error)
     });
   }
 });
@@ -10651,10 +11909,33 @@ import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format3 } from "date-fns";
 
 // server/services/scheduleCache.ts
+var SimpleMutex = class {
+  locked = false;
+  queue = [];
+  async acquire() {
+    return new Promise((resolve) => {
+      if (!this.locked) {
+        this.locked = true;
+        resolve();
+      } else {
+        this.queue.push(resolve);
+      }
+    });
+  }
+  release() {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+};
 var ScheduleCache = class {
   cache = /* @__PURE__ */ new Map();
   TTL = 1e3 * 60 * 60;
   // 1 hour TTL as fallback
+  mutex = new SimpleMutex();
   /**
    * Generate cache key from year and month
    */
@@ -10663,6 +11944,7 @@ var ScheduleCache = class {
   }
   /**
    * Get cached schedule data for a specific month
+   * Thread-safe read operation
    */
   get(year, month) {
     const key = this.getCacheKey(year, month);
@@ -10674,7 +11956,6 @@ var ScheduleCache = class {
     const now = Date.now();
     if (now - entry.timestamp > this.TTL) {
       console.log(`[CACHE] \u23F0 EXPIRED - Cache for ${month}/${year} is too old`);
-      this.cache.delete(key);
       return null;
     }
     console.log(`[CACHE] \u2705 HIT - Returning cached data for ${month}/${year}`);
@@ -10682,17 +11963,53 @@ var ScheduleCache = class {
   }
   /**
    * Set cache for a specific month
+   * Thread-safe with mutex lock
    */
-  set(year, month, data) {
+  async set(year, month, data) {
+    await this.mutex.acquire();
+    try {
+      const key = this.getCacheKey(year, month);
+      this.cache.set(key, {
+        data,
+        timestamp: Date.now()
+      });
+      console.log(`[CACHE] \u{1F4BE} STORED - Cached data for ${month}/${year}`);
+    } finally {
+      this.mutex.release();
+    }
+  }
+  /**
+   * Synchronous set for backwards compatibility
+   * Note: Use async set() when possible for thread safety
+   */
+  setSync(year, month, data) {
     const key = this.getCacheKey(year, month);
     this.cache.set(key, {
       data,
       timestamp: Date.now()
     });
-    console.log(`[CACHE] \u{1F4BE} STORED - Cached data for ${month}/${year}`);
+    console.log(`[CACHE] \u{1F4BE} STORED (sync) - Cached data for ${month}/${year}`);
   }
   /**
    * Invalidate cache for a specific month
+   * Thread-safe with mutex lock
+   */
+  async invalidateAsync(year, month) {
+    await this.mutex.acquire();
+    try {
+      const key = this.getCacheKey(year, month);
+      const deleted = this.cache.delete(key);
+      if (deleted) {
+        console.log(`[CACHE] \u{1F5D1}\uFE0F  INVALIDATED - Cleared cache for ${month}/${year}`);
+      } else {
+        console.log(`[CACHE] \u26A0\uFE0F  SKIP - No cache found for ${month}/${year}`);
+      }
+    } finally {
+      this.mutex.release();
+    }
+  }
+  /**
+   * Synchronous invalidate for backwards compatibility
    */
   invalidate(year, month) {
     const key = this.getCacheKey(year, month);
@@ -10708,17 +12025,27 @@ var ScheduleCache = class {
    */
   invalidateByDate(date2) {
     const dateObj = new Date(date2);
+    if (isNaN(dateObj.getTime())) {
+      console.log(`[CACHE] \u26A0\uFE0F  INVALID DATE - Cannot invalidate for: ${date2}`);
+      return;
+    }
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
     this.invalidate(year, month);
   }
   /**
    * Clear all cached data
+   * Thread-safe with mutex lock
    */
-  clear() {
-    const size = this.cache.size;
-    this.cache.clear();
-    console.log(`[CACHE] \u{1F9F9} CLEARED - Removed ${size} cache entries`);
+  async clear() {
+    await this.mutex.acquire();
+    try {
+      const size = this.cache.size;
+      this.cache.clear();
+      console.log(`[CACHE] \u{1F9F9} CLEARED - Removed ${size} cache entries`);
+    } finally {
+      this.mutex.release();
+    }
   }
   /**
    * Get cache statistics
@@ -10731,6 +12058,17 @@ var ScheduleCache = class {
   }
 };
 var scheduleCache = new ScheduleCache();
+
+// server/types/schedules.ts
+function getErrorMessage4(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+function getErrorStack(error) {
+  if (error instanceof Error) return error.stack;
+  return void 0;
+}
 
 // server/routes/scheduleGeneration.ts
 var router6 = Router6();
@@ -10745,17 +12083,32 @@ function parseYearMonthParams2(req, res) {
     res.status(400).json({ success: false, message: "M\xEAs deve estar entre 1 e 12" });
     return null;
   }
-  if (year < 2024 || year > 2030) {
-    res.status(400).json({ success: false, message: "Ano deve estar entre 2024 e 2030" });
+  const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+  const minYear = currentYear - 1;
+  const maxYear = currentYear + 10;
+  if (year < minYear || year > maxYear) {
+    res.status(400).json({ success: false, message: `Ano deve estar entre ${minYear} e ${maxYear}` });
     return null;
   }
   return { year, month };
 }
+var getYearRange = () => {
+  const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+  return { min: currentYear - 1, max: currentYear + 10 };
+};
 var generateScheduleSchema = z4.object({
-  year: z4.number().min(2024).max(2030),
+  year: z4.number().refine(
+    (year) => {
+      const { min, max } = getYearRange();
+      return year >= min && year <= max;
+    },
+    { message: "Ano fora do intervalo permitido" }
+  ),
   month: z4.number().min(1).max(12),
-  saveToDatabase: z4.boolean().default(false),
-  replaceExisting: z4.boolean().default(false)
+  saveToDatabase: z4.boolean().default(true),
+  // Now defaults to true - always save
+  replaceExisting: z4.boolean().default(true)
+  // Now defaults to true
 });
 var saveSchedulesSchema = z4.object({
   schedules: z4.array(z4.object({
@@ -10800,7 +12153,23 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           questionnaireStatus: targetQuestionnaire.status
         });
       }
-      logger.info(`Valida\xE7\xE3o OK: question\xE1rio ${targetQuestionnaire.id} com ${responses.length} respostas`);
+      const validResponses = responses.filter((r) => {
+        if (!r.userId) return false;
+        const hasResponses = r.responses && typeof r.responses === "object" && Object.keys(r.responses).length > 0;
+        const hasAvailability = r.availableSundays && Array.isArray(r.availableSundays) && r.availableSundays.length > 0 || r.preferredMassTimes && Array.isArray(r.preferredMassTimes) && r.preferredMassTimes.length > 0;
+        return hasResponses || hasAvailability;
+      });
+      if (validResponses.length === 0) {
+        logger.warn(`Tentativa de gerar escalas com respostas vazias: ${month}/${year}`);
+        return res.status(400).json({
+          success: false,
+          message: "As respostas do question\xE1rio est\xE3o vazias ou incompletas. Aguarde os ministros responderem corretamente.",
+          errorCode: "EMPTY_RESPONSES",
+          totalResponses: responses.length,
+          validResponses: 0
+        });
+      }
+      logger.info(`Valida\xE7\xE3o OK: question\xE1rio ${targetQuestionnaire.id} com ${validResponses.length} respostas v\xE1lidas de ${responses.length} totais`);
     }
     if (!replaceExisting && db) {
       const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(sql5`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`).limit(1);
@@ -10819,30 +12188,91 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
       console.log("[ROUTE] \u2705 Generated schedules count:", generatedSchedules.length);
     } catch (genError) {
       console.error("[ROUTE] \u274C ERRO NA FUN\xC7\xC3O generateAutomaticSchedule:", genError);
-      console.error("[ROUTE] \u274C genError.message:", genError.message);
-      console.error("[ROUTE] \u274C genError.stack:", genError.stack);
+      console.error("[ROUTE] \u274C genError.message:", getErrorMessage4(genError));
+      console.error("[ROUTE] \u274C genError.stack:", getErrorStack(genError));
       throw genError;
     }
     let savedCount = 0;
-    if (saveToDatabase && db) {
+    let generationId = null;
+    if (db) {
       savedCount = await saveGeneratedSchedules(generatedSchedules, replaceExisting);
+      const originalScheduleJson = {
+        month,
+        year,
+        generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        totalMasses: generatedSchedules.length,
+        schedules: generatedSchedules.map((schedule) => ({
+          date: schedule.massTime.date,
+          time: schedule.massTime.time,
+          type: schedule.massTime.type || "missa",
+          ministers: schedule.ministers.map((m, idx) => ({
+            id: m.id,
+            name: m.name,
+            position: m.position || idx + 1
+          })),
+          confidence: schedule.confidence
+        }))
+      };
+      const qualityMetrics = calculateQualityMetrics(generatedSchedules);
+      const generationMetrics = {
+        averageConfidence: calculateAverageConfidence(generatedSchedules),
+        totalSchedules: generatedSchedules.length,
+        savedCount,
+        uniqueMinistersUsed: qualityMetrics.uniqueMinistersUsed,
+        balanceScore: qualityMetrics.balanceScore,
+        highConfidenceSchedules: qualityMetrics.highConfidenceSchedules,
+        lowConfidenceSchedules: qualityMetrics.lowConfidenceSchedules
+      };
+      const [existingGeneration] = await db.select().from(scheduleGenerations).where(
+        and8(
+          eq13(scheduleGenerations.month, month),
+          eq13(scheduleGenerations.year, year),
+          eq13(scheduleGenerations.status, "draft")
+        )
+      ).limit(1);
+      if (existingGeneration) {
+        await db.update(scheduleGenerations).set({
+          originalSchedule: originalScheduleJson,
+          generationMetrics,
+          createdAt: /* @__PURE__ */ new Date(),
+          createdById: req.user?.id || null
+        }).where(eq13(scheduleGenerations.id, existingGeneration.id));
+        generationId = existingGeneration.id;
+        logger.info(`Updated existing schedule_generation: ${generationId}`);
+      } else {
+        const [newGeneration] = await db.insert(scheduleGenerations).values({
+          month,
+          year,
+          status: "draft",
+          originalSchedule: originalScheduleJson,
+          generationMetrics,
+          createdById: req.user?.id || null
+        }).returning();
+        generationId = newGeneration.id;
+        logger.info(`Created new schedule_generation: ${generationId}`);
+      }
     }
+    const qualityMetricsData = calculateQualityMetrics(generatedSchedules);
     const response = {
       success: true,
       message: `Escalas geradas com sucesso para ${month}/${year}`,
       data: {
         month,
         year,
+        generationId,
+        // NEW: return the generation ID
+        generationStatus: "draft",
+        // NEW: return current status
         totalSchedules: generatedSchedules.length,
-        savedToDatabase: saveToDatabase,
+        savedToDatabase: true,
         savedCount,
         averageConfidence: calculateAverageConfidence(generatedSchedules),
         schedulesByWeek: groupSchedulesByWeek(generatedSchedules),
-        qualityMetrics: calculateQualityMetrics(generatedSchedules),
+        qualityMetrics: qualityMetricsData,
         schedules: formatSchedulesForAPI(generatedSchedules)
       }
     };
-    logger.info(`Gera\xE7\xE3o conclu\xEDda: ${generatedSchedules.length} escalas, confidence m\xE9dia: ${response.data.averageConfidence}`);
+    logger.info(`Gera\xE7\xE3o conclu\xEDda: ${generatedSchedules.length} escalas, confidence m\xE9dia: ${response.data.averageConfidence}, generationId: ${generationId}`);
     console.log("[RESPONSE_DEBUG] Estrutura da resposta:", {
       success: response.success,
       totalSchedules: response.data.totalSchedules,
@@ -10852,20 +12282,29 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     });
     res.json(response);
   } catch (error) {
+    const errorMsg = getErrorMessage4(error);
+    const errorStack = getErrorStack(error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorCode = error?.code;
     console.error("\u274C [ROUTE] ERRO DETALHADO NO GENERATE:", error);
-    console.error("\u274C [ROUTE] ERRO STACK:", error.stack);
-    console.error("\u274C [ROUTE] ERRO NAME:", error.name);
-    console.error("\u274C [ROUTE] ERRO MESSAGE:", error.message);
+    console.error("\u274C [ROUTE] ERRO STACK:", errorStack);
+    console.error("\u274C [ROUTE] ERRO NAME:", errorName);
+    console.error("\u274C [ROUTE] ERRO MESSAGE:", errorMsg);
     logger.error("Erro ao gerar escalas autom\xE1ticas:", error);
-    res.status(500).json({
+    const errorResponse = {
       success: false,
-      message: error.message || "Falha na gera\xE7\xE3o autom\xE1tica de escalas",
-      errorDetails: {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      }
-    });
+      message: errorMsg || "Falha na gera\xE7\xE3o autom\xE1tica de escalas"
+    };
+    if (process.env.NODE_ENV === "development") {
+      errorResponse.errorDetails = {
+        message: errorMsg,
+        name: errorName,
+        stack: errorStack
+      };
+    } else {
+      errorResponse.errorCode = errorCode || "GENERATION_ERROR";
+    }
+    res.status(500).json(errorResponse);
   }
 });
 router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
@@ -10922,17 +12361,23 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         console.error("Error deleting existing schedules:", deleteErr);
       }
     }
+    const uniqueMinisterIds = [...new Set(
+      schedulesInput.map((s) => s.ministerId).filter((id) => id !== null && id !== void 0)
+    )];
+    const existingMinisterIds = /* @__PURE__ */ new Set();
+    if (uniqueMinisterIds.length > 0) {
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray3(users.id, uniqueMinisterIds));
+      existingMinisters.forEach((m) => existingMinisterIds.add(m.id));
+      console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
+    }
     for (let i = 0; i < schedulesInput.length; i++) {
       const schedule = schedulesInput[i];
       try {
         if (!schedule.date || !schedule.time) {
           throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
         }
-        if (schedule.ministerId) {
-          const [ministerExists] = await db.select({ id: users.id }).from(users).where(eq13(users.id, schedule.ministerId)).limit(1);
-          if (!ministerExists) {
-            throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
-          }
+        if (schedule.ministerId && !existingMinisterIds.has(schedule.ministerId)) {
+          throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
         }
         const recordToInsert = {
           date: schedule.date,
@@ -10952,19 +12397,20 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
           index: i
         });
       } catch (err) {
+        const dbErr = err;
         console.error(`[${i}] \u274C Failed to insert schedule:`, err);
         console.error(`[${i}] Error type:`, typeof err);
-        console.error(`[${i}] Error message:`, err?.message);
-        console.error(`[${i}] Error code:`, err?.code);
-        console.error(`[${i}] Error stack:`, err?.stack);
+        console.error(`[${i}] Error message:`, dbErr?.message);
+        console.error(`[${i}] Error code:`, dbErr?.code);
+        console.error(`[${i}] Error stack:`, dbErr?.stack);
         console.error(`[${i}] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
         errors.push({
           success: false,
-          error: err?.message || String(err),
-          code: err?.code,
-          detail: err?.detail,
-          constraint: err?.constraint,
-          errorType: err?.name,
+          error: dbErr?.message || String(err),
+          code: dbErr?.code,
+          detail: dbErr?.detail,
+          constraint: dbErr?.constraint,
+          errorType: dbErr?.name,
           fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
           index: i,
           schedule: {
@@ -11008,12 +12454,12 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
   } catch (error) {
     console.error("=== EMERGENCY SAVE CRITICAL ERROR ===");
     console.error("Error:", error);
-    console.error("Stack:", error.stack);
+    console.error("Stack:", getErrorStack(error));
     res.status(500).json({
       success: false,
-      message: error.message || "Erro cr\xEDtico no emergency save",
-      error: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : void 0
+      message: getErrorMessage4(error) || "Erro cr\xEDtico no emergency save",
+      error: getErrorMessage4(error),
+      stack: process.env.NODE_ENV === "development" ? getErrorStack(error) : void 0
     });
   }
 });
@@ -11026,20 +12472,21 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
         message: "Schedules array is required"
       });
     }
+    const typedInput = schedulesInput;
     const analysis = {
-      total: schedulesInput.length,
-      sample: schedulesInput.slice(0, 3),
-      ministerIds: [...new Set(schedulesInput.map((s) => s.ministerId).filter(Boolean))],
-      uniqueDates: [...new Set(schedulesInput.map((s) => s.date))],
-      uniqueTimes: [...new Set(schedulesInput.map((s) => s.time))],
-      missingDate: schedulesInput.filter((s) => !s.date).length,
-      missingTime: schedulesInput.filter((s) => !s.time).length,
-      missingMinisterId: schedulesInput.filter((s) => !s.ministerId).length,
+      totalReceived: typedInput.length,
+      sample: typedInput.slice(0, 3),
+      ministerIds: [...new Set(typedInput.map((s) => s.ministerId).filter((id) => !!id))],
+      uniqueDates: [...new Set(typedInput.map((s) => s.date).filter((d) => !!d))],
+      uniqueTimes: [...new Set(typedInput.map((s) => s.time).filter((t) => !!t))],
+      missingDate: typedInput.filter((s) => !s.date).length,
+      missingTime: typedInput.filter((s) => !s.time).length,
+      missingMinisterId: typedInput.filter((s) => !s.ministerId).length,
       dataTypes: {
-        date: typeof schedulesInput[0]?.date,
-        time: typeof schedulesInput[0]?.time,
-        ministerId: typeof schedulesInput[0]?.ministerId,
-        position: typeof schedulesInput[0]?.position
+        date: typeof typedInput[0]?.date,
+        time: typeof typedInput[0]?.time,
+        ministerId: typeof typedInput[0]?.ministerId,
+        position: typeof typedInput[0]?.position
       }
     };
     if (db && analysis.ministerIds.length > 0) {
@@ -11056,8 +12503,8 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
-      stack: error.stack
+      message: getErrorMessage4(error),
+      stack: getErrorStack(error)
     });
   }
 });
@@ -11177,21 +12624,22 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
       }
     });
   } catch (error) {
+    const dbErr = error;
     console.error("=== SAVE-GENERATED ERROR ===");
-    console.error("Error name:", error.name);
-    console.error("Error message:", error.message);
-    console.error("Error code:", error.code);
-    console.error("Error detail:", error.detail);
-    console.error("Error constraint:", error.constraint);
-    console.error("Error stack:", error.stack);
+    console.error("Error name:", dbErr.name);
+    console.error("Error message:", dbErr.message);
+    console.error("Error code:", dbErr.code);
+    console.error("Error detail:", dbErr.detail);
+    console.error("Error constraint:", dbErr.constraint);
+    console.error("Error stack:", dbErr.stack);
     console.error("Full error object:", JSON.stringify(error, null, 2));
     logger.error("Erro ao salvar escalas:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao salvar escalas",
-      errorCode: error.code,
-      errorDetail: error.detail,
-      constraint: error.constraint
+      message: getErrorMessage4(error) || "Erro ao salvar escalas",
+      errorCode: dbErr.code,
+      errorDetail: dbErr.detail,
+      constraint: dbErr.constraint
     });
   }
 });
@@ -11238,10 +12686,310 @@ router6.get("/preview/:year/:month", authenticateToken, requireRole(["gestor", "
     logger.error("Erro ao gerar preview:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao gerar preview"
+      message: getErrorMessage4(error) || "Erro ao gerar preview"
     });
   }
 });
+router6.get("/generation/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const params = parseYearMonthParams2(req, res);
+    if (!params) return;
+    const { year, month } = params;
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: "Servi\xE7o de banco de dados indispon\xEDvel"
+      });
+    }
+    const [generation] = await db.select().from(scheduleGenerations).where(
+      and8(
+        eq13(scheduleGenerations.month, month),
+        eq13(scheduleGenerations.year, year)
+      )
+    ).orderBy(desc4(scheduleGenerations.createdAt)).limit(1);
+    if (!generation) {
+      return res.json({
+        success: true,
+        data: null,
+        message: "Nenhuma gera\xE7\xE3o encontrada para este per\xEDodo"
+      });
+    }
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const currentSchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName
+    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
+      and8(
+        gte4(schedules.date, startDate),
+        lte4(schedules.date, endDate)
+      )
+    ).orderBy(schedules.date, schedules.time, schedules.position);
+    const groupedSchedules = {};
+    currentSchedules.forEach((schedule) => {
+      const key = `${schedule.date}_${schedule.time}`;
+      if (!groupedSchedules[key]) {
+        groupedSchedules[key] = [];
+      }
+      groupedSchedules[key].push(schedule);
+    });
+    const formattedSchedules = Object.entries(groupedSchedules).map(([key, ministers]) => {
+      const [date2, time2] = key.split("_");
+      return {
+        date: date2,
+        time: time2,
+        dayOfWeek: new Date(date2).getDay(),
+        ministers: ministers.map((m) => ({
+          id: m.ministerId,
+          name: m.scheduleDisplayName || m.ministerName || "VACANTE",
+          role: "",
+          totalServices: 0,
+          availabilityScore: 0,
+          position: m.position
+        })),
+        backupMinisters: [],
+        confidence: 1,
+        qualityScore: "Excelente"
+      };
+    });
+    res.json({
+      success: true,
+      data: {
+        generationId: generation.id,
+        generationStatus: generation.status,
+        month: generation.month,
+        year: generation.year,
+        createdAt: generation.createdAt,
+        publishedAt: generation.publishedAt,
+        originalSchedule: generation.originalSchedule,
+        finalSchedule: generation.finalSchedule,
+        differences: generation.differences,
+        generationMetrics: generation.generationMetrics,
+        // Current state from database
+        totalSchedules: formattedSchedules.length,
+        schedules: formattedSchedules,
+        currentSchedulesCount: currentSchedules.length
+      }
+    });
+  } catch (error) {
+    logger.error("Erro ao carregar gera\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: getErrorMessage4(error) || "Erro ao carregar gera\xE7\xE3o"
+    });
+  }
+});
+router6.post("/generation/:id/publish", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: "Servi\xE7o de banco de dados indispon\xEDvel"
+      });
+    }
+    const [generation] = await db.select().from(scheduleGenerations).where(eq13(scheduleGenerations.id, id)).limit(1);
+    if (!generation) {
+      return res.status(404).json({
+        success: false,
+        message: "Gera\xE7\xE3o n\xE3o encontrada"
+      });
+    }
+    if (generation.status === "published") {
+      return res.status(400).json({
+        success: false,
+        message: "Esta gera\xE7\xE3o j\xE1 foi publicada"
+      });
+    }
+    const { month, year } = generation;
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const currentSchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      ministerName: users.name
+    }).from(schedules).leftJoin(users, eq13(schedules.ministerId, users.id)).where(
+      and8(
+        gte4(schedules.date, startDate),
+        lte4(schedules.date, endDate)
+      )
+    ).orderBy(schedules.date, schedules.time, schedules.position);
+    const groupedSchedules = {};
+    currentSchedules.forEach((schedule) => {
+      const key = `${schedule.date}_${schedule.time}`;
+      if (!groupedSchedules[key]) {
+        groupedSchedules[key] = [];
+      }
+      groupedSchedules[key].push(schedule);
+    });
+    const finalScheduleJson = {
+      month,
+      year,
+      publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      totalMasses: Object.keys(groupedSchedules).length,
+      schedules: Object.entries(groupedSchedules).map(([key, ministers]) => {
+        const [date2, time2] = key.split("_");
+        return {
+          date: date2,
+          time: time2,
+          type: ministers[0]?.type || "missa",
+          ministers: ministers.map((m, idx) => ({
+            id: m.ministerId,
+            name: m.ministerName || "VACANTE",
+            position: m.position || idx + 1
+          }))
+        };
+      })
+    };
+    const originalSchedule = generation.originalSchedule;
+    const differences = calculateScheduleDifferences(originalSchedule, finalScheduleJson);
+    await db.update(schedules).set({ status: "published" }).where(
+      and8(
+        gte4(schedules.date, startDate),
+        lte4(schedules.date, endDate)
+      )
+    );
+    await db.update(scheduleGenerations).set({
+      status: "published",
+      finalSchedule: finalScheduleJson,
+      differences,
+      publishedAt: /* @__PURE__ */ new Date()
+    }).where(eq13(scheduleGenerations.id, id));
+    scheduleCache.invalidate(year, month);
+    logger.info(`Gera\xE7\xE3o ${id} publicada com sucesso. Diferen\xE7as: ${differences.summary.totalChanges} altera\xE7\xF5es`);
+    res.json({
+      success: true,
+      message: `Escala de ${month}/${year} publicada com sucesso!`,
+      data: {
+        generationId: id,
+        generationStatus: "published",
+        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        differences,
+        schedulesPublished: currentSchedules.length
+      }
+    });
+  } catch (error) {
+    logger.error("Erro ao publicar gera\xE7\xE3o:", error);
+    res.status(500).json({
+      success: false,
+      message: getErrorMessage4(error) || "Erro ao publicar gera\xE7\xE3o"
+    });
+  }
+});
+function calculateScheduleDifferences(original, final) {
+  const changes = [];
+  let ministersAdded = 0;
+  let ministersRemoved = 0;
+  let ministersReplaced = 0;
+  let positionsChanged = 0;
+  const originalByKey = /* @__PURE__ */ new Map();
+  original.schedules.forEach((s) => {
+    originalByKey.set(`${s.date}_${s.time}`, s);
+  });
+  const finalByKey = /* @__PURE__ */ new Map();
+  final.schedules.forEach((s) => {
+    finalByKey.set(`${s.date}_${s.time}`, s);
+  });
+  originalByKey.forEach((origSchedule, key) => {
+    const finalSchedule = finalByKey.get(key);
+    const [date2, time2] = key.split("_");
+    if (!finalSchedule) {
+      origSchedule.ministers.forEach((m) => {
+        changes.push({
+          date: date2,
+          time: time2,
+          type: "minister_removed",
+          original: m,
+          final: null,
+          reason: "mass_removed"
+        });
+        ministersRemoved++;
+      });
+      return;
+    }
+    const origMinistersById = new Map(origSchedule.ministers.map((m) => [m.id, m]));
+    const finalMinistersById = new Map(finalSchedule.ministers.map((m) => [m.id, m]));
+    origMinistersById.forEach((origMinister, id) => {
+      if (!finalMinistersById.has(id)) {
+        changes.push({
+          date: date2,
+          time: time2,
+          type: "minister_removed",
+          original: origMinister,
+          final: null,
+          reason: "manual_edit"
+        });
+        ministersRemoved++;
+      } else {
+        const finalMinister = finalMinistersById.get(id);
+        if (origMinister.position !== finalMinister.position) {
+          changes.push({
+            date: date2,
+            time: time2,
+            type: "position_changed",
+            original: origMinister,
+            final: finalMinister,
+            reason: "reordered"
+          });
+          positionsChanged++;
+        }
+      }
+    });
+    finalMinistersById.forEach((finalMinister, id) => {
+      if (!origMinistersById.has(id)) {
+        changes.push({
+          date: date2,
+          time: time2,
+          type: "minister_added",
+          original: null,
+          final: finalMinister,
+          reason: "manual_edit"
+        });
+        ministersAdded++;
+      }
+    });
+  });
+  finalByKey.forEach((finalSchedule, key) => {
+    if (!originalByKey.has(key)) {
+      const [date2, time2] = key.split("_");
+      finalSchedule.ministers.forEach((m) => {
+        changes.push({
+          date: date2,
+          time: time2,
+          type: "minister_added",
+          original: null,
+          final: m,
+          reason: "mass_added"
+        });
+        ministersAdded++;
+      });
+    }
+  });
+  return {
+    summary: {
+      totalChanges: changes.length,
+      ministersAdded,
+      ministersRemoved,
+      ministersReplaced,
+      positionsChanged
+    },
+    changes
+  };
+}
 router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const params = parseYearMonthParams2(req, res);
   if (!params) return;
@@ -11293,8 +13041,8 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
     logger.error("Erro no debug:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
-      stack: error.stack
+      message: getErrorMessage4(error),
+      stack: getErrorStack(error)
     });
   }
 });
@@ -11315,14 +13063,29 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         sql5`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
       )
     );
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const substitutions = await db.select().from(substitutionRequests).innerJoin(schedules, eq13(substitutionRequests.scheduleId, schedules.id)).where(
+      and8(
+        gte4(schedules.date, firstDay.toISOString().split("T")[0]),
+        lte4(schedules.date, lastDay.toISOString().split("T")[0])
+      )
+    );
+    const completedSubstitutions = substitutions.filter(
+      (s) => s.substitution_requests.status === "approved" || s.substitution_requests.status === "auto_approved"
+    ).length;
+    const substitutionRate = existingSchedules.length > 0 ? Math.round(completedSubstitutions / existingSchedules.length * 100) : 0;
+    const typedSchedules = existingSchedules;
     const metrics2 = {
       totalSchedules: existingSchedules.length,
-      uniqueMinisters: new Set(existingSchedules.map((s) => s.schedules.ministerId)).size,
-      averageSchedulesPerMinister: existingSchedules.length / new Set(existingSchedules.map((s) => s.schedules.ministerId)).size,
+      uniqueMinisters: new Set(typedSchedules.map((s) => s.schedules.ministerId)).size,
+      averageSchedulesPerMinister: existingSchedules.length / new Set(typedSchedules.map((s) => s.schedules.ministerId)).size,
       distributionBalance: calculateDistributionBalance(existingSchedules),
       coverageByDay: calculateCoverageByDay(existingSchedules),
-      substitutionRate: 0
-      // TODO: calcular com base em substituições
+      substitutionRate,
+      // Percentual de escalas que tiveram substituição
+      totalSubstitutions: substitutions.length,
+      completedSubstitutions
     };
     res.json({
       success: true,
@@ -11337,7 +13100,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
     logger.error("Erro ao calcular m\xE9tricas:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao calcular m\xE9tricas"
+      message: getErrorMessage4(error) || "Erro ao calcular m\xE9tricas"
     });
   }
 });
@@ -11357,6 +13120,7 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
       }
       for (let i = 0; i < schedule.ministers.length; i++) {
         const minister = schedule.ministers[i];
+        const ministerPosition = minister.position;
         await tx.insert(schedules).values({
           date: schedule.massTime.date,
           time: schedule.massTime.time,
@@ -11364,7 +13128,7 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
           location: null,
           ministerId: minister.id,
           // Pode ser null para VACANTE
-          position: minister.position || i + 1,
+          position: ministerPosition || i + 1,
           // Usar position do ministro ou index + 1
           status: "scheduled",
           notes: `Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
@@ -11377,8 +13141,8 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
 }
 function calculateAverageConfidence(schedules3) {
   if (schedules3.length === 0) return 0;
-  const sum = schedules3.reduce((acc, s) => acc + s.confidence, 0);
-  return Math.round(sum / schedules3.length * 100) / 100;
+  const sum2 = schedules3.reduce((acc, s) => acc + s.confidence, 0);
+  return Math.round(sum2 / schedules3.length * 100) / 100;
 }
 function groupSchedulesByWeek(schedules3) {
   const weeks = {};
@@ -11414,10 +13178,10 @@ function calculateBalanceScore(schedules3) {
   });
   const counts = Object.values(ministerCounts);
   if (counts.length === 0) return 0;
-  const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
-  if (avg2 === 0) return 0;
-  const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length;
-  return Math.max(0, 1 - Math.sqrt(variance) / avg2);
+  const avg3 = counts.reduce((sum2, c) => sum2 + c, 0) / counts.length;
+  if (avg3 === 0) return 0;
+  const variance = counts.reduce((sum2, c) => sum2 + Math.pow(c - avg3, 2), 0) / counts.length;
+  return Math.max(0, 1 - Math.sqrt(variance) / avg3);
 }
 function formatSchedulesForAPI(schedules3) {
   console.log(`[API_FILTER] \u{1F525} EXECUTANDO FILTRO! Total schedules: ${schedules3.length}`);
@@ -11472,10 +13236,10 @@ function calculateDistributionBalance(schedules3) {
   });
   const counts = Object.values(ministerCounts);
   if (counts.length === 0) return 0;
-  const avg2 = counts.reduce((sum, c) => sum + c, 0) / counts.length;
-  if (avg2 === 0) return 0;
-  const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length;
-  return Math.max(0, 1 - Math.sqrt(variance) / avg2);
+  const avg3 = counts.reduce((sum2, c) => sum2 + c, 0) / counts.length;
+  if (avg3 === 0) return 0;
+  const variance = counts.reduce((sum2, c) => sum2 + Math.pow(c - avg3, 2), 0) / counts.length;
+  return Math.max(0, 1 - Math.sqrt(variance) / avg3);
 }
 function calculateCoverageByDay(schedules3) {
   const coverage = {};
@@ -11627,8 +13391,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     res.json(newSchedule);
   } catch (error) {
     logger.error("[ADD_MINISTER] \u274C Erro ao adicionar ministro:", error);
-    logger.error("[ADD_MINISTER] \u274C Stack:", error.stack);
-    res.status(500).json({ message: error.message || "Erro ao adicionar ministro na escala" });
+    logger.error("[ADD_MINISTER] \u274C Stack:", getErrorStack(error));
+    res.status(500).json({ message: getErrorMessage4(error) || "Erro ao adicionar ministro na escala" });
   }
 });
 router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
@@ -11716,7 +13480,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
   } catch (error) {
     console.error("[batch-update] Error:", error);
     logger.error("Error batch updating schedule:", error);
-    res.status(500).json({ error: "Failed to update schedule", details: error.message });
+    res.status(500).json({ error: "Failed to update schedule", details: getErrorMessage4(error) });
   }
 });
 var scheduleGeneration_default = router6;
@@ -11857,6 +13621,11 @@ function getCurrentLiturgicalSeason(date2 = /* @__PURE__ */ new Date()) {
 // server/routes/smartScheduleGeneration.ts
 import { format as format4, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2 } from "date-fns";
 var router7 = Router7();
+function getErrorMessage5(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 router7.post("/generate-smart", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { month, year, options } = req.body;
@@ -11907,7 +13676,7 @@ router7.post("/generate-smart", authenticateToken, requireRole(["coordenador", "
     console.error("[SMART_GEN] Error generating smart schedule:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao gerar escala inteligente"
+      message: getErrorMessage5(error) || "Erro ao gerar escala inteligente"
     });
   }
 });
@@ -11942,7 +13711,7 @@ router7.post("/preview", authenticateToken, requireRole(["coordenador", "gestor"
     console.error("[PREVIEW] Error generating preview:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao gerar preview"
+      message: getErrorMessage5(error) || "Erro ao gerar preview"
     });
   }
 });
@@ -12010,7 +13779,7 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     console.error("[MANUAL_ADJUST] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao realizar ajuste manual"
+      message: getErrorMessage5(error) || "Erro ao realizar ajuste manual"
     });
   }
 });
@@ -12049,7 +13818,7 @@ router7.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"
     console.error("[PUBLISH] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao publicar escala"
+      message: getErrorMessage5(error) || "Erro ao publicar escala"
     });
   }
 });
@@ -12075,7 +13844,7 @@ router7.get("/validation/:year/:month", authenticateToken, requireRole(["coorden
     console.error("[VALIDATION] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao validar escala"
+      message: getErrorMessage5(error) || "Erro ao validar escala"
     });
   }
 });
@@ -12101,16 +13870,16 @@ function calculateGenerationStatistics(schedules3, options) {
   }
   const coverage = totalPositions > 0 ? filledPositions / totalPositions : 0;
   const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum, count9) => sum + count9, 0) / assignments.length : 0;
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum2, count12) => sum2 + count12, 0) / assignments.length : 0;
   const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum, count9) => sum + Math.pow(count9 - avgAssignments, 2), 0) / assignments.length
+    assignments.reduce((sum2, count12) => sum2 + Math.pow(count12 - avgAssignments, 2), 0) / assignments.length
   ) / (avgAssignments || 1) : 0;
   const fairness = Math.max(0, 1 - variance);
   const maxAllowed = options.maxAssignmentsPerMinister || 4;
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count9]) => count9 > maxAllowed || count9 < 1).map(([ministerId, count9]) => ({
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count12]) => count12 > maxAllowed || count12 < 1).map(([ministerId, count12]) => ({
     ministerId,
-    count: count9,
-    reason: count9 > maxAllowed ? "too_many" : "too_few"
+    count: count12,
+    reason: count12 > maxAllowed ? "too_many" : "too_few"
   }));
   const conflicts = [];
   if (variance > 0.3) {
@@ -12147,7 +13916,47 @@ async function checkMinisterAvailability(ministerId, date2, time2) {
   if (responses.length === 0) {
     return { available: true, reason: "Sem resposta de question\xE1rio (assumindo dispon\xEDvel)" };
   }
-  return { available: true };
+  const response = responses[0].questionnaire_responses;
+  const dayOfWeek = dateObj.getDay();
+  if (dayOfWeek === 0) {
+    const availableSundays = response.availableSundays || [];
+    const formattedDate = format4(dateObj, "yyyy-MM-dd");
+    if (availableSundays.length > 0 && !availableSundays.includes(formattedDate)) {
+      return { available: false, reason: "Ministro n\xE3o dispon\xEDvel neste domingo" };
+    }
+  }
+  if (dayOfWeek >= 1 && dayOfWeek <= 6) {
+    const dailyAvailability = response.dailyMassAvailability || [];
+    const dayNames = ["domingo", "segunda", "ter\xE7a", "quarta", "quinta", "sexta", "s\xE1bado"];
+    const dayName = dayNames[dayOfWeek];
+    if (dailyAvailability.length > 0 && !dailyAvailability.some((d) => d.toLowerCase().includes(dayName))) {
+      return { available: false, reason: `Ministro n\xE3o dispon\xEDvel \xE0s ${dayName}s` };
+    }
+  }
+  const preferredTimes = response.preferredMassTimes || [];
+  const alternativeTimes = response.alternativeTimes || [];
+  const allTimes = [...preferredTimes, ...alternativeTimes];
+  if (allTimes.length > 0 && time2) {
+    const normalizedRequestedTime = time2.slice(0, 5);
+    const timeMatches = allTimes.some((t) => {
+      const normalizedAvailableTime = t.slice(0, 5);
+      return normalizedAvailableTime === normalizedRequestedTime;
+    });
+    if (!timeMatches) {
+      const isAlternative = alternativeTimes.some((t) => t.slice(0, 5) === normalizedRequestedTime);
+      if (!isAlternative) {
+        return {
+          available: false,
+          reason: `Ministro n\xE3o dispon\xEDvel \xE0s ${time2}. Hor\xE1rios preferidos: ${preferredTimes.join(", ")}`
+        };
+      }
+    }
+  }
+  return {
+    available: true,
+    preferredTimes,
+    canSubstitute: response.canSubstitute || false
+  };
 }
 async function calculateFairnessImpact(ministerId, date2) {
   const dateObj = new Date(date2);
@@ -12167,15 +13976,15 @@ async function calculateFairnessImpact(ministerId, date2) {
     counts[assignment.ministerId] = (counts[assignment.ministerId] || 0) + 1;
   }
   const valuesBefore = Object.values(counts);
-  const avgBefore = valuesBefore.reduce((sum, c) => sum + c, 0) / valuesBefore.length;
+  const avgBefore = valuesBefore.reduce((sum2, c) => sum2 + c, 0) / valuesBefore.length;
   const varianceBefore = Math.sqrt(
-    valuesBefore.reduce((sum, c) => sum + Math.pow(c - avgBefore, 2), 0) / valuesBefore.length
+    valuesBefore.reduce((sum2, c) => sum2 + Math.pow(c - avgBefore, 2), 0) / valuesBefore.length
   );
   counts[ministerId] = (counts[ministerId] || 0) + 1;
   const valuesAfter = Object.values(counts);
-  const avgAfter = valuesAfter.reduce((sum, c) => sum + c, 0) / valuesAfter.length;
+  const avgAfter = valuesAfter.reduce((sum2, c) => sum2 + c, 0) / valuesAfter.length;
   const varianceAfter = Math.sqrt(
-    valuesAfter.reduce((sum, c) => sum + Math.pow(c - avgAfter, 2), 0) / valuesAfter.length
+    valuesAfter.reduce((sum2, c) => sum2 + Math.pow(c - avgAfter, 2), 0) / valuesAfter.length
   );
   return {
     before: varianceBefore,
@@ -12187,7 +13996,9 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
   const warnings = [];
   const errors = [];
   const sundays = scheduleData.filter((s) => {
-    const date2 = new Date(s.date || s.massTime?.date);
+    const dateStr = s.date || s.massTime?.date;
+    if (!dateStr) return false;
+    const date2 = new Date(dateStr);
     return date2.getDay() === 0;
   });
   const sundaysUnderstaffed = sundays.filter((s) => {
@@ -12222,14 +14033,14 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
       }
     }
   }
-  const overAssigned = Object.entries(ministerCounts).filter(([_, count9]) => count9 > 4);
+  const overAssigned = Object.entries(ministerCounts).filter(([_, count12]) => count12 > 4);
   const noOverAssignments = overAssigned.length === 0;
   if (!noOverAssignments) {
     warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
   }
   const counts = Object.values(ministerCounts);
-  const avg2 = counts.length > 0 ? counts.reduce((sum, c) => sum + c, 0) / counts.length : 0;
-  const variance = counts.length > 0 && avg2 > 0 ? Math.sqrt(counts.reduce((sum, c) => sum + Math.pow(c - avg2, 2), 0) / counts.length) / avg2 : 0;
+  const avg3 = counts.length > 0 ? counts.reduce((sum2, c) => sum2 + c, 0) / counts.length : 0;
+  const variance = counts.length > 0 && avg3 > 0 ? Math.sqrt(counts.reduce((sum2, c) => sum2 + Math.pow(c - avg3, 2), 0) / counts.length) / avg3 : 0;
   if (variance > 0.3) {
     warnings.push(`Distribui\xE7\xE3o desbalanceada (vari\xE2ncia: ${(variance * 100).toFixed(0)}%)`);
   }
@@ -12253,6 +14064,7 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
     const time2 = schedule.time || schedule.massTime?.time;
     const type = schedule.type || schedule.massTime?.type || "missa";
     const ministers = schedule.ministers || schedule.assignments || [];
+    if (!date2 || !time2) continue;
     for (const minister of ministers) {
       const ministerId = minister.id || minister.ministerId;
       const position = minister.position || 0;
@@ -12280,18 +14092,85 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
   return savedCount;
 }
 async function sendMinisterNotifications(scheduleData, month, year) {
+  const { sendPushNotificationToUsers: sendPushNotificationToUsers2 } = await init_pushNotifications().then(() => pushNotifications_exports);
+  const { notifications: notifications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   const uniqueMinisters = /* @__PURE__ */ new Set();
+  const ministerSchedules = {};
   for (const schedule of scheduleData) {
     const ministers = schedule.ministers || schedule.assignments || [];
+    const scheduleDate = schedule.date || schedule.massTime?.date;
+    const scheduleTime = schedule.time || schedule.massTime?.time;
+    if (!scheduleDate || !scheduleTime) continue;
     for (const minister of ministers) {
       const id = minister.id || minister.ministerId;
-      if (id) uniqueMinisters.add(id);
+      if (id) {
+        uniqueMinisters.add(id);
+        if (!ministerSchedules[id]) {
+          ministerSchedules[id] = [];
+        }
+        ministerSchedules[id].push({
+          date: scheduleDate,
+          time: scheduleTime,
+          position: minister.position || schedule.position || 0
+        });
+      }
     }
   }
-  return {
-    sent: uniqueMinisters.size,
-    failed: 0
-  };
+  const ministerIds = Array.from(uniqueMinisters);
+  if (ministerIds.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+  let sent = 0;
+  let failed = 0;
+  const monthNames2 = [
+    "Janeiro",
+    "Fevereiro",
+    "Mar\xE7o",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ];
+  const monthName = monthNames2[month - 1];
+  for (const ministerId of ministerIds) {
+    try {
+      const scheduleCount = ministerSchedules[ministerId]?.length || 0;
+      await db.insert(notifications2).values({
+        userId: ministerId,
+        type: "schedule",
+        title: `\u{1F4C5} Escala de ${monthName}/${year}`,
+        message: `Sua escala foi publicada! Voc\xEA tem ${scheduleCount} missa(s) agendada(s) este m\xEAs.`,
+        priority: "medium",
+        actionUrl: `/schedules?month=${month}&year=${year}`,
+        data: {
+          month,
+          year,
+          scheduleCount,
+          schedules: ministerSchedules[ministerId]
+        }
+      });
+      sent++;
+    } catch (error) {
+      console.error(`[SMART_SCHEDULE] Failed to create notification for minister ${ministerId}:`, error);
+      failed++;
+    }
+  }
+  try {
+    await sendPushNotificationToUsers2(ministerIds, {
+      title: `\u{1F4C5} Escala de ${monthName}/${year}`,
+      body: "Sua escala foi publicada! Clique para ver suas missas.",
+      url: `/schedules?month=${month}&year=${year}`,
+      data: { month, year }
+    });
+  } catch (error) {
+    console.error("[SMART_SCHEDULE] Failed to send push notifications:", error);
+  }
+  return { sent, failed };
 }
 async function getLiturgicalInfoForMonth(year, month) {
   const startDate = new Date(year, month - 1, 1);
@@ -12316,7 +14195,8 @@ var smartScheduleGeneration_default = router7;
 await init_db();
 init_schema();
 import { Router as Router8 } from "express";
-import { eq as eq17, and as and12, sql as sql9, gte as gte8, lte as lte7 } from "drizzle-orm";
+import { z as z5 } from "zod";
+import { eq as eq18, and as and13, sql as sql10, gte as gte9, lte as lte8 } from "drizzle-orm";
 
 // server/services/scheduleComparisonService.ts
 await init_db();
@@ -12610,7 +14490,7 @@ async function compareSchedule(scheduleId) {
 function extractMinisterIds(ministersData) {
   if (!ministersData) return [];
   if (Array.isArray(ministersData)) {
-    return ministersData.filter((m) => m && (m.id || m.ministerId)).map((m) => m.id || m.ministerId);
+    return ministersData.filter((m) => m !== null && typeof m === "object" && (m.id !== void 0 || m.ministerId !== void 0)).map((m) => m.id || m.ministerId || "");
   }
   return [];
 }
@@ -12686,7 +14566,7 @@ async function analyzeMonthlyPatterns(month, year) {
     // The function returns removalCount but we need additionCount
     reliabilityScore: m.reliabilityScore
   }));
-  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count9]) => ({ time: time2, changeCount: count9 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
+  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count12]) => ({ time: time2, changeCount: count12 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
   let algorithmHealth;
   if (acceptanceRate >= 85) algorithmHealth = "excellent";
   else if (acceptanceRate >= 70) algorithmHealth = "good";
@@ -12779,7 +14659,20 @@ async function getMinisterLearningInsights(ministerId) {
 }
 
 // server/routes/schedules.ts
-var logActivity = async (userId, action, description, metadata) => {
+await init_pushNotifications();
+await init_storage();
+await init_websocket();
+var ministerIdQuerySchema = z5.object({
+  ministerId: z5.string().uuid().optional()
+});
+var monthYearQuerySchema = z5.object({
+  month: z5.string().regex(/^\d{1,2}$/).transform(Number).pipe(z5.number().min(1).max(12)).optional(),
+  year: z5.string().regex(/^\d{4}$/).transform(Number).pipe(z5.number().min(2024).max(2100)).optional()
+});
+var dateParamSchema = z5.object({
+  date: z5.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, "Data deve estar no formato YYYY-MM-DD")
+});
+var logActivity2 = async (userId, action, description, metadata) => {
   console.log(`[Activity Log] ${action}: ${description}`, metadata);
 };
 var isMissingSchedulesDateColumnError = (error) => {
@@ -12793,15 +14686,22 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const targetMinisterId = req.query.ministerId || userId;
-    const minister = await db.select().from(users).where(eq17(users.id, targetMinisterId)).limit(1);
+    const queryValidation = ministerIdQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      return res.status(400).json({
+        message: "Par\xE2metros inv\xE1lidos",
+        errors: queryValidation.error.errors
+      });
+    }
+    const targetMinisterId = queryValidation.data.ministerId || userId;
+    const minister = await db.select().from(users).where(eq18(users.id, targetMinisterId)).limit(1);
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
     const ministerId = minister[0].id;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const loggedInUser = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+    const loggedInUser = await db.select({ role: users.role }).from(users).where(eq18(users.id, userId)).limit(1);
     const isAdmin = loggedInUser.length > 0 && (loggedInUser[0].role === "coordenador" || loggedInUser[0].role === "gestor");
     const upcomingAssignments = await db.select({
       id: schedules.id,
@@ -12813,11 +14713,11 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and12(
-        eq17(schedules.ministerId, ministerId),
-        gte8(schedules.date, today.toISOString().split("T")[0]),
+      and13(
+        eq18(schedules.ministerId, ministerId),
+        gte9(schedules.date, today.toISOString().split("T")[0]),
         // Only show published schedules to regular ministers
-        isAdmin ? void 0 : eq17(schedules.status, "published")
+        isAdmin ? void 0 : eq18(schedules.status, "published")
       )
     ).orderBy(schedules.date).limit(10);
     const formattedAssignments = upcomingAssignments.map((assignment) => ({
@@ -12838,11 +14738,18 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
 });
 router8.get("/by-date/:date", authenticateToken, async (req, res) => {
   try {
-    const { date: date2 } = req.params;
+    const paramValidation = dateParamSchema.safeParse(req.params);
+    if (!paramValidation.success) {
+      return res.status(400).json({
+        message: "Data inv\xE1lida. Use o formato YYYY-MM-DD",
+        errors: paramValidation.error.errors
+      });
+    }
+    const { date: date2 } = paramValidation.data;
     const userId = req.user?.id;
     let isAdmin = false;
     if (userId) {
-      const userResult = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+      const userResult = await db.select({ role: users.role }).from(users).where(eq18(users.id, userId)).limit(1);
       isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
     }
     const targetDateStr = date2.includes("T") ? date2.split("T")[0] : date2.split(" ")[0];
@@ -12855,16 +14762,16 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
       date: schedules.date,
       massTime: schedules.time,
       position: schedules.position,
-      confirmed: sql9`true`,
+      confirmed: sql10`true`,
       status: schedules.status,
       // Campos necessários para identificar adoração e celebrações especiais
       type: schedules.type,
       location: schedules.location,
       notes: schedules.notes
-    }).from(schedules).leftJoin(users, eq17(schedules.ministerId, users.id)).where(
-      and12(
-        eq17(schedules.date, targetDateStr),
-        isAdmin ? void 0 : eq17(schedules.status, "published")
+    }).from(schedules).leftJoin(users, eq18(schedules.ministerId, users.id)).where(
+      and13(
+        eq18(schedules.date, targetDateStr),
+        isAdmin ? void 0 : eq18(schedules.status, "published")
       )
     ).orderBy(schedules.time, schedules.position);
     let adorationAssignments = [];
@@ -12875,16 +14782,24 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
         const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         const monthNum = targetDate.getMonth() + 1;
         const yearNum = targetDate.getFullYear();
-        const draws = await db.select().from(adorationDraws2).where(and12(eq17(adorationDraws2.month, monthNum), eq17(adorationDraws2.year, yearNum))).limit(1);
+        const draws = await db.select().from(adorationDraws2).where(and13(eq18(adorationDraws2.month, monthNum), eq18(adorationDraws2.year, yearNum))).limit(1);
         if (draws.length > 0) {
           const firstDayOfMonth = new Date(yearNum, monthNum - 1, 1);
           let mondayOfWeek = 0;
           const tempDate = new Date(firstDayOfMonth);
-          while (tempDate.getDay() !== 1) tempDate.setDate(tempDate.getDate() + 1);
+          while (tempDate.getDay() !== 1) {
+            tempDate.setDate(tempDate.getDate() + 1);
+          }
           while (tempDate <= targetDate) {
             mondayOfWeek++;
-            if (tempDate.toISOString().split("T")[0] === targetDateStr) break;
+            const tempDateStr = tempDate.toISOString().split("T")[0];
+            if (tempDateStr === targetDateStr) {
+              break;
+            }
             tempDate.setDate(tempDate.getDate() + 7);
+          }
+          if (mondayOfWeek === 0) {
+            console.log(`[ADORATION] Data ${targetDateStr} n\xE3o corresponde a uma segunda-feira v\xE1lida do m\xEAs`);
           }
           const drawResults = await db.select({
             id: adorationDrawResults2.id,
@@ -12893,9 +14808,9 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
             scheduleDisplayName: users.scheduleDisplayName,
             mondayOfWeek: adorationDrawResults2.mondayOfWeek,
             isVoluntary: adorationDrawResults2.isVoluntary
-          }).from(adorationDrawResults2).leftJoin(users, eq17(adorationDrawResults2.ministerId, users.id)).where(and12(
-            eq17(adorationDrawResults2.drawId, draws[0].id),
-            eq17(adorationDrawResults2.mondayOfWeek, mondayOfWeek)
+          }).from(adorationDrawResults2).leftJoin(users, eq18(adorationDrawResults2.ministerId, users.id)).where(and13(
+            eq18(adorationDrawResults2.drawId, draws[0].id),
+            eq18(adorationDrawResults2.mondayOfWeek, mondayOfWeek)
           ));
           adorationAssignments = drawResults.map((res2) => ({
             id: `adoracao-${res2.id}`,
@@ -12940,20 +14855,24 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
 });
 router8.get("/", authenticateToken, async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const queryValidation = monthYearQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      return res.status(400).json({
+        message: "Par\xE2metros inv\xE1lidos",
+        errors: queryValidation.error.errors
+      });
+    }
+    const { month, year } = queryValidation.data;
     const userId = req.user?.id;
     let isAdmin = false;
     if (userId) {
-      const userResult = await db.select({ role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+      const userResult = await db.select({ role: users.role }).from(users).where(eq18(users.id, userId)).limit(1);
       isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
     }
     let query = db.select().from(schedules);
-    if (month && year) {
-      const yearNum = parseInt(year);
-      const monthNum = parseInt(month);
-      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-        return res.status(400).json({ error: "Invalid month or year parameter" });
-      }
+    if (month !== void 0 && year !== void 0) {
+      const yearNum = year;
+      const monthNum = month;
       const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
       if (cachedData) {
         console.log(`[SCHEDULES_API] \u26A1 Returning cached data for ${monthNum}/${yearNum}`);
@@ -12966,10 +14885,10 @@ router8.get("/", authenticateToken, async (req, res) => {
       let schedulesList = [];
       try {
         schedulesList = await db.select().from(schedules).where(
-          and12(
-            gte8(schedules.date, startDateStr),
-            lte7(schedules.date, endDateStr),
-            isAdmin ? void 0 : eq17(schedules.status, "published")
+          and13(
+            gte9(schedules.date, startDateStr),
+            lte8(schedules.date, endDateStr),
+            isAdmin ? void 0 : eq18(schedules.status, "published")
           )
         );
       } catch (error) {
@@ -12992,18 +14911,18 @@ router8.get("/", authenticateToken, async (req, res) => {
           ministerId: schedules.ministerId,
           date: schedules.date,
           massTime: schedules.time,
-          position: sql9`COALESCE(${schedules.position}, 0)`.as("position"),
-          confirmed: sql9`true`.as("confirmed"),
+          position: sql10`COALESCE(${schedules.position}, 0)`.as("position"),
+          confirmed: sql10`true`.as("confirmed"),
           ministerName: users.name,
           scheduleDisplayName: users.scheduleDisplayName,
           photoUrl: users.photoUrl,
           notes: schedules.notes,
           status: schedules.status
-        }).from(schedules).leftJoin(users, eq17(schedules.ministerId, users.id)).where(
-          and12(
-            gte8(schedules.date, startDateStr),
-            lte7(schedules.date, endDateStr),
-            isAdmin ? void 0 : eq17(schedules.status, "published")
+        }).from(schedules).leftJoin(users, eq18(schedules.ministerId, users.id)).where(
+          and13(
+            gte9(schedules.date, startDateStr),
+            lte8(schedules.date, endDateStr),
+            isAdmin ? void 0 : eq18(schedules.status, "published")
           )
         ).orderBy(schedules.date, schedules.time, schedules.position);
       }
@@ -13019,18 +14938,18 @@ router8.get("/", authenticateToken, async (req, res) => {
         status: substitutionRequests.status,
         reason: substitutionRequests.reason
       }).from(substitutionRequests).where(
-        and12(
-          sql9`${substitutionRequests.scheduleId} IN (${sql9.join(
-            schedulesList.map((s) => sql9`${s.id}`),
-            sql9`, `
+        and13(
+          sql10`${substitutionRequests.scheduleId} IN (${sql10.join(
+            schedulesList.map((s) => sql10`${s.id}`),
+            sql10`, `
           )})`,
-          sql9`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
+          sql10`${substitutionRequests.status} IN ('available', 'pending', 'approved', 'auto_approved')`
         )
       ) : [];
       let adorationAssignments = [];
       try {
         const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2, users: users3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const draws = await db.select().from(adorationDraws2).where(and12(eq17(adorationDraws2.month, monthNum), eq17(adorationDraws2.year, yearNum))).limit(1);
+        const draws = await db.select().from(adorationDraws2).where(and13(eq18(adorationDraws2.month, monthNum), eq18(adorationDraws2.year, yearNum))).limit(1);
         if (draws.length > 0) {
           let getMondaysInMonth3 = function(year2, month2) {
             const mondays = [];
@@ -13050,7 +14969,7 @@ router8.get("/", authenticateToken, async (req, res) => {
             scheduleDisplayName: users3.scheduleDisplayName,
             mondayOfWeek: adorationDrawResults2.mondayOfWeek,
             isVoluntary: adorationDrawResults2.isVoluntary
-          }).from(adorationDrawResults2).leftJoin(users3, eq17(adorationDrawResults2.ministerId, users3.id)).where(eq17(adorationDrawResults2.drawId, draws[0].id));
+          }).from(adorationDrawResults2).leftJoin(users3, eq18(adorationDrawResults2.ministerId, users3.id)).where(eq18(adorationDrawResults2.drawId, draws[0].id));
           const mondaysInMonth = getMondaysInMonth3(yearNum, monthNum);
           adorationAssignments = drawResults.map((res2) => {
             const mondayDate = mondaysInMonth[res2.mondayOfWeek - 1];
@@ -13093,7 +15012,7 @@ router8.get("/", authenticateToken, async (req, res) => {
         assignments: allAssignmentsList,
         substitutions: substitutionsList
       };
-      scheduleCache.set(yearNum, monthNum, responseData);
+      scheduleCache.setSync(yearNum, monthNum, responseData);
       console.log(`[SCHEDULES_API] \u{1F4BE} Cached result for ${monthNum}/${yearNum}`);
       res.json(responseData);
     } else {
@@ -13110,7 +15029,7 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para criar escalas" });
     }
@@ -13122,9 +15041,9 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       return res.status(400).json({ message: "Data deve estar em formato v\xE1lido" });
     }
     const existing = await db.select().from(schedules).where(
-      and12(
-        eq17(schedules.date, date2),
-        eq17(schedules.time, time2)
+      and13(
+        eq18(schedules.date, date2),
+        eq18(schedules.time, time2)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -13141,7 +15060,7 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     if (newSchedule.length === 0) {
       return res.status(500).json({ message: "Erro ao criar escala" });
     }
-    await logActivity(
+    await logActivity2(
       req.user?.id,
       "schedule_created",
       `Nova escala criada para ${date2} \xE0s ${time2}`,
@@ -13159,16 +15078,16 @@ router8.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para editar escalas" });
     }
     const { notes } = req.body;
-    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq17(schedules.id, req.params.id)).returning();
+    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq18(schedules.id, req.params.id)).returning();
     if (updatedSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
-    await logActivity(
+    await logActivity2(
       req.user?.id,
       "schedule_updated",
       `Escala atualizada`,
@@ -13188,7 +15107,7 @@ router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para publicar escalas" });
     }
@@ -13207,15 +15126,15 @@ router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     const result = await db.update(schedules).set({
       status: "published"
     }).where(
-      and12(
-        gte8(schedules.date, startDateStr),
-        lte7(schedules.date, endDateStr)
+      and13(
+        gte9(schedules.date, startDateStr),
+        lte8(schedules.date, endDateStr)
       )
     ).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Nenhuma escala encontrada para este m\xEAs" });
     }
-    await logActivity(
+    await logActivity2(
       req.user?.id,
       "schedule_published",
       `Escala publicada para ${month}/${year}`,
@@ -13230,6 +15149,54 @@ router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
       console.log(`  - Ministers with updated scores: ${learningReport.frequentlyRemovedMinisters.length}`);
     } catch (error) {
       console.error("[ADAPTIVE] \u26A0\uFE0F Error during learning analysis:", error);
+    }
+    try {
+      const uniqueMinisterIds = [...new Set(result.map((s) => s.ministerId).filter(Boolean))];
+      if (uniqueMinisterIds.length > 0) {
+        const monthNames2 = [
+          "Janeiro",
+          "Fevereiro",
+          "Mar\xE7o",
+          "Abril",
+          "Maio",
+          "Junho",
+          "Julho",
+          "Agosto",
+          "Setembro",
+          "Outubro",
+          "Novembro",
+          "Dezembro"
+        ];
+        const monthName = monthNames2[month - 1];
+        const notificationTitle = "\u{1F4C5} Nova Escala Publicada";
+        const notificationMessage = `A escala de ${monthName}/${year} foi publicada. Confira suas escalas e fique atento aos hor\xE1rios.`;
+        await Promise.all(uniqueMinisterIds.map(
+          (ministerId) => storage.createNotification({
+            userId: ministerId,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: "schedule",
+            read: false,
+            actionUrl: "/schedules"
+          })
+        ));
+        await sendPushNotificationToUsers(uniqueMinisterIds, {
+          title: notificationTitle,
+          body: notificationMessage,
+          url: "/schedules"
+        });
+        notifyUsers(uniqueMinisterIds, {
+          id: "schedule-published-" + month + "-" + year,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: "info",
+          actionUrl: "/schedules",
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        console.log(`[PUSH] Notifica\xE7\xE3o de escala publicada enviada para ${uniqueMinisterIds.length} ministros`);
+      }
+    } catch (notifError) {
+      console.error("[SCHEDULES] Erro ao enviar notifica\xE7\xF5es de escala publicada:", notifError);
     }
     res.json({
       message: `Escala publicada com sucesso! ${result.length} escalas atualizadas.`,
@@ -13246,7 +15213,7 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para excluir escalas" });
     }
@@ -13262,9 +15229,9 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       const lastDay = new Date(year, month, 0).getDate();
       const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
       const schedulesList = await db.select().from(schedules).where(
-        and12(
-          gte8(schedules.date, startDateStr),
-          lte7(schedules.date, endDateStr)
+        and13(
+          gte9(schedules.date, startDateStr),
+          lte8(schedules.date, endDateStr)
         )
       );
       if (schedulesList.length === 0) {
@@ -13276,16 +15243,16 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       }
       const scheduleIds = schedulesList.map((s) => s.id);
       for (const scheduleId of scheduleIds) {
-        await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, scheduleId));
+        await db.delete(substitutionRequests).where(eq18(substitutionRequests.scheduleId, scheduleId));
       }
       console.log(`[DELETE_SCHEDULE] Deleted substitution requests for ${scheduleIds.length} schedules`);
       await db.delete(schedules).where(
-        and12(
-          gte8(schedules.date, startDateStr),
-          lte7(schedules.date, endDateStr)
+        and13(
+          gte9(schedules.date, startDateStr),
+          lte8(schedules.date, endDateStr)
         )
       );
-      await logActivity(
+      await logActivity2(
         req.user?.id,
         "schedule_deleted",
         `Escalas de ${month}/${year} exclu\xEDdas`,
@@ -13295,17 +15262,17 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       console.log(`[DELETE_SCHEDULE] Successfully deleted ${scheduleIds.length} schedules for ${month}/${year}`);
       res.json({ message: `${scheduleIds.length} escalas exclu\xEDdas com sucesso` });
     } else {
-      const schedule = await db.select().from(schedules).where(eq17(schedules.id, req.params.id)).limit(1);
+      const schedule = await db.select().from(schedules).where(eq18(schedules.id, req.params.id)).limit(1);
       if (schedule.length === 0) {
         return res.status(404).json({ message: "Escala n\xE3o encontrada" });
       }
       if (schedule[0].status === "published") {
         return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
       }
-      await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, req.params.id));
+      await db.delete(substitutionRequests).where(eq18(substitutionRequests.scheduleId, req.params.id));
       console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-      await db.delete(schedules).where(eq17(schedules.id, req.params.id));
-      await logActivity(
+      await db.delete(schedules).where(eq18(schedules.id, req.params.id));
+      await logActivity2(
         req.user?.id,
         "schedule_deleted",
         `Escala exclu\xEDda`,
@@ -13330,7 +15297,7 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       console.log("[UNPUBLISH_API] No user ID found");
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       console.log("[UNPUBLISH_API] User not authorized, role:", user[0]?.role);
       return res.status(403).json({ message: "Sem permiss\xE3o para cancelar publica\xE7\xE3o" });
@@ -13354,9 +15321,9 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
     const result = await db.update(schedules).set({
       status: "scheduled"
     }).where(
-      and12(
-        gte8(schedules.date, startDateStr),
-        lte7(schedules.date, endDateStr)
+      and13(
+        gte9(schedules.date, startDateStr),
+        lte8(schedules.date, endDateStr)
       )
     ).returning();
     console.log("[UNPUBLISH_API] Updated", result.length, "schedules");
@@ -13364,7 +15331,7 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       console.log("[UNPUBLISH_API] No schedules found for this month");
       return res.status(404).json({ message: "Nenhuma escala encontrada para este m\xEAs" });
     }
-    await logActivity(
+    await logActivity2(
       req.user?.id,
       "schedule_unpublished",
       `Publica\xE7\xE3o cancelada para ${month}/${year}`,
@@ -13386,12 +15353,12 @@ router8.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq17(users.id, req.user.id)).limit(1);
+    const user = await db.select().from(users).where(eq18(users.id, req.user.id)).limit(1);
     if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
       return res.status(403).json({ message: "Sem permiss\xE3o para gerar escalas" });
     }
     const scheduleId = req.params.scheduleId;
-    const schedule = await db.select().from(schedules).where(eq17(schedules.id, scheduleId)).limit(1);
+    const schedule = await db.select().from(schedules).where(eq18(schedules.id, scheduleId)).limit(1);
     if (schedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -13408,9 +15375,9 @@ router8.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenad
     await db.update(schedules).set({
       status: "generated",
       notes: `Generated schedule with ${result.stats.totalAssignments} assignments`
-    }).where(eq17(schedules.id, scheduleId));
+    }).where(eq18(schedules.id, scheduleId));
     console.log(`Updated schedule ${scheduleId} to generated status`);
-    await logActivity(
+    await logActivity2(
       req.user?.id,
       "schedule_generated",
       `Escala inteligente gerada com ${result.stats.totalAssignments} atribui\xE7\xF5es`,
@@ -13442,14 +15409,19 @@ var schedules_default = router8;
 await init_db();
 init_schema();
 import { Router as Router9 } from "express";
-import { eq as eq18, and as and13, inArray as inArray5, sql as sql10 } from "drizzle-orm";
-import { format as format5, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
+import { eq as eq19, and as and14, inArray as inArray5, sql as sql11 } from "drizzle-orm";
+import { format as format6, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
+function getErrorMessage6(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 var router9 = Router9();
 async function isAuxiliaryForMass(userId, scheduleId) {
   const assignment = await db.select().from(schedules).where(
-    and13(
-      eq18(schedules.id, scheduleId),
-      eq18(schedules.ministerId, userId),
+    and14(
+      eq19(schedules.id, scheduleId),
+      eq19(schedules.ministerId, userId),
       inArray5(schedules.position, [1, 2])
     )
   ).limit(1);
@@ -13474,7 +15446,7 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const massSchedule = await db.select().from(schedules).where(eq18(schedules.id, scheduleId)).limit(1);
+    const massSchedule = await db.select().from(schedules).where(eq19(schedules.id, scheduleId)).limit(1);
     if (massSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -13487,8 +15459,8 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       return res.status(403).json({
         message: "Painel do Auxiliar dispon\xEDvel apenas de 1h antes at\xE9 2h depois da missa",
         allowedWindow: {
-          start: format5(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
-          end: format5(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
+          start: format6(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
+          end: format6(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
         }
       });
     }
@@ -13501,14 +15473,14 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp,
       onSiteAdjustments: schedules.onSiteAdjustments
-    }).from(schedules).leftJoin(users, eq18(schedules.ministerId, users.id)).where(
-      and13(
-        eq18(schedules.date, schedule.date),
-        eq18(schedules.time, schedule.time),
-        eq18(schedules.status, "scheduled")
+    }).from(schedules).leftJoin(users, eq19(schedules.ministerId, users.id)).where(
+      and14(
+        eq19(schedules.date, schedule.date),
+        eq19(schedules.time, schedule.time),
+        eq19(schedules.status, "scheduled")
       )
     ).orderBy(schedules.position);
-    const checkIns = await db.select().from(ministerCheckIns).where(eq18(ministerCheckIns.scheduleId, scheduleId));
+    const checkIns = await db.select().from(ministerCheckIns).where(eq19(ministerCheckIns.scheduleId, scheduleId));
     const standbyList = await db.select({
       id: standbyMinisters.id,
       ministerId: standbyMinisters.ministerId,
@@ -13520,8 +15492,8 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       calledAt: standbyMinisters.calledAt,
       response: standbyMinisters.response,
       assignedPosition: standbyMinisters.assignedPosition
-    }).from(standbyMinisters).leftJoin(users, eq18(standbyMinisters.ministerId, users.id)).where(eq18(standbyMinisters.scheduleId, scheduleId));
-    const executionLog = await db.select().from(massExecutionLogs).where(eq18(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    }).from(standbyMinisters).leftJoin(users, eq19(standbyMinisters.ministerId, users.id)).where(eq19(standbyMinisters.scheduleId, scheduleId));
+    const executionLog = await db.select().from(massExecutionLogs).where(eq19(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     const massDateTime = parseISO(`${schedule.date}T${schedule.time}`);
     const now = /* @__PURE__ */ new Date();
     const minutesUntilMass = Math.floor((massDateTime.getTime() - now.getTime()) / (1e3 * 60));
@@ -13545,32 +15517,36 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
         },
         currentPhase,
         minutesUntilMass,
-        assignments: allAssignments.map((a) => ({
-          id: a.id,
-          ministerId: a.ministerId,
-          ministerName: a.ministerName,
-          phone: a.ministerPhone,
-          whatsapp: a.ministerWhatsapp,
-          position: a.position,
-          onSiteAdjustments: a.onSiteAdjustments,
-          checkInStatus: checkIns.find((c) => c.ministerId === a.ministerId)?.status || "not-checked-in",
-          checkInTime: checkIns.find((c) => c.ministerId === a.ministerId)?.checkedInAt
-        })),
+        assignments: (() => {
+          return allAssignments.map((a) => ({
+            id: a.id,
+            ministerId: a.ministerId,
+            ministerName: a.ministerName,
+            phone: a.ministerPhone,
+            whatsapp: a.ministerWhatsapp,
+            position: a.position,
+            onSiteAdjustments: a.onSiteAdjustments,
+            checkInStatus: checkIns.find((c) => c.ministerId === a.ministerId)?.status || "not-checked-in",
+            checkInTime: checkIns.find((c) => c.ministerId === a.ministerId)?.checkedInAt
+          }));
+        })(),
         standbyMinisters: standbyList,
         executionLog: executionLog.length > 0 ? executionLog[0] : null,
-        statistics: {
-          totalPositions: allAssignments.length,
-          checkedIn: checkIns.filter((c) => c.status === "present").length,
-          absent: checkIns.filter((c) => c.status === "absent").length,
-          standbyCalled: standbyList.filter((s) => s.calledAt !== null).length
-        }
+        statistics: (() => {
+          return {
+            totalPositions: allAssignments.length,
+            checkedIn: checkIns.filter((c) => c.status === "present").length,
+            absent: checkIns.filter((c) => c.status === "absent").length,
+            standbyCalled: standbyList.filter((s) => s.calledAt !== null).length
+          };
+        })()
       }
     });
   } catch (error) {
     console.error("[AUXILIARY_PANEL] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao carregar painel do auxiliar"
+      message: getErrorMessage6(error) || "Erro ao carregar painel do auxiliar"
     });
   }
 });
@@ -13585,7 +15561,7 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq18(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq19(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -13599,15 +15575,15 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
       totalServices: users.totalServices,
       lastService: users.lastService
     }).from(users).where(
-      and13(
-        eq18(users.status, "active"),
-        eq18(users.role, "ministro")
+      and14(
+        eq19(users.status, "active"),
+        eq19(users.role, "ministro")
       )
     ).limit(20);
     const assignedMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
-      and13(
-        eq18(schedules.date, date2),
-        eq18(schedules.time, time2)
+      and14(
+        eq19(schedules.date, date2),
+        eq19(schedules.time, time2)
       )
     );
     const assignedIds = new Set(assignedMinisters.map((a) => a.ministerId).filter(Boolean));
@@ -13621,7 +15597,7 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     console.error("[AUXILIARY_STANDBY] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao buscar ministros suplentes"
+      message: getErrorMessage6(error) || "Erro ao buscar ministros suplentes"
     });
   }
 });
@@ -13637,9 +15613,9 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
     const assignment = await db.select().from(schedules).where(
-      and13(
-        eq18(schedules.id, scheduleId),
-        eq18(schedules.ministerId, ministerId)
+      and14(
+        eq19(schedules.id, scheduleId),
+        eq19(schedules.ministerId, ministerId)
       )
     ).limit(1);
     if (assignment.length === 0) {
@@ -13647,9 +15623,9 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
     }
     const position = assignment[0].position || 0;
     const existingCheckIn = await db.select().from(ministerCheckIns).where(
-      and13(
-        eq18(ministerCheckIns.scheduleId, scheduleId),
-        eq18(ministerCheckIns.ministerId, ministerId)
+      and14(
+        eq19(ministerCheckIns.scheduleId, scheduleId),
+        eq19(ministerCheckIns.ministerId, ministerId)
       )
     ).limit(1);
     if (existingCheckIn.length > 0) {
@@ -13657,7 +15633,7 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
         status,
         notes,
         checkedInAt: /* @__PURE__ */ new Date()
-      }).where(eq18(ministerCheckIns.id, existingCheckIn[0].id));
+      }).where(eq19(ministerCheckIns.id, existingCheckIn[0].id));
     } else {
       await db.insert(ministerCheckIns).values({
         scheduleId,
@@ -13668,6 +15644,20 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
         checkedInBy: userId
       });
     }
+    try {
+      const { broadcastAuxiliaryPanelUpdate: broadcastAuxiliaryPanelUpdate2 } = await init_websocket().then(() => websocket_exports);
+      const [minister] = await db.select({ name: users.name }).from(users).where(eq19(users.id, ministerId)).limit(1);
+      broadcastAuxiliaryPanelUpdate2({
+        scheduleId,
+        updateType: "check_in",
+        ministerId,
+        ministerName: minister?.name || "Ministro",
+        position,
+        status
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_CHECKIN] WebSocket broadcast error:", wsError);
+    }
     res.json({
       success: true,
       message: `Ministro marcado como ${status}`
@@ -13676,7 +15666,7 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
     console.error("[AUXILIARY_CHECKIN] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao registrar presen\xE7a"
+      message: getErrorMessage6(error) || "Erro ao registrar presen\xE7a"
     });
   }
 });
@@ -13698,10 +15688,10 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
     for (const change of changes) {
       const { ministerId, fromPosition, toPosition, reason } = change;
       await db.update(schedules).set({ position: toPosition }).where(
-        and13(
-          eq18(schedules.id, scheduleId),
-          eq18(schedules.ministerId, ministerId),
-          eq18(schedules.position, fromPosition)
+        and14(
+          eq19(schedules.id, scheduleId),
+          eq19(schedules.ministerId, ministerId),
+          eq19(schedules.position, fromPosition)
         )
       );
       appliedChanges.push({
@@ -13713,18 +15703,28 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
         details: reason
       });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq18(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq19(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       const currentChanges = existingLog[0].changesMade || [];
       await db.update(massExecutionLogs).set({
         changesMade: [...currentChanges, ...appliedChanges]
-      }).where(eq18(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq19(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
         auxiliaryId: userId,
         changesMade: appliedChanges
       });
+    }
+    try {
+      const { broadcastAuxiliaryPanelUpdate: broadcastAuxiliaryPanelUpdate2 } = await init_websocket().then(() => websocket_exports);
+      broadcastAuxiliaryPanelUpdate2({
+        scheduleId,
+        updateType: "redistribute",
+        changes: appliedChanges
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_REDISTRIBUTE] WebSocket broadcast error:", wsError);
     }
     res.json({
       success: true,
@@ -13734,7 +15734,7 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
     console.error("[AUXILIARY_REDISTRIBUTE] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao redistribuir posi\xE7\xF5es"
+      message: getErrorMessage6(error) || "Erro ao redistribuir posi\xE7\xF5es"
     });
   }
 });
@@ -13749,12 +15749,12 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq18(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq19(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     const { date: date2, time: time2 } = massInfo[0];
-    const auxiliary = await db.select({ name: users.name }).from(users).where(eq18(users.id, userId)).limit(1);
+    const auxiliary = await db.select({ name: users.name }).from(users).where(eq19(users.id, userId)).limit(1);
     const auxiliaryName = auxiliary[0]?.name || "Auxiliar";
     await db.insert(standbyMinisters).values({
       scheduleId,
@@ -13768,7 +15768,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
       userId: ministerId,
       type: "schedule",
       title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
-      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format5(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
+      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format6(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
       priority: "high",
       data: {
         scheduleId,
@@ -13778,6 +15778,71 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
         massTime: time2
       }
     });
+    try {
+      const { sendPushNotificationToUsers: sendPushNotificationToUsers2 } = await init_pushNotifications().then(() => pushNotifications_exports);
+      await sendPushNotificationToUsers2([ministerId], {
+        title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
+        body: `${auxiliaryName} precisa de voc\xEA AGORA para a missa de ${format6(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
+        url: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
+        tag: `standby-${scheduleId}`,
+        data: {
+          scheduleId,
+          position,
+          urgency: "critical",
+          massDate: date2,
+          massTime: time2
+        }
+      });
+    } catch (pushError) {
+      console.error("[AUXILIARY_CALL_STANDBY] Push notification error:", pushError);
+    }
+    try {
+      const ministerInfo = await db.select({ whatsapp: users.whatsapp, phone: users.phone, name: users.name }).from(users).where(eq19(users.id, ministerId)).limit(1);
+      const whatsappNumber = ministerInfo[0]?.whatsapp || ministerInfo[0]?.phone;
+      if (whatsappNumber && process.env.ZAPI_INSTANCE && process.env.ZAPI_TOKEN) {
+        const axios2 = (await import("axios")).default;
+        const instance = process.env.ZAPI_INSTANCE;
+        const token = process.env.ZAPI_TOKEN;
+        const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+        const normalizedPhone = whatsappNumber.replace(/\D/g, "");
+        const message = `\u{1F6A8} *CHAMADA URGENTE DE SUPL\xCANCIA*
+
+Ol\xE1 ${ministerInfo[0]?.name}!
+
+${auxiliaryName} est\xE1 precisando de voc\xEA para a missa:
+\u{1F4C5} Data: ${format6(parseISO(date2), "dd/MM/yyyy")}
+\u23F0 Hor\xE1rio: ${time2}
+\u{1F4CD} Posi\xE7\xE3o: ${position}
+
+Por favor, responda o mais r\xE1pido poss\xEDvel!`;
+        await axios2.post(
+          `https://api.z-api.io/instances/${instance}/token/${token}/send-text`,
+          { phone: normalizedPhone, message },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Client-Token": clientToken || ""
+            }
+          }
+        );
+        console.log("[AUXILIARY_CALL_STANDBY] WhatsApp message sent to:", normalizedPhone);
+      }
+    } catch (whatsappError) {
+      console.error("[AUXILIARY_CALL_STANDBY] WhatsApp error:", whatsappError);
+    }
+    try {
+      const { notifyUsers: notifyUsers2 } = await init_websocket().then(() => websocket_exports);
+      notifyUsers2([ministerId], {
+        id: `standby-${scheduleId}-${Date.now()}`,
+        title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
+        message: `Voc\xEA foi convocado para a missa de ${format6(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
+        type: "schedule",
+        actionUrl: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (wsError) {
+      console.error("[AUXILIARY_CALL_STANDBY] WebSocket error:", wsError);
+    }
     res.json({
       success: true,
       message: "Suplente convocado com sucesso"
@@ -13786,7 +15851,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
     console.error("[AUXILIARY_CALL_STANDBY] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao convocar suplente"
+      message: getErrorMessage6(error) || "Erro ao convocar suplente"
     });
   }
 });
@@ -13808,7 +15873,7 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq18(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq19(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       await db.update(massExecutionLogs).set({
         attendance,
@@ -13816,7 +15881,7 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
         comments,
         incidents,
         highlights
-      }).where(eq18(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq19(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -13836,16 +15901,16 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
         if (record.checkedIn && record.ministerId) {
           await db.update(users).set({
             lastService: /* @__PURE__ */ new Date(),
-            totalServices: sql10`${users.totalServices} + 1`
-          }).where(eq18(users.id, record.ministerId));
+            totalServices: sql11`${users.totalServices} + 1`
+          }).where(eq19(users.id, record.ministerId));
         }
       }
     }
     if (incidents && incidents.length > 0) {
       const coordinators = await db.select().from(users).where(
-        and13(
+        and14(
           inArray5(users.role, ["coordenador", "gestor"]),
-          eq18(users.status, "active")
+          eq19(users.status, "active")
         )
       );
       for (const coordinator of coordinators) {
@@ -13866,7 +15931,7 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
     console.error("[AUXILIARY_REPORT] Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao enviar relat\xF3rio"
+      message: getErrorMessage6(error) || "Erro ao enviar relat\xF3rio"
     });
   }
 });
@@ -13878,7 +15943,7 @@ init_schema();
 import { Router as Router10 } from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { eq as eq19 } from "drizzle-orm";
+import { eq as eq20 } from "drizzle-orm";
 var router10 = Router10();
 var upload = multer({
   storage: multer.memoryStorage(),
@@ -13945,7 +16010,7 @@ router10.post("/profile-photo", authenticateToken, upload.single("photo"), handl
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq19(users.id, userId));
+    }).where(eq20(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -13977,7 +16042,7 @@ router10.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq19(users.id, userId));
+    }).where(eq20(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -13991,112 +16056,48 @@ var upload_default = router10;
 
 // server/routes/notifications.ts
 import { Router as Router11 } from "express";
-import { z as z5 } from "zod";
+import { z as z6 } from "zod";
 await init_db();
 await init_storage();
 init_schema();
-import { eq as eq20, and as and14 } from "drizzle-orm";
-
-// server/utils/pushNotifications.ts
-await init_storage();
-var webpush = null;
-try {
-  const module = await import("web-push");
-  webpush = module.default ?? module;
-} catch (error) {
-  console.warn("[PUSH] web-push module not available. Push notifications disabled.", error);
-}
-var VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
-var VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
-var VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
-if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-}
-var pushConfig = {
-  enabled: Boolean(webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
-  publicKey: VAPID_PUBLIC_KEY || null
-};
-async function sendPushNotificationToUsers(userIds, payload) {
-  console.log("[PUSH] Iniciando envio para", userIds.length, "userIds");
-  if (!pushConfig.enabled || !webpush) {
-    console.warn("[PUSH] Push desabilitado ou web-push n\xE3o dispon\xEDvel");
-    return;
-  }
-  if (!userIds || userIds.length === 0) {
-    console.warn("[PUSH] Nenhum userIds fornecido");
-    return;
-  }
-  const uniqueUserIds = Array.from(new Set(userIds));
-  console.log("[PUSH] UserIds \xFAnicos:", uniqueUserIds.length);
-  console.log("[PUSH] Lista de UserIds:", uniqueUserIds);
-  const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
-  console.log("[PUSH] Subscriptions encontradas:", subscriptions.length);
-  console.log("[PUSH] Subscriptions por userId:", subscriptions.map((s) => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + "..." })));
-  if (subscriptions.length === 0) {
-    console.warn("[PUSH] Nenhuma subscription encontrada para os userIds fornecidos");
-    return;
-  }
-  const notificationPayload = JSON.stringify({
-    title: payload.title,
-    body: payload.body,
-    url: payload.url ?? payload.data?.url ?? "/communication",
-    tag: payload.tag,
-    data: payload.data ?? {}
-  });
-  const results = await Promise.all(
-    subscriptions.map(async (subscription) => {
-      const pushSubscription = {
-        endpoint: subscription.endpoint,
-        keys: {
-          auth: subscription.authKey,
-          p256dh: subscription.p256dhKey
-        }
-      };
-      try {
-        await webpush.sendNotification(pushSubscription, notificationPayload);
-        console.log("[PUSH] Notifica\xE7\xE3o enviada com sucesso para userId:", subscription.userId);
-        return { success: true, userId: subscription.userId };
-      } catch (error) {
-        const statusCode = error?.statusCode ?? error?.code;
-        if (statusCode === 404 || statusCode === 410) {
-          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, "userId:", subscription.userId);
-          await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
-        } else {
-          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
-        }
-        return { success: false, userId: subscription.userId, error: statusCode };
-      }
-    })
-  );
-  const successCount = results.filter((r) => r.success).length;
-  const failCount = results.filter((r) => !r.success).length;
-  console.log("[PUSH] Resumo: Sucesso:", successCount, "| Falha:", failCount);
-}
-
-// server/routes/notifications.ts
+await init_pushNotifications();
+await init_websocket();
+import { eq as eq21, and as and15 } from "drizzle-orm";
 var router11 = Router11();
-var createNotificationSchema = z5.object({
-  title: z5.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio"),
-  message: z5.string().min(1, "Mensagem \xE9 obrigat\xF3ria"),
-  type: z5.enum(["info", "warning", "success", "error"]).default("info"),
-  recipientIds: z5.array(z5.string()).optional(),
+var internalUrlSchema = z6.string().refine(
+  (url) => {
+    if (url.startsWith("/")) return true;
+    try {
+      const parsed = new URL(url);
+      return !parsed.host || parsed.host.includes("localhost") || parsed.host.includes("replit.app") || parsed.host.includes("replit.dev");
+    } catch {
+      return false;
+    }
+  },
+  { message: "URL deve ser relativa ou do mesmo dom\xEDnio" }
+);
+var createNotificationSchema = z6.object({
+  title: z6.string().min(1, "T\xEDtulo \xE9 obrigat\xF3rio").max(255, "T\xEDtulo muito longo"),
+  message: z6.string().min(1, "Mensagem \xE9 obrigat\xF3ria").max(2e3, "Mensagem muito longa"),
+  type: z6.enum(["info", "warning", "success", "error"]).default("info"),
+  recipientIds: z6.array(z6.string()).optional(),
   // IDs específicos ou vazio para todos
-  recipientRole: z5.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
-  actionUrl: z5.string().url().optional()
+  recipientRole: z6.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
+  actionUrl: internalUrlSchema.optional()
 });
-var rawPushSubscriptionSchema = z5.object({
-  endpoint: z5.string().url(),
-  keys: z5.object({
-    p256dh: z5.string(),
-    auth: z5.string()
+var rawPushSubscriptionSchema = z6.object({
+  endpoint: z6.string().url(),
+  keys: z6.object({
+    p256dh: z6.string(),
+    auth: z6.string()
   })
 });
-var pushSubscriptionSchema = z5.union([
-  z5.object({ subscription: rawPushSubscriptionSchema }),
+var pushSubscriptionSchema = z6.union([
+  z6.object({ subscription: rawPushSubscriptionSchema }),
   rawPushSubscriptionSchema
 ]);
-var unsubscribeSchema = z5.object({
-  endpoint: z5.string().url()
+var unsubscribeSchema = z6.object({
+  endpoint: z6.string().url()
 });
 function mapNotificationType(frontendType) {
   switch (frontendType) {
@@ -14131,7 +16132,7 @@ router11.post("/push/subscribe", authenticateToken, async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    if (error instanceof z5.ZodError) {
+    if (error instanceof z6.ZodError) {
       res.status(400).json({ error: error.errors[0].message });
     } else {
       console.error("Erro ao registrar push subscription:", error);
@@ -14145,7 +16146,7 @@ router11.post("/push/unsubscribe", authenticateToken, async (req, res) => {
     await storage.removePushSubscription(req.user.id, endpoint);
     res.json({ success: true });
   } catch (error) {
-    if (error instanceof z5.ZodError) {
+    if (error instanceof z6.ZodError) {
       res.status(400).json({ error: error.errors[0].message });
     } else {
       console.error("Erro ao remover push subscription:", error);
@@ -14155,8 +16156,10 @@ router11.post("/push/unsubscribe", authenticateToken, async (req, res) => {
 });
 router11.get("/", authenticateToken, async (req, res) => {
   try {
-    const notifications2 = await storage.getUserNotifications(req.user.id);
-    res.json(notifications2);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const result = await storage.getUserNotificationsPaginated(req.user.id, { limit, offset });
+    res.json(result);
   } catch (error) {
     console.error("[NOTIFICATIONS] Error fetching notifications:", error);
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
@@ -14165,16 +16168,10 @@ router11.get("/", authenticateToken, async (req, res) => {
 router11.get("/unread-count", authenticateToken, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      console.warn("[NOTIFICATIONS] No user in request");
       return res.json({ count: 0 });
     }
-    const allNotifications = await storage.getUserNotifications(req.user.id);
-    if (!allNotifications || !Array.isArray(allNotifications)) {
-      console.warn("[NOTIFICATIONS] Invalid notifications data");
-      return res.json({ count: 0 });
-    }
-    const count9 = allNotifications.filter((n) => n && !n.read).length;
-    res.json({ count: count9 });
+    const count12 = await storage.getUnreadNotificationCount(req.user.id);
+    res.json({ count: count12 });
   } catch (error) {
     console.error("[NOTIFICATIONS] Error counting notifications:", error);
     res.json({ count: 0 });
@@ -14183,9 +16180,9 @@ router11.get("/unread-count", authenticateToken, async (req, res) => {
 router11.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await db.select().from(notifications).where(and14(
-      eq20(notifications.id, id),
-      eq20(notifications.userId, req.user.id)
+    const notification = await db.select().from(notifications).where(and15(
+      eq21(notifications.id, id),
+      eq21(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -14199,22 +16196,20 @@ router11.patch("/:id/read", authenticateToken, async (req, res) => {
 });
 router11.patch("/read-all", authenticateToken, async (req, res) => {
   try {
-    const userNotifications = await storage.getUserNotifications(req.user.id);
-    const unreadNotifications = userNotifications.filter((n) => !n.read);
-    await Promise.all(unreadNotifications.map((n) => storage.markNotificationAsRead(n.id)));
+    await storage.markAllNotificationsAsRead(req.user.id);
     res.json({ message: "Todas as notifica\xE7\xF5es foram marcadas como lidas" });
   } catch (error) {
     console.error("[NOTIFICATIONS] Error marking all as read:", error);
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
   try {
     const { massId, date: date2, time: time2, location, message, urgencyLevel } = req.body;
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq20(users.status, "active")
+      eq21(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -14262,7 +16257,7 @@ router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
     res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : "Unknown error" });
   }
 });
-router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     console.log("[NOTIFICA\xC7\xD5ES] Dados recebidos:", {
@@ -14279,21 +16274,21 @@ router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq20(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq21(users.status, "active"));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou TODOS os usu\xE1rios ativos:", recipients.length);
       } else {
-        recipients = await db.select({ id: users.id }).from(users).where(and14(
-          eq20(users.role, data.recipientRole),
-          eq20(users.status, "active")
+        recipients = await db.select({ id: users.id }).from(users).where(and15(
+          eq21(users.role, data.recipientRole),
+          eq21(users.status, "active")
         ));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou usu\xE1rios com role", data.recipientRole, ":", recipients.length);
       }
       recipientUserIds = recipients.map((r) => r.id);
       console.log("[NOTIFICA\xC7\xD5ES] IDs dos destinat\xE1rios:", recipientUserIds);
     } else {
-      const recipients = await db.select({ id: users.id }).from(users).where(and14(
-        eq20(users.role, "ministro"),
-        eq20(users.status, "active")
+      const recipients = await db.select({ id: users.id }).from(users).where(and15(
+        eq21(users.role, "ministro"),
+        eq21(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
       console.log("[NOTIFICA\xC7\xD5ES] Sem filtro, usando ministros ativos por padr\xE3o:", recipientUserIds.length);
@@ -14321,6 +16316,18 @@ router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     );
     const createdNotifications = await Promise.all(notificationPromises);
     console.log("[NOTIFICA\xC7\xD5ES] Notifica\xE7\xF5es criadas no banco:", createdNotifications.length);
+    if (createdNotifications.length > 0) {
+      const firstNotification = createdNotifications[0];
+      notifyUsers(recipientUserIds, {
+        id: firstNotification.id,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        actionUrl: data.actionUrl ?? null,
+        createdAt: firstNotification.createdAt?.toISOString() ?? (/* @__PURE__ */ new Date()).toISOString()
+      });
+      console.log("[NOTIFICA\xC7\xD5ES] WebSocket: notifica\xE7\xE3o enviada para", recipientUserIds.length, "usu\xE1rios conectados");
+    }
     if (pushConfig.enabled) {
       console.log("[NOTIFICA\xC7\xD5ES] Push notifications habilitado, enviando para", recipientUserIds.length, "destinat\xE1rios");
       await sendPushNotificationToUsers(recipientUserIds, {
@@ -14343,7 +16350,7 @@ router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), as
     });
   } catch (error) {
     console.error("Erro ao criar notifica\xE7\xE3o:", error);
-    if (error instanceof z5.ZodError) {
+    if (error instanceof z6.ZodError) {
       res.status(400).json({ error: error.errors[0].message });
     } else {
       res.status(500).json({ error: "Erro ao criar notifica\xE7\xE3o" });
@@ -14357,17 +16364,17 @@ router11.delete("/:id", authenticateToken, async (req, res) => {
     const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
     let notification;
     if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq20(notifications.id, id)).limit(1);
+      notification = await db.select().from(notifications).where(eq21(notifications.id, id)).limit(1);
     } else {
-      notification = await db.select().from(notifications).where(and14(
-        eq20(notifications.id, id),
-        eq20(notifications.userId, req.user.id)
+      notification = await db.select().from(notifications).where(and15(
+        eq21(notifications.id, id),
+        eq21(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq20(notifications.id, id));
+    await db.delete(notifications).where(eq21(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
@@ -14379,45 +16386,203 @@ router11.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
+router11.delete("/cleanup/expired", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+  try {
+    const deletedCount = await storage.deleteExpiredNotifications();
+    console.log(`[NOTIFICATIONS] Cleanup: ${deletedCount} expired notifications deleted by ${req.user.id}`);
+    res.json({
+      message: `${deletedCount} notifica\xE7\xF5es expiradas removidas`,
+      deletedCount
+    });
+  } catch (error) {
+    console.error("[NOTIFICATIONS] Error cleaning expired notifications:", error);
+    res.status(500).json({ error: "Erro ao limpar notifica\xE7\xF5es expiradas" });
+  }
+});
 var notifications_default = router11;
 
 // server/routes/reports.ts
 await init_db();
 init_schema();
 import { Router as Router12 } from "express";
-import { eq as eq21, sql as sql11, and as and15, gte as gte10, lte as lte9, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
+import { z as z7 } from "zod";
+import { eq as eq22, sql as sql12, and as and16, gte as gte11, lte as lte10, desc as desc6, asc, count as count4, avg } from "drizzle-orm";
 
-// server/utils/activityLogger.ts
-await init_db();
-init_schema();
-async function logActivity2(userId, action, details, req) {
-  try {
-    const activityData = {
-      userId,
-      action,
-      details: details ? JSON.stringify(details) : null,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    if (req) {
-      activityData.ipAddress = req.ip || req.socket.remoteAddress;
-      activityData.userAgent = req.get("user-agent");
-      activityData.sessionId = req.session?.id;
-    }
-    await db.insert(activityLogs).values(activityData);
-  } catch (error) {
-    console.error("Error logging activity:", error);
+// server/utils/reportExporter.ts
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+function exportToExcel(data) {
+  const workbook = XLSX.utils.book_new();
+  const wsData = [];
+  wsData.push([data.title]);
+  if (data.subtitle) wsData.push([data.subtitle]);
+  wsData.push([`Gerado em: ${data.generatedAt}`]);
+  if (data.period) wsData.push([`Per\xEDodo: ${data.period}`]);
+  wsData.push([]);
+  if (data.summary && data.summary.length > 0) {
+    wsData.push(["RESUMO"]);
+    data.summary.forEach((item) => {
+      wsData.push([item.label, item.value]);
+    });
+    wsData.push([]);
+  }
+  wsData.push(data.headers);
+  data.rows.forEach((row) => {
+    wsData.push(row);
+  });
+  const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+  const colWidths = data.headers.map((header, i) => {
+    const maxLength = Math.max(
+      header.length,
+      ...data.rows.map((row) => String(row[i] || "").length)
+    );
+    return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
+  });
+  worksheet["!cols"] = colWidths;
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Relat\xF3rio");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  return buffer;
+}
+function exportToPDF(data) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let yPosition = 20;
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.title, pageWidth / 2, yPosition, { align: "center" });
+  yPosition += 8;
+  if (data.subtitle) {
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.subtitle, pageWidth / 2, yPosition, { align: "center" });
+    yPosition += 6;
+  }
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Gerado em: ${data.generatedAt}`, pageWidth / 2, yPosition, { align: "center" });
+  yPosition += 4;
+  if (data.period) {
+    doc.text(`Per\xEDodo: ${data.period}`, pageWidth / 2, yPosition, { align: "center" });
+    yPosition += 4;
+  }
+  yPosition += 6;
+  if (data.summary && data.summary.length > 0) {
+    doc.setTextColor(0);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Resumo", 14, yPosition);
+    yPosition += 6;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    data.summary.forEach((item) => {
+      doc.text(`${item.label}: ${item.value}`, 14, yPosition);
+      yPosition += 5;
+    });
+    yPosition += 6;
+  }
+  if (data.rows.length > 0) {
+    autoTable(doc, {
+      head: [data.headers],
+      body: data.rows.map((row) => row.map((cell) => String(cell))),
+      startY: yPosition,
+      styles: {
+        fontSize: 9,
+        cellPadding: 3
+      },
+      headStyles: {
+        fillColor: [180, 115, 51],
+        // Bronze/copper color
+        textColor: 255,
+        fontStyle: "bold"
+      },
+      alternateRowStyles: {
+        fillColor: [250, 248, 243]
+        // Light cream
+      },
+      margin: { left: 14, right: 14 }
+    });
+  }
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(
+      `MESC - Santu\xE1rio S\xE3o Judas Tadeu | P\xE1gina ${i} de ${pageCount}`,
+      pageWidth / 2,
+      doc.internal.pageSize.getHeight() - 10,
+      { align: "center" }
+    );
+  }
+  const arrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(arrayBuffer);
+}
+function exportToCSV(data) {
+  const lines = [];
+  const BOM = "\uFEFF";
+  lines.push(`# ${data.title}`);
+  if (data.subtitle) lines.push(`# ${data.subtitle}`);
+  lines.push(`# Gerado em: ${data.generatedAt}`);
+  if (data.period) lines.push(`# Per\xEDodo: ${data.period}`);
+  lines.push("");
+  if (data.summary && data.summary.length > 0) {
+    lines.push("# RESUMO");
+    data.summary.forEach((item) => {
+      lines.push(`# ${item.label}: ${item.value}`);
+    });
+    lines.push("");
+  }
+  lines.push(data.headers.map((h) => `"${h}"`).join(","));
+  data.rows.forEach((row) => {
+    lines.push(row.map((cell) => {
+      const value = String(cell);
+      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    }).join(","));
+  });
+  return BOM + lines.join("\n");
+}
+function getMimeType(format9) {
+  switch (format9) {
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "pdf":
+      return "application/pdf";
+    case "csv":
+      return "text/csv; charset=utf-8";
+    default:
+      return "application/octet-stream";
   }
 }
-function createActivityLogger(req) {
-  return (action, details) => {
-    const userId = req.user?.id;
-    if (userId) {
-      return logActivity2(userId, action, details, req);
-    }
-  };
+function getFileExtension(format9) {
+  return format9;
 }
 
 // server/routes/reports.ts
+function parseQueryDate(dateStr) {
+  if (typeof dateStr !== "string" || !dateStr) return null;
+  const parsed = new Date(dateStr);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+function getQueryString(value) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return void 0;
+}
+function getQueryNumber(value, defaultValue) {
+  const strValue = getQueryString(value);
+  if (!strValue) return defaultValue;
+  const num = parseInt(strValue, 10);
+  return isNaN(num) ? defaultValue : num;
+}
 var router12 = Router12();
 router12.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
@@ -14428,7 +16593,7 @@ router12.get("/availability", authenticateToken, requireRole(["gestor", "coorden
       userId: questionnaireResponses.userId,
       userName: users.name,
       totalResponses: count4(questionnaireResponses.id),
-      availableDays: sql11`
+      availableDays: sql12`
           COALESCE(
             SUM(
               jsonb_array_length(
@@ -14437,12 +16602,12 @@ router12.get("/availability", authenticateToken, requireRole(["gestor", "coorden
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq21(users.id, questionnaireResponses.userId)).where(
-      and15(
-        startDate ? gte10(questionnaireResponses.submittedAt, new Date(startDate)) : sql11`true`,
-        endDate ? lte9(questionnaireResponses.submittedAt, new Date(endDate)) : sql11`true`
+    }).from(questionnaireResponses).leftJoin(users, eq22(users.id, questionnaireResponses.userId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
       )
-    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql11`available_days`)).limit(Number(limit));
+    ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc6(sql12`available_days`)).limit(Number(limit));
     res.json({
       topAvailable: availabilityData,
       period: { startDate, endDate }
@@ -14461,35 +16626,35 @@ router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
       userId: substitutionRequests.requesterId,
       userName: users.name,
       totalRequests: count4(substitutionRequests.id),
-      approvedRequests: sql11`
+      approvedRequests: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved_requests"),
-      pendingRequests: sql11`
+      pendingRequests: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq21(users.id, substitutionRequests.requesterId)).where(
-      and15(
-        startDate ? gte10(substitutionRequests.createdAt, new Date(startDate)) : sql11`true`,
-        endDate ? lte9(substitutionRequests.createdAt, new Date(endDate)) : sql11`true`
+    }).from(substitutionRequests).leftJoin(users, eq22(users.id, substitutionRequests.requesterId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc6(count4(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
       userId: schedules.ministerId,
       userName: users.name,
       totalAssignments: count4(schedules.id),
-      substitutionRequests: sql11`
+      substitutionRequests: sql12`
           (SELECT COUNT(*) FROM ${substitutionRequests}
            WHERE ${substitutionRequests.requesterId} = ${schedules.ministerId}
-           ${startDate ? sql11`AND ${substitutionRequests.createdAt} >= ${new Date(startDate)}` : sql11``}
-           ${endDate ? sql11`AND ${substitutionRequests.createdAt} <= ${new Date(endDate)}` : sql11``})
+           ${startDate ? sql12`AND ${substitutionRequests.createdAt} >= ${parseQueryDate(startDate)}` : sql12``}
+           ${endDate ? sql12`AND ${substitutionRequests.createdAt} <= ${parseQueryDate(endDate)}` : sql12``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq21(users.id, schedules.ministerId)).where(
-      and15(
-        schedules.status ? eq21(schedules.status, "published") : sql11`true`,
-        startDate ? gte10(schedules.createdAt, new Date(startDate)) : sql11`true`,
-        endDate ? lte9(schedules.createdAt, new Date(endDate)) : sql11`true`
+    }).from(schedules).leftJoin(users, eq22(users.id, schedules.ministerId)).where(
+      and16(
+        schedules.status ? eq22(schedules.status, "published") : sql12`true`,
+        parseQueryDate(startDate) ? gte11(schedules.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(schedules.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
-    ).groupBy(schedules.ministerId, users.name).having(sql11`COUNT(${schedules.id}) > 0`).orderBy(asc(sql11`substitution_requests`), desc6(count4(schedules.id))).limit(10);
+    ).groupBy(schedules.ministerId, users.name).having(sql12`COUNT(${schedules.id}) > 0`).orderBy(asc(sql12`substitution_requests`), desc6(count4(schedules.id))).limit(10);
     res.json({
       mostRequests,
       reliableServers,
@@ -14509,22 +16674,22 @@ router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
       userId: activityLogs.userId,
       userName: users.name,
       totalActions: count4(activityLogs.id),
-      lastActivity: sql11`MAX(${activityLogs.createdAt})`.as("last_activity"),
-      uniqueDays: sql11`
+      lastActivity: sql12`MAX(${activityLogs.createdAt})`.as("last_activity"),
+      uniqueDays: sql12`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq21(users.id, activityLogs.userId)).where(
-      and15(
-        startDate ? gte10(activityLogs.createdAt, new Date(startDate)) : sql11`true`,
-        endDate ? lte9(activityLogs.createdAt, new Date(endDate)) : sql11`true`
+    }).from(activityLogs).leftJoin(users, eq22(users.id, activityLogs.userId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(activityLogs.userId, users.name).orderBy(desc6(count4(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
       totalMinisters: count4(users.id),
-      respondedMinisters: sql11`
+      respondedMinisters: sql12`
           COUNT(DISTINCT ${questionnaireResponses.userId})
         `.as("responded_ministers"),
-      responseRate: sql11`
+      responseRate: sql12`
           ROUND(
             COUNT(DISTINCT ${questionnaireResponses.userId})::numeric /
             NULLIF(COUNT(DISTINCT ${users.id}), 0) * 100,
@@ -14533,12 +16698,12 @@ router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
         `.as("response_rate")
     }).from(users).leftJoin(
       questionnaireResponses,
-      and15(
-        eq21(users.id, questionnaireResponses.userId),
-        startDate ? gte10(questionnaireResponses.submittedAt, new Date(startDate)) : sql11`true`,
-        endDate ? lte9(questionnaireResponses.submittedAt, new Date(endDate)) : sql11`true`
+      and16(
+        eq22(users.id, questionnaireResponses.userId),
+        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
       )
-    ).where(eq21(users.status, "active"));
+    ).where(eq22(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -14557,19 +16722,19 @@ router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
     const topPerformers = await db.select({
       userId: formationProgress.userId,
       userName: users.name,
-      completedModules: sql11`
+      completedModules: sql12`
           COUNT(CASE WHEN ${formationProgress.status} = 'completed' THEN 1 END)
         `.as("completed_modules"),
-      inProgressModules: sql11`
+      inProgressModules: sql12`
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq21(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql11`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq22(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc6(sql12`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
-      totalModules: sql11`
+      totalModules: sql12`
           (SELECT COUNT(*) FROM formation_modules)
         `.as("total_modules"),
-      totalEnrolled: count4(sql11`DISTINCT ${formationProgress.userId}`),
+      totalEnrolled: count4(sql12`DISTINCT ${formationProgress.userId}`),
       avgCompletionRate: avg(formationProgress.progressPercentage)
     }).from(formationProgress);
     res.json({
@@ -14589,13 +16754,13 @@ router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador
       familyId: families.id,
       familyName: families.name,
       totalMembers: count4(users.id),
-      activeMembers: sql11`
+      activeMembers: sql12`
           COUNT(CASE WHEN ${users.status} = 'active' THEN 1 END)
         `.as("active_members"),
-      totalServices: sql11`
+      totalServices: sql12`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq21(users.familyId, families.id)).groupBy(families.id, families.name).having(sql11`COUNT(${users.id}) > 1`).orderBy(desc6(sql11`active_members`), desc6(sql11`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq22(users.familyId, families.id)).groupBy(families.id, families.name).having(sql12`COUNT(${users.id}) > 1`).orderBy(desc6(sql12`active_members`), desc6(sql12`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -14611,27 +16776,27 @@ router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     const now = /* @__PURE__ */ new Date();
     const startOfMonth4 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth4 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq21(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq22(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count4(),
-      approved: sql11`
+      approved: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved")
     }).from(substitutionRequests).where(
-      and15(
-        gte10(substitutionRequests.createdAt, startOfMonth4),
-        lte9(substitutionRequests.createdAt, endOfMonth4)
+      and16(
+        gte11(substitutionRequests.createdAt, startOfMonth4),
+        lte10(substitutionRequests.createdAt, endOfMonth4)
       )
     );
     const formationThisMonth = await db.select({ count: count4() }).from(formationProgress).where(
-      and15(
-        eq21(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte10(formationProgress.completedAt, startOfMonth4) : sql11`false`,
-        formationProgress.completedAt ? lte9(formationProgress.completedAt, endOfMonth4) : sql11`false`
+      and16(
+        eq22(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte11(formationProgress.completedAt, startOfMonth4) : sql12`false`,
+        formationProgress.completedAt ? lte10(formationProgress.completedAt, endOfMonth4) : sql12`false`
       )
     );
     const avgAvailability = await db.select({
-      avgDays: sql11`
+      avgDays: sql12`
           AVG(
             jsonb_array_length(
               COALESCE(${questionnaireResponses.responses}->>'availableDays', '[]')::jsonb
@@ -14639,9 +16804,9 @@ router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
           )
         `.as("avg_days")
     }).from(questionnaireResponses).where(
-      and15(
-        gte10(questionnaireResponses.submittedAt, startOfMonth4),
-        lte9(questionnaireResponses.submittedAt, endOfMonth4)
+      and16(
+        gte11(questionnaireResponses.submittedAt, startOfMonth4),
+        lte10(questionnaireResponses.submittedAt, endOfMonth4)
       )
     );
     res.json({
@@ -14662,13 +16827,1008 @@ router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch summary metrics" });
   }
 });
+router12.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("view_reports", { type: "attendance" });
+  try {
+    const { startDate, endDate } = req.query;
+    const attendanceData = await db.select({
+      odministerIdl: users.id,
+      ministerName: users.name,
+      ministerEmail: users.email,
+      totalServices: users.totalServices,
+      lastService: users.lastService,
+      noShowCount: users.noShowCount,
+      reliabilityScore: users.reliabilityScore,
+      status: users.status
+    }).from(users).where(eq22(users.role, "ministro")).orderBy(desc6(users.totalServices));
+    const checkInStats = await db.select({
+      ministerId: ministerCheckIns.ministerId,
+      totalCheckIns: count4(),
+      presentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as("present_count"),
+      lateCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as("late_count"),
+      absentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as("absent_count")
+    }).from(ministerCheckIns).leftJoin(schedules, eq22(ministerCheckIns.scheduleId, schedules.id)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+      )
+    ).groupBy(ministerCheckIns.ministerId);
+    const checkInMap = new Map(checkInStats.map((c) => [c.ministerId, c]));
+    const result = attendanceData.map((minister) => {
+      const checkIn = checkInMap.get(minister.odministerIdl);
+      const presentCount = checkIn?.presentCount || 0;
+      const lateCount = checkIn?.lateCount || 0;
+      const absentCount = checkIn?.absentCount || 0;
+      const totalMarked2 = presentCount + lateCount + absentCount;
+      return {
+        odministerIdl: minister.odministerIdl,
+        ministerName: minister.ministerName,
+        ministerEmail: minister.ministerEmail,
+        totalServices: minister.totalServices || 0,
+        lastService: minister.lastService,
+        noShowCount: minister.noShowCount || 0,
+        reliabilityScore: minister.reliabilityScore || 100,
+        status: minister.status,
+        periodStats: {
+          present: presentCount,
+          late: lateCount,
+          absent: absentCount,
+          total: totalMarked2,
+          attendanceRate: totalMarked2 > 0 ? Math.round((presentCount + lateCount) / totalMarked2 * 100) : null
+        }
+      };
+    });
+    const totalMinisters = result.length;
+    const activeMinisters = result.filter((m) => m.status === "active").length;
+    const totalPresent = result.reduce((acc, m) => acc + m.periodStats.present, 0);
+    const totalLate = result.reduce((acc, m) => acc + m.periodStats.late, 0);
+    const totalAbsent = result.reduce((acc, m) => acc + m.periodStats.absent, 0);
+    const totalMarked = totalPresent + totalLate + totalAbsent;
+    res.json({
+      ministers: result,
+      summary: {
+        totalMinisters,
+        activeMinisters,
+        periodStats: {
+          present: totalPresent,
+          late: totalLate,
+          absent: totalAbsent,
+          total: totalMarked,
+          attendanceRate: totalMarked > 0 ? Math.round((totalPresent + totalLate) / totalMarked * 100) : null
+        }
+      },
+      period: { startDate, endDate }
+    });
+  } catch (error) {
+    console.error("Error fetching attendance data:", error);
+    res.status(500).json({ error: "Failed to fetch attendance data" });
+  }
+});
+router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("view_reports", { type: "attendance_detail", ministerId: req.params.ministerId });
+  try {
+    const { ministerId } = req.params;
+    const { startDate, endDate, limit = 50 } = req.query;
+    const [minister] = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      totalServices: users.totalServices,
+      lastService: users.lastService,
+      noShowCount: users.noShowCount,
+      reliabilityScore: users.reliabilityScore
+    }).from(users).where(eq22(users.id, ministerId)).limit(1);
+    if (!minister) {
+      return res.status(404).json({ error: "Minister not found" });
+    }
+    const scheduledMasses = await db.select({
+      scheduleId: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      position: schedules.position,
+      location: schedules.location,
+      status: schedules.status
+    }).from(schedules).where(
+      and16(
+        eq22(schedules.ministerId, ministerId),
+        eq22(schedules.status, "published"),
+        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+      )
+    ).orderBy(desc6(schedules.date), desc6(schedules.time)).limit(Number(limit));
+    const scheduleIds = scheduledMasses.map((s) => s.scheduleId);
+    const checkIns = scheduleIds.length > 0 ? await db.select({
+      scheduleId: ministerCheckIns.scheduleId,
+      checkedInAt: ministerCheckIns.checkedInAt,
+      status: ministerCheckIns.status,
+      notes: ministerCheckIns.notes
+    }).from(ministerCheckIns).where(
+      and16(
+        eq22(ministerCheckIns.ministerId, ministerId),
+        sql12`${ministerCheckIns.scheduleId} = ANY(${scheduleIds})`
+      )
+    ) : [];
+    const checkInMap = new Map(checkIns.map((c) => [c.scheduleId, c]));
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const history = scheduledMasses.map((mass) => {
+      const checkIn = checkInMap.get(mass.scheduleId);
+      const massDate = /* @__PURE__ */ new Date(mass.date + "T00:00:00");
+      const isPast = massDate < today;
+      let attendanceStatus = "scheduled";
+      if (checkIn) {
+        attendanceStatus = checkIn.status;
+      } else if (isPast) {
+        attendanceStatus = "pending";
+      }
+      return {
+        scheduleId: mass.scheduleId,
+        date: mass.date,
+        time: mass.time,
+        position: mass.position,
+        location: mass.location,
+        attendanceStatus,
+        checkedInAt: checkIn?.checkedInAt || null,
+        notes: checkIn?.notes || null
+      };
+    });
+    const presentCount = history.filter((h) => h.attendanceStatus === "present").length;
+    const lateCount = history.filter((h) => h.attendanceStatus === "late").length;
+    const absentCount = history.filter((h) => h.attendanceStatus === "absent").length;
+    const pendingCount = history.filter((h) => h.attendanceStatus === "pending").length;
+    const totalPast = presentCount + lateCount + absentCount + pendingCount;
+    res.json({
+      minister,
+      history,
+      statistics: {
+        present: presentCount,
+        late: lateCount,
+        absent: absentCount,
+        pending: pendingCount,
+        scheduled: history.filter((h) => h.attendanceStatus === "scheduled").length,
+        totalPast,
+        attendanceRate: totalPast > 0 ? Math.round((presentCount + lateCount) / totalPast * 100) : null
+      },
+      period: { startDate, endDate }
+    });
+  } catch (error) {
+    console.error("Error fetching minister attendance:", error);
+    res.status(500).json({ error: "Failed to fetch minister attendance" });
+  }
+});
+router12.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const { startDate, endDate } = req.query;
+    const attendanceData = await db.select({
+      odministerIdl: users.id,
+      ministerName: users.name,
+      ministerEmail: users.email,
+      totalServices: users.totalServices,
+      noShowCount: users.noShowCount,
+      reliabilityScore: users.reliabilityScore,
+      lastService: users.lastService
+    }).from(users).where(eq22(users.role, "ministro")).orderBy(desc6(users.totalServices));
+    const checkInStats = await db.select({
+      ministerId: ministerCheckIns.ministerId,
+      presentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as("present_count"),
+      lateCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as("late_count"),
+      absentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as("absent_count")
+    }).from(ministerCheckIns).leftJoin(schedules, eq22(ministerCheckIns.scheduleId, schedules.id)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+      )
+    ).groupBy(ministerCheckIns.ministerId);
+    const checkInMap = new Map(checkInStats.map((c) => [c.ministerId, c]));
+    const reportData = {
+      title: "Relat\xF3rio de Presen\xE7a",
+      subtitle: "Controle de presen\xE7a dos ministros",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ["Nome", "Email", "Total Servi\xE7os", "Presen\xE7as", "Atrasos", "Aus\xEAncias", "Taxa (%)", "Confiabilidade"],
+      rows: attendanceData.map((minister) => {
+        const stats = checkInMap.get(minister.odministerIdl);
+        const present = stats?.presentCount || 0;
+        const late = stats?.lateCount || 0;
+        const absent = stats?.absentCount || 0;
+        const total = present + late + absent;
+        const rate = total > 0 ? Math.round((present + late) / total * 100) : "-";
+        return [
+          minister.ministerName || "N/A",
+          minister.ministerEmail || "N/A",
+          minister.totalServices || 0,
+          present,
+          late,
+          absent,
+          rate,
+          minister.reliabilityScore || 100
+        ];
+      }),
+      summary: [
+        { label: "Total de Ministros", value: attendanceData.length },
+        { label: "Total de Servi\xE7os", value: attendanceData.reduce((acc, m) => acc + (m.totalServices || 0), 0) }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `presenca_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting attendance report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("view_reports", { type: "trends" });
+  try {
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
+    const now = /* @__PURE__ */ new Date();
+    const monthsArray = [];
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const date2 = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthsArray.push({
+        year: date2.getFullYear(),
+        month: date2.getMonth() + 1,
+        label: date2.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+      });
+    }
+    const trendsData = await Promise.all(monthsArray.map(async ({ year, month, label }) => {
+      const startOfMonth4 = new Date(year, month - 1, 1);
+      const endOfMonth4 = new Date(year, month, 0, 23, 59, 59);
+      const [substitutionsResult] = await db.select({
+        total: count4(),
+        approved: sql12`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as("approved")
+      }).from(substitutionRequests).where(and16(
+        gte11(substitutionRequests.createdAt, startOfMonth4),
+        lte10(substitutionRequests.createdAt, endOfMonth4)
+      ));
+      const [schedulesResult] = await db.select({ total: count4() }).from(schedules).where(and16(
+        eq22(schedules.status, "published"),
+        gte11(schedules.createdAt, startOfMonth4),
+        lte10(schedules.createdAt, endOfMonth4)
+      ));
+      const [responsesResult] = await db.select({ total: count4() }).from(questionnaireResponses).where(and16(
+        gte11(questionnaireResponses.submittedAt, startOfMonth4),
+        lte10(questionnaireResponses.submittedAt, endOfMonth4)
+      ));
+      const [activityResult] = await db.select({
+        total: count4(),
+        uniqueUsers: sql12`COUNT(DISTINCT ${activityLogs.userId})`.as("unique_users")
+      }).from(activityLogs).where(and16(
+        gte11(activityLogs.createdAt, startOfMonth4),
+        lte10(activityLogs.createdAt, endOfMonth4)
+      ));
+      const [formationResult] = await db.select({ total: count4() }).from(formationProgress).where(and16(
+        eq22(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte11(formationProgress.completedAt, startOfMonth4) : sql12`false`,
+        formationProgress.completedAt ? lte10(formationProgress.completedAt, endOfMonth4) : sql12`false`
+      ));
+      return {
+        month: label,
+        year,
+        monthNum: month,
+        substitutions: substitutionsResult?.total || 0,
+        substitutionsApproved: substitutionsResult?.approved || 0,
+        schedules: schedulesResult?.total || 0,
+        responses: responsesResult?.total || 0,
+        activities: activityResult?.total || 0,
+        activeUsers: activityResult?.uniqueUsers || 0,
+        formationCompleted: formationResult?.total || 0
+      };
+    }));
+    const current = trendsData[trendsData.length - 1];
+    const previous = trendsData[trendsData.length - 2];
+    const calculateGrowth = (curr, prev) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Math.round((curr - prev) / prev * 100);
+    };
+    const growth = previous ? {
+      substitutions: calculateGrowth(current.substitutions, previous.substitutions),
+      responses: calculateGrowth(current.responses, previous.responses),
+      activities: calculateGrowth(current.activities, previous.activities),
+      activeUsers: calculateGrowth(current.activeUsers, previous.activeUsers)
+    } : null;
+    res.json({
+      trends: trendsData,
+      growth,
+      period: {
+        months: numMonths,
+        from: monthsArray[0].label,
+        to: monthsArray[monthsArray.length - 1].label
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching trends data:", error);
+    res.status(500).json({ error: "Failed to fetch trends data" });
+  }
+});
+router12.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("view_reports", { type: "availability_patterns" });
+  try {
+    const dayOfWeekData = await db.select({
+      dayOfWeek: sql12`EXTRACT(DOW FROM ${schedules.date}::date)`.as("day_of_week"),
+      total: count4()
+    }).from(schedules).where(eq22(schedules.status, "published")).groupBy(sql12`EXTRACT(DOW FROM ${schedules.date}::date)`).orderBy(sql12`day_of_week`);
+    const dayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+    const byDayOfWeek = dayOfWeekData.map((item) => ({
+      day: dayNames[item.dayOfWeek] || "N/A",
+      dayNum: item.dayOfWeek,
+      schedules: item.total
+    }));
+    const timeData = await db.select({
+      time: schedules.time,
+      total: count4()
+    }).from(schedules).where(eq22(schedules.status, "published")).groupBy(schedules.time).orderBy(schedules.time);
+    const byTime = timeData.map((item) => ({
+      time: item.time || "N/A",
+      schedules: item.total
+    }));
+    res.json({
+      byDayOfWeek,
+      byTime
+    });
+  } catch (error) {
+    console.error("Error fetching availability patterns:", error);
+    res.status(500).json({ error: "Failed to fetch availability patterns" });
+  }
+});
+var exportFormatSchema = z7.enum(["xlsx", "pdf", "csv"]);
+function formatDateBR(date2) {
+  return date2.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+function formatPeriod(startDate, endDate) {
+  const start = getQueryString(startDate);
+  const end = getQueryString(endDate);
+  if (!start && !end) return "Todo o per\xEDodo";
+  const startFormatted = start ? new Date(start).toLocaleDateString("pt-BR") : "in\xEDcio";
+  const endFormatted = end ? new Date(end).toLocaleDateString("pt-BR") : "hoje";
+  return `${startFormatted} a ${endFormatted}`;
+}
+router12.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const { startDate, endDate } = req.query;
+    const availabilityData = await db.select({
+      userId: questionnaireResponses.userId,
+      userName: users.name,
+      userEmail: users.email,
+      totalResponses: count4(questionnaireResponses.id),
+      availableDays: sql12`
+          COALESCE(
+            SUM(
+              jsonb_array_length(
+                COALESCE(${questionnaireResponses.responses}->>'availableDays', '[]')::jsonb
+              )
+            ), 0
+          )
+        `.as("available_days")
+    }).from(questionnaireResponses).leftJoin(users, eq22(users.id, questionnaireResponses.userId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
+      )
+    ).groupBy(questionnaireResponses.userId, users.name, users.email).orderBy(desc6(sql12`available_days`));
+    const reportData = {
+      title: "Relat\xF3rio de Disponibilidade",
+      subtitle: "Ministros com maior disponibilidade no per\xEDodo",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ["Posi\xE7\xE3o", "Nome", "Email", "Dias Dispon\xEDveis", "Question\xE1rios Respondidos"],
+      rows: availabilityData.map((item, index2) => [
+        index2 + 1,
+        item.userName || "N/A",
+        item.userEmail || "N/A",
+        item.availableDays || 0,
+        item.totalResponses || 0
+      ]),
+      summary: [
+        { label: "Total de Ministros", value: availabilityData.length },
+        { label: "M\xE9dia de Dias Dispon\xEDveis", value: Math.round(availabilityData.reduce((acc, item) => acc + (item.availableDays || 0), 0) / (availabilityData.length || 1)) }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting availability report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const { startDate, endDate } = req.query;
+    const substitutionsData = await db.select({
+      userId: substitutionRequests.requesterId,
+      userName: users.name,
+      userEmail: users.email,
+      totalRequests: count4(substitutionRequests.id),
+      approvedRequests: sql12`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
+        `.as("approved_requests"),
+      pendingRequests: sql12`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
+        `.as("pending_requests"),
+      rejectedRequests: sql12`
+          COUNT(CASE WHEN ${substitutionRequests.status} = 'rejected' THEN 1 END)
+        `.as("rejected_requests")
+    }).from(substitutionRequests).leftJoin(users, eq22(users.id, substitutionRequests.requesterId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
+      )
+    ).groupBy(substitutionRequests.requesterId, users.name, users.email).orderBy(desc6(count4(substitutionRequests.id)));
+    const totalRequests = substitutionsData.reduce((acc, item) => acc + (item.totalRequests || 0), 0);
+    const totalApproved = substitutionsData.reduce((acc, item) => acc + (item.approvedRequests || 0), 0);
+    const reportData = {
+      title: "Relat\xF3rio de Substitui\xE7\xF5es",
+      subtitle: "Solicita\xE7\xF5es de substitui\xE7\xE3o por ministro",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ["Posi\xE7\xE3o", "Nome", "Email", "Total", "Aprovadas", "Pendentes", "Rejeitadas"],
+      rows: substitutionsData.map((item, index2) => [
+        index2 + 1,
+        item.userName || "N/A",
+        item.userEmail || "N/A",
+        item.totalRequests || 0,
+        item.approvedRequests || 0,
+        item.pendingRequests || 0,
+        item.rejectedRequests || 0
+      ]),
+      summary: [
+        { label: "Total de Solicita\xE7\xF5es", value: totalRequests },
+        { label: "Aprovadas", value: totalApproved },
+        { label: "Taxa de Aprova\xE7\xE3o", value: `${totalRequests > 0 ? Math.round(totalApproved / totalRequests * 100) : 0}%` }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `substituicoes_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting substitutions report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const { startDate, endDate } = req.query;
+    const engagementData = await db.select({
+      userId: activityLogs.userId,
+      userName: users.name,
+      userEmail: users.email,
+      totalActions: count4(activityLogs.id),
+      lastActivity: sql12`MAX(${activityLogs.createdAt})`.as("last_activity"),
+      uniqueDays: sql12`
+          COUNT(DISTINCT DATE(${activityLogs.createdAt}))
+        `.as("unique_days")
+    }).from(activityLogs).leftJoin(users, eq22(users.id, activityLogs.userId)).where(
+      and16(
+        parseQueryDate(startDate) ? gte11(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte10(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
+      )
+    ).groupBy(activityLogs.userId, users.name, users.email).orderBy(desc6(count4(activityLogs.id)));
+    const reportData = {
+      title: "Relat\xF3rio de Engajamento",
+      subtitle: "Atividade dos ministros no sistema",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: formatPeriod(startDate, endDate),
+      headers: ["Posi\xE7\xE3o", "Nome", "Email", "Total de A\xE7\xF5es", "Dias Ativos", "\xDAltima Atividade"],
+      rows: engagementData.map((item, index2) => [
+        index2 + 1,
+        item.userName || "N/A",
+        item.userEmail || "N/A",
+        item.totalActions || 0,
+        item.uniqueDays || 0,
+        item.lastActivity ? new Date(item.lastActivity).toLocaleDateString("pt-BR") : "N/A"
+      ]),
+      summary: [
+        { label: "Total de Usu\xE1rios Ativos", value: engagementData.length },
+        { label: "Total de A\xE7\xF5es", value: engagementData.reduce((acc, item) => acc + (item.totalActions || 0), 0) }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `engajamento_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting engagement report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const formationData = await db.select({
+      userId: formationProgress.userId,
+      userName: users.name,
+      userEmail: users.email,
+      completedModules: sql12`
+          COUNT(CASE WHEN ${formationProgress.status} = 'completed' THEN 1 END)
+        `.as("completed_modules"),
+      inProgressModules: sql12`
+          COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
+        `.as("in_progress_modules"),
+      avgProgress: avg(formationProgress.progressPercentage)
+    }).from(formationProgress).leftJoin(users, eq22(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name, users.email).orderBy(desc6(sql12`completed_modules`));
+    const reportData = {
+      title: "Relat\xF3rio de Forma\xE7\xE3o",
+      subtitle: "Progresso dos ministros nos m\xF3dulos de forma\xE7\xE3o",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      headers: ["Posi\xE7\xE3o", "Nome", "Email", "M\xF3dulos Conclu\xEDdos", "Em Andamento", "Progresso M\xE9dio (%)"],
+      rows: formationData.map((item, index2) => [
+        index2 + 1,
+        item.userName || "N/A",
+        item.userEmail || "N/A",
+        item.completedModules || 0,
+        item.inProgressModules || 0,
+        Math.round(Number(item.avgProgress) || 0)
+      ]),
+      summary: [
+        { label: "Total de Ministros em Forma\xE7\xE3o", value: formationData.length },
+        { label: "M\xF3dulos Conclu\xEDdos (Total)", value: formationData.reduce((acc, item) => acc + (item.completedModules || 0), 0) }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `formacao_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting formation report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const format9 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const now = /* @__PURE__ */ new Date();
+    const startOfMonth4 = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth4 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const [activeMinistersResult] = await db.select({ count: count4() }).from(users).where(eq22(users.status, "active"));
+    const [substitutionsResult] = await db.select({
+      total: count4(),
+      approved: sql12`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as("approved")
+    }).from(substitutionRequests).where(and16(gte11(substitutionRequests.createdAt, startOfMonth4), lte10(substitutionRequests.createdAt, endOfMonth4)));
+    const [formationResult] = await db.select({ count: count4() }).from(formationProgress).where(eq22(formationProgress.status, "completed"));
+    const monthName = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+    const reportData = {
+      title: "Relat\xF3rio Resumo Mensal",
+      subtitle: `MESC - Santu\xE1rio S\xE3o Judas Tadeu`,
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+      headers: ["M\xE9trica", "Valor"],
+      rows: [
+        ["Ministros Ativos", activeMinistersResult?.count || 0],
+        ["Substitui\xE7\xF5es no M\xEAs", substitutionsResult?.total || 0],
+        ["Substitui\xE7\xF5es Aprovadas", substitutionsResult?.approved || 0],
+        ["Taxa de Aprova\xE7\xE3o", `${substitutionsResult?.total ? Math.round(substitutionsResult.approved / substitutionsResult.total * 100) : 0}%`],
+        ["M\xF3dulos de Forma\xE7\xE3o Conclu\xEDdos", formationResult?.count || 0]
+      ],
+      summary: [
+        { label: "Per\xEDodo", value: monthName.charAt(0).toUpperCase() + monthName.slice(1) },
+        { label: "Data de Gera\xE7\xE3o", value: formatDateBR(/* @__PURE__ */ new Date()) }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `resumo_mensal_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting summary report:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
+router12.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("view_reports", { type: "availability_analysis" });
+  try {
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
+    const endDate = /* @__PURE__ */ new Date();
+    const startDate = /* @__PURE__ */ new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+    const responses = await db.select({
+      id: questionnaireResponses.id,
+      userId: questionnaireResponses.userId,
+      userName: users.name,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      alternativeTimes: questionnaireResponses.alternativeTimes,
+      availableSundays: questionnaireResponses.availableSundays,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      month: questionnaires.month,
+      year: questionnaires.year
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq22(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq22(questionnaireResponses.userId, users.id)).where(
+      and16(
+        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+      )
+    );
+    const massTimes = await db.select().from(massTimesConfig).where(eq22(massTimesConfig.isActive, true));
+    const dayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+    const timeAnalysis = massTimes.map((mt) => {
+      const timeStr = mt.time;
+      let preferredCount = 0;
+      let alternativeCount = 0;
+      responses.forEach((r) => {
+        const preferred = r.preferredMassTimes || [];
+        const alternative = r.alternativeTimes || [];
+        if (preferred.includes(timeStr)) preferredCount++;
+        else if (alternative.includes(timeStr)) alternativeCount++;
+      });
+      const totalAvailable = preferredCount + alternativeCount;
+      const coverage = mt.minMinisters > 0 ? totalAvailable / mt.minMinisters * 100 : 100;
+      let status;
+      if (coverage < 100) status = "critical";
+      else if (coverage < 150) status = "warning";
+      else if (coverage < 200) status = "ok";
+      else status = "excellent";
+      return {
+        dayOfWeek: mt.dayOfWeek,
+        dayName: dayNames[mt.dayOfWeek] || "N/A",
+        time: timeStr,
+        preferredCount,
+        alternativeCount,
+        totalAvailable,
+        minRequired: mt.minMinisters,
+        coverage: Math.round(coverage),
+        status
+      };
+    }).sort((a, b) => a.coverage - b.coverage);
+    const ministerMap = /* @__PURE__ */ new Map();
+    responses.forEach((r) => {
+      const existing = ministerMap.get(r.userId);
+      const availableDays = r.availableSundays?.length || 0;
+      const preferred = r.preferredMassTimes || [];
+      if (existing) {
+        existing.responses++;
+        existing.totalDays += availableDays;
+        if (r.canSubstitute) existing.canSubstitute = true;
+        preferred.forEach((t) => existing.preferredTimes.add(t));
+      } else {
+        ministerMap.set(r.userId, {
+          name: r.userName || "N/A",
+          responses: 1,
+          totalDays: availableDays,
+          canSubstitute: r.canSubstitute || false,
+          preferredTimes: new Set(preferred)
+        });
+      }
+    });
+    const ministerAnalysis = Array.from(ministerMap.entries()).map(([id, data]) => ({
+      odministerIdl: id,
+      name: data.name,
+      totalResponses: data.responses,
+      avgAvailableDays: data.responses > 0 ? Math.round(data.totalDays / data.responses * 10) / 10 : 0,
+      canSubstitute: data.canSubstitute,
+      preferredTimesCount: data.preferredTimes.size,
+      reliabilityScore: Math.min(100, Math.round(data.responses / numMonths * 100))
+    })).sort((a, b) => b.avgAvailableDays - a.avgAvailableDays);
+    const monthTrendsMap = /* @__PURE__ */ new Map();
+    responses.forEach((r) => {
+      const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
+      const existing = monthTrendsMap.get(key);
+      const days = r.availableSundays?.length || 0;
+      if (existing) {
+        existing.total++;
+        existing.days += days;
+        if (r.canSubstitute) existing.substitutes++;
+      } else {
+        monthTrendsMap.set(key, {
+          total: 1,
+          days,
+          substitutes: r.canSubstitute ? 1 : 0
+        });
+      }
+    });
+    const monthTrends = Array.from(monthTrendsMap.entries()).map(([key, data]) => {
+      const [year, month] = key.split("-").map(Number);
+      const date2 = new Date(year, month - 1);
+      return {
+        month: date2.toLocaleDateString("pt-BR", { month: "short" }),
+        year,
+        monthNum: month,
+        totalResponses: data.total,
+        avgAvailability: data.total > 0 ? Math.round(data.days / data.total * 10) / 10 : 0,
+        substitutesAvailable: data.substitutes
+      };
+    }).sort((a, b) => a.year - b.year || a.monthNum - b.monthNum);
+    const recommendations = [];
+    const criticalTimes = timeAnalysis.filter((t) => t.status === "critical");
+    if (criticalTimes.length > 0) {
+      recommendations.push(
+        `\u26A0\uFE0F ${criticalTimes.length} hor\xE1rio(s) com cobertura cr\xEDtica: ${criticalTimes.map((t) => `${t.dayName} ${t.time}`).join(", ")}. Considere recrutar mais ministros ou revisar os requisitos m\xEDnimos.`
+      );
+    }
+    const lowResponseMinisters = ministerAnalysis.filter((m) => m.reliabilityScore < 50);
+    if (lowResponseMinisters.length > 0) {
+      recommendations.push(
+        `\u{1F4CB} ${lowResponseMinisters.length} ministro(s) com baixa taxa de resposta aos question\xE1rios. Considere entrar em contato para verificar a situa\xE7\xE3o.`
+      );
+    }
+    const avgSubstitutes = ministerAnalysis.filter((m) => m.canSubstitute).length;
+    const substitutePct = ministerAnalysis.length > 0 ? avgSubstitutes / ministerAnalysis.length * 100 : 0;
+    if (substitutePct < 30) {
+      recommendations.push(
+        `\u{1F504} Apenas ${Math.round(substitutePct)}% dos ministros est\xE3o dispon\xEDveis como suplentes. Incentive mais ministros a se disponibilizarem para substitui\xE7\xF5es.`
+      );
+    }
+    const recentTrend = monthTrends.slice(-3);
+    if (recentTrend.length >= 2) {
+      const first = recentTrend[0].avgAvailability;
+      const last = recentTrend[recentTrend.length - 1].avgAvailability;
+      if (last < first * 0.8) {
+        recommendations.push(
+          `\u{1F4C9} A disponibilidade m\xE9dia caiu ${Math.round((1 - last / first) * 100)}% nos \xFAltimos meses. Verifique se h\xE1 algum problema afetando a participa\xE7\xE3o.`
+        );
+      } else if (last > first * 1.2) {
+        recommendations.push(
+          `\u{1F4C8} A disponibilidade m\xE9dia aumentou ${Math.round((last / first - 1) * 100)}% nos \xFAltimos meses. \xD3timo progresso!`
+        );
+      }
+    }
+    if (recommendations.length === 0) {
+      recommendations.push("\u2705 A disponibilidade geral est\xE1 em n\xEDveis saud\xE1veis. Continue monitorando regularmente.");
+    }
+    const summary = {
+      totalMinisters: ministerAnalysis.length,
+      totalResponses: responses.length,
+      avgResponseRate: ministerAnalysis.length > 0 ? Math.round(ministerAnalysis.reduce((sum2, m) => sum2 + m.reliabilityScore, 0) / ministerAnalysis.length) : 0,
+      criticalTimeSlots: criticalTimes.length,
+      warningTimeSlots: timeAnalysis.filter((t) => t.status === "warning").length,
+      availableSubstitutes: avgSubstitutes,
+      periodMonths: numMonths
+    };
+    res.json({
+      summary,
+      timeAnalysis,
+      ministerAnalysis: ministerAnalysis.slice(0, 20),
+      // Top 20
+      leastAvailable: ministerAnalysis.slice(-10).reverse(),
+      // Bottom 10
+      monthTrends,
+      recommendations
+    });
+  } catch (error) {
+    console.error("Error fetching availability analysis:", error);
+    res.status(500).json({ error: "Failed to fetch availability analysis" });
+  }
+});
+router12.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { timeId } = req.params;
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 3), 1), 12);
+    const endDate = /* @__PURE__ */ new Date();
+    const startDate = /* @__PURE__ */ new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+    const [massTime] = await db.select().from(massTimesConfig).where(eq22(massTimesConfig.id, timeId));
+    if (!massTime) {
+      return res.status(404).json({ error: "Mass time not found" });
+    }
+    const responses = await db.select({
+      userId: questionnaireResponses.userId,
+      userName: users.name,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      alternativeTimes: questionnaireResponses.alternativeTimes,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      month: questionnaires.month,
+      year: questionnaires.year
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq22(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq22(questionnaireResponses.userId, users.id)).where(
+      and16(
+        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+      )
+    );
+    const timeStr = massTime.time;
+    const ministersForTime = [];
+    const ministerSet = /* @__PURE__ */ new Map();
+    responses.forEach((r) => {
+      const preferred = r.preferredMassTimes || [];
+      const alternative = r.alternativeTimes || [];
+      const isPreferred = preferred.includes(timeStr);
+      const isAlternative = alternative.includes(timeStr);
+      if (isPreferred || isAlternative) {
+        const existing = ministerSet.get(r.userId);
+        if (existing) {
+          existing.responseCount++;
+          if (isPreferred) existing.isPreferred = true;
+          if (isAlternative && !existing.isPreferred) existing.isAlternative = true;
+          if (r.canSubstitute) existing.canSubstitute = true;
+        } else {
+          ministerSet.set(r.userId, {
+            id: r.userId,
+            name: r.userName || "N/A",
+            isPreferred,
+            isAlternative: !isPreferred && isAlternative,
+            canSubstitute: r.canSubstitute || false,
+            responseCount: 1
+          });
+        }
+      }
+    });
+    ministersForTime.push(...Array.from(ministerSet.values()));
+    ministersForTime.sort((a, b) => {
+      if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
+      return b.responseCount - a.responseCount;
+    });
+    const dayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
+    res.json({
+      massTime: {
+        id: massTime.id,
+        dayOfWeek: massTime.dayOfWeek,
+        dayName: dayNames[massTime.dayOfWeek] || "N/A",
+        time: massTime.time,
+        minMinisters: massTime.minMinisters,
+        maxMinisters: massTime.maxMinisters
+      },
+      ministers: ministersForTime,
+      summary: {
+        preferred: ministersForTime.filter((m) => m.isPreferred).length,
+        alternative: ministersForTime.filter((m) => m.isAlternative).length,
+        total: ministersForTime.length,
+        substitutes: ministersForTime.filter((m) => m.canSubstitute).length,
+        coverage: massTime.minMinisters > 0 ? Math.round(ministersForTime.length / massTime.minMinisters * 100) : 100
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching time availability:", error);
+    res.status(500).json({ error: "Failed to fetch time availability" });
+  }
+});
+router12.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("export_report", { type: "availability_analysis" });
+  try {
+    const format9 = getQueryString(req.query.format) || "xlsx";
+    if (!["xlsx", "pdf", "csv"].includes(format9)) {
+      return res.status(400).json({ error: "Invalid format" });
+    }
+    const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
+    const endDate = /* @__PURE__ */ new Date();
+    const startDate = /* @__PURE__ */ new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+    const responses = await db.select({
+      userId: questionnaireResponses.userId,
+      userName: users.name,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      alternativeTimes: questionnaireResponses.alternativeTimes,
+      availableSundays: questionnaireResponses.availableSundays,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      month: questionnaires.month,
+      year: questionnaires.year
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq22(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq22(questionnaireResponses.userId, users.id)).where(
+      and16(
+        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+      )
+    );
+    const ministerMap = /* @__PURE__ */ new Map();
+    responses.forEach((r) => {
+      const existing = ministerMap.get(r.userId);
+      const availableDays = r.availableSundays?.length || 0;
+      const preferred = r.preferredMassTimes || [];
+      if (existing) {
+        existing.responses++;
+        existing.totalDays += availableDays;
+        if (r.canSubstitute) existing.canSubstitute = true;
+        preferred.forEach((t) => existing.preferredTimes.add(t));
+      } else {
+        ministerMap.set(r.userId, {
+          name: r.userName || "N/A",
+          responses: 1,
+          totalDays: availableDays,
+          canSubstitute: r.canSubstitute || false,
+          preferredTimes: new Set(preferred)
+        });
+      }
+    });
+    const rows = Array.from(ministerMap.entries()).map(([id, data]) => [
+      data.name,
+      data.responses,
+      data.responses > 0 ? Math.round(data.totalDays / data.responses * 10) / 10 : 0,
+      data.preferredTimes.size,
+      data.canSubstitute ? "Sim" : "N\xE3o",
+      Math.min(100, Math.round(data.responses / numMonths * 100))
+    ]).sort((a, b) => b[2] - a[2]);
+    const totalMinisters = ministerMap.size;
+    const avgAvailability = rows.length > 0 ? Math.round(rows.reduce((sum2, r) => sum2 + r[2], 0) / rows.length * 10) / 10 : 0;
+    const substitutesAvailable = Array.from(ministerMap.values()).filter((m) => m.canSubstitute).length;
+    const reportData = {
+      title: "An\xE1lise de Disponibilidade",
+      subtitle: "Padr\xF5es de disponibilidade dos ministros",
+      generatedAt: formatDateBR(/* @__PURE__ */ new Date()),
+      period: `\xDAltimos ${numMonths} meses`,
+      headers: ["Nome", "Respostas", "M\xE9dia Dias", "Hor\xE1rios Preferidos", "Suplente", "Taxa Resposta (%)"],
+      rows,
+      summary: [
+        { label: "Total de Ministros", value: totalMinisters },
+        { label: "M\xE9dia de Disponibilidade", value: `${avgAvailability} dias` },
+        { label: "Suplentes Dispon\xEDveis", value: substitutesAvailable }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `analise_disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting availability analysis:", error);
+    res.status(500).json({ error: "Failed to export report" });
+  }
+});
 var reports_default = router12;
 
 // server/routes/ministers.ts
 await init_db();
 init_schema();
 import { Router as Router13 } from "express";
-import { eq as eq22, and as and16, sql as sql12 } from "drizzle-orm";
+import { eq as eq23, and as and17, sql as sql13 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -14691,7 +17851,7 @@ var router13 = Router13();
 router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const ministersList = await db.select().from(users).where(
-      sql12`${users.role} IN ('ministro', 'coordenador')`
+      sql13`${users.role} IN ('ministro', 'coordenador')`
     );
     res.json(ministersList);
   } catch (error) {
@@ -14701,9 +17861,9 @@ router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
 });
 router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
-    const minister = await db.select().from(users).where(and16(
-      eq22(users.id, req.params.id),
-      eq22(users.role, "ministro")
+    const minister = await db.select().from(users).where(and17(
+      eq23(users.id, req.params.id),
+      eq23(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -14761,9 +17921,9 @@ router13.patch("/:id", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
-    const result = await db.update(users).set(updateData).where(and16(
-      eq22(users.id, userId),
-      eq22(users.role, "ministro")
+    const result = await db.update(users).set(updateData).where(and17(
+      eq23(users.id, userId),
+      eq23(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -14785,9 +17945,9 @@ router13.patch("/:id", authenticateToken, async (req, res) => {
 router13.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
-    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and16(
-      eq22(users.id, ministerId),
-      eq22(users.role, "ministro")
+    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and17(
+      eq23(users.id, ministerId),
+      eq23(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -14811,7 +17971,19 @@ await init_db();
 init_schema();
 import { Router as Router14 } from "express";
 import { eq as eq24, and as and18, sql as sql14, gte as gte12, desc as desc7, count as count5, notInArray, inArray as inArray6 } from "drizzle-orm";
+await init_pushNotifications();
+await init_storage();
+await init_websocket();
 var router14 = Router14();
+function getErrorMessage7(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+function getErrorStack2(error) {
+  if (error instanceof Error) return error.stack;
+  return void 0;
+}
 function calculateUrgency(massDateStr, massTime) {
   if (!massDateStr || !massTime) return "low";
   const now = /* @__PURE__ */ new Date();
@@ -14955,6 +18127,32 @@ router14.post("/", authenticateToken, async (req, res) => {
       urgency,
       hoursUntil: Math.round((massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60))
     });
+    if (finalSubstituteId) {
+      const requesterName = requestWithDetails.requestingUser?.name || "Um ministro";
+      const formattedDate = schedule.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
+      await storage.createNotification({
+        userId: finalSubstituteId,
+        title: "\u{1F4CB} Pedido de Substitui\xE7\xE3o",
+        message: `${requesterName} solicitou que voc\xEA o substitua na missa de ${formattedDate} \xE0s ${schedule.time || "hor\xE1rio n\xE3o definido"}. Responda o mais breve poss\xEDvel.`,
+        type: "substitution",
+        read: false,
+        actionUrl: "/substitutions"
+      });
+      await sendPushNotificationToUsers([finalSubstituteId], {
+        title: "\u{1F4CB} Pedido de Substitui\xE7\xE3o",
+        body: `${requesterName} solicitou que voc\xEA o substitua na missa de ${formattedDate} \xE0s ${schedule.time || ""}`,
+        url: "/substitutions"
+      });
+      notifyUsers([finalSubstituteId], {
+        id: "sub-request-" + newRequest.id,
+        title: "\u{1F4CB} Pedido de Substitui\xE7\xE3o",
+        message: `${requesterName} solicitou que voc\xEA o substitua na missa de ${formattedDate} \xE0s ${schedule.time || ""}`,
+        type: "warning",
+        actionUrl: "/substitutions",
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      console.log(`[PUSH] Notifica\xE7\xE3o de substitui\xE7\xE3o enviada para ${finalSubstituteId}`);
+    }
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after creating substitution request for ${schedule.date}`);
     res.json({
@@ -14965,14 +18163,14 @@ router14.post("/", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error("[Substitutions] Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o:", error);
-    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Stack trace:", getErrorStack2(error));
     console.error("[Substitutions] Request body:", req.body);
     console.error("[Substitutions] User:", req.user);
     res.status(500).json({
       success: false,
       message: "Erro ao criar solicita\xE7\xE3o de substitui\xE7\xE3o",
-      error: error.message,
-      details: process.env.NODE_ENV === "development" ? error.stack : void 0
+      error: getErrorMessage7(error),
+      details: process.env.NODE_ENV === "development" ? getErrorStack2(error) : void 0
     });
   }
 });
@@ -15010,28 +18208,28 @@ router14.get("/", authenticateToken, async (req, res) => {
       ).orderBy(desc7(substitutionRequests.createdAt));
     }
     const enrichedRequests = await Promise.all(
-      requests.map(async (req2) => {
+      requests.map(async (reqRow) => {
         let substituteUser = null;
-        if (req2.request.substituteId) {
+        if (reqRow.request.substituteId) {
           const [substitute] = await db.select({
             id: users.id,
             name: users.name
-          }).from(users).where(eq24(users.id, req2.request.substituteId)).limit(1);
+          }).from(users).where(eq24(users.id, reqRow.request.substituteId)).limit(1);
           if (substitute) {
             substituteUser = substitute;
           }
         }
         return {
-          ...req2,
+          ...reqRow,
           substituteUser
         };
       })
     );
-    const mappedRequests = enrichedRequests.map((req2) => ({
-      ...req2,
+    const mappedRequests = enrichedRequests.map((reqRow) => ({
+      ...reqRow,
       assignment: {
-        ...req2.assignment,
-        massTime: req2.assignment.time
+        ...reqRow.assignment,
+        massTime: reqRow.assignment.time
       }
     }));
     res.json(mappedRequests);
@@ -15081,11 +18279,11 @@ router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error("[Substitutions] Erro ao buscar substitutos dispon\xEDveis:", error);
-    console.error("[Substitutions] Stack trace:", error.stack);
+    console.error("[Substitutions] Stack trace:", getErrorStack2(error));
     res.status(500).json({
       success: false,
       message: "Erro ao buscar substitutos dispon\xEDveis",
-      error: error.message
+      error: getErrorMessage7(error)
     });
   }
 });
@@ -15144,6 +18342,33 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
       scheduleCache.invalidateByDate(schedule.date);
       console.log(`[CACHE] Invalidated cache after responding to substitution for ${schedule.date}`);
     }
+    const [substituteUser] = await db.select({ name: users.name }).from(users).where(eq24(users.id, userId)).limit(1);
+    const substituteName = substituteUser?.name || "O ministro";
+    const formattedDate = schedule?.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
+    const notificationTitle = newStatus === "approved" ? "\u2705 Substitui\xE7\xE3o Aceita" : "\u274C Substitui\xE7\xE3o Recusada";
+    const notificationMessage = newStatus === "approved" ? `${substituteName} aceitou substituir voc\xEA na missa de ${formattedDate}. Voc\xEA est\xE1 liberado desta escala.` : `${substituteName} n\xE3o pode substituir voc\xEA na missa de ${formattedDate}. Procure outro substituto.`;
+    await storage.createNotification({
+      userId: request.requesterId,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: "substitution",
+      read: false,
+      actionUrl: "/substitutions"
+    });
+    await sendPushNotificationToUsers([request.requesterId], {
+      title: notificationTitle,
+      body: notificationMessage,
+      url: "/substitutions"
+    });
+    notifyUsers([request.requesterId], {
+      id: "sub-response-" + id,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: newStatus === "approved" ? "success" : "warning",
+      actionUrl: "/substitutions",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    console.log(`[PUSH] Notifica\xE7\xE3o de resposta de substitui\xE7\xE3o enviada para ${request.requesterId}`);
     res.json({
       success: true,
       message: response === "accepted" ? "Substitui\xE7\xE3o aceita com sucesso" : "Substitui\xE7\xE3o rejeitada"
@@ -15232,12 +18457,39 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
     });
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
+    const [claimerUser] = await db.select({ name: users.name }).from(users).where(eq24(users.id, userId)).limit(1);
+    const claimerName = claimerUser?.name || "Um ministro";
+    const formattedDate = schedule?.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
+    const notificationTitle = "\u2705 Substituto Encontrado!";
+    const notificationMessage = `${claimerName} se ofereceu para substituir voc\xEA na missa de ${formattedDate} \xE0s ${schedule.time || ""}. Voc\xEA est\xE1 liberado desta escala.`;
+    await storage.createNotification({
+      userId: request.requesterId,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: "substitution",
+      read: false,
+      actionUrl: "/substitutions"
+    });
+    await sendPushNotificationToUsers([request.requesterId], {
+      title: notificationTitle,
+      body: notificationMessage,
+      url: "/substitutions"
+    });
+    notifyUsers([request.requesterId], {
+      id: "sub-claimed-" + id,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: "success",
+      actionUrl: "/substitutions",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    console.log(`[PUSH] Notifica\xE7\xE3o de claim de substitui\xE7\xE3o enviada para ${request.requesterId}`);
     res.json({
       success: true,
       message: "Substitui\xE7\xE3o aceita com sucesso!"
     });
   } catch (error) {
-    if (error?.message === "SUBSTITUTION_ALREADY_CLAIMED") {
+    if (error instanceof Error && error.message === "SUBSTITUTION_ALREADY_CLAIMED") {
       return res.status(409).json({
         success: false,
         message: "Esta solicita\xE7\xE3o j\xE1 foi aceita por outro ministro"
@@ -15472,6 +18724,15 @@ init_schema();
 import { Router as Router16 } from "express";
 import { eq as eq27, asc as asc2 } from "drizzle-orm";
 var router16 = Router16();
+function getErrorMessage8(error) {
+  if (error instanceof Error) return getErrorMessage8(error);
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+function getErrorStack3(error) {
+  if (error instanceof Error) return error.stack;
+  return void 0;
+}
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
     return res.status(403).json({
@@ -15495,8 +18756,8 @@ router16.post("/seed", async (req, res) => {
     console.error("Error running formation seed:", error);
     res.status(500).json({
       error: "Erro ao popular banco de dados",
-      message: error.message,
-      details: error.stack
+      message: getErrorMessage8(error),
+      details: getErrorStack3(error)
     });
   }
 });
@@ -15508,7 +18769,7 @@ router16.get("/tracks", async (req, res) => {
     console.error("Error fetching formation tracks:", error);
     res.status(500).json({
       error: "Erro ao buscar trilhas de forma\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15527,7 +18788,7 @@ router16.get("/tracks/:id", async (req, res) => {
     console.error("Error fetching formation track:", error);
     res.status(500).json({
       error: "Erro ao buscar trilha de forma\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15543,7 +18804,7 @@ router16.post("/tracks", async (req, res) => {
     console.error("Error creating formation track:", error);
     res.status(500).json({
       error: "Erro ao criar trilha de forma\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15566,7 +18827,7 @@ router16.patch("/tracks/:id", async (req, res) => {
     console.error("Error updating formation track:", error);
     res.status(500).json({
       error: "Erro ao atualizar trilha de forma\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15595,7 +18856,7 @@ router16.delete("/tracks/:id", async (req, res) => {
     console.error("Error deleting formation track:", error);
     res.status(500).json({
       error: "Erro ao deletar trilha de forma\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15608,7 +18869,7 @@ router16.get("/tracks/:trackId/modules", async (req, res) => {
     console.error("Error fetching formation modules:", error);
     res.status(500).json({
       error: "Erro ao buscar m\xF3dulos",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15627,7 +18888,7 @@ router16.get("/modules/:id", async (req, res) => {
     console.error("Error fetching formation module:", error);
     res.status(500).json({
       error: "Erro ao buscar m\xF3dulo",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15643,7 +18904,7 @@ router16.post("/modules", async (req, res) => {
     console.error("Error creating formation module:", error);
     res.status(500).json({
       error: "Erro ao criar m\xF3dulo",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15666,7 +18927,7 @@ router16.patch("/modules/:id", async (req, res) => {
     console.error("Error updating formation module:", error);
     res.status(500).json({
       error: "Erro ao atualizar m\xF3dulo",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15695,7 +18956,7 @@ router16.delete("/modules/:id", async (req, res) => {
     console.error("Error deleting formation module:", error);
     res.status(500).json({
       error: "Erro ao deletar m\xF3dulo",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15708,7 +18969,7 @@ router16.get("/modules/:moduleId/lessons", async (req, res) => {
     console.error("Error fetching formation lessons:", error);
     res.status(500).json({
       error: "Erro ao buscar li\xE7\xF5es",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15727,7 +18988,7 @@ router16.get("/lessons/:id", async (req, res) => {
     console.error("Error fetching formation lesson:", error);
     res.status(500).json({
       error: "Erro ao buscar li\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15743,7 +19004,7 @@ router16.post("/lessons", async (req, res) => {
     console.error("Error creating formation lesson:", error);
     res.status(500).json({
       error: "Erro ao criar li\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15766,7 +19027,7 @@ router16.patch("/lessons/:id", async (req, res) => {
     console.error("Error updating formation lesson:", error);
     res.status(500).json({
       error: "Erro ao atualizar li\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15795,7 +19056,7 @@ router16.delete("/lessons/:id", async (req, res) => {
     console.error("Error deleting formation lesson:", error);
     res.status(500).json({
       error: "Erro ao deletar li\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15808,7 +19069,7 @@ router16.get("/lessons/:lessonId/sections", async (req, res) => {
     console.error("Error fetching lesson sections:", error);
     res.status(500).json({
       error: "Erro ao buscar se\xE7\xF5es",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15827,7 +19088,7 @@ router16.get("/sections/:id", async (req, res) => {
     console.error("Error fetching lesson section:", error);
     res.status(500).json({
       error: "Erro ao buscar se\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15843,7 +19104,7 @@ router16.post("/sections", async (req, res) => {
     console.error("Error creating lesson section:", error);
     res.status(500).json({
       error: "Erro ao criar se\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15866,7 +19127,7 @@ router16.patch("/sections/:id", async (req, res) => {
     console.error("Error updating lesson section:", error);
     res.status(500).json({
       error: "Erro ao atualizar se\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15888,7 +19149,7 @@ router16.delete("/sections/:id", async (req, res) => {
     console.error("Error deleting lesson section:", error);
     res.status(500).json({
       error: "Erro ao deletar se\xE7\xE3o",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -15913,7 +19174,7 @@ router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
     console.error("Error reordering sections:", error);
     res.status(500).json({
       error: "Erro ao reordenar se\xE7\xF5es",
-      message: error.message
+      message: getErrorMessage8(error)
     });
   }
 });
@@ -16232,13 +19493,14 @@ var dashboard_default = router18;
 // server/routes/pushSubscriptions.ts
 await init_storage();
 import { Router as Router19 } from "express";
-import { z as z6 } from "zod";
+await init_pushNotifications();
+import { z as z8 } from "zod";
 var router19 = Router19();
-var pushSubscriptionSchema2 = z6.object({
-  endpoint: z6.string().url(),
-  keys: z6.object({
-    p256dh: z6.string(),
-    auth: z6.string()
+var pushSubscriptionSchema2 = z8.object({
+  endpoint: z8.string().url(),
+  keys: z8.object({
+    p256dh: z8.string(),
+    auth: z8.string()
   })
 });
 router19.get("/vapid-public-key", (req, res) => {
@@ -16276,7 +19538,7 @@ router19.post("/subscribe", csrfProtection, authenticateToken, async (req, res) 
     res.json({ success: true, message: "Subscribed to push notifications" });
   } catch (error) {
     console.error("[PUSH API] Subscribe error:", error);
-    if (error.name === "ZodError") {
+    if (error instanceof z8.ZodError) {
       return res.status(400).json({ error: "Invalid subscription data" });
     }
     res.status(500).json({ error: "Failed to subscribe" });
@@ -16312,13 +19574,1954 @@ router19.get("/subscriptions", authenticateToken, async (req, res) => {
 });
 var pushSubscriptions_default = router19;
 
+// server/routes/certificates.ts
+import { Router as Router20 } from "express";
+
+// server/services/certificateService.ts
+await init_db();
+init_schema();
+import { eq as eq29, and as and21, count as count7, sql as sql17 } from "drizzle-orm";
+
+// server/utils/certificateGenerator.ts
+import { jsPDF as jsPDF2 } from "jspdf";
+var CATEGORY_CONFIG = {
+  liturgia: {
+    color: "#8B4513",
+    // Saddle brown (liturgical)
+    accent: "#D4AF37",
+    // Gold
+    title: "Forma\xE7\xE3o Lit\xFArgica",
+    icon: "\u271D"
+  },
+  espiritualidade: {
+    color: "#4A3728",
+    // Dark brown
+    accent: "#C0A080",
+    // Warm tan
+    title: "Forma\xE7\xE3o Espiritual",
+    icon: "\u{1F54A}"
+  },
+  pratica: {
+    color: "#5C4033",
+    // Brown
+    accent: "#B8860B",
+    // Dark golden rod
+    title: "Forma\xE7\xE3o Pastoral",
+    icon: "\u{1F932}"
+  }
+};
+function generateCertificatePDF(data) {
+  const doc = new jsPDF2({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4"
+  });
+  const pageWidth = 297;
+  const pageHeight = 210;
+  const config = CATEGORY_CONFIG[data.trackCategory];
+  doc.setFillColor(252, 250, 245);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  drawBorder(doc, config.color, config.accent);
+  drawHeaderDecoration(doc, config.color);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(36);
+  doc.setTextColor(config.color);
+  doc.text("CERTIFICADO", pageWidth / 2, 45, { align: "center" });
+  doc.setFontSize(14);
+  doc.setTextColor(100, 100, 100);
+  doc.text(config.title.toUpperCase(), pageWidth / 2, 55, { align: "center" });
+  doc.setDrawColor(config.accent);
+  doc.setLineWidth(0.5);
+  doc.line(80, 60, 217, 60);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.setTextColor(60, 60, 60);
+  doc.text("Certificamos que", pageWidth / 2, 75, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.setTextColor(config.color);
+  doc.text(data.recipientName, pageWidth / 2, 90, { align: "center" });
+  const nameWidth = doc.getTextWidth(data.recipientName);
+  doc.setDrawColor(config.accent);
+  doc.setLineWidth(0.3);
+  doc.line((pageWidth - nameWidth) / 2 - 10, 94, (pageWidth + nameWidth) / 2 + 10, 94);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.setTextColor(60, 60, 60);
+  doc.text("concluiu com \xEAxito a trilha de forma\xE7\xE3o", pageWidth / 2, 108, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(config.color);
+  doc.text(`"${data.trackTitle}"`, pageWidth / 2, 120, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(80, 80, 80);
+  const detailsText = `completando ${data.totalLessons} ${data.totalLessons === 1 ? "li\xE7\xE3o" : "li\xE7\xF5es"} com carga hor\xE1ria total de ${data.totalHours} ${data.totalHours === 1 ? "hora" : "horas"}.`;
+  doc.text(detailsText, pageWidth / 2, 132, { align: "center" });
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    "Minist\xE9rio Extraordin\xE1rio da Sagrada Comunh\xE3o - Santu\xE1rio S\xE3o Judas Tadeu",
+    pageWidth / 2,
+    142,
+    { align: "center" }
+  );
+  const issuedDate = formatDate(data.issuedAt);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(11);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Sorocaba/SP, ${issuedDate}`, pageWidth / 2, 155, { align: "center" });
+  if (data.issuedBy) {
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.3);
+    doc.line(pageWidth / 2 - 40, 172, pageWidth / 2 + 40, 172);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(data.issuedBy, pageWidth / 2, 178, { align: "center" });
+    doc.text("Coordenador(a)", pageWidth / 2, 183, { align: "center" });
+  }
+  drawFooter(doc, data.certificateNumber, data.verificationCode, config.color);
+  const pdfOutput = doc.output("arraybuffer");
+  return Buffer.from(pdfOutput);
+}
+function drawBorder(doc, mainColor, accentColor) {
+  const pageWidth = 297;
+  const pageHeight = 210;
+  const margin = 8;
+  const innerMargin = 12;
+  doc.setDrawColor(mainColor);
+  doc.setLineWidth(2);
+  doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
+  doc.setDrawColor(accentColor);
+  doc.setLineWidth(0.5);
+  doc.rect(innerMargin, innerMargin, pageWidth - innerMargin * 2, pageHeight - innerMargin * 2);
+  const corners = [
+    { x: margin + 3, y: margin + 3 },
+    { x: pageWidth - margin - 3, y: margin + 3 },
+    { x: margin + 3, y: pageHeight - margin - 3 },
+    { x: pageWidth - margin - 3, y: pageHeight - margin - 3 }
+  ];
+  doc.setFillColor(accentColor);
+  corners.forEach((corner) => {
+    doc.circle(corner.x, corner.y, 2, "F");
+  });
+}
+function drawHeaderDecoration(doc, color) {
+  const pageWidth = 297;
+  doc.setDrawColor(color);
+  doc.setLineWidth(1);
+  const centerX = pageWidth / 2;
+  const topY = 22;
+  doc.line(centerX, topY - 5, centerX, topY + 5);
+  doc.line(centerX - 5, topY, centerX + 5, topY);
+}
+function drawFooter(doc, certificateNumber, verificationCode, color) {
+  const pageWidth = 297;
+  const pageHeight = 210;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Certificado N: ${certificateNumber}`, 20, pageHeight - 15);
+  doc.text(`Verificar em: mesc.app/certificado/${verificationCode}`, pageWidth - 20, pageHeight - 15, {
+    align: "right"
+  });
+  doc.setFontSize(7);
+  doc.text(`Codigo de Verificacao: ${verificationCode}`, pageWidth / 2, pageHeight - 15, {
+    align: "center"
+  });
+}
+function formatDate(date2) {
+  const months = [
+    "janeiro",
+    "fevereiro",
+    "marco",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro"
+  ];
+  const day = date2.getDate();
+  const month = months[date2.getMonth()];
+  const year = date2.getFullYear();
+  return `${day} de ${month} de ${year}`;
+}
+function generateCertificateNumber(sequenceNumber) {
+  const year = (/* @__PURE__ */ new Date()).getFullYear();
+  const paddedNumber = sequenceNumber.toString().padStart(5, "0");
+  return `MESC-${year}-${paddedNumber}`;
+}
+function generateVerificationCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// server/services/certificateService.ts
+async function getTrackCompletionStatus(userId, trackId) {
+  const tracksQuery = trackId ? db.select().from(formationTracks).where(eq29(formationTracks.id, trackId)) : db.select().from(formationTracks).where(eq29(formationTracks.isActive, true));
+  const tracks = await tracksQuery;
+  const results = [];
+  for (const track of tracks) {
+    const lessons = await db.select({
+      id: formationLessons.id,
+      durationMinutes: formationLessons.durationMinutes
+    }).from(formationLessons).where(
+      and21(
+        eq29(formationLessons.trackId, track.id),
+        eq29(formationLessons.isActive, true)
+      )
+    );
+    const lessonIds = lessons.map((l) => l.id);
+    const totalDuration = lessons.reduce((sum2, l) => sum2 + (l.durationMinutes || 0), 0);
+    let completedLessons = 0;
+    let latestCompletionDate;
+    if (lessonIds.length > 0) {
+      const progress = await db.select({
+        lessonId: formationLessonProgress.lessonId,
+        status: formationLessonProgress.status,
+        completedAt: formationLessonProgress.completedAt
+      }).from(formationLessonProgress).where(
+        and21(
+          eq29(formationLessonProgress.userId, userId),
+          sql17`${formationLessonProgress.lessonId} IN (${sql17.join(lessonIds.map((id) => sql17`${id}`), sql17`, `)})`
+        )
+      );
+      for (const p of progress) {
+        if (p.status === "completed") {
+          completedLessons++;
+          if (p.completedAt && (!latestCompletionDate || p.completedAt > latestCompletionDate)) {
+            latestCompletionDate = p.completedAt;
+          }
+        }
+      }
+    }
+    const isCompleted = lessonIds.length > 0 && completedLessons === lessonIds.length;
+    const existingCert = await db.select({ id: formationCertificates.id }).from(formationCertificates).where(
+      and21(
+        eq29(formationCertificates.userId, userId),
+        eq29(formationCertificates.trackId, track.id)
+      )
+    ).limit(1);
+    results.push({
+      trackId: track.id,
+      trackTitle: track.title,
+      trackCategory: track.category,
+      totalLessons: lessonIds.length,
+      completedLessons,
+      totalDurationMinutes: totalDuration,
+      isCompleted,
+      completionDate: latestCompletionDate,
+      hasCertificate: existingCert.length > 0,
+      certificateId: existingCert[0]?.id
+    });
+  }
+  return results;
+}
+async function issueCertificate(userId, trackId, issuedById) {
+  const [status] = await getTrackCompletionStatus(userId, trackId);
+  if (!status) {
+    return { success: false, error: "Trilha de formacao nao encontrada" };
+  }
+  if (!status.isCompleted) {
+    return {
+      success: false,
+      error: `Trilha nao concluida. Completou ${status.completedLessons} de ${status.totalLessons} licoes.`
+    };
+  }
+  if (status.hasCertificate) {
+    const existing = await db.select().from(formationCertificates).where(
+      and21(
+        eq29(formationCertificates.userId, userId),
+        eq29(formationCertificates.trackId, trackId)
+      )
+    ).limit(1);
+    return { success: true, certificate: existing[0] };
+  }
+  const [user] = await db.select({ name: users.name }).from(users).where(eq29(users.id, userId));
+  if (!user) {
+    return { success: false, error: "Usuario nao encontrado" };
+  }
+  const [certCount] = await db.select({ count: count7() }).from(formationCertificates);
+  const certificateNumber = generateCertificateNumber((certCount?.count || 0) + 1);
+  const verificationCode = generateVerificationCode();
+  const lessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(eq29(formationLessons.trackId, trackId));
+  const lessonIds = lessons.map((l) => l.id);
+  const completedProgress = await db.select({ lessonId: formationLessonProgress.lessonId }).from(formationLessonProgress).where(
+    and21(
+      eq29(formationLessonProgress.userId, userId),
+      eq29(formationLessonProgress.status, "completed"),
+      sql17`${formationLessonProgress.lessonId} IN (${sql17.join(lessonIds.map((id) => sql17`${id}`), sql17`, `)})`
+    )
+  );
+  const [certificate] = await db.insert(formationCertificates).values({
+    userId,
+    trackId,
+    certificateNumber,
+    userName: user.name,
+    trackTitle: status.trackTitle,
+    trackCategory: status.trackCategory,
+    totalLessons: status.totalLessons,
+    totalHours: Math.ceil(status.totalDurationMinutes / 60),
+    issuedBy: issuedById,
+    verificationCode,
+    metadata: {
+      lessonsCompleted: completedProgress.map((p) => p.lessonId),
+      completionDate: status.completionDate?.toISOString() || (/* @__PURE__ */ new Date()).toISOString()
+    }
+  }).returning();
+  return { success: true, certificate };
+}
+async function generateCertificatePDFById(certificateId) {
+  const [cert] = await db.select().from(formationCertificates).where(eq29(formationCertificates.id, certificateId));
+  if (!cert) {
+    return null;
+  }
+  let issuerName;
+  if (cert.issuedBy) {
+    const [issuer] = await db.select({ name: users.name }).from(users).where(eq29(users.id, cert.issuedBy));
+    issuerName = issuer?.name;
+  }
+  const data = {
+    certificateNumber: cert.certificateNumber,
+    verificationCode: cert.verificationCode,
+    recipientName: cert.userName,
+    trackTitle: cert.trackTitle,
+    trackCategory: cert.trackCategory,
+    totalLessons: cert.totalLessons,
+    totalHours: cert.totalHours,
+    issuedAt: cert.issuedAt,
+    issuedBy: issuerName,
+    validUntil: cert.validUntil || void 0
+  };
+  return generateCertificatePDF(data);
+}
+async function verifyCertificate(verificationCode) {
+  const [cert] = await db.select().from(formationCertificates).where(eq29(formationCertificates.verificationCode, verificationCode.toUpperCase()));
+  return cert || null;
+}
+async function getUserCertificates(userId) {
+  return db.select().from(formationCertificates).where(eq29(formationCertificates.userId, userId)).orderBy(formationCertificates.issuedAt);
+}
+async function getCertificateById(certificateId) {
+  const [cert] = await db.select().from(formationCertificates).where(eq29(formationCertificates.id, certificateId));
+  return cert || null;
+}
+
+// server/routes/certificates.ts
+var router20 = Router20();
+router20.get("/status", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const trackId = req.query.trackId;
+    const status = await getTrackCompletionStatus(userId, trackId);
+    res.json(status);
+  } catch (error) {
+    console.error("Error getting track status:", error);
+    res.status(500).json({ error: "Erro ao obter status das trilhas" });
+  }
+});
+router20.get("/", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const certificates = await getUserCertificates(userId);
+    res.json(certificates);
+  } catch (error) {
+    console.error("Error getting certificates:", error);
+    res.status(500).json({ error: "Erro ao obter certificados" });
+  }
+});
+router20.post("/issue", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const { trackId } = req.body;
+    if (!trackId) {
+      return res.status(400).json({ error: "trackId e obrigatorio" });
+    }
+    const result = await issueCertificate(userId, trackId, userId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.certificate);
+  } catch (error) {
+    console.error("Error issuing certificate:", error);
+    res.status(500).json({ error: "Erro ao emitir certificado" });
+  }
+});
+router20.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const certificate = await getCertificateById(id);
+    if (!certificate) {
+      return res.status(404).json({ error: "Certificado nao encontrado" });
+    }
+    const userRole = req.user?.role;
+    if (certificate.userId !== userId && userRole !== "coordenador" && userRole !== "gestor") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+    res.json(certificate);
+  } catch (error) {
+    console.error("Error getting certificate:", error);
+    res.status(500).json({ error: "Erro ao obter certificado" });
+  }
+});
+router20.get("/:id/pdf", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const certificate = await getCertificateById(id);
+    if (!certificate) {
+      return res.status(404).json({ error: "Certificado nao encontrado" });
+    }
+    const userRole = req.user?.role;
+    if (certificate.userId !== userId && userRole !== "coordenador" && userRole !== "gestor") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+    const pdfBuffer = await generateCertificatePDFById(id);
+    if (!pdfBuffer) {
+      return res.status(500).json({ error: "Erro ao gerar PDF" });
+    }
+    const filename = `certificado-${certificate.certificateNumber}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating certificate PDF:", error);
+    res.status(500).json({ error: "Erro ao gerar PDF do certificado" });
+  }
+});
+router20.get("/verify/:code", async (req, res) => {
+  try {
+    const { code } = req.params;
+    if (!code || code.length !== 6) {
+      return res.status(400).json({ error: "Codigo de verificacao invalido" });
+    }
+    const certificate = await verifyCertificate(code);
+    if (!certificate) {
+      return res.status(404).json({
+        valid: false,
+        error: "Certificado nao encontrado"
+      });
+    }
+    res.json({
+      valid: true,
+      certificate: {
+        certificateNumber: certificate.certificateNumber,
+        recipientName: certificate.userName,
+        trackTitle: certificate.trackTitle,
+        trackCategory: certificate.trackCategory,
+        totalLessons: certificate.totalLessons,
+        totalHours: certificate.totalHours,
+        issuedAt: certificate.issuedAt,
+        validUntil: certificate.validUntil
+      }
+    });
+  } catch (error) {
+    console.error("Error verifying certificate:", error);
+    res.status(500).json({ error: "Erro ao verificar certificado" });
+  }
+});
+router20.post("/issue-for-user", authenticateToken, async (req, res) => {
+  try {
+    const issuerId = req.user?.id;
+    const userRole = req.user?.role;
+    if (userRole !== "coordenador" && userRole !== "gestor") {
+      return res.status(403).json({ error: "Apenas coordenadores podem emitir certificados para outros usuarios" });
+    }
+    const { userId, trackId } = req.body;
+    if (!userId || !trackId) {
+      return res.status(400).json({ error: "userId e trackId sao obrigatorios" });
+    }
+    const result = await issueCertificate(userId, trackId, issuerId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.certificate);
+  } catch (error) {
+    console.error("Error issuing certificate for user:", error);
+    res.status(500).json({ error: "Erro ao emitir certificado" });
+  }
+});
+var certificates_default = router20;
+
+// server/routes/insights.ts
+import { Router as Router21 } from "express";
+
+// server/services/insightsService.ts
+await init_db();
+init_schema();
+import { eq as eq30, and as and22, gte as gte15, lte as lte13, desc as desc10, count as count8, avg as avg2 } from "drizzle-orm";
+function calculateNoShowRisk(noShowCount, totalServices, reliabilityScore) {
+  if (totalServices === 0) return "medium";
+  const noShowRate = noShowCount / totalServices * 100;
+  if (reliabilityScore < 40 || noShowRate > 20) return "critical";
+  if (reliabilityScore < 60 || noShowRate > 10) return "high";
+  if (reliabilityScore < 75 || noShowRate > 5) return "medium";
+  return "low";
+}
+function calculateSubstitutionLikelihood(substitutionRequestCount, totalServices, recentActivityDays) {
+  if (totalServices === 0) return 30;
+  const baseRate = substitutionRequestCount / Math.max(totalServices, 1) * 100;
+  let adjustment = 0;
+  if (recentActivityDays > 30) adjustment = 10;
+  if (recentActivityDays > 60) adjustment = 20;
+  return Math.min(100, Math.max(0, baseRate + adjustment));
+}
+function determineEngagementLevel(lastActivity, totalServices, questionnaireResponseRate) {
+  const now = /* @__PURE__ */ new Date();
+  const daysSinceActivity = lastActivity ? Math.floor((now.getTime() - lastActivity.getTime()) / (1e3 * 60 * 60 * 24)) : 999;
+  if (daysSinceActivity > 90) return "inactive";
+  if (daysSinceActivity > 60 || questionnaireResponseRate < 30) return "declining";
+  if (daysSinceActivity > 30 || questionnaireResponseRate < 60) return "moderate";
+  return "active";
+}
+async function getMinisterRiskProfiles() {
+  const ministers = await db.select({
+    id: users.id,
+    name: users.name,
+    reliabilityScore: users.reliabilityScore,
+    noShowCount: users.noShowCount,
+    totalServices: users.totalServices,
+    substitutionRequestCount: users.substitutionRequestCount,
+    substitutionFulfilledCount: users.substitutionFulfilledCount,
+    lastService: users.lastService,
+    lastLogin: users.lastLogin
+  }).from(users).where(
+    and22(
+      eq30(users.status, "active"),
+      eq30(users.role, "ministro")
+    )
+  );
+  const profiles = [];
+  for (const minister of ministers) {
+    const lastActivity = minister.lastLogin || minister.lastService;
+    const daysSinceActivity = lastActivity ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1e3 * 60 * 60 * 24)) : 999;
+    const noShowRisk = calculateNoShowRisk(
+      minister.noShowCount || 0,
+      minister.totalServices || 0,
+      minister.reliabilityScore || 100
+    );
+    const substitutionLikelihood = calculateSubstitutionLikelihood(
+      minister.substitutionRequestCount || 0,
+      minister.totalServices || 0,
+      daysSinceActivity
+    );
+    const engagementLevel = determineEngagementLevel(
+      lastActivity ? new Date(lastActivity) : null,
+      minister.totalServices || 0,
+      80
+      // Placeholder - would calculate from questionnaire responses
+    );
+    const factors = [];
+    if (noShowRisk === "critical" || noShowRisk === "high") {
+      factors.push(`${minister.noShowCount || 0} ausencias registradas`);
+    }
+    if ((minister.reliabilityScore || 100) < 60) {
+      factors.push(`Score de confiabilidade baixo (${minister.reliabilityScore})`);
+    }
+    if (daysSinceActivity > 60) {
+      factors.push(`Sem atividade ha ${daysSinceActivity} dias`);
+    }
+    if (substitutionLikelihood > 50) {
+      factors.push(`Alta frequencia de substituicoes`);
+    }
+    let recommendation = "Ministro em bom estado";
+    if (noShowRisk === "critical") {
+      recommendation = "Requer atencao urgente - considerar conversa individual";
+    } else if (noShowRisk === "high") {
+      recommendation = "Monitorar de perto nas proximas escalas";
+    } else if (engagementLevel === "inactive") {
+      recommendation = "Verificar se ainda esta ativo no ministerio";
+    } else if (engagementLevel === "declining") {
+      recommendation = "Considerar contato para verificar disponibilidade";
+    }
+    profiles.push({
+      ministerId: minister.id,
+      ministerName: minister.name,
+      reliabilityScore: minister.reliabilityScore || 100,
+      noShowRisk,
+      substitutionLikelihood: Math.round(substitutionLikelihood),
+      engagementLevel,
+      lastActivity: lastActivity ? new Date(lastActivity) : null,
+      factors,
+      recommendation
+    });
+  }
+  const riskOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  profiles.sort((a, b) => riskOrder[a.noShowRisk] - riskOrder[b.noShowRisk]);
+  return profiles;
+}
+async function getTimeSlotInsights() {
+  const massTimes = await db.select().from(massTimesConfig).where(eq30(massTimesConfig.isActive, true));
+  const now = /* @__PURE__ */ new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const [currentQuestionnaire] = await db.select().from(questionnaires).where(
+    and22(
+      eq30(questionnaires.month, currentMonth),
+      eq30(questionnaires.year, currentYear)
+    )
+  ).limit(1);
+  const [reliableCount] = await db.select({ count: count8() }).from(users).where(
+    and22(
+      eq30(users.status, "active"),
+      eq30(users.role, "ministro"),
+      gte15(users.reliabilityScore, 75)
+    )
+  );
+  const insights = [];
+  const dayNames = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
+  for (const massTime of massTimes) {
+    const estimatedAvailable = Math.floor((reliableCount?.count || 0) * 0.3);
+    const required = massTime.minMinisters;
+    const coveragePercentage = required > 0 ? estimatedAvailable / required * 100 : 100;
+    let coverageStatus;
+    if (coveragePercentage < 100) coverageStatus = "critical";
+    else if (coveragePercentage < 150) coverageStatus = "warning";
+    else if (coveragePercentage < 200) coverageStatus = "healthy";
+    else coverageStatus = "excellent";
+    const riskFactors = [];
+    if (coveragePercentage < 100) {
+      riskFactors.push(`Faltam ${required - estimatedAvailable} ministros`);
+    }
+    if (massTime.dayOfWeek === 0 && massTime.time === "07:00:00") {
+      riskFactors.push("Horario com historico de baixa adesao");
+    }
+    let recommendation = "Cobertura adequada";
+    if (coverageStatus === "critical") {
+      recommendation = "Necessario recrutar mais ministros para este horario";
+    } else if (coverageStatus === "warning") {
+      recommendation = "Considerar incentivos para este horario";
+    }
+    insights.push({
+      dayOfWeek: massTime.dayOfWeek,
+      time: massTime.time,
+      coverageStatus,
+      availableCount: estimatedAvailable,
+      requiredCount: required,
+      coveragePercentage: Math.round(coveragePercentage),
+      reliableMinistersCount: reliableCount?.count || 0,
+      riskFactors,
+      recommendation
+    });
+  }
+  const statusOrder = { critical: 0, warning: 1, healthy: 2, excellent: 3 };
+  insights.sort((a, b) => statusOrder[a.coverageStatus] - statusOrder[b.coverageStatus]);
+  return insights;
+}
+async function getSubstitutionPatterns() {
+  const sixMonthsAgo = /* @__PURE__ */ new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const ministers = await db.select({
+    id: users.id,
+    name: users.name,
+    substitutionRequestCount: users.substitutionRequestCount,
+    substitutionFulfilledCount: users.substitutionFulfilledCount,
+    totalServices: users.totalServices
+  }).from(users).where(
+    and22(
+      eq30(users.status, "active"),
+      eq30(users.role, "ministro"),
+      gte15(users.substitutionRequestCount, 1)
+    )
+  ).orderBy(desc10(users.substitutionRequestCount)).limit(20);
+  const patterns = [];
+  for (const minister of ministers) {
+    const requestCount = minister.substitutionRequestCount || 0;
+    const fulfilledCount = minister.substitutionFulfilledCount || 0;
+    const totalServices = minister.totalServices || 1;
+    const monthlyFrequency = requestCount / 6;
+    const fulfillmentRate = totalServices > 0 ? fulfilledCount / Math.max(requestCount, fulfilledCount, 1) * 100 : 0;
+    let trend = "stable";
+    if (monthlyFrequency > 2) trend = "increasing";
+    else if (monthlyFrequency < 0.5) trend = "decreasing";
+    patterns.push({
+      ministerId: minister.id,
+      ministerName: minister.name,
+      requestFrequency: Math.round(monthlyFrequency * 10) / 10,
+      fulfillmentRate: Math.round(fulfillmentRate),
+      commonReasons: ["Trabalho", "Viagem", "Saude"],
+      // Would analyze from actual data
+      peakPeriods: ["Dezembro", "Janeiro"],
+      // Would analyze from actual data
+      trend
+    });
+  }
+  return patterns;
+}
+async function getSeasonalPatterns() {
+  const monthNames2 = [
+    "Janeiro",
+    "Fevereiro",
+    "Marco",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ];
+  const patterns = monthNames2.map((name, index2) => {
+    const month = index2 + 1;
+    let avgAvailability = 75;
+    let avgSubstitutionRequests = 5;
+    let avgNoShows = 2;
+    let isHighRisk = false;
+    const notes = [];
+    if (month === 12 || month === 1) {
+      avgAvailability = 55;
+      avgSubstitutionRequests = 12;
+      isHighRisk = true;
+      notes.push("Periodo de ferias e festas");
+    } else if (month === 7) {
+      avgAvailability = 60;
+      avgSubstitutionRequests = 8;
+      notes.push("Ferias escolares");
+    } else if (month === 4) {
+      avgAvailability = 85;
+      avgSubstitutionRequests = 3;
+      notes.push("Semana Santa - maior engajamento");
+    } else if (month === 5) {
+      avgAvailability = 80;
+      notes.push("Mes de Maria - participacao elevada");
+    }
+    return {
+      month,
+      monthName: name,
+      avgAvailability,
+      avgSubstitutionRequests,
+      avgNoShows,
+      isHighRisk,
+      notes
+    };
+  });
+  return patterns;
+}
+async function getEngagementTrends() {
+  const trends = [];
+  const now = /* @__PURE__ */ new Date();
+  for (let i = 5; i >= 0; i--) {
+    const date2 = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthName = date2.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+    const monthStart = new Date(date2.getFullYear(), date2.getMonth(), 1);
+    const monthEnd = new Date(date2.getFullYear(), date2.getMonth() + 1, 0);
+    const [activeCount] = await db.select({ count: count8() }).from(activityLogs).where(
+      and22(
+        gte15(activityLogs.createdAt, monthStart),
+        lte13(activityLogs.createdAt, monthEnd)
+      )
+    );
+    const [avgScore] = await db.select({ avg: avg2(users.reliabilityScore) }).from(users).where(eq30(users.status, "active"));
+    trends.push({
+      period: monthName,
+      activeUsers: Math.min(activeCount?.count || 0, 100),
+      // Cap for display
+      questionnaireResponseRate: 70 + Math.floor(Math.random() * 20),
+      // Would calculate from actual data
+      avgReliabilityScore: Math.round(Number(avgScore?.avg) || 80),
+      formationCompletionRate: 40 + Math.floor(Math.random() * 30),
+      // Would calculate from actual data
+      trend: "stable"
+    });
+  }
+  if (trends.length >= 3) {
+    const recent = trends.slice(-3);
+    const avgRecent = recent.reduce((sum2, t) => sum2 + t.activeUsers, 0) / 3;
+    const avgEarlier = trends.slice(0, 3).reduce((sum2, t) => sum2 + t.activeUsers, 0) / 3;
+    const trendDirection = avgRecent > avgEarlier * 1.1 ? "improving" : avgRecent < avgEarlier * 0.9 ? "declining" : "stable";
+    trends[trends.length - 1].trend = trendDirection;
+  }
+  return trends;
+}
+async function generatePredictiveInsights() {
+  const [
+    ministerRisks,
+    timeSlotInsights,
+    substitutionPatterns,
+    seasonalPatterns,
+    engagementTrends
+  ] = await Promise.all([
+    getMinisterRiskProfiles(),
+    getTimeSlotInsights(),
+    getSubstitutionPatterns(),
+    getSeasonalPatterns(),
+    getEngagementTrends()
+  ]);
+  const atRiskCount = ministerRisks.filter(
+    (m) => m.noShowRisk === "critical" || m.noShowRisk === "high"
+  ).length;
+  const healthyCount = ministerRisks.filter(
+    (m) => m.noShowRisk === "low" && m.engagementLevel === "active"
+  ).length;
+  const criticalTimeSlots = timeSlotInsights.filter(
+    (t) => t.coverageStatus === "critical"
+  ).length;
+  const upcomingRisks = [];
+  const currentMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+  const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+  const nextMonthPattern = seasonalPatterns.find((p) => p.month === nextMonth);
+  if (nextMonthPattern?.isHighRisk) {
+    upcomingRisks.push(`${nextMonthPattern.monthName}: periodo de alto risco`);
+  }
+  if (atRiskCount > 5) {
+    upcomingRisks.push(`${atRiskCount} ministros requerem atencao`);
+  }
+  if (criticalTimeSlots > 0) {
+    upcomingRisks.push(`${criticalTimeSlots} horarios com cobertura critica`);
+  }
+  const recommendations = [];
+  if (atRiskCount > 0) {
+    recommendations.push(
+      `Agendar conversa com os ${atRiskCount} ministros em situacao de risco`
+    );
+  }
+  if (criticalTimeSlots > 0) {
+    recommendations.push(
+      `Priorizar recrutamento para os ${criticalTimeSlots} horarios criticos`
+    );
+  }
+  const decliningEngagement = ministerRisks.filter(
+    (m) => m.engagementLevel === "declining" || m.engagementLevel === "inactive"
+  ).length;
+  if (decliningEngagement > 3) {
+    recommendations.push(
+      `Verificar situacao de ${decliningEngagement} ministros com engajamento em declinio`
+    );
+  }
+  if (nextMonthPattern?.isHighRisk) {
+    recommendations.push(
+      `Preparar escala de ${nextMonthPattern.monthName} com antecedencia devido a alta demanda por substituicoes`
+    );
+  }
+  return {
+    generatedAt: /* @__PURE__ */ new Date(),
+    summary: {
+      totalMinisters: ministerRisks.length,
+      atRiskCount,
+      healthyCount,
+      criticalTimeSlots,
+      upcomingRisks
+    },
+    ministerRisks: ministerRisks.slice(0, 20),
+    // Top 20 by risk
+    timeSlotInsights,
+    substitutionPatterns,
+    seasonalPatterns,
+    engagementTrends,
+    recommendations
+  };
+}
+async function getScheduleRiskAssessment(date2) {
+  const dateStr = date2.toISOString().split("T")[0];
+  const scheduled = await db.select({
+    ministerId: schedules.ministerId,
+    time: schedules.time,
+    ministerName: users.name,
+    reliabilityScore: users.reliabilityScore,
+    noShowCount: users.noShowCount,
+    totalServices: users.totalServices
+  }).from(schedules).innerJoin(users, eq30(schedules.ministerId, users.id)).where(eq30(schedules.date, dateStr));
+  const assignments = scheduled.map((s) => {
+    const riskLevel = calculateNoShowRisk(
+      s.noShowCount || 0,
+      s.totalServices || 0,
+      s.reliabilityScore || 100
+    );
+    const factors = [];
+    if ((s.reliabilityScore || 100) < 60) {
+      factors.push(`Score ${s.reliabilityScore}`);
+    }
+    if ((s.noShowCount || 0) > 2) {
+      factors.push(`${s.noShowCount} ausencias`);
+    }
+    return {
+      ministerId: s.ministerId || "",
+      ministerName: s.ministerName,
+      time: s.time,
+      riskLevel: riskLevel === "critical" ? "high" : riskLevel,
+      factors
+    };
+  });
+  const highRiskCount = assignments.filter((a) => a.riskLevel === "high").length;
+  const overallRisk = highRiskCount > 2 ? "high" : highRiskCount > 0 ? "medium" : "low";
+  const recommendations = [];
+  if (highRiskCount > 0) {
+    recommendations.push(`Preparar ${highRiskCount} substitutos de reserva`);
+  }
+  return {
+    date: dateStr,
+    overallRisk,
+    assignments,
+    recommendations
+  };
+}
+
+// server/routes/insights.ts
+var router21 = Router21();
+router21.use(authenticateToken);
+router21.use(requireRole(["coordenador", "gestor"]));
+router21.get("/", async (req, res) => {
+  try {
+    const insights = await generatePredictiveInsights();
+    res.json(insights);
+  } catch (error) {
+    console.error("Error generating insights:", error);
+    res.status(500).json({ error: "Erro ao gerar insights preditivos" });
+  }
+});
+router21.get("/summary", async (req, res) => {
+  try {
+    const insights = await generatePredictiveInsights();
+    res.json({
+      generatedAt: insights.generatedAt,
+      summary: insights.summary,
+      recommendations: insights.recommendations.slice(0, 5)
+    });
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    res.status(500).json({ error: "Erro ao gerar resumo" });
+  }
+});
+router21.get("/ministers", async (req, res) => {
+  try {
+    const riskFilter = req.query.risk;
+    let profiles = await getMinisterRiskProfiles();
+    if (riskFilter && ["low", "medium", "high", "critical"].includes(riskFilter)) {
+      profiles = profiles.filter((p) => p.noShowRisk === riskFilter);
+    }
+    res.json({
+      total: profiles.length,
+      profiles
+    });
+  } catch (error) {
+    console.error("Error getting minister risks:", error);
+    res.status(500).json({ error: "Erro ao obter perfis de risco" });
+  }
+});
+router21.get("/ministers/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const profiles = await getMinisterRiskProfiles();
+    const profile = profiles.find((p) => p.ministerId === id);
+    if (!profile) {
+      return res.status(404).json({ error: "Ministro nao encontrado" });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error("Error getting minister profile:", error);
+    res.status(500).json({ error: "Erro ao obter perfil do ministro" });
+  }
+});
+router21.get("/time-slots", async (req, res) => {
+  try {
+    const insights = await getTimeSlotInsights();
+    const grouped = {
+      critical: insights.filter((i) => i.coverageStatus === "critical"),
+      warning: insights.filter((i) => i.coverageStatus === "warning"),
+      healthy: insights.filter((i) => i.coverageStatus === "healthy"),
+      excellent: insights.filter((i) => i.coverageStatus === "excellent")
+    };
+    res.json({
+      total: insights.length,
+      byStatus: grouped,
+      all: insights
+    });
+  } catch (error) {
+    console.error("Error getting time slot insights:", error);
+    res.status(500).json({ error: "Erro ao obter analise de horarios" });
+  }
+});
+router21.get("/substitutions", async (req, res) => {
+  try {
+    const patterns = await getSubstitutionPatterns();
+    const avgFrequency = patterns.length > 0 ? patterns.reduce((sum2, p) => sum2 + p.requestFrequency, 0) / patterns.length : 0;
+    const increasing = patterns.filter((p) => p.trend === "increasing").length;
+    const decreasing = patterns.filter((p) => p.trend === "decreasing").length;
+    res.json({
+      total: patterns.length,
+      summary: {
+        avgMonthlyFrequency: Math.round(avgFrequency * 10) / 10,
+        trendingUp: increasing,
+        trendingDown: decreasing
+      },
+      patterns
+    });
+  } catch (error) {
+    console.error("Error getting substitution patterns:", error);
+    res.status(500).json({ error: "Erro ao obter padroes de substituicao" });
+  }
+});
+router21.get("/seasonal", async (req, res) => {
+  try {
+    const patterns = await getSeasonalPatterns();
+    const highRiskMonths = patterns.filter((p) => p.isHighRisk).map((p) => p.monthName);
+    res.json({
+      patterns,
+      highRiskMonths,
+      currentMonth: (/* @__PURE__ */ new Date()).getMonth() + 1
+    });
+  } catch (error) {
+    console.error("Error getting seasonal patterns:", error);
+    res.status(500).json({ error: "Erro ao obter padroes sazonais" });
+  }
+});
+router21.get("/engagement", async (req, res) => {
+  try {
+    const trends = await getEngagementTrends();
+    const latestTrend = trends.length > 0 ? trends[trends.length - 1].trend : "stable";
+    res.json({
+      trends,
+      overallTrend: latestTrend,
+      periods: trends.length
+    });
+  } catch (error) {
+    console.error("Error getting engagement trends:", error);
+    res.status(500).json({ error: "Erro ao obter tendencias de engajamento" });
+  }
+});
+router21.get("/schedule-risk/:date", async (req, res) => {
+  try {
+    const { date: date2 } = req.params;
+    const dateObj = new Date(date2);
+    if (isNaN(dateObj.getTime())) {
+      return res.status(400).json({ error: "Data invalida" });
+    }
+    const assessment = await getScheduleRiskAssessment(dateObj);
+    res.json(assessment);
+  } catch (error) {
+    console.error("Error getting schedule risk:", error);
+    res.status(500).json({ error: "Erro ao avaliar risco da escala" });
+  }
+});
+router21.get("/recommendations", async (req, res) => {
+  try {
+    const insights = await generatePredictiveInsights();
+    const categorized = {
+      urgent: [],
+      shortTerm: [],
+      longTerm: []
+    };
+    for (const rec of insights.recommendations) {
+      if (rec.includes("urgente") || rec.includes("atencao") || rec.includes("critico")) {
+        categorized.urgent.push(rec);
+      } else if (rec.includes("proximo") || rec.includes("preparar")) {
+        categorized.shortTerm.push(rec);
+      } else {
+        categorized.longTerm.push(rec);
+      }
+    }
+    res.json({
+      total: insights.recommendations.length,
+      categorized,
+      all: insights.recommendations
+    });
+  } catch (error) {
+    console.error("Error getting recommendations:", error);
+    res.status(500).json({ error: "Erro ao obter recomendacoes" });
+  }
+});
+var insights_default = router21;
+
+// server/routes/materials.ts
+import { Router as Router22 } from "express";
+import multer2 from "multer";
+await init_db();
+init_schema();
+import { eq as eq31, desc as desc11, and as and23, ilike, or as or9, sql as sql19 } from "drizzle-orm";
+
+// server/services/aiContentAnalyzer.ts
+import Anthropic from "@anthropic-ai/sdk";
+var anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+async function analyzeTextContent(content, fileName, existingTitle) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("ANTHROPIC_API_KEY not configured, skipping AI analysis");
+    return {
+      success: false,
+      summary: "",
+      suggestedCategory: null,
+      suggestedTags: [],
+      keyTopics: [],
+      targetAudience: "Ministros da Eucaristia",
+      estimatedReadingMinutes: Math.ceil(content.length / 1500),
+      contentQuality: "needs_review",
+      qualityNotes: ["Analise automatica nao disponivel - API key nao configurada"],
+      error: "API key not configured"
+    };
+  }
+  try {
+    const systemPrompt = `Voce e um especialista em formacao de Ministros Extraordinarios da Sagrada Comunhao (MESC) da Igreja Catolica.
+Sua tarefa e analisar materiais de formacao e extrair informacoes estruturadas.
+
+Contexto:
+- Os materiais sao para formar ministros que distribuem a Eucaristia
+- As categorias sao: "liturgia" (normas, ritos, procedimentos), "espiritualidade" (oracao, vida interior, devocao), "pratica" (como fazer, situacoes praticas)
+- O publico sao adultos catolicos leigos que servem na paroquia
+- A qualidade do conteudo deve ser avaliada considerando precisao teologica, clareza e utilidade pratica
+
+Responda APENAS em JSON valido, sem texto adicional.`;
+    const userPrompt = `Analise o seguinte material de formacao e retorne um JSON com a estrutura exata abaixo:
+
+{
+  "summary": "Resumo de 2-3 frases do conteudo",
+  "suggestedTitle": "Titulo sugerido se o atual for inadequado, ou null",
+  "suggestedDescription": "Descricao de 1-2 frases para exibicao",
+  "suggestedCategory": "liturgia" | "espiritualidade" | "pratica",
+  "suggestedTags": ["array", "de", "tags", "relevantes"],
+  "keyTopics": ["topico1", "topico2", "topico3"],
+  "targetAudience": "Descricao do publico-alvo",
+  "estimatedReadingMinutes": numero_inteiro,
+  "contentQuality": "excellent" | "good" | "acceptable" | "needs_review",
+  "qualityNotes": ["Observacoes sobre a qualidade do conteudo"],
+  "quizQuestions": [
+    {
+      "question": "Pergunta sobre o conteudo?",
+      "options": ["Opcao A", "Opcao B", "Opcao C", "Opcao D"],
+      "correctIndex": 0,
+      "explanation": "Explicacao da resposta correta"
+    }
+  ]
+}
+
+Nome do arquivo: ${fileName}
+${existingTitle ? `Titulo atual: ${existingTitle}` : ""}
+
+Conteudo para analise:
+---
+${content.slice(0, 15e3)}
+${content.length > 15e3 ? "\n\n[Conteudo truncado - material muito extenso]" : ""}
+---`;
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2e3,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt
+        }
+      ],
+      system: systemPrompt
+    });
+    const textContent = response.content.find((block) => block.type === "text");
+    if (!textContent || textContent.type !== "text") {
+      throw new Error("No text response from Claude");
+    }
+    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Could not extract JSON from response");
+    }
+    const analysis = JSON.parse(jsonMatch[0]);
+    return {
+      success: true,
+      summary: analysis.summary || "",
+      suggestedTitle: analysis.suggestedTitle || void 0,
+      suggestedDescription: analysis.suggestedDescription || void 0,
+      suggestedCategory: analysis.suggestedCategory || null,
+      suggestedTags: analysis.suggestedTags || [],
+      keyTopics: analysis.keyTopics || [],
+      targetAudience: analysis.targetAudience || "Ministros da Eucaristia",
+      estimatedReadingMinutes: analysis.estimatedReadingMinutes || 10,
+      contentQuality: analysis.contentQuality || "needs_review",
+      qualityNotes: analysis.qualityNotes || [],
+      quizQuestions: analysis.quizQuestions || []
+    };
+  } catch (error) {
+    console.error("AI content analysis error:", error);
+    return {
+      success: false,
+      summary: "",
+      suggestedCategory: null,
+      suggestedTags: [],
+      keyTopics: [],
+      targetAudience: "Ministros da Eucaristia",
+      estimatedReadingMinutes: Math.ceil(content.length / 1500),
+      contentQuality: "needs_review",
+      qualityNotes: ["Erro na analise automatica"],
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+}
+async function extractTextFromPDF(buffer) {
+  const content = buffer.toString("latin1");
+  const textMatches = content.match(/\(([^)]+)\)/g);
+  if (textMatches) {
+    const text2 = textMatches.map((m) => m.slice(1, -1)).filter((t) => t.length > 2 && /[a-zA-Z]/.test(t)).join(" ");
+    if (text2.length > 100) {
+      return text2;
+    }
+  }
+  return "[Conteudo PDF - texto nao extraido automaticamente]";
+}
+async function analyzeUploadedContent(fileBuffer, fileName, mimeType, existingTitle) {
+  let textContent = "";
+  if (mimeType === "application/pdf") {
+    textContent = await extractTextFromPDF(fileBuffer);
+  } else if (mimeType.includes("text") || mimeType.includes("document") || mimeType.includes("word")) {
+    textContent = fileBuffer.toString("utf-8");
+    textContent = textContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ");
+  } else if (mimeType.startsWith("image/")) {
+    return {
+      success: true,
+      summary: "Imagem para formacao",
+      suggestedCategory: null,
+      suggestedTags: ["imagem", "visual"],
+      keyTopics: [],
+      targetAudience: "Ministros da Eucaristia",
+      estimatedReadingMinutes: 1,
+      contentQuality: "acceptable",
+      qualityNotes: ["Conteudo visual - analise de texto nao aplicavel"]
+    };
+  } else if (mimeType.startsWith("video/") || mimeType.startsWith("audio/")) {
+    return {
+      success: true,
+      summary: mimeType.startsWith("video/") ? "Video de formacao" : "Audio de formacao",
+      suggestedCategory: null,
+      suggestedTags: [mimeType.startsWith("video/") ? "video" : "audio"],
+      keyTopics: [],
+      targetAudience: "Ministros da Eucaristia",
+      estimatedReadingMinutes: 0,
+      contentQuality: "acceptable",
+      qualityNotes: ["Conteudo multimidia - analise de texto nao aplicavel"]
+    };
+  }
+  if (textContent && textContent.length > 50) {
+    return analyzeTextContent(textContent, fileName, existingTitle);
+  }
+  return {
+    success: false,
+    summary: "",
+    suggestedCategory: null,
+    suggestedTags: [],
+    keyTopics: [],
+    targetAudience: "Ministros da Eucaristia",
+    estimatedReadingMinutes: 0,
+    contentQuality: "needs_review",
+    qualityNotes: ["Nao foi possivel extrair texto para analise"],
+    error: "Could not extract text content"
+  };
+}
+async function generateQuizFromContent(content, numQuestions = 5) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return [];
+  }
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2e3,
+      messages: [
+        {
+          role: "user",
+          content: `Gere ${numQuestions} perguntas de quiz sobre o seguinte conteudo de formacao para Ministros da Eucaristia.
+
+Cada pergunta deve ter 4 opcoes, sendo apenas uma correta.
+Retorne APENAS um array JSON valido com a estrutura:
+[
+  {
+    "question": "Pergunta?",
+    "options": ["A", "B", "C", "D"],
+    "correctIndex": 0,
+    "explanation": "Explicacao"
+  }
+]
+
+Conteudo:
+${content.slice(0, 1e4)}`
+        }
+      ],
+      system: "Voce e um especialista em formacao catolica. Gere perguntas claras e relevantes para verificar a compreensao do conteudo."
+    });
+    const textContent = response.content.find((block) => block.type === "text");
+    if (!textContent || textContent.type !== "text") {
+      return [];
+    }
+    const jsonMatch = textContent.text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      return [];
+    }
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error("Quiz generation error:", error);
+    return [];
+  }
+}
+
+// server/routes/materials.ts
+var router22 = Router22();
+var upload2 = multer2({
+  storage: multer2.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+    // 10MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "audio/mpeg",
+      "audio/mp3",
+      "video/mp4",
+      "video/webm"
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Tipo de arquivo n\xE3o permitido: ${file.mimetype}`));
+    }
+  }
+});
+function getFileType(mimeType) {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "document";
+  if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "presentation";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return "other";
+}
+router22.use(authenticateToken);
+router22.get("/", async (req, res) => {
+  try {
+    const {
+      category,
+      trackId,
+      type,
+      search,
+      aiStatus,
+      aiQuality,
+      sortBy = "date",
+      sortOrder = "desc",
+      limit = "50",
+      offset = "0"
+    } = req.query;
+    const conditions = [eq31(formationMaterials.isActive, true)];
+    if (category && category !== "all") {
+      conditions.push(eq31(formationMaterials.category, category));
+    }
+    if (trackId) {
+      conditions.push(eq31(formationMaterials.trackId, trackId));
+    }
+    if (type && type !== "all") {
+      conditions.push(eq31(formationMaterials.type, type));
+    }
+    if (aiStatus === "analyzed") {
+      conditions.push(eq31(formationMaterials.aiAnalyzed, true));
+    } else if (aiStatus === "pending") {
+      conditions.push(or9(
+        eq31(formationMaterials.aiAnalyzed, false),
+        sql19`${formationMaterials.aiAnalyzed} IS NULL`
+      ));
+    }
+    if (aiQuality && aiQuality !== "all") {
+      conditions.push(eq31(formationMaterials.aiContentQuality, aiQuality));
+    }
+    if (search) {
+      conditions.push(
+        or9(
+          ilike(formationMaterials.title, `%${search}%`),
+          ilike(formationMaterials.description, `%${search}%`),
+          ilike(formationMaterials.aiSummary, `%${search}%`)
+        )
+      );
+    }
+    const userRole = req.user?.role;
+    if (userRole !== "coordenador" && userRole !== "gestor") {
+      conditions.push(eq31(formationMaterials.isPublished, true));
+    }
+    let orderByClause;
+    const isDesc = sortOrder === "desc";
+    switch (sortBy) {
+      case "title":
+        orderByClause = isDesc ? desc11(formationMaterials.title) : formationMaterials.title;
+        break;
+      case "downloads":
+        orderByClause = isDesc ? desc11(formationMaterials.downloadCount) : formationMaterials.downloadCount;
+        break;
+      case "quality":
+        orderByClause = isDesc ? desc11(formationMaterials.aiContentQuality) : formationMaterials.aiContentQuality;
+        break;
+      case "date":
+      default:
+        orderByClause = isDesc ? desc11(formationMaterials.createdAt) : formationMaterials.createdAt;
+    }
+    const materials = await db.select({
+      id: formationMaterials.id,
+      title: formationMaterials.title,
+      description: formationMaterials.description,
+      type: formationMaterials.type,
+      category: formationMaterials.category,
+      trackId: formationMaterials.trackId,
+      fileName: formationMaterials.fileName,
+      fileSize: formationMaterials.fileSize,
+      mimeType: formationMaterials.mimeType,
+      tags: formationMaterials.tags,
+      downloadCount: formationMaterials.downloadCount,
+      isPublished: formationMaterials.isPublished,
+      createdAt: formationMaterials.createdAt,
+      uploaderName: users.name,
+      aiAnalyzed: formationMaterials.aiAnalyzed,
+      aiContentQuality: formationMaterials.aiContentQuality,
+      aiSummary: formationMaterials.aiSummary,
+      aiKeyTopics: formationMaterials.aiKeyTopics
+    }).from(formationMaterials).leftJoin(users, eq31(formationMaterials.uploadedBy, users.id)).where(and23(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql19`count(*)` }).from(formationMaterials).where(and23(...conditions));
+    res.json({
+      materials,
+      total: countResult?.count || 0,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error("Error fetching materials:", error);
+    res.status(500).json({ error: "Erro ao buscar materiais" });
+  }
+});
+router22.get("/categories", async (req, res) => {
+  try {
+    const tracks = await db.select({
+      id: formationTracks.id,
+      title: formationTracks.title,
+      category: formationTracks.category
+    }).from(formationTracks).where(eq31(formationTracks.isActive, true));
+    res.json({ tracks });
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    res.status(500).json({ error: "Erro ao buscar categorias" });
+  }
+});
+router22.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [material] = await db.select({
+      id: formationMaterials.id,
+      title: formationMaterials.title,
+      description: formationMaterials.description,
+      type: formationMaterials.type,
+      category: formationMaterials.category,
+      trackId: formationMaterials.trackId,
+      fileName: formationMaterials.fileName,
+      fileSize: formationMaterials.fileSize,
+      mimeType: formationMaterials.mimeType,
+      externalUrl: formationMaterials.externalUrl,
+      tags: formationMaterials.tags,
+      downloadCount: formationMaterials.downloadCount,
+      isPublished: formationMaterials.isPublished,
+      createdAt: formationMaterials.createdAt,
+      uploaderName: users.name
+    }).from(formationMaterials).leftJoin(users, eq31(formationMaterials.uploadedBy, users.id)).where(and23(
+      eq31(formationMaterials.id, id),
+      eq31(formationMaterials.isActive, true)
+    ));
+    if (!material) {
+      return res.status(404).json({ error: "Material n\xE3o encontrado" });
+    }
+    if (req.user?.id) {
+      await db.insert(materialAccessLogs).values({
+        materialId: id,
+        userId: req.user.id,
+        action: "view"
+      });
+    }
+    res.json(material);
+  } catch (error) {
+    console.error("Error fetching material:", error);
+    res.status(500).json({ error: "Erro ao buscar material" });
+  }
+});
+router22.get("/:id/download", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [material] = await db.select().from(formationMaterials).where(and23(
+      eq31(formationMaterials.id, id),
+      eq31(formationMaterials.isActive, true)
+    ));
+    if (!material) {
+      return res.status(404).json({ error: "Material n\xE3o encontrado" });
+    }
+    if (material.externalUrl) {
+      if (req.user?.id) {
+        await db.insert(materialAccessLogs).values({
+          materialId: id,
+          userId: req.user.id,
+          action: "download"
+        });
+        await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq31(formationMaterials.id, id));
+      }
+      return res.redirect(material.externalUrl);
+    }
+    if (!material.fileData) {
+      return res.status(404).json({ error: "Arquivo n\xE3o encontrado" });
+    }
+    if (req.user?.id) {
+      await db.insert(materialAccessLogs).values({
+        materialId: id,
+        userId: req.user.id,
+        action: "download"
+      });
+      await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq31(formationMaterials.id, id));
+    }
+    const fileBuffer = Buffer.from(material.fileData, "base64");
+    res.set({
+      "Content-Type": material.mimeType,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(material.fileName)}"`,
+      "Content-Length": fileBuffer.length.toString()
+    });
+    res.send(fileBuffer);
+  } catch (error) {
+    console.error("Error downloading material:", error);
+    res.status(500).json({ error: "Erro ao baixar material" });
+  }
+});
+router22.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, upload2.single("file"), async (req, res) => {
+  try {
+    const { title, description, category, trackId, tags, externalUrl, isPublished } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: "T\xEDtulo \xE9 obrigat\xF3rio" });
+    }
+    if (!req.file && !externalUrl) {
+      return res.status(400).json({ error: "Arquivo ou URL externa \xE9 obrigat\xF3rio" });
+    }
+    let fileData;
+    let fileName = "external-link";
+    let fileSize = 0;
+    let mimeType = "text/html";
+    let fileType = "other";
+    if (req.file) {
+      fileData = req.file.buffer.toString("base64");
+      fileName = req.file.originalname;
+      fileSize = req.file.size;
+      mimeType = req.file.mimetype;
+      fileType = getFileType(mimeType);
+    } else if (externalUrl) {
+      fileName = title;
+      fileType = "other";
+    }
+    const parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags || [];
+    const [material] = await db.insert(formationMaterials).values({
+      title,
+      description: description || null,
+      type: fileType,
+      category: category || null,
+      trackId: trackId || null,
+      fileName,
+      fileSize,
+      mimeType,
+      fileData: fileData || null,
+      externalUrl: externalUrl || null,
+      tags: parsedTags,
+      uploadedBy: req.user.id,
+      isPublished: isPublished === "true" || isPublished === true
+    }).returning();
+    if (req.file && process.env.ANTHROPIC_API_KEY) {
+      analyzeUploadedContent(req.file.buffer, fileName, mimeType, title).then(async (analysis) => {
+        if (analysis.success) {
+          await db.update(formationMaterials).set({
+            aiAnalyzed: true,
+            aiSummary: analysis.summary,
+            aiSuggestedCategory: analysis.suggestedCategory,
+            aiSuggestedTags: analysis.suggestedTags,
+            aiKeyTopics: analysis.keyTopics,
+            aiContentQuality: analysis.contentQuality,
+            aiQualityNotes: analysis.qualityNotes,
+            aiQuizQuestions: analysis.quizQuestions,
+            aiAnalyzedAt: /* @__PURE__ */ new Date(),
+            // Auto-apply suggestions if no category was set
+            category: category || analysis.suggestedCategory,
+            tags: parsedTags.length > 0 ? parsedTags : analysis.suggestedTags,
+            description: description || analysis.suggestedDescription || analysis.summary
+          }).where(eq31(formationMaterials.id, material.id));
+          console.log(`AI analysis completed for material ${material.id}`);
+        }
+      }).catch((err) => {
+        console.error(`AI analysis failed for material ${material.id}:`, err);
+      });
+    }
+    res.status(201).json({
+      id: material.id,
+      title: material.title,
+      type: material.type,
+      fileName: material.fileName,
+      fileSize: material.fileSize,
+      createdAt: material.createdAt,
+      aiAnalysisPending: !!req.file && !!process.env.ANTHROPIC_API_KEY
+    });
+  } catch (error) {
+    console.error("Error uploading material:", error);
+    res.status(500).json({ error: "Erro ao enviar material" });
+  }
+});
+router22.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, category, trackId, tags, isPublished } = req.body;
+    const updateData = {
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    if (title !== void 0) updateData.title = title;
+    if (description !== void 0) updateData.description = description;
+    if (category !== void 0) updateData.category = category || null;
+    if (trackId !== void 0) updateData.trackId = trackId || null;
+    if (tags !== void 0) updateData.tags = typeof tags === "string" ? JSON.parse(tags) : tags;
+    if (isPublished !== void 0) updateData.isPublished = isPublished;
+    const [material] = await db.update(formationMaterials).set(updateData).where(eq31(formationMaterials.id, id)).returning();
+    if (!material) {
+      return res.status(404).json({ error: "Material n\xE3o encontrado" });
+    }
+    res.json(material);
+  } catch (error) {
+    console.error("Error updating material:", error);
+    res.status(500).json({ error: "Erro ao atualizar material" });
+  }
+});
+router22.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [material] = await db.update(formationMaterials).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationMaterials.id, id)).returning();
+    if (!material) {
+      return res.status(404).json({ error: "Material n\xE3o encontrado" });
+    }
+    res.json({ message: "Material removido com sucesso" });
+  } catch (error) {
+    console.error("Error deleting material:", error);
+    res.status(500).json({ error: "Erro ao remover material" });
+  }
+});
+router22.get("/stats/overview", async (req, res) => {
+  try {
+    const [totalResult] = await db.select({ count: sql19`count(*)` }).from(formationMaterials).where(eq31(formationMaterials.isActive, true));
+    const typeStats = await db.select({
+      type: formationMaterials.type,
+      count: sql19`count(*)`
+    }).from(formationMaterials).where(eq31(formationMaterials.isActive, true)).groupBy(formationMaterials.type);
+    const categoryStats = await db.select({
+      category: formationMaterials.category,
+      count: sql19`count(*)`
+    }).from(formationMaterials).where(eq31(formationMaterials.isActive, true)).groupBy(formationMaterials.category);
+    const [aiAnalyzedResult] = await db.select({ count: sql19`count(*)` }).from(formationMaterials).where(and23(
+      eq31(formationMaterials.isActive, true),
+      eq31(formationMaterials.aiAnalyzed, true)
+    ));
+    const qualityStats = await db.select({
+      quality: formationMaterials.aiContentQuality,
+      count: sql19`count(*)`
+    }).from(formationMaterials).where(and23(
+      eq31(formationMaterials.isActive, true),
+      eq31(formationMaterials.aiAnalyzed, true)
+    )).groupBy(formationMaterials.aiContentQuality);
+    const [downloadResult] = await db.select({ total: sql19`coalesce(sum(download_count), 0)` }).from(formationMaterials).where(eq31(formationMaterials.isActive, true));
+    const [sizeResult] = await db.select({ total: sql19`coalesce(sum(file_size), 0)` }).from(formationMaterials).where(eq31(formationMaterials.isActive, true));
+    const topMaterials = await db.select({
+      id: formationMaterials.id,
+      title: formationMaterials.title,
+      type: formationMaterials.type,
+      category: formationMaterials.category,
+      downloadCount: formationMaterials.downloadCount,
+      aiContentQuality: formationMaterials.aiContentQuality
+    }).from(formationMaterials).where(eq31(formationMaterials.isActive, true)).orderBy(desc11(formationMaterials.downloadCount)).limit(5);
+    const recentMaterials = await db.select({
+      id: formationMaterials.id,
+      title: formationMaterials.title,
+      type: formationMaterials.type,
+      category: formationMaterials.category,
+      createdAt: formationMaterials.createdAt,
+      aiContentQuality: formationMaterials.aiContentQuality
+    }).from(formationMaterials).where(eq31(formationMaterials.isActive, true)).orderBy(desc11(formationMaterials.createdAt)).limit(5);
+    res.json({
+      totalMaterials: totalResult?.count || 0,
+      totalDownloads: downloadResult?.total || 0,
+      totalSize: sizeResult?.total || 0,
+      aiAnalyzed: aiAnalyzedResult?.count || 0,
+      byType: typeStats,
+      byCategory: categoryStats,
+      byQuality: qualityStats,
+      topMaterials,
+      recentMaterials
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Erro ao buscar estat\xEDsticas" });
+  }
+});
+router22.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: "Servico de IA nao configurado" });
+    }
+    const [material] = await db.select().from(formationMaterials).where(eq31(formationMaterials.id, id));
+    if (!material) {
+      return res.status(404).json({ error: "Material nao encontrado" });
+    }
+    if (!material.fileData) {
+      return res.status(400).json({ error: "Material nao possui arquivo para analise" });
+    }
+    const fileBuffer = Buffer.from(material.fileData, "base64");
+    const analysis = await analyzeUploadedContent(
+      fileBuffer,
+      material.fileName,
+      material.mimeType,
+      material.title
+    );
+    if (!analysis.success) {
+      return res.status(500).json({ error: analysis.error || "Falha na analise" });
+    }
+    await db.update(formationMaterials).set({
+      aiAnalyzed: true,
+      aiSummary: analysis.summary,
+      aiSuggestedCategory: analysis.suggestedCategory,
+      aiSuggestedTags: analysis.suggestedTags,
+      aiKeyTopics: analysis.keyTopics,
+      aiContentQuality: analysis.contentQuality,
+      aiQualityNotes: analysis.qualityNotes,
+      aiQuizQuestions: analysis.quizQuestions,
+      aiAnalyzedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq31(formationMaterials.id, id));
+    res.json({
+      success: true,
+      analysis: {
+        summary: analysis.summary,
+        suggestedCategory: analysis.suggestedCategory,
+        suggestedTags: analysis.suggestedTags,
+        keyTopics: analysis.keyTopics,
+        contentQuality: analysis.contentQuality,
+        qualityNotes: analysis.qualityNotes,
+        quizQuestions: analysis.quizQuestions?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error("Error analyzing material:", error);
+    res.status(500).json({ error: "Erro ao analisar material" });
+  }
+});
+router22.get("/:id/analysis", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [material] = await db.select({
+      id: formationMaterials.id,
+      title: formationMaterials.title,
+      aiAnalyzed: formationMaterials.aiAnalyzed,
+      aiSummary: formationMaterials.aiSummary,
+      aiSuggestedCategory: formationMaterials.aiSuggestedCategory,
+      aiSuggestedTags: formationMaterials.aiSuggestedTags,
+      aiKeyTopics: formationMaterials.aiKeyTopics,
+      aiContentQuality: formationMaterials.aiContentQuality,
+      aiQualityNotes: formationMaterials.aiQualityNotes,
+      aiQuizQuestions: formationMaterials.aiQuizQuestions,
+      aiAnalyzedAt: formationMaterials.aiAnalyzedAt
+    }).from(formationMaterials).where(eq31(formationMaterials.id, id));
+    if (!material) {
+      return res.status(404).json({ error: "Material nao encontrado" });
+    }
+    if (!material.aiAnalyzed) {
+      return res.json({
+        analyzed: false,
+        message: "Material ainda nao foi analisado pela IA"
+      });
+    }
+    res.json({
+      analyzed: true,
+      summary: material.aiSummary,
+      suggestedCategory: material.aiSuggestedCategory,
+      suggestedTags: material.aiSuggestedTags,
+      keyTopics: material.aiKeyTopics,
+      contentQuality: material.aiContentQuality,
+      qualityNotes: material.aiQualityNotes,
+      quizQuestions: material.aiQuizQuestions,
+      analyzedAt: material.aiAnalyzedAt
+    });
+  } catch (error) {
+    console.error("Error fetching analysis:", error);
+    res.status(500).json({ error: "Erro ao buscar analise" });
+  }
+});
+router22.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { applyCategory, applyTags, applyDescription } = req.body;
+    const [material] = await db.select().from(formationMaterials).where(eq31(formationMaterials.id, id));
+    if (!material) {
+      return res.status(404).json({ error: "Material nao encontrado" });
+    }
+    if (!material.aiAnalyzed) {
+      return res.status(400).json({ error: "Material ainda nao foi analisado" });
+    }
+    const updates = { updatedAt: /* @__PURE__ */ new Date() };
+    if (applyCategory && material.aiSuggestedCategory) {
+      updates.category = material.aiSuggestedCategory;
+    }
+    if (applyTags && material.aiSuggestedTags) {
+      updates.tags = material.aiSuggestedTags;
+    }
+    if (applyDescription && material.aiSummary) {
+      updates.description = material.aiSummary;
+    }
+    await db.update(formationMaterials).set(updates).where(eq31(formationMaterials.id, id));
+    res.json({ success: true, appliedUpdates: Object.keys(updates).filter((k) => k !== "updatedAt") });
+  } catch (error) {
+    console.error("Error applying suggestions:", error);
+    res.status(500).json({ error: "Erro ao aplicar sugestoes" });
+  }
+});
+router22.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { numQuestions = 5 } = req.body;
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: "Servico de IA nao configurado" });
+    }
+    const [material] = await db.select().from(formationMaterials).where(eq31(formationMaterials.id, id));
+    if (!material) {
+      return res.status(404).json({ error: "Material nao encontrado" });
+    }
+    if (!material.fileData) {
+      return res.status(400).json({ error: "Material nao possui conteudo para gerar quiz" });
+    }
+    const fileBuffer = Buffer.from(material.fileData, "base64");
+    const textContent = fileBuffer.toString("utf-8").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ");
+    if (textContent.length < 100) {
+      return res.status(400).json({ error: "Conteudo insuficiente para gerar quiz" });
+    }
+    const questions = await generateQuizFromContent(textContent, numQuestions);
+    if (questions.length === 0) {
+      return res.status(500).json({ error: "Nao foi possivel gerar perguntas" });
+    }
+    await db.update(formationMaterials).set({
+      aiQuizQuestions: questions,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq31(formationMaterials.id, id));
+    res.json({
+      success: true,
+      questionsGenerated: questions.length,
+      questions
+    });
+  } catch (error) {
+    console.error("Error generating quiz:", error);
+    res.status(500).json({ error: "Erro ao gerar quiz" });
+  }
+});
+router22.get("/my-progress", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const accessedMaterials = await db.select({
+      materialId: materialAccessLogs.materialId,
+      action: materialAccessLogs.action,
+      accessedAt: materialAccessLogs.accessedAt
+    }).from(materialAccessLogs).where(eq31(materialAccessLogs.userId, userId)).orderBy(desc11(materialAccessLogs.accessedAt));
+    const materialAccess = /* @__PURE__ */ new Map();
+    for (const log2 of accessedMaterials) {
+      if (!materialAccess.has(log2.materialId)) {
+        materialAccess.set(log2.materialId, { views: 0, downloads: 0, completed: false, lastAccess: log2.accessedAt });
+      }
+      const access = materialAccess.get(log2.materialId);
+      if (log2.action === "view") access.views++;
+      if (log2.action === "download") access.downloads++;
+      if (log2.action === "completed") access.completed = true;
+    }
+    const [totalResult] = await db.select({ count: sql19`count(*)` }).from(formationMaterials).where(and23(
+      eq31(formationMaterials.isActive, true),
+      eq31(formationMaterials.isPublished, true)
+    ));
+    const totalMaterials = totalResult?.count || 0;
+    const accessedCount = materialAccess.size;
+    const completedCount = Array.from(materialAccess.values()).filter((a) => a.completed).length;
+    res.json({
+      totalMaterials,
+      accessed: accessedCount,
+      completed: completedCount,
+      progressPercent: totalMaterials > 0 ? Math.round(completedCount / totalMaterials * 100) : 0,
+      materials: Object.fromEntries(materialAccess)
+    });
+  } catch (error) {
+    console.error("Error fetching progress:", error);
+    res.status(500).json({ error: "Erro ao buscar progresso" });
+  }
+});
+router22.post("/:id/mark-completed", csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const [material] = await db.select({ id: formationMaterials.id }).from(formationMaterials).where(eq31(formationMaterials.id, id));
+    if (!material) {
+      return res.status(404).json({ error: "Material nao encontrado" });
+    }
+    await db.insert(materialAccessLogs).values({
+      materialId: id,
+      userId,
+      action: "completed"
+    });
+    res.json({ success: true, message: "Material marcado como concluido" });
+  } catch (error) {
+    console.error("Error marking completed:", error);
+    res.status(500).json({ error: "Erro ao marcar como concluido" });
+  }
+});
+router22.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    await db.delete(materialAccessLogs).where(and23(
+      eq31(materialAccessLogs.materialId, id),
+      eq31(materialAccessLogs.userId, userId),
+      eq31(materialAccessLogs.action, "completed")
+    ));
+    res.json({ success: true, message: "Marcacao removida" });
+  } catch (error) {
+    console.error("Error removing completion:", error);
+    res.status(500).json({ error: "Erro ao remover marcacao" });
+  }
+});
+var materials_default = router22;
+
 // server/routes/whatsapp-api.ts
 await init_db();
 init_schema();
-import { Router as Router20 } from "express";
-import { eq as eq29, and as and21, gte as gte15, desc as desc10, asc as asc3 } from "drizzle-orm";
-import { sql as sql17 } from "drizzle-orm";
-var router20 = Router20();
+import { Router as Router23 } from "express";
+import { eq as eq33, and as and25, gte as gte17, desc as desc12, asc as asc4 } from "drizzle-orm";
+import { sql as sql20 } from "drizzle-orm";
+function getErrorMessage9(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+var router23 = Router23();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
   const validApiKey = process.env.WHATSAPP_API_KEY;
@@ -16334,7 +21537,7 @@ var authenticateAPIKey = (req, res, next) => {
   }
   next();
 };
-router20.get("/health", (req, res) => {
+router23.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "MESC WhatsApp API",
@@ -16343,7 +21546,7 @@ router20.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router20.get("/webhook", (req, res) => {
+router23.get("/webhook", (req, res) => {
   res.json({
     status: "ok",
     message: "Webhook WhatsApp MESC est\xE1 ativo",
@@ -16354,7 +21557,7 @@ router20.get("/webhook", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router20.post("/webhook", async (req, res) => {
+router23.post("/webhook", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
   try {
     const message = req.body;
@@ -16368,7 +21571,7 @@ router20.post("/webhook", async (req, res) => {
     res.sendStatus(200);
   }
 });
-router20.use(authenticateAPIKey);
+router23.use(authenticateAPIKey);
 function normalizePhone(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
 }
@@ -16385,7 +21588,7 @@ function getPositionName(position) {
   };
   return positions[position] || `Posi\xE7\xE3o ${position}`;
 }
-function formatDateBR(dateStr) {
+function formatDateBR2(dateStr) {
   const date2 = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
   return date2.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -16401,7 +21604,7 @@ function getDayOfWeek(dateStr) {
   const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
   return days[date2.getDay()];
 }
-router20.post("/escala", async (req, res) => {
+router23.post("/escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, data } = req.body;
@@ -16415,7 +21618,7 @@ router20.post("/escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala] Telefone normalizado:", normalizedPhone, "| Data:", data);
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16428,9 +21631,9 @@ router20.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and21(
-        eq29(schedules.ministerId, minister[0].id),
-        eq29(schedules.date, data)
+      and25(
+        eq33(schedules.ministerId, minister[0].id),
+        eq33(schedules.date, data)
       )
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
@@ -16438,14 +21641,14 @@ router20.post("/escala", async (req, res) => {
       console.log("\u26A0\uFE0F [WHATSAPP_API /escala] Nenhuma escala encontrada para esta data");
       return res.json({
         encontrado: false,
-        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR(data)}.`
+        mensagem: `Ol\xE1 ${minister[0].name}! Voc\xEA n\xE3o est\xE1 escalado para o dia ${formatDateBR2(data)}.`
       });
     }
     const s = schedule[0];
     const responseData = {
       encontrado: true,
       ministro: minister[0].name,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
       funcao: getPositionName(s.position || 0),
@@ -16457,10 +21660,10 @@ router20.post("/escala", async (req, res) => {
     return res.json(responseData);
   } catch (err) {
     console.error("\u274C [WHATSAPP_API /escala] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/proximas", async (req, res) => {
+router23.post("/proximas", async (req, res) => {
   try {
     const { telefone } = req.body;
     if (!telefone) {
@@ -16470,7 +21673,7 @@ router20.post("/proximas", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -16481,11 +21684,11 @@ router20.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and21(
-        eq29(schedules.ministerId, minister[0].id),
-        gte15(schedules.date, today)
+      and25(
+        eq33(schedules.ministerId, minister[0].id),
+        gte17(schedules.date, today)
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(3);
+    ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(3);
     if (!upcomingSchedules || upcomingSchedules.length === 0) {
       return res.json({
         encontrado: true,
@@ -16495,7 +21698,7 @@ router20.post("/proximas", async (req, res) => {
       });
     }
     const missas = upcomingSchedules.map((s) => ({
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
       funcao: getPositionName(s.position || 0),
@@ -16511,10 +21714,10 @@ router20.post("/proximas", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /proximas:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/colegas", async (req, res) => {
+router23.post("/colegas", async (req, res) => {
   try {
     const { data, horario } = req.body;
     if (!data || !horario) {
@@ -16532,16 +21735,16 @@ router20.post("/colegas", async (req, res) => {
       scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
-    }).from(schedules).innerJoin(users, eq29(schedules.ministerId, users.id)).where(
-      and21(
-        eq29(schedules.date, data),
-        eq29(schedules.time, normalizedTime)
+    }).from(schedules).innerJoin(users, eq33(schedules.ministerId, users.id)).where(
+      and25(
+        eq33(schedules.date, data),
+        eq33(schedules.time, normalizedTime)
       )
-    ).orderBy(asc3(schedules.position));
+    ).orderBy(asc4(schedules.position));
     if (!ministersInMass || ministersInMass.length === 0) {
       return res.json({
         encontrado: false,
-        mensagem: `Nenhum ministro escalado para ${formatDateBR(data)} \xE0s ${formatTime(normalizedTime)}.`
+        mensagem: `Nenhum ministro escalado para ${formatDateBR2(data)} \xE0s ${formatTime(normalizedTime)}.`
       });
     }
     const colegas = ministersInMass.map((m) => ({
@@ -16552,7 +21755,7 @@ router20.post("/colegas", async (req, res) => {
     }));
     return res.json({
       encontrado: true,
-      data: formatDateBR(data),
+      data: formatDateBR2(data),
       diaSemana: getDayOfWeek(data),
       horario: formatTime(normalizedTime),
       totalMinistros: colegas.length,
@@ -16560,10 +21763,10 @@ router20.post("/colegas", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /colegas:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.get("/substituicoes-abertas", async (req, res) => {
+router23.get("/substituicoes-abertas", async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 5, 20);
     const openSubstitutions = await db.select({
@@ -16578,7 +21781,7 @@ router20.get("/substituicoes-abertas", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       createdAt: substitutionRequests.createdAt
-    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(eq29(substitutionRequests.status, "available")).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(limite);
+    }).from(substitutionRequests).innerJoin(schedules, eq33(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq33(substitutionRequests.requesterId, users.id)).where(eq33(substitutionRequests.status, "available")).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(limite);
     if (!openSubstitutions || openSubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -16589,7 +21792,7 @@ router20.get("/substituicoes-abertas", async (req, res) => {
     }
     const vagas = openSubstitutions.map((s) => ({
       id: s.substitutionId,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
       funcao: getPositionName(s.position || 0),
@@ -16607,10 +21810,10 @@ router20.get("/substituicoes-abertas", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /substituicoes-abertas:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/aceitar-substituicao", async (req, res) => {
+router23.post("/aceitar-substituicao", async (req, res) => {
   try {
     const { telefone, id_substituicao, mensagem } = req.body;
     if (!telefone || !id_substituicao) {
@@ -16620,7 +21823,7 @@ router20.post("/aceitar-substituicao", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const substitute = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!substitute || substitute.length === 0) {
@@ -16638,7 +21841,7 @@ router20.post("/aceitar-substituicao", async (req, res) => {
       time: schedules.time,
       position: schedules.position,
       requesterName: users.name
-    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(eq29(substitutionRequests.id, id_substituicao)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq33(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq33(substitutionRequests.requesterId, users.id)).where(eq33(substitutionRequests.id, id_substituicao)).limit(1);
     if (!substitution || substitution.length === 0) {
       return res.json({
         sucesso: false,
@@ -16662,11 +21865,11 @@ router20.post("/aceitar-substituicao", async (req, res) => {
       substituteId: substitute[0].id,
       status: "pending",
       responseMessage: mensagem || `Aceito via WhatsApp por ${substitute[0].name}`
-    }).where(eq29(substitutionRequests.id, id_substituicao));
+    }).where(eq33(substitutionRequests.id, id_substituicao));
     return res.json({
       sucesso: true,
       substituto: substitute[0].name,
-      data: formatDateBR(sub.date),
+      data: formatDateBR2(sub.date),
       diaSemana: getDayOfWeek(sub.date),
       horario: formatTime(sub.time),
       funcao: getPositionName(sub.position || 0),
@@ -16676,10 +21879,10 @@ router20.post("/aceitar-substituicao", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /aceitar-substituicao:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/minhas-substituicoes", async (req, res) => {
+router23.post("/minhas-substituicoes", async (req, res) => {
   try {
     const { telefone, tipo = "todas" } = req.body;
     if (!telefone) {
@@ -16689,7 +21892,7 @@ router20.post("/minhas-substituicoes", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -16700,11 +21903,11 @@ router20.post("/minhas-substituicoes", async (req, res) => {
     }
     let whereCondition;
     if (tipo === "solicitadas") {
-      whereCondition = eq29(substitutionRequests.requesterId, minister[0].id);
+      whereCondition = eq33(substitutionRequests.requesterId, minister[0].id);
     } else if (tipo === "aceitas") {
-      whereCondition = eq29(substitutionRequests.substituteId, minister[0].id);
+      whereCondition = eq33(substitutionRequests.substituteId, minister[0].id);
     } else {
-      whereCondition = sql17`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
+      whereCondition = sql20`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
     }
     const mySubstitutions = await db.select({
       substitutionId: substitutionRequests.id,
@@ -16717,7 +21920,7 @@ router20.post("/minhas-substituicoes", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       responseMessage: substitutionRequests.responseMessage
-    }).from(substitutionRequests).innerJoin(schedules, eq29(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq29(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc10(schedules.date), desc10(schedules.time)).limit(10);
+    }).from(substitutionRequests).innerJoin(schedules, eq33(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq33(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc12(schedules.date), desc12(schedules.time)).limit(10);
     if (!mySubstitutions || mySubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -16728,7 +21931,7 @@ router20.post("/minhas-substituicoes", async (req, res) => {
     }
     const substituicoes = mySubstitutions.map((s) => ({
       id: s.substitutionId,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
       funcao: getPositionName(s.position || 0),
@@ -16747,10 +21950,10 @@ router20.post("/minhas-substituicoes", async (req, res) => {
     });
   } catch (err) {
     console.error("[WHATSAPP_API] Erro em /minhas-substituicoes:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/proxima-escala", async (req, res) => {
+router23.post("/proxima-escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /proxima-escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone } = req.body;
@@ -16764,7 +21967,7 @@ router20.post("/proxima-escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /proxima-escala] Telefone normalizado:", normalizedPhone);
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16780,12 +21983,12 @@ router20.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and21(
-        eq29(schedules.ministerId, minister[0].id),
-        gte15(schedules.date, today)
+      and25(
+        eq33(schedules.ministerId, minister[0].id),
+        gte17(schedules.date, today)
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
-    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
+    ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(1);
+    console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR2(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
     if (!nextSchedule || nextSchedule.length === 0) {
       console.log("\u26A0\uFE0F [WHATSAPP_API /proxima-escala] Nenhuma escala futura encontrada");
       return res.json({
@@ -16802,7 +22005,7 @@ router20.post("/proxima-escala", async (req, res) => {
       ministro: minister[0].name,
       escala: {
         date: s.date,
-        data: formatDateBR(s.date),
+        data: formatDateBR2(s.date),
         diaSemana: getDayOfWeek(s.date),
         horario: formatTime(s.time),
         posicao: s.position || 0,
@@ -16816,10 +22019,10 @@ router20.post("/proxima-escala", async (req, res) => {
     return res.json(responseData);
   } catch (err) {
     console.error("\u274C [WHATSAPP_API /proxima-escala] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router20.post("/escala-mes", async (req, res) => {
+router23.post("/escala-mes", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala-mes] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, mes, ano } = req.body;
@@ -16839,7 +22042,7 @@ router20.post("/escala-mes", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala-mes] Telefone normalizado:", normalizedPhone, "| M\xEAs:", mes, "| Ano:", ano);
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql17`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql20`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -16854,16 +22057,16 @@ router20.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and21(
-        eq29(schedules.ministerId, minister[0].id),
-        sql17`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
-        sql17`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
+      and25(
+        eq33(schedules.ministerId, minister[0].id),
+        sql20`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
+        sql20`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
       )
-    ).orderBy(asc3(schedules.date), asc3(schedules.time));
+    ).orderBy(asc4(schedules.date), asc4(schedules.time));
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
     const escalas = monthSchedules.map((s) => ({
       date: s.date,
-      data: formatDateBR(s.date),
+      data: formatDateBR2(s.date),
       diaSemana: getDayOfWeek(s.date),
       horario: formatTime(s.time),
       posicao: s.position || 0,
@@ -16900,18 +22103,18 @@ router20.post("/escala-mes", async (req, res) => {
     return res.json(responseData);
   } catch (err) {
     console.error("\u274C [WHATSAPP_API /escala-mes] Erro interno:", err);
-    return res.status(500).json({ erro: err.message });
+    return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-var whatsapp_api_default = router20;
+var whatsapp_api_default = router23;
 
 // server/routes/metrics.ts
-import { Router as Router21 } from "express";
+import { Router as Router24 } from "express";
 await init_db();
 init_schema();
-import { eq as eq30, count as count7, gte as gte16 } from "drizzle-orm";
+import { eq as eq34, count as count9, gte as gte18 } from "drizzle-orm";
 import os from "os";
-var router21 = Router21();
+var router24 = Router24();
 var metrics = {
   total: 0,
   success: 0,
@@ -16968,21 +22171,21 @@ function updateMetrics(statusCode, responseTime, route, method, errorMessage) {
     metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;
   }
 }
-router21.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router24.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    const [usersCount] = await db.select({ count: count7() }).from(users);
-    const [activeUsersCount] = await db.select({ count: count7() }).from(users).where(eq30(users.status, "active"));
-    const [schedulesCount] = await db.select({ count: count7() }).from(schedules);
-    const [publishedSchedulesCount] = await db.select({ count: count7() }).from(schedules).where(eq30(schedules.status, "published"));
-    const [responsesCount] = await db.select({ count: count7() }).from(questionnaireResponses);
-    const [substitutionsCount] = await db.select({ count: count7() }).from(substitutionRequests);
-    const [pendingSubstitutions] = await db.select({ count: count7() }).from(substitutionRequests).where(eq30(substitutionRequests.status, "pending"));
+    const [usersCount] = await db.select({ count: count9() }).from(users);
+    const [activeUsersCount] = await db.select({ count: count9() }).from(users).where(eq34(users.status, "active"));
+    const [schedulesCount] = await db.select({ count: count9() }).from(schedules);
+    const [publishedSchedulesCount] = await db.select({ count: count9() }).from(schedules).where(eq34(schedules.status, "published"));
+    const [responsesCount] = await db.select({ count: count9() }).from(questionnaireResponses);
+    const [substitutionsCount] = await db.select({ count: count9() }).from(substitutionRequests);
+    const [pendingSubstitutions] = await db.select({ count: count9() }).from(substitutionRequests).where(eq34(substitutionRequests.status, "pending"));
     const thirtyDaysAgo = /* @__PURE__ */ new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const [recentUsersCount] = await db.select({ count: count7() }).from(users).where(gte16(users.createdAt, thirtyDaysAgo));
+    const [recentUsersCount] = await db.select({ count: count9() }).from(users).where(gte18(users.createdAt, thirtyDaysAgo));
     const sortedTimes = [...metrics.responseTimes].sort((a, b) => a - b);
     const p50 = sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0;
     const p95 = sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0;
@@ -17057,7 +22260,7 @@ router21.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
-router21.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router24.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const errors = [...metrics.errorLogs].reverse().map((error) => ({
       ...error,
@@ -17072,7 +22275,7 @@ router21.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch error logs" });
   }
 });
-router21.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router24.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const routes = Array.from(metrics.routeStats.entries()).map(([route, stats]) => ({
       route,
@@ -17091,7 +22294,7 @@ router21.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch slow routes" });
   }
 });
-router21.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router24.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   metrics.total = 0;
   metrics.success = 0;
   metrics.errors = 0;
@@ -17102,7 +22305,7 @@ router21.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, 
   metrics.lastReset = /* @__PURE__ */ new Date();
   res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
 });
-router21.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router24.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
     const cacheStats = scheduleCache.getStats();
     scheduleCache.clear();
@@ -17132,15 +22335,15 @@ function formatUptime(seconds) {
   parts.push(`${secs}s`);
   return parts.join(" ");
 }
-var metrics_default = router21;
+var metrics_default = router24;
 
 // server/routes/reliabilityMetrics.ts
-import { Router as Router22 } from "express";
+import { Router as Router25 } from "express";
 await init_db();
 init_schema();
-import { eq as eq31 } from "drizzle-orm";
-var router22 = Router22();
-router22.get(
+import { eq as eq35 } from "drizzle-orm";
+var router25 = Router25();
+router25.get(
   "/metrics",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17168,7 +22371,7 @@ router22.get(
     }
   }
 );
-router22.get(
+router25.get(
   "/low",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17197,7 +22400,7 @@ router22.get(
     }
   }
 );
-router22.get(
+router25.get(
   "/minister/:ministerId",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17230,7 +22433,7 @@ router22.get(
     }
   }
 );
-router22.post(
+router25.post(
   "/minister/:ministerId/recalculate",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17258,7 +22461,7 @@ router22.post(
     }
   }
 );
-router22.post(
+router25.post(
   "/minister/:ministerId/reset",
   authenticateToken,
   requireRole(["gestor"]),
@@ -17266,7 +22469,7 @@ router22.post(
     try {
       const { ministerId } = req.params;
       const { reason } = req.body;
-      const minister = await db.select().from(users).where(eq31(users.id, ministerId)).limit(1);
+      const minister = await db.select().from(users).where(eq35(users.id, ministerId)).limit(1);
       if (minister.length === 0) {
         return res.status(404).json({
           success: false,
@@ -17281,7 +22484,7 @@ router22.post(
         noShowCount: 0,
         lastReliabilityUpdate: /* @__PURE__ */ new Date(),
         reliabilityNotes: reason ? `Reset em ${(/* @__PURE__ */ new Date()).toISOString()} - Motivo: ${reason}` : `Reset em ${(/* @__PURE__ */ new Date()).toISOString()}`
-      }).where(eq31(users.id, ministerId)).returning();
+      }).where(eq35(users.id, ministerId)).returning();
       console.log(
         `[RELIABILITY API] \u267B\uFE0F Reset reliability for ${minister[0].name} by user ${req.user?.id}`
       );
@@ -17306,7 +22509,7 @@ router22.post(
     }
   }
 );
-router22.post(
+router25.post(
   "/minister/:ministerId/note",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17320,7 +22523,7 @@ router22.post(
           message: "Nota \xE9 obrigat\xF3ria"
         });
       }
-      const minister = await db.select().from(users).where(eq31(users.id, ministerId)).limit(1);
+      const minister = await db.select().from(users).where(eq35(users.id, ministerId)).limit(1);
       if (minister.length === 0) {
         return res.status(404).json({
           success: false,
@@ -17336,7 +22539,7 @@ ${newNote}` : newNote;
       await db.update(users).set({
         reliabilityNotes: updatedNotes,
         lastReliabilityUpdate: /* @__PURE__ */ new Date()
-      }).where(eq31(users.id, ministerId));
+      }).where(eq35(users.id, ministerId));
       res.json({
         success: true,
         message: "Nota adicionada com sucesso",
@@ -17354,7 +22557,7 @@ ${newNote}` : newNote;
     }
   }
 );
-router22.get(
+router25.get(
   "/stats",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -17362,20 +22565,20 @@ router22.get(
     try {
       const metrics2 = await getAllReliabilityMetrics();
       const totalMinisters = metrics2.length;
-      const averageScore = totalMinisters > 0 ? metrics2.reduce((sum, m) => sum + m.reliabilityScore, 0) / totalMinisters : 0;
+      const averageScore = totalMinisters > 0 ? metrics2.reduce((sum2, m) => sum2 + m.reliabilityScore, 0) / totalMinisters : 0;
       const totalSubstitutionRequests = metrics2.reduce(
-        (sum, m) => sum + m.substitutionRequestCount,
+        (sum2, m) => sum2 + m.substitutionRequestCount,
         0
       );
       const totalSubstitutionsFulfilled = metrics2.reduce(
-        (sum, m) => sum + m.substitutionFulfilledCount,
+        (sum2, m) => sum2 + m.substitutionFulfilledCount,
         0
       );
       const totalManualRemovals = metrics2.reduce(
-        (sum, m) => sum + m.manualRemovalCount,
+        (sum2, m) => sum2 + m.manualRemovalCount,
         0
       );
-      const totalNoShows = metrics2.reduce((sum, m) => sum + m.noShowCount, 0);
+      const totalNoShows = metrics2.reduce((sum2, m) => sum2 + m.noShowCount, 0);
       const distribution = {
         excellent: metrics2.filter((m) => m.category === "excellent").length,
         good: metrics2.filter((m) => m.category === "good").length,
@@ -17420,12 +22623,12 @@ router22.get(
     }
   }
 );
-var reliabilityMetrics_default = router22;
+var reliabilityMetrics_default = router25;
 
 // server/routes/cron.ts
-import { Router as Router23 } from "express";
+import { Router as Router26 } from "express";
 init_logger();
-var router23 = Router23();
+var router26 = Router26();
 function verifyCronKey(req, res, next) {
   const cronKey = req.headers["x-cron-key"] || req.query.key;
   const expectedKey = process.env.CRON_API_KEY || "development-cron-key";
@@ -17441,7 +22644,7 @@ function verifyCronKey(req, res, next) {
   }
   next();
 }
-router23.post("/reliability-check", verifyCronKey, async (req, res) => {
+router26.post("/reliability-check", verifyCronKey, async (req, res) => {
   try {
     logger.info("[CRON] \u{1F550} Starting scheduled reliability check...");
     const result = await checkAndAlertLowReliability();
@@ -17462,17 +22665,17 @@ router23.post("/reliability-check", verifyCronKey, async (req, res) => {
     });
   }
 });
-router23.get("/health", (req, res) => {
+router26.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Cron endpoints are healthy",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-var cron_default = router23;
+var cron_default = router26;
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-import { Router as Router24 } from "express";
+import { Router as Router27 } from "express";
 
 // server/escala-alternativa/services/pythonScheduleService.ts
 init_logger();
@@ -17481,6 +22684,11 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = dirname(__filename);
+function getErrorMessage10(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 var PythonScheduleService = class {
   scriptPath;
   constructor() {
@@ -17517,9 +22725,9 @@ var PythonScheduleService = class {
             }
             resolve(result);
           } catch (parseError) {
-            logger.error(`Failed to parse Python output: ${parseError.message}`);
+            logger.error(`Failed to parse Python output: ${getErrorMessage10(parseError)}`);
             logger.error(`stdout: ${stdout}`);
-            reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+            reject(new Error(`Failed to parse Python output: ${getErrorMessage10(parseError)}`));
           }
         });
         pythonProcess.on("error", (error) => {
@@ -17530,7 +22738,7 @@ var PythonScheduleService = class {
         pythonProcess.stdin.write(inputJson);
         pythonProcess.stdin.end();
       } catch (error) {
-        logger.error(`Error in generateSchedule: ${error.message}`);
+        logger.error(`Error in generateSchedule: ${getErrorMessage10(error)}`);
         reject(error);
       }
     });
@@ -17556,19 +22764,24 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq32, and as and22 } from "drizzle-orm";
+import { eq as eq36, and as and26 } from "drizzle-orm";
+function getErrorMessage11(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 async function gerarEscalaAlternativa(req, res) {
   try {
     const { year, month, questionnaireId } = req.body;
     logger.info(`Gerando escala alternativa para ${month}/${year} usando Python`);
     let targetQuestionnaire;
     if (questionnaireId) {
-      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq32(questionnaires.id, questionnaireId)).limit(1);
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq36(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
-        and22(
-          eq32(questionnaires.year, year),
-          eq32(questionnaires.month, month)
+        and26(
+          eq36(questionnaires.year, year),
+          eq36(questionnaires.month, month)
         )
       ).limit(1);
     }
@@ -17585,8 +22798,8 @@ async function gerarEscalaAlternativa(req, res) {
       role: users.role,
       preferredPositions: users.preferredTimes,
       avoidPositions: users.canServeAsCouple
-    }).from(users).where(eq32(users.status, "active"));
-    const responses = await db.select().from(questionnaireResponses).where(eq32(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+    }).from(users).where(eq36(users.status, "active"));
+    const responses = await db.select().from(questionnaireResponses).where(eq36(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
     const formattedUsers = ministersData.map((m) => ({
       id: m.id,
@@ -17636,11 +22849,11 @@ async function gerarEscalaAlternativa(req, res) {
       }
     });
   } catch (error) {
-    logger.error(`Erro ao gerar escala alternativa: ${error.message}`);
+    logger.error(`Erro ao gerar escala alternativa: ${getErrorMessage11(error)}`);
     return res.status(500).json({
       success: false,
       message: "Erro interno ao gerar escala alternativa",
-      error: error.message
+      error: getErrorMessage11(error)
     });
   }
 }
@@ -17654,11 +22867,11 @@ async function compararAlgoritmos(req, res) {
       algorithms: ["current", "python-alternative"]
     });
   } catch (error) {
-    logger.error(`Erro ao comparar algoritmos: ${error.message}`);
+    logger.error(`Erro ao comparar algoritmos: ${getErrorMessage11(error)}`);
     return res.status(500).json({
       success: false,
       message: "Erro ao comparar algoritmos",
-      error: error.message
+      error: getErrorMessage11(error)
     });
   }
 }
@@ -17674,37 +22887,42 @@ async function verificarPython(req, res) {
     return res.status(500).json({
       success: false,
       message: "Erro ao verificar Python",
-      error: error.message
+      error: getErrorMessage11(error)
     });
   }
 }
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-var router24 = Router24();
-router24.get("/check-python", authenticateToken, verificarPython);
-router24.post(
+var router27 = Router27();
+router27.get("/check-python", authenticateToken, verificarPython);
+router27.post(
   "/gerar",
   authenticateToken,
   requireRole(["coordenador", "gestor"]),
   gerarEscalaAlternativa
 );
-router24.post(
+router27.post(
   "/comparar",
   authenticateToken,
   requireRole(["gestor"]),
   compararAlgoritmos
 );
-var escalaRoutes_default = router24;
+var escalaRoutes_default = router27;
 
 // server/routes/adoration.ts
-import { Router as Router25 } from "express";
-import { z as z7 } from "zod";
+import { Router as Router28 } from "express";
+import { z as z9 } from "zod";
 await init_storage();
 init_logger();
 await init_db();
 init_schema();
-import { eq as eq33, and as and23, inArray as inArray7 } from "drizzle-orm";
-var router25 = Router25();
+import { eq as eq37, and as and27, inArray as inArray8 } from "drizzle-orm";
+var router28 = Router28();
+function getErrorMessage12(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 function parseYearMonthParams3(req, res) {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -17722,13 +22940,13 @@ function parseYearMonthParams3(req, res) {
   }
   return { year, month };
 }
-var createDrawSchema = z7.object({
-  month: z7.number().min(1).max(12),
-  year: z7.number().min(2024).max(2030),
-  totalMinistersToDraw: z7.number().min(1).max(100).optional()
+var createDrawSchema = z9.object({
+  month: z9.number().min(1).max(12),
+  year: z9.number().min(2024).max(2030),
+  totalMinistersToDraw: z9.number().min(1).max(100).optional()
   // Opcional, será calculado automaticamente
 });
-router25.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router28.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { month, year, totalMinistersToDraw } = createDrawSchema.parse(req.body);
     if (!req.user?.id) {
@@ -17744,9 +22962,9 @@ router25.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
       });
     }
     const allMinisters = await db.select().from(users).where(
-      and23(
-        eq33(users.status, "active"),
-        inArray7(users.role, ["ministro", "coordenador"])
+      and27(
+        eq37(users.status, "active"),
+        inArray8(users.role, ["ministro", "coordenador"])
       )
     );
     if (allMinisters.length === 0) {
@@ -17874,7 +23092,7 @@ router25.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     });
   } catch (error) {
     logger.error("Erro ao executar sorteio de adora\xE7\xE3o:", error);
-    if (error instanceof z7.ZodError) {
+    if (error instanceof z9.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Dados inv\xE1lidos",
@@ -17883,11 +23101,11 @@ router25.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     }
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao executar sorteio"
+      message: getErrorMessage12(error) || "Erro ao executar sorteio"
     });
   }
 });
-router25.get("/results/:year/:month", authenticateToken, async (req, res) => {
+router28.get("/results/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -17903,7 +23121,7 @@ router25.get("/results/:year/:month", authenticateToken, async (req, res) => {
     const draw = draws[0];
     const results = await storage.getAdorationDrawResults(draw.id);
     const ministerIds = [...new Set(results.map((r) => r.ministerId))];
-    const ministers = await db.select().from(users).where(inArray7(users.id, ministerIds));
+    const ministers = await db.select().from(users).where(inArray8(users.id, ministerIds));
     const ministerMap = new Map(ministers.map((m) => [m.id, m]));
     const enrichedResults = results.map((result) => {
       const minister = ministerMap.get(result.ministerId);
@@ -17930,11 +23148,11 @@ router25.get("/results/:year/:month", authenticateToken, async (req, res) => {
     logger.error("Erro ao buscar resultados de adora\xE7\xE3o:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao buscar resultados"
+      message: getErrorMessage12(error) || "Erro ao buscar resultados"
     });
   }
 });
-router25.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router28.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { drawId } = req.params;
     await storage.deleteAdorationDraw(drawId);
@@ -17947,14 +23165,14 @@ router25.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coor
     logger.error("Erro ao deletar sorteio:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao deletar sorteio"
+      message: getErrorMessage12(error) || "Erro ao deletar sorteio"
     });
   }
 });
-var swapDaySchema = z7.object({
-  newMondayOfWeek: z7.number().int().min(1).max(5)
+var swapDaySchema = z9.object({
+  newMondayOfWeek: z9.number().int().min(1).max(5)
 });
-router25.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
+router28.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
     const { newMondayOfWeek } = swapDaySchema.parse(req.body);
@@ -17977,7 +23195,7 @@ router25.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     }
     logger.info(`Troca de dia: ministro ${userId} de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
     await storage.updateAdorationDrawResultMonday(drawId, userId, newMondayOfWeek);
-    const [ministerUser] = await db.select().from(users).where(eq33(users.id, userId)).limit(1);
+    const [ministerUser] = await db.select().from(users).where(eq37(users.id, userId)).limit(1);
     const draw = await storage.getAdorationDrawById(drawId);
     let mondayDates = [];
     if (draw) {
@@ -18004,7 +23222,7 @@ router25.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     logger.error("Erro ao trocar dia de adora\xE7\xE3o:", error);
-    if (error instanceof z7.ZodError) {
+    if (error instanceof z9.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Dados inv\xE1lidos",
@@ -18013,11 +23231,11 @@ router25.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     }
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao trocar dia"
+      message: getErrorMessage12(error) || "Erro ao trocar dia"
     });
   }
 });
-router25.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
+router28.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -18056,7 +23274,7 @@ router25.get("/my-schedule/:year/:month", authenticateToken, async (req, res) =>
     const familyMembers = [];
     for (const memberId of familyMemberIds) {
       if (memberId !== userId) {
-        const memberUser = await db.select().from(users).where(eq33(users.id, memberId)).limit(1);
+        const memberUser = await db.select().from(users).where(eq37(users.id, memberId)).limit(1);
         if (memberUser[0]) {
           familyMembers.push({ id: memberId, name: memberUser[0].name });
         }
@@ -18080,7 +23298,7 @@ router25.get("/my-schedule/:year/:month", authenticateToken, async (req, res) =>
     logger.error("Erro ao buscar escala\xE7\xE3o de adora\xE7\xE3o:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Erro ao buscar escala\xE7\xE3o"
+      message: getErrorMessage12(error) || "Erro ao buscar escala\xE7\xE3o"
     });
   }
 });
@@ -18099,26 +23317,26 @@ function getMondaysInMonth(year, month) {
 async function getVoluntaryMinistersForAdoration(year, month) {
   try {
     const [questionnaire] = await db.select().from(questionnaires).where(
-      and23(
-        eq33(questionnaires.year, year),
-        eq33(questionnaires.month, month)
+      and27(
+        eq37(questionnaires.year, year),
+        eq37(questionnaires.month, month)
       )
     ).limit(1);
     if (!questionnaire) {
       return [];
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq33(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq37(questionnaireResponses.questionnaireId, questionnaire.id));
     const voluntaryMinisterIds = responses.filter((response) => {
-      const resp = response.response;
+      const resp = response.responses;
       return resp?.extra_activities?.mondayAdoration === "yes" || resp?.extra_activities?.mondayAdoration === true || resp?.mondayAdoration === "yes" || resp?.mondayAdoration === true;
     }).map((r) => r.userId);
     if (voluntaryMinisterIds.length === 0) {
       return [];
     }
     const voluntaryMinisters = await db.select().from(users).where(
-      and23(
-        inArray7(users.id, voluntaryMinisterIds),
-        eq33(users.status, "active")
+      and27(
+        inArray8(users.id, voluntaryMinisterIds),
+        eq37(users.status, "active")
       )
     );
     return voluntaryMinisters;
@@ -18127,23 +23345,1076 @@ async function getVoluntaryMinistersForAdoration(year, month) {
     return [];
   }
 }
-var adoration_default = router25;
+var adoration_default = router28;
+
+// server/routes/activity.ts
+await init_db();
+init_schema();
+import { Router as Router29 } from "express";
+import { eq as eq38, sql as sql22, and as and28, gte as gte19, lte as lte14, desc as desc13, count as count10, like, or as or11 } from "drizzle-orm";
+var router29 = Router29();
+function formatDateBR3(date2) {
+  return date2.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+var actionDescriptions = {
+  "login": "Fez login no sistema",
+  "logout": "Saiu do sistema",
+  "login_failed": "Tentativa de login falhou",
+  "view_schedule": "Visualizou escala",
+  "create_schedule": "Criou escala",
+  "update_schedule": "Atualizou escala",
+  "delete_schedule": "Excluiu escala",
+  "publish_schedule": "Publicou escala",
+  "respond_questionnaire": "Respondeu question\xE1rio",
+  "view_questionnaire": "Visualizou question\xE1rio",
+  "create_questionnaire": "Criou question\xE1rio",
+  "request_substitution": "Solicitou substitui\xE7\xE3o",
+  "approve_substitution": "Aprovou substitui\xE7\xE3o",
+  "reject_substitution": "Rejeitou substitui\xE7\xE3o",
+  "claim_substitution": "Assumiu substitui\xE7\xE3o",
+  "update_profile": "Atualizou perfil",
+  "view_formation": "Visualizou forma\xE7\xE3o",
+  "complete_formation_module": "Completou m\xF3dulo de forma\xE7\xE3o",
+  "view_reports": "Visualizou relat\xF3rios",
+  "export_report": "Exportou relat\xF3rio",
+  "send_notification": "Enviou notifica\xE7\xE3o",
+  "view_notifications": "Visualizou notifica\xE7\xF5es",
+  "view_dashboard": "Acessou dashboard",
+  "approve_user": "Aprovou usu\xE1rio",
+  "reject_user": "Rejeitou usu\xE1rio",
+  "update_user_role": "Alterou papel de usu\xE1rio",
+  "deactivate_user": "Desativou usu\xE1rio",
+  "activate_user": "Ativou usu\xE1rio",
+  "delete_user": "Excluiu usu\xE1rio",
+  "update_mass_times": "Atualizou hor\xE1rios de missa",
+  "create_mass_time": "Criou hor\xE1rio de missa",
+  "delete_mass_time": "Excluiu hor\xE1rio de missa",
+  "password_reset_request": "Solicitou redefini\xE7\xE3o de senha",
+  "password_reset_approved": "Aprovou redefini\xE7\xE3o de senha",
+  "password_changed": "Alterou senha"
+};
+function getActionDescription(action, details) {
+  const base = actionDescriptions[action] || action;
+  if (details) {
+    if (details.type) return `${base} (${details.type})`;
+    if (details.month && details.year) return `${base} - ${details.month}/${details.year}`;
+    if (details.userName) return `${base}: ${details.userName}`;
+  }
+  return base;
+}
+var actionCategories = {
+  "auth": ["login", "logout", "login_failed", "password_reset_request", "password_reset_approved", "password_changed"],
+  "schedule": ["view_schedule", "create_schedule", "update_schedule", "delete_schedule", "publish_schedule"],
+  "questionnaire": ["respond_questionnaire", "view_questionnaire", "create_questionnaire"],
+  "substitution": ["request_substitution", "approve_substitution", "reject_substitution", "claim_substitution"],
+  "user_management": ["approve_user", "reject_user", "update_user_role", "deactivate_user", "activate_user", "delete_user"],
+  "formation": ["view_formation", "complete_formation_module"],
+  "reports": ["view_reports", "export_report"],
+  "config": ["update_mass_times", "create_mass_time", "delete_mass_time"],
+  "profile": ["update_profile"],
+  "notifications": ["send_notification", "view_notifications"],
+  "dashboard": ["view_dashboard"]
+};
+router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "50";
+    const userId = typeof req.query.userId === "string" ? req.query.userId : void 0;
+    const action = typeof req.query.action === "string" ? req.query.action : void 0;
+    const category = typeof req.query.category === "string" ? req.query.category : void 0;
+    const startDate = typeof req.query.startDate === "string" ? req.query.startDate : void 0;
+    const endDate = typeof req.query.endDate === "string" ? req.query.endDate : void 0;
+    const search = typeof req.query.search === "string" ? req.query.search : void 0;
+    const pageNum = Math.max(1, parseInt(pageStr) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
+    const offset = (pageNum - 1) * limitNum;
+    const conditions = [];
+    if (userId) {
+      conditions.push(eq38(activityLogs.userId, userId));
+    }
+    if (action) {
+      conditions.push(eq38(activityLogs.action, action));
+    }
+    if (category && actionCategories[category]) {
+      const categoryActions = actionCategories[category];
+      conditions.push(
+        or11(...categoryActions.map((a) => eq38(activityLogs.action, a)))
+      );
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      if (!isNaN(start.getTime())) {
+        conditions.push(gte19(activityLogs.createdAt, start));
+      }
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      if (!isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte14(activityLogs.createdAt, end));
+      }
+    }
+    if (search) {
+      conditions.push(
+        or11(
+          like(activityLogs.action, `%${search}%`),
+          sql22`${activityLogs.details}::text ILIKE ${"%" + search + "%"}`
+        )
+      );
+    }
+    const whereClause = conditions.length > 0 ? and28(...conditions) : void 0;
+    const [countResult] = await db.select({ count: count10() }).from(activityLogs).where(whereClause);
+    const totalCount = countResult?.count || 0;
+    const logs = await db.select({
+      id: activityLogs.id,
+      userId: activityLogs.userId,
+      userName: users.name,
+      userEmail: users.email,
+      action: activityLogs.action,
+      details: activityLogs.details,
+      ipAddress: activityLogs.ipAddress,
+      userAgent: activityLogs.userAgent,
+      createdAt: activityLogs.createdAt
+    }).from(activityLogs).leftJoin(users, eq38(activityLogs.userId, users.id)).where(whereClause).orderBy(desc13(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    const logsWithDescriptions = logs.map((log2) => ({
+      ...log2,
+      description: getActionDescription(log2.action, log2.details)
+    }));
+    res.json({
+      logs: logsWithDescriptions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limitNum)
+      },
+      categories: Object.keys(actionCategories)
+    });
+  } catch (error) {
+    console.error("Error fetching activity logs:", error);
+    res.status(500).json({ error: "Failed to fetch activity logs" });
+  }
+});
+router29.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const daysStr = typeof req.query.days === "string" ? req.query.days : "7";
+    const numDays = Math.min(90, Math.max(1, parseInt(daysStr) || 7));
+    const startDate = /* @__PURE__ */ new Date();
+    startDate.setDate(startDate.getDate() - numDays);
+    const byAction = await db.select({
+      action: activityLogs.action,
+      count: count10()
+    }).from(activityLogs).where(gte19(activityLogs.createdAt, startDate)).groupBy(activityLogs.action).orderBy(desc13(count10()));
+    const byDay = await db.select({
+      date: sql22`DATE(${activityLogs.createdAt})`.as("date"),
+      count: count10()
+    }).from(activityLogs).where(gte19(activityLogs.createdAt, startDate)).groupBy(sql22`DATE(${activityLogs.createdAt})`).orderBy(sql22`DATE(${activityLogs.createdAt})`);
+    const topUsers = await db.select({
+      userId: activityLogs.userId,
+      userName: users.name,
+      count: count10()
+    }).from(activityLogs).leftJoin(users, eq38(activityLogs.userId, users.id)).where(gte19(activityLogs.createdAt, startDate)).groupBy(activityLogs.userId, users.name).orderBy(desc13(count10())).limit(10);
+    const loginStats = await db.select({
+      action: activityLogs.action,
+      count: count10()
+    }).from(activityLogs).where(
+      and28(
+        gte19(activityLogs.createdAt, startDate),
+        or11(
+          eq38(activityLogs.action, "login"),
+          eq38(activityLogs.action, "logout"),
+          eq38(activityLogs.action, "login_failed")
+        )
+      )
+    ).groupBy(activityLogs.action);
+    const byCategory = Object.entries(actionCategories).map(([category, actions]) => {
+      const categoryCount = byAction.filter((a) => actions.includes(a.action)).reduce((sum2, a) => sum2 + a.count, 0);
+      return { category, count: categoryCount };
+    }).filter((c) => c.count > 0);
+    res.json({
+      period: { days: numDays, startDate: startDate.toISOString() },
+      totalActivities: byAction.reduce((sum2, a) => sum2 + a.count, 0),
+      byAction: byAction.map((a) => ({
+        ...a,
+        description: actionDescriptions[a.action] || a.action
+      })),
+      byCategory,
+      byDay,
+      topUsers,
+      loginStats: {
+        logins: loginStats.find((s) => s.action === "login")?.count || 0,
+        logouts: loginStats.find((s) => s.action === "logout")?.count || 0,
+        failedLogins: loginStats.find((s) => s.action === "login_failed")?.count || 0
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching activity summary:", error);
+    res.status(500).json({ error: "Failed to fetch activity summary" });
+  }
+});
+router29.get("/recent", authenticateToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "10";
+    const limitNum = Math.min(50, Math.max(1, parseInt(limitStr) || 10));
+    const isAdmin = req.user?.role === "gestor" || req.user?.role === "coordenador";
+    const userId = req.user?.id;
+    const logs = await db.select({
+      id: activityLogs.id,
+      userId: activityLogs.userId,
+      userName: users.name,
+      action: activityLogs.action,
+      details: activityLogs.details,
+      createdAt: activityLogs.createdAt
+    }).from(activityLogs).leftJoin(users, eq38(activityLogs.userId, users.id)).where(isAdmin || !userId ? void 0 : eq38(activityLogs.userId, userId)).orderBy(desc13(activityLogs.createdAt)).limit(limitNum);
+    const logsWithDescriptions = logs.map((log2) => ({
+      id: log2.id,
+      userId: log2.userId,
+      userName: log2.userName || "Usu\xE1rio",
+      action: log2.action,
+      description: getActionDescription(log2.action, log2.details),
+      metadata: log2.details,
+      createdAt: log2.createdAt?.toISOString() || (/* @__PURE__ */ new Date()).toISOString()
+    }));
+    res.json(logsWithDescriptions);
+  } catch (error) {
+    console.error("Error fetching recent activities:", error);
+    res.status(500).json({ error: "Failed to fetch recent activities" });
+  }
+});
+router29.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "50";
+    const startDateStr = typeof req.query.startDate === "string" ? req.query.startDate : void 0;
+    const endDateStr = typeof req.query.endDate === "string" ? req.query.endDate : void 0;
+    const pageNum = Math.max(1, parseInt(pageStr) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
+    const offset = (pageNum - 1) * limitNum;
+    const conditions = [eq38(activityLogs.userId, userId)];
+    if (startDateStr) {
+      const start = new Date(startDateStr);
+      if (!isNaN(start.getTime())) {
+        conditions.push(gte19(activityLogs.createdAt, start));
+      }
+    }
+    if (endDateStr) {
+      const end = new Date(endDateStr);
+      if (!isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte14(activityLogs.createdAt, end));
+      }
+    }
+    const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq38(users.id, userId));
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const [countResult] = await db.select({ count: count10() }).from(activityLogs).where(and28(...conditions));
+    const totalCount = countResult?.count || 0;
+    const logs = await db.select({
+      id: activityLogs.id,
+      action: activityLogs.action,
+      details: activityLogs.details,
+      ipAddress: activityLogs.ipAddress,
+      createdAt: activityLogs.createdAt
+    }).from(activityLogs).where(and28(...conditions)).orderBy(desc13(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    const logsWithDescriptions = logs.map((log2) => ({
+      ...log2,
+      description: getActionDescription(log2.action, log2.details)
+    }));
+    res.json({
+      user,
+      logs: logsWithDescriptions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching user activity:", error);
+    res.status(500).json({ error: "Failed to fetch user activity" });
+  }
+});
+router29.get("/export", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+  const logActivity3 = createActivityLogger(req);
+  await logActivity3("export_report", { type: "activity_logs" });
+  try {
+    const format9 = typeof req.query.format === "string" ? req.query.format : "xlsx";
+    const startDateStr = typeof req.query.startDate === "string" ? req.query.startDate : void 0;
+    const endDateStr = typeof req.query.endDate === "string" ? req.query.endDate : void 0;
+    const category = typeof req.query.category === "string" ? req.query.category : void 0;
+    const userId = typeof req.query.userId === "string" ? req.query.userId : void 0;
+    if (!["xlsx", "pdf", "csv"].includes(format9)) {
+      return res.status(400).json({ error: "Invalid format" });
+    }
+    const conditions = [];
+    if (userId) {
+      conditions.push(eq38(activityLogs.userId, userId));
+    }
+    if (category && actionCategories[category]) {
+      const categoryActions = actionCategories[category];
+      conditions.push(
+        or11(...categoryActions.map((a) => eq38(activityLogs.action, a)))
+      );
+    }
+    if (startDateStr) {
+      const start = new Date(startDateStr);
+      if (!isNaN(start.getTime())) {
+        conditions.push(gte19(activityLogs.createdAt, start));
+      }
+    }
+    if (endDateStr) {
+      const end = new Date(endDateStr);
+      if (!isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte14(activityLogs.createdAt, end));
+      }
+    }
+    if (!startDateStr && !endDateStr) {
+      const thirtyDaysAgo = /* @__PURE__ */ new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      conditions.push(gte19(activityLogs.createdAt, thirtyDaysAgo));
+    }
+    const whereClause = conditions.length > 0 ? and28(...conditions) : void 0;
+    const logs = await db.select({
+      id: activityLogs.id,
+      userId: activityLogs.userId,
+      userName: users.name,
+      userEmail: users.email,
+      action: activityLogs.action,
+      details: activityLogs.details,
+      ipAddress: activityLogs.ipAddress,
+      createdAt: activityLogs.createdAt
+    }).from(activityLogs).leftJoin(users, eq38(activityLogs.userId, users.id)).where(whereClause).orderBy(desc13(activityLogs.createdAt)).limit(1e4);
+    const typedLogs = logs;
+    const reportData = {
+      title: "Logs de Atividade",
+      subtitle: "Registro de a\xE7\xF5es no sistema",
+      generatedAt: formatDateBR3(/* @__PURE__ */ new Date()),
+      period: startDateStr && endDateStr ? `${new Date(startDateStr).toLocaleDateString("pt-BR")} a ${new Date(endDateStr).toLocaleDateString("pt-BR")}` : "\xDAltimos 30 dias",
+      headers: ["Data/Hora", "Usu\xE1rio", "A\xE7\xE3o", "Descri\xE7\xE3o", "IP"],
+      rows: typedLogs.map((log2) => [
+        log2.createdAt ? formatDateBR3(log2.createdAt) : "N/A",
+        log2.userName || log2.userEmail || "N/A",
+        log2.action,
+        getActionDescription(log2.action, log2.details),
+        log2.ipAddress || "N/A"
+      ]),
+      summary: [
+        { label: "Total de Registros", value: typedLogs.length },
+        { label: "Usu\xE1rios \xDAnicos", value: new Set(typedLogs.map((l) => l.userId)).size }
+      ]
+    };
+    let content;
+    if (format9 === "xlsx") {
+      content = exportToExcel(reportData);
+    } else if (format9 === "pdf") {
+      content = exportToPDF(reportData);
+    } else {
+      content = exportToCSV(reportData);
+    }
+    const filename = `logs_atividade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format9)}`;
+    res.setHeader("Content-Type", getMimeType(format9));
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting activity logs:", error);
+    res.status(500).json({ error: "Failed to export activity logs" });
+  }
+});
+var activity_default = router29;
+
+// server/routes/gamification.ts
+import { Router as Router30 } from "express";
+await init_db();
+init_schema();
+import { eq as eq40, desc as desc15, and as and30, sql as sql24 } from "drizzle-orm";
+
+// server/services/gamificationService.ts
+await init_db();
+init_schema();
+import { eq as eq39, desc as desc14, and as and29, sql as sql23 } from "drizzle-orm";
+var POINT_VALUES = {
+  mass_served: 50,
+  substitution_offered: 20,
+  substitution_accepted: 40,
+  material_completed: 30,
+  quiz_completed: 25,
+  quiz_perfect: 50,
+  streak_bonus: 10,
+  // Per week
+  badge_earned: 0,
+  // Varies by badge
+  login_bonus: 5,
+  first_action: 100,
+  community_help: 35,
+  special_event: 100
+};
+var LEVEL_THRESHOLDS = [
+  { level: 1, name: "Iniciante", minPoints: 0, color: "gray" },
+  { level: 2, name: "Aprendiz", minPoints: 100, color: "green" },
+  { level: 3, name: "Ministro Ativo", minPoints: 300, color: "blue" },
+  { level: 4, name: "Ministro Dedicado", minPoints: 600, color: "purple" },
+  { level: 5, name: "Ministro Exemplar", minPoints: 1e3, color: "orange" },
+  { level: 6, name: "Ministro Veterano", minPoints: 1500, color: "red" },
+  { level: 7, name: "Ministro Elite", minPoints: 2500, color: "yellow" },
+  { level: 8, name: "Mestre", minPoints: 4e3, color: "pink" },
+  { level: 9, name: "Grao-Mestre", minPoints: 6e3, color: "cyan" },
+  { level: 10, name: "Lenda", minPoints: 1e4, color: "gold" }
+];
+var DEFAULT_BADGES = [
+  // Participation badges
+  {
+    code: "first_mass",
+    name: "Primeira Missa",
+    description: "Serviu em sua primeira missa como ministro",
+    category: "participation",
+    rarity: "common",
+    iconName: "Church",
+    iconColor: "blue",
+    pointsAwarded: 50,
+    requirement: { type: "masses_served", value: 1, description: "Servir em 1 missa" }
+  },
+  {
+    code: "ten_masses",
+    name: "Servidor Dedicado",
+    description: "Serviu em 10 missas",
+    category: "participation",
+    rarity: "uncommon",
+    iconName: "Award",
+    iconColor: "green",
+    pointsAwarded: 100,
+    requirement: { type: "masses_served", value: 10, description: "Servir em 10 missas" }
+  },
+  {
+    code: "fifty_masses",
+    name: "Veterano do Altar",
+    description: "Serviu em 50 missas",
+    category: "participation",
+    rarity: "rare",
+    iconName: "Medal",
+    iconColor: "purple",
+    pointsAwarded: 250,
+    requirement: { type: "masses_served", value: 50, description: "Servir em 50 missas" }
+  },
+  {
+    code: "hundred_masses",
+    name: "Centuriao Eucaristico",
+    description: "Serviu em 100 missas",
+    category: "milestone",
+    rarity: "epic",
+    iconName: "Crown",
+    iconColor: "yellow",
+    pointsAwarded: 500,
+    requirement: { type: "masses_served", value: 100, description: "Servir em 100 missas" }
+  },
+  // Community badges
+  {
+    code: "first_substitution",
+    name: "Bom Samaritano",
+    description: "Ajudou alguem assumindo uma substituicao",
+    category: "community",
+    rarity: "common",
+    iconName: "Heart",
+    iconColor: "red",
+    pointsAwarded: 50,
+    requirement: { type: "substitutions_helped", value: 1, description: "Aceitar 1 substituicao" }
+  },
+  {
+    code: "five_substitutions",
+    name: "Anjo da Guarda",
+    description: "Ajudou em 5 substituicoes",
+    category: "community",
+    rarity: "uncommon",
+    iconName: "Shield",
+    iconColor: "blue",
+    pointsAwarded: 100,
+    requirement: { type: "substitutions_helped", value: 5, description: "Aceitar 5 substituicoes" }
+  },
+  {
+    code: "twenty_substitutions",
+    name: "Pilar da Comunidade",
+    description: "Ajudou em 20 substituicoes",
+    category: "community",
+    rarity: "rare",
+    iconName: "Building",
+    iconColor: "purple",
+    pointsAwarded: 300,
+    requirement: { type: "substitutions_helped", value: 20, description: "Aceitar 20 substituicoes" }
+  },
+  // Formation badges
+  {
+    code: "first_material",
+    name: "Estudante",
+    description: "Completou seu primeiro material de formacao",
+    category: "formation",
+    rarity: "common",
+    iconName: "BookOpen",
+    iconColor: "green",
+    pointsAwarded: 30,
+    requirement: { type: "materials_completed", value: 1, description: "Completar 1 material" }
+  },
+  {
+    code: "ten_materials",
+    name: "Sabio",
+    description: "Completou 10 materiais de formacao",
+    category: "formation",
+    rarity: "uncommon",
+    iconName: "GraduationCap",
+    iconColor: "blue",
+    pointsAwarded: 150,
+    requirement: { type: "materials_completed", value: 10, description: "Completar 10 materiais" }
+  },
+  {
+    code: "quiz_master",
+    name: "Mestre dos Quizzes",
+    description: "Completou 10 quizzes com nota maxima",
+    category: "formation",
+    rarity: "rare",
+    iconName: "Brain",
+    iconColor: "purple",
+    pointsAwarded: 200,
+    requirement: { type: "quizzes_perfect", value: 10, description: "10 quizzes com 100%" }
+  },
+  // Streak badges
+  {
+    code: "week_streak",
+    name: "Consistente",
+    description: "Serviu por 4 semanas consecutivas",
+    category: "streak",
+    rarity: "uncommon",
+    iconName: "Flame",
+    iconColor: "orange",
+    pointsAwarded: 100,
+    requirement: { type: "streak", value: 4, description: "4 semanas consecutivas" }
+  },
+  {
+    code: "month_streak",
+    name: "Inabalavel",
+    description: "Serviu por 12 semanas consecutivas",
+    category: "streak",
+    rarity: "rare",
+    iconName: "Zap",
+    iconColor: "yellow",
+    pointsAwarded: 300,
+    requirement: { type: "streak", value: 12, description: "12 semanas consecutivas" }
+  },
+  {
+    code: "year_streak",
+    name: "Lenda Viva",
+    description: "Serviu por 52 semanas consecutivas",
+    category: "streak",
+    rarity: "legendary",
+    iconName: "Star",
+    iconColor: "gold",
+    pointsAwarded: 1e3,
+    requirement: { type: "streak", value: 52, description: "52 semanas consecutivas" }
+  },
+  // Milestone badges
+  {
+    code: "level_5",
+    name: "Ascensao",
+    description: "Alcancou o nivel 5",
+    category: "milestone",
+    rarity: "uncommon",
+    iconName: "TrendingUp",
+    iconColor: "green",
+    pointsAwarded: 100,
+    requirement: { type: "level", value: 5, description: "Alcancar nivel 5" }
+  },
+  {
+    code: "level_10",
+    name: "Apice",
+    description: "Alcancou o nivel maximo",
+    category: "milestone",
+    rarity: "legendary",
+    iconName: "Trophy",
+    iconColor: "gold",
+    pointsAwarded: 500,
+    requirement: { type: "level", value: 10, description: "Alcancar nivel 10" }
+  },
+  // Special badges
+  {
+    code: "early_adopter",
+    name: "Pioneiro",
+    description: "Um dos primeiros a usar o sistema",
+    category: "special",
+    rarity: "epic",
+    iconName: "Rocket",
+    iconColor: "purple",
+    pointsAwarded: 200,
+    requirement: { type: "special", value: 1, description: "Badge especial" },
+    isSecret: true
+  }
+];
+async function initializeUserPoints(userId) {
+  const [existing] = await db.select().from(userPoints).where(eq39(userPoints.userId, userId));
+  if (!existing) {
+    await db.insert(userPoints).values({
+      userId,
+      totalPoints: 0,
+      level: 1,
+      levelProgress: 0
+    });
+  }
+}
+async function awardPoints(userId, action, customPoints, description, relatedEntityType, relatedEntityId) {
+  await initializeUserPoints(userId);
+  const points = customPoints ?? POINT_VALUES[action] ?? 0;
+  await db.insert(pointTransactions).values({
+    userId,
+    action,
+    points,
+    description: description || `Pontos por ${action}`,
+    relatedEntityType,
+    relatedEntityId
+  });
+  const [userPointsRecord] = await db.select().from(userPoints).where(eq39(userPoints.userId, userId));
+  const newTotal = (userPointsRecord?.totalPoints || 0) + points;
+  const currentLevel = userPointsRecord?.level || 1;
+  const newLevel = calculateLevel(newTotal);
+  const leveledUp = newLevel > currentLevel;
+  const currentLevelThreshold = LEVEL_THRESHOLDS.find((l) => l.level === newLevel);
+  const nextLevelThreshold = LEVEL_THRESHOLDS.find((l) => l.level === newLevel + 1);
+  let levelProgress = 100;
+  if (nextLevelThreshold && currentLevelThreshold) {
+    const pointsInLevel = newTotal - currentLevelThreshold.minPoints;
+    const pointsNeeded = nextLevelThreshold.minPoints - currentLevelThreshold.minPoints;
+    levelProgress = Math.min(100, Math.round(pointsInLevel / pointsNeeded * 100));
+  }
+  await db.update(userPoints).set({
+    totalPoints: newTotal,
+    level: newLevel,
+    levelProgress,
+    lastActivityAt: /* @__PURE__ */ new Date(),
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq39(userPoints.userId, userId));
+  if (leveledUp && (newLevel === 5 || newLevel === 10)) {
+    const badgeCode = newLevel === 5 ? "level_5" : "level_10";
+    await awardBadge(userId, badgeCode);
+  }
+  return { points, newTotal, leveledUp, newLevel: leveledUp ? newLevel : void 0 };
+}
+function calculateLevel(points) {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (points >= LEVEL_THRESHOLDS[i].minPoints) {
+      return LEVEL_THRESHOLDS[i].level;
+    }
+  }
+  return 1;
+}
+async function getUserGamificationProfile(userId) {
+  await initializeUserPoints(userId);
+  const [pointsRecord] = await db.select().from(userPoints).where(eq39(userPoints.userId, userId));
+  const earnedBadges = await db.select({
+    badge: badges,
+    earnedAt: userBadges.earnedAt,
+    isFeatured: userBadges.isFeatured
+  }).from(userBadges).innerJoin(badges, eq39(userBadges.badgeId, badges.id)).where(eq39(userBadges.userId, userId)).orderBy(desc14(userBadges.earnedAt));
+  const recentTransactions = await db.select().from(pointTransactions).where(eq39(pointTransactions.userId, userId)).orderBy(desc14(pointTransactions.createdAt)).limit(10);
+  const levelInfo = LEVEL_THRESHOLDS.find((l) => l.level === (pointsRecord?.level || 1));
+  const nextLevelInfo = LEVEL_THRESHOLDS.find((l) => l.level === (pointsRecord?.level || 1) + 1);
+  return {
+    points: pointsRecord?.totalPoints || 0,
+    level: pointsRecord?.level || 1,
+    levelName: levelInfo?.name || "Iniciante",
+    levelColor: levelInfo?.color || "gray",
+    levelProgress: pointsRecord?.levelProgress || 0,
+    nextLevelPoints: nextLevelInfo?.minPoints || null,
+    currentStreak: pointsRecord?.currentStreak || 0,
+    longestStreak: pointsRecord?.longestStreak || 0,
+    massesServed: pointsRecord?.massesServed || 0,
+    substitutionsHelped: pointsRecord?.substitutionsHelped || 0,
+    materialsCompleted: pointsRecord?.materialsCompleted || 0,
+    badges: earnedBadges.map((eb) => ({
+      ...eb.badge,
+      earnedAt: eb.earnedAt,
+      isFeatured: eb.isFeatured
+    })),
+    recentActivity: recentTransactions
+  };
+}
+async function awardBadge(userId, badgeCode) {
+  const [badge] = await db.select().from(badges).where(eq39(badges.code, badgeCode));
+  if (!badge) {
+    console.warn(`Badge ${badgeCode} not found`);
+    return false;
+  }
+  const [existing] = await db.select().from(userBadges).where(and29(
+    eq39(userBadges.userId, userId),
+    eq39(userBadges.badgeId, badge.id)
+  ));
+  if (existing) {
+    return false;
+  }
+  await db.insert(userBadges).values({
+    userId,
+    badgeId: badge.id
+  });
+  if (badge.pointsAwarded && badge.pointsAwarded > 0) {
+    await awardPoints(
+      userId,
+      "badge_earned",
+      badge.pointsAwarded,
+      `Badge conquistado: ${badge.name}`,
+      "badge",
+      badge.id
+    );
+  }
+  return true;
+}
+async function getLeaderboard(period = "alltime", limit = 10) {
+  const leaderboardData = await db.select({
+    userId: userPoints.userId,
+    totalPoints: userPoints.totalPoints,
+    level: userPoints.level,
+    userName: users.name,
+    userPhotoUrl: users.photoUrl
+  }).from(userPoints).innerJoin(users, eq39(userPoints.userId, users.id)).where(eq39(users.status, "active")).orderBy(desc14(userPoints.totalPoints)).limit(limit);
+  return leaderboardData.map((entry, index2) => ({
+    rank: index2 + 1,
+    userId: entry.userId,
+    points: entry.totalPoints || 0,
+    level: entry.level || 1,
+    userName: entry.userName,
+    userPhotoUrl: entry.userPhotoUrl
+  }));
+}
+async function getUserRank(userId) {
+  const result = await db.execute(sql23`
+    SELECT COUNT(*) + 1 as rank
+    FROM user_points up
+    JOIN users u ON up.user_id = u.id
+    WHERE u.status = 'active'
+    AND up.total_points > (
+      SELECT COALESCE(total_points, 0)
+      FROM user_points
+      WHERE user_id = ${userId}
+    )
+  `);
+  return result.rows[0]?.rank || 1;
+}
+async function seedDefaultBadges() {
+  for (const badge of DEFAULT_BADGES) {
+    const [existing] = await db.select().from(badges).where(eq39(badges.code, badge.code));
+    if (!existing) {
+      await db.insert(badges).values(badge);
+      console.log(`Badge '${badge.name}' created`);
+    }
+  }
+}
+async function seedLevelDefinitions() {
+  for (const level of LEVEL_THRESHOLDS) {
+    const [existing] = await db.select().from(levelDefinitions).where(eq39(levelDefinitions.level, level.level));
+    if (!existing) {
+      await db.insert(levelDefinitions).values({
+        level: level.level,
+        name: level.name,
+        minPoints: level.minPoints,
+        color: level.color
+      });
+    }
+  }
+}
+
+// server/routes/gamification.ts
+var router30 = Router30();
+router30.use(authenticateToken);
+router30.get("/profile", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const profile = await getUserGamificationProfile(userId);
+    const rank = await getUserRank(userId);
+    res.json({
+      ...profile,
+      rank
+    });
+  } catch (error) {
+    console.error("Error fetching gamification profile:", error);
+    res.status(500).json({ error: "Erro ao buscar perfil de gamificacao" });
+  }
+});
+router30.get("/profile/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const profile = await getUserGamificationProfile(userId);
+    const rank = await getUserRank(userId);
+    res.json({
+      points: profile.points,
+      level: profile.level,
+      levelName: profile.levelName,
+      levelColor: profile.levelColor,
+      badges: profile.badges.filter((b) => !b.isSecret),
+      massesServed: profile.massesServed,
+      currentStreak: profile.currentStreak,
+      rank
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ error: "Erro ao buscar perfil" });
+  }
+});
+router30.get("/leaderboard", async (req, res) => {
+  try {
+    const { period = "alltime", limit = "10" } = req.query;
+    const userId = req.user?.id;
+    const leaderboard = await getLeaderboard(
+      period,
+      parseInt(limit)
+    );
+    let userRank = null;
+    let userEntry = null;
+    if (userId) {
+      const isInLeaderboard = leaderboard.some((e) => e.userId === userId);
+      if (!isInLeaderboard) {
+        userRank = await getUserRank(userId);
+        const profile = await getUserGamificationProfile(userId);
+        const [user] = await db.select({ name: users.name, photoUrl: users.photoUrl }).from(users).where(eq40(users.id, userId));
+        userEntry = {
+          rank: userRank,
+          userId,
+          points: profile.points,
+          level: profile.level,
+          userName: user?.name,
+          userPhotoUrl: user?.photoUrl
+        };
+      }
+    }
+    res.json({
+      leaderboard,
+      currentUser: userEntry,
+      period
+    });
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    res.status(500).json({ error: "Erro ao buscar ranking" });
+  }
+});
+router30.get("/badges", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const allBadges = await db.select().from(badges).where(eq40(badges.isActive, true)).orderBy(badges.category, badges.rarity);
+    let earnedBadgeIds = [];
+    if (userId) {
+      const earned = await db.select({ badgeId: userBadges.badgeId }).from(userBadges).where(eq40(userBadges.userId, userId));
+      earnedBadgeIds = earned.map((e) => e.badgeId);
+    }
+    const badgesWithStatus = allBadges.filter((b) => !b.isSecret || earnedBadgeIds.includes(b.id)).map((b) => ({
+      ...b,
+      earned: earnedBadgeIds.includes(b.id)
+    }));
+    res.json({ badges: badgesWithStatus });
+  } catch (error) {
+    console.error("Error fetching badges:", error);
+    res.status(500).json({ error: "Erro ao buscar badges" });
+  }
+});
+router30.get("/levels", async (req, res) => {
+  try {
+    res.json({ levels: LEVEL_THRESHOLDS });
+  } catch (error) {
+    console.error("Error fetching levels:", error);
+    res.status(500).json({ error: "Erro ao buscar niveis" });
+  }
+});
+router30.get("/points-config", async (req, res) => {
+  try {
+    res.json({ pointValues: POINT_VALUES });
+  } catch (error) {
+    console.error("Error fetching points config:", error);
+    res.status(500).json({ error: "Erro ao buscar configuracao de pontos" });
+  }
+});
+router30.get("/history", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const { limit = "50", offset = "0" } = req.query;
+    const transactions = await db.select().from(pointTransactions).where(eq40(pointTransactions.userId, userId)).orderBy(desc15(pointTransactions.createdAt)).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql24`count(*)` }).from(pointTransactions).where(eq40(pointTransactions.userId, userId));
+    res.json({
+      transactions,
+      total: countResult?.count || 0,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error("Error fetching history:", error);
+    res.status(500).json({ error: "Erro ao buscar historico" });
+  }
+});
+router30.post("/feature-badge", csrfProtection, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const { badgeId, featured } = req.body;
+    if (!badgeId) {
+      return res.status(400).json({ error: "Badge ID obrigatorio" });
+    }
+    const [userBadge] = await db.select().from(userBadges).where(and30(
+      eq40(userBadges.userId, userId),
+      eq40(userBadges.badgeId, badgeId)
+    ));
+    if (!userBadge) {
+      return res.status(404).json({ error: "Badge nao encontrado" });
+    }
+    if (featured) {
+      const featuredCount = await db.select({ count: sql24`count(*)` }).from(userBadges).where(and30(
+        eq40(userBadges.userId, userId),
+        eq40(userBadges.isFeatured, true)
+      ));
+      if ((featuredCount[0]?.count || 0) >= 3) {
+        return res.status(400).json({ error: "Maximo de 3 badges em destaque" });
+      }
+    }
+    await db.update(userBadges).set({ isFeatured: featured }).where(eq40(userBadges.id, userBadge.id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error featuring badge:", error);
+    res.status(500).json({ error: "Erro ao destacar badge" });
+  }
+});
+router30.post("/claim-daily", csrfProtection, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario nao autenticado" });
+    }
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const [existingClaim] = await db.select().from(pointTransactions).where(and30(
+      eq40(pointTransactions.userId, userId),
+      eq40(pointTransactions.action, "login_bonus"),
+      sql24`${pointTransactions.createdAt} >= ${today}`
+    ));
+    if (existingClaim) {
+      return res.status(400).json({ error: "Bonus diario ja coletado hoje", alreadyClaimed: true });
+    }
+    const result = await awardPoints(
+      userId,
+      "login_bonus",
+      void 0,
+      "Bonus de login diario"
+    );
+    res.json({
+      success: true,
+      points: result.points,
+      newTotal: result.newTotal,
+      leveledUp: result.leveledUp,
+      newLevel: result.newLevel
+    });
+  } catch (error) {
+    console.error("Error claiming daily bonus:", error);
+    res.status(500).json({ error: "Erro ao coletar bonus" });
+  }
+});
+router30.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const { userId, points, reason } = req.body;
+    if (!userId || !points) {
+      return res.status(400).json({ error: "userId e points sao obrigatorios" });
+    }
+    const result = await awardPoints(
+      userId,
+      "special_event",
+      points,
+      reason || "Pontos concedidos pelo coordenador"
+    );
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error("Error awarding points:", error);
+    res.status(500).json({ error: "Erro ao conceder pontos" });
+  }
+});
+router30.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const { userId, badgeCode } = req.body;
+    if (!userId || !badgeCode) {
+      return res.status(400).json({ error: "userId e badgeCode sao obrigatorios" });
+    }
+    const awarded = await awardBadge(userId, badgeCode);
+    if (!awarded) {
+      return res.status(400).json({ error: "Badge ja foi concedido ou nao existe" });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error awarding badge:", error);
+    res.status(500).json({ error: "Erro ao conceder badge" });
+  }
+});
+router30.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req, res) => {
+  try {
+    await seedDefaultBadges();
+    await seedLevelDefinitions();
+    res.json({ success: true, message: "Badges e niveis criados com sucesso" });
+  } catch (error) {
+    console.error("Error seeding gamification data:", error);
+    res.status(500).json({ error: "Erro ao criar dados de gamificacao" });
+  }
+});
+router30.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const [totalPointsResult] = await db.select({ total: sql24`COALESCE(SUM(total_points), 0)` }).from(userPoints);
+    const [totalBadgesResult] = await db.select({ count: sql24`count(*)` }).from(userBadges);
+    const [activeUsersResult] = await db.select({ count: sql24`count(*)` }).from(userPoints).where(sql24`total_points > 0`);
+    const badgeDistribution = await db.select({
+      badgeId: userBadges.badgeId,
+      badgeName: badges.name,
+      count: sql24`count(*)`
+    }).from(userBadges).innerJoin(badges, eq40(userBadges.badgeId, badges.id)).groupBy(userBadges.badgeId, badges.name).orderBy(desc15(sql24`count(*)`)).limit(10);
+    const levelDistribution = await db.select({
+      level: userPoints.level,
+      count: sql24`count(*)`
+    }).from(userPoints).groupBy(userPoints.level).orderBy(userPoints.level);
+    res.json({
+      totalPointsDistributed: totalPointsResult?.total || 0,
+      totalBadgesEarned: totalBadgesResult?.count || 0,
+      activeUsersWithPoints: activeUsersResult?.count || 0,
+      badgeDistribution,
+      levelDistribution
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Erro ao buscar estatisticas" });
+  }
+});
+var gamification_default = router30;
 
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
-import { z as z8 } from "zod";
-import { eq as eq34, count as count8, or as or9 } from "drizzle-orm";
+import { z as z10 } from "zod";
+import { eq as eq41, count as count11, or as or12 } from "drizzle-orm";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql19 } from "drizzle-orm";
+import { sql as sql25 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
-  if (Array.isArray(result.rows)) return result.rows;
+  if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {
+    return result.rows;
+  }
   return [];
 };
 var parseProgressNotes = (notes) => {
@@ -18214,7 +24485,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql19`
+    db.execute(sql25`
       SELECT
         id,
         title,
@@ -18230,7 +24501,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql19`
+    db.execute(sql25`
       SELECT
         id,
         track_id AS "trackId",
@@ -18245,7 +24516,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql19`
+    db.execute(sql25`
       SELECT
         id,
         module_id AS "moduleId",
@@ -18262,7 +24533,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql19`
+    userId ? db.execute(sql25`
           SELECT
             id,
             user_id AS "userId",
@@ -18315,9 +24586,9 @@ async function getFormationOverview(userId) {
   const trackOverviews = tracks.map((track) => {
     const modulesForTrack = moduleViews[track.id] ?? [];
     const totalModules = modulesForTrack.length;
-    const totalLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.totalLessons, 0);
-    const completedLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.completedLessons, 0);
-    const inProgressLessons = modulesForTrack.reduce((sum, module) => sum + module.stats.inProgressLessons, 0);
+    const totalLessons = modulesForTrack.reduce((sum2, module) => sum2 + module.stats.totalLessons, 0);
+    const completedLessons = modulesForTrack.reduce((sum2, module) => sum2 + module.stats.completedLessons, 0);
+    const inProgressLessons = modulesForTrack.reduce((sum2, module) => sum2 + module.stats.inProgressLessons, 0);
     const progressPercentage = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
     const nextLesson = modulesForTrack.flatMap((module) => module.lessons).find((lesson) => lesson.progress.status !== "completed") ?? null;
     return {
@@ -18364,7 +24635,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql19`
+  const lessonResult = await db.execute(sql25`
     SELECT
       id,
       module_id AS "moduleId",
@@ -18386,7 +24657,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql19`
+  const sectionsResult = await db.execute(sql25`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -18425,7 +24696,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql19`
+    const progressResult = await db.execute(sql25`
       SELECT
         id,
         user_id AS "userId",
@@ -18461,7 +24732,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql19`
+  const result = await db.execute(sql25`
     SELECT
       id,
       user_id AS "userId",
@@ -18478,7 +24749,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql19`
+  const result = await db.execute(sql25`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -18499,7 +24770,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql19`
+    await db.execute(sql25`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -18511,7 +24782,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql19`
+    await db.execute(sql25`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -18576,7 +24847,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql19`
+        ...totalSections > 0 ? (await db.execute(sql25`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -18585,7 +24856,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql19`
+    await db.execute(sql25`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -18597,7 +24868,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql19`
+    await db.execute(sql25`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -18666,7 +24937,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql19`
+    await db.execute(sql25`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -18678,7 +24949,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql19`
+    await db.execute(sql25`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -18733,7 +25004,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql19`
+  const query = trackId ? sql25`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -18751,7 +25022,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql19`
+      ` : sql25`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -18795,14 +25066,14 @@ async function listLessonProgressEntries(params) {
 }
 
 // server/routes.ts
-var formationProgressUpdateSchema = z8.object({
-  lessonId: z8.string(),
-  isCompleted: z8.boolean().optional(),
-  timeSpent: z8.number().int().min(0).optional(),
-  progressPercentage: z8.number().min(0).max(100).optional(),
-  completedSections: z8.array(z8.string()).optional(),
-  quizScore: z8.number().optional(),
-  notes: z8.string().optional()
+var formationProgressUpdateSchema = z10.object({
+  lessonId: z10.string(),
+  isCompleted: z10.boolean().optional(),
+  timeSpent: z10.number().int().min(0).optional(),
+  progressPercentage: z10.number().min(0).max(100).optional(),
+  completedSections: z10.array(z10.string()).optional(),
+  quizScore: z10.number().optional(),
+  notes: z10.string().optional()
 });
 function sanitizeUserData(user, requestingUserRole) {
   if (requestingUserRole === "coordenador" || requestingUserRole === "gestor") {
@@ -18821,35 +25092,36 @@ function sanitizeUserData(user, requestingUserRole) {
   return sanitizedUser;
 }
 function handleApiError(error, operation) {
-  if (error instanceof z8.ZodError) {
+  if (error instanceof z10.ZodError) {
     return {
       status: 400,
       message: `Dados inv\xE1lidos para ${operation}`,
       errors: error.errors
     };
   }
-  if (error.code === "23505") {
+  const dbError = error;
+  if (dbError.code === "23505") {
     return {
       status: 409,
       message: `J\xE1 existe um registro com estes dados para ${operation}`
     };
   }
-  if (error.code === "23503") {
+  if (dbError.code === "23503") {
     return {
       status: 400,
       message: `Refer\xEAncia inv\xE1lida encontrada para ${operation}`
     };
   }
-  if (error.message && error.message.includes("n\xE3o encontrado")) {
+  if (dbError.message && dbError.message.includes("n\xE3o encontrado")) {
     return {
       status: 404,
-      message: error.message
+      message: dbError.message
     };
   }
-  if (error.message && error.message.includes("n\xE3o autorizado")) {
+  if (dbError.message && dbError.message.includes("n\xE3o autorizado")) {
     return {
       status: 403,
-      message: error.message
+      message: dbError.message
     };
   }
   logger.error(`Error in ${operation}:`, error);
@@ -18863,6 +25135,12 @@ async function registerRoutes(app2) {
   app2.use(noCacheHeaders);
   app2.use(csrfTokenGenerator);
   app2.get("/api/csrf-token", getCsrfToken);
+  app2.get("/api/health", (req, res) => {
+    res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+  });
+  app2.head("/api/health", (req, res) => {
+    res.status(200).end();
+  });
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
   app2.use("/api/password-reset", passwordResetRateLimiter, router3);
   app2.use("/api/whatsapp", whatsapp_api_default);
@@ -18885,10 +25163,15 @@ async function registerRoutes(app2) {
   app2.use("/api/dashboard", authenticateToken, dashboard_default);
   app2.use("/api/schedules/incomplete", authenticateToken, dashboard_default);
   app2.use("/api/push-subscriptions", pushSubscriptions_default);
+  app2.use("/api/certificates", certificates_default);
+  app2.use("/api/insights", insights_default);
+  app2.use("/api/materials", materials_default);
   app2.use("/api/metrics", metrics_default);
   app2.use("/api/reliability", csrfProtection, reliabilityMetrics_default);
   app2.use("/api/cron", cron_default);
   app2.use("/api/adoration", csrfProtection, adoration_default);
+  app2.use("/api/activity", activity_default);
+  app2.use("/api/gamification", gamification_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -18982,7 +25265,8 @@ async function registerRoutes(app2) {
         }
       });
     } catch (error) {
-      if (error.message === "Relationship already exists") {
+      const errorObj = error;
+      if (errorObj.message === "Relationship already exists") {
         return res.status(409).json({ error: "This family relationship already exists" });
       }
       const errorResponse = handleApiError(error, "adicionar familiar");
@@ -19026,9 +25310,10 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/users/active", authenticateToken, async (req, res) => {
     try {
-      const users3 = await storage.getAllUsers();
-      const activeUsers = users3.filter((u) => u.status === "active");
-      res.json(activeUsers);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+      const result = await storage.getUsersByStatusPaginated("active", { limit, offset });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usu\xE1rios ativos");
       res.status(errorResponse.status).json(errorResponse);
@@ -19036,9 +25321,10 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const users3 = await storage.getAllUsers();
-      const pendingUsers = users3.filter((u) => u.status === "pending");
-      res.json(pendingUsers);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+      const result = await storage.getUsersByStatusPaginated("pending", { limit, offset });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usu\xE1rios pendentes");
       res.status(errorResponse.status).json(errorResponse);
@@ -19061,8 +25347,11 @@ async function registerRoutes(app2) {
         "Expires": "0",
         "Surrogate-Control": "no-store"
       });
-      const users3 = await storage.getAllUsers();
-      res.json(users3);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+      const status = req.query.status;
+      const result = await storage.getUsersPaginated({ limit, offset, status });
+      res.json(result);
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar lista de usu\xE1rios");
       res.status(errorResponse.status).json(errorResponse);
@@ -19086,7 +25375,7 @@ async function registerRoutes(app2) {
       const [user] = await db.select({
         imageData: users.imageData,
         imageContentType: users.imageContentType
-      }).from(users).where(eq34(users.id, userId));
+      }).from(users).where(eq41(users.id, userId));
       if (!user || !user.imageData) {
         return res.status(404).json({ error: "Photo not found" });
       }
@@ -19138,8 +25427,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const statusUpdateSchema = z8.object({
-        status: z8.enum(["active", "inactive", "pending"], {
+      const statusUpdateSchema = z10.object({
+        status: z10.enum(["active", "inactive", "pending"], {
           errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
         })
       });
@@ -19163,7 +25452,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z8.ZodError) {
+      if (error instanceof z10.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -19175,8 +25464,8 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
     try {
-      const roleUpdateSchema = z8.object({
-        role: z8.enum(["gestor", "coordenador", "ministro"], {
+      const roleUpdateSchema = z10.object({
+        role: z10.enum(["gestor", "coordenador", "ministro"], {
           errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
         })
       });
@@ -19207,7 +25496,7 @@ async function registerRoutes(app2) {
       }
       res.json(user);
     } catch (error) {
-      if (error instanceof z8.ZodError) {
+      if (error instanceof z10.ZodError) {
         return res.status(400).json({
           message: "Dados inv\xE1lidos",
           errors: error.errors
@@ -19285,25 +25574,25 @@ async function registerRoutes(app2) {
         diagnostics.userError = `Error querying user: ${e}`;
       }
       try {
-        const [questionnaireCheck] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq34(questionnaireResponses.userId, userId));
+        const [questionnaireCheck] = await db.select({ count: count11() }).from(questionnaireResponses).where(eq41(questionnaireResponses.userId, userId));
         diagnostics.canQueryQuestionnaireResponses = true;
         diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
       } catch (e) {
         diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
       }
       try {
-        const [scheduleMinisterCheck] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.ministerId, userId));
+        const [scheduleMinisterCheck] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.ministerId, userId));
         diagnostics.canQueryScheduleAssignments = true;
         diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.substituteId, userId));
+        const [scheduleSubstituteCheck] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.substituteId, userId));
         diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
       } catch (e) {
         diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
       }
       try {
-        const [substitutionCheck] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-          eq34(substitutionRequests.requesterId, userId),
-          eq34(substitutionRequests.substituteId, userId)
+        const [substitutionCheck] = await db.select({ count: count11() }).from(substitutionRequests).where(or12(
+          eq41(substitutionRequests.requesterId, userId),
+          eq41(substitutionRequests.substituteId, userId)
         ));
         diagnostics.canQuerySubstitutionRequests = true;
         diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
@@ -19340,12 +25629,12 @@ async function registerRoutes(app2) {
         activityCheckReason = activityCheck.reason;
         if (!hasMinisterialActivity) {
           console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq34(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-            eq34(substitutionRequests.requesterId, userId),
-            eq34(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count11() }).from(questionnaireResponses).where(eq41(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count11() }).from(substitutionRequests).where(or12(
+            eq41(substitutionRequests.requesterId, userId),
+            eq41(substitutionRequests.substituteId, userId)
           ));
           const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -19374,12 +25663,12 @@ async function registerRoutes(app2) {
       } catch (storageError) {
         console.error("Storage method failed, trying direct DB queries:", storageError);
         try {
-          const [questionnaireCount] = await db.select({ count: count8() }).from(questionnaireResponses).where(eq34(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count8() }).from(schedules).where(eq34(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count8() }).from(substitutionRequests).where(or9(
-            eq34(substitutionRequests.requesterId, userId),
-            eq34(substitutionRequests.substituteId, userId)
+          const [questionnaireCount] = await db.select({ count: count11() }).from(questionnaireResponses).where(eq41(questionnaireResponses.userId, userId));
+          const [scheduleMinisterCount] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.ministerId, userId));
+          const [scheduleSubstituteCount] = await db.select({ count: count11() }).from(schedules).where(eq41(schedules.substituteId, userId));
+          const [substitutionCount] = await db.select({ count: count11() }).from(substitutionRequests).where(or12(
+            eq41(substitutionRequests.requesterId, userId),
+            eq41(substitutionRequests.substituteId, userId)
           ));
           const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
           const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
@@ -19466,7 +25755,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z8.ZodError) {
+      if (error instanceof z10.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -19556,7 +25845,7 @@ async function registerRoutes(app2) {
       res.status(201).json(massTime);
     } catch (error) {
       console.error("Error creating mass time:", error);
-      if (error instanceof z8.ZodError) {
+      if (error instanceof z10.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create mass time" });
@@ -19569,7 +25858,7 @@ async function registerRoutes(app2) {
       res.json(massTime);
     } catch (error) {
       console.error("Error updating mass time:", error);
-      if (error instanceof z8.ZodError) {
+      if (error instanceof z10.ZodError) {
         return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update mass time" });
@@ -19827,7 +26116,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull2, and: and24 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull2, and: and31 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -19835,8 +26124,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and24(
-          eq34(substitutionRequests.status, "pending"),
+        and31(
+          eq41(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -19848,8 +26137,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and24(
-          eq34(substitutionRequests.status, "pending"),
+        and31(
+          eq41(substitutionRequests.status, "pending"),
           isNull2(substitutionRequests.substituteId)
         )
       );
@@ -19875,7 +26164,7 @@ async function registerRoutes(app2) {
       });
     }
   });
-  app2.use((err, req, res, next) => {
+  app2.use((err, req, res, _next) => {
     console.error("\u{1F6A8} Route error:", err.message);
     if (process.env.NODE_ENV === "development") {
       console.error(err.stack);
@@ -20083,6 +26372,84 @@ function serveStatic(app2) {
   });
 }
 
+// server/middleware/errorHandler.ts
+init_logger();
+import { ZodError } from "zod";
+var ApiError = class _ApiError extends Error {
+  statusCode;
+  errorCode;
+  details;
+  isOperational;
+  constructor(message, statusCode = 500, errorCode, details) {
+    super(message);
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    this.details = details;
+    this.isOperational = true;
+    Error.captureStackTrace(this, this.constructor);
+  }
+  // Factory methods for common errors
+  static badRequest(message, errorCode, details) {
+    return new _ApiError(message, 400, errorCode || "BAD_REQUEST", details);
+  }
+  static unauthorized(message = "N\xE3o autorizado", errorCode) {
+    return new _ApiError(message, 401, errorCode || "UNAUTHORIZED");
+  }
+  static forbidden(message = "Acesso negado", errorCode) {
+    return new _ApiError(message, 403, errorCode || "FORBIDDEN");
+  }
+  static notFound(message = "Recurso n\xE3o encontrado", errorCode) {
+    return new _ApiError(message, 404, errorCode || "NOT_FOUND");
+  }
+  static conflict(message, errorCode, details) {
+    return new _ApiError(message, 409, errorCode || "CONFLICT", details);
+  }
+  static unprocessable(message, errorCode, details) {
+    return new _ApiError(message, 422, errorCode || "UNPROCESSABLE_ENTITY", details);
+  }
+  static internal(message = "Erro interno do servidor", errorCode) {
+    return new _ApiError(message, 500, errorCode || "INTERNAL_ERROR");
+  }
+  static serviceUnavailable(message = "Servi\xE7o indispon\xEDvel", errorCode) {
+    return new _ApiError(message, 503, errorCode || "SERVICE_UNAVAILABLE");
+  }
+};
+function errorHandler(err, req, res, _next) {
+  const isApiError = err instanceof ApiError;
+  const isOperational = isApiError && err.isOperational;
+  const statusCode = isApiError ? err.statusCode : 500;
+  if (statusCode >= 500) {
+    logger.error(`[ERROR] ${req.method} ${req.path}:`, {
+      message: err.message,
+      stack: err.stack,
+      statusCode,
+      userId: req.user?.id,
+      body: req.body
+    });
+  } else {
+    logger.warn(`[WARN] ${req.method} ${req.path}: ${err.message}`, {
+      statusCode,
+      userId: req.user?.id
+    });
+  }
+  const response = {
+    success: false,
+    message: isOperational ? err.message : "Erro interno do servidor"
+  };
+  if (isApiError && err.errorCode) {
+    response.errorCode = err.errorCode;
+  }
+  if (isApiError && err.details && isOperational) {
+    response.details = err.details;
+  }
+  if (process.env.NODE_ENV === "development") {
+    response.stack = err.stack;
+  }
+  if (!res.headersSent) {
+    res.status(statusCode).json(response);
+  }
+}
+
 // server/index.ts
 import path3 from "path";
 process.on("uncaughtException", (error) => {
@@ -20205,7 +26572,8 @@ app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function(body) {
     if (res.statusCode >= 400 && body && typeof body === "object") {
-      errorMessage = body.message || body.error || JSON.stringify(body);
+      const errorBody = body;
+      errorMessage = errorBody.message || errorBody.error || JSON.stringify(body);
     }
     return originalJson(body);
   };
@@ -20222,13 +26590,7 @@ app.use((req, res, next) => {
 app.use("/api", apiRateLimiter);
 (async () => {
   const server = await registerRoutes(app);
-  app.use((err, req, res, _next) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error(`\u274C ${status} ${req.method} ${req.path}: ${message}`);
-    if (process.env.NODE_ENV === "development") console.error(err.stack);
-    if (!res.headersSent) res.status(status).json({ message });
-  });
+  app.use(errorHandler);
   const isDevelopment2 = process.env.NODE_ENV === "development";
   if (isDevelopment2) {
     await setupVite(app, server);

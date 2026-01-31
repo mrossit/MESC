@@ -78,7 +78,13 @@
       "Bash(__NEW_LINE_699a2d047f2e9582__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
       "Bash(__NEW_LINE_b752b8e5f3168e92__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
       "Bash(__NEW_LINE_610daf952e3be8ae__ echo \"=== TEST FILE SUMMARY ===\" echo \"\" echo \"Unit Tests:\" find /home/runner/workspace/test/unit -type f -name \"*.test.ts\")",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(PGPASSWORD=npg_0JeUfXEWQxm8 psql:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npm run:*)",
+      "Bash(printf:*)",
+      "Bash(script -qc 'printf \"\"\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\"\" | npx drizzle-kit push' /dev/null)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []
