@@ -84,7 +84,8 @@
       "Bash(npm run:*)",
       "Bash(printf:*)",
       "Bash(script -qc 'printf \"\"\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\"\" | npx drizzle-kit push' /dev/null)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []
