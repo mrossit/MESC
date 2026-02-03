@@ -60,11 +60,12 @@ export default function Communication() {
   const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
 
   // Fetch notifications with auto-refresh
-  const { data: notifications = [], isLoading, refetch } = useQuery<Notification[]>({
+  const { data: notificationsResponse, isLoading, refetch } = useQuery<{ data: Notification[]; total: number; hasMore: boolean }>({
     queryKey: ["/api/notifications"],
     enabled: activeTab === "inbox",
     refetchInterval: 30000, // Atualiza a cada 30 segundos
   });
+  const notifications = notificationsResponse?.data ?? [];
 
   // Fetch unread count
   const { data: unreadCount } = useQuery<{ count: number }>({
