@@ -131,6 +131,53 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     order: 1
   });
 
+  // 1.1 Disponibilidade alternativa (aparece se Q1 = Não)
+  questions.push({
+    id: 'alternative_availability',
+    type: 'multiple_choice',
+    question: 'Você tem disponibilidade neste mês em outros horários?',
+    options: ['Sim', 'Não'],
+    required: false,
+    category: 'regular',
+    metadata: {
+      dependsOn: 'monthly_availability',
+      showIf: 'Não'
+    },
+    order: 1.1
+  });
+
+  // 1.2 Horários alternativos (aparece se Q2 = Sim)
+  questions.push({
+    id: 'alternative_times',
+    type: 'yes_no_with_options',
+    question: 'Em quais horários alternativos você pode servir neste mês?',
+    options: ['Sim', 'Não'],
+    required: false,
+    category: 'regular',
+    metadata: {
+      dependsOn: 'alternative_availability',
+      showIf: 'Sim',
+      conditionalOptions: ['8h', '10h', '19h']
+    },
+    order: 1.2
+  });
+
+  // 1.3 Domingos disponíveis no horário alternativo (aparece se Q2 = Sim)
+  questions.push({
+    id: 'alternative_sundays',
+    type: 'checkbox',
+    question: 'Em quais domingos deste mês você poderá servir no horário alternativo?',
+    options: ['Nenhum domingo', ...sundayDates],
+    required: false,
+    category: 'regular',
+    metadata: {
+      dependsOn: 'alternative_availability',
+      showIf: 'Sim',
+      sundayDates: sundayDates
+    },
+    order: 1.3
+  });
+
   // 2. Horário principal de serviço
   questions.push({
     id: 'main_service_time',
@@ -601,7 +648,13 @@ export function analyzeResponses(responses: ResponseAnalysisInput[]): ResponseAn
       if (monthlyAvailability.answer === 'Sim') {
         analysis.availability.available++;
       } else if (monthlyAvailability.answer === 'Não') {
-        analysis.availability.unavailable++;
+        // Verificar se tem disponibilidade alternativa
+        const altAvailability = response.responses?.find((r: ResponseItem) => r.questionId === 'alternative_availability');
+        if (altAvailability?.answer === 'Sim') {
+          analysis.availability.partial++; // Disponível em horários alternativos
+        } else {
+          analysis.availability.unavailable++; // Apenas substituto pontual
+        }
       } else {
         analysis.availability.partial++;
       }
