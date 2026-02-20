@@ -35,31 +35,19 @@ router.post("/subscribe", csrfProtection, requireAuth, async (req: AuthRequest, 
     const validatedData = pushSubscriptionSchema.parse(req.body);
     const userId = req.user!.id;
 
-    // Check if subscription already exists
-    const existing = await storage.getPushSubscriptionByEndpoint(validatedData.endpoint);
-    
-    if (existing) {
-      // Update existing subscription with new user if needed
-      if (existing.userId !== userId) {
-        await storage.removePushSubscriptionByEndpoint(validatedData.endpoint);
-        await storage.createPushSubscription({
-          userId,
-          endpoint: validatedData.endpoint,
-          p256dhKey: validatedData.keys.p256dh,
-          authKey: validatedData.keys.auth
-        });
-      }
-      return res.json({ success: true, message: "Subscription updated" });
-    }
-
-    // Create new subscription
-    await storage.createPushSubscription({
-      userId,
+    // Usar upsert para SEMPRE atualizar as chaves de criptografia.
+    // O browser pode gerar novas chaves a qualquer momento (re-registro do SW,
+    // atualização do browser, etc). Se não atualizarmos, web-push falha
+    // silenciosamente ao tentar enviar com chaves stale.
+    await storage.upsertPushSubscription(userId, {
       endpoint: validatedData.endpoint,
-      p256dhKey: validatedData.keys.p256dh,
-      authKey: validatedData.keys.auth
+      keys: {
+        auth: validatedData.keys.auth,
+        p256dh: validatedData.keys.p256dh
+      }
     });
 
+    console.log(`[PUSH API] Subscription upserted for userId: ${userId}, endpoint: ${validatedData.endpoint.substring(0, 60)}...`);
     res.json({ success: true, message: "Subscribed to push notifications" });
   } catch (error: unknown) {
     console.error("[PUSH API] Subscribe error:", error);
