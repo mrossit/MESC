@@ -38,6 +38,7 @@ interface StandardizedResponse {
     shared_with?: string[];
   };
   can_substitute: boolean;
+  substitute_only?: boolean; // True when minister is only available as substitute (Q1=Não, Q2=Não)
   notes?: string;
   alternative_times?: string[]; // Public field in v2.0 schema for times beyond primary mass
   _alternativeTimes?: string[]; // Internal field for migration/conversion only
@@ -189,7 +190,8 @@ export class QuestionnaireService {
       /^special_event_/, // Includes Finados, etc
       'daily_mass_availability', 'daily_mass', 'daily_mass_days',
       'can_substitute', 'notes', 'observations',
-      'family_serve_preference', 'monthly_availability', 'other_times_available'
+      'family_serve_preference', 'monthly_availability', 'other_times_available',
+      'alternative_availability', 'alternative_times', 'alternative_sundays'
     ];
 
     for (const item of responses) {
@@ -298,6 +300,37 @@ export class QuestionnaireService {
       // Map monthly availability (base question)
       else if (questionId === 'monthly_availability') {
         // This is just the yes/no base question, not stored separately
+        processedQuestionIds.add(questionId);
+      }
+      // Map alternative availability (Q2 - appears when Q1=Não)
+      else if (questionId === 'alternative_availability') {
+        if (answer === 'Não') {
+          // Minister is substitute-only: not in initial schedule but can substitute
+          standardized.substitute_only = true;
+          standardized.can_substitute = true;
+        }
+        processedQuestionIds.add(questionId);
+      }
+      // Map alternative sundays (appears when Q2=Sim)
+      else if (questionId === 'alternative_sundays' && Array.isArray(answer)) {
+        this.parseAvailableSundays(answer, standardized, currentYear, currentMonth);
+        processedQuestionIds.add(questionId);
+      }
+      // Map alternative times selection (appears when Q2=Sim)
+      else if (questionId === 'alternative_times') {
+        if (answer && answer !== 'Não') {
+          // Handle object format: { answer: "Sim", selectedOptions: ["8h", "10h", ...] }
+          if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+            const answerObj = answer as Record<string, unknown>;
+            if (Array.isArray(answerObj.selectedOptions)) {
+              standardized._alternativeTimes = answerObj.selectedOptions as string[];
+            }
+          }
+          // Handle legacy array format: ["8h", "10h"]
+          else if (Array.isArray(answer)) {
+            standardized._alternativeTimes = answer as string[];
+          }
+        }
         processedQuestionIds.add(questionId);
       }
       // Map other times available
@@ -603,6 +636,7 @@ export class QuestionnaireService {
     // Copy optional fields
     if (response.family) result.family = response.family as StandardizedResponse['family'];
     if (response.notes) result.notes = response.notes as string;
+    if (response.substitute_only) result.substitute_only = response.substitute_only as boolean;
     if (response.alternative_times) result.alternative_times = response.alternative_times as string[];
     if (response._alternativeTimes) result._alternativeTimes = response._alternativeTimes as string[];
 
@@ -617,6 +651,11 @@ export class QuestionnaireService {
         normalized === 'true';
     } else if (typeof response.can_substitute === 'boolean') {
       result.can_substitute = response.can_substitute;
+    }
+
+    // Handle substitute_only: ensure can_substitute is true
+    if (result.substitute_only) {
+      result.can_substitute = true;
     }
 
     // Migrate alternative_times to internal _alternativeTimes for extraction
@@ -644,6 +683,7 @@ export class QuestionnaireService {
     dailyMassAvailability: string[] | null;
     specialEvents: StandardizedResponse['special_events'];
     canSubstitute: boolean;
+    substituteOnly: boolean;
     notes: string | null;
   } {
     // 🔥 CRITICAL FIX: Extract available Sundays WITH TIME
@@ -703,11 +743,12 @@ export class QuestionnaireService {
       availableSundays: availableSundays.length > 0 ? availableSundays : null,
       preferredMassTimes: preferredMassTimes.length > 0 ? preferredMassTimes : null,
       alternativeTimes: alternativeTimes, // Extract from _alternativeTimes internal field
-      dailyMassAvailability: hasWeekdayData 
-        ? (dailyMassAvailability.length > 0 ? dailyMassAvailability : []) 
+      dailyMassAvailability: hasWeekdayData
+        ? (dailyMassAvailability.length > 0 ? dailyMassAvailability : [])
         : null, // Empty array if answered NO, null if didn't answer
       specialEvents: standardized.special_events,
       canSubstitute: standardized.can_substitute,
+      substituteOnly: standardized.substitute_only || false,
       notes: standardized.notes || null
     };
   }

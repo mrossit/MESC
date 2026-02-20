@@ -46,6 +46,7 @@ export interface CompiledAvailability {
   };
   metadata: {
     canSubstitute: boolean;
+    substituteOnly: boolean;
     preferredPosition?: number;
     familyId?: string;
     familyPreference?: 'together' | 'separate';
@@ -430,6 +431,7 @@ export class ResponseCompiler {
       },
       metadata: {
         canSubstitute: false,
+        substituteOnly: false,
         preferredPosition: user.preferredPosition,
         familyId: user.familyId
       }
@@ -614,6 +616,13 @@ export class ResponseCompiler {
     base.metadata.canSubstitute = data.can_substitute || false;
     base.metadata.notes = data.notes;
 
+    // Handle substitute_only flag from v2.0 data
+    if ((data as Record<string, unknown>).substitute_only === true) {
+      base.metadata.substituteOnly = true;
+      base.metadata.canSubstitute = true;
+      console.log(`    ℹ️ V2: Ministro é SUBSTITUTO PONTUAL apenas`);
+    }
+
     return base;
   }
 
@@ -633,15 +642,34 @@ export class ResponseCompiler {
 
     // PRIMEIRA PASSADA: Verificar disponibilidade geral no mês
     let hasMonthlyAvailability = true; // Default: assume que tem disponibilidade
+    let hasAlternativeAvailability = false;
+    let isSubstituteOnly = false;
+
     for (const item of data) {
       if (item.questionId === 'monthly_availability') {
         hasMonthlyAvailability = (item.answer === 'Sim');
         if (!hasMonthlyAvailability) {
           console.log(`      ⚠️  Ministro SEM disponibilidade regular no mês`);
-          console.log(`      → Processando apenas disponibilidades ESPECÍFICAS (novena, festas, eventos)`);
         }
-        break;
       }
+      if (item.questionId === 'alternative_availability') {
+        hasAlternativeAvailability = (item.answer === 'Sim');
+        if (item.answer === 'Não') {
+          isSubstituteOnly = true;
+          console.log(`      ℹ️  Ministro é SUBSTITUTO PONTUAL apenas`);
+        } else if (hasAlternativeAvailability) {
+          console.log(`      → Disponível em horários alternativos`);
+        }
+      }
+    }
+
+    if (isSubstituteOnly) {
+      base.metadata.substituteOnly = true;
+      base.metadata.canSubstitute = true;
+    }
+
+    if (!hasMonthlyAvailability && !hasAlternativeAvailability && !isSubstituteOnly) {
+      console.log(`      → Processando apenas disponibilidades ESPECÍFICAS (novena, festas, eventos)`);
     }
 
     // SEGUNDA PASSADA: Detectar horário principal (main_service_time)
@@ -752,6 +780,38 @@ export class ResponseCompiler {
         }
       }
 
+      // Processar domingos alternativos (Q1=Não, Q2=Sim)
+      else if (questionId === 'alternative_sundays' && Array.isArray(answer) && hasAlternativeAvailability) {
+        // Find alternative time from responses
+        let altTime = mainServiceTime;
+        for (const altItem of data) {
+          if (altItem.questionId === 'alternative_times' && altItem.answer) {
+            if (typeof altItem.answer === 'object' && !Array.isArray(altItem.answer)) {
+              const answerObj = altItem.answer as Record<string, unknown>;
+              if (Array.isArray(answerObj.selectedOptions) && answerObj.selectedOptions.length > 0) {
+                const timeMap: Record<string, string> = { '8h': '08:00', '10h': '10:00', '19h': '19:00' };
+                altTime = timeMap[answerObj.selectedOptions[0] as string] || mainServiceTime;
+              }
+            }
+            break;
+          }
+        }
+
+        for (const sunday of answer) {
+          if (sunday === 'Nenhum domingo') continue;
+          const parsed = this.parseSundayString(sunday, month, year, altTime);
+          if (parsed) {
+            const { date, time } = parsed;
+            if (!base.availability.dates[date]) {
+              base.availability.dates[date] = { date, times: {} };
+            }
+            base.availability.dates[date].times[time] = true;
+            processedCount++;
+            console.log(`      ✓ Domingo alternativo: ${date} às ${time}`);
+          }
+        }
+      }
+
       // Metadados
       else if (questionId === 'can_substitute') {
         base.metadata.canSubstitute = answer === 'Sim';
@@ -760,6 +820,12 @@ export class ResponseCompiler {
       else if (questionId === 'notes') {
         base.metadata.notes = typeof answer === 'string' ? answer : undefined;
       }
+    }
+
+    // Ensure substitute-only status is preserved even after processing
+    if (isSubstituteOnly) {
+      base.metadata.substituteOnly = true;
+      base.metadata.canSubstitute = true;
     }
 
     console.log(`    ✅ V1 Array: ${processedCount} disponibilidades processadas`);

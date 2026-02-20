@@ -38,13 +38,21 @@ export class QuestionnaireParser {
     // Handle V2 format (object with format_version)
     const responseObj = response as Record<string, unknown> | null | undefined;
     if (responseObj?.format_version === '2.0') {
-      return {
+      const result: ParsedAvailability = {
         masses: (responseObj.masses as Record<string, Record<string, boolean>>) || {},
         weekdays: (responseObj.weekdays as Record<string, boolean>) || parsed.weekdays,
         specialEvents: (responseObj.special_events as Record<string, boolean>) || {},
         canSubstitute: Boolean(responseObj.can_substitute) || false,
         notes: responseObj.notes as string | undefined
       };
+
+      // Handle substitute_only: minister declined regular and alternative availability
+      // but is still eligible as substitute
+      if (responseObj.substitute_only === true) {
+        result.canSubstitute = true;
+      }
+
+      return result;
     }
 
     // V1 item type
@@ -53,6 +61,17 @@ export class QuestionnaireParser {
     // Handle V1 format (array of {questionId, answer})
     if (Array.isArray(response)) {
       const responseArray = response as V1ResponseItem[];
+
+      // First pass: detect alternative availability flow
+      const altAvailability = responseArray.find(r => r.questionId === 'alternative_availability');
+      const isSubstituteOnly = altAvailability?.answer === 'Não';
+      const hasAlternativeAvailability = altAvailability?.answer === 'Sim';
+
+      // If substitute-only, set canSubstitute and skip regular availability processing
+      if (isSubstituteOnly) {
+        parsed.canSubstitute = true;
+      }
+
       responseArray.forEach(item => {
         // Parse October 28 responses
         if (item.questionId?.startsWith('saint_judas_feast_')) {
@@ -90,6 +109,34 @@ export class QuestionnaireParser {
                 const normalizedTime = this.normalizeTime(mainTime);
                 parsed.masses[date][normalizedTime] = true;
               }
+            }
+          });
+        }
+
+        // Parse alternative Sundays (Q1=Não, Q2=Sim flow)
+        if (item.questionId === 'alternative_sundays' && Array.isArray(item.answer) && hasAlternativeAvailability) {
+          // Find alternative time selection
+          const altTimesItem = responseArray.find(r => r.questionId === 'alternative_times');
+          let altTime = '10:00'; // Default
+          if (altTimesItem?.answer && typeof altTimesItem.answer === 'object' && !Array.isArray(altTimesItem.answer)) {
+            const answerObj = altTimesItem.answer as Record<string, unknown>;
+            if (Array.isArray(answerObj.selectedOptions) && answerObj.selectedOptions.length > 0) {
+              altTime = this.normalizeTime(answerObj.selectedOptions[0] as string);
+            }
+          } else if (Array.isArray(altTimesItem?.answer) && altTimesItem.answer.length > 0) {
+            altTime = this.normalizeTime(altTimesItem.answer[0] as string);
+          }
+
+          item.answer.forEach((sunday: string) => {
+            if (sunday === 'Nenhum domingo') return;
+            const dateMatch = sunday.match(/(\d{1,2})\/(\d{2})/);
+            if (dateMatch) {
+              const day = dateMatch[1].padStart(2, '0');
+              const date = `${year}-${month.toString().padStart(2, '0')}-${day}`;
+              if (!parsed.masses[date]) {
+                parsed.masses[date] = {};
+              }
+              parsed.masses[date][altTime] = true;
             }
           });
         }
@@ -134,6 +181,11 @@ export class QuestionnaireParser {
           parsed.notes = item.answer;
         }
       });
+
+      // Ensure substitute-only ministers retain canSubstitute even if can_substitute question wasn't answered
+      if (isSubstituteOnly) {
+        parsed.canSubstitute = true;
+      }
     }
 
     return parsed;

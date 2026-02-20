@@ -566,41 +566,47 @@ export default function QuestionnaireUnified() {
         ...prev,
         [questionId]: value
       };
-      
-      // Limpar respostas de perguntas dependentes quando a dependência muda
+
+      // Limpar respostas de perguntas dependentes recursivamente quando a dependência muda
       if (template) {
-        template.questions.forEach(question => {
-          if (question.metadata?.dependsOn === questionId) {
-            // Extrair valor real da resposta (pode ser string ou objeto yes_no_with_options)
-            const raw = newResponses[question.metadata.dependsOn];
-            const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
-            
-            // Verificar se a pergunta dependente deve ser desabilitada
-            let shouldDisable = false;
-            
-            const expected = question.metadata.enabledWhen ?? question.metadata.showIf;
-            if (expected !== undefined) {
-              if (Array.isArray(expected)) {
-                shouldDisable = !expected.includes(depVal);
-              } else {
-                shouldDisable = depVal !== expected;
+        const clearDependents = (parentId: string) => {
+          template.questions.forEach(question => {
+            if (question.metadata?.dependsOn === parentId) {
+              // Extrair valor real da resposta (pode ser string ou objeto yes_no_with_options)
+              const raw = newResponses[question.metadata.dependsOn];
+              const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
+
+              // Verificar se a pergunta dependente deve ser desabilitada
+              let shouldDisable = false;
+
+              const expected = question.metadata.enabledWhen ?? question.metadata.showIf;
+              if (expected !== undefined) {
+                if (Array.isArray(expected)) {
+                  shouldDisable = !expected.includes(depVal);
+                } else {
+                  shouldDisable = depVal !== expected;
+                }
+              }
+
+              // Se deve desabilitar, limpar a resposta e limpar dependentes recursivamente
+              if (shouldDisable) {
+                if (question.type === 'checkbox') {
+                  newResponses[question.id] = [];
+                } else if (question.type === 'yes_no_with_options') {
+                  newResponses[question.id] = { answer: '', selectedOptions: [] };
+                } else {
+                  newResponses[question.id] = '';
+                }
+                // Recursivamente limpar dependentes desta pergunta
+                clearDependents(question.id);
               }
             }
-            
-            // Se deve desabilitar, limpar a resposta
-            if (shouldDisable) {
-              if (question.type === 'checkbox') {
-                newResponses[question.id] = [];
-              } else if (question.type === 'yes_no_with_options') {
-                newResponses[question.id] = { answer: '', selectedOptions: [] };
-              } else {
-                newResponses[question.id] = '';
-              }
-            }
-          }
-        });
+          });
+        };
+
+        clearDependents(questionId);
       }
-      
+
       return newResponses;
     });
   };
@@ -1977,6 +1983,18 @@ export default function QuestionnaireUnified() {
                           </CardContent>
                         </Card>
                     ))}
+
+                    {/* Mensagem informativa: substituto pontual apenas */}
+                    {responses['monthly_availability'] === 'Não' &&
+                     responses['alternative_availability'] === 'Não' && (
+                      <Alert className="border-amber-200 bg-amber-50">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800">
+                          Você não será incluído na escalação inicial deste mês, mas poderá
+                          substituir pontualmente quando surgirem pedidos de substituição.
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     {/* Seção de Compartilhamento Familiar */}
                     {familySharingScenario !== 'none' && familyMembers.length > 0 && (
