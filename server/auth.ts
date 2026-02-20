@@ -75,9 +75,16 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   const verifyAndCheckStatus = async (user: JWTUserPayload) => {
     try {
-      // Use Drizzle ORM for database access (works with both SQLite and PostgreSQL)
+      // Busca dados ATUAIS do banco para garantir role e status corretos
+      // (o JWT pode ter dados stale se o usuário foi promovido/demovido)
       const [currentUser] = await db
-        .select()
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+          status: users.status
+        })
         .from(users)
         .where(eq(users.id, user.id))
         .limit(1);
@@ -86,7 +93,13 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
       }
 
-      req.user = user;
+      // Usar dados frescos do banco, não do JWT (evita role stale)
+      req.user = {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        role: currentUser.role
+      };
       next();
     } catch (error) {
       console.error('[AUTH] Database error:', error);
@@ -119,21 +132,16 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   });
 }
 
-// Middleware para verificar roles - verifica role atual no banco
+// Middleware para verificar roles
+// Usa os dados já atualizados por authenticateToken (que busca do banco)
 export function requireRole(roles: string[]) {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Não autenticado' });
     }
 
-    // Buscar role atual no banco para evitar bypass com tokens antigos
-    const [currentUser] = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, req.user.id))
-      .limit(1);
-
-    if (!currentUser || !roles.includes(currentUser.role)) {
+    // req.user.role já vem atualizado do banco via authenticateToken
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Permissão insuficiente para esta ação' });
     }
 

@@ -285,7 +285,9 @@ export const schedules = pgTable('schedules', {
   // Minister schedule lookup by date (my schedules)
   index('idx_schedules_minister_date').on(table.ministerId, table.date),
   // Published schedules filtering
-  index('idx_schedules_date_status').on(table.date, table.status)
+  index('idx_schedules_date_status').on(table.date, table.status),
+  // Prevent duplicate position at same date/time
+  unique('uq_schedules_date_time_position').on(table.date, table.time, table.position)
 ]);
 
 // Mass Execution Logs (for auxiliary leaders)
@@ -488,7 +490,7 @@ export const formationProgress = pgTable('formation_progress', {
   // Get all progress for a module
   index('idx_formation_progress_module').on(table.moduleId),
   // Unique progress per user/module combination
-  index('idx_formation_progress_user_module').on(table.userId, table.moduleId)
+  unique('uq_formation_progress_user_module').on(table.userId, table.moduleId)
 ]);
 
 // Formation lessons (individual lessons within modules)
@@ -545,7 +547,7 @@ export const formationLessonProgress = pgTable('formation_lesson_progress', {
   // Get all progress for a lesson
   index('idx_formation_lesson_progress_lesson').on(table.lessonId),
   // Unique progress per user/lesson combination
-  index('idx_formation_lesson_progress_user_lesson').on(table.userId, table.lessonId)
+  unique('uq_formation_lesson_progress_user_lesson').on(table.userId, table.lessonId)
 ]);
 
 // Formation Certificates - issued when user completes a track

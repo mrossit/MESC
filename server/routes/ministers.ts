@@ -10,10 +10,29 @@ import { auditPersonalDataAccess, logAudit, AuditAction } from "../middleware/au
 const router = Router();
 
 // Get all ministers (users with role 'ministro' OR 'coordenador')
+// SEGURANÇA: Retorna apenas campos necessários — nunca expor passwordHash, imageData, etc.
 router.get("/", requireAuth, auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const ministersList = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        status: users.status,
+        active: users.active,
+        photoUrl: users.photoUrl,
+        scheduleDisplayName: users.scheduleDisplayName,
+        preferredPosition: users.preferredPosition,
+        preferredPositions: users.preferredPositions,
+        avoidPositions: users.avoidPositions,
+        canServeAsCouple: users.canServeAsCouple,
+        spouseMinisterId: users.spouseMinisterId,
+        familyId: users.familyId,
+        totalServices: users.totalServices,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(
         sql`${users.role} IN ('ministro', 'coordenador')`
@@ -27,10 +46,30 @@ router.get("/", requireAuth, auditPersonalDataAccess('personal'), async (req: Au
 });
 
 // Get single minister
+// SEGURANÇA: Retorna apenas campos necessários
 router.get("/:id", requireAuth, auditPersonalDataAccess('personal'), async (req: AuthRequest, res) => {
   try {
     const minister = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        status: users.status,
+        active: users.active,
+        photoUrl: users.photoUrl,
+        scheduleDisplayName: users.scheduleDisplayName,
+        preferredPosition: users.preferredPosition,
+        preferredPositions: users.preferredPositions,
+        avoidPositions: users.avoidPositions,
+        canServeAsCouple: users.canServeAsCouple,
+        spouseMinisterId: users.spouseMinisterId,
+        familyId: users.familyId,
+        totalServices: users.totalServices,
+        observations: users.observations,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(and(
         eq(users.id, req.params.id),

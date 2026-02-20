@@ -1899,7 +1899,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       return res.status(503).json({ error: 'Database unavailable' });
     }
 
-    // Buscar escalas existentes para esta data/hora
+    // Buscar escalas existentes para esta data/hora (ordenadas por posição para manter associação correta)
     console.log('[batch-update] Fetching existing schedules for:', { date, time });
     const existingSchedules = await db
       .select()
@@ -1907,7 +1907,8 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       .where(and(
         eq(schedules.date, date),
         eq(schedules.time, time)
-      ));
+      ))
+      .orderBy(schedules.position, schedules.id);
 
     console.log('[batch-update] Found existing schedules:', existingSchedules.length);
 
@@ -1930,12 +1931,24 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           eq(schedules.time, time)
         ));
       
+      // Invalidar cache do servidor para o mês afetado
+      scheduleCache.invalidateByDate(date);
+      console.log(`[batch-update] Cache invalidated for date: ${date}`);
+
       console.log('[batch-update] Mass deleted successfully');
       return res.json({ success: true, message: 'Missa removida completamente do calendário' });
     }
 
     // Estratégia: atualizar existentes e adicionar/remover conforme necessário
     // Isso evita deletar registros que podem ter foreign keys
+
+    // Determinar o status correto para novos registros (herdar dos existentes)
+    const existingStatus = existingSchedules.length > 0
+      ? existingSchedules[0].status
+      : 'scheduled';
+    const existingType = existingSchedules.length > 0
+      ? existingSchedules[0].type
+      : 'missa';
 
     // 1. Atualizar ou criar registros para os ministros na nova lista
     for (let i = 0; i < ministers.length; i++) {
@@ -1953,15 +1966,15 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           })
           .where(eq(schedules.id, existingSchedules[i].id));
       } else {
-        // Criar novo registro
-        console.log('[batch-update] Creating new schedule at position:', position);
+        // Criar novo registro (herdar status e tipo dos registros existentes)
+        console.log('[batch-update] Creating new schedule at position:', position, 'with status:', existingStatus);
         await db.insert(schedules).values({
           date,
           time,
           ministerId: ministerId,
           position: position,
-          type: 'missa',
-          status: 'scheduled'
+          type: existingType,
+          status: existingStatus
         });
       }
     }
@@ -1995,6 +2008,10 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
         }
       }
     }
+
+    // Invalidar cache do servidor para o mês afetado
+    scheduleCache.invalidateByDate(date);
+    console.log(`[batch-update] Cache invalidated for date: ${date}`);
 
     console.log('[batch-update] Success! Updated schedule');
     res.json({ success: true, message: 'Escala atualizada com sucesso' });

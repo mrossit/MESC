@@ -829,7 +829,10 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Verificar se a missa já passou
-    const scheduleDate = new Date(schedule.date);
+    // Usar parsing local da data para evitar bug de timezone
+    // new Date("2025-10-05") cria em UTC, mas precisamos em horário local (Brasil UTC-3)
+    const dateParts = schedule.date.split('-').map(Number);
+    const scheduleDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

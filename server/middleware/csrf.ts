@@ -34,15 +34,51 @@ export function csrfTokenGenerator(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Middleware para validar token CSRF em requests que modificam estado
- * Aplica-se a: POST, PUT, PATCH, DELETE
- * 
- * NOTA: Temporariamente desabilitado pois o sistema usa JWT para autenticação
- * e não depende de express-session
+ * Middleware de proteção CSRF usando validação de Content-Type.
+ *
+ * Estratégia: Para métodos que modificam estado (POST, PUT, PATCH, DELETE),
+ * exigimos Content-Type: application/json. Formulários HTML cross-site só
+ * conseguem enviar application/x-www-form-urlencoded, multipart/form-data
+ * ou text/plain — nunca application/json. Isso impede ataques CSRF via forms.
+ *
+ * Combinado com SameSite=Lax no cookie (já configurado), isso provê
+ * defesa em camadas contra CSRF.
+ *
+ * Referência: OWASP "Custom Request Headers" defense.
  */
 export function csrfProtection(req: Request, res: Response, next: NextFunction): void {
-  // CSRF desabilitado - sistema usa JWT
-  next();
+  // Métodos seguros (leitura) — não precisam de verificação
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) {
+    return next();
+  }
+
+  // Para métodos que modificam estado, verificar Content-Type
+  const contentType = req.headers['content-type'] || '';
+
+  // Permitir requests sem body (ex: DELETE sem payload)
+  // Content-Length ausente ou "0" indica que não há body
+  const contentLength = req.headers['content-length'];
+  if (!contentLength || contentLength === '0') {
+    return next();
+  }
+
+  // Se há body, deve ser JSON (forms cross-site não podem enviar application/json)
+  if (contentType.includes('application/json')) {
+    return next();
+  }
+
+  // Permitir multipart/form-data para uploads legítimos (upload de fotos etc.)
+  // Estes endpoints já são protegidos por autenticação JWT + SameSite=Lax
+  if (contentType.includes('multipart/form-data')) {
+    return next();
+  }
+
+  // Bloquear requests com Content-Type suspeito (ex: text/plain de um form cross-site)
+  console.warn(`[CSRF] Blocked ${req.method} ${req.path} - suspicious Content-Type: ${contentType}`);
+  res.status(403).json({
+    error: 'Requisição bloqueada por proteção CSRF. Content-Type inválido.'
+  });
 }
 
 /**
