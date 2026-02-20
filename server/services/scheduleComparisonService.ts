@@ -4,6 +4,9 @@
  * Compares auto-generated schedules with manually published ones
  * to identify patterns and improve future generations.
  *
+ * Uses the `differences` JSON stored in `scheduleGenerations` table
+ * (calculated when a generation is published via the generation route).
+ *
  * This service tracks:
  * - Ministers removed by coordinators (tracks manual removal)
  * - Ministers added manually (potential candidates for future)
@@ -12,19 +15,17 @@
  */
 
 import { db } from '../db';
-import { schedules, users } from '../../shared/schema';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { scheduleGenerations, users } from '../../shared/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { trackManualRemoval } from './reliabilityScoreService';
 
 export interface ScheduleComparison {
-  scheduleId: string;
   date: string;
   time: string;
   generatedMinisters: string[]; // IDs from auto-generation
   publishedMinisters: string[]; // IDs in final published version
   removedMinisters: string[];   // Removed by coordinator
   addedMinisters: string[];     // Added by coordinator
-  changeReason?: string;
   wasModified: boolean;
 }
 
@@ -61,137 +62,137 @@ export interface LearningReport {
   recommendations: string[];
 }
 
-/**
- * Compare a single schedule's generated vs published ministers
- */
-async function compareSchedule(scheduleId: string): Promise<ScheduleComparison | null> {
-  const schedule = await db
-    .select()
-    .from(schedules)
-    .where(eq(schedules.id, scheduleId))
-    .limit(1);
-
-  if (schedule.length === 0) {
-    console.log(`[COMPARISON] Schedule ${scheduleId} not found`);
-    return null;
-  }
-
-  const scheduleData = schedule[0];
-
-  // Extract minister IDs from both versions
-  const generatedMinisters = extractMinisterIds(scheduleData.generatedMinisters);
-  const publishedMinisters = extractMinisterIds(scheduleData.assignedMinisters);
-
-  // Find differences
-  const removedMinisters = generatedMinisters.filter(id => !publishedMinisters.includes(id));
-  const addedMinisters = publishedMinisters.filter(id => !generatedMinisters.includes(id));
-
-  const wasModified = removedMinisters.length > 0 || addedMinisters.length > 0;
-
-  return {
-    scheduleId: scheduleData.id,
-    date: scheduleData.date.toISOString().split('T')[0],
-    time: scheduleData.time,
-    generatedMinisters,
-    publishedMinisters,
-    removedMinisters,
-    addedMinisters,
-    wasModified,
-  };
+// Interfaces for the differences JSON stored in scheduleGenerations
+interface DiffChange {
+  type: 'minister_removed' | 'minister_added' | 'minister_changed' | string;
+  date: string;
+  time: string;
+  original?: { id: string | null; name: string; position?: number } | null;
+  final?: { id: string | null; name: string; position?: number } | null;
 }
 
-// Minister data item interface for extraction
-interface MinisterDataItem {
-  id?: string;
-  ministerId?: string;
+interface DiffSummary {
+  totalChanges: number;
   [key: string]: unknown;
 }
 
-/**
- * Extract minister IDs from ministers JSON field
- */
-function extractMinisterIds(ministersData: unknown): string[] {
-  if (!ministersData) return [];
-
-  // Handle both array of objects and direct array formats
-  if (Array.isArray(ministersData)) {
-    return ministersData
-      .filter((m: unknown): m is MinisterDataItem => m !== null && typeof m === 'object' && ((m as MinisterDataItem).id !== undefined || (m as MinisterDataItem).ministerId !== undefined))
-      .map((m: MinisterDataItem) => m.id || m.ministerId || '');
-  }
-
-  return [];
+interface StoredDifferences {
+  summary: DiffSummary;
+  changes: DiffChange[];
 }
 
 /**
- * Compare and learn from all schedules in a month
- * This is the main function called when a schedule is published
+ * Extract comparisons from the stored differences in scheduleGenerations.
+ * Groups changes by date+time to produce per-slot comparisons.
+ */
+function extractComparisonsFromDifferences(differences: StoredDifferences): ScheduleComparison[] {
+  if (!differences?.changes || !Array.isArray(differences.changes)) {
+    return [];
+  }
+
+  // Group changes by date+time
+  const slotMap = new Map<string, { date: string; time: string; removed: string[]; added: string[] }>();
+
+  for (const change of differences.changes) {
+    if (!change.date || !change.time) continue;
+
+    const key = `${change.date}|${change.time}`;
+    if (!slotMap.has(key)) {
+      slotMap.set(key, { date: change.date, time: change.time, removed: [], added: [] });
+    }
+    const slot = slotMap.get(key)!;
+
+    if (change.type === 'minister_removed' && change.original?.id) {
+      slot.removed.push(change.original.id);
+    } else if (change.type === 'minister_added' && change.final?.id) {
+      slot.added.push(change.final.id);
+    }
+  }
+
+  const comparisons: ScheduleComparison[] = [];
+  for (const slot of slotMap.values()) {
+    const wasModified = slot.removed.length > 0 || slot.added.length > 0;
+    comparisons.push({
+      date: slot.date,
+      time: slot.time,
+      generatedMinisters: [], // Not tracked per-slot, only diffs
+      publishedMinisters: [],
+      removedMinisters: slot.removed,
+      addedMinisters: slot.added,
+      wasModified,
+    });
+  }
+
+  return comparisons;
+}
+
+/**
+ * Compare and learn from all schedules in a month.
+ * Uses the `differences` JSON from `scheduleGenerations` table.
  */
 export async function compareAndLearn(
   month: number,
   year: number
 ): Promise<ScheduleComparison[]> {
-  console.log(`[COMPARISON] 🔍 Analyzing schedules for ${year}-${String(month).padStart(2, '0')}`);
+  console.log(`[COMPARISON] Analyzing schedules for ${year}-${String(month).padStart(2, '0')}`);
 
-  // Get all published schedules for the month
-  const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  const monthSchedules = await db
-    .select()
-    .from(schedules)
+  // Look up the published generation record for this month
+  const generations = await db
+    .select({
+      id: scheduleGenerations.id,
+      differences: scheduleGenerations.differences,
+    })
+    .from(scheduleGenerations)
     .where(
       and(
-        gte(schedules.date, startDate),
-        lte(schedules.date, endDate),
-        eq(schedules.status, 'published')
+        eq(scheduleGenerations.month, month),
+        eq(scheduleGenerations.year, year),
+        eq(scheduleGenerations.status, 'published')
       )
     );
 
-  console.log(`[COMPARISON] Found ${monthSchedules.length} published schedules`);
+  if (generations.length === 0) {
+    console.log(`[COMPARISON] No published generation found for ${month}/${year} - skipping comparison`);
+    return [];
+  }
 
-  const comparisons: ScheduleComparison[] = [];
+  // Use the most recent generation (last one)
+  const generation = generations[generations.length - 1];
+  const differences = generation.differences as StoredDifferences | null;
 
-  for (const schedule of monthSchedules) {
-    const comparison = await compareSchedule(schedule.id);
+  if (!differences || !differences.changes) {
+    console.log(`[COMPARISON] No differences data in generation ${generation.id} - schedule was accepted as-is`);
+    return [];
+  }
 
-    if (comparison && comparison.wasModified) {
-      comparisons.push(comparison);
+  const comparisons = extractComparisonsFromDifferences(differences);
 
-      // 🤖 ADAPTIVE LEARNING: Track manual removals
-      console.log(`[COMPARISON] 📊 Schedule ${schedule.id} was modified:`);
-      console.log(`  - Removed: ${comparison.removedMinisters.length} ministers`);
-      console.log(`  - Added: ${comparison.addedMinisters.length} ministers`);
+  console.log(`[COMPARISON] Found ${comparisons.length} time slots with changes`);
 
-      // Track each removed minister
-      for (const ministerId of comparison.removedMinisters) {
+  // Track manual removals for reliability scoring
+  for (const comparison of comparisons) {
+    if (!comparison.wasModified) continue;
+
+    for (const ministerId of comparison.removedMinisters) {
+      try {
         await trackManualRemoval(
           ministerId,
-          schedule.id,
+          generation.id,
           `Removed during ${year}-${month} schedule publication`
         );
-        console.log(`[COMPARISON] ⚠️ Tracked manual removal for minister ${ministerId}`);
+      } catch (err) {
+        console.error(`[COMPARISON] Failed to track removal for minister ${ministerId}:`, err);
       }
-
-      // TODO: Future enhancement - track added ministers with small bonus
-      // for (const ministerId of comparison.addedMinisters) {
-      //   await trackManualAddition(ministerId, schedule.id);
-      // }
-    } else if (comparison && !comparison.wasModified) {
-      comparisons.push(comparison);
-      console.log(`[COMPARISON] ✅ Schedule ${schedule.id} accepted without changes`);
     }
   }
 
   const modifiedCount = comparisons.filter(c => c.wasModified).length;
-  const acceptanceRate = comparisons.length > 0
-    ? ((comparisons.length - modifiedCount) / comparisons.length * 100).toFixed(1)
-    : 0;
+  const totalSlots = comparisons.length;
+  const acceptanceRate = totalSlots > 0
+    ? ((totalSlots - modifiedCount) / totalSlots * 100).toFixed(1)
+    : '100.0';
 
-  console.log(`[COMPARISON] 📈 Monthly Summary:`);
-  console.log(`  - Total schedules: ${comparisons.length}`);
-  console.log(`  - Modified: ${modifiedCount}`);
-  console.log(`  - Acceptance rate: ${acceptanceRate}%`);
+  console.log(`[COMPARISON] Monthly Summary: ${totalSlots} slots, ${modifiedCount} modified, ${acceptanceRate}% acceptance`);
 
   return comparisons;
 }
@@ -203,7 +204,7 @@ export async function analyzeMonthlyPatterns(
   month: number,
   year: number
 ): Promise<LearningReport> {
-  console.log(`[LEARNING] 📊 Generating learning report for ${year}-${month}`);
+  console.log(`[LEARNING] Generating learning report for ${year}-${month}`);
 
   const comparisons = await compareAndLearn(month, year);
   const totalSchedules = comparisons.length;
@@ -212,7 +213,7 @@ export async function analyzeMonthlyPatterns(
     ? ((totalSchedules - modifiedSchedules) / totalSchedules * 100)
     : 100;
 
-  // Track which ministers were frequently removed
+  // Track which ministers were frequently removed/added
   const removalCounts = new Map<string, number>();
   const additionCounts = new Map<string, number>();
   const massTimeChanges = new Map<string, number>();
@@ -220,32 +221,27 @@ export async function analyzeMonthlyPatterns(
   for (const comparison of comparisons) {
     if (!comparison.wasModified) continue;
 
-    // Count removals
     for (const ministerId of comparison.removedMinisters) {
       removalCounts.set(ministerId, (removalCounts.get(ministerId) || 0) + 1);
     }
 
-    // Count additions
     for (const ministerId of comparison.addedMinisters) {
       additionCounts.set(ministerId, (additionCounts.get(ministerId) || 0) + 1);
     }
 
-    // Count changes per mass time
     massTimeChanges.set(
       comparison.time,
       (massTimeChanges.get(comparison.time) || 0) + 1
     );
   }
 
-  // Get minister details for frequently removed
+  // Get minister details
   const frequentlyRemovedMinisters = await getMinisterDetails(removalCounts);
   const addedMinistersRaw = await getMinisterDetails(additionCounts);
-  // Map removalCount to additionCount for the added ministers
-  type MinisterDetailRow = Awaited<ReturnType<typeof getMinisterDetails>>[number];
-  const frequentlyAddedMinisters = addedMinistersRaw.map((m: MinisterDetailRow) => ({
+  const frequentlyAddedMinisters = addedMinistersRaw.map(m => ({
     ministerId: m.ministerId,
     ministerName: m.ministerName,
-    additionCount: m.removalCount, // The function returns removalCount but we need additionCount
+    additionCount: m.count,
     reliabilityScore: m.reliabilityScore,
   }));
 
@@ -294,23 +290,20 @@ export async function analyzeMonthlyPatterns(
     recommendations,
   };
 
-  console.log(`[LEARNING] ✅ Report generated:`);
-  console.log(`  - Health: ${algorithmHealth}`);
-  console.log(`  - Acceptance: ${acceptanceRate.toFixed(1)}%`);
-  console.log(`  - Recommendations: ${recommendations.length}`);
+  console.log(`[LEARNING] Report: health=${algorithmHealth}, acceptance=${acceptanceRate.toFixed(1)}%, recommendations=${recommendations.length}`);
 
   return report;
 }
 
 /**
- * Helper: Get minister details with removal/addition counts
+ * Helper: Get minister details with counts (safe query using inArray)
  */
 async function getMinisterDetails(
   counts: Map<string, number>
 ): Promise<Array<{
   ministerId: string;
   ministerName: string;
-  removalCount: number;
+  count: number;
   reliabilityScore: number;
 }>> {
   const ministerIds = Array.from(counts.keys());
@@ -324,20 +317,17 @@ async function getMinisterDetails(
       reliabilityScore: users.reliabilityScore,
     })
     .from(users)
-    .where(sql`${users.id} IN ${sql.raw(`('${ministerIds.join("','")}')`)}`)
-    .execute();
+    .where(inArray(users.id, ministerIds));
 
-  type MinisterRow = typeof ministers[number];
-  type MappedResult = { ministerId: string; ministerName: string; removalCount: number; reliabilityScore: number };
   return ministers
-    .map((m: MinisterRow): MappedResult => ({
+    .map(m => ({
       ministerId: m.id,
       ministerName: m.name,
-      removalCount: counts.get(m.id) || 0,
+      count: counts.get(m.id) || 0,
       reliabilityScore: m.reliabilityScore || 100,
     }))
-    .sort((a: MappedResult, b: MappedResult) => b.removalCount - a.removalCount)
-    .slice(0, 10); // Top 10
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
 }
 
 /**
@@ -348,7 +338,7 @@ export async function getMinisterLearningInsights(ministerId: string): Promise<{
   ministerName: string;
   reliabilityScore: number;
   totalRemovals: number;
-  recentRemovals: number; // Last 3 months
+  recentRemovals: number;
   trend: 'improving' | 'stable' | 'declining';
   recommendation: string;
 }> {
@@ -369,18 +359,14 @@ export async function getMinisterLearningInsights(ministerId: string): Promise<{
 
   const ministerData = minister[0];
   const totalRemovals = ministerData.manualRemovalCount || 0;
+  const recentRemovals = totalRemovals;
 
-  // TODO: Track recent removals from audit log when available
-  const recentRemovals = totalRemovals; // Placeholder
-
-  // Determine trend based on reliability score
   const reliabilityScore = ministerData.reliabilityScore || 100;
   let trend: 'improving' | 'stable' | 'declining';
   if (reliabilityScore >= 90) trend = 'stable';
   else if (reliabilityScore >= 70) trend = 'improving';
   else trend = 'declining';
 
-  // Generate recommendation
   let recommendation = '';
   if (reliabilityScore < 50) {
     recommendation = 'CRITICAL: Consider discussing with minister about availability and commitment.';

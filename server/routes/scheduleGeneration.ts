@@ -1099,7 +1099,7 @@ router.post('/generation/:id/publish', authenticateToken, requireRole(['gestor',
 
     // 🤖 ADAPTIVE LEARNING: Learn from coordinator edits
     // This analyzes the differences and creates patterns for future schedule generation
-    if (differences.summary.totalChanges > 0 && process.env.USE_DATABASE_MASS_CONFIG === 'true') {
+    if (differences.summary.totalChanges > 0) {
       try {
         // Convert differences to learning format
         const learningDiffs = differences.changes
