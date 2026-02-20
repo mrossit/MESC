@@ -87,7 +87,8 @@
       "Bash(pip install:*)",
       "Bash(chmod:*)",
       "Bash(git stash:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "Bash(gh auth status:*)"
     ],
     "deny": [],
     "ask": []
