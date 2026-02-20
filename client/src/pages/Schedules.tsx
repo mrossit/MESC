@@ -3138,7 +3138,7 @@ export default function Schedules() {
                                   variant="default"
                                   onClick={() => {
                                     // Preparar dados para edição
-                                    const ministersForEdit = assignments
+                                    const ministersForEdit = [...assignments]
                                       .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
                                       .map(a => ({
                                         id: a.ministerId,

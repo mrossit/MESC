@@ -546,8 +546,25 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
       res.json(responseData);
     } else {
-      const allSchedules = await db.select().from(schedules);
-      res.json({ schedules: allSchedules, assignments: [] });
+      // Sem mês/ano especificados: usar mês atual como fallback seguro
+      // (evita full table scan que retornaria o banco inteiro)
+      const now = new Date();
+      const fallbackYear = now.getFullYear();
+      const fallbackMonth = now.getMonth() + 1;
+      const startDateStr = `${fallbackYear}-${fallbackMonth.toString().padStart(2, '0')}-01`;
+      const lastDay = new Date(fallbackYear, fallbackMonth, 0).getDate();
+      const endDateStr = `${fallbackYear}-${fallbackMonth.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+      const fallbackSchedules = await db
+        .select()
+        .from(schedules)
+        .where(
+          and(
+            gte(schedules.date, startDateStr),
+            lte(schedules.date, endDateStr)
+          )
+        );
+      res.json({ schedules: fallbackSchedules, assignments: [] });
     }
   } catch (error) {
     console.error("Error fetching schedules:", error);
@@ -1030,91 +1047,13 @@ router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor'
 });
 
 // Generate intelligent schedule
-router.post("/:scheduleId/generate", requireAuth, requireRole(['coordenador', 'gestor']), async (req: AuthRequest, res: Response) => {
-  try {
-    // Only coordinators can generate schedules
-    if (!req.user?.id) {
-      return res.status(401).json({ message: "Usuário não autenticado" });
-    }
-    const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
-      return res.status(403).json({ message: "Sem permissão para gerar escalas" });
-    }
-
-    const scheduleId = req.params.scheduleId;
-    
-    // Get the schedule
-    const schedule = await db
-      .select()
-      .from(schedules)
-      .where(eq(schedules.id, scheduleId))
-      .limit(1);
-      
-    if (schedule.length === 0) {
-      return res.status(404).json({ message: "Escala não encontrada" });
-    }
-
-    const currentSchedule = schedule[0];
-    
-    const scheduleDate = new Date(currentSchedule.date);
-    console.log(`🔄 Gerando escala inteligente para ${scheduleDate.toDateString()}`);
-    
-    // Generate automatic schedule (stub - function exists but may not work as expected)
-    // const result = await generateAutomaticSchedule(
-    //   scheduleDate.getFullYear(),
-    //   scheduleDate.getMonth() + 1
-    // );
-    
-    // For now, create a mock result until the function is properly implemented
-    const result = {
-      stats: {
-        totalAssignments: 1,
-        responseRate: 100,
-        missingResponses: 0
-      }
-    };
-
-    // Note: scheduleAssignments table doesn't exist in schema
-    // For now, just update the schedule status to indicate it was generated
-    await db
-      .update(schedules)
-      .set({ 
-        status: "generated",
-        notes: `Generated schedule with ${result.stats.totalAssignments} assignments`
-      })
-      .where(eq(schedules.id, scheduleId));
-
-    console.log(`Updated schedule ${scheduleId} to generated status`);
-
-    await logActivity(
-      req.user?.id!,
-      "schedule_generated",
-      `Escala inteligente gerada com ${result.stats.totalAssignments} atribuições`,
-      { 
-        scheduleId, 
-        assignmentsCount: result.stats.totalAssignments,
-        responseRate: result.stats.responseRate,
-        missingResponses: result.stats.missingResponses
-      }
-    );
-
-    console.log(`✅ Escala gerada: ${result.stats.totalAssignments} atribuições criadas`);
-
-    // Preparar mensagem com alerta de respostas ausentes
-    let message = `Escala gerada com sucesso! ${result.stats.totalAssignments} atribuições criadas.`;
-    if (result.stats.missingResponses > 0) {
-      message += ` ⚠️ ATENÇÃO: ${result.stats.missingResponses} ministros ainda não responderam o questionário (${result.stats.responseRate}% de resposta).`;
-    }
-
-    res.json({ 
-      message,
-      assignments: result.stats.totalAssignments,
-      stats: result.stats
-    });
-  } catch (error) {
-    console.error("Error generating intelligent schedule:", error);
-    res.status(500).json({ message: "Erro ao gerar escala inteligente" });
-  }
+// NOTA: Este endpoint é um stub — a geração real acontece em scheduleGeneration.ts
+// (POST /api/schedules/generate). Este endpoint NÃO deve escrever status inválidos no banco.
+router.post("/:scheduleId/generate", requireAuth, requireRole(['coordenador', 'gestor']), async (_req: AuthRequest, res: Response) => {
+  res.status(501).json({
+    message: "Use o endpoint POST /api/schedules/generate para gerar escalas automáticas.",
+    hint: "Este endpoint individual está desativado. A geração de escalas é feita por mês completo."
+  });
 });
 
 export default router;

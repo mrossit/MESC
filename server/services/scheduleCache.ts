@@ -147,15 +147,21 @@ class ScheduleCache {
 
   /**
    * Invalidate cache for a specific date (extracts month/year from date)
+   * Usa split de string para evitar bug de timezone com new Date()
+   * (new Date("2025-10-05") cria UTC midnight, que em UTC-3 é dia anterior)
    */
   invalidateByDate(date: string): void {
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    const parts = date.split('-');
+    if (parts.length < 2) {
       console.log(`[CACHE] ⚠️  INVALID DATE - Cannot invalidate for: ${date}`);
       return;
     }
-    const year = dateObj.getFullYear();
-    const month = dateObj.getMonth() + 1;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      console.log(`[CACHE] ⚠️  INVALID DATE - Cannot invalidate for: ${date}`);
+      return;
+    }
     this.invalidate(year, month);
   }
 
