@@ -2963,7 +2963,7 @@ export class ScheduleGenerator {
 
     // 7. 🤖 ADAPTIVE LEARNING: Apply learned pattern adjustments (15% do peso)
     // This uses patterns learned from coordinator edits to future generations
-    if (this.useDatabaseConfig && minister.id && massTime) {
+    if (minister.id && massTime) {
       const patternScore = this.learnedPatternAdjustments.get(minister.id) || 0;
       if (patternScore !== 0) {
         const adjustedScore = patternScore * 0.15; // 15% weight for learned patterns
@@ -2985,8 +2985,6 @@ export class ScheduleGenerator {
    * Called once at the start of schedule generation
    */
   private async loadLearnedPatternAdjustments(massType: string, dayOfWeek: number, time: string): Promise<void> {
-    if (!this.useDatabaseConfig) return;
-
     try {
       const patterns = await this.db.select()
         .from(learnedPatterns)
