@@ -393,11 +393,16 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
 
   try {
     const schema = z.object({
-      type: z.enum(['multiple_choice', 'checkbox', 'text', 'time_selection']),
+      type: z.enum(['multiple_choice', 'checkbox', 'text', 'time_selection', 'yes_no_with_options']),
       question: z.string(),
       options: z.array(z.string()).optional(),
       required: z.boolean(),
-      category: z.enum(['custom']).default('custom')
+      category: z.enum(['custom']).default('custom'),
+      metadata: z.object({
+        dependsOn: z.string().optional(),
+        showIf: z.string().optional(),
+        conditionalOptions: z.array(z.string()).optional()
+      }).optional()
     });
 
     const questionData = schema.parse(req.body);
@@ -417,7 +422,12 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       id: `custom_${Date.now()}`,
       ...questionData,
       editable: true,
-      modified: false
+      modified: false,
+      metadata: {
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        ...(questionData.metadata || {})
+      }
     };
 
     const currentVersion = template.version ?? 1;

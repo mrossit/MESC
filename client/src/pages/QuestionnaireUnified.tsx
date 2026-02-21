@@ -295,6 +295,17 @@ export default function QuestionnaireUnified() {
           return 0; // Manter ordem relativa
         });
         
+        // Corrigir retroativamente perguntas customizadas sem dependsOn
+        sortedQuestions.forEach(q => {
+          if (q.category === 'custom' && !q.metadata?.dependsOn) {
+            q.metadata = {
+              ...(q.metadata || {}),
+              dependsOn: 'monthly_availability',
+              showIf: 'Sim'
+            };
+          }
+        });
+
         templateData.questions = sortedQuestions;
         // Armazenar snapshot das perguntas para merge em caso de conflito
         templateData.baseQuestions = JSON.parse(JSON.stringify(sortedQuestions));
@@ -1192,11 +1203,13 @@ export default function QuestionnaireUnified() {
       required: newQuestion.required || false,
       category: 'custom',
       editable: true,
-      metadata: newQuestion.type === 'yes_no_with_options' && conditionalTrigger && conditionalOptions.some(o => o.trim())
-        ? {
-            conditionalOptions: conditionalOptions.filter(o => o.trim())
-          }
-        : {}
+      metadata: {
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        ...(newQuestion.type === 'yes_no_with_options' && conditionalTrigger && conditionalOptions.some(o => o.trim())
+          ? { conditionalOptions: conditionalOptions.filter(o => o.trim()) }
+          : {})
+      }
     };
     
     if (template) {
