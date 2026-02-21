@@ -40,6 +40,8 @@ type Question = {
     dependsOn?: string;
     enabledWhen?: string | string[];
     showIf?: string; // Condição para mostrar a pergunta
+    alternativeDependsOn?: string; // Dependência alternativa (OR) para fluxo alternativo
+    alternativeShowIf?: string; // Valor esperado para dependência alternativa
     conditionalOptions?: string[]; // Opções que aparecem quando responde "Sim"
     filterMode?: 'exclude' | 'include'; // Modo de filtro para opções condicionais
     sundayDates?: string[]; // Datas dos domingos do mês
@@ -301,7 +303,9 @@ export default function QuestionnaireUnified() {
             q.metadata = {
               ...(q.metadata || {}),
               dependsOn: 'monthly_availability',
-              showIf: 'Sim'
+              showIf: 'Sim',
+              alternativeDependsOn: 'alternative_availability',
+              alternativeShowIf: 'Sim'
             };
           }
         });
@@ -1206,6 +1210,8 @@ export default function QuestionnaireUnified() {
       metadata: {
         dependsOn: 'monthly_availability',
         showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim',
         ...(newQuestion.type === 'yes_no_with_options' && conditionalTrigger && conditionalOptions.some(o => o.trim())
           ? { conditionalOptions: conditionalOptions.filter(o => o.trim()) }
           : {})
@@ -1981,17 +1987,27 @@ export default function QuestionnaireUnified() {
                       // Verificar se a pergunta deve ser exibida baseado em dependências
                       const meta = question.metadata;
                       if (!meta?.dependsOn) return true;
-                      
+
                       // Extrair valor real da resposta (pode ser string ou objeto yes_no_with_options)
                       const raw = responses[meta.dependsOn];
                       const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
-                      
+
                       // Obter valor esperado (pode ser string ou array)
                       const expected = meta.enabledWhen ?? meta.showIf;
                       if (expected === undefined) return true;
-                      
+
                       // Comparar com suporte para arrays e strings
-                      return Array.isArray(expected) ? expected.includes(depVal) : depVal === expected;
+                      const primaryMatch = Array.isArray(expected) ? expected.includes(depVal) : depVal === expected;
+                      if (primaryMatch) return true;
+
+                      // Verificar dependência alternativa (OR): ex. mostrar se monthly_availability=Sim OU alternative_availability=Sim
+                      if (meta.alternativeDependsOn && meta.alternativeShowIf) {
+                        const altRaw = responses[meta.alternativeDependsOn];
+                        const altVal = typeof altRaw === 'object' && altRaw?.answer !== undefined ? altRaw.answer : altRaw;
+                        return altVal === meta.alternativeShowIf;
+                      }
+
+                      return false;
                     }).map((question) => (
                         <Card 
                           key={question.id} 
