@@ -24,7 +24,7 @@ interface StandardizedResponse {
     first_friday?: boolean;
     first_saturday?: boolean;
     healing_liberation?: boolean;
-    [key: string]: boolean | string[] | Record<string, boolean> | undefined;
+    [key: string]: boolean | string | string[] | Record<string, boolean> | Record<string, unknown> | undefined;
   };
   weekdays?: {
     monday: boolean;
@@ -254,14 +254,23 @@ export class QuestionnaireService {
         standardized.special_events[normalizedName] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       }
-      // 🔥 CRITICAL FIX: Map custom_ questions (Natal, Ano Novo, etc.)
-      // These are user-created custom questions with IDs like custom_1763406457753
-      // Store as BOOLEAN to maintain compatibility with schedule generator consumers
+      // Map custom_ questions (user-created custom questions with IDs like custom_1763406457753)
+      // Preserve full answer data: objects for yes_no_with_options, arrays for checkbox, strings for text
       else if (questionId.startsWith('custom_')) {
-        const normalizedAnswer = this.normalizeValue(answer);
-        standardized.special_events[questionId] = normalizedAnswer;
+        if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+          // yes_no_with_options: { answer: "Sim", selectedOptions: [...] }
+          standardized.special_events[questionId] = answer as Record<string, unknown>;
+        } else if (Array.isArray(answer)) {
+          // checkbox: ["Opção 1", "Opção 2"]
+          standardized.special_events[questionId] = answer as string[];
+        } else if (typeof answer === 'string' && answer.length > 20) {
+          // text livre (resposta longa)
+          standardized.special_events[questionId] = answer;
+        } else {
+          // sim/não simples → boolean
+          standardized.special_events[questionId] = this.normalizeValue(answer);
+        }
         processedQuestionIds.add(questionId);
-        console.log(`[QUESTIONNAIRE_SERVICE] ✅ Mapped custom question: ${questionId} = ${normalizedAnswer}`);
       }
       // Map daily mass availability
       else if (questionId === 'daily_mass_availability' || questionId === 'daily_mass') {
