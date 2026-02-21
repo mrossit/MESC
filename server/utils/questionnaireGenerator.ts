@@ -17,6 +17,8 @@ interface Question {
     conditionalOptions?: string[];
     dependsOn?: string;
     showIf?: string;
+    alternativeDependsOn?: string;
+    alternativeShowIf?: string;
     filterMode?: 'exclude' | 'include';
     sundayDates?: string[];
   };
@@ -202,7 +204,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     category: 'regular',
     metadata: {
       dependsOn: 'monthly_availability',
-      showIf: 'Sim'
+      showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim'
     },
     order: 3
   });
@@ -249,6 +253,8 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     metadata: {
       dependsOn: 'monthly_availability',
       showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim',
       conditionalOptions: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']
     },
     order: 6
@@ -268,6 +274,8 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     metadata: {
       dependsOn: 'monthly_availability',
       showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim',
       eventDate: `${firstThursday.day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
       eventName: 'Missa por Cura e Libertação'
     },
@@ -286,6 +294,8 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     metadata: {
       dependsOn: 'monthly_availability',
       showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim',
       eventDate: `${firstFriday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
       eventName: 'Missa votiva ao Sagrado Coração de Jesus'
     },
@@ -304,6 +314,8 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     metadata: {
       dependsOn: 'monthly_availability',
       showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim',
       eventDate: `${firstSaturday.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`,
       eventName: 'Missa votiva ao Imaculado Coração de Maria'
     },
@@ -320,7 +332,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
     category: 'special_event',
     metadata: {
       dependsOn: 'monthly_availability',
-      showIf: 'Sim'
+      showIf: 'Sim',
+      alternativeDependsOn: 'alternative_availability',
+      alternativeShowIf: 'Sim'
     },
     order: 8
   });
@@ -339,7 +353,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '29/09',
         eventName: 'São Miguel Arcanjo',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9
     });
@@ -365,7 +381,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: 'Festa de São Judas Tadeu - 7h',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.1
     });
@@ -381,7 +399,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: 'Festa de São Judas Tadeu - 10h',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.2
     });
@@ -397,7 +417,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: 'Festa de São Judas Tadeu - 12h',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.3
     });
@@ -413,7 +435,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: 'Festa de São Judas Tadeu - 15h',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.4
     });
@@ -429,7 +453,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: 'Festa de São Judas Tadeu - 17h',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.5
     });
@@ -445,7 +471,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '28/10',
         eventName: `Festa de São Judas Tadeu - ${eveningMassTime}`,
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.6
     });
@@ -471,7 +499,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: '19-27/10',
         eventName: 'Novena de São Judas Tadeu',
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 9.7
     });
@@ -516,7 +546,9 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         eventDate: event.date,
         eventName: event.name,
         dependsOn: 'monthly_availability',
-        showIf: 'Sim'
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
       },
       order: 10 + index
     });

@@ -401,6 +401,8 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       metadata: z.object({
         dependsOn: z.string().optional(),
         showIf: z.string().optional(),
+        alternativeDependsOn: z.string().optional(),
+        alternativeShowIf: z.string().optional(),
         conditionalOptions: z.array(z.string()).optional()
       }).optional()
     });
@@ -426,6 +428,8 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       metadata: {
         dependsOn: 'monthly_availability',
         showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim',
         ...(questionData.metadata || {})
       }
     };
