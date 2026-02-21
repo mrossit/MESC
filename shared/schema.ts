@@ -203,6 +203,7 @@ export const questionnaires = pgTable('questionnaires', {
   targetUserIds: jsonb('target_user_ids').$type<string[]>(),
   notifiedUserIds: jsonb('notified_user_ids').$type<string[]>(),
   createdById: varchar('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+  version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
