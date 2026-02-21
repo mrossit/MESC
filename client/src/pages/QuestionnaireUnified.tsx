@@ -54,6 +54,8 @@ type QuestionnaireTemplate = {
   status?: 'draft' | 'sent' | 'closed';
   sentAt?: string;
   closedAt?: string;
+  version?: number;
+  baseQuestions?: Question[];
 };
 
 type Response = {
@@ -294,6 +296,8 @@ export default function QuestionnaireUnified() {
         });
         
         templateData.questions = sortedQuestions;
+        // Armazenar snapshot das perguntas para merge em caso de conflito
+        templateData.baseQuestions = JSON.parse(JSON.stringify(sortedQuestions));
         setTemplate(templateData);
         
         // Inicializar respostas vazias
@@ -429,11 +433,11 @@ export default function QuestionnaireUnified() {
 
   const saveTemplate = async () => {
     if (!template) return;
-    
+
     setSaving(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
       const res = await fetch('/api/questionnaires/admin/templates', {
         method: 'POST',
@@ -441,18 +445,32 @@ export default function QuestionnaireUnified() {
         credentials: 'include',
         body: JSON.stringify(template)
       });
-      
+
       if (res.ok) {
         const data = await res.json();
+        // Atualizar baseQuestions com o snapshot atual após salvar
+        data.baseQuestions = JSON.parse(JSON.stringify(data.questions));
         setTemplate(data);
-        setSuccess('Template salvo com sucesso!');
-        
+
+        if (data.merged) {
+          setSuccess('Template salvo com sucesso! Alterações de outro coordenador foram mescladas automaticamente.');
+        } else {
+          setSuccess('Template salvo com sucesso!');
+        }
+
         // Auto-habilitar modo resposta após salvar
         if (isAdmin) {
           setTimeout(() => {
             setMode('respond');
           }, 500);
         }
+      } else if (res.status === 409) {
+        const errorData = await res.json();
+        setError(errorData.message || 'O questionário foi modificado por outro coordenador. Recarregando...');
+        // Recarregar o template com a versão mais recente
+        setTimeout(() => {
+          loadQuestionnaire();
+        }, 1500);
       } else {
         setError('Erro ao salvar template');
       }
@@ -1291,10 +1309,15 @@ export default function QuestionnaireUnified() {
 
         if (res.ok) {
           const data = await res.json();
-          setTemplate({ ...template, questions: data.questions });
+          const updatedBaseQuestions = JSON.parse(JSON.stringify(data.questions));
+          setTemplate({ ...template, questions: data.questions, version: data.version, baseQuestions: updatedBaseQuestions });
           setSuccess(isStandardQuestion
             ? 'Pergunta padrão removida! Se necessário, você pode regenerar o template para restaurá-la.'
             : 'Pergunta customizada removida com sucesso!');
+        } else if (res.status === 409) {
+          const errorData = await res.json();
+          setError(errorData.message || 'O questionário foi modificado por outro coordenador. Recarregando...');
+          setTimeout(() => loadQuestionnaire(), 1500);
         } else {
           const errorData = await res.json();
           setError(errorData.error || 'Erro ao remover pergunta');

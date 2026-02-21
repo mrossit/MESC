@@ -8,6 +8,7 @@ import { authenticateToken as requireAuth, requireRole, AuthRequest } from '../a
 import { storage } from '../storage';
 import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
 import { logger } from '../utils/logger';
+import { mergeQuestionChanges, MergeableQuestion } from '../utils/questionnaireMerge';
 
 // Types for questionnaire data
 interface QuestionnaireQuestion {
@@ -224,26 +225,37 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
 // Salvar ou atualizar template
 router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res: Response) => {
   try {
+    const questionSchema = z.object({
+      id: z.string(),
+      type: z.enum(['multiple_choice', 'checkbox', 'text', 'time_selection', 'yes_no_with_options']),
+      question: z.string(),
+      options: z.array(z.string()).optional(),
+      required: z.boolean(),
+      category: z.enum(['regular', 'daily', 'special_event', 'custom']),
+      editable: z.boolean().optional(),
+      modified: z.boolean().optional(),
+      order: z.number().optional(),
+      metadata: z.object({
+        eventDate: z.string().optional(),
+        eventName: z.string().optional(),
+        availableTimes: z.array(z.string()).optional(),
+        conditionalOptions: z.array(z.string()).optional(),
+        conditionalTrigger: z.boolean().optional(),
+        dependsOn: z.string().optional(),
+        enabledWhen: z.union([z.string(), z.array(z.string())]).optional(),
+        showIf: z.string().optional(),
+        filterMode: z.enum(['exclude', 'include']).optional(),
+        sundayDates: z.array(z.string()).optional()
+      }).optional()
+    });
+
     const schema = z.object({
       id: z.string().optional(),
       month: z.number().min(1).max(12),
       year: z.number().min(2024).max(2050),
-      questions: z.array(z.object({
-        id: z.string(),
-        type: z.enum(['multiple_choice', 'checkbox', 'text', 'time_selection', 'yes_no_with_options']),
-        question: z.string(),
-        options: z.array(z.string()).optional(),
-        required: z.boolean(),
-        category: z.enum(['regular', 'daily', 'special_event', 'custom']),
-        editable: z.boolean().optional(),
-        modified: z.boolean().optional(),
-        metadata: z.object({
-          eventDate: z.string().optional(),
-          eventName: z.string().optional(),
-          availableTimes: z.array(z.string()).optional(),
-          conditionalOptions: z.array(z.string()).optional()
-        }).optional()
-      }))
+      questions: z.array(questionSchema),
+      version: z.number().optional(),
+      baseQuestions: z.array(questionSchema).optional()
     });
 
     const data = schema.parse(req.body);
@@ -261,17 +273,85 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
       ));
 
     if (existingTemplate) {
-      // Atualizar template existente
+      const currentVersion = existingTemplate.version ?? 1;
+      const clientVersion = data.version;
+
+      // Verificar conflito de versão
+      if (clientVersion !== undefined && clientVersion !== currentVersion) {
+        // Versão diverge - tentar merge automático
+        if (data.baseQuestions) {
+          const mergeResult = mergeQuestionChanges(
+            data.baseQuestions as MergeableQuestion[],
+            existingTemplate.questions as MergeableQuestion[],
+            data.questions as MergeableQuestion[]
+          );
+
+          if (!mergeResult.success) {
+            return res.status(409).json({
+              error: 'Conflito de edição',
+              message: 'Outro coordenador modificou as mesmas perguntas. Recarregue o questionário e tente novamente.',
+              conflicts: mergeResult.conflicts,
+              currentVersion
+            });
+          }
+
+          // Merge automático bem-sucedido
+          const [updated] = await db
+            .update(questionnaires)
+            .set({
+              questions: mergeResult.merged,
+              version: currentVersion + 1,
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(questionnaires.id, existingTemplate.id),
+              eq(questionnaires.version, currentVersion)
+            ))
+            .returning();
+
+          if (!updated) {
+            return res.status(409).json({
+              error: 'Conflito de edição',
+              message: 'O questionário foi modificado enquanto processávamos sua requisição. Por favor, recarregue e tente novamente.'
+            });
+          }
+
+          return res.json({
+            ...updated,
+            questions: updated.questions,
+            merged: true
+          });
+        }
+
+        // Sem baseQuestions - não é possível fazer merge
+        return res.status(409).json({
+          error: 'Conflito de edição',
+          message: 'O questionário foi modificado por outro coordenador. Recarregue e tente novamente.',
+          currentVersion
+        });
+      }
+
+      // Versão compatível ou cliente não enviou versão (backward compatible)
       const [updated] = await db
         .update(questionnaires)
         .set({
           questions: data.questions,
+          version: currentVersion + 1,
           updatedAt: new Date()
         })
-        .where(eq(questionnaires.id, existingTemplate.id))
+        .where(and(
+          eq(questionnaires.id, existingTemplate.id),
+          eq(questionnaires.version, currentVersion)
+        ))
         .returning();
 
-      // Parse questions back to object for response
+      if (!updated) {
+        return res.status(409).json({
+          error: 'Conflito de edição',
+          message: 'O questionário foi modificado por outro coordenador. Recarregue e tente novamente.'
+        });
+      }
+
       res.json({
         ...updated,
         questions: updated.questions
@@ -288,12 +368,12 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
           description: `Questionário de disponibilidade para ${getMonthName(data.month)} de ${data.year}`,
           status: 'draft',
           createdById: userId,
+          version: 1,
           targetUserIds: [],
           notifiedUserIds: []
         })
         .returning();
 
-      // Parse questions back to object for response
       res.json({
         ...created,
         questions: created.questions
@@ -340,16 +420,28 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       modified: false
     };
 
+    const currentVersion = template.version ?? 1;
     const updatedQuestions = [...(template.questions as QuestionnaireQuestion[]), newQuestion];
 
     const [updated] = await db
       .update(questionnaires)
       .set({
         questions: updatedQuestions,
+        version: currentVersion + 1,
         updatedAt: new Date()
       })
-      .where(eq(questionnaires.id, template.id))
+      .where(and(
+        eq(questionnaires.id, template.id),
+        eq(questionnaires.version, currentVersion)
+      ))
       .returning();
+
+    if (!updated) {
+      return res.status(409).json({
+        error: 'Conflito de edição',
+        message: 'O questionário foi modificado por outro coordenador. Recarregue e tente novamente.'
+      });
+    }
 
     res.json({
       ...updated,
@@ -388,11 +480,12 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
       return res.status(404).json({ error: 'Template not found' });
     }
 
+    const currentVersion = template.version ?? 1;
     const updatedQuestions = (template.questions as QuestionnaireQuestion[]).map(q => {
       if (q.id === questionId) {
         // Permitir edição de qualquer pergunta e marcar como modificada
-        return { 
-          ...q, 
+        return {
+          ...q,
           ...updates,
           modified: true // Marcar como modificada quando editada
         };
@@ -404,10 +497,21 @@ router.put('/templates/:year/:month/questions/:questionId', requireAuth, require
       .update(questionnaires)
       .set({
         questions: updatedQuestions,
+        version: currentVersion + 1,
         updatedAt: new Date()
       })
-      .where(eq(questionnaires.id, template.id))
+      .where(and(
+        eq(questionnaires.id, template.id),
+        eq(questionnaires.version, currentVersion)
+      ))
       .returning();
+
+    if (!updated) {
+      return res.status(409).json({
+        error: 'Conflito de edição',
+        message: 'O questionário foi modificado por outro coordenador. Recarregue e tente novamente.'
+      });
+    }
 
     res.json({
       ...updated,
@@ -448,6 +552,7 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
 
     // Permitir deletar qualquer pergunta (customizada ou padrão)
     // Coordenadores têm controle total sobre o questionário
+    const currentVersion = template.version ?? 1;
     const updatedQuestions = (template.questions as QuestionnaireQuestion[]).filter(q => q.id !== questionId);
 
     console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question}" (categoria: ${questionToDelete.category}) do questionário ${month}/${year}`);
@@ -456,10 +561,21 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
       .update(questionnaires)
       .set({
         questions: updatedQuestions,
+        version: currentVersion + 1,
         updatedAt: new Date()
       })
-      .where(eq(questionnaires.id, template.id))
+      .where(and(
+        eq(questionnaires.id, template.id),
+        eq(questionnaires.version, currentVersion)
+      ))
       .returning();
+
+    if (!updated) {
+      return res.status(409).json({
+        error: 'Conflito de edição',
+        message: 'O questionário foi modificado por outro coordenador. Recarregue e tente novamente.'
+      });
+    }
 
     res.json({
       ...updated,
