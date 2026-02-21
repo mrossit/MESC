@@ -165,10 +165,11 @@ export default function QuestionnaireUnified() {
     checkAutoClose();
   }, [template?.id, isAdmin]);
 
+  // Determinar modo baseado no status do template e papel do usuário
+  // Usar template.id como dependência para só resetar o modo quando carregar um template diferente,
+  // não quando o template é atualizado localmente (addQuestion, deleteQuestion, etc.)
   useEffect(() => {
-    // Determinar modo baseado no status do template e papel do usuário
     if (template) {
-      
       if (isAdmin && template.status === 'draft') {
         setMode('admin');
       } else if (template.status === 'sent') {
@@ -177,7 +178,7 @@ export default function QuestionnaireUnified() {
         setMode('view');
       }
     }
-  }, [template, isAdmin]);
+  }, [template?.id, template?.status, isAdmin]);
 
   // Carregar familiares quando o template existe, independentemente do modo
   // Isso permite que compartilhamento familiar funcione mesmo quando questionário é reaberto
@@ -1198,31 +1199,31 @@ export default function QuestionnaireUnified() {
   };
 
   // Componentes para administração (movidos do QuestionnaireAdmin)
-  const addCustomQuestion = () => {
+  const addCustomQuestion = async () => {
     if (!newQuestion.question) {
       setError('Por favor, digite a pergunta');
       return;
     }
-    
-    if ((newQuestion.type === 'multiple_choice' || newQuestion.type === 'checkbox' || newQuestion.type === 'yes_no_with_options') && 
+
+    if ((newQuestion.type === 'multiple_choice' || newQuestion.type === 'checkbox' || newQuestion.type === 'yes_no_with_options') &&
         (!newQuestion.options || newQuestion.options.filter(o => o.trim()).length === 0)) {
       setError('Por favor, adicione pelo menos uma opção');
       return;
     }
-    
+
     if (newQuestion.type === 'yes_no_with_options' && conditionalTrigger && !conditionalOptions.some(o => o.trim())) {
       setError('Por favor, adicione pelo menos uma sub-opção para a pergunta condicional');
       return;
     }
-    
-    const question: Question = {
-      id: `custom_${Date.now()}`,
-      type: newQuestion.type as Question['type'],
+
+    if (!template) return;
+
+    const questionPayload = {
+      type: newQuestion.type,
       question: newQuestion.question,
       options: newQuestion.options?.filter(o => o.trim()),
       required: newQuestion.required || false,
-      category: 'custom',
-      editable: true,
+      category: 'custom' as const,
       metadata: {
         dependsOn: 'monthly_availability',
         showIf: 'Sim',
@@ -1233,45 +1234,70 @@ export default function QuestionnaireUnified() {
           : {})
       }
     };
-    
-    if (template) {
-      // Adicionar a pergunta e aplicar ordenação automática
+
+    // Se o template já existe no banco, persistir via API
+    if (template.id) {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/questionnaires/admin/templates/${selectedYear}/${selectedMonth}/questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(questionPayload)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const updatedBaseQuestions = JSON.parse(JSON.stringify(data.questions));
+          setTemplate({ ...template, questions: data.questions, version: data.version, baseQuestions: updatedBaseQuestions });
+          setShowAddQuestion(false);
+          setNewQuestion({ type: 'multiple_choice', question: '', options: ['', ''], required: false, category: 'custom', metadata: {} });
+          setConditionalOptions(['']);
+          setConditionalTrigger('');
+          setSuccess('Pergunta customizada adicionada e salva com sucesso!');
+        } else if (res.status === 409) {
+          const errorData = await res.json();
+          setError(errorData.message || 'O questionário foi modificado por outro coordenador. Recarregando...');
+          setTimeout(() => loadQuestionnaire(), 1500);
+        } else {
+          const errorData = await res.json();
+          setError(errorData.error || 'Erro ao adicionar pergunta');
+        }
+      } catch (err) {
+        console.error('Erro ao adicionar pergunta:', err);
+        setError('Erro ao adicionar pergunta');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Template ainda não salvo, apenas atualizar estado local
+      const question: Question = {
+        id: `custom_${Date.now()}`,
+        type: newQuestion.type as Question['type'],
+        question: newQuestion.question,
+        options: newQuestion.options?.filter(o => o.trim()),
+        required: newQuestion.required || false,
+        category: 'custom',
+        editable: true,
+        metadata: questionPayload.metadata
+      };
+
       const allQuestions = [...template.questions, question];
-      
-      // Ordenar: múltipla escolha antes de texto
       const sortedQuestions = allQuestions.sort((a, b) => {
         const isAText = a.type === 'text';
         const isBText = b.type === 'text';
-        
-        if (isAText && !isBText) return 1; // Texto vai para o final
-        if (!isAText && isBText) return -1; // Não-texto vem primeiro
-        
-        return 0; // Manter ordem relativa
+        if (isAText && !isBText) return 1;
+        if (!isAText && isBText) return -1;
+        return 0;
       });
-      
-      // Atualizar ordem
-      sortedQuestions.forEach((q, idx) => {
-        q.order = idx;
-      });
-      
-      const updatedTemplate = {
-        ...template,
-        questions: sortedQuestions
-      };
-      
-      setTemplate(updatedTemplate);
+      sortedQuestions.forEach((q, idx) => { q.order = idx; });
+
+      setTemplate({ ...template, questions: sortedQuestions });
       setShowAddQuestion(false);
-      setNewQuestion({
-        type: 'multiple_choice',
-        question: '',
-        options: ['', ''],
-        required: false,
-        category: 'custom',
-        metadata: {}
-      });
+      setNewQuestion({ type: 'multiple_choice', question: '', options: ['', ''], required: false, category: 'custom', metadata: {} });
       setConditionalOptions(['']);
       setConditionalTrigger('');
-      setSuccess('Pergunta adicionada e ordenada com sucesso!');
+      setSuccess('Pergunta adicionada com sucesso!');
     }
   };
 
