@@ -297,13 +297,29 @@ export default function QuestionnaireUnified() {
           return 0; // Manter ordem relativa
         });
         
-        // Corrigir retroativamente perguntas customizadas sem dependsOn
+        // Corrigir retroativamente perguntas sem alternativeDependsOn
+        // Perguntas exclusivas do fluxo "Sim" (não devem ter dependência alternativa)
+        const simFlowOnly = ['main_service_time', 'available_sundays', 'other_times_available'];
         sortedQuestions.forEach(q => {
+          // Custom sem dependsOn: adicionar dependência completa
           if (q.category === 'custom' && !q.metadata?.dependsOn) {
             q.metadata = {
               ...(q.metadata || {}),
               dependsOn: 'monthly_availability',
               showIf: 'Sim',
+              alternativeDependsOn: 'alternative_availability',
+              alternativeShowIf: 'Sim'
+            };
+          }
+          // Perguntas com dependsOn monthly_availability sem alternativeDependsOn
+          else if (
+            q.metadata?.dependsOn === 'monthly_availability' &&
+            q.metadata?.showIf === 'Sim' &&
+            !q.metadata?.alternativeDependsOn &&
+            !simFlowOnly.includes(q.id)
+          ) {
+            q.metadata = {
+              ...q.metadata,
               alternativeDependsOn: 'alternative_availability',
               alternativeShowIf: 'Sim'
             };
