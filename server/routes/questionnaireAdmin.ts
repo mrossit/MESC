@@ -244,6 +244,8 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
         dependsOn: z.string().optional(),
         enabledWhen: z.union([z.string(), z.array(z.string())]).optional(),
         showIf: z.string().optional(),
+        alternativeDependsOn: z.string().optional(),
+        alternativeShowIf: z.string().optional(),
         filterMode: z.enum(['exclude', 'include']).optional(),
         sundayDates: z.array(z.string()).optional()
       }).optional()
