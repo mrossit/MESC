@@ -784,12 +784,17 @@ export class ResponseCompiler {
       else if (questionId === 'alternative_sundays' && Array.isArray(answer) && hasAlternativeAvailability) {
         // Find alternative time from responses
         let altTime = mainServiceTime;
+        const timeMap: Record<string, string> = { '8h': '08:00', '10h': '10:00', '19h': '19:00' };
         for (const altItem of data) {
           if (altItem.questionId === 'alternative_times' && altItem.answer) {
-            if (typeof altItem.answer === 'object' && !Array.isArray(altItem.answer)) {
+            // New format: direct array ["8h", "10h"]
+            if (Array.isArray(altItem.answer) && altItem.answer.length > 0) {
+              altTime = timeMap[altItem.answer[0] as string] || mainServiceTime;
+            }
+            // Legacy format: { answer: "Sim", selectedOptions: ["8h", ...] }
+            else if (typeof altItem.answer === 'object' && !Array.isArray(altItem.answer)) {
               const answerObj = altItem.answer as Record<string, unknown>;
               if (Array.isArray(answerObj.selectedOptions) && answerObj.selectedOptions.length > 0) {
-                const timeMap: Record<string, string> = { '8h': '08:00', '10h': '10:00', '19h': '19:00' };
                 altTime = timeMap[answerObj.selectedOptions[0] as string] || mainServiceTime;
               }
             }

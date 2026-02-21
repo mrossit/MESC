@@ -149,15 +149,14 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
   // 1.2 Horários alternativos (aparece se Q2 = Sim)
   questions.push({
     id: 'alternative_times',
-    type: 'yes_no_with_options',
+    type: 'checkbox',
     question: 'Em quais horários alternativos você pode servir neste mês?',
-    options: ['Sim', 'Não'],
+    options: ['8h', '10h', '19h'],
     required: false,
     category: 'regular',
     metadata: {
       dependsOn: 'alternative_availability',
-      showIf: 'Sim',
-      conditionalOptions: ['8h', '10h', '19h']
+      showIf: 'Sim'
     },
     order: 1.2
   });

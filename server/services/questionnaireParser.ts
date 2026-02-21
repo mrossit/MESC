@@ -118,13 +118,16 @@ export class QuestionnaireParser {
           // Find alternative time selection
           const altTimesItem = responseArray.find(r => r.questionId === 'alternative_times');
           let altTime = '10:00'; // Default
-          if (altTimesItem?.answer && typeof altTimesItem.answer === 'object' && !Array.isArray(altTimesItem.answer)) {
+          // New format: direct array ["8h", "10h"]
+          if (Array.isArray(altTimesItem?.answer) && altTimesItem.answer.length > 0) {
+            altTime = this.normalizeTime(altTimesItem.answer[0] as string);
+          }
+          // Legacy format: { answer: "Sim", selectedOptions: ["8h", ...] }
+          else if (altTimesItem?.answer && typeof altTimesItem.answer === 'object' && !Array.isArray(altTimesItem.answer)) {
             const answerObj = altTimesItem.answer as Record<string, unknown>;
             if (Array.isArray(answerObj.selectedOptions) && answerObj.selectedOptions.length > 0) {
               altTime = this.normalizeTime(answerObj.selectedOptions[0] as string);
             }
-          } else if (Array.isArray(altTimesItem?.answer) && altTimesItem.answer.length > 0) {
-            altTime = this.normalizeTime(altTimesItem.answer[0] as string);
           }
 
           item.answer.forEach((sunday: string) => {
