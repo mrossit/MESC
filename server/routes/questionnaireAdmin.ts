@@ -237,6 +237,7 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
       order: z.number().optional(),
       metadata: z.object({
         eventDate: z.string().optional(),
+        eventTime: z.string().optional(),
         eventName: z.string().optional(),
         availableTimes: z.array(z.string()).optional(),
         conditionalOptions: z.array(z.string()).optional(),
@@ -405,6 +406,9 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
         showIf: z.string().optional(),
         alternativeDependsOn: z.string().optional(),
         alternativeShowIf: z.string().optional(),
+        eventDate: z.string().optional(),
+        eventTime: z.string().optional(),
+        eventName: z.string().optional(),
         conditionalOptions: z.array(z.string()).optional()
       }).optional()
     });

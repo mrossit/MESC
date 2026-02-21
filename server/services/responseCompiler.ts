@@ -251,6 +251,11 @@ export class ResponseCompiler {
       id?: string;
       question?: string;
       category?: string;
+      metadata?: {
+        eventDate?: string;
+        eventTime?: string;
+        eventName?: string;
+      };
     }
 
     // Categories that may contain specific date/time questions
@@ -289,7 +294,33 @@ export class ResponseCompiler {
         continue;
       }
 
-      // PRIORITY 2: Fallback to regex extraction from question text
+      // PRIORITY 2: Check for structured metadata (eventDate/eventTime)
+      if (q.metadata?.eventDate && q.metadata?.eventTime) {
+        // eventDate can be YYYY-MM-DD (from date input) or DD/MM
+        let date = q.metadata.eventDate;
+        if (date.includes('/')) {
+          // Convert DD/MM to YYYY-MM-DD
+          const parts = date.split('/');
+          date = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        // eventTime can be HH:MM (from time input) or "19h", "19h30"
+        let time = q.metadata.eventTime;
+        if (time.includes('h')) {
+          const timeParts = time.split('h');
+          time = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+        }
+        parsed.push({
+          id: q.id,
+          question: q.question || '',
+          date: date,
+          time: time,
+          category: category
+        });
+        console.log(`      📋 Using metadata: ${q.id} -> ${date} às ${time} (${q.metadata.eventName || 'sem nome'})`);
+        continue;
+      }
+
+      // PRIORITY 3: Fallback to regex extraction from question text
       const questionText = q.question || '';
 
       // Try to extract date: "dia 28/01/2026" or "28/01/2026" or "28/01" or "dia 28/11" or "18/02/26"
@@ -345,6 +376,11 @@ export class ResponseCompiler {
       id?: string;
       question?: string;
       category?: string;
+      metadata?: {
+        eventDate?: string;
+        eventTime?: string;
+        eventName?: string;
+      };
     }
 
     const relevantCategories = ['custom', 'special_event', 'special'];
@@ -364,12 +400,37 @@ export class ResponseCompiler {
         continue;
       }
 
+      if (!q.id) continue;
+
+      // PRIORITY 1: Check for structured metadata (eventDate/eventTime)
+      if (q.metadata?.eventDate && q.metadata?.eventTime) {
+        let date = q.metadata.eventDate;
+        if (date.includes('/')) {
+          const parts = date.split('/');
+          date = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        let time = q.metadata.eventTime;
+        if (time.includes('h')) {
+          const timeParts = time.split('h');
+          time = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+        }
+        parsed.push({
+          id: q.id,
+          question: q.question || '',
+          date: date,
+          time: time,
+          category: category
+        });
+        continue;
+      }
+
+      // PRIORITY 2: Fallback to regex extraction from question text
       const questionText = q.question || '';
 
       const dateMatch = questionText.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
       const timeMatch = questionText.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
 
-      if (dateMatch && timeMatch && q.id) {
+      if (dateMatch && timeMatch) {
         const day = dateMatch[1].padStart(2, '0');
         const month = dateMatch[2].padStart(2, '0');
 
