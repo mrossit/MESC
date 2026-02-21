@@ -15,6 +15,12 @@ interface QuestionnaireQuestionItem {
   category?: string;
   type?: string;
   options?: unknown[];
+  metadata?: {
+    eventDate?: string;
+    eventTime?: string;
+    eventName?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface Minister {
@@ -1647,9 +1653,35 @@ export class ScheduleGenerator {
 
       // Para cada pergunta customizada, extrair informações da missa
       for (const question of customQuestions) {
-        // Extrair data e horário da pergunta
-        // Formato esperado: "Você pode servir na missa ... - dia DD/MM/YYYY às HH:MM?"
-        const massInfo = this.extractMassInfoFromQuestion(question.question, year, month);
+        // PRIORIDADE 1: Usar metadata estruturada (eventDate/eventTime)
+        let massInfo: { date: string; time: string; dayOfWeek: number; minMinisters?: number; maxMinisters?: number } | null = null;
+
+        if (question.metadata?.eventDate && question.metadata?.eventTime) {
+          let eventDate = question.metadata.eventDate;
+          // eventDate pode ser YYYY-MM-DD (do input type=date) ou DD/MM
+          if (eventDate.includes('/')) {
+            const parts = eventDate.split('/');
+            eventDate = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+          let eventTime = question.metadata.eventTime;
+          // eventTime pode ser HH:MM (do input type=time) ou "19h", "19h30"
+          if (eventTime.includes('h')) {
+            const timeParts = eventTime.split('h');
+            eventTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+          }
+          const dateObj = new Date(eventDate + 'T12:00:00');
+          massInfo = {
+            date: eventDate,
+            time: eventTime,
+            dayOfWeek: dateObj.getDay()
+          };
+          console.log(`[SCHEDULE_GEN] 📋 Using metadata: ${question.id} -> ${eventDate} ${eventTime} (${question.metadata.eventName || 'sem nome'})`);
+        }
+
+        // PRIORIDADE 2: Fallback regex do texto da pergunta
+        if (!massInfo) {
+          massInfo = this.extractMassInfoFromQuestion(question.question, year, month);
+        }
 
         if (massInfo) {
           specialMasses.push({
@@ -1660,7 +1692,7 @@ export class ScheduleGenerator {
             minMinisters: massInfo.minMinisters || 7,
             maxMinisters: massInfo.maxMinisters || 7,
             type: question.id, // Usar o ID da pergunta como tipo
-            description: question.question
+            description: question.metadata?.eventName || question.question
           });
           console.log(`[SCHEDULE_GEN] ✅ Special mass added: ${massInfo.date} ${massInfo.time} - ${question.question.substring(0, 60)}...`);
         } else {

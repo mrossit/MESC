@@ -34,6 +34,7 @@ type Question = {
   order?: number; // Ordem personalizada definida pelo coordenador
   metadata?: {
     eventDate?: string;
+    eventTime?: string;
     eventName?: string;
     availableTimes?: string[];
     conditionalTrigger?: boolean;
@@ -1229,6 +1230,9 @@ export default function QuestionnaireUnified() {
         showIf: 'Sim',
         alternativeDependsOn: 'alternative_availability',
         alternativeShowIf: 'Sim',
+        ...(newQuestion.metadata?.eventDate ? { eventDate: newQuestion.metadata.eventDate } : {}),
+        ...(newQuestion.metadata?.eventTime ? { eventTime: newQuestion.metadata.eventTime } : {}),
+        ...(newQuestion.metadata?.eventName ? { eventName: newQuestion.metadata.eventName } : {}),
         ...(newQuestion.type === 'yes_no_with_options' && conditionalTrigger && conditionalOptions.some(o => o.trim())
           ? { conditionalOptions: conditionalOptions.filter(o => o.trim()) }
           : {})
@@ -1370,8 +1374,14 @@ export default function QuestionnaireUnified() {
 
         if (res.ok) {
           const data = await res.json();
-          const updatedBaseQuestions = JSON.parse(JSON.stringify(data.questions));
-          setTemplate({ ...template, questions: data.questions, version: data.version, baseQuestions: updatedBaseQuestions });
+          // Preservar edições locais não salvas (questions com modified: true)
+          const serverQuestions = Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions);
+          const mergedQuestions = serverQuestions.map((sq: Question) => {
+            const localQ = template.questions.find(q => q.id === sq.id && q.modified);
+            return localQ || sq;
+          });
+          const updatedBaseQuestions = JSON.parse(JSON.stringify(serverQuestions));
+          setTemplate({ ...template, questions: mergedQuestions, version: data.version, baseQuestions: updatedBaseQuestions });
           setSuccess(isStandardQuestion
             ? 'Pergunta padrão removida! Se necessário, você pode regenerar o template para restaurá-la.'
             : 'Pergunta customizada removida com sucesso!');
@@ -1821,6 +1831,48 @@ export default function QuestionnaireUnified() {
                             </div>
                           )}
                           
+                          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                            <Label className="text-sm font-semibold">Vincular a Evento/Missa (opcional)</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Preencha para que esta pergunta gere automaticamente um evento na escala
+                            </p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs">Data do Evento</Label>
+                                <Input
+                                  type="date"
+                                  value={newQuestion.metadata?.eventDate || ''}
+                                  onChange={(e) => setNewQuestion(prev => ({
+                                    ...prev,
+                                    metadata: { ...(prev.metadata || {}), eventDate: e.target.value }
+                                  }))}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Horário do Evento</Label>
+                                <Input
+                                  type="time"
+                                  value={newQuestion.metadata?.eventTime || ''}
+                                  onChange={(e) => setNewQuestion(prev => ({
+                                    ...prev,
+                                    metadata: { ...(prev.metadata || {}), eventTime: e.target.value }
+                                  }))}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Nome do Evento</Label>
+                              <Input
+                                value={newQuestion.metadata?.eventName || ''}
+                                onChange={(e) => setNewQuestion(prev => ({
+                                  ...prev,
+                                  metadata: { ...(prev.metadata || {}), eventName: e.target.value }
+                                }))}
+                                placeholder="Ex: Missa de Natal, Via Sacra..."
+                              />
+                            </div>
+                          </div>
+
                           <div>
                             <Label>Categoria</Label>
                             <Select
