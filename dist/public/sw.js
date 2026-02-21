@@ -286,7 +286,24 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('pushsubscriptionchange', (event) => {
-  console.log('[SW] pushsubscriptionchange event', event);
+  console.log('[SW] pushsubscriptionchange event - re-subscribing');
+  event.waitUntil(
+    self.registration.pushManager.subscribe(event.oldSubscription?.options || {
+      userVisibleOnly: true
+    }).then((newSubscription) => {
+      // Sync the new subscription with the server
+      return fetch('/api/push-subscriptions/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(newSubscription.toJSON())
+      });
+    }).then((response) => {
+      console.log('[SW] Re-subscription synced:', response.ok);
+    }).catch((err) => {
+      console.error('[SW] Failed to re-subscribe after pushsubscriptionchange:', err);
+    })
+  );
 });
 
 // Handle app update available and force refresh
