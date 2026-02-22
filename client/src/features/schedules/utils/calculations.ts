@@ -40,15 +40,14 @@ export function isUserScheduledOnDate(
   if (!userId) return false;
 
   const dayAssignments = getAssignmentsForDate(assignments, date);
-  const currentMinister = ministers.find(m => m.id === userId);
-  if (!currentMinister) return false;
 
-  const isCurrentlyAssigned = dayAssignments.some(a => a.ministerId === currentMinister.id);
+  // Compare directly with userId - no need to look up in ministers array
+  const isCurrentlyAssigned = dayAssignments.some(a => a.ministerId === userId);
 
   const dayAssignmentIds = dayAssignments.map(a => a.id);
   const hasSubstitutionRequest = substitutions.some(s =>
     dayAssignmentIds.includes(s.assignmentId) &&
-    s.requestingMinisterId === currentMinister.id
+    s.requestingMinisterId === userId
   );
 
   return isCurrentlyAssigned || hasSubstitutionRequest;
@@ -67,19 +66,16 @@ export function getUserSubstitutionStatus(
   if (!userId) return null;
 
   const dayAssignments = getAssignmentsForDate(assignments, date);
-  const currentMinister = ministers.find(m => m.id === userId);
-  if (!currentMinister) return null;
 
   const dayAssignmentIds = dayAssignments.map(a => a.id);
   const userSubstitutionRequest = substitutions.find(s => {
     const hasAssignment = dayAssignmentIds.includes(s.assignmentId);
-    const isRequester = s.requestingMinisterId === currentMinister.id;
+    const isRequester = s.requestingMinisterId === userId;
     return hasAssignment && isRequester;
   });
 
   if (!userSubstitutionRequest) {
-    const userAssignment = dayAssignments.find(a => a.ministerId === currentMinister.id);
-    return userAssignment ? null : null;
+    return null;
   }
 
   if (userSubstitutionRequest.status === 'pending') {
