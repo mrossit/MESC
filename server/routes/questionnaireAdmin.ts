@@ -724,11 +724,24 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
       }
     }
     
-    const message = isResend 
+    // Enviar push notifications se habilitado
+    if (pushConfig.enabled) {
+      const pushUserIds = allMinisters.map(m => m.id).filter(Boolean) as string[];
+      await sendPushNotificationToUsers(pushUserIds, {
+        title: isResend ? 'Questionário Atualizado' : 'Novo Questionário Disponível',
+        body: isResend
+          ? `O questionário de ${monthNames[month - 1]} de ${year} foi atualizado. Revise suas respostas.`
+          : `Preencha suas disponibilidades para ${monthNames[month - 1]}/${year}`,
+        url: '/questionnaires',
+        tag: `questionnaire-${template.id}`
+      });
+    }
+
+    const message = isResend
       ? 'Questionário reenviado com sucesso! As mudanças estão disponíveis para todos os ministros.'
       : 'Questionário enviado com sucesso para todos os ministros!';
-    
-    res.json({ 
+
+    res.json({
       message,
       isResend,
       template: {
@@ -776,8 +789,8 @@ router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordena
         .from(users)
         .where(eq(users.status, 'active'));
 
-      const questionnaireMonth = updated.targetMonth;
-      const questionnaireYear = updated.targetYear;
+      const questionnaireMonth = updated.month;
+      const questionnaireYear = updated.year;
       const monthName = getMonthName(questionnaireMonth);
 
       // Criar notificação no banco para cada usuário
