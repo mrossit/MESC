@@ -400,7 +400,7 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       question: z.string(),
       options: z.array(z.string()).optional(),
       required: z.boolean(),
-      category: z.enum(['custom']).default('custom'),
+      category: z.enum(['custom', 'special_event']).default('custom'),
       metadata: z.object({
         dependsOn: z.string().optional(),
         showIf: z.string().optional(),
@@ -426,8 +426,9 @@ router.post('/templates/:year/:month/questions', requireAuth, requireRole(['gest
       return res.status(404).json({ error: 'Template not found' });
     }
 
+    const idPrefix = questionData.category === 'special_event' ? 'special' : 'custom';
     const newQuestion = {
-      id: `custom_${Date.now()}`,
+      id: `${idPrefix}_${Date.now()}`,
       ...questionData,
       editable: true,
       modified: false,
