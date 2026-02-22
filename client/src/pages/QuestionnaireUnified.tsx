@@ -639,6 +639,16 @@ export default function QuestionnaireUnified() {
                 }
               }
 
+              // Verificar se a pergunta ainda está visível via dependência alternativa (OR)
+              // Ex: se monthly_availability=Não MAS alternative_availability=Sim, NÃO limpar
+              if (shouldDisable && question.metadata.alternativeDependsOn && question.metadata.alternativeShowIf) {
+                const altRaw = newResponses[question.metadata.alternativeDependsOn];
+                const altVal = typeof altRaw === 'object' && altRaw?.answer !== undefined ? altRaw.answer : altRaw;
+                if (altVal === question.metadata.alternativeShowIf) {
+                  shouldDisable = false; // Pergunta ainda visível via dependência alternativa
+                }
+              }
+
               // Se deve desabilitar, limpar a resposta e limpar dependentes recursivamente
               if (shouldDisable) {
                 if (question.type === 'checkbox') {
@@ -696,6 +706,42 @@ export default function QuestionnaireUnified() {
 
     if (missingRequired.length > 0) {
       setError('Por favor, responda todas as perguntas obrigatórias');
+      return;
+    }
+
+    // Validar perguntas de evento visíveis sem resposta (special_event e custom com metadata de evento)
+    const isQuestionVisible = (q: Question) => {
+      const meta = q.metadata;
+      if (!meta?.dependsOn) return true;
+      const raw = responses[meta.dependsOn];
+      const depVal = typeof raw === 'object' && raw?.answer !== undefined ? raw.answer : raw;
+      const expected = meta.enabledWhen ?? meta.showIf;
+      if (expected === undefined) return true;
+      const primaryMatch = Array.isArray(expected) ? expected.includes(depVal) : depVal === expected;
+      if (primaryMatch) return true;
+      if (meta.alternativeDependsOn && meta.alternativeShowIf) {
+        const altRaw = responses[meta.alternativeDependsOn];
+        const altVal = typeof altRaw === 'object' && altRaw?.answer !== undefined ? altRaw.answer : altRaw;
+        return altVal === meta.alternativeShowIf;
+      }
+      return false;
+    };
+
+    const unansweredEventQuestions = template.questions.filter(q => {
+      // Só verificar perguntas de evento (special_event ou custom com metadata de evento)
+      const isEventQuestion = q.category === 'special_event' ||
+        (q.category === 'custom' && (q.metadata?.eventDate || q.metadata?.eventTime));
+      if (!isEventQuestion) return false;
+      if (!isQuestionVisible(q)) return false;
+      const response = responses[q.id];
+      if (typeof response === 'string') return !response.trim();
+      if (response?.answer !== undefined) return !response.answer;
+      return !response;
+    });
+
+    if (unansweredEventQuestions.length > 0) {
+      const names = unansweredEventQuestions.map(q => q.metadata?.eventName || q.question).join(', ');
+      setError(`Por favor, responda as perguntas sobre eventos/missas especiais: ${names}`);
       return;
     }
 
@@ -1219,12 +1265,14 @@ export default function QuestionnaireUnified() {
 
     if (!template) return;
 
+    const selectedCategory = (newQuestion.category === 'special_event' ? 'special_event' : 'custom') as 'custom' | 'special_event';
+
     const questionPayload = {
       type: newQuestion.type,
       question: newQuestion.question,
       options: newQuestion.options?.filter(o => o.trim()),
       required: newQuestion.required || false,
-      category: 'custom' as const,
+      category: selectedCategory,
       metadata: {
         dependsOn: 'monthly_availability',
         showIf: 'Sim',
@@ -1276,12 +1324,12 @@ export default function QuestionnaireUnified() {
     } else {
       // Template ainda não salvo, apenas atualizar estado local
       const question: Question = {
-        id: `custom_${Date.now()}`,
+        id: `${selectedCategory === 'special_event' ? 'special' : 'custom'}_${Date.now()}`,
         type: newQuestion.type as Question['type'],
         question: newQuestion.question,
         options: newQuestion.options?.filter(o => o.trim()),
         required: newQuestion.required || false,
-        category: 'custom',
+        category: selectedCategory,
         editable: true,
         metadata: questionPayload.metadata
       };
@@ -1884,7 +1932,7 @@ export default function QuestionnaireUnified() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="regular">Regular</SelectItem>
-                                <SelectItem value="special">Eventos Especiais</SelectItem>
+                                <SelectItem value="special_event">Eventos Especiais</SelectItem>
                                 <SelectItem value="custom">Personalizada</SelectItem>
                               </SelectContent>
                             </Select>

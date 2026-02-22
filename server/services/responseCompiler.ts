@@ -272,7 +272,7 @@ export class ResponseCompiler {
 
       // Process if it's a relevant category OR if ID suggests it's special
       const isRelevantCategory = relevantCategories.includes(category);
-      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event');
+      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event') || q.id?.startsWith('special_');
 
       if (!isRelevantCategory && !isSpecialId) {
         continue;
@@ -394,7 +394,7 @@ export class ResponseCompiler {
       }
 
       const isRelevantCategory = relevantCategories.includes(category);
-      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event');
+      const isSpecialId = q.id?.startsWith('custom_') || q.id?.startsWith('special_event') || q.id?.startsWith('special_');
 
       if (!isRelevantCategory && !isSpecialId) {
         continue;
