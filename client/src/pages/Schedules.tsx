@@ -1286,22 +1286,19 @@ export default function Schedules() {
 
   const isUserScheduledOnDate = (date: Date) => {
     if (!user?.id) return false;
-    
+
     const dayAssignments = getAssignmentsForDate(date);
-    // Find current user's minister record - comparing id directly
-    const currentMinister = ministers.find(m => m.id === user.id);
-    if (!currentMinister) return false;
-    
-    // Check if user is currently assigned OR has a substitution request for this date
-    const isCurrentlyAssigned = dayAssignments.some(a => a.ministerId === currentMinister.id);
-    
+
+    // Check if user is currently assigned (compare directly with user.id)
+    const isCurrentlyAssigned = dayAssignments.some(a => a.ministerId === user.id);
+
     // Also check if user requested substitution (even if approved and transferred)
     const dayAssignmentIds = dayAssignments.map(a => a.id);
-    const hasSubstitutionRequest = substitutions.some(s => 
-      dayAssignmentIds.includes(s.assignmentId) && 
-      s.requestingMinisterId === currentMinister.id
+    const hasSubstitutionRequest = substitutions.some(s =>
+      dayAssignmentIds.includes(s.assignmentId) &&
+      s.requestingMinisterId === user.id
     );
-    
+
     return isCurrentlyAssigned || hasSubstitutionRequest;
   };
 
@@ -1309,23 +1306,15 @@ export default function Schedules() {
     if (!user?.id) return null;
 
     const dayAssignments = getAssignmentsForDate(date);
-    const currentMinister = ministers.find(m => m.id === user.id);
-    if (!currentMinister) return null;
 
     // Check if user has a substitution request for this date
     // We need to check by requestingMinisterId, not by current assignment
     // because when approved, the assignment is transferred to the substitute
     const dayAssignmentIds = dayAssignments.map(a => a.id);
 
-    // DEBUG: Log para verificar dados
-    if (dayAssignments.length > 0 && substitutions.length > 0) {
-    }
-
     const userSubstitutionRequest = substitutions.find(s => {
       const hasAssignment = dayAssignmentIds.includes(s.assignmentId);
-      const isRequester = s.requestingMinisterId === currentMinister.id;
-
-
+      const isRequester = s.requestingMinisterId === user.id;
       return hasAssignment && isRequester;
     });
 
@@ -2315,9 +2304,8 @@ export default function Schedules() {
                   <div className="grid gap-2">
                     {(() => {
                       // Check if current user is Auxiliar 1 or 2 for this mass
-                      const currentMinister = ministers.find(m => m.id === user?.id);
                       const userAssignmentsForThisMass = selectedDateAssignments.filter(
-                        a => a.ministerId === currentMinister?.id
+                        a => a.ministerId === user?.id
                       );
                       const isUserAuxiliar1or2 = userAssignmentsForThisMass.some(
                         a => a.position === 1 || a.position === 2
@@ -2326,7 +2314,7 @@ export default function Schedules() {
                       return selectedDateAssignments
                           .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
                           .map((assignment) => {
-                            const isCurrentUser = currentMinister && assignment.ministerId === currentMinister.id;
+                            const isCurrentUser = user?.id && assignment.ministerId === user.id;
 
                             return (
                               <div
@@ -3032,17 +3020,16 @@ export default function Schedules() {
                   const totalCount = assignments.length;
 
                   // Verificar se o usuário atual está escalado neste horário
-                  const currentMinister = ministers.find(m => m.id === user?.id);
-                  const userAssignment = currentMinister
-                    ? assignments.find(a => a.ministerId === currentMinister.id)
+                  const userAssignment = user?.id
+                    ? assignments.find(a => a.ministerId === user.id)
                     : null;
 
                   // Verificar status de substituição do usuário neste horário
                   let userSubstitutionStatus = null;
-                  if (currentMinister && userAssignment) {
+                  if (user?.id && userAssignment) {
                     const substitutionRequest = substitutions.find(s =>
                       s.assignmentId === userAssignment.id &&
-                      s.requestingMinisterId === currentMinister.id
+                      s.requestingMinisterId === user.id
                     );
                     if (substitutionRequest) {
                       userSubstitutionStatus = substitutionRequest.status;
@@ -3169,7 +3156,7 @@ export default function Schedules() {
                           .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
                           .slice(0, 4)
                           .map((assignment, idx) => {
-                            const isUserAssignment = currentMinister && assignment.ministerId === currentMinister.id;
+                            const isUserAssignment = user?.id && assignment.ministerId === user.id;
                             return (
                               <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm">
                                 <Badge
@@ -3195,7 +3182,7 @@ export default function Schedules() {
                         {assignments.length > 4 && (
                           <div className="text-xs text-muted-foreground italic">
                             +{assignments.length - 4} ministros...
-                            {userAssignment && !assignments.slice(0, 4).some(a => a.ministerId === currentMinister?.id) && (
+                            {userAssignment && !assignments.slice(0, 4).some(a => a.ministerId === user?.id) && (
                               <span className="font-semibold" style={{ color: '#959D90' }}> (incluindo você)</span>
                             )}
                           </div>
