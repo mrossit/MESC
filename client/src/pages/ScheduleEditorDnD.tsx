@@ -143,25 +143,37 @@ export default function ScheduleEditorDnD() {
         }
       }
 
-      // Buscar ministros
-      const ministersResponse = await fetch('/api/users/active', { credentials: 'include' });
-      if (ministersResponse.ok) {
-        const response = await ministersResponse.json();
-        // Handle paginated response format { data: [], total, hasMore }
-        const ministersData: ApiUser[] = response.data ?? response;
-        const formattedMinisters: Minister[] = ministersData
-          .filter((u) => u.role === 'ministro' && u.status === 'active')
-          .map((u) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            photoUrl: u.photoUrl,
-            preferredPosition: u.preferredPosition,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
+      // Buscar todos os ministros (com paginação automática)
+      const allMinistersData: ApiUser[] = [];
+      let mOffset = 0;
+      const mLimit = 500;
+      let mHasMore = true;
 
-        setAllMinisters(formattedMinisters);
+      while (mHasMore) {
+        const ministersResponse = await fetch(`/api/users/active?limit=${mLimit}&offset=${mOffset}`, { credentials: 'include' });
+        if (ministersResponse.ok) {
+          const response = await ministersResponse.json();
+          const pageData: ApiUser[] = response.data ?? response;
+          allMinistersData.push(...pageData);
+          mHasMore = response.hasMore === true;
+          mOffset += mLimit;
+        } else {
+          break;
+        }
       }
+
+      const formattedMinisters: Minister[] = allMinistersData
+        .filter((u) => u.role === 'ministro' && u.status === 'active')
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          photoUrl: u.photoUrl,
+          preferredPosition: u.preferredPosition,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setAllMinisters(formattedMinisters);
     } catch (error) {
       console.error('Error fetching schedule data:', error);
       toast({
