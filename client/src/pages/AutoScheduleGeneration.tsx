@@ -652,7 +652,11 @@ export default function AutoScheduleGeneration() {
                               role: '',
                               totalServices: 0,
                               availabilityScore: 0
-                            }))
+                            })),
+                            // Preservar backups, removendo ministros que agora foram escalados
+                            backupMinisters: (s.backupMinisters || []).filter(
+                              (b: any) => !(updatedSchedule.ministers as UpdatedMinister[]).some((m) => m.ministerId === b.id)
+                            )
                           }
                         : s
                     )
