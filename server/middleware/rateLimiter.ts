@@ -55,7 +55,7 @@ export const authRateLimiter = rateLimit({
  */
 export const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 100, // Máximo 100 requests por minuto por IP
+  max: 300, // Máximo 300 requests por minuto por IP
   
   // Desabilita validações pois usamos trust proxy no Replit
   validate: false,
