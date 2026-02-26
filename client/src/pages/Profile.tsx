@@ -121,11 +121,22 @@ export default function Profile() {
   const { data: usersData } = useQuery<AvailableUser[]>({
     queryKey: ['/api/users/active'],
     queryFn: async () => {
-      const res = await fetch('/api/users/active', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch users');
-      const response = await res.json();
-      // Handle paginated response format { data: [], total, hasMore }
-      return response.data ?? response;
+      const allUsers: AvailableUser[] = [];
+      let offset = 0;
+      const limit = 500;
+      let hasMore = true;
+
+      while (hasMore) {
+        const res = await fetch(`/api/users/active?limit=${limit}&offset=${offset}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch users');
+        const response = await res.json();
+        const data = response.data ?? response;
+        allUsers.push(...data);
+        hasMore = response.hasMore === true;
+        offset += limit;
+      }
+
+      return allUsers;
     },
     enabled: showAddFamily
   });

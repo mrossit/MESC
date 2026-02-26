@@ -71,30 +71,38 @@ export default function MinistersDirectory() {
   const user = authData?.user;
   const isCoordinator = user?.role === 'coordenador' || user?.role === 'gestor';
 
-  // Buscar todos os ministros ativos
+  // Buscar todos os ministros ativos (com paginação automática)
   const { data: ministersData, isLoading, error } = useQuery({
     queryKey: ['/api/users/active'],
     queryFn: async () => {
-      const res = await fetch('/api/users/active', {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
+      const allUsers: Minister[] = [];
+      let offset = 0;
+      const limit = 500;
+      let hasMore = true;
+
+      while (hasMore) {
+        const res = await fetch(`/api/users/active?limit=${limit}&offset=${offset}`, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Erro na resposta:', errorText);
+          throw new Error(`Failed to fetch ministers: ${res.status}`);
         }
-      });
 
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Erro na resposta:', errorText);
-        throw new Error(`Failed to fetch ministers: ${res.status}`);
+        const response = await res.json();
+        const data = response.data ?? response;
+        allUsers.push(...data);
+        hasMore = response.hasMore === true;
+        offset += limit;
       }
 
-      const response = await res.json();
-      // Handle paginated response format { data: [], total, hasMore }
-      const data = response.data ?? response;
-
       // Filtrar ministros, coordenadores e gestores ativos
-      const filtered = data.filter((user: Minister) =>
+      const filtered = allUsers.filter((user: Minister) =>
         (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'gestor') &&
         (!user.status || user.status === 'active')
       );

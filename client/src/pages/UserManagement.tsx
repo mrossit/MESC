@@ -150,29 +150,40 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   const [sortField, setSortField] = useState<keyof User>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Função para carregar usuários (declarada antes dos mutations)
+  // Função para carregar usuários com paginação automática
   const fetchUsers = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
 
-      const response = await fetch("/api/users", {
-        credentials: "include"
-      });
+      const allUsers: User[] = [];
+      let offset = 0;
+      const limit = 500;
+      let hasMore = true;
 
-      if (response.ok) {
-        const responseData = await response.json();
-        // Handle paginated response format { data: [], total, hasMore }
-        const data = responseData.data ?? responseData;
-        setUsers(data);
-      } else {
-        toast({
-          title: "Erro",
-          description: "Erro ao carregar usuários",
-          variant: "destructive"
+      while (hasMore) {
+        const response = await fetch(`/api/users?limit=${limit}&offset=${offset}`, {
+          credentials: "include"
         });
+
+        if (response.ok) {
+          const responseData = await response.json();
+          const data = responseData.data ?? responseData;
+          allUsers.push(...data);
+          hasMore = responseData.hasMore === true;
+          offset += limit;
+        } else {
+          toast({
+            title: "Erro",
+            description: "Erro ao carregar usuários",
+            variant: "destructive"
+          });
+          return;
+        }
       }
+
+      setUsers(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast({
