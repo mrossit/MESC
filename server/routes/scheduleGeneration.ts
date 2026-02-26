@@ -945,6 +945,18 @@ router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor',
       groupedSchedules[key].push(schedule);
     });
 
+    // Extrair backups do JSON original/final da geração
+    const savedScheduleData = (generation.finalSchedule || generation.originalSchedule) as any;
+    const savedSchedules: any[] = savedScheduleData?.schedules || savedScheduleData || [];
+    const backupsByKey: Record<string, any[]> = {};
+    if (Array.isArray(savedSchedules)) {
+      savedSchedules.forEach((s: any) => {
+        if (s.date && s.time && Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
+          backupsByKey[`${s.date}_${s.time}`] = s.backupMinisters;
+        }
+      });
+    }
+
     // Format as GeneratedSchedule-like structure
     const formattedSchedules = Object.entries(groupedSchedules).map(([key, ministers]) => {
       const [date, time] = key.split('_');
@@ -960,7 +972,7 @@ router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor',
           availabilityScore: 0,
           position: m.position
         })),
-        backupMinisters: [],
+        backupMinisters: backupsByKey[key] || [],
         confidence: 1.0,
         qualityScore: 'Excelente'
       };
