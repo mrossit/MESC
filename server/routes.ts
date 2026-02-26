@@ -89,14 +89,24 @@ interface DatabaseError extends Error {
   code?: string;
 }
 
+// Strip heavy/sensitive fields from user objects for list endpoints
+// imageData can be hundreds of KB per user in base64, causing massive responses
+function stripHeavyFields(user: any): any {
+  const { imageData, imageContentType, passwordHash, ...rest } = user;
+  return rest;
+}
+
 // 🤖 ADAPTIVE LEARNING: Sanitize user data to hide reliability metrics from ministers
 // Reliability scores should ONLY be visible to coordinators/managers to avoid:
 // - Competition between ministers
 // - Deviation from spiritual purpose (serving God, not chasing points)
 function sanitizeUserData(user: UserWithReliability, requestingUserRole?: string): Partial<User> {
-  // Coordinators and managers can see all data
+  // Always strip heavy/sensitive fields first
+  const cleanUser = stripHeavyFields(user);
+
+  // Coordinators and managers can see all data (minus heavy fields)
   if (requestingUserRole === 'coordenador' || requestingUserRole === 'gestor') {
-    return user;
+    return cleanUser;
   }
 
   // Ministers should NOT see reliability metrics - remove sensitive fields
@@ -109,7 +119,7 @@ function sanitizeUserData(user: UserWithReliability, requestingUserRole?: string
     lastReliabilityUpdate,
     reliabilityNotes,
     ...sanitizedUser
-  } = user;
+  } = cleanUser;
 
   return sanitizedUser;
 }
@@ -449,7 +459,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
       const result = await storage.getUsersByStatusPaginated('active', { limit, offset });
-      res.json(result);
+      // Strip imageData/passwordHash to avoid massive responses
+      res.json({
+        ...result,
+        data: result.data.map(stripHeavyFields)
+      });
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuários ativos");
       res.status(errorResponse.status).json(errorResponse);
@@ -462,7 +476,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
       const result = await storage.getUsersByStatusPaginated('pending', { limit, offset });
-      res.json(result);
+      // Strip imageData/passwordHash to avoid massive responses
+      res.json({
+        ...result,
+        data: result.data.map(stripHeavyFields)
+      });
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuários pendentes");
       res.status(errorResponse.status).json(errorResponse);
@@ -496,7 +514,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = req.query.status as string | undefined;
 
       const result = await storage.getUsersPaginated({ limit, offset, status });
-      res.json(result);
+      // Strip imageData/passwordHash to avoid massive responses
+      res.json({
+        ...result,
+        data: result.data.map(stripHeavyFields)
+      });
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar lista de usuários");
       res.status(errorResponse.status).json(errorResponse);
@@ -509,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
-      res.json(user);
+      res.json(stripHeavyFields(user));
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar usuário");
       res.status(errorResponse.status).json(errorResponse);
@@ -579,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { role, status, ...safeUserData } = userData;
       
       const user = await storage.updateUser(req.params.id, safeUserData);
-      res.json(user);
+      res.json(stripHeavyFields(user));
     } catch (error) {
       const errorResponse = handleApiError(error, "atualizar usuário");
       res.status(errorResponse.status).json(errorResponse);
