@@ -67,6 +67,7 @@ export interface AvailabilityData {
   dailyMassAvailability: string[];
   weekdayMasses?: string[];
   specialEvents?: Record<string, string | boolean | number>;
+  customEventsByDateTime?: Record<string, boolean>; // "2026-03-28_07:00" → true/false
 }
 
 export interface MassTime {
@@ -1047,6 +1048,51 @@ export class ScheduleGenerator {
       return;
     }
 
+    // Parsear custom event questions para mapear IDs → {date, time}
+    const customEventIdToDateTime = new Map<string, {date: string, time: string}>();
+    const questions = targetQuestionnaire.questions;
+    if (Array.isArray(questions)) {
+      for (const q of questions) {
+        const item = q as { id?: string; question?: string; category?: string; metadata?: { eventDate?: string; eventTime?: string } };
+        if (!item.id) continue;
+        const isCustom = item.id.startsWith('custom_') || item.id.startsWith('special_event');
+        if (!isCustom) continue;
+
+        // Prioridade 1: metadata estruturado
+        if (item.metadata?.eventDate && item.metadata?.eventTime) {
+          let date = item.metadata.eventDate;
+          if (date.includes('/')) {
+            const parts = date.split('/');
+            date = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+          let time = item.metadata.eventTime;
+          if (time.includes('h')) {
+            const tp = time.split('h');
+            time = `${tp[0].padStart(2, '0')}:${(tp[1] || '00').padStart(2, '0')}`;
+          }
+          customEventIdToDateTime.set(item.id, { date, time });
+          continue;
+        }
+
+        // Prioridade 2: regex do texto da pergunta
+        const text = item.question || '';
+        const dateMatch = text.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
+        const timeMatch = text.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+        if (dateMatch && timeMatch) {
+          const day = dateMatch[1].padStart(2, '0');
+          const mo = dateMatch[2].padStart(2, '0');
+          let yr = dateMatch[3] || year.toString();
+          if (yr.length === 2) yr = '20' + yr;
+          const hour = timeMatch[1].padStart(2, '0');
+          const minute = (timeMatch[2] || '00').padStart(2, '0');
+          customEventIdToDateTime.set(item.id, { date: `${yr}-${mo}-${day}`, time: `${hour}:${minute}` });
+        }
+      }
+    }
+    if (customEventIdToDateTime.size > 0) {
+      console.log(`[SCHEDULE_GEN] 📋 Custom event mappings:`, Object.fromEntries(customEventIdToDateTime));
+    }
+
     // Buscar as respostas deste questionário
     const responses = await this.db.select()
       .from(questionnaireResponses)
@@ -1077,6 +1123,20 @@ export class ScheduleGenerator {
       // 🔧 NORMALIZAÇÃO: Converter booleanos em strings para eventos especiais
       const normalizedSpecialEvents = this.normalizeSpecialEvents(specialEvents);
 
+      // Construir customEventsByDateTime a partir de specialEvents + mapeamento de questions
+      const customEventsByDateTime: Record<string, boolean> = {};
+      if (normalizedSpecialEvents && customEventIdToDateTime.size > 0) {
+        for (const [eventId, dateTime] of customEventIdToDateTime) {
+          const response = normalizedSpecialEvents[eventId];
+          if (response !== undefined) {
+            const responseStr = String(response);
+            const isAvailable = responseStr === 'Sim' || responseStr === 'sim' || responseStr === 'true' || responseStr === '1';
+            const key = `${dateTime.date}_${dateTime.time}`;
+            customEventsByDateTime[key] = isAvailable;
+          }
+        }
+      }
+
       const processedData = {
         ministerId: r.userId,
         availableSundays: normalizedSundays,
@@ -1085,7 +1145,8 @@ export class ScheduleGenerator {
         canSubstitute,
         dailyMassAvailability,
         specialEvents: normalizedSpecialEvents,
-        weekdayMasses: adapted.weekdayMasses
+        weekdayMasses: adapted.weekdayMasses,
+        customEventsByDateTime: Object.keys(customEventsByDateTime).length > 0 ? customEventsByDateTime : undefined
       };
 
       console.log(`[SCHEDULE_GEN] 💾 DADOS PROCESSADOS para ${r.userId}:`, processedData);
@@ -2442,6 +2503,21 @@ export class ScheduleGenerator {
       return false;
     }
 
+    // Para missas mensais de São Judas, verificar via customEventsByDateTime
+    if (massType === 'missa_sao_judas_mensal' && massTime && massDate) {
+      const availability = this.availabilityData.get(ministerId);
+      if (availability?.customEventsByDateTime) {
+        const key = `${massDate}_${massTime}`;
+        const isAvailable = availability.customEventsByDateTime[key];
+        if (isAvailable !== undefined) {
+          console.log(`[SPECIAL_MASS] 🔍 ${ministerId} para ${massType} (${key}): ${isAvailable}`);
+          return isAvailable;
+        }
+      }
+      console.log(`[SPECIAL_MASS] ❌ ${ministerId}: Sem resposta para ${massType} ${massDate}_${massTime}`);
+      return false;
+    }
+
     // 🔥 CRITICAL FIX: Mapear tipos de missa para campos CORRETOS do questionário v2.0
     const massTypeMapping: { [key: string]: string } = {
       'missa_cura_libertacao': 'healing_liberation',     // v2.0: healing_liberation (não healing_liberation_mass!)
@@ -2504,8 +2580,8 @@ export class ScheduleGenerator {
       // 🔧 FIX: Tipos regulares (domingos, diárias) são verificados por dia/horário depois
       // Tipos de São Judas têm verificação própria
       // Qualquer outro tipo: verificar se há resposta específica em specialEvents
-      const regularTypes = ['missa_dominical', 'missa_diaria', 'missa', 'missa_sao_judas', 'missa_sao_judas_festa', 
-                           'missa_finados', 'missa_puc', 'missa_sao_judas_mensal', 'adoracao_santissimo'];
+      const regularTypes = ['missa_dominical', 'missa_diaria', 'missa', 'missa_sao_judas', 'missa_sao_judas_festa',
+                           'missa_finados', 'missa_puc', 'adoracao_santissimo'];
       if (regularTypes.includes(massType)) {
         console.log(`[SPECIAL_MASS] ℹ️ Tipo regular ${massType}, verificação por dia/horário`);
         return true;
