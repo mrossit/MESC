@@ -83,4 +83,8 @@ export interface EditingSchedule {
     id: string;
     name: string;
   }>;
+  backupMinisters?: Array<{
+    id: string;
+    name: string;
+  }>;
 }

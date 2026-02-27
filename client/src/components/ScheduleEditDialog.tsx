@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown, Edit3 } from 'lucide-react';
+import { GripVertical, X, Plus, Save, ChevronUp, ChevronDown, Edit3, UserPlus } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ interface ScheduleEditDialogProps {
   time: string;
   initialMinisters: Minister[];
   onSave: () => void;
+  backupMinisters?: Array<{ id: string; name: string }>;
 }
 
 export function ScheduleEditDialog({
@@ -31,7 +32,8 @@ export function ScheduleEditDialog({
   date,
   time,
   initialMinisters,
-  onSave
+  onSave,
+  backupMinisters
 }: ScheduleEditDialogProps) {
   const [ministers, setMinisters] = useState<Minister[]>(initialMinisters);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -321,6 +323,35 @@ export function ScheduleEditDialog({
                 )}
               </div>
             </div>
+
+            {/* Backups disponíveis */}
+            {(() => {
+              const availableBackups = (backupMinisters || []).filter(
+                b => b.id && !ministers.some(m => m.id === b.id)
+              );
+              if (availableBackups.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Backups Disponíveis ({availableBackups.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {availableBackups.map((backup) => (
+                      <Badge
+                        key={backup.id}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-accent transition-colors px-3 py-1.5 text-xs"
+                        onClick={() => handleAddMinisterAtPosition({ id: backup.id, name: backup.name }, insertPosition)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {formatMinisterName(backup.name)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Adicionar ministro */}
             <div className="space-y-2">

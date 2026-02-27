@@ -284,6 +284,8 @@ export default function Schedules() {
   const [editDialogDate, setEditDialogDate] = useState<string>("");
   const [editDialogTime, setEditDialogTime] = useState<string>("");
   const [editDialogMinisters, setEditDialogMinisters] = useState<{ id: string | null; name: string }[]>([]);
+  const [backupsByTime, setBackupsByTime] = useState<Record<string, any[]>>({});
+  const [editDialogBackups, setEditDialogBackups] = useState<Array<{ id: string; name: string }>>([]);
 
   // Estado para seleção de horário antes de editar
   const [isTimeSelectionDialogOpen, setIsTimeSelectionDialogOpen] = useState(false);
@@ -403,6 +405,9 @@ export default function Schedules() {
         const data = await response.json();
         console.log('[DEBUG] Received data:', data);
         console.log('[DEBUG] Assignments count:', data.assignments?.length || 0);
+
+        // Extrair backups da resposta
+        setBackupsByTime(data.backupsByTime || {});
 
         if (data.assignments && data.assignments.length > 0) {
           console.log('[DEBUG] Setting assignments:', data.assignments);
@@ -820,23 +825,29 @@ export default function Schedules() {
 
         let rowCount = 0;
         allDays.forEach(day => {
-          const massTimes = getMassTimesForDate(day);
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const standardMassTimes = getMassTimesForDate(day);
+          const actualTimesForDay = Array.from(new Set(
+            assignments.filter(a => a.date === dateStr).map(a => normalizeMassTime(a.massTime))
+          ));
+          // Mesclar horários padrão com reais, mas excluir padrão vazio quando há dados reais em outros horários
+          const massTimes = Array.from(new Set([
+            ...standardMassTimes.map(normalizeMassTime),
+            ...actualTimesForDay
+          ])).sort().filter(mt => {
+            if (actualTimesForDay.includes(mt)) return true;
+            if (actualTimesForDay.length > 0) return false;
+            return true;
+          });
 
           if (massTimes.length > 0) {
             massTimes.forEach(massTime => {
-              const dateStr = format(day, 'yyyy-MM-dd');
               const dayName = format(day, 'EEEE', { locale: ptBR });
               const dayNumber = day.getDate();
               const time = massTime.substring(0, 5);
 
               // Normalizar formato de hora para comparação
               const normalizedMassTime = normalizeMassTime(massTime);
-
-              // Contar assignments para esta data/hora
-              const assignmentsForMass = assignments.filter(
-                a => a.date === dateStr && normalizeMassTime(a.massTime) === normalizedMassTime
-              );
-
 
               // Obter tipo e cor da missa
               const massInfo = getMassTypeAndColor(day, normalizedMassTime);
@@ -1417,8 +1428,20 @@ export default function Schedules() {
       ])
     ).sort();
 
+    // Filtrar horários padrão que não têm nenhuma assignment
+    // (ex: sexta 06:30 quando na realidade só há missa às 05:00)
+    const normalizedActualTimes = new Set(uniqueActualTimes.map(normalizeMassTime));
+    const filteredMassTimes = allMassTimes.filter(mt => {
+      // Manter se tem dados reais para este horário
+      if (normalizedActualTimes.has(mt)) return true;
+      // Manter horários padrão SOMENTE se não existem dados reais em outros horários neste dia
+      // (ou seja, dia sem nenhum dado = mostra o padrão; dia com dados em outro horário = oculta padrão vazio)
+      if (normalizedActualTimes.size > 0) return false;
+      return true;
+    });
+
     // Adicionar missas normais
-    allMassTimes.forEach((massTime) => {
+    filteredMassTimes.forEach((massTime) => {
       const normalizedMassTime = normalizeMassTime(massTime);
       const assignmentsForMass = assignments.filter(
         (assignment) =>
@@ -2549,6 +2572,33 @@ export default function Schedules() {
                           });
                     })()}
                   </div>
+
+                  {/* Backups disponíveis (apenas para coordenadores) */}
+                  {isCoordinator && selectedMassTime && (() => {
+                    const backups = (backupsByTime[selectedMassTime] || []).filter(
+                      (b: any) => b.id && !selectedDateAssignments.some(a => a.ministerId === b.id)
+                    );
+                    if (backups.length === 0) return null;
+                    return (
+                      <div className="mt-4 pt-3 border-t">
+                        <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1">
+                          <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          Backups Disponíveis ({backups.length})
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {backups.map((backup: any) => (
+                            <Badge
+                              key={backup.id}
+                              variant="outline"
+                              className="text-[10px] sm:text-xs px-2 py-1"
+                            >
+                              {formatMinisterName(backup.name)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -3137,6 +3187,7 @@ export default function Schedules() {
                                     setEditDialogDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '');
                                     setEditDialogTime(massTime);
                                     setEditDialogMinisters(ministersForEdit);
+                                    setEditDialogBackups((backupsByTime[massTime] || []).map((b: any) => ({ id: b.id, name: b.name })));
                                     setIsTimeSelectionDialogOpen(false);
                                     setIsEditDialogOpen(true);
                                   }}
@@ -3210,6 +3261,7 @@ export default function Schedules() {
         date={editDialogDate}
         time={editDialogTime}
         initialMinisters={editDialogMinisters}
+        backupMinisters={editDialogBackups}
         onSave={async () => {
           // Recarregar dados após salvar
           await fetchSchedules();
