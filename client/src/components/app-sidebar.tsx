@@ -152,10 +152,10 @@ export function AppSidebar() {
     {
       title: "Formação",
       icon: GraduationCap,
-      roles: ["gestor", "coordenador", "ministro"],
+      roles: ["gestor", "coordenador"],
       items: [
-        { title: "Trilha Liturgia", href: "/formation/liturgy", roles: ["gestor", "coordenador", "ministro"] },
-        { title: "Espiritualidade", href: "/formation/spirituality", roles: ["gestor", "coordenador", "ministro"] },
+        { title: "Trilha Liturgia", href: "/formation/liturgy", roles: ["gestor", "coordenador"] },
+        { title: "Espiritualidade", href: "/formation/spirituality", roles: ["gestor", "coordenador"] },
         { title: "Biblioteca", href: "/formation/library", roles: ["gestor", "coordenador"] },
       ]
     },

@@ -762,7 +762,17 @@ export default function Formation() {
     enabled: !!overview
   });
 
-  const tracks = overview?.tracks ?? [];
+  // Para ministros, filtrar apenas módulos 100% completos
+  const allTracks = overview?.tracks ?? [];
+  const tracks = useMemo(() => {
+    if (isAdmin) return allTracks;
+    return allTracks
+      .map((track) => ({
+        ...track,
+        modules: track.modules.filter((m) => m.stats.progressPercentage === 100),
+      }))
+      .filter((track) => track.modules.length > 0);
+  }, [allTracks, isAdmin]);
   const summary = overview?.summary;
 
   // Helper to get certificate status for a track
