@@ -90,7 +90,8 @@
       "Bash(npx vite build:*)",
       "Bash(gh auth status:*)",
       "Bash(git:*)",
-      "Bash(npx web-push:*)"
+      "Bash(npx web-push:*)",
+      "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql:*)"
     ],
     "deny": [],
     "ask": []
