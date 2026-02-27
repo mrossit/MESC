@@ -129,7 +129,7 @@ export function CommandSearch() {
       href: "/formation/liturgy",
       icon: GraduationCap,
       group: "Formação",
-      roles: ["gestor", "coordenador", "ministro"]
+      roles: ["gestor", "coordenador"]
     },
     {
       id: "formation-spirituality",
@@ -138,7 +138,7 @@ export function CommandSearch() {
       href: "/formation/spirituality",
       icon: GraduationCap,
       group: "Formação",
-      roles: ["gestor", "coordenador", "ministro"]
+      roles: ["gestor", "coordenador"]
     },
     {
       id: "formation-library",
@@ -147,7 +147,7 @@ export function CommandSearch() {
       href: "/formation/library",
       icon: GraduationCap,
       group: "Formação",
-      roles: ["gestor", "coordenador", "ministro"]
+      roles: ["gestor", "coordenador"]
     },
     {
       id: "communication",

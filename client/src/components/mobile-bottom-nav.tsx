@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Calendar, Users, GraduationCap, Menu, Home } from "lucide-react";
+import { Calendar, Users, Menu, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -30,9 +30,9 @@ export function MobileBottomNav() {
       icon: Users,
     },
     {
-      title: "Liturgia",
-      href: "/formation/liturgy",
-      icon: GraduationCap,
+      title: "Perfil",
+      href: "/profile",
+      icon: Users,
     },
   ];
 
