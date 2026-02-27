@@ -481,7 +481,8 @@ export default function AutoScheduleGeneration() {
                     onEdit={() => setEditingSchedule({
                       date: schedule.date,
                       time: schedule.time,
-                      ministers: schedule.ministers.map(m => ({ id: m.id, name: m.name }))
+                      ministers: schedule.ministers.map(m => ({ id: m.id, name: m.name })),
+                      backupMinisters: (schedule.backupMinisters || []).map((b: any) => ({ id: b.id, name: b.name }))
                     })}
                     index={index}
                   />
@@ -632,6 +633,7 @@ export default function AutoScheduleGeneration() {
             date={editingSchedule.date}
             time={editingSchedule.time}
             initialMinisters={editingSchedule.ministers}
+            backupMinisters={editingSchedule.backupMinisters}
             onSave={async () => {
               // Após salvar, atualizar apenas a escala específica editada
               if (generatedData && editingSchedule) {

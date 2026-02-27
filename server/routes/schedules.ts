@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
-import { eq, and, sql, gte, lte, count } from "drizzle-orm";
+import { eq, and, sql, gte, lte, count, desc } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
 import type { ScheduleAssignment } from "../types/schedules";
@@ -293,10 +293,45 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
     // Mesclar escalações de missas com as de adoração
     const allAssignments = [...massAssignments, ...adorationAssignments];
 
+    // Buscar backups da geração do mês (apenas para coordenadores)
+    let backupsByTime: Record<string, any[]> = {};
+    if (isAdmin) {
+      try {
+        const [yearStr, monthStr] = targetDateStr.split('-');
+        const genYear = parseInt(yearStr);
+        const genMonth = parseInt(monthStr);
+
+        const { scheduleGenerations } = await import('@shared/schema');
+        const [generation] = await db.select()
+          .from(scheduleGenerations)
+          .where(and(
+            eq(scheduleGenerations.year, genYear),
+            eq(scheduleGenerations.month, genMonth)
+          ))
+          .orderBy(desc(scheduleGenerations.createdAt))
+          .limit(1);
+
+        if (generation) {
+          const savedData = (generation.finalSchedule || generation.originalSchedule) as any;
+          const savedSchedules: any[] = savedData?.schedules || savedData || [];
+          if (Array.isArray(savedSchedules)) {
+            savedSchedules.forEach((s: any) => {
+              if (s.date === targetDateStr && s.time && Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
+                backupsByTime[s.time] = s.backupMinisters;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[SCHEDULES_BY_DATE] Erro ao buscar backups:", e);
+      }
+    }
+
     if (allAssignments.length === 0) {
       return res.json({
         schedule: null,
         assignments: [],
+        backupsByTime,
         message: "Nenhuma escala encontrada para esta data"
       });
     }
@@ -307,7 +342,8 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         date: targetDateStr,
         status: "scheduled"
       },
-      assignments: allAssignments
+      assignments: allAssignments,
+      backupsByTime
     });
   } catch (error) {
     console.error("Error fetching schedule by date:", error);
