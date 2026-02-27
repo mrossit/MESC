@@ -9,14 +9,14 @@ import {
   type InsertFormationLesson,
   type InsertFormationLessonSection
 } from '@shared/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, desc, asc, sql, count } from 'drizzle-orm';
 import { authenticateToken, AuthRequest } from '../auth';
 
 const router = Router();
 
 // Helper function to extract error message
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return getErrorMessage(error);
+  if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return 'Unknown error';
 }
@@ -686,6 +686,210 @@ router.post('/lessons/:lessonId/sections/reorder', async (req, res) => {
     console.error('Error reordering sections:', error);
     res.status(500).json({
       error: 'Erro ao reordenar seções',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// ========================================
+// REORDER ENDPOINTS
+// ========================================
+
+// Reorder tracks
+router.post('/tracks/reorder', async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        message: 'ids deve ser um array'
+      });
+    }
+
+    const updates = ids.map((id: string, index: number) =>
+      db
+        .update(formationTracks)
+        .set({ orderIndex: index })
+        .where(eq(formationTracks.id, id))
+    );
+
+    await Promise.all(updates);
+
+    res.json({ message: 'Ordem das trilhas atualizada com sucesso' });
+  } catch (error: unknown) {
+    console.error('Error reordering tracks:', error);
+    res.status(500).json({
+      error: 'Erro ao reordenar trilhas',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// Reorder modules within a track
+router.post('/tracks/:trackId/modules/reorder', async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        message: 'ids deve ser um array'
+      });
+    }
+
+    const updates = ids.map((id: string, index: number) =>
+      db
+        .update(formationModules)
+        .set({ orderIndex: index })
+        .where(eq(formationModules.id, id))
+    );
+
+    await Promise.all(updates);
+
+    res.json({ message: 'Ordem dos módulos atualizada com sucesso' });
+  } catch (error: unknown) {
+    console.error('Error reordering modules:', error);
+    res.status(500).json({
+      error: 'Erro ao reordenar módulos',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// Reorder lessons within a module
+router.post('/modules/:moduleId/lessons/reorder', async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        message: 'ids deve ser um array'
+      });
+    }
+
+    const updates = ids.map((id: string, index: number) =>
+      db
+        .update(formationLessons)
+        .set({ orderIndex: index })
+        .where(eq(formationLessons.id, id))
+    );
+
+    await Promise.all(updates);
+
+    res.json({ message: 'Ordem das lições atualizada com sucesso' });
+  } catch (error: unknown) {
+    console.error('Error reordering lessons:', error);
+    res.status(500).json({
+      error: 'Erro ao reordenar lições',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// ========================================
+// ADMIN STATS
+// ========================================
+
+router.get('/stats', async (req, res) => {
+  try {
+    const [tracksCount] = await db.select({ total: count() }).from(formationTracks);
+    const [modulesCount] = await db.select({ total: count() }).from(formationModules);
+    const [lessonsCount] = await db.select({ total: count() }).from(formationLessons);
+    const [sectionsCount] = await db.select({ total: count() }).from(formationLessonSections);
+
+    const [activeTracksCount] = await db.select({ total: count() }).from(formationTracks).where(eq(formationTracks.isActive, true));
+    const [activeLessonsCount] = await db.select({ total: count() }).from(formationLessons).where(eq(formationLessons.isActive, true));
+
+    res.json({
+      tracks: { total: tracksCount.total, active: activeTracksCount.total },
+      modules: { total: modulesCount.total },
+      lessons: { total: lessonsCount.total, active: activeLessonsCount.total },
+      sections: { total: sectionsCount.total }
+    });
+  } catch (error: unknown) {
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({
+      error: 'Erro ao buscar estatísticas',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// ========================================
+// TOGGLE ACTIVE
+// ========================================
+
+// Toggle track active status
+router.patch('/tracks/:id/toggle-active', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [track] = await db
+      .select()
+      .from(formationTracks)
+      .where(eq(formationTracks.id, id))
+      .limit(1);
+
+    if (!track) {
+      return res.status(404).json({
+        error: 'Trilha não encontrada',
+        message: `Trilha com ID ${id} não encontrada`
+      });
+    }
+
+    const updated = await db
+      .update(formationTracks)
+      .set({ isActive: !track.isActive, updatedAt: new Date() })
+      .where(eq(formationTracks.id, id))
+      .returning();
+
+    res.json({
+      message: `Trilha ${updated[0].isActive ? 'ativada' : 'desativada'} com sucesso`,
+      track: updated[0]
+    });
+  } catch (error: unknown) {
+    console.error('Error toggling track active:', error);
+    res.status(500).json({
+      error: 'Erro ao alterar status da trilha',
+      message: getErrorMessage(error)
+    });
+  }
+});
+
+// Toggle lesson active status
+router.patch('/lessons/:id/toggle-active', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [lesson] = await db
+      .select()
+      .from(formationLessons)
+      .where(eq(formationLessons.id, id))
+      .limit(1);
+
+    if (!lesson) {
+      return res.status(404).json({
+        error: 'Lição não encontrada',
+        message: `Lição com ID ${id} não encontrada`
+      });
+    }
+
+    const updated = await db
+      .update(formationLessons)
+      .set({ isActive: !lesson.isActive, updatedAt: new Date() })
+      .where(eq(formationLessons.id, id))
+      .returning();
+
+    res.json({
+      message: `Lição ${updated[0].isActive ? 'ativada' : 'desativada'} com sucesso`,
+      lesson: updated[0]
+    });
+  } catch (error: unknown) {
+    console.error('Error toggling lesson active:', error);
+    res.status(500).json({
+      error: 'Erro ao alterar status da lição',
       message: getErrorMessage(error)
     });
   }
