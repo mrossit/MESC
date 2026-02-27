@@ -167,7 +167,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
 
     // IMPORTANT: Ministers can only see PUBLISHED schedules
     // Coordinators/Managers can see all schedules
-    const massAssignments = await db
+    const massAssignmentsRaw = await db
       .select({
         id: schedules.id,
         scheduleId: schedules.id,
@@ -193,6 +193,17 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         )
       )
       .orderBy(schedules.time, schedules.position, schedules.id);
+
+    // Mapear entradas VACANTE: quando ministerId é null ou 'VACANT', definir ministerName como 'VACANTE'
+    const massAssignments = massAssignmentsRaw.map(a => {
+      const isVacant = !a.ministerId || a.ministerId === 'VACANT';
+      return {
+        ...a,
+        ministerId: isVacant ? null : a.ministerId,
+        ministerName: isVacant ? 'VACANTE' : a.ministerName,
+        scheduleDisplayName: isVacant ? 'VACANTE' : a.scheduleDisplayName,
+      };
+    });
 
     // 🕊️ INCLUSÃO DE ADORAÇÃO: Verificar se a data é uma segunda-feira e buscar sorteio
     let adorationAssignments: ScheduleAssignment[] = [];
@@ -400,7 +411,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
       if (schedulesList.length > 0) {
         // IMPORTANT: Apply same filter as schedulesList - ministers only see published
-        assignmentsList = await db
+        const rawAssignments = await db
           .select({
             id: schedules.id,
             scheduleId: schedules.id,
@@ -425,6 +436,25 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
             )
           )
           .orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
+
+        // Mapear entradas VACANTE: quando ministerId é null ou 'VACANT', definir ministerName como 'VACANTE'
+        assignmentsList = rawAssignments.map(a => {
+          const isVacant = !a.ministerId || a.ministerId === 'VACANT';
+          return {
+            id: a.id,
+            scheduleId: a.scheduleId,
+            ministerId: isVacant ? null : a.ministerId,
+            date: a.date,
+            massTime: a.massTime,
+            position: a.position as number,
+            confirmed: a.confirmed as boolean,
+            ministerName: isVacant ? 'VACANTE' : a.ministerName,
+            scheduleDisplayName: isVacant ? 'VACANTE' : a.scheduleDisplayName,
+            photoUrl: a.photoUrl,
+            notes: a.notes,
+            status: a.status,
+          };
+        });
       }
 
       // Get substitution requests for these schedules

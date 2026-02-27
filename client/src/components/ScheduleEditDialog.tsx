@@ -192,7 +192,10 @@ export function ScheduleEditDialog({
     try {
       setSaving(true);
 
-      const ministerIds = ministers.map(m => m.id);
+      // Normalizar IDs: VACANT/VACANTE → null
+      const ministerIds = ministers.map(m =>
+        (m.id === null || m.id === 'VACANT' || m.name === 'VACANT' || m.name === 'VACANTE') ? null : m.id
+      );
 
       // Atualizar escala usando o endpoint batch-update
       await apiRequest('PATCH', '/api/schedules/batch-update', {
@@ -262,7 +265,7 @@ export function ScheduleEditDialog({
                         <Badge variant="outline" className="w-8 justify-center flex-shrink-0">
                           {index + 1}
                         </Badge>
-                        {minister.id === null ? (
+                        {minister.id === null || minister.id === 'VACANT' || minister.name === 'VACANT' || minister.name === 'VACANTE' ? (
                           <span className="font-medium text-muted-foreground italic">VACANTE</span>
                         ) : (
                           <span className="font-medium truncate">{formatMinisterName(minister.name)}</span>

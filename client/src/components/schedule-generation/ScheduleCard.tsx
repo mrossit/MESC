@@ -76,14 +76,23 @@ export function ScheduleCard({
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             <span className="text-sm font-medium">Ministros:</span>
-            {ministers.map((minister) => (
-              <Badge key={minister.id} variant="outline" className="text-xs">
-                {minister.position && `${minister.position}. `}{minister.name}
-                <span className="ml-1 text-muted-foreground">
-                  ({minister.totalServices}x)
-                </span>
-              </Badge>
-            ))}
+            {ministers.map((minister) => {
+              const isVacant = !minister.id || minister.id === 'VACANT' || minister.name === 'VACANT' || minister.name === 'VACANTE';
+              return (
+                <Badge
+                  key={`${minister.id}-${minister.position}`}
+                  variant={isVacant ? "destructive" : "outline"}
+                  className={`text-xs ${isVacant ? 'italic' : ''}`}
+                >
+                  {minister.position && `${minister.position}. `}{isVacant ? 'VACANTE' : minister.name}
+                  {!isVacant && (
+                    <span className="ml-1 text-muted-foreground">
+                      ({minister.totalServices}x)
+                    </span>
+                  )}
+                </Badge>
+              );
+            })}
           </div>
 
           {backupMinisters.length > 0 && (

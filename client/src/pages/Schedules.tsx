@@ -1806,9 +1806,9 @@ export default function Schedules() {
                                 // Total de escalados = todos os assignments (incluindo VACANTES)
                                 const totalAssigned = dayAssignments.length;
                                 // Confirmados = ministros reais (não VACANTES)
-                                const confirmed = dayAssignments.filter(a => a.ministerName !== 'VACANT').length;
+                                const confirmed = dayAssignments.filter(a => a.ministerName && a.ministerName !== 'VACANTE' && a.ministerName !== 'VACANT').length;
                                 // À confirmar = ministros VACANTES
-                                const toConfirm = dayAssignments.filter(a => a.ministerName === 'VACANT').length;
+                                const toConfirm = dayAssignments.filter(a => !a.ministerName || a.ministerName === 'VACANTE' || a.ministerName === 'VACANT').length;
 
                                 return (
                                   <div className="flex flex-col items-center gap-0.5">
@@ -2242,7 +2242,9 @@ export default function Schedules() {
                             Array.from({ length: TOTAL_POSITIONS }, (_, index) => {
                               const position = index + 1;
                               const assignment = row.assignmentsByPosition.get(position);
-                              const displayName = assignment?.scheduleDisplayName || assignment?.ministerName || "";
+                              const displayName = assignment
+                                ? (!assignment.ministerId ? 'VACANTE' : (assignment.scheduleDisplayName || assignment.ministerName || ""))
+                                : "";
                               return (
                                 <td
                                   key={`${row.key}-${position}`}
@@ -2358,7 +2360,7 @@ export default function Schedules() {
                                           className={cn("font-medium text-xs sm:text-sm truncate", isCurrentUser && "font-bold")}
                                           style={isCurrentUser ? { color: '#959D90' } : {}}
                                         >
-                                          {formatMinisterName(assignment.ministerName) || "Ministro"}
+                                          {!assignment.ministerId ? 'VACANTE' : (formatMinisterName(assignment.ministerName) || "Ministro")}
                                         </p>
                                         {(() => {
                                           const minister = ministers.find(m => m.id === assignment.ministerId);
@@ -2388,7 +2390,7 @@ export default function Schedules() {
                                   {(() => {
                                     const minister = ministers.find(m => m.id === assignment.ministerId);
                                     const ministerPhotoUrl = minister?.photoUrl;
-                                    const ministerName = formatMinisterName(assignment.ministerName) || "Ministro";
+                                    const ministerName = !assignment.ministerId ? 'VACANTE' : (formatMinisterName(assignment.ministerName) || "Ministro");
                                     const initials = ministerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
                                     return (
