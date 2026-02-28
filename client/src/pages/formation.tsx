@@ -926,7 +926,7 @@ export default function Formation() {
   }
 
   if (adminMode && isAdmin) {
-    return <FormationAdmin />;
+    return <FormationAdmin onExit={() => setAdminMode(false)} />;
   }
 
   return (
