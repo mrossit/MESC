@@ -94,7 +94,7 @@ export function ScheduleEditDialog({
   };
 
   const handleRemoveMinister = (index: number) => {
-    setMinisters(ministers.filter((_, i) => i !== index));
+    setMinisters(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleMoveUp = (index: number) => {
@@ -250,7 +250,7 @@ export function ScheduleEditDialog({
                 ) : (
                   ministers.map((minister, index) => (
                     <div
-                      key={`${minister.id}-${index}`}
+                      key={minister.id ?? `vacant-${index}`}
                       draggable
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={(e) => handleDragOver(e, index)}

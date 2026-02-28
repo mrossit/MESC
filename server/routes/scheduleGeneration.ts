@@ -1907,7 +1907,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
 
     const { date, time, ministers } = schema.parse(req.body);
 
-    console.log('[batch-update] Parsed data:', { date, time, ministers });
+    console.log('[batch-update] Parsed data:', { date, time, ministersCount: ministers.length, ministers });
 
     if (!db) {
       return res.status(503).json({ error: 'Database unavailable' });
@@ -1924,19 +1924,20 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       ))
       .orderBy(schedules.position, schedules.id);
 
-    console.log('[batch-update] Found existing schedules:', existingSchedules.length);
+    console.log('[batch-update] Found existing schedules:', existingSchedules.length,
+      'details:', existingSchedules.map(s => ({ id: s.id.substring(0, 8), pos: s.position, minister: s.ministerId?.substring(0, 8) })));
 
     // SPECIAL CASE: Se todos os ministros foram removidos (lista vazia), deletar a missa inteira
     if (ministers.length === 0) {
       console.log('[batch-update] All ministers removed - deleting entire mass and related substitutions');
-      
+
       // Primeiro, deletar todas as substituições relacionadas
       for (const schedule of existingSchedules) {
         await db
           .delete(substitutionRequests)
           .where(eq(substitutionRequests.scheduleId, schedule.id));
       }
-      
+
       // Depois, deletar todas as escalações dessa missa
       await db
         .delete(schedules)
@@ -1944,7 +1945,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           eq(schedules.date, date),
           eq(schedules.time, time)
         ));
-      
+
       // Invalidar cache do servidor para o mês afetado
       scheduleCache.invalidateByDate(date);
       console.log(`[batch-update] Cache invalidated for date: ${date}`);
@@ -1953,8 +1954,10 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       return res.json({ success: true, message: 'Missa removida completamente do calendário' });
     }
 
-    // Estratégia: atualizar existentes e adicionar/remover conforme necessário
-    // Isso evita deletar registros que podem ter foreign keys
+    // Estratégia robusta: usar os primeiros N registros existentes para atualizar,
+    // criar novos para posições extras, e deletar excedentes.
+    // IMPORTANTE: Desassociar posições antigas antes de reatribuir para evitar
+    // violação de constraint unique(date, time, position)
 
     // Determinar o status correto para novos registros (herdar dos existentes)
     const existingStatus = existingSchedules.length > 0
@@ -1964,14 +1967,23 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       ? existingSchedules[0].type
       : 'missa';
 
-    // 1. Atualizar ou criar registros para os ministros na nova lista
+    // Passo 1: Mover todos os registros existentes para posições temporárias negativas
+    // para evitar violação de unique constraint durante reordenação
+    for (let i = 0; i < existingSchedules.length; i++) {
+      await db
+        .update(schedules)
+        .set({ position: -(i + 1) })
+        .where(eq(schedules.id, existingSchedules[i].id));
+    }
+
+    // Passo 2: Atualizar ou criar registros para os ministros na nova lista
     for (let i = 0; i < ministers.length; i++) {
       const ministerId = ministers[i];
       const position = i + 1;
 
       if (existingSchedules[i]) {
-        // Atualizar registro existente
-        console.log('[batch-update] Updating schedule:', existingSchedules[i].id);
+        // Atualizar registro existente com novo ministro e posição final
+        console.log(`[batch-update] Updating schedule ${existingSchedules[i].id.substring(0, 8)}: minister=${ministerId?.substring(0, 8) || 'null'}, position=${position}`);
         await db
           .update(schedules)
           .set({
@@ -1981,7 +1993,7 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           .where(eq(schedules.id, existingSchedules[i].id));
       } else {
         // Criar novo registro (herdar status e tipo dos registros existentes)
-        console.log('[batch-update] Creating new schedule at position:', position, 'with status:', existingStatus);
+        console.log(`[batch-update] Creating new schedule at position=${position}, minister=${ministerId?.substring(0, 8) || 'null'}, status=${existingStatus}`);
         await db.insert(schedules).values({
           date,
           time,
@@ -1993,10 +2005,11 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
       }
     }
 
-    // 2. Remover registros excedentes (se a nova lista for menor)
+    // Passo 3: Remover registros excedentes (se a nova lista for menor)
     if (existingSchedules.length > ministers.length) {
       const schedulesToDelete = existingSchedules.slice(ministers.length);
-      console.log('[batch-update] Removing excess schedules:', schedulesToDelete.length);
+      console.log('[batch-update] Removing excess schedules:', schedulesToDelete.length,
+        'ids:', schedulesToDelete.map(s => s.id.substring(0, 8)));
 
       for (const schedule of schedulesToDelete) {
         // Verificar se há substituições vinculadas antes de deletar
@@ -2007,15 +2020,15 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           .limit(1);
 
         if (hasSubstitutions.length > 0) {
-          // Se houver substituições, apenas marcar o ministerId como null ao invés de deletar
-          console.log('[batch-update] Schedule has substitutions, setting ministerId to null:', schedule.id);
+          // Se houver substituições, apenas marcar o ministerId como null e restaurar posição válida
+          console.log(`[batch-update] Schedule ${schedule.id.substring(0, 8)} has substitutions, setting ministerId to null`);
           await db
             .update(schedules)
-            .set({ ministerId: null })
+            .set({ ministerId: null, position: ministers.length + schedulesToDelete.indexOf(schedule) + 1 })
             .where(eq(schedules.id, schedule.id));
         } else {
           // Se não houver substituições, pode deletar
-          console.log('[batch-update] Deleting schedule:', schedule.id);
+          console.log(`[batch-update] Deleting schedule ${schedule.id.substring(0, 8)}`);
           await db
             .delete(schedules)
             .where(eq(schedules.id, schedule.id));
@@ -2026,6 +2039,19 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
     // Invalidar cache do servidor para o mês afetado
     scheduleCache.invalidateByDate(date);
     console.log(`[batch-update] Cache invalidated for date: ${date}`);
+
+    // Verificar resultado final
+    const finalSchedules = await db
+      .select()
+      .from(schedules)
+      .where(and(
+        eq(schedules.date, date),
+        eq(schedules.time, time)
+      ))
+      .orderBy(schedules.position);
+
+    console.log('[batch-update] Final state:', finalSchedules.length, 'schedules:',
+      finalSchedules.map(s => ({ id: s.id.substring(0, 8), pos: s.position, minister: s.ministerId?.substring(0, 8) })));
 
     console.log('[batch-update] Success! Updated schedule');
     res.json({ success: true, message: 'Escala atualizada com sucesso' });
