@@ -2337,7 +2337,7 @@ export default function Schedules() {
                       );
 
                       return selectedDateAssignments
-                          .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
+                          .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || ((a.id || '') < (b.id || '') ? -1 : (a.id || '') > (b.id || '') ? 1 : 0))
                           .map((assignment) => {
                             const isCurrentUser = user?.id && assignment.ministerId === user.id;
 
@@ -3178,7 +3178,7 @@ export default function Schedules() {
                                   onClick={() => {
                                     // Preparar dados para edição
                                     const ministersForEdit = [...assignments]
-                                      .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
+                                      .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || ((a.id || '') < (b.id || '') ? -1 : (a.id || '') > (b.id || '') ? 1 : 0))
                                       .map(a => ({
                                         id: a.ministerId,
                                         name: formatMinisterName(a.ministerName) || 'VACANTE'
@@ -3206,7 +3206,7 @@ export default function Schedules() {
                       {/* Preview dos ministros */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
                         {assignments
-                          .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id || '').localeCompare(b.id || ''))
+                          .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || ((a.id || '') < (b.id || '') ? -1 : (a.id || '') > (b.id || '') ? 1 : 0))
                           .slice(0, 4)
                           .map((assignment, idx) => {
                             const isUserAssignment = user?.id && assignment.ministerId === user.id;
