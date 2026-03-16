@@ -1,3 +1,7 @@
+// Configurar fuso horário do servidor para Brasil (UTC-3)
+// DEVE ser a primeira linha antes de qualquer import que use Date
+process.env.TZ = 'America/Sao_Paulo';
+
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
