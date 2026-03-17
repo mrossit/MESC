@@ -2,6 +2,7 @@ import { format, getDaysInMonth, getDay, lastDayOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { logger } from './logger';
 import { LITURGICAL_THEMES, getMonthDescription } from '../../shared/constants/liturgicalThemes';
+import { getMovableFeasts } from './liturgicalCalculations';
 
 interface Question {
   id: string;
@@ -504,6 +505,135 @@ export function generateQuestionnaireQuestions(month: number, year: number): Que
         alternativeShowIf: 'Sim'
       },
       order: 9.7
+    });
+  }
+
+  // Semana Santa / Páscoa (datas móveis)
+  const movableFeasts = getMovableFeasts(year);
+  const holyThursdayMonth = movableFeasts.holyThursday.getMonth() + 1;
+  const goodFridayMonth = movableFeasts.goodFriday.getMonth() + 1;
+  const holySaturdayMonth = movableFeasts.holySaturday.getMonth() + 1;
+
+  if (holyThursdayMonth === month) {
+    const htDay = movableFeasts.holyThursday.getDate().toString().padStart(2, '0');
+    const htMonth = holyThursdayMonth.toString().padStart(2, '0');
+    questions.push({
+      id: 'holy_thursday_mass',
+      type: 'multiple_choice',
+      question: `Você pode servir na Missa do Lava-pés – Quinta-feira Santa (${htDay}/${htMonth}) às 19h30?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: `${htDay}/${htMonth}`,
+        eventName: 'Missa do Lava-pés – Quinta-feira Santa',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.01
+    });
+  }
+
+  if (goodFridayMonth === month) {
+    const gfDay = movableFeasts.goodFriday.getDate().toString().padStart(2, '0');
+    const gfMonth = goodFridayMonth.toString().padStart(2, '0');
+    questions.push({
+      id: 'good_friday_celebration',
+      type: 'multiple_choice',
+      question: `Você pode servir na Sexta-feira Santa – Adoração da Cruz e Comunhão (${gfDay}/${gfMonth}) às 14h? (Participação de todos os ministros)`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: `${gfDay}/${gfMonth}`,
+        eventName: 'Sexta-feira Santa – Adoração da Cruz e Comunhão',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.02
+    });
+  }
+
+  if (holySaturdayMonth === month) {
+    const hsDay = movableFeasts.holySaturday.getDate().toString().padStart(2, '0');
+    const hsMonth = holySaturdayMonth.toString().padStart(2, '0');
+    questions.push({
+      id: 'easter_vigil_mass',
+      type: 'multiple_choice',
+      question: `Você pode servir na Missa da Vigília Pascal – Sábado Santo (${hsDay}/${hsMonth}) às 18h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: `${hsDay}/${hsMonth}`,
+        eventName: 'Missa da Vigília Pascal – Sábado Santo',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.03
+    });
+  }
+
+  // Festa de São Judas Tadeu em abril (28/04)
+  if (month === 4) {
+    questions.push({
+      id: 'saint_judas_april_7h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Missa de São Judas Tadeu - 28/04/${year} às 7h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/04',
+        eventName: 'Missa de São Judas Tadeu - 7h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.11
+    });
+
+    questions.push({
+      id: 'saint_judas_april_15h',
+      type: 'multiple_choice',
+      question: `Você pode servir na Missa de São Judas Tadeu - 28/04/${year} às 15h?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/04',
+        eventName: 'Missa de São Judas Tadeu - 15h',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.12
+    });
+
+    questions.push({
+      id: 'saint_judas_april_19h30',
+      type: 'multiple_choice',
+      question: `Você pode servir na Missa de São Judas Tadeu - 28/04/${year} às 19h30?`,
+      options: ['Sim', 'Não'],
+      required: false,
+      category: 'special_event',
+      metadata: {
+        eventDate: '28/04',
+        eventName: 'Missa de São Judas Tadeu - 19h30',
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim'
+      },
+      order: 9.13
     });
   }
 

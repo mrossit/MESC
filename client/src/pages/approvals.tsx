@@ -160,7 +160,7 @@ export default function Approvals() {
                               {user.role === "ministro" ? "Ministro" : user.role}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              Solicitado em {new Date().toLocaleDateString('pt-BR')}
+                              Solicitado em {new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                             </span>
                           </div>
                         </div>
