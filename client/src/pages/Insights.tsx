@@ -520,7 +520,7 @@ export default function Insights() {
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Atualizado em: {new Date(insights.generatedAt).toLocaleString('pt-BR')}
+            Atualizado em: {new Date(insights.generatedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
           </span>
           <Button variant="ghost" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" />

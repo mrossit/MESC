@@ -1007,7 +1007,7 @@ export default function Formation() {
                   <p className="text-xs text-muted-foreground">
                     Última atualização:{" "}
                     {summary?.lastUpdated
-                      ? new Date(summary.lastUpdated).toLocaleDateString("pt-BR")
+                      ? new Date(summary.lastUpdated).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
                       : "—"}
                   </p>
                 </div>

@@ -283,7 +283,7 @@ export default function QuestionnaireResponses() {
           r.email,
           r.phone || '',
           r.responded ? 'Sim' : 'Não',
-          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
+          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '',
           r.availability || ''
         ])
       ].map(row => row.join(',')).join('\n');
@@ -328,7 +328,7 @@ export default function QuestionnaireResponses() {
           r.email,
           r.phone || '',
           r.responded ? 'Sim' : 'Não',
-          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR') : '',
+          r.respondedAt ? new Date(r.respondedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '',
           r.availability || ''
         ])
       ].map(row => row.join(',')).join('\n');
@@ -802,7 +802,7 @@ export default function QuestionnaireResponses() {
                                       {minister.respondedAt ? (
                                         <span className="inline-flex items-center gap-1 text-xs">
                                           <Calendar className="h-3 w-3" />
-                                          {new Date(minister.respondedAt).toLocaleDateString('pt-BR')}
+                                          {new Date(minister.respondedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                                         </span>
                                       ) : (
                                         '-'
@@ -908,7 +908,7 @@ export default function QuestionnaireResponses() {
                                       {minister.respondedAt && (
                                         <div className="flex items-center gap-2 text-muted-foreground">
                                           <Calendar className="h-4 w-4 flex-shrink-0" />
-                                          <span>Respondido em {new Date(minister.respondedAt).toLocaleDateString('pt-BR')}</span>
+                                          <span>Respondido em {new Date(minister.respondedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</span>
                                         </div>
                                       )}
                                     </div>
@@ -1014,7 +1014,7 @@ export default function QuestionnaireResponses() {
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm text-muted-foreground">Data de envio:</span>
                   <Badge variant="outline">
-                    {new Date(detailedResponse.response.submittedAt).toLocaleString('pt-BR')}
+                    {new Date(detailedResponse.response.submittedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                   </Badge>
                 </div>
                 

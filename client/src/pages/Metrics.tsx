@@ -234,7 +234,7 @@ export default function Metrics() {
               Atualização: {autoRefresh ? '5s' : 'Manual'}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              Última atualização: {new Date(metrics.timestamp).toLocaleTimeString('pt-BR')}
+              Última atualização: {new Date(metrics.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
             </span>
           </div>
           
@@ -619,7 +619,7 @@ export default function Metrics() {
                 {errorsData.errors.map((error, index) => (
                   <TableRow key={index} data-testid={`row-error-${index}`}>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(error.timestamp).toLocaleTimeString('pt-BR')}
+                      {new Date(error.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{error.method}</Badge>

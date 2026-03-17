@@ -319,7 +319,7 @@ export const DebugPanel = memo(({ isConnected, renderCount = 0 }: DebugPanelProp
                         <div className="font-medium">{error.status || 'ERR'}: {error.message}</div>
                         <div className="text-xs opacity-70 truncate">{error.url}</div>
                         <div className="text-xs opacity-50">
-                          {new Date(error.timestamp).toLocaleTimeString()}
+                          {new Date(error.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                         </div>
                       </AlertDescription>
                     </Alert>

@@ -122,7 +122,8 @@ export function LiturgicalMassCalendar({
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'America/Sao_Paulo'
     });
   };
 
