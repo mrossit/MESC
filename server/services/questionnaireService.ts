@@ -24,6 +24,10 @@ interface StandardizedResponse {
     first_friday?: boolean;
     first_saturday?: boolean;
     healing_liberation?: boolean;
+    adoration_monday?: boolean;
+    holy_thursday_mass?: boolean;
+    good_friday_celebration?: boolean;
+    easter_vigil_mass?: boolean;
     [key: string]: boolean | string | string[] | Record<string, boolean> | Record<string, unknown> | undefined;
   };
   weekdays?: {
@@ -185,8 +189,9 @@ export class QuestionnaireService {
     // Known questionId patterns
     const knownPatterns = [
       'available_sundays', 'main_service_time', 'primary_mass_time',
-      /^saint_judas_feast_/, 'saint_judas_novena',
+      /^saint_judas_feast_/, 'saint_judas_novena', /^saint_judas_april_/,
       'healing_liberation_mass', 'sacred_heart_mass', 'immaculate_heart_mass',
+      'holy_thursday_mass', 'good_friday_celebration', 'easter_vigil_mass',
       /^special_event_/, // Includes Finados, etc
       'daily_mass_availability', 'daily_mass', 'daily_mass_days',
       'can_substitute', 'notes', 'observations',
@@ -241,6 +246,24 @@ export class QuestionnaireService {
       // Map Adoration Monday (Rosary at 22h)
       else if (questionId === 'adoration_monday') {
         standardized.special_events.adoration_monday = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      }
+      // Map Holy Week events (Semana Santa - movable feasts)
+      else if (questionId === 'holy_thursday_mass') {
+        standardized.special_events.holy_thursday_mass = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      }
+      else if (questionId === 'good_friday_celebration') {
+        standardized.special_events.good_friday_celebration = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      }
+      else if (questionId === 'easter_vigil_mass') {
+        standardized.special_events.easter_vigil_mass = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      }
+      // Map Saint Judas April masses (28/04)
+      else if (questionId.startsWith('saint_judas_april_')) {
+        standardized.special_events[questionId] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       }
       // Map custom special events (Finados, etc.)
