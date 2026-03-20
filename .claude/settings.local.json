@@ -91,7 +91,21 @@
       "Bash(gh auth status:*)",
       "Bash(git:*)",
       "Bash(npx web-push:*)",
-      "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql:*)"
+      "Bash(PGPASSWORD=\"npg_3QKylioran9V\" psql:*)",
+      "Bash(find /home/runner/workspace -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js \\\\\\) ! -path */node_modules/* ! -path */.cache/*)",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"\\\\dt\")",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"SELECT id, title, month, year, status, deadline FROM questionnaires WHERE month = 4 AND year = 2026;\" 2>&1)",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"SELECT id, title, month, year, questions::text FROM questionnaires WHERE month = 4 AND year = 2026;\")",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"SELECT id, title, month, year, status, deadline FROM questionnaires ORDER BY year DESC, month DESC;\" 2>&1)",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"SELECT id, title, month, year, status FROM questionnaires WHERE month = 4 AND year = 2026;\" 2>&1)",
+      "Bash(PGPASSWORD=password psql -h helium -U postgres -d heliumdb -c \"SELECT id, title, month, year, status FROM questionnaires ORDER BY year DESC, month DESC LIMIT 10;\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT id, title, month, year, status FROM questionnaires WHERE month = 4 AND year = 2026;\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT qr.id, u.name, qr.\\\\\"specialEvents\\\\\"::text, qr.\\\\\"unmappedResponses\\\\\"::text, qr.\\\\\"processingWarnings\\\\\"::text FROM questionnaire_responses qr JOIN users u ON qr.\\\\\"userId\\\\\" = u.id WHERE qr.\\\\\"questionnaireId\\\\\" = 'f37d77e3-66d5-4c13-a7a3-0ee9272121b7' AND \\(qr.\\\\\"isDeleted\\\\\" IS NULL OR qr.\\\\\"isDeleted\\\\\" = false\\);\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT column_name FROM information_schema.columns WHERE table_name = 'questionnaire_responses' ORDER BY ordinal_position;\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT qr.id, u.name, qr.special_events::text, qr.unmapped_responses::text, qr.processing_warnings::text FROM questionnaire_responses qr JOIN users u ON qr.user_id = u.id WHERE qr.questionnaire_id = 'f37d77e3-66d5-4c13-a7a3-0ee9272121b7' AND \\(qr.is_deleted IS NULL OR qr.is_deleted = false\\);\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT COUNT\\(*\\) as total, COUNT\\(DISTINCT user_id\\) as users_unicos FROM push_subscriptions;\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT id, user_id, LEFT\\(endpoint, 80\\) as endpoint_prefix, created_at, updated_at FROM push_subscriptions ORDER BY created_at DESC;\" 2>&1)",
+      "Bash(PGPASSWORD='npg_3QKylioran9V' psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT n.id, n.title, LEFT\\(n.message, 60\\) as msg, n.type, n.created_at, n.action_url FROM notifications n ORDER BY n.created_at DESC LIMIT 10;\" 2>&1)"
     ],
     "deny": [],
     "ask": []
