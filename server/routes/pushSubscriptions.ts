@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { authenticateToken as requireAuth, type AuthRequest } from "../auth";
 import { csrfProtection } from "../middleware/csrf";
-import { pushConfig } from "../utils/pushNotifications";
+import { pushConfig, cleanupUserSubscriptions } from "../utils/pushNotifications";
 import { z } from "zod";
 
 const router = Router();
@@ -46,6 +46,12 @@ router.post("/subscribe", csrfProtection, requireAuth, async (req: AuthRequest, 
         p256dh: validatedData.keys.p256dh
       }
     });
+
+    // Limpar subscriptions antigas do usuário (mantém apenas as N mais recentes)
+    const removed = await cleanupUserSubscriptions(userId);
+    if (removed > 0) {
+      console.log(`[PUSH API] Cleanup: ${removed} subscriptions antigas removidas para userId: ${userId}`);
+    }
 
     console.log(`[PUSH API] Subscription upserted for userId: ${userId}, endpoint: ${validatedData.endpoint.substring(0, 60)}...`);
     res.json({ success: true, message: "Subscribed to push notifications" });
