@@ -43,6 +43,20 @@ export const pushConfig = {
   publicKey: VAPID_PUBLIC_KEY || null
 };
 
+// Códigos de erro que indicam subscription inválida/expirada e deve ser removida
+const INVALID_SUBSCRIPTION_STATUS_CODES = [
+  401, // Unauthorized - chaves inválidas
+  403, // Forbidden - subscription não autorizada
+  404, // Not Found - endpoint não existe mais
+  410, // Gone - subscription expirou explicitamente
+];
+
+// Máximo de subscriptions por usuário (evita acúmulo de endpoints mortos)
+const MAX_SUBSCRIPTIONS_PER_USER = 3;
+
+// Subscriptions sem atualização há mais de este período são consideradas stale
+const STALE_SUBSCRIPTION_DAYS = 45;
+
 export async function sendPushNotificationToUsers(userIds: string[], payload: PushPayload) {
   console.log('[PUSH] Iniciando envio para', userIds.length, 'userIds');
 
@@ -58,14 +72,44 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
 
   const uniqueUserIds = Array.from(new Set(userIds));
   console.log('[PUSH] UserIds únicos:', uniqueUserIds.length);
-  console.log('[PUSH] Lista de UserIds:', uniqueUserIds);
 
-  const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
-  console.log('[PUSH] Subscriptions encontradas:', subscriptions.length);
-  console.log('[PUSH] Subscriptions por userId:', subscriptions.map(s => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + '...' })));
+  const allSubscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  console.log('[PUSH] Subscriptions encontradas:', allSubscriptions.length);
 
-  if (subscriptions.length === 0) {
+  if (allSubscriptions.length === 0) {
     console.warn('[PUSH] Nenhuma subscription encontrada para os userIds fornecidos');
+    return;
+  }
+
+  // Filtrar subscriptions stale (sem atualização há muito tempo)
+  const staleCutoff = new Date();
+  staleCutoff.setDate(staleCutoff.getDate() - STALE_SUBSCRIPTION_DAYS);
+
+  const freshSubscriptions = [];
+  const staleSubscriptions = [];
+
+  for (const sub of allSubscriptions) {
+    const updatedAt = sub.updatedAt ? new Date(sub.updatedAt) : (sub.createdAt ? new Date(sub.createdAt) : new Date(0));
+    if (updatedAt < staleCutoff) {
+      staleSubscriptions.push(sub);
+    } else {
+      freshSubscriptions.push(sub);
+    }
+  }
+
+  // Remover subscriptions stale do banco em background
+  if (staleSubscriptions.length > 0) {
+    console.log(`[PUSH] Removendo ${staleSubscriptions.length} subscriptions stale (sem atualização há +${STALE_SUBSCRIPTION_DAYS} dias)`);
+    Promise.all(
+      staleSubscriptions.map(sub => {
+        console.log(`[PUSH] Removendo stale: userId=${sub.userId}, endpoint=${sub.endpoint.substring(0, 50)}...`);
+        return storage.removePushSubscriptionByEndpoint(sub.endpoint);
+      })
+    ).catch(err => console.error('[PUSH] Erro ao remover subscriptions stale:', err));
+  }
+
+  if (freshSubscriptions.length === 0) {
+    console.warn('[PUSH] Todas as subscriptions estão stale, nenhuma notificação enviada');
     return;
   }
 
@@ -78,7 +122,7 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
   });
 
   const results = await Promise.all(
-    subscriptions.map(async (subscription) => {
+    freshSubscriptions.map(async (subscription) => {
       const pushSubscription = {
         endpoint: subscription.endpoint,
         keys: {
@@ -94,11 +138,11 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
       } catch (error: unknown) {
         const pushError = error as PushError;
         const statusCode = pushError?.statusCode ?? pushError?.code;
-        if (statusCode === 404 || statusCode === 410) {
-          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, 'userId:', subscription.userId);
+        if (statusCode && INVALID_SUBSCRIPTION_STATUS_CODES.includes(statusCode)) {
+          console.warn(`[PUSH] Subscription inválida (HTTP ${statusCode}), removendo: endpoint=${subscription.endpoint.substring(0, 50)}... userId=${subscription.userId}`);
           await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
         } else {
-          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
+          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, 'statusCode:', statusCode, error);
         }
         return { success: false, userId: subscription.userId, error: statusCode };
       }
@@ -107,5 +151,40 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
 
   const successCount = results.filter(r => r.success).length;
   const failCount = results.filter(r => !r.success).length;
-  console.log('[PUSH] Resumo: Sucesso:', successCount, '| Falha:', failCount);
+  console.log(`[PUSH] Resumo: Sucesso: ${successCount} | Falha: ${failCount} | Stale removidas: ${staleSubscriptions.length}`);
+}
+
+/**
+ * Limpa subscriptions antigas de um usuário, mantendo apenas as N mais recentes.
+ * Chamado no momento do subscribe para evitar acúmulo.
+ */
+export async function cleanupUserSubscriptions(userId: string): Promise<number> {
+  const userSubs = await storage.getPushSubscriptionsByUserIds([userId]);
+
+  if (userSubs.length <= MAX_SUBSCRIPTIONS_PER_USER) {
+    return 0;
+  }
+
+  // Ordenar por updated_at DESC (mais recentes primeiro)
+  const sorted = userSubs.sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+
+  // Remover as mais antigas além do limite
+  const toRemove = sorted.slice(MAX_SUBSCRIPTIONS_PER_USER);
+  let removed = 0;
+
+  for (const sub of toRemove) {
+    try {
+      await storage.removePushSubscriptionByEndpoint(sub.endpoint);
+      console.log(`[PUSH] Cleanup: removida subscription antiga userId=${userId}, endpoint=${sub.endpoint.substring(0, 50)}...`);
+      removed++;
+    } catch (err) {
+      console.error('[PUSH] Erro ao remover subscription no cleanup:', err);
+    }
+  }
+
+  return removed;
 }
