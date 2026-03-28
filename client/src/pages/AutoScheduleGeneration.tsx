@@ -35,6 +35,7 @@ import { ScheduleEditDialog } from '@/components/ScheduleEditDialog';
 import { PeriodSelector, MONTHS } from '@/components/schedule-generation/PeriodSelector';
 import { GenerationMetrics } from '@/components/schedule-generation/GenerationMetrics';
 import { ScheduleCard } from '@/components/schedule-generation/ScheduleCard';
+import { DraggableScheduleCard } from '@/components/schedule-generation/DraggableScheduleCard';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { usePageLeaveWarning } from '@/hooks/usePageLeaveWarning';
 import type { TestResult, EditingSchedule } from '@/types/schedule';
@@ -470,7 +471,7 @@ export default function AutoScheduleGeneration() {
               {/* Lista de escalas */}
               <div className="space-y-3">
                 {generatedData.schedules.map((schedule, index) => (
-                  <ScheduleCard
+                  <DraggableScheduleCard
                     key={index}
                     date={schedule.date}
                     time={schedule.time}
@@ -478,6 +479,19 @@ export default function AutoScheduleGeneration() {
                     qualityScore={schedule.qualityScore}
                     ministers={schedule.ministers}
                     backupMinisters={schedule.backupMinisters}
+                    onMinistersChange={(newMinisters, newBackups) => {
+                      const updatedSchedules = [...generatedData.schedules];
+                      updatedSchedules[index] = {
+                        ...updatedSchedules[index],
+                        ministers: newMinisters,
+                        backupMinisters: newBackups,
+                      };
+                      setGeneratedData({
+                        ...generatedData,
+                        schedules: updatedSchedules,
+                      });
+                      setHasUnsavedChanges(true);
+                    }}
                     onEdit={() => setEditingSchedule({
                       date: schedule.date,
                       time: schedule.time,
