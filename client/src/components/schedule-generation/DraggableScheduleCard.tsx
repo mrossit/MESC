@@ -1,21 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   closestCenter,
-  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from '@/components/ui/card';
@@ -41,15 +38,16 @@ interface DraggableScheduleCardProps {
   index: number;
 }
 
-// --- Componente de Ministro Arrastável ---
-
-function SortableMinisterBadge({
+// Wrapper para itens sortáveis — cada ministro é um item arrastável
+function SortableMinisterItem({
   minister,
   isBackup,
 }: {
   minister: Minister;
   isBackup: boolean;
 }) {
+  const sortableId = `${isBackup ? 'b' : 'a'}_${minister.id}`;
+
   const {
     attributes,
     listeners,
@@ -57,48 +55,34 @@ function SortableMinisterBadge({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `${isBackup ? 'backup' : 'active'}-${minister.id}` });
+  } = useSortable({ id: sortableId });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  const isVacant =
-    !minister.id ||
-    minister.id === 'VACANT' ||
-    minister.name === 'VACANT' ||
-    minister.name === 'VACANTE';
-
-  if (isVacant) {
-    return (
-      <Badge variant="destructive" className="text-xs italic">
-        {minister.position && `${minister.position}. `}VACANTE
-      </Badge>
-    );
-  }
-
   return (
     <div
       ref={setNodeRef}
       style={style}
+      className={cn(
+        'inline-flex items-center cursor-grab active:cursor-grabbing',
+        isDragging && 'opacity-30 z-50'
+      )}
       {...attributes}
       {...listeners}
-      className={cn(
-        'inline-flex items-center gap-1 cursor-grab active:cursor-grabbing touch-none',
-        isDragging && 'opacity-40'
-      )}
     >
       <Badge
         variant={isBackup ? 'secondary' : 'outline'}
         className={cn(
-          'text-xs select-none transition-all',
-          'hover:shadow-md hover:scale-105',
+          'text-xs select-none transition-shadow gap-1',
+          'hover:shadow-md',
           isDragging && 'ring-2 ring-primary shadow-lg'
         )}
       >
-        <GripVertical className="h-3 w-3 mr-1 text-muted-foreground" />
-        {minister.position && !isBackup && `${minister.position}. `}
+        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+        {minister.position && !isBackup ? `${minister.position}. ` : ''}
         {minister.name}
         {!isBackup && minister.totalServices !== undefined && (
           <span className="ml-1 text-muted-foreground">
@@ -110,55 +94,19 @@ function SortableMinisterBadge({
   );
 }
 
-// --- Drop Zone ---
-
-function DroppableZone({
-  id,
-  children,
-  label,
-  icon: Icon,
-  isEmpty,
-}: {
-  id: string;
-  children: React.ReactNode;
-  label: string;
-  icon: React.ElementType;
-  isEmpty: boolean;
-}) {
-  const { isOver, setNodeRef } = useDroppable({ id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        'rounded-lg p-2 transition-colors min-h-[48px]',
-        isOver && 'bg-primary/10 ring-2 ring-primary/30',
-        !isOver && 'bg-transparent'
-      )}
-    >
-      <div className="flex items-center gap-1 mb-2">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {children}
-        {isEmpty && (
-          <span className="text-xs text-muted-foreground italic py-1">
-            Arraste ministros para cá
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// --- Componente Principal ---
+// --- Helpers ---
 
 function getConfidenceBadgeVariant(confidence: number) {
   if (confidence >= 0.8) return 'default' as const;
   if (confidence >= 0.6) return 'secondary' as const;
   return 'destructive' as const;
 }
+
+function isVacant(m: Minister) {
+  return !m.id || m.id === 'VACANT' || m.name === 'VACANT' || m.name === 'VACANTE';
+}
+
+// --- Componente Principal ---
 
 export function DraggableScheduleCard({
   date,
@@ -175,27 +123,24 @@ export function DraggableScheduleCard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 5 },
+      activationConstraint: { distance: 8 },
     })
   );
 
   const borderColor =
     confidence >= 0.8 ? '#22c55e' : confidence >= 0.6 ? '#f59e0b' : '#ef4444';
 
-  // Filtrar vacantes (não são arrastáveis)
-  const activeMinistersFiltered = ministers.filter(
-    (m) => m.id && m.id !== 'VACANT' && m.name !== 'VACANT' && m.name !== 'VACANTE'
-  );
-  const vacantMinisters = ministers.filter(
-    (m) => !m.id || m.id === 'VACANT' || m.name === 'VACANT' || m.name === 'VACANTE'
-  );
+  // Separar vacantes (não arrastáveis) dos ministros reais
+  const realMinisters = ministers.filter((m) => !isVacant(m));
+  const vacantMinisters = ministers.filter((m) => isVacant(m));
 
-  const activeIds = activeMinistersFiltered.map((m) => `active-${m.id}`);
-  const backupIds = backupMinisters.map((m) => `backup-${m.id}`);
-  const allIds = [...activeIds, ...backupIds];
+  // IDs para SortableContext — todos numa lista só, com prefixo pra saber a zona
+  const activeIds = realMinisters.map((m) => `a_${m.id}`);
+  const backupIds = backupMinisters.map((m) => `b_${m.id}`);
+
+  // Separador invisível entre as duas zonas
+  const separatorId = '__separator__';
+  const allSortableIds = [...activeIds, separatorId, ...backupIds];
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -205,113 +150,111 @@ export function DraggableScheduleCard({
     const { active, over } = event;
     setActiveId(null);
 
-    if (!over) return;
+    if (!over || active.id === over.id) return;
 
     const activeIdStr = active.id as string;
     const overIdStr = over.id as string;
 
-    const isActiveFromBackup = activeIdStr.startsWith('backup-');
-    const isActiveFromActive = activeIdStr.startsWith('active-');
-    const activeMinisterId = activeIdStr.replace(/^(backup|active)-/, '');
+    const isFromBackup = activeIdStr.startsWith('b_');
+    const isFromActive = activeIdStr.startsWith('a_');
+    const draggedMinisterId = activeIdStr.substring(2);
 
-    // Determinar destino
-    let targetIsBackup: boolean;
-    if (overIdStr === 'zone-backups') {
-      targetIsBackup = true;
-    } else if (overIdStr === 'zone-escalados') {
-      targetIsBackup = false;
-    } else if (overIdStr.startsWith('backup-')) {
-      targetIsBackup = true;
-    } else if (overIdStr.startsWith('active-')) {
-      targetIsBackup = false;
-    } else {
-      return;
-    }
+    const isOverBackup = overIdStr.startsWith('b_') || overIdStr === separatorId;
+    const isOverActive = overIdStr.startsWith('a_');
 
-    // Se está movendo para a mesma zona → reordenar
-    if (
-      (isActiveFromBackup && targetIsBackup) ||
-      (isActiveFromActive && !targetIsBackup)
-    ) {
-      if (isActiveFromActive && !targetIsBackup && overIdStr.startsWith('active-')) {
-        // Reordenar dentro dos escalados
-        const oldIndex = activeMinistersFiltered.findIndex((m) => `active-${m.id}` === activeIdStr);
-        const newIndex = activeMinistersFiltered.findIndex((m) => `active-${m.id}` === overIdStr);
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const reordered = arrayMove(activeMinistersFiltered, oldIndex, newIndex).map((m, i) => ({
-            ...m,
-            position: i + 1,
-          }));
-          onMinistersChange([...reordered, ...vacantMinisters], backupMinisters);
-        }
-      }
-      if (isActiveFromBackup && targetIsBackup && overIdStr.startsWith('backup-')) {
-        // Reordenar dentro dos backups
-        const oldIndex = backupMinisters.findIndex((m) => `backup-${m.id}` === activeIdStr);
-        const newIndex = backupMinisters.findIndex((m) => `backup-${m.id}` === overIdStr);
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const reordered = arrayMove(backupMinisters, oldIndex, newIndex);
-          onMinistersChange([...activeMinistersFiltered, ...vacantMinisters], reordered);
-        }
-      }
-      return;
-    }
-
-    // Mover entre zonas
-    if (isActiveFromBackup && !targetIsBackup) {
-      // Backup → Escalado
-      const minister = backupMinisters.find((m) => m.id === activeMinisterId);
+    // Mover de Escalados → Backup
+    if (isFromActive && isOverBackup) {
+      const minister = realMinisters.find((m) => m.id === draggedMinisterId);
       if (!minister) return;
 
-      const newBackups = backupMinisters.filter((m) => m.id !== activeMinisterId);
-      const newActives = [
-        ...activeMinistersFiltered,
-        { ...minister, position: activeMinistersFiltered.length + 1 },
-      ].map((m, i) => ({ ...m, position: i + 1 }));
-
-      // Remover um vacante se existir (backup está substituindo)
-      const updatedVacants = vacantMinisters.length > 0 ? vacantMinisters.slice(1) : vacantMinisters;
-
-      onMinistersChange([...newActives, ...updatedVacants], newBackups);
-    } else if (isActiveFromActive && targetIsBackup) {
-      // Escalado → Backup
-      const minister = activeMinistersFiltered.find((m) => m.id === activeMinisterId);
-      if (!minister) return;
-
-      const newActives = activeMinistersFiltered
-        .filter((m) => m.id !== activeMinisterId)
+      const newActives = realMinisters
+        .filter((m) => m.id !== draggedMinisterId)
         .map((m, i) => ({ ...m, position: i + 1 }));
       const newBackups = [...backupMinisters, minister];
 
       onMinistersChange([...newActives, ...vacantMinisters], newBackups);
+      return;
+    }
+
+    // Mover de Backup → Escalados
+    if (isFromBackup && isOverActive) {
+      const minister = backupMinisters.find((m) => m.id === draggedMinisterId);
+      if (!minister) return;
+
+      const newBackups = backupMinisters.filter((m) => m.id !== draggedMinisterId);
+      const newActives = [
+        ...realMinisters,
+        { ...minister, position: realMinisters.length + 1 },
+      ].map((m, i) => ({ ...m, position: i + 1 }));
+
+      // Remover um vacante se existir
+      const newVacants = vacantMinisters.length > 0 ? vacantMinisters.slice(1) : vacantMinisters;
+
+      onMinistersChange([...newActives, ...newVacants], newBackups);
+      return;
+    }
+
+    // Reordenar dentro dos Escalados
+    if (isFromActive && isOverActive) {
+      const overMinisterId = overIdStr.substring(2);
+      const oldIndex = realMinisters.findIndex((m) => m.id === draggedMinisterId);
+      const newIndex = realMinisters.findIndex((m) => m.id === overMinisterId);
+
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const reordered = [...realMinisters];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+      const updated = reordered.map((m, i) => ({ ...m, position: i + 1 }));
+
+      onMinistersChange([...updated, ...vacantMinisters], backupMinisters);
+      return;
+    }
+
+    // Reordenar dentro dos Backups
+    if (isFromBackup && isOverBackup && overIdStr !== separatorId) {
+      const overMinisterId = overIdStr.substring(2);
+      const oldIndex = backupMinisters.findIndex((m) => m.id === draggedMinisterId);
+      const newIndex = backupMinisters.findIndex((m) => m.id === overMinisterId);
+
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const reordered = [...backupMinisters];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      onMinistersChange([...realMinisters, ...vacantMinisters], reordered);
     }
   };
 
-  // Encontrar ministro ativo para overlay
-  const draggedMinister = activeId
-    ? [...activeMinistersFiltered, ...backupMinisters].find(
-        (m) => `active-${m.id}` === activeId || `backup-${m.id}` === activeId
-      )
-    : null;
-  const isDraggedBackup = activeId?.startsWith('backup-') ?? false;
+  // Ministro sendo arrastado (para overlay)
+  const draggedMinister = useMemo(() => {
+    if (!activeId) return null;
+    const ministerId = activeId.substring(2);
+    return (
+      realMinisters.find((m) => m.id === ministerId) ||
+      backupMinisters.find((m) => m.id === ministerId) ||
+      null
+    );
+  }, [activeId, realMinisters, backupMinisters]);
+
+  const isDraggedBackup = activeId?.startsWith('b_') ?? false;
 
   return (
     <Card className="border-l-4" style={{ borderLeftColor: borderColor }}>
       <CardContent className="p-4">
+        {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div>
-              <h4 className="font-semibold">
-                {format(new Date(date + 'T00:00:00'), 'EEEE', { locale: ptBR })} -{' '}
-                {format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy')}
-              </h4>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                {time}
-              </div>
+          <div>
+            <h4 className="font-semibold">
+              {format(new Date(date + 'T00:00:00'), 'EEEE', { locale: ptBR })} -{' '}
+              {format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy')}
+            </h4>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              {time}
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -334,65 +277,79 @@ export function DraggableScheduleCard({
           </div>
         </div>
 
+        {/* DnD Area */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="space-y-2">
-            {/* Zona Escalados */}
-            <DroppableZone
-              id="zone-escalados"
-              label="Ministros"
-              icon={Users}
-              isEmpty={activeMinistersFiltered.length === 0}
-            >
-              <SortableContext items={activeIds} strategy={verticalListSortingStrategy}>
-                {activeMinistersFiltered.map((minister) => (
-                  <SortableMinisterBadge
-                    key={`active-${minister.id}`}
-                    minister={minister}
-                    isBackup={false}
-                  />
-                ))}
-              </SortableContext>
-              {vacantMinisters.map((minister, i) => (
-                <Badge key={`vacant-${i}`} variant="destructive" className="text-xs italic">
-                  {minister.position && `${minister.position}. `}VACANTE
-                </Badge>
-              ))}
-            </DroppableZone>
-
-            {/* Zona Backups */}
-            {(backupMinisters.length > 0 || activeId) && (
-              <DroppableZone
-                id="zone-backups"
-                label="Backup"
-                icon={UserMinus}
-                isEmpty={backupMinisters.length === 0}
-              >
-                <SortableContext items={backupIds} strategy={verticalListSortingStrategy}>
-                  {backupMinisters.map((minister) => (
-                    <SortableMinisterBadge
-                      key={`backup-${minister.id}`}
+          <SortableContext items={allSortableIds} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {/* Zona Escalados */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Ministros:</span>
+                </div>
+                <div className="flex flex-wrap gap-2 min-h-[32px] p-1.5 rounded-md border border-dashed border-transparent hover:border-muted-foreground/20 transition-colors">
+                  {realMinisters.map((minister) => (
+                    <SortableMinisterItem
+                      key={`a_${minister.id}`}
                       minister={minister}
-                      isBackup={true}
+                      isBackup={false}
                     />
                   ))}
-                </SortableContext>
-              </DroppableZone>
-            )}
-          </div>
+                  {vacantMinisters.map((m, i) => (
+                    <Badge key={`vacant-${i}`} variant="destructive" className="text-xs italic">
+                      {m.position && `${m.position}. `}VACANTE
+                    </Badge>
+                  ))}
+                  {realMinisters.length === 0 && vacantMinisters.length === 0 && (
+                    <span className="text-xs text-muted-foreground italic">
+                      Arraste backups para cá
+                    </span>
+                  )}
+                </div>
+              </div>
 
-          {/* Overlay do item sendo arrastado */}
+              {/* Separador invisível (drop target entre as zonas) */}
+              <SeparatorDropTarget id={separatorId} />
+
+              {/* Zona Backups */}
+              {(backupMinisters.length > 0 || activeId) && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <UserMinus className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Backup:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 min-h-[32px] p-1.5 rounded-md border border-dashed border-transparent hover:border-muted-foreground/20 transition-colors">
+                    {backupMinisters.map((minister) => (
+                      <SortableMinisterItem
+                        key={`b_${minister.id}`}
+                        minister={minister}
+                        isBackup={true}
+                      />
+                    ))}
+                    {backupMinisters.length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">
+                        Arraste escalados para cá
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </SortableContext>
+
+          {/* Overlay */}
           <DragOverlay>
             {draggedMinister && (
               <Badge
                 variant={isDraggedBackup ? 'secondary' : 'outline'}
-                className="text-xs shadow-lg ring-2 ring-primary cursor-grabbing"
+                className="text-xs shadow-xl ring-2 ring-primary cursor-grabbing gap-1"
               >
-                <GripVertical className="h-3 w-3 mr-1" />
+                <GripVertical className="h-3 w-3" />
                 {draggedMinister.name}
               </Badge>
             )}
@@ -400,5 +357,20 @@ export function DraggableScheduleCard({
         </DndContext>
       </CardContent>
     </Card>
+  );
+}
+
+// Separador que serve como drop target entre as zonas
+function SeparatorDropTarget({ id }: { id: string }) {
+  const { setNodeRef, isOver } = useSortable({ id, disabled: true });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'h-1 rounded-full transition-all mx-2',
+        isOver ? 'bg-primary/40 h-2' : 'bg-muted/30'
+      )}
+    />
   );
 }
