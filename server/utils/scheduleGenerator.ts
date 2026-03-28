@@ -1055,23 +1055,32 @@ export class ScheduleGenerator {
       for (const q of questions) {
         const item = q as { id?: string; question?: string; category?: string; metadata?: { eventDate?: string; eventTime?: string } };
         if (!item.id) continue;
-        const isCustom = item.id.startsWith('custom_') || item.id.startsWith('special_event');
+        const isCustom = item.id.startsWith('custom_') || item.id.startsWith('special_event') || item.category === 'custom' || item.category === 'special_event';
         if (!isCustom) continue;
 
-        // Prioridade 1: metadata estruturado
-        if (item.metadata?.eventDate && item.metadata?.eventTime) {
+        // Prioridade 1: metadata estruturado (eventDate obrigatório, eventTime pode vir do texto)
+        if (item.metadata?.eventDate) {
           let date = item.metadata.eventDate;
           if (date.includes('/')) {
             const parts = date.split('/');
             date = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
           }
           let time = item.metadata.eventTime;
-          if (time.includes('h')) {
-            const tp = time.split('h');
-            time = `${tp[0].padStart(2, '0')}:${(tp[1] || '00').padStart(2, '0')}`;
+          // Se eventTime não está na metadata, extrair do texto da pergunta
+          if (!time && item.question) {
+            const timeFromText = item.question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+            if (timeFromText) {
+              time = `${timeFromText[1].padStart(2, '0')}:${(timeFromText[2] || '00').padStart(2, '0')}`;
+            }
           }
-          customEventIdToDateTime.set(item.id, { date, time });
-          continue;
+          if (time) {
+            if (time.includes('h')) {
+              const tp = time.split('h');
+              time = `${tp[0].padStart(2, '0')}:${(tp[1] || '00').padStart(2, '0')}`;
+            }
+            customEventIdToDateTime.set(item.id, { date, time });
+            continue;
+          }
         }
 
         // Prioridade 2: regex do texto da pergunta
@@ -1717,7 +1726,7 @@ export class ScheduleGenerator {
         // PRIORIDADE 1: Usar metadata estruturada (eventDate/eventTime)
         let massInfo: { date: string; time: string; dayOfWeek: number; minMinisters?: number; maxMinisters?: number } | null = null;
 
-        if (question.metadata?.eventDate && question.metadata?.eventTime) {
+        if (question.metadata?.eventDate) {
           let eventDate = question.metadata.eventDate;
           // eventDate pode ser YYYY-MM-DD (do input type=date) ou DD/MM
           if (eventDate.includes('/')) {
@@ -1725,18 +1734,27 @@ export class ScheduleGenerator {
             eventDate = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
           }
           let eventTime = question.metadata.eventTime;
-          // eventTime pode ser HH:MM (do input type=time) ou "19h", "19h30"
-          if (eventTime.includes('h')) {
-            const timeParts = eventTime.split('h');
-            eventTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+          // Se eventTime não está na metadata, extrair do texto da pergunta
+          if (!eventTime) {
+            const timeFromText = question.question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+            if (timeFromText) {
+              eventTime = `${timeFromText[1].padStart(2, '0')}:${(timeFromText[2] || '00').padStart(2, '0')}`;
+            }
           }
-          const dateObj = new Date(eventDate + 'T12:00:00');
-          massInfo = {
-            date: eventDate,
-            time: eventTime,
-            dayOfWeek: dateObj.getDay()
-          };
-          console.log(`[SCHEDULE_GEN] 📋 Using metadata: ${question.id} -> ${eventDate} ${eventTime} (${question.metadata.eventName || 'sem nome'})`);
+          if (eventTime) {
+            // eventTime pode ser HH:MM (do input type=time) ou "19h", "19h30"
+            if (eventTime.includes('h')) {
+              const timeParts = eventTime.split('h');
+              eventTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+            }
+            const dateObj = new Date(eventDate + 'T12:00:00');
+            massInfo = {
+              date: eventDate,
+              time: eventTime,
+              dayOfWeek: dateObj.getDay()
+            };
+            console.log(`[SCHEDULE_GEN] 📋 Using metadata: ${question.id} -> ${eventDate} ${eventTime} (${question.metadata.eventName || 'sem nome'})`);
+          }
         }
 
         // PRIORIDADE 2: Fallback regex do texto da pergunta
@@ -1785,8 +1803,8 @@ export class ScheduleGenerator {
     // Ex: "dia 08/12/2025 às 19h30" ou "quinta feira 01/01/2026 às 19h"
     // 🔧 FIX: Também suporta "dia 18/02/26 às 7h" (ano com 2 dígitos)
 
-    // Extrair data DD/MM/YY ou DD/MM/YYYY (suporta 2 ou 4 dígitos no ano)
-    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    // Extrair data DD/MM/YY, DD/MM/YYYY ou DD/MM (ano opcional, usa parâmetro year como fallback)
+    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
     if (!dateMatch) {
       console.log(`[EXTRACT_MASS_INFO] ⚠️ No date found in: ${question.substring(0, 80)}...`);
       return null;
@@ -1794,7 +1812,7 @@ export class ScheduleGenerator {
 
     const day = parseInt(dateMatch[1]);
     const monthFromQuestion = parseInt(dateMatch[2]);
-    let yearFromQuestion = parseInt(dateMatch[3]);
+    let yearFromQuestion = dateMatch[3] ? parseInt(dateMatch[3]) : year;
 
     // 🔧 FIX: Converter ano de 2 dígitos para 4 dígitos
     // Ex: 26 → 2026, 25 → 2025
@@ -2492,7 +2510,9 @@ export class ScheduleGenerator {
     // If this is a custom event, check directly in specialEvents
     if (massType.startsWith('custom_') || massType.startsWith('healing_liberation') ||
         massType.startsWith('sacred_heart') || massType.startsWith('immaculate_heart') ||
-        massType === 'special_event_1' || massType.startsWith('adoration_')) {
+        massType === 'special_event_1' || massType.startsWith('adoration_') ||
+        massType.startsWith('holy_thursday') || massType.startsWith('good_friday') ||
+        massType.startsWith('easter_vigil') || massType.startsWith('saint_judas_april')) {
       if (specialEvents && typeof specialEvents === 'object') {
         const response = specialEvents[massType];
         const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
