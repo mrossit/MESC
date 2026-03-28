@@ -38,6 +38,7 @@ import { ScheduleCard } from '@/components/schedule-generation/ScheduleCard';
 import { DraggableScheduleCard } from '@/components/schedule-generation/DraggableScheduleCard';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { usePageLeaveWarning } from '@/hooks/usePageLeaveWarning';
+import { useScheduleAutosave } from '@/hooks/useScheduleAutosave';
 import type { TestResult, EditingSchedule } from '@/types/schedule';
 
 // Interface for outliers in test results
@@ -94,15 +95,32 @@ export default function AutoScheduleGeneration() {
   // Warn before leaving if there are unsaved changes
   usePageLeaveWarning(hasUnsavedChanges);
 
+  // Auto-save no localStorage
+  const { restoreFromLocal, clearLocalDraft, hasLocalDraft } = useScheduleAutosave(
+    generatedData,
+    hasUnsavedChanges,
+    selectedYear,
+    selectedMonth,
+    generationId,
+  );
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState<{ year: number; month: number } | null>(null);
+
   // Load existing generation when month/year changes
   useEffect(() => {
     loadExistingGeneration(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, loadExistingGeneration]);
 
-  // Handle loaded data
+  // Handle loaded data — check for local draft first
   useEffect(() => {
     if (existingGenerationData !== undefined) {
       handleExistingGenerationLoaded({ success: true, data: existingGenerationData });
+
+      // Após carregar do servidor, verificar se há rascunho local mais recente
+      if (hasLocalDraft(selectedYear, selectedMonth)) {
+        setPendingRestore({ year: selectedYear, month: selectedMonth });
+        setShowRestorePrompt(true);
+      }
     }
   }, [existingGenerationData, handleExistingGenerationLoaded]);
 
@@ -139,14 +157,43 @@ export default function AutoScheduleGeneration() {
     }
   };
 
+  const handleRestoreLocalDraft = () => {
+    if (pendingRestore) {
+      const draft = restoreFromLocal(pendingRestore.year, pendingRestore.month);
+      if (draft) {
+        setGeneratedData(draft.generatedData);
+        setHasUnsavedChanges(true);
+        toast({
+          title: "Rascunho restaurado",
+          description: `Escala de ${pendingRestore.month}/${pendingRestore.year} restaurada do rascunho local (salvo em ${new Date(draft.savedAt).toLocaleString('pt-BR')}).`,
+        });
+      }
+    }
+    setShowRestorePrompt(false);
+    setPendingRestore(null);
+  };
+
+  const handleDiscardLocalDraft = () => {
+    if (pendingRestore) {
+      clearLocalDraft(pendingRestore.year, pendingRestore.month);
+    }
+    setShowRestorePrompt(false);
+    setPendingRestore(null);
+  };
+
   const handleSave = () => {
     if (generatedData?.schedules) {
-      saveMutation.mutate(generatedData.schedules);
+      saveMutation.mutate(generatedData.schedules, {
+        onSuccess: () => {
+          clearLocalDraft(selectedYear, selectedMonth);
+        },
+      });
     }
   };
 
   const handlePublish = async () => {
     await publishGeneration();
+    clearLocalDraft(selectedYear, selectedMonth);
   };
 
   const handleReprocessResponses = async () => {
@@ -703,6 +750,27 @@ export default function AutoScheduleGeneration() {
               <AlertDialogCancel onClick={() => setPendingAction(null)}>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleConfirmRegenerate}>
                 Regenerar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Diálogo de restauração de rascunho local */}
+        <AlertDialog open={showRestorePrompt} onOpenChange={setShowRestorePrompt}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Rascunho encontrado</AlertDialogTitle>
+              <AlertDialogDescription>
+                Encontramos um rascunho local com edições não salvas para esta escala.
+                Deseja restaurar as alterações de onde parou?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleDiscardLocalDraft}>
+                Descartar
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleRestoreLocalDraft}>
+                Restaurar rascunho
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
