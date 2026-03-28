@@ -171,6 +171,11 @@ export class ScheduleGenerator {
       await this.loadMinistersData();
       console.timeEnd('[PERF] Step 1: Load ministers');
 
+      // 🔥 HISTORICAL FAIRNESS: Load assignment counts from previous months
+      console.time('[PERF] Step 1b: Load historical counts');
+      await this.loadHistoricalAssignmentCounts(year, month);
+      console.timeEnd('[PERF] Step 1b: Load historical counts');
+
       // 🔥 DATA VALIDATION: Check if ministers were loaded
       console.log(`\n[VALIDATION] Ministers loaded:`, {
         count: this.ministers.length,
@@ -583,6 +588,83 @@ export class ScheduleGenerator {
       const preferTogether = this.familyPreferences.get(familyId) ?? true;
       const preferenceText = preferTogether ? '(prefer together)' : '(prefer separate)';
       console.log(`[FAMILY_SYSTEM] Family ${familyId.substring(0, 8)}: ${memberNames} ${preferenceText}`);
+    }
+  }
+
+  /**
+   * 📊 HISTORICAL FAIRNESS: Load minister assignment counts from previous months
+   * Uses the last 3 months of schedules to seed monthlyAssignmentCount so that
+   * ministers who served more recently/frequently get a lower priority.
+   * Weights: current-1 month = 1.0, current-2 = 0.6, current-3 = 0.3
+   */
+  private async loadHistoricalAssignmentCounts(year: number, month: number): Promise<void> {
+    if (!this.db) {
+      console.log('[HISTORICAL] No database connection, skipping historical counts');
+      return;
+    }
+
+    try {
+      // Calculate date ranges for previous 3 months
+      const ranges: { start: string; end: string; weight: number }[] = [];
+      const weights = [1.0, 0.6, 0.3];
+      for (let i = 1; i <= 3; i++) {
+        let m = month - i;
+        let y = year;
+        if (m <= 0) { m += 12; y -= 1; }
+        const start = `${y}-${String(m).padStart(2, '0')}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const end = `${y}-${String(m).padStart(2, '0')}-${lastDay}`;
+        ranges.push({ start, end, weight: weights[i - 1] });
+      }
+
+      console.log(`[HISTORICAL] Loading assignment counts from previous 3 months...`);
+
+      // Query counts for each period
+      const ministerWeightedCounts = new Map<string, number>();
+
+      for (const range of ranges) {
+        const rows = await this.db.execute(
+          sql`SELECT minister_id, COUNT(*)::int as cnt
+              FROM schedules
+              WHERE date >= ${range.start} AND date <= ${range.end}
+                AND status IN ('scheduled', 'published')
+                AND minister_id IS NOT NULL
+              GROUP BY minister_id`
+        );
+
+        if (rows.rows) {
+          for (const row of rows.rows) {
+            const id = row.minister_id as string;
+            const cnt = (row.cnt as number) * range.weight;
+            ministerWeightedCounts.set(id, (ministerWeightedCounts.get(id) || 0) + cnt);
+          }
+        }
+      }
+
+      // Apply weighted counts to ministers as initial monthlyAssignmentCount
+      let applied = 0;
+      for (const minister of this.ministers) {
+        if (minister.id && ministerWeightedCounts.has(minister.id)) {
+          const weighted = ministerWeightedCounts.get(minister.id)!;
+          // Normalize: convert weighted historical count to an equivalent "current month" count
+          // This seeds the fairness algorithm so ministers who served a lot recently are deprioritized
+          minister.monthlyAssignmentCount = Math.round(weighted / 3);
+          applied++;
+        }
+      }
+
+      console.log(`[HISTORICAL] ✅ Applied historical counts to ${applied}/${this.ministers.length} ministers`);
+      // Log top 5 for debugging
+      const top = [...this.ministers]
+        .filter(m => (m.monthlyAssignmentCount || 0) > 0)
+        .sort((a, b) => (b.monthlyAssignmentCount || 0) - (a.monthlyAssignmentCount || 0))
+        .slice(0, 5);
+      top.forEach(m => {
+        console.log(`[HISTORICAL]   ${m.name}: ${m.monthlyAssignmentCount} (weighted historical)`);
+      });
+    } catch (error) {
+      console.error('[HISTORICAL] Error loading historical counts:', error);
+      // Non-fatal: continue with counts at 0
     }
   }
 
@@ -1763,13 +1845,21 @@ export class ScheduleGenerator {
         }
 
         if (massInfo) {
+          // Determinar número de ministros baseado no tipo de evento
+          const eventMinisterCounts: Record<string, number> = {
+            'holy_thursday_mass': 25,       // Quinta-feira Santa (Lava-pés)
+            'good_friday_celebration': 25,   // Sexta-feira Santa (Adoração da Cruz)
+            'easter_vigil_mass': 25,         // Vigília Pascal (Sábado Santo)
+          };
+          const eventMinisters = eventMinisterCounts[question.id] || massInfo.minMinisters || 7;
+
           specialMasses.push({
             id: `custom-${question.id}`,
             dayOfWeek: massInfo.dayOfWeek,
             time: massInfo.time,
             date: massInfo.date,
-            minMinisters: massInfo.minMinisters || 7,
-            maxMinisters: massInfo.maxMinisters || 7,
+            minMinisters: eventMinisters,
+            maxMinisters: eventMinisters,
             type: question.id, // Usar o ID da pergunta como tipo
             description: question.metadata?.eventName || question.question
           });
