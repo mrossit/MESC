@@ -128,3 +128,14 @@ USUARIOS-*.txt
 cookies.txt
 build-output.txt
 escala_*.csv
+
+# ==========================================
+# DATA EXPORTS (dados reais - nunca versionar!)
+# ==========================================
+data-exports/
+*-backup-*.json
+export_*.json
+prod_backup_*.json
+
+# COVERAGE (já gerado localmente)
+coverage/
