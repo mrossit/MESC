@@ -2452,6 +2452,20 @@ export class ScheduleGenerator {
 
       // Verificar disponibilidade para domingo específico
       if (massTime.dayOfWeek === 0) {
+        // 🔥 CRITICAL FIX: Para missas custom/especiais em domingo (ex: Missa do
+        // Cemitério 9h30, Retiro 14h, missas em horários não-padrão), NÃO aplicar
+        // o filtro de availableSundays — esse array só contém os horários padrão
+        // de domingo (8h, 10h, 19h). A disponibilidade para o evento específico
+        // já foi confirmada em isAvailableForSpecialMass (custom_* check).
+        const isCustomSunday = massTime.type && (
+          massTime.type.startsWith('custom_') ||
+          massTime.type.startsWith('special_event')
+        );
+        if (isCustomSunday) {
+          console.log(`[AVAILABILITY_CHECK] ✅ ${minister.name} disponível para missa custom de domingo (${massTime.type}) — pulando filtro availableSundays`);
+          return true;
+        }
+
         console.log(`[AVAILABILITY_CHECK] Verificando domingo ${massTime.date} ${massTime.time}`);
 
         // Definir chaves de busca no início
@@ -2850,6 +2864,26 @@ export class ScheduleGenerator {
     // Quando um ministro marca disponibilidade para dias da semana, ele está se disponibilizando
     // para TODOS aqueles dias no mês, não apenas para 4 vezes.
     const isDailyMass = massTime.type === 'missa_diaria';
+
+    // Missas especiais (questionário custom_*, votivas, festas, novenas, eventos
+    // de Páscoa, etc.) também não devem contar para o limite — são eventos pontuais
+    // em que o ministro se disponibilizou explicitamente para AQUELE dia/horário,
+    // e bloquear por já ter servido 4× no mês deixa o slot vazio mesmo havendo
+    // muitos respondentes (caso típico: São Judas mensal dia 28).
+    const t = massTime.type || '';
+    const isSpecialEvent =
+      t.startsWith('custom_') ||
+      t.startsWith('special_event') ||
+      t.endsWith('_mass') ||
+      t === 'missa_sao_judas' ||
+      t === 'missa_sao_judas_festa' ||
+      t === 'missa_sao_judas_mensal' ||
+      t === 'missa_cura_libertacao' ||
+      t === 'missa_sagrado_coracao' ||
+      t === 'missa_imaculado_coracao' ||
+      t === 'missa_finados' ||
+      t === 'missa_puc';
+    const skipMonthlyLimit = isDailyMass || isSpecialEvent;
     
     // ⛪ SUNDAY PRIORITIZATION: Separate ministers by preferred time match
     const isSunday = massTime.dayOfWeek === 0;
@@ -2906,8 +2940,9 @@ export class ScheduleGenerator {
       const assignmentCount = minister.monthlyAssignmentCount || 0;
       const alreadyServedToday = minister.lastAssignedDate === massTime.date;
 
-      // Hard limit check - MAS NÃO para missas diárias!
-      if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+      // Hard limit check — NÃO aplicar para missas diárias nem missas especiais
+      // (eventos pontuais com pergunta dedicada no questionário).
+      if (!skipMonthlyLimit && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
         console.log(`[FAIR_ALGORITHM] ❌ ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
         return false;
       }
@@ -2918,8 +2953,8 @@ export class ScheduleGenerator {
         return false;
       }
 
-      if (isDailyMass) {
-        console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible for DAILY MASS (${assignmentCount} total assignments)`);
+      if (skipMonthlyLimit) {
+        console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible for ${isDailyMass ? 'DAILY' : 'SPECIAL'} MASS (${assignmentCount} total assignments)`);
       } else {
         console.log(`[FAIR_ALGORITHM] ✅ ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
       }
@@ -2927,6 +2962,25 @@ export class ScheduleGenerator {
     });
 
     console.log(`[FAIR_ALGORITHM] Eligible after filters: ${eligible.length}/${available.length}`);
+
+    // ⛪ SUNDAY EARLY-FALLBACK: If Tier A is empty/eligible-empty on a Sunday,
+    // pull from Tier B BEFORE giving up. Otherwise an 8h slot stays empty
+    // when nobody picked 8h as their preferred time, even though many people
+    // said they're available for that exact Sunday.
+    if (eligible.length === 0 && isSunday && tierB.length > 0) {
+      console.log(`[SUNDAY_PRIORITY] ⚠️ Tier A eligible empty — pulling from Tier B early`);
+      const tierBEligible = tierB.filter(minister => {
+        if (!minister.id) return false;
+        const cnt = minister.monthlyAssignmentCount || 0;
+        if (!skipMonthlyLimit && cnt >= MAX_MONTHLY_ASSIGNMENTS) return false;
+        if (minister.lastAssignedDate === massTime.date) return false;
+        return true;
+      });
+      if (tierBEligible.length > 0) {
+        console.log(`[SUNDAY_PRIORITY] ✅ ${tierBEligible.length} Tier B ministers eligible — using as primary pool`);
+        eligible.push(...tierBEligible);
+      }
+    }
 
     if (eligible.length === 0) {
       logger.error(`[FAIR_ALGORITHM] ❌ NO ELIGIBLE MINISTERS for ${massTime.date} ${massTime.time}!`);
@@ -3067,11 +3121,11 @@ export class ScheduleGenerator {
           if (!minister.id) return false;
           const assignmentCount = minister.monthlyAssignmentCount || 0;
           const alreadyServedToday = minister.lastAssignedDate === massTime.date;
-          
-          if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
+
+          if (!skipMonthlyLimit && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
           if (alreadyServedToday) return false;
           if (used.has(minister.id)) return false;
-          
+
           return true;
         });
         
