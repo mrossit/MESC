@@ -220,6 +220,11 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
             name: m.name,
             position: m.position || (idx + 1)
           })),
+          backupMinisters: (schedule.backupMinisters || []).map((m, idx) => ({
+            id: m.id,
+            name: m.name,
+            position: (m as { position?: number }).position || (schedule.ministers.length + idx + 1)
+          })),
           confidence: schedule.confidence
         }))
       };

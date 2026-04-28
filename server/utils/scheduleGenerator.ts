@@ -2020,25 +2020,42 @@ export class ScheduleGenerator {
       } else {
         // Há conflito - aplicar prioridade
         console.log(`[SCHEDULE_GEN] ⚠️ CONFLITO em ${key}: ${conflicts.map(m => m.type).join(' vs ')}`);
-        
-        // Ordem de prioridade: especiais > dominicais > diárias  
+
+        // Ordem de prioridade: especiais > dominicais > diárias
         const priorityOrder = [
           'missa_sao_judas_festa', 'missa_sao_judas', 'missa_cura_libertacao',
           'missa_sagrado_coracao', 'missa_imaculado_coracao',
           'missa_dominical', 'missa_diaria'
         ];
-        
+
+        // Custom (questionnaire-defined) masses must beat hardcoded defaults
+        // when they overlap — the parish's custom config is always more specific.
+        const isCustomType = (t?: string) => !!t && t.startsWith('custom_');
+
         // Selecionar a missa com maior prioridade
         let selected = conflicts[0];
         for (const mass of conflicts) {
+          const currentIsCustom = isCustomType(mass.type);
+          const selectedIsCustom = isCustomType(selected.type);
+
+          // Custom always beats non-custom
+          if (currentIsCustom && !selectedIsCustom) {
+            selected = mass;
+            continue;
+          }
+          if (!currentIsCustom && selectedIsCustom) {
+            continue;
+          }
+
+          // Both same custom-ness: fall back to priorityOrder
           const currentPriority = priorityOrder.indexOf(mass.type || 'missa_diaria');
           const selectedPriority = priorityOrder.indexOf(selected.type || 'missa_diaria');
-          
+
           if (currentPriority < selectedPriority) { // Menor índice = maior prioridade
             selected = mass;
           }
         }
-        
+
         console.log(`[SCHEDULE_GEN] ✅ RESOLVIDO: ${selected.type} prevaleceu em ${key}`);
         resolvedTimes.push(selected);
       }
@@ -2604,9 +2621,17 @@ export class ScheduleGenerator {
         massType.startsWith('holy_thursday') || massType.startsWith('good_friday') ||
         massType.startsWith('easter_vigil') || massType.startsWith('saint_judas_april')) {
       if (specialEvents && typeof specialEvents === 'object') {
-        const response = specialEvents[massType];
+        // v2.0 client persists the legacy fixed specials under shorter keys.
+        // The questionnaire uses *_mass ids; the response payload uses these.
+        const v2KeyMap: { [key: string]: string } = {
+          'sacred_heart_mass': 'first_friday',
+          'immaculate_heart_mass': 'first_saturday',
+          'healing_liberation_mass': 'healing_liberation'
+        };
+        const lookupKey = v2KeyMap[massType] || massType;
+        const response = specialEvents[lookupKey] ?? specialEvents[massType];
         const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
-        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} for CUSTOM event ${massType}: ${response} = ${isAvailable}`);
+        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} for CUSTOM event ${massType} (lookup=${lookupKey}): ${response} = ${isAvailable}`);
         return isAvailable;
       }
       console.log(`[SPECIAL_MASS] ❌ ${ministerId}: No special events data for ${massType}`);
