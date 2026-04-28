@@ -82,6 +82,48 @@ export interface MassTime {
   description?: string; // Descrição adicional
 }
 
+/**
+ * Returns a human-readable name for a mass slot, suitable for display in
+ * the schedule UI (instead of the cryptic `type` field).
+ *
+ * Hardcoded types map to fixed Portuguese labels; questionnaire-driven
+ * masses (custom_*, *_mass) reuse the question text or its eventName.
+ */
+export function getMassDisplayName(massTime: MassTime): string {
+  const t = massTime.type;
+  const hardcodedNames: Record<string, string> = {
+    'missa_diaria': 'Missa Diária',
+    'missa_dominical': 'Missa Dominical',
+    'missa_sagrado_coracao': 'Missa votiva ao Sagrado Coração de Jesus',
+    'missa_imaculado_coracao': 'Missa votiva ao Imaculado Coração de Maria',
+    'missa_cura_libertacao': 'Missa por Cura e Libertação',
+    'missa_sao_judas': 'Novena de São Judas Tadeu',
+    'missa_sao_judas_festa': 'Festa de São Judas Tadeu',
+    'missa_sao_judas_mensal': 'Missa Mensal a São Judas Tadeu',
+    'missa_finados': 'Missa de Finados (Cemitério Memorial)',
+    'missa_puc': 'Missa PUC – Consciência Negra',
+    'adoracao_santissimo': 'Adoração ao Santíssimo',
+    'sacred_heart_mass': 'Missa votiva ao Sagrado Coração de Jesus',
+    'immaculate_heart_mass': 'Missa votiva ao Imaculado Coração de Maria',
+    'healing_liberation_mass': 'Missa por Cura e Libertação',
+    'holy_thursday_mass': 'Missa da Ceia do Senhor (Quinta-feira Santa)',
+    'good_friday_celebration': 'Adoração da Cruz (Sexta-feira Santa)',
+    'easter_vigil_mass': 'Vigília Pascal (Sábado Santo)',
+  };
+  if (t && hardcodedNames[t]) return hardcodedNames[t];
+
+  // Questionnaire custom masses: prefer description (set when adding the slot)
+  if (massTime.description) {
+    // Description may be the full question text — strip the boilerplate.
+    return massTime.description
+      .replace(/^Você pode servir n[ao]\s+/i, '')
+      .replace(/\s*-\s*(?:domingo|segunda(?:-feira)?|terça(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sábado)\s*\(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\)\s*às\s*\d{1,2}h?\d{0,2}\??$/i, '')
+      .replace(/\?$/, '')
+      .trim();
+  }
+  return t || 'Missa';
+}
+
 export interface GeneratedSchedule {
   massTime: MassTime;
   ministers: Minister[];

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireRole } from '../auth';
 import type { AuthRequest } from '../auth';
-import { generateAutomaticSchedule, GeneratedSchedule } from '../utils/scheduleGenerator';
+import { generateAutomaticSchedule, GeneratedSchedule, getMassDisplayName } from '../utils/scheduleGenerator';
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { schedules, users, massTimesConfig, questionnaires, questionnaireResponses, substitutionRequests, scheduleGenerations } from '@shared/schema';
@@ -215,6 +215,8 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: schedule.massTime.type || 'missa',
+          name: getMassDisplayName(schedule.massTime),
+          location: schedule.massTime.location || null,
           ministers: schedule.ministers.map((m, idx) => ({
             id: m.id,
             name: m.name,
@@ -923,6 +925,7 @@ router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor',
       date: schedules.date,
       time: schedules.time,
       type: schedules.type,
+      location: schedules.location,
       ministerId: schedules.ministerId,
       position: schedules.position,
       status: schedules.status,
@@ -950,25 +953,39 @@ router.get('/generation/:year/:month', authenticateToken, requireRole(['gestor',
       groupedSchedules[key].push(schedule);
     });
 
-    // Extrair backups do JSON original/final da geração
+    // Extrair metadata (backups, nome, tipo, local) do JSON original/final da geração
     const savedScheduleData = (generation.finalSchedule || generation.originalSchedule) as any;
     const savedSchedules: any[] = savedScheduleData?.schedules || savedScheduleData || [];
     const backupsByKey: Record<string, any[]> = {};
+    const metaByKey: Record<string, { name?: string; type?: string; location?: string | null }> = {};
     if (Array.isArray(savedSchedules)) {
       savedSchedules.forEach((s: any) => {
-        if (s.date && s.time && Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
-          backupsByKey[`${s.date}_${s.time}`] = s.backupMinisters;
+        if (!s.date || !s.time) return;
+        const key = `${s.date}_${s.time}`;
+        if (Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
+          backupsByKey[key] = s.backupMinisters;
         }
+        metaByKey[key] = {
+          name: s.name || undefined,
+          type: s.type || undefined,
+          location: s.location ?? undefined
+        };
       });
     }
 
     // Format as GeneratedSchedule-like structure
     const formattedSchedules = Object.entries(groupedSchedules).map(([key, ministers]) => {
       const [date, time] = key.split('_');
+      const meta = metaByKey[key] || {};
+      // Fallback: extract mass name from notes column ("<MassName> | Gerado...") if JSON didn't have it
+      const noteName = ministers[0]?.notes?.split(' | ')[0];
       return {
         date,
         time,
         dayOfWeek: new Date(date).getDay(),
+        type: meta.type || ministers[0]?.type || 'missa',
+        name: meta.name || (noteName && !noteName.startsWith('Gerado') ? noteName : undefined),
+        location: meta.location ?? ministers[0]?.location ?? null,
         ministers: ministers.map(m => ({
           id: m.ministerId,
           name: m.scheduleDisplayName || m.ministerName || 'VACANTE',
@@ -1494,6 +1511,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
       // Inserir ministros escalados com posição para manter a ordem
       // Filtrar posições VACANT — não salvar vagas vazias da geração automática
       const validMinisters = schedule.ministers.filter(m => m.id && m.id !== 'VACANT');
+      const massName = getMassDisplayName(schedule.massTime);
       for (let i = 0; i < validMinisters.length; i++) {
         const minister = validMinisters[i];
         const ministerPosition = (minister as { position?: number }).position;
@@ -1501,11 +1519,11 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: 'missa',
-          location: null,
+          location: schedule.massTime.location || null,
           ministerId: minister.id,
           position: ministerPosition || (i + 1),
           status: 'scheduled',
-          notes: `Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
+          notes: `${massName} | Gerado automaticamente - Confiança: ${Math.round(schedule.confidence * 100)}%`
         });
         savedCount++;
       }

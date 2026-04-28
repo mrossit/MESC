@@ -11,6 +11,9 @@ export interface GeneratedSchedule {
   date: string;
   time: string;
   dayOfWeek: number;
+  type?: string;
+  name?: string;
+  location?: string | null;
   ministers: Minister[];
   backupMinisters: Minister[];
   confidence: number;
