@@ -1888,12 +1888,38 @@ export class ScheduleGenerator {
 
         if (massInfo) {
           // Determinar número de ministros baseado no tipo de evento
+          // (Phase 2 vai mover isso para configuração do questionário; por ora,
+          // matching por id do evento e por padrão de texto.)
           const eventMinisterCounts: Record<string, number> = {
-            'holy_thursday_mass': 25,       // Quinta-feira Santa (Lava-pés)
-            'good_friday_celebration': 25,   // Sexta-feira Santa (Adoração da Cruz)
-            'easter_vigil_mass': 25,         // Vigília Pascal (Sábado Santo)
+            'holy_thursday_mass': 25,        // Quinta-feira Santa (Lava-pés)
+            'good_friday_celebration': 25,    // Sexta-feira Santa (Adoração da Cruz)
+            'easter_vigil_mass': 25,          // Vigília Pascal (Sábado Santo)
+            'healing_liberation_mass': 26,    // Missa por Cura e Libertação (1ª 5ª-feira)
+            'sacred_heart_mass': 6,           // Sagrado Coração de Jesus (1ª 6ª-feira)
+            'immaculate_heart_mass': 6,       // Imaculado Coração de Maria (1º sábado)
           };
-          const eventMinisters = eventMinisterCounts[question.id] || massInfo.minMinisters || 7;
+
+          // Padrões textuais para perguntas custom_* sem id estruturado
+          const inferFromText = (text: string): number | null => {
+            const t = text.toLowerCase();
+            if (/cura\s+e\s+liberta/.test(t)) return 26;
+            if (/novena.*pentecostes/.test(t)) return 15;
+            if (/finados.*cemit[eé]rio/.test(t)) return 10;
+            if (/dia\s+das\s+m[ãa]es.*cemit[eé]rio/.test(t)) return 10;
+            // São Judas Tadeu (votiva mensal): horários específicos
+            if (/s[ãa]o\s+judas/.test(t)) {
+              if (/\b7h\b|\b07h\b|\b07:00\b/.test(t)) return 6;
+              if (/\b15h\b|\b15:00\b/.test(t)) return 4;
+              if (/19h?30|19:30/.test(t)) return 7;
+            }
+            return null;
+          };
+
+          const eventMinisters =
+            eventMinisterCounts[question.id]
+            || inferFromText(question.question)
+            || massInfo.minMinisters
+            || 7;
 
           specialMasses.push({
             id: `custom-${question.id}`,
@@ -3173,12 +3199,47 @@ export class ScheduleGenerator {
         }
       }
       
+      // 🔥 FILL-TO-MIN FINAL PASS: Quando ainda abaixo do mínimo, ignorar
+      // o limite mensal (4×/mês) e a preferência familiar para garantir que
+      // o slot tenha pelo menos minMinisters. Caso contrário, sobram pessoas
+      // disponíveis viraram backup com a missa subdimensionada.
+      if (selected.length < targetCount) {
+        const stillNeeded = targetCount - selected.length;
+        console.log(`[FILL_TO_MIN] 🆘 Slot abaixo do mínimo (${selected.length}/${targetCount}), forçando preenchimento de ${stillNeeded} vagas...`);
+
+        const fillCandidates = available.filter(m => {
+          if (!m.id) return false;
+          if (used.has(m.id)) return false;
+          if (m.lastAssignedDate === massTime.date) return false; // mesmo-dia continua proibido
+          return true;
+        });
+
+        // Ordenar por menor monthlyAssignmentCount (mais justo) → totalServices
+        fillCandidates.sort((a, b) => {
+          const ca = a.monthlyAssignmentCount || 0;
+          const cb = b.monthlyAssignmentCount || 0;
+          if (ca !== cb) return ca - cb;
+          return (a.totalServices || 0) - (b.totalServices || 0);
+        });
+
+        for (const minister of fillCandidates) {
+          if (selected.length >= targetCount) break;
+          if (!minister.id) continue;
+          selected.push(minister);
+          used.add(minister.id);
+          minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+          minister.lastAssignedDate = massTime.date;
+          console.log(`[FILL_TO_MIN] ✅ Adicionado ${minister.name} (count agora ${minister.monthlyAssignmentCount}, ignorando limite/familia)`);
+        }
+        console.log(`[FILL_TO_MIN] 📊 Após fill-to-min: ${selected.length}/${targetCount}`);
+      }
+
       // Final check after potential Tier B fill
       if (selected.length < targetCount) {
         const finalShortage = targetCount - selected.length;
         logger.warn(`⚠️ [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${finalShortage})`);
         console.log(`[FAIR_ALGORITHM] ⚠️ INCOMPLETE: ${selected.length}/${targetCount}`);
-        console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
+        console.log(`[FAIR_ALGORITHM] Reason: Only ${available.length} ministers available in pool`);
 
         // Mark as incomplete
         selected.forEach(m => {
