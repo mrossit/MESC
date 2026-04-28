@@ -1498,6 +1498,26 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
 
       // Se replaceExisting, remover escalas existentes para esta data/hora
       if (replaceExisting) {
+        // Schema declares ON DELETE CASCADE on substitution_requests.schedule_id,
+        // but the live DB constraint was created without CASCADE — delete the
+        // child rows explicitly to avoid 23503 FK violations.
+        const oldScheduleIds = await tx
+          .select({ id: schedules.id })
+          .from(schedules)
+          .where(
+            and(
+              eq(schedules.date, schedule.massTime.date),
+              eq(schedules.time, schedule.massTime.time)
+            )
+          );
+
+        if (oldScheduleIds.length > 0) {
+          const ids = oldScheduleIds.map(r => r.id);
+          await tx
+            .delete(substitutionRequests)
+            .where(inArray(substitutionRequests.scheduleId, ids));
+        }
+
         // Delete old schedules for this date/time
         await tx.delete(schedules)
           .where(
