@@ -474,6 +474,8 @@ export default function AutoScheduleGeneration() {
                     key={index}
                     date={schedule.date}
                     time={schedule.time}
+                    name={schedule.name}
+                    location={schedule.location}
                     confidence={schedule.confidence}
                     qualityScore={schedule.qualityScore}
                     ministers={schedule.ministers}

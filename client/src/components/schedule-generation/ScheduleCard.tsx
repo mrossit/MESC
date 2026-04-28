@@ -15,6 +15,8 @@ interface ScheduleCardProps {
   backupMinisters: Minister[];
   onEdit: () => void;
   index: number;
+  name?: string;
+  location?: string | null;
 }
 
 function getConfidenceBadgeVariant(confidence: number) {
@@ -31,7 +33,9 @@ export function ScheduleCard({
   ministers,
   backupMinisters,
   onEdit,
-  index
+  index,
+  name,
+  location
 }: ScheduleCardProps) {
   const borderColor = confidence >= 0.8 ? '#22c55e' : confidence >= 0.6 ? '#f59e0b' : '#ef4444';
 
@@ -42,11 +46,17 @@ export function ScheduleCard({
           <div className="flex items-center gap-3">
             <div>
               <h4 className="font-semibold">
-                {format(new Date(date + 'T00:00:00'), 'EEEE', { locale: ptBR })} - {format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy')}
+                {name || `${format(new Date(date + 'T00:00:00'), 'EEEE', { locale: ptBR })} - ${format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy')}`}
               </h4>
+              {name && (
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(date + 'T00:00:00'), "EEEE, dd/MM/yyyy", { locale: ptBR })}
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 {time}
+                {location && <span className="ml-2">· {location}</span>}
               </div>
             </div>
           </div>

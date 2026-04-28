@@ -82,6 +82,48 @@ export interface MassTime {
   description?: string; // Descrição adicional
 }
 
+/**
+ * Returns a human-readable name for a mass slot, suitable for display in
+ * the schedule UI (instead of the cryptic `type` field).
+ *
+ * Hardcoded types map to fixed Portuguese labels; questionnaire-driven
+ * masses (custom_*, *_mass) reuse the question text or its eventName.
+ */
+export function getMassDisplayName(massTime: MassTime): string {
+  const t = massTime.type;
+  const hardcodedNames: Record<string, string> = {
+    'missa_diaria': 'Missa Diária',
+    'missa_dominical': 'Missa Dominical',
+    'missa_sagrado_coracao': 'Missa votiva ao Sagrado Coração de Jesus',
+    'missa_imaculado_coracao': 'Missa votiva ao Imaculado Coração de Maria',
+    'missa_cura_libertacao': 'Missa por Cura e Libertação',
+    'missa_sao_judas': 'Novena de São Judas Tadeu',
+    'missa_sao_judas_festa': 'Festa de São Judas Tadeu',
+    'missa_sao_judas_mensal': 'Missa Mensal a São Judas Tadeu',
+    'missa_finados': 'Missa de Finados (Cemitério Memorial)',
+    'missa_puc': 'Missa PUC – Consciência Negra',
+    'adoracao_santissimo': 'Adoração ao Santíssimo',
+    'sacred_heart_mass': 'Missa votiva ao Sagrado Coração de Jesus',
+    'immaculate_heart_mass': 'Missa votiva ao Imaculado Coração de Maria',
+    'healing_liberation_mass': 'Missa por Cura e Libertação',
+    'holy_thursday_mass': 'Missa da Ceia do Senhor (Quinta-feira Santa)',
+    'good_friday_celebration': 'Adoração da Cruz (Sexta-feira Santa)',
+    'easter_vigil_mass': 'Vigília Pascal (Sábado Santo)',
+  };
+  if (t && hardcodedNames[t]) return hardcodedNames[t];
+
+  // Questionnaire custom masses: prefer description (set when adding the slot)
+  if (massTime.description) {
+    // Description may be the full question text — strip the boilerplate.
+    return massTime.description
+      .replace(/^Você pode servir n[ao]\s+/i, '')
+      .replace(/\s*-\s*(?:domingo|segunda(?:-feira)?|terça(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sábado)\s*\(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\)\s*às\s*\d{1,2}h?\d{0,2}\??$/i, '')
+      .replace(/\?$/, '')
+      .trim();
+  }
+  return t || 'Missa';
+}
+
 export interface GeneratedSchedule {
   massTime: MassTime;
   ministers: Minister[];
@@ -2020,25 +2062,42 @@ export class ScheduleGenerator {
       } else {
         // Há conflito - aplicar prioridade
         console.log(`[SCHEDULE_GEN] ⚠️ CONFLITO em ${key}: ${conflicts.map(m => m.type).join(' vs ')}`);
-        
-        // Ordem de prioridade: especiais > dominicais > diárias  
+
+        // Ordem de prioridade: especiais > dominicais > diárias
         const priorityOrder = [
           'missa_sao_judas_festa', 'missa_sao_judas', 'missa_cura_libertacao',
           'missa_sagrado_coracao', 'missa_imaculado_coracao',
           'missa_dominical', 'missa_diaria'
         ];
-        
+
+        // Custom (questionnaire-defined) masses must beat hardcoded defaults
+        // when they overlap — the parish's custom config is always more specific.
+        const isCustomType = (t?: string) => !!t && t.startsWith('custom_');
+
         // Selecionar a missa com maior prioridade
         let selected = conflicts[0];
         for (const mass of conflicts) {
+          const currentIsCustom = isCustomType(mass.type);
+          const selectedIsCustom = isCustomType(selected.type);
+
+          // Custom always beats non-custom
+          if (currentIsCustom && !selectedIsCustom) {
+            selected = mass;
+            continue;
+          }
+          if (!currentIsCustom && selectedIsCustom) {
+            continue;
+          }
+
+          // Both same custom-ness: fall back to priorityOrder
           const currentPriority = priorityOrder.indexOf(mass.type || 'missa_diaria');
           const selectedPriority = priorityOrder.indexOf(selected.type || 'missa_diaria');
-          
+
           if (currentPriority < selectedPriority) { // Menor índice = maior prioridade
             selected = mass;
           }
         }
-        
+
         console.log(`[SCHEDULE_GEN] ✅ RESOLVIDO: ${selected.type} prevaleceu em ${key}`);
         resolvedTimes.push(selected);
       }
@@ -2604,9 +2663,17 @@ export class ScheduleGenerator {
         massType.startsWith('holy_thursday') || massType.startsWith('good_friday') ||
         massType.startsWith('easter_vigil') || massType.startsWith('saint_judas_april')) {
       if (specialEvents && typeof specialEvents === 'object') {
-        const response = specialEvents[massType];
+        // v2.0 client persists the legacy fixed specials under shorter keys.
+        // The questionnaire uses *_mass ids; the response payload uses these.
+        const v2KeyMap: { [key: string]: string } = {
+          'sacred_heart_mass': 'first_friday',
+          'immaculate_heart_mass': 'first_saturday',
+          'healing_liberation_mass': 'healing_liberation'
+        };
+        const lookupKey = v2KeyMap[massType] || massType;
+        const response = specialEvents[lookupKey] ?? specialEvents[massType];
         const isAvailable = response === 'Sim' || response === 'sim' || response === true || response === 'true' || response === 1;
-        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} for CUSTOM event ${massType}: ${response} = ${isAvailable}`);
+        console.log(`[SPECIAL_MASS] 🎯 ${ministerId} for CUSTOM event ${massType} (lookup=${lookupKey}): ${response} = ${isAvailable}`);
         return isAvailable;
       }
       console.log(`[SPECIAL_MASS] ❌ ${ministerId}: No special events data for ${massType}`);
