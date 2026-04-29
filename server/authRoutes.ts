@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { login, register, changePassword, resetPassword, authenticateToken, requireRole, AuthRequest, hashPassword } from './auth';
+import { isAdminUser } from './config/admins';
 import { z } from 'zod';
 import { db } from './db';
 import { users } from '@shared/schema';
@@ -266,7 +267,10 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
 
     res.json({
       success: true,
-      user
+      user: {
+        ...user,
+        isAdmin: isAdminUser(user.id)
+      }
     });
   } catch (error) {
     console.error('Erro ao buscar dados do usuário:', error);
@@ -275,7 +279,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
       success: true,
       user: {
         ...req.user,
-        status: 'active' // Adiciona status padrão em caso de erro
+        status: 'active', // Adiciona status padrão em caso de erro
+        isAdmin: isAdminUser(req.user?.id)
       }
     });
   }

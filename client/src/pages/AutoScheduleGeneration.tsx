@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,9 @@ import {
   Send,
   CheckCircle2,
   Clock,
-  FileEdit
+  FileEdit,
+  Download,
+  Upload
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -35,9 +37,11 @@ import { ScheduleEditDialog } from '@/components/ScheduleEditDialog';
 import { PeriodSelector, MONTHS } from '@/components/schedule-generation/PeriodSelector';
 import { GenerationMetrics } from '@/components/schedule-generation/GenerationMetrics';
 import { ScheduleCard } from '@/components/schedule-generation/ScheduleCard';
+import { ImportXlsxDialog } from '@/components/schedule-generation/ImportXlsxDialog';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { usePageLeaveWarning } from '@/hooks/usePageLeaveWarning';
 import type { TestResult, EditingSchedule } from '@/types/schedule';
+import type { AuthResponse } from '@/lib/auth';
 
 // Interface for outliers in test results
 interface Outlier {
@@ -70,9 +74,16 @@ export default function AutoScheduleGeneration() {
   const [showTestResults, setShowTestResults] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'generate' | 'preview'; preview: boolean } | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Verifica se o usuário tem acesso a funcionalidades admin (xlsx import/export).
+  // Origem: server/config/admins.ts. Quando liberado para todos, isso é trivialmente
+  // true e os botões aparecem para todo coordenador/gestor.
+  const { data: authData } = useQuery<AuthResponse>({ queryKey: ['/api/auth/me'] });
+  const isAdmin = authData?.user?.isAdmin === true;
   const {
     generatedData,
     setGeneratedData,
@@ -146,6 +157,42 @@ export default function AutoScheduleGeneration() {
 
   const handlePublish = async () => {
     await publishGeneration();
+  };
+
+  const handleExportXlsx = async () => {
+    if (!generationId) return;
+    try {
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem('token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const apiBaseURL = (import.meta.env.VITE_API_URL as string | undefined) || '';
+      const url = `${apiBaseURL}/api/schedules/generation/${generationId}/export-xlsx`;
+      const res = await fetch(url, { headers, credentials: 'include' });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `escala-${String(selectedMonth).padStart(2, '0')}-${selectedYear}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      toast({
+        title: 'Erro ao exportar',
+        description: e instanceof Error ? e.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleImportApplied = () => {
+    // Invalidate schedule queries para refetch da escala atualizada
+    queryClient.invalidateQueries({ queryKey: ['/api/schedules'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['/api/schedules/generation'], exact: false });
   };
 
   const handleReprocessResponses = async () => {
@@ -390,6 +437,31 @@ export default function AutoScheduleGeneration() {
                   <Shuffle className="h-4 w-4 mr-2" />
                   Regerar
                 </Button>
+
+                {isAdmin && generationId && (
+                  <>
+                    <Button
+                      onClick={handleExportXlsx}
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-export-xlsx"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar .xlsx
+                    </Button>
+                    {generationStatus === 'draft' && (
+                      <Button
+                        onClick={() => setShowImportDialog(true)}
+                        variant="outline"
+                        size="sm"
+                        data-testid="button-import-xlsx"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Importar .xlsx
+                      </Button>
+                    )}
+                  </>
+                )}
 
                 {hasUnsavedChanges && (
                   <Button
@@ -672,6 +744,16 @@ export default function AutoScheduleGeneration() {
                 }
               }
             }}
+          />
+        )}
+
+        {/* Import xlsx dialog (admins only) */}
+        {isAdmin && generationId && (
+          <ImportXlsxDialog
+            open={showImportDialog}
+            onOpenChange={setShowImportDialog}
+            generationId={generationId}
+            onApplied={handleImportApplied}
           />
         )}
 
