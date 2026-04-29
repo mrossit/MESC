@@ -11,6 +11,7 @@ import { noCacheHeaders } from "./middleware/noCacheHeaders";
 import questionnaireAdminRoutes from "./routes/questionnaireAdmin";
 import questionnaireRoutes from "./routes/questionnaires";
 import scheduleGenerationRoutes from "./routes/scheduleGeneration";
+import scheduleImportExportRoutes from "./routes/scheduleImportExport";
 import smartScheduleRoutes from "./routes/smartScheduleGeneration";
 import schedulesRoutes from "./routes/schedules";
 import auxiliaryPanelRoutes from "./routes/auxiliaryPanel";
@@ -91,6 +92,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Schedule generation routes - com proteção CSRF
   app.use('/api/schedules', csrfProtection, scheduleGenerationRoutes);
+
+  // Schedule import/export (xlsx) — restrito a admins (rollout faseado)
+  app.use('/api/schedules', csrfProtection, scheduleImportExportRoutes);
 
   // Smart schedule generation routes (advanced algorithm) - com proteção CSRF
   app.use('/api/schedules', csrfProtection, smartScheduleRoutes);

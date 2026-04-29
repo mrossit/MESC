@@ -29,6 +29,11 @@ export interface AuthUser {
   lastName?: string | null;
   phone?: string | null;
   photoUrl?: string | null;
+  /**
+   * Acesso a funcionalidades em rollout (ex: import/export xlsx).
+   * Origem: ADMIN_USER_IDS em server/config/admins.ts.
+   */
+  isAdmin?: boolean;
 }
 
 // Auth API response types
