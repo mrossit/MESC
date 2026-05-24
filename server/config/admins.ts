@@ -9,8 +9,8 @@
 import type { AuthRequest } from '../auth';
 
 export const ADMIN_USER_IDS: ReadonlyArray<string> = [
-  // Marco Rossit (rewayoflight@hotmail.com) — owner / superadmin
-  'bc2f4e56-dfd2-41b2-9917-473e6fd233f8',
+  // Marco Rossit (rossit@icloud.com) — owner / superadmin
+  '629a3fcc-96e2-4ac1-881f-2c8726fbd9d3',
 ];
 
 export function isAdminUser(userId: string | null | undefined): boolean {
