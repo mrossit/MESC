@@ -1692,27 +1692,47 @@ export class ScheduleGenerator {
     // Ex: "dia 08/12/2025 às 19h30" ou "quinta feira 01/01/2026 às 19h"
     // 🔧 FIX: Também suporta "dia 18/02/26 às 7h" (ano com 2 dígitos)
 
-    // Extrair data DD/MM/YY ou DD/MM/YYYY (suporta 2 ou 4 dígitos no ano)
-    const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-    if (!dateMatch) {
-      console.log(`[EXTRACT_MASS_INFO] ⚠️ No date found in: ${question.substring(0, 80)}...`);
-      return null;
+    // Extrair data: aceita DD/MM/YYYY, DD/MM/YY ou DD/MM (sem ano)
+    // 🔧 FIX 2026-05-30: Perguntas de missas especiais costumam vir como "(04/06)"
+    //   SEM o ano (ex.: Corpus Christi). Antes, o regex exigia o ano e a missa era
+    //   silenciosamente descartada do gerador. Agora caímos no ano do questionário.
+    let day: number;
+    let monthFromQuestion: number;
+    let yearFromQuestion: number;
+
+    const dateMatchFull = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (dateMatchFull) {
+      day = parseInt(dateMatchFull[1]);
+      monthFromQuestion = parseInt(dateMatchFull[2]);
+      yearFromQuestion = parseInt(dateMatchFull[3]);
+
+      // 🔧 Converter ano de 2 dígitos para 4 dígitos (26 → 2026)
+      if (yearFromQuestion < 100) {
+        yearFromQuestion = 2000 + yearFromQuestion;
+        console.log(`[EXTRACT_MASS_INFO] 📅 Converted 2-digit year: ${dateMatchFull[3]} → ${yearFromQuestion}`);
+      }
+    } else {
+      // Sem ano na pergunta: tentar DD/MM e usar o ano do questionário.
+      // Negative lookahead evita capturar a parte DD/MM de uma data completa.
+      const dateMatchShort = question.match(/(\d{1,2})\/(\d{1,2})(?!\s*\/)/);
+      if (!dateMatchShort) {
+        console.log(`[EXTRACT_MASS_INFO] ⚠️ No date found in: ${question.substring(0, 80)}...`);
+        return null;
+      }
+      day = parseInt(dateMatchShort[1]);
+      monthFromQuestion = parseInt(dateMatchShort[2]);
+      yearFromQuestion = year;
+
+      // Virada de ano: questionário de dez./2025 perguntando sobre missa de jan. → 2026
+      if (monthFromQuestion < month) {
+        yearFromQuestion = year + 1;
+      }
+      console.log(`[EXTRACT_MASS_INFO] 📅 Data sem ano "${dateMatchShort[0]}" → assumindo ${yearFromQuestion} (do questionário)`);
     }
 
-    const day = parseInt(dateMatch[1]);
-    const monthFromQuestion = parseInt(dateMatch[2]);
-    let yearFromQuestion = parseInt(dateMatch[3]);
-
-    // 🔧 FIX: Converter ano de 2 dígitos para 4 dígitos
-    // Ex: 26 → 2026, 25 → 2025
-    if (yearFromQuestion < 100) {
-      // Assumir século 21 para anos entre 00-99
-      yearFromQuestion = 2000 + yearFromQuestion;
-      console.log(`[EXTRACT_MASS_INFO] 📅 Converted 2-digit year: ${dateMatch[3]} → ${yearFromQuestion}`);
-    }
-
-    // Extrair horário (HH:MM ou HHh ou HHhMM)
-    const timeMatch = question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{2})?/i);
+    // Extrair horário: HH:MM, HHh, HHhMM ou "HH horas" (com ou sem minutos)
+    // 🔧 FIX 2026-05-30: também aceita "às 10 horas" (antes exigia "h" ou ":" colado).
+    const timeMatch = question.match(/(?:às|as|ás)\s*(\d{1,2})(?:\s*[h:]\s*(\d{2}))?/i);
     if (!timeMatch) {
       console.log(`[EXTRACT_MASS_INFO] ⚠️ No time found in: ${question.substring(0, 80)}...`);
       return null;
