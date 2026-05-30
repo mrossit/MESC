@@ -1719,8 +1719,11 @@ export default function Schedules() {
                       dayAssignments.map(a => formatMassTime(a.massTime))
                     )
                   );
+                  // standardMassTimes vem como "HH:MM:SS" e actualMassTimes como "HH:MM"
+                  // (via formatMassTime). Sem normalizar, o Set não funde "06:30:00" e
+                  // "06:30", fazendo a mesma missa aparecer duas vezes no calendário.
                   const availableMassTimes = Array.from(
-                    new Set([...standardMassTimes, ...actualMassTimes])
+                    new Set([...standardMassTimes.map(formatMassTime), ...actualMassTimes])
                   ).sort();
                   
                   return (
