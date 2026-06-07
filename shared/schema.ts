@@ -29,8 +29,28 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Communities table (multi-community support)
+export const communities = pgTable(
+  'communities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    parishName: varchar('parish_name', { length: 255 }).notNull().default('Santuário São Judas Tadeu de Sorocaba'),
+    name: varchar('name', { length: 255 }).notNull(),
+    slug: varchar('slug', { length: 64 }).notNull().unique(),
+    colorHex: varchar('color_hex', { length: 7 }).notNull(),
+    isMatriz: boolean('is_matriz').notNull().default(false),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_communities_slug').on(table.slug),
+    index('idx_communities_active').on(table.active),
+  ]
+);
+
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['gestor', 'coordenador', 'ministro']);
+export const userRoleEnum = pgEnum('user_role', ['gestor', 'reitor', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro']);
 export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
 export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
@@ -91,7 +111,8 @@ export const users = pgTable("users", {
   imageData: text('image_data'), // Base64 encoded image data
   imageContentType: varchar('image_content_type', { length: 50 }), // MIME type
   familyId: uuid('family_id').references(() => families.id),
-  
+  homeCommunityId: uuid('home_community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
+
   // Personal information
   birthDate: date('birth_date'),
   address: text('address'),
@@ -164,6 +185,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 }, (table) => [
+  index('idx_users_home_community').on(table.homeCommunityId),
   // Filter users by status (pending, active, inactive)
   index('idx_users_status').on(table.status),
   // Filter by role and status (e.g., active ministers)
@@ -193,6 +215,7 @@ export const familyRelationships = pgTable('family_relationships', {
 // Questionnaires table
 export const questionnaires = pgTable('questionnaires', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
   month: integer('month').notNull(),
@@ -211,6 +234,7 @@ export const questionnaires = pgTable('questionnaires', {
 // Questionnaire responses
 export const questionnaireResponses = pgTable('questionnaire_responses', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   questionnaireId: uuid('questionnaire_id').notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
   userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   responses: jsonb('responses').notNull(),
@@ -261,6 +285,7 @@ export const questionnaireResponses = pgTable('questionnaire_responses', {
 // Schedules
 export const schedules = pgTable('schedules', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   date: date('date').notNull(),
   time: time('time').notNull(),
   type: scheduleTypeEnum('type').notNull().default('missa'),
@@ -279,6 +304,7 @@ export const schedules = pgTable('schedules', {
   }[]>(),
   createdAt: timestamp('created_at').defaultNow()
 }, (table) => [
+  index('idx_schedules_community_date').on(table.communityId, table.date),
   index('idx_schedules_date').on(table.date),
   index('idx_schedules_minister').on(table.ministerId),
   index('idx_schedules_date_time').on(table.date, table.time),
@@ -294,6 +320,7 @@ export const schedules = pgTable('schedules', {
 // Mass Execution Logs (for auxiliary leaders)
 export const massExecutionLogs = pgTable('mass_execution_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
   auxiliaryId: varchar('auxiliary_id').notNull().references(() => users.id),
   changesMade: jsonb('changes_made').$type<{
@@ -331,6 +358,7 @@ export const massExecutionLogs = pgTable('mass_execution_logs', {
 // Standby Ministers (available for emergency calls)
 export const standbyMinisters = pgTable('standby_ministers', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
   ministerId: varchar('minister_id').notNull().references(() => users.id),
   confirmedAvailable: boolean('confirmed_available').default(false),
@@ -351,6 +379,7 @@ export const standbyMinisters = pgTable('standby_ministers', {
 // Minister Check-ins (real-time presence tracking)
 export const ministerCheckIns = pgTable('minister_check_ins', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
   ministerId: varchar('minister_id').notNull().references(() => users.id),
   position: integer('position').notNull(),
@@ -366,6 +395,7 @@ export const ministerCheckIns = pgTable('minister_check_ins', {
 // Schedule Confirmations (minister attendance confirmation)
 export const scheduleConfirmations = pgTable('schedule_confirmations', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
   ministerId: varchar('minister_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: confirmationStatusEnum('status').notNull().default('pending'),
@@ -389,6 +419,7 @@ export const scheduleConfirmations = pgTable('schedule_confirmations', {
 // Substitution requests
 export const substitutionRequests = pgTable('substitution_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   scheduleId: uuid('schedule_id').notNull().references(() => schedules.id, { onDelete: 'cascade' }),
   requesterId: varchar('requester_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   substituteId: varchar('substitute_id').references(() => users.id, { onDelete: 'set null' }),
@@ -636,6 +667,7 @@ export const materialAccessLogs = pgTable('material_access_logs', {
 // Mass times configuration (legacy - kept for compatibility)
 export const massTimesConfig = pgTable('mass_times_config', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   dayOfWeek: integer('day_of_week').notNull(),
   time: time('time').notNull(),
   minMinisters: integer('min_ministers').notNull().default(3),
@@ -654,6 +686,7 @@ export const massTimesConfig = pgTable('mass_times_config', {
 // Mass Configurations - Recurring mass settings (replaces hardcoded rules)
 export const massConfigurations = pgTable('mass_configurations', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
 
@@ -697,6 +730,7 @@ export const massConfigurations = pgTable('mass_configurations', {
 // Special Events - Non-recurring events (novenas, feasts, etc.)
 export const specialEvents = pgTable('special_events', {
   id: uuid('id').primaryKey().defaultRandom(),
+  communityId: uuid('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
 
@@ -1157,6 +1191,12 @@ export const saints = pgTable('saints', {
 ]);
 
 // Relations
+export const communitiesRelations = relations(communities, ({ many }) => ({
+  users: many(users),
+  schedules: many(schedules),
+  questionnaires: many(questionnaires),
+}));
+
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(users)
 }));
@@ -1179,6 +1219,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   family: one(families, {
     fields: [users.familyId],
     references: [families.id]
+  }),
+  homeCommunity: one(communities, {
+    fields: [users.homeCommunityId],
+    references: [communities.id]
   }),
   questionnaires: many(questionnaires),
   questionnaireResponses: many(questionnaireResponses),
@@ -1599,6 +1643,8 @@ export const insertLearnedPatternSchema = createInsertSchema(learnedPatterns).pi
 });
 
 // Type exports
+export type Community = typeof communities.$inferSelect;
+export type InsertCommunity = typeof communities.$inferInsert;
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
