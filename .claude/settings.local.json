@@ -152,7 +152,8 @@
       "Bash(PGPASSWORD=npg_3QKylioran9V psql \"postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" -c \"\nSELECT minister_id, COUNT\\(*\\)::int as cnt\nFROM schedules\nWHERE date >= '2026-03-01' AND date <= '2026-03-31'\n  AND status IN \\('scheduled', 'published'\\)\n  AND minister_id IS NOT NULL\nGROUP BY minister_id\nORDER BY cnt DESC\nLIMIT 10;\n\" 2>/dev/null)",
       "Bash(PGPASSWORD='npg_3QKylioran9V' psql -h ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech -U neondb_owner -d neondb -c \"\\\\dt\")",
       "Bash(PGPASSWORD='npg_3QKylioran9V' psql *)",
-      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require' npx tsx *)"
+      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require' npx tsx *)",
+      "Bash(NODE_PATH=/home/runner/workspace/node_modules node /tmp/diag.mjs)"
     ],
     "deny": [],
     "ask": []
