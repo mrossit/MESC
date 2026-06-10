@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+import { expandRoles } from '@shared/roles';
 
 // Lazy load das páginas para melhor performance
 const Dashboard = lazy(() => import('@/pages/dashboard'));
@@ -23,7 +24,7 @@ const Install = lazy(() => import('@/pages/install'));
 const NotFound = lazy(() => import('@/pages/not-found'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
 
-export type RouteRole = 'gestor' | 'coordenador' | 'ministro';
+export type RouteRole = 'gestor' | 'reitor' | 'coordenador' | 'coordenador_comunidade' | 'coordenador_paroquial' | 'ministro';
 
 export interface RouteConfig {
   path: string;
@@ -234,7 +235,8 @@ export function getRoutesByRole(role?: RouteRole): RouteConfig[] {
   return routes.filter(route => {
     if (!route.showInMenu) return false;
     if (!route.allowedRoles) return true;
-    return role && route.allowedRoles.includes(role);
+    // expandRoles: 'coordenador' nas rotas aceita as variantes comunidade/paroquial
+    return role ? expandRoles(route.allowedRoles).includes(role) : false;
   });
 }
 
@@ -244,5 +246,5 @@ export function hasRoutePermission(path: string, role?: RouteRole): boolean {
   if (!route) return false;
   if (!route.requiresAuth) return true;
   if (!route.allowedRoles) return true;
-  return role ? route.allowedRoles.includes(role) : false;
+  return role ? expandRoles(route.allowedRoles).includes(role) : false;
 }

@@ -48,6 +48,7 @@ import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
 import Database from 'better-sqlite3';
 import { formatName } from "./utils/nameFormatter";
+import { getMatrizCommunityId, communityIdFromQuestionnaire } from "./utils/communityContext";
 
 // Type for SQLite row data
 type SQLiteRow = Record<string, unknown>;
@@ -415,7 +416,8 @@ export class DatabaseStorage implements IStorage {
         specialSkills: userData.specialSkills || null,
         liturgicalTraining: userData.liturgicalTraining || false,
         observations: userData.observations || null,
-        requiresPasswordChange: true // Force password change for admin-created users
+        requiresPasswordChange: true, // Force password change for admin-created users
+        homeCommunityId: (userData as any).homeCommunityId || await getMatrizCommunityId()
       })
       .returning();
     return user;
@@ -554,6 +556,8 @@ export class DatabaseStorage implements IStorage {
       .insert(questionnaireResponses)
       .values({
         ...responseData,
+        // community_id herdado do questionário respondido (se não veio explícito)
+        communityId: (responseData as any).communityId || await communityIdFromQuestionnaire(responseData.questionnaireId),
         isDeleted: false, // Garantir que não está marcado como deletado
         deletedAt: null // Limpar timestamp de deleção
       })
@@ -843,7 +847,10 @@ export class DatabaseStorage implements IStorage {
   async createMassTime(massTimeData: InsertMassTime): Promise<MassTimeConfig> {
     const [massTime] = await db
       .insert(massTimesConfig)
-      .values(massTimeData)
+      .values({
+        ...massTimeData,
+        communityId: (massTimeData as any).communityId || await getMatrizCommunityId()
+      })
       .returning();
     return massTime;
   }

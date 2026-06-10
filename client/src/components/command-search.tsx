@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
+import { expandRoles } from "@shared/roles";
 import {
   Command,
   CommandDialog,
@@ -216,8 +217,8 @@ export function CommandSearch() {
   ];
 
   // Filtrar itens baseado no papel do usuário
-  const availableItems = allMenuItems.filter(item => 
-    user && item.roles?.includes(user.role)
+  const availableItems = allMenuItems.filter(item =>
+    user && item.roles && expandRoles(item.roles).includes(user.role)
   );
 
   // Filtrar baseado na busca

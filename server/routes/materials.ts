@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { authenticateToken, requireRole, AuthRequest } from '../auth';
+import { isAdmin as isAdminRole } from '@shared/roles';
 import { csrfProtection } from '../middleware/csrf';
 import { db } from '../db';
 import { formationMaterials, materialAccessLogs, formationTracks, users } from '@shared/schema';
@@ -121,7 +122,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     // Only show unpublished to coordinators/managers
     const userRole = req.user?.role;
-    if (userRole !== 'coordenador' && userRole !== 'gestor') {
+    if (!isAdminRole(userRole)) {
       conditions.push(eq(formationMaterials.isPublished, true));
     }
 

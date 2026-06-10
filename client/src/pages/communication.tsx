@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ export default function Communication() {
   });
 
   const user = authData?.user;
-  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isCoordinator = isAdminRole(user?.role);
 
   // Fetch notifications with auto-refresh
   const { data: notificationsResponse, isLoading, refetch } = useQuery<{ data: Notification[]; total: number; hasMore: boolean }>({

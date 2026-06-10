@@ -3,6 +3,7 @@ import { db } from "../db";
 import { schedules, users } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
+import { isAdmin as isAdminRole } from "@shared/roles";
 
 // Update data type for schedule updates
 interface ScheduleUpdateData {
@@ -44,7 +45,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
 
     // Check if user is Auxiliar 1 or 2 for THIS mass before blocking
     let isAuxiliar1or2ForThisMass = false;
-    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+    if (!isAdminRole(userRole)) {
       const userAssignmentsForThisMass = await db
         .select()
         .from(schedules)
@@ -63,9 +64,8 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Allow gestor, coordenador, and auxiliares 1 and 2 to edit even after deadline
-    const canEditAfterDeadline = 
-      userRole === 'gestor' || 
-      userRole === 'coordenador' || 
+    const canEditAfterDeadline =
+      isAdminRole(userRole) ||
       isAuxiliar1or2ForThisMass;
 
     if (now > threeHoursAfterMass && !canEditAfterDeadline) {
@@ -75,7 +75,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Check if user has permission to edit
-    const isCoordOrGestor = userRole === 'coordenador' || userRole === 'gestor';
+    const isCoordOrGestor = isAdminRole(userRole);
 
     if (!isCoordOrGestor && !isAuxiliar1or2ForThisMass) {
       return res.status(403).json({

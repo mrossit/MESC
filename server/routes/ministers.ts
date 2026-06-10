@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db } from "../db";
 import { users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
+import { COORDINATOR_ROLES, isAdmin as isAdminRole } from "@shared/roles";
 import { storage } from "../storage";
 import { formatMinisterName } from "../utils/formatters";
 import { auditPersonalDataAccess, logAudit, AuditAction } from "../middleware/auditLogger";
@@ -34,7 +35,7 @@ router.get("/", requireAuth, auditPersonalDataAccess('personal'), async (req: Au
       })
       .from(users)
       .where(
-        sql`${users.role} IN ('ministro', 'coordenador')`
+        inArray(users.role, ['ministro', ...COORDINATOR_ROLES])
       );
 
     res.json(ministersList);
@@ -93,7 +94,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
     const currentUser = req.user!;
     
     // Check permissions
-    if (currentUser.role !== "gestor" && currentUser.role !== "coordenador" && currentUser.id !== userId) {
+    if (!isAdminRole(currentUser.role) && currentUser.id !== userId) {
       return res.status(403).json({ message: "Sem permissão para editar este ministro" });
     }
 

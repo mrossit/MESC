@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import {
@@ -95,7 +96,7 @@ export default function AdorationDraw() {
     queryFn: () => authAPI.getMe(),
   });
   const user = authData?.user;
-  const isCoordinator = user?.role === 'coordenador' || user?.role === 'gestor';
+  const isCoordinator = isAdminRole(user?.role);
 
   // Fetch draw results
   const {

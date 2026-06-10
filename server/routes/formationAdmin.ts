@@ -11,6 +11,7 @@ import {
 } from '@shared/schema';
 import { eq, desc, asc, sql, count } from 'drizzle-orm';
 import { authenticateToken, AuthRequest } from '../auth';
+import { isAdmin as isAdminRole } from '@shared/roles';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ function getErrorStack(error: unknown): string | undefined {
 
 // Middleware to check if user is gestor or coordenador
 function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user || (req.user.role !== 'gestor' && req.user.role !== 'coordenador')) {
+  if (!req.user || !isAdminRole(req.user.role)) {
     return res.status(403).json({
       error: 'Acesso negado',
       message: 'Apenas gestores e coordenadores podem acessar esta funcionalidade'

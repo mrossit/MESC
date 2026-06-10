@@ -11,6 +11,8 @@ import {
 import { eq, and, or } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
+import { isAdmin as isAdminRole } from '@shared/roles';
+import { communityIdFromQuestionnaire } from '../utils/communityContext';
 import {
   getQuestionnaireResponsesForExport,
   getMonthlyResponsesForExport,
@@ -377,7 +379,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           name: foundUser.name,
           active: foundUser.status === 'active'
         };
-      } else if (foundUser && ['coordenador', 'gestor'].includes(foundUser.role)) {
+      } else if (foundUser && isAdminRole(foundUser.role)) {
         console.log('[RESPONSES] Usuário é coordenador/reitor, pode responder');
         // Criar um ministro temporário para coordenadores/reitores
         minister = {
@@ -472,6 +474,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     const responseValues = {
       userId: minister.id,
       questionnaireId: templateId,
+      communityId: await communityIdFromQuestionnaire(templateId), // herda do questionário
       responses: JSON.stringify(standardizedResponse), // SAVE STANDARDIZED V2.0 FORMAT
       availableSundays: extractedData.availableSundays,
       preferredMassTimes: extractedData.preferredMassTimes,
@@ -622,6 +625,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
               .values({
                 userId: familyUserId,
                 questionnaireId: templateId,
+                communityId: await communityIdFromQuestionnaire(templateId), // herda do questionário
                 responses: JSON.stringify(standardizedResponse),
                 availableSundays: extractedData.availableSundays,
                 preferredMassTimes: extractedData.preferredMassTimes,
@@ -716,7 +720,7 @@ router.get('/responses/:year/:month', requireAuth, async (req: AuthRequest, res)
         .limit(1);
       
       // Criar objeto ministro compatível
-      const minister = user && (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'gestor') ? {
+      const minister = user && (user.role === 'ministro' || isAdminRole(user.role)) ? {
         id: user.id,
         userId: user.id
       } : null;
@@ -809,7 +813,7 @@ router.get('/admin/responses-status/:year/:month', requireAuth, async (req: Auth
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
-    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -916,7 +920,7 @@ router.get('/admin/responses-summary/:year/:month', requireAuth, async (req: Aut
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
-    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -983,7 +987,7 @@ router.get('/admin/responses/:templateId/:userId', requireAuth, async (req: Auth
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
-    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -1063,7 +1067,7 @@ router.get('/responses/all/:year/:month', requireAuth, async (req: AuthRequest, 
     const userRole = req.user!.role;
 
     // Verificar se o usuário tem permissão
-    if (userRole !== 'gestor' && userRole !== 'coordenador') {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -1110,7 +1114,7 @@ router.patch('/admin/templates/:id/close', requireAuth, requireRole(['coordenado
     const templateId = req.params.id;
     
     // Verificar se é admin (reitor ou coordenador)
-    if (!req.user || !['gestor', 'coordenador'].includes(req.user.role)) {
+    if (!req.user || !isAdminRole(req.user.role)) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     
@@ -1158,7 +1162,7 @@ router.patch('/admin/templates/:id/reopen', requireAuth, requireRole(['coordenad
     const templateId = req.params.id;
     
     // Verificar se é admin (reitor ou coordenador)
-    if (!req.user || !['gestor', 'coordenador'].includes(req.user.role)) {
+    if (!req.user || !isAdminRole(req.user.role)) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     

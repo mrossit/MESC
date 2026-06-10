@@ -1,11 +1,12 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { isAdmin as isAdminRole, expandRoles } from "@shared/roles";
 import { notificationRateLimiter } from "../middleware/rateLimiter";
 import { db } from "../db";
 import { storage } from "../storage";
 import { notifications, users } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { pushConfig, sendPushNotificationToUsers } from "../utils/pushNotifications";
 import { notifyUsers } from "../websocket";
 
@@ -37,7 +38,7 @@ const createNotificationSchema = z.object({
   message: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
   type: z.enum(["info", "warning", "success", "error"]).default("info"),
   recipientIds: z.array(z.string()).optional(), // IDs específicos ou vazio para todos
-  recipientRole: z.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
+  recipientRole: z.enum(["ministro", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "gestor", "reitor", "all"]).optional(),
   actionUrl: internalUrlSchema.optional(),
 });
 
@@ -302,10 +303,11 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
         console.log('[NOTIFICAÇÕES] Buscou TODOS os usuários ativos:', recipients.length);
       } else {
         // Role específica
+        // expandRoles: alvo "coordenador" atinge todas as variantes (comunidade/paroquial)
         recipients = await db.select({ id: users.id })
           .from(users)
           .where(and(
-            eq(users.role, data.recipientRole),
+            inArray(users.role, expandRoles([data.recipientRole])),
             eq(users.status, "active")
           ));
         console.log('[NOTIFICAÇÕES] Buscou usuários com role', data.recipientRole, ':', recipients.length);
@@ -411,7 +413,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     
     // Verificar se o usuário é coordenador/reitor
     const user = await storage.getUser(req.user!.id);
-    const isCoordinator = user && ['coordenador', 'gestor'].includes(user.role);
+    const isCoordinator = user && isAdminRole(user.role);
     
     let notification;
     if (isCoordinator) {

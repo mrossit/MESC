@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
+import { isAdmin as isAdminRole } from '@shared/roles';
 import { useToast } from '@/hooks/use-toast';
 
 interface SubstitutionData {
@@ -138,7 +139,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
                 const data = message.data as SubstitutionData & { requestingUser?: { name?: string } };
                 onSubstitutionRequest(data);
                 // Show toast notification
-                if (user.role === 'coordenador' || user.role === 'gestor') {
+                if (isAdminRole(user.role)) {
                   toast({
                     title: "Nova Solicitação de Substituição",
                     description: `${data.requestingUser?.name || 'Ministro'} solicitou substituição`,
@@ -153,7 +154,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
                 const data = message.data as CriticalMassData & { hoursUntil?: number };
                 onCriticalMass(data);
                 // Show critical toast
-                if (user.role === 'coordenador' || user.role === 'gestor') {
+                if (isAdminRole(user.role)) {
                   toast({
                     title: "Atenção: Missa Crítica",
                     description: `Missa em ${data.hoursUntil || '?'}h sem ministros`,

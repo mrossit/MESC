@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 import { db } from '../db';
 import { users, questionnaireResponses, questionnaires } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { COORDINATOR_ROLES } from '@shared/roles';
 
 const router = Router();
 
@@ -81,7 +82,7 @@ router.post('/draw', authenticateToken, requireRole(['gestor', 'coordenador']), 
       .where(
         and(
           eq(users.status, 'active'),
-          inArray(users.role, ['ministro', 'coordenador'])
+          inArray(users.role, ['ministro', ...COORDINATOR_ROLES])
         )
       );
 

@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
+import { isManager as isManagerRole, isCoordinator as isCoordinatorRole } from "@shared/roles";
 import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -68,7 +69,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                       {/* Dev Mode: Show current role */}
                       {(import.meta.env.DEV || window.location.hostname === 'localhost') && user && (
                         <Badge
-                          variant={user.role === 'gestor' ? 'default' : user.role === 'coordenador' ? 'secondary' : 'outline'}
+                          variant={isManagerRole(user.role) ? 'default' : isCoordinatorRole(user.role) ? 'secondary' : 'outline'}
                           className="text-[10px] sm:text-xs px-1.5 py-0 h-5"
                         >
                           {user.role}

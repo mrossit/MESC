@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { ADMIN_ROLES } from "@shared/roles";
 import { format, addHours, subHours, isWithinInterval, parseISO } from 'date-fns';
 
 // Helper to get error message
@@ -757,7 +758,7 @@ router.post("/mass-report", requireAuth, async (req: AuthRequest, res: Response)
         .from(users)
         .where(
           and(
-            inArray(users.role, ['coordenador', 'gestor']),
+            inArray(users.role, [...ADMIN_ROLES]),
             eq(users.status, 'active')
           )
         );

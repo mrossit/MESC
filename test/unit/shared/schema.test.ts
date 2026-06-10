@@ -48,7 +48,8 @@ describe('Schema Validations', () => {
     });
 
     it('should validate role enum values', () => {
-      const validRoles = ['gestor', 'coordenador', 'ministro'];
+      // Vocabulário multi-comunidade (Phase 1+): 'coordenador' foi renomeado.
+      const validRoles = ['gestor', 'reitor', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro'];
 
       for (const role of validRoles) {
         const user = {

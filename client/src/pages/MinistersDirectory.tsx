@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
+import { isAdmin as isAdminRole, isCoordinator as isCoordinatorRole } from '@shared/roles';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -69,7 +70,7 @@ export default function MinistersDirectory() {
     queryKey: ['/api/auth/me'],
   });
   const user = authData?.user;
-  const isCoordinator = user?.role === 'coordenador' || user?.role === 'gestor';
+  const isCoordinator = isAdminRole(user?.role);
 
   // Buscar todos os ministros ativos (com paginação automática)
   const { data: ministersData, isLoading, error } = useQuery({
@@ -103,7 +104,7 @@ export default function MinistersDirectory() {
 
       // Filtrar ministros, coordenadores e gestores ativos
       const filtered = allUsers.filter((user: Minister) =>
-        (user.role === 'ministro' || user.role === 'coordenador' || user.role === 'gestor') &&
+        (user.role === 'ministro' || isAdminRole(user.role)) &&
         (!user.status || user.status === 'active')
       );
 
@@ -136,7 +137,7 @@ export default function MinistersDirectory() {
   // Agrupar ministros por papel (para contadores)
   const groupedMinisters = {
     gestor: baseFilteredMinisters.filter((m: Minister) => m.role === 'gestor'),
-    coordenador: baseFilteredMinisters.filter((m: Minister) => m.role === 'coordenador'),
+    coordenador: baseFilteredMinisters.filter((m: Minister) => isCoordinatorRole(m.role)),
     ministro: baseFilteredMinisters.filter((m: Minister) => m.role === 'ministro')
   };
 

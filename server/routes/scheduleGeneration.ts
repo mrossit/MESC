@@ -474,7 +474,9 @@ router.post('/emergency-save', authenticateToken, requireRole(['gestor', 'coorde
           ministerId: schedule.ministerId || null,
           position: schedule.position !== undefined ? schedule.position : (i + 1),
           status: 'scheduled' as const,
-          notes: schedule.notes || null
+          notes: schedule.notes || null,
+          // Comunidade do coordenador que está gerando a escala
+          communityId: req.user!.homeCommunityId
           // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
         };
 
@@ -737,7 +739,8 @@ router.post('/save-generated', authenticateToken, requireRole(['gestor', 'coorde
         ministerId: s.ministerId, // Drizzle will map this to minister_id
         position: s.position ?? positionInGroup, // Use provided position or calculated group position
         notes: s.notes || null,
-        status: 'scheduled' as const
+        status: 'scheduled' as const,
+        communityId: req.user!.homeCommunityId // comunidade do coordenador
         // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
       };
     });
@@ -2045,7 +2048,8 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
           ministerId: ministerId,
           position: position,
           type: existingType,
-          status: existingStatus
+          status: existingStatus,
+          communityId: req.user!.homeCommunityId
         });
       }
     }

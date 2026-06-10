@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isAdmin as isAdminRole, isCoordinator as isCoordinatorRole, isManager as isManagerRole } from '@shared/roles';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -67,7 +68,7 @@ export default function Settings() {
 
   // WebSocket connection status
   const { isConnected } = useWebSocket({
-    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+    enabled: isAdminRole(authData?.user?.role),
   });
 
   // Push Notifications hook
@@ -667,9 +668,9 @@ export default function Settings() {
                           </Button>
 
                           <Button
-                            variant={authData?.user?.role === 'coordenador' ? 'default' : 'outline'}
+                            variant={isCoordinatorRole(authData?.user?.role) ? 'default' : 'outline'}
                             onClick={() => handleRoleSwitch('coordenador')}
-                            disabled={switchingRole || authData?.user?.role === 'coordenador'}
+                            disabled={switchingRole || isCoordinatorRole(authData?.user?.role)}
                             className="w-full"
                           >
                             <Users className="mr-2 h-4 w-4" />
@@ -677,9 +678,9 @@ export default function Settings() {
                           </Button>
 
                           <Button
-                            variant={authData?.user?.role === 'gestor' ? 'default' : 'outline'}
+                            variant={isManagerRole(authData?.user?.role) ? 'default' : 'outline'}
                             onClick={() => handleRoleSwitch('gestor')}
-                            disabled={switchingRole || authData?.user?.role === 'gestor'}
+                            disabled={switchingRole || isManagerRole(authData?.user?.role)}
                             className="w-full"
                           >
                             <Users className="mr-2 h-4 w-4" />
@@ -734,7 +735,7 @@ export default function Settings() {
               <Info className="h-3.5 w-3.5" />
               <span>Versão {APP_VERSION}</span>
             </div>
-            {(authData?.user?.role === "coordenador" || authData?.user?.role === "gestor") && (
+            {isAdminRole(authData?.user?.role) && (
               <div className="flex items-center gap-1.5">
                 <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
                 <span>{isConnected ? 'Tempo real ativo' : 'Modo polling'}</span>

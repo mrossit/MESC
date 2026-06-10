@@ -3,6 +3,7 @@ import { db } from "../db";
 import { activityLogs, users } from "@shared/schema";
 import { eq, sql, and, gte, lte, desc, count, like, or } from "drizzle-orm";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { createActivityLogger } from "../utils/activityLogger";
 import {
   exportToExcel,
@@ -362,7 +363,7 @@ router.get("/recent", authenticateToken, async (req: AuthRequest, res) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limitStr) || 10));
 
     // For non-admin users, only show their own activities
-    const isAdmin = req.user?.role === 'gestor' || req.user?.role === 'coordenador';
+    const isAdmin = isAdminRole(req.user?.role);
     const userId = req.user?.id;
 
     const logs = await db

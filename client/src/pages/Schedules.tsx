@@ -1,4 +1,5 @@
 import { Layout } from "@/components/layout";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -300,7 +301,7 @@ export default function Schedules() {
   const [notesText, setNotesText] = useState<string>("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isCoordinator = isAdminRole(user?.role);
   const isMinister = user?.role === "ministro";
 
   // Invalidar cache ao entrar na página de escalas

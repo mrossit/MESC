@@ -1,4 +1,5 @@
 import { Layout } from "@/components/layout";
+import { isAdmin as isAdminRole, isCoordinator as isCoordinatorRole } from "@shared/roles";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -84,7 +85,7 @@ interface User {
   email: string;
   phone?: string;
   status: 'active' | 'inactive' | 'pending';
-  role: "gestor" | "coordenador" | "ministro";
+  role: "gestor" | "reitor" | "coordenador" | "coordenador_comunidade" | "coordenador_paroquial" | "ministro";
   birthDate?: string;
   address?: string;
   city?: string;
@@ -126,7 +127,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   });
 
   const user = authData?.user;
-  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isCoordinator = isAdminRole(user?.role);
 
   // State management
   const [users, setUsers] = useState<User[]>([]);
@@ -559,7 +560,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
   const stats = {
     total: users.length,
     reitores: users.filter(u => u.role === "gestor").length,
-    coordenadores: users.filter(u => u.role === "coordenador").length,
+    coordenadores: users.filter(u => isCoordinatorRole(u.role)).length,
     ministros: users.filter(u => u.role === "ministro").length,
     active: users.filter(u => u.status === "active").length,
     inactive: users.filter(u => u.status === "inactive").length,
@@ -779,7 +780,7 @@ export default function UserManagement({ isEmbedded = false }: { isEmbedded?: bo
                                   userId: targetUser.id,
                                   role: "coordenador"
                                 })}
-                                disabled={targetUser.role === "coordenador"}
+                                disabled={isCoordinatorRole(targetUser.role)}
                               >
                                 <Shield className="mr-2 h-4 w-4" />
                                 Alterar para Coordenador

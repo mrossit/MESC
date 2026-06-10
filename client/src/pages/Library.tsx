@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -282,7 +283,7 @@ export default function Library() {
     queryFn: () => authAPI.getMe(),
   });
   const user = authData?.user;
-  const isCoordinator = user?.role === 'coordenador' || user?.role === 'gestor';
+  const isCoordinator = isAdminRole(user?.role);
 
   // Fetch materials
   const { data: materialsData, isLoading } = useQuery<MaterialsResponse>({

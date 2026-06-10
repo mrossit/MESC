@@ -15,8 +15,9 @@
 
 import { db } from '../db';
 import { users, substitutionRequests, notifications } from '../../shared/schema';
-import { eq, and, gte, sql } from 'drizzle-orm';
+import { eq, and, gte, sql, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
+import { ADMIN_ROLES } from '../../shared/roles';
 
 export interface ReliabilityMetrics {
   ministerId: string;
@@ -391,7 +392,7 @@ export async function checkAndAlertLowReliability(): Promise<{
       .from(users)
       .where(
         and(
-          sql`${users.role} IN ('coordenador', 'gestor')`,
+          inArray(users.role, [...ADMIN_ROLES]),
           eq(users.status, 'active')
         )
       );

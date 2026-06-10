@@ -3,6 +3,7 @@ import { Redirect, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient } from "@/lib/queryClient";
 import { hasValidUser, isAuthResponse, safeGetUserProperty, AuthResponse } from "@/lib/auth";
+import { expandRoles } from "@shared/roles";
 
 interface CachedAuthGuardProps {
   children: React.ReactNode;
@@ -43,7 +44,8 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     // Verifica permissões com safe access
     if (allowedRoles && allowedRoles.length > 0) {
       const userRole = userData.role;
-      const hasPermission = allowedRoles.includes(userRole);
+      // expandRoles: rota que permite 'coordenador' aceita as variantes comunidade/paroquial
+      const hasPermission = expandRoles(allowedRoles).includes(userRole);
       
       if (!hasPermission) {
         return <Redirect to="/dashboard" />;

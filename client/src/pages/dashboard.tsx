@@ -2,6 +2,7 @@ import { Layout } from "@/components/layout";
 import { MinisterDashboard } from "@/components/minister-dashboard";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -130,7 +131,7 @@ export default function Dashboard() {
   // Fetch urgent alerts - refetch every 5 minutes (WebSocket handles real-time updates)
   const { data: alertsData, refetch: refetchAlerts } = useQuery({
     queryKey: ["/api/dashboard/urgent-alerts"],
-    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+    enabled: isAdminRole(authData?.user?.role),
     refetchInterval: 300000, // Refetch every 5 minutes (300s)
   });
 
@@ -221,7 +222,7 @@ export default function Dashboard() {
 
   // WebSocket connection for real-time notifications
   const { isConnected } = useWebSocket({
-    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+    enabled: isAdminRole(authData?.user?.role),
     onSubstitutionRequest: handleSubstitutionRequest,
     onCriticalMass: handleCriticalMass,
     onAlertUpdate: handleAlertUpdate
@@ -230,19 +231,19 @@ export default function Dashboard() {
   // Fetch next week masses
   const { data: nextWeekData } = useQuery({
     queryKey: ["/api/dashboard/next-week-masses"],
-    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+    enabled: isAdminRole(authData?.user?.role),
     refetchInterval: 120000, // Refetch every 2 minutes
   });
 
   // Fetch ministry stats
   const { data: statsData } = useQuery({
     queryKey: ["/api/dashboard/ministry-stats"],
-    enabled: authData?.user?.role === "coordenador" || authData?.user?.role === "gestor",
+    enabled: isAdminRole(authData?.user?.role),
     refetchInterval: 300000, // Refetch every 5 minutes
   });
 
   const user = authData?.user;
-  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isCoordinator = isAdminRole(user?.role);
 
   // Update browser tab title with notification badge
   useEffect(() => {
@@ -281,8 +282,7 @@ export default function Dashboard() {
   }, []);
 
   const getTitle = () => {
-    if (user?.role === "coordenador") return "Central de Operações";
-    if (user?.role === "gestor") return "Central de Operações";
+    if (isAdminRole(user?.role)) return "Central de Operações";
     return "Dashboard Ministro";
   };
 

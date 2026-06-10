@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { eq, and, sql, gte, lte, count, desc } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
@@ -85,8 +86,7 @@ router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Resp
       .where(eq(users.id, userId))
       .limit(1);
 
-    const isAdmin = loggedInUser.length > 0 &&
-      (loggedInUser[0].role === 'coordenador' || loggedInUser[0].role === 'gestor');
+    const isAdmin = loggedInUser.length > 0 && isAdminRole(loggedInUser[0].role);
 
     // Note: scheduleAssignments table doesn't exist in schema - using schedules table instead
     // IMPORTANT: Ministers can only see PUBLISHED schedules
@@ -157,8 +157,7 @@ router.get("/by-date/:date", requireAuth, async (req: AuthRequest, res: Response
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
-      isAdmin = userResult.length > 0 &&
-        (userResult[0].role === 'coordenador' || userResult[0].role === 'gestor');
+      isAdmin = userResult.length > 0 && isAdminRole(userResult[0].role);
     }
 
     // Parse date string directly to avoid timezone issues
@@ -374,8 +373,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
-      isAdmin = userResult.length > 0 &&
-        (userResult[0].role === 'coordenador' || userResult[0].role === 'gestor');
+      isAdmin = userResult.length > 0 && isAdminRole(userResult[0].role);
     }
 
     let query = db.select().from(schedules);
@@ -646,7 +644,7 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+    if (user.length === 0 || !isAdminRole(user[0].role)) {
       return res.status(403).json({ message: "Sem permissão para criar escalas" });
     }
 
@@ -719,7 +717,7 @@ router.put("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async (r
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+    if (user.length === 0 || !isAdminRole(user[0].role)) {
       return res.status(403).json({ message: "Sem permissão para editar escalas" });
     }
 
@@ -763,7 +761,7 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+    if (user.length === 0 || !isAdminRole(user[0].role)) {
       return res.status(403).json({ message: "Sem permissão para publicar escalas" });
     }
 
@@ -895,7 +893,7 @@ router.delete("/:id", requireAuth, requireRole(['coordenador', 'gestor']), async
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+    if (user.length === 0 || !isAdminRole(user[0].role)) {
       return res.status(403).json({ message: "Sem permissão para excluir escalas" });
     }
 
@@ -1038,7 +1036,7 @@ router.patch("/:id/unpublish", requireAuth, requireRole(['coordenador', 'gestor'
       return res.status(401).json({ message: "Usuário não autenticado" });
     }
     const user = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || (user[0].role !== "coordenador" && user[0].role !== "gestor")) {
+    if (user.length === 0 || !isAdminRole(user[0].role)) {
       console.log('[UNPUBLISH_API] User not authorized, role:', user[0]?.role);
       return res.status(403).json({ message: "Sem permissão para cancelar publicação" });
     }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import crypto from "crypto";
 import { storage } from "../storage";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
+import { isCoordinator as isCoordinatorRole } from "@shared/roles";
 import { csrfProtection } from "../middleware/csrf";
 import { stripHeavyFields, sanitizeUserData, handleApiError } from "../utils/routeHelpers";
 import { insertUserSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
@@ -205,8 +206,8 @@ router.patch('/api/users/:id/status', authenticateToken, requireRole(['gestor', 
 router.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'coordenador']), csrfProtection, async (req: AuthRequest, res) => {
   try {
     const roleUpdateSchema = z.object({
-      role: z.enum(['gestor', 'coordenador', 'ministro'], {
-        errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
+      role: z.enum(['gestor', 'reitor', 'coordenador', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro'], {
+        errorMap: () => ({ message: "Papel deve ser: gestor, reitor, coordenador (comunidade/paroquial) ou ministro" })
       })
     });
     
@@ -215,10 +216,10 @@ router.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'c
     // Permitir que coordenadores alterem seu próprio perfil, mas com restrições
     if (req.user?.id === req.params.id) {
       // Coordenadores podem se auto-promover ou rebaixar
-      if (req.user?.role === 'coordenador') {
+      if (isCoordinatorRole(req.user?.role)) {
         // Coordenador pode mudar para ministro (rebaixar) ou gestor (promover)
         // Mas não pode mudar para o mesmo perfil
-        if (role === 'coordenador') {
+        if (isCoordinatorRole(role)) {
           return res.status(400).json({ message: "Você já é um coordenador" });
         }
         // Se está se promovendo a gestor, permitir
@@ -465,7 +466,7 @@ router.delete('/api/users/:id', authenticateToken, requireRole(['gestor', 'coord
     }
     
     // Coordenadores não podem excluir gestores
-    if (currentUser?.role === 'coordenador' && targetUser.role === 'gestor') {
+    if (isCoordinatorRole(currentUser?.role) && targetUser.role === 'gestor') {
       return res.status(403).json({ 
         message: "Coordenadores não podem excluir gestores",
         shouldBlock: true 

@@ -7,6 +7,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { db } from './db';
 import { schedules, substitutionRequests, users } from '../shared/schema';
+import { isAdmin as isAdminRole } from '../shared/roles';
 import { eq, and, gte, lte, sql, or } from 'drizzle-orm';
 import { format, addDays } from 'date-fns';
 
@@ -119,7 +120,7 @@ export function initializeWebSocket(httpServer: Server): WebSocketServer {
           ws.userRole = data.userRole;
 
           // Send initial alerts to newly connected coordinator
-          if (ws.userRole === 'coordenador' || ws.userRole === 'gestor') {
+          if (isAdminRole(ws.userRole)) {
             const alerts = await getCriticalAlerts();
             ws.send(JSON.stringify({
               type: 'ALERT_UPDATE',
@@ -254,7 +255,7 @@ async function broadcastCriticalAlerts() {
     clients.forEach((client) => {
       if (
         client.readyState === WebSocket.OPEN &&
-        (client.userRole === 'coordenador' || client.userRole === 'gestor')
+        isAdminRole(client.userRole)
       ) {
         client.send(JSON.stringify({
           type: 'ALERT_UPDATE',
@@ -281,7 +282,7 @@ export function notifySubstitutionRequest(substitutionData: SubstitutionRequestD
   clients.forEach((client) => {
     if (
       client.readyState === WebSocket.OPEN &&
-      (client.userRole === 'coordenador' || client.userRole === 'gestor')
+      isAdminRole(client.userRole)
     ) {
       client.send(JSON.stringify(message));
     }
@@ -301,7 +302,7 @@ export function notifyCriticalMass(massData: CriticalMassData) {
   clients.forEach((client) => {
     if (
       client.readyState === WebSocket.OPEN &&
-      (client.userRole === 'coordenador' || client.userRole === 'gestor')
+      isAdminRole(client.userRole)
     ) {
       client.send(JSON.stringify(message));
     }
@@ -397,7 +398,7 @@ export function broadcastAuxiliaryPanelUpdate(updateData: AuxiliaryPanelUpdate) 
     if (
       client.readyState === WebSocket.OPEN &&
       client.userId &&
-      (client.userRole === 'coordenador' || client.userRole === 'gestor' || client.userRole === 'auxiliar')
+      (isAdminRole(client.userRole) || client.userRole === 'auxiliar')
     ) {
       client.send(messageStr);
     }

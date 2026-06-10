@@ -5,6 +5,8 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { formatName } from './utils/nameFormatter';
+import { expandRoles } from '@shared/roles';
+import { getMatrizCommunityId } from './utils/communityContext';
 
 // JWT secret - SEMPRE deve vir de variável de ambiente
 function getJWTSecret(): string {
@@ -29,6 +31,7 @@ export interface AuthRequest extends Request {
     email: string;
     name: string;
     role: string;
+    homeCommunityId: string;
   };
 }
 
@@ -49,6 +52,7 @@ interface JWTUserPayload {
   email: string;
   name: string;
   role: string;
+  homeCommunityId: string;
 }
 
 // Função para gerar JWT
@@ -58,7 +62,8 @@ export function generateToken(user: JWTUserPayload): string {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role
+      role: user.role,
+      homeCommunityId: user.homeCommunityId
     },
     JWT_SECRET,
     {
@@ -83,7 +88,8 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
           email: users.email,
           name: users.name,
           role: users.role,
-          status: users.status
+          status: users.status,
+          homeCommunityId: users.homeCommunityId
         })
         .from(users)
         .where(eq(users.id, user.id))
@@ -93,12 +99,13 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
         return res.status(403).json({ message: 'Conta inativa ou pendente. Entre em contato com a coordenação.' });
       }
 
-      // Usar dados frescos do banco, não do JWT (evita role stale)
+      // Usar dados frescos do banco, não do JWT (evita role/comunidade stale)
       req.user = {
         id: currentUser.id,
         email: currentUser.email,
         name: currentUser.name,
-        role: currentUser.role
+        role: currentUser.role,
+        homeCommunityId: currentUser.homeCommunityId
       };
       next();
     } catch (error) {
@@ -135,13 +142,16 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 // Middleware para verificar roles
 // Usa os dados já atualizados por authenticateToken (que busca do banco)
 export function requireRole(roles: string[]) {
+  // Expande para reconhecer o vocabulário multi-comunidade: uma rota que permite
+  // 'coordenador' (legado) também aceita coordenador_comunidade/coordenador_paroquial.
+  const allowed = expandRoles(roles);
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Não autenticado' });
     }
 
     // req.user.role já vem atualizado do banco via authenticateToken
-    if (!roles.includes(req.user.role)) {
+    if (!allowed.includes(req.user.role)) {
       return res.status(403).json({ message: 'Permissão insuficiente para esta ação' });
     }
 
@@ -239,6 +249,9 @@ export async function register(userData: {
     // Format name with proper capitalization
     const formattedName = formatName(userData.name);
 
+    // Sem seleção de comunidade no cadastro ainda (Fase 3 da UI) → matriz por padrão
+    const homeCommunityId = await getMatrizCommunityId();
+
     // Cria o usuário
     const [newUser] = await db
       .insert(users)
@@ -250,7 +263,8 @@ export async function register(userData: {
         role: userData.role as any || 'ministro',
         status: userData.status as any || 'pending',
         observations: userData.observations || null,
-        requiresPasswordChange: false
+        requiresPasswordChange: false,
+        homeCommunityId
       })
       .returning();
 

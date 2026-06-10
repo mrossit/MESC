@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: "gestor" | "coordenador" | "ministro";
+  role: "gestor" | "reitor" | "coordenador" | "coordenador_comunidade" | "coordenador_paroquial" | "ministro";
   status: "pending" | "active" | "inactive";
   requiresPasswordChange?: boolean;
   profilePhoto?: string;

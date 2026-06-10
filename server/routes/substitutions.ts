@@ -3,6 +3,8 @@ import { db } from "../db";
 import { substitutionRequests, schedules, users, questionnaireResponses, questionnaires } from "@shared/schema";
 import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
+import { isAdmin as isAdminRole } from "@shared/roles";
+import { communityIdFromSchedule } from "../utils/communityContext";
 import { scheduleCache } from "../services/scheduleCache";
 import { trackSubstitutionRequest, trackSubstitutionFulfillment } from "../services/reliabilityScoreService";
 import { sendPushNotificationToUsers } from "../utils/pushNotifications";
@@ -312,6 +314,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         scheduleId,
         requesterId,
         substituteId: finalSubstituteId,
+        communityId: await communityIdFromSchedule(scheduleId), // herda do schedule pai
         reason: reason || null,
         status,
         urgency,
@@ -451,7 +454,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const userRole = req.user!.role;
-    const isCoordinator = userRole === 'coordenador' || userRole === 'gestor';
+    const isCoordinator = isAdminRole(userRole);
 
     let requests;
 
@@ -995,7 +998,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
 
     // Verificar se o usuário é o solicitante ou coordenador
     const isRequester = request.requesterId === userId;
-    const isCoordinator = req.user!.role === 'coordenador' || req.user!.role === 'gestor';
+    const isCoordinator = isAdminRole(req.user!.role);
 
     if (!isRequester && !isCoordinator) {
       return res.status(403).json({

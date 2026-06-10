@@ -27,6 +27,8 @@ __export(schema_exports, {
   badgeRarityEnum: () => badgeRarityEnum,
   badges: () => badges,
   celebrationRankEnum: () => celebrationRankEnum,
+  communities: () => communities,
+  communitiesRelations: () => communitiesRelations,
   confirmationStatusEnum: () => confirmationStatusEnum,
   families: () => families,
   familiesRelations: () => familiesRelations,
@@ -141,7 +143,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, materialTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, confirmationStatusEnum, recurrenceTypeEnum, massTypeEnum, learnedPatternTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, scheduleConfirmations, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, formationCertificates, formationMaterials, materialAccessLogs, massTimesConfig, massConfigurations, specialEvents, questionMassMappings, learnedPatterns, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, badgeCategoryEnum, badgeRarityEnum, badges, userBadges, userPoints, pointActionEnum, pointTransactions, leaderboardCache, levelDefinitions, scheduleGenerationStatusEnum, scheduleGenerations, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, formationMaterialsRelations, materialAccessLogsRelations, notificationsRelations, scheduleGenerationsRelations, massConfigurationsRelations, specialEventsRelations, questionMassMappingsRelations, learnedPatternsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertFormationMaterialSchema, insertAdorationDrawSchema, insertMassConfigurationSchema, insertSpecialEventSchema, insertQuestionMassMappingSchema, insertLearnedPatternSchema;
+var sessions, communities, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, materialTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, confirmationStatusEnum, recurrenceTypeEnum, massTypeEnum, learnedPatternTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, scheduleConfirmations, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, formationCertificates, formationMaterials, materialAccessLogs, massTimesConfig, massConfigurations, specialEvents, questionMassMappings, learnedPatterns, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, badgeCategoryEnum, badgeRarityEnum, badges, userBadges, userPoints, pointActionEnum, pointTransactions, leaderboardCache, levelDefinitions, scheduleGenerationStatusEnum, scheduleGenerations, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, communitiesRelations, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, formationMaterialsRelations, materialAccessLogsRelations, notificationsRelations, scheduleGenerationsRelations, massConfigurationsRelations, specialEventsRelations, questionMassMappingsRelations, learnedPatternsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertFormationMaterialSchema, insertAdorationDrawSchema, insertMassConfigurationSchema, insertSpecialEventSchema, insertQuestionMassMappingSchema, insertLearnedPatternSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -154,7 +156,25 @@ var init_schema = __esm({
       },
       (table) => [index("IDX_session_expire").on(table.expire)]
     );
-    userRoleEnum = pgEnum("user_role", ["gestor", "coordenador", "ministro"]);
+    communities = pgTable(
+      "communities",
+      {
+        id: uuid("id").primaryKey().defaultRandom(),
+        parishName: varchar("parish_name", { length: 255 }).notNull().default("Santu\xE1rio S\xE3o Judas Tadeu de Sorocaba"),
+        name: varchar("name", { length: 255 }).notNull(),
+        slug: varchar("slug", { length: 64 }).notNull().unique(),
+        colorHex: varchar("color_hex", { length: 7 }).notNull(),
+        isMatriz: boolean("is_matriz").notNull().default(false),
+        active: boolean("active").notNull().default(true),
+        createdAt: timestamp("created_at").notNull().defaultNow(),
+        updatedAt: timestamp("updated_at").notNull().defaultNow()
+      },
+      (table) => [
+        index("idx_communities_slug").on(table.slug),
+        index("idx_communities_active").on(table.active)
+      ]
+    );
+    userRoleEnum = pgEnum("user_role", ["gestor", "reitor", "coordenador_comunidade", "coordenador_paroquial", "ministro"]);
     userStatusEnum = pgEnum("user_status", ["active", "inactive", "pending"]);
     scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published", "completed"]);
     scheduleTypeEnum = pgEnum("schedule_type", ["missa", "celebracao", "evento"]);
@@ -212,6 +232,7 @@ var init_schema = __esm({
       imageContentType: varchar("image_content_type", { length: 50 }),
       // MIME type
       familyId: uuid("family_id").references(() => families.id),
+      homeCommunityId: uuid("home_community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       // Personal information
       birthDate: date("birth_date"),
       address: text("address"),
@@ -276,6 +297,7 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     }, (table) => [
+      index("idx_users_home_community").on(table.homeCommunityId),
       // Filter users by status (pending, active, inactive)
       index("idx_users_status").on(table.status),
       // Filter by role and status (e.g., active ministers)
@@ -301,6 +323,7 @@ var init_schema = __esm({
     });
     questionnaires = pgTable("questionnaires", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       title: varchar("title", { length: 255 }).notNull(),
       description: text("description"),
       month: integer("month").notNull(),
@@ -317,6 +340,7 @@ var init_schema = __esm({
     });
     questionnaireResponses = pgTable("questionnaire_responses", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       questionnaireId: uuid("questionnaire_id").notNull().references(() => questionnaires.id, { onDelete: "cascade" }),
       userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       responses: jsonb("responses").notNull(),
@@ -353,6 +377,7 @@ var init_schema = __esm({
     ]);
     schedules = pgTable("schedules", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       date: date("date").notNull(),
       time: time("time").notNull(),
       type: scheduleTypeEnum("type").notNull().default("missa"),
@@ -366,6 +391,7 @@ var init_schema = __esm({
       onSiteAdjustments: jsonb("on_site_adjustments").$type(),
       createdAt: timestamp("created_at").defaultNow()
     }, (table) => [
+      index("idx_schedules_community_date").on(table.communityId, table.date),
       index("idx_schedules_date").on(table.date),
       index("idx_schedules_minister").on(table.ministerId),
       index("idx_schedules_date_time").on(table.date, table.time),
@@ -379,6 +405,7 @@ var init_schema = __esm({
     ]);
     massExecutionLogs = pgTable("mass_execution_logs", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
       auxiliaryId: varchar("auxiliary_id").notNull().references(() => users.id),
       changesMade: jsonb("changes_made").$type(),
@@ -395,6 +422,7 @@ var init_schema = __esm({
     ]);
     standbyMinisters = pgTable("standby_ministers", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
       ministerId: varchar("minister_id").notNull().references(() => users.id),
       confirmedAvailable: boolean("confirmed_available").default(false),
@@ -414,6 +442,7 @@ var init_schema = __esm({
     ]);
     ministerCheckIns = pgTable("minister_check_ins", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
       ministerId: varchar("minister_id").notNull().references(() => users.id),
       position: integer("position").notNull(),
@@ -429,6 +458,7 @@ var init_schema = __esm({
     ]);
     scheduleConfirmations = pgTable("schedule_confirmations", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
       ministerId: varchar("minister_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       status: confirmationStatusEnum("status").notNull().default("pending"),
@@ -451,6 +481,7 @@ var init_schema = __esm({
     ]);
     substitutionRequests = pgTable("substitution_requests", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       scheduleId: uuid("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
       requesterId: varchar("requester_id").notNull().references(() => users.id, { onDelete: "cascade" }),
       substituteId: varchar("substitute_id").references(() => users.id, { onDelete: "set null" }),
@@ -680,6 +711,7 @@ var init_schema = __esm({
     ]);
     massTimesConfig = pgTable("mass_times_config", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       dayOfWeek: integer("day_of_week").notNull(),
       time: time("time").notNull(),
       minMinisters: integer("min_ministers").notNull().default(3),
@@ -692,6 +724,7 @@ var init_schema = __esm({
     });
     massConfigurations = pgTable("mass_configurations", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       name: varchar("name", { length: 255 }).notNull(),
       description: text("description"),
       // Recurrence settings
@@ -731,6 +764,7 @@ var init_schema = __esm({
     ]);
     specialEvents = pgTable("special_events", {
       id: uuid("id").primaryKey().defaultRandom(),
+      communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "restrict" }),
       name: varchar("name", { length: 255 }).notNull(),
       description: text("description"),
       // Event timing
@@ -1166,6 +1200,11 @@ var init_schema = __esm({
       index("idx_saints_name").on(table.name),
       index("idx_saints_brazilian").on(table.isBrazilian)
     ]);
+    communitiesRelations = relations(communities, ({ many }) => ({
+      users: many(users),
+      schedules: many(schedules),
+      questionnaires: many(questionnaires)
+    }));
     familiesRelations = relations(families, ({ many }) => ({
       members: many(users)
     }));
@@ -1185,6 +1224,10 @@ var init_schema = __esm({
       family: one(families, {
         fields: [users.familyId],
         references: [families.id]
+      }),
+      homeCommunity: one(communities, {
+        fields: [users.homeCommunityId],
+        references: [communities.id]
       }),
       questionnaires: many(questionnaires),
       questionnaireResponses: many(questionnaireResponses),
@@ -1660,13 +1703,44 @@ var init_nameFormatter = __esm({
   }
 });
 
+// server/utils/communityContext.ts
+import { eq as eq2 } from "drizzle-orm";
+async function getMatrizCommunityId() {
+  if (matrizIdCache) return matrizIdCache;
+  const [matriz] = await db.select({ id: communities.id }).from(communities).where(eq2(communities.isMatriz, true)).limit(1);
+  if (!matriz) {
+    throw new Error("Comunidade matriz n\xE3o encontrada (rode a migra\xE7\xE3o 0005).");
+  }
+  matrizIdCache = matriz.id;
+  return matriz.id;
+}
+async function communityIdFromSchedule(scheduleId) {
+  const [row] = await db.select({ communityId: schedules.communityId }).from(schedules).where(eq2(schedules.id, scheduleId)).limit(1);
+  if (row?.communityId) return row.communityId;
+  return getMatrizCommunityId();
+}
+async function communityIdFromQuestionnaire(questionnaireId) {
+  const [row] = await db.select({ communityId: questionnaires.communityId }).from(questionnaires).where(eq2(questionnaires.id, questionnaireId)).limit(1);
+  if (row?.communityId) return row.communityId;
+  return getMatrizCommunityId();
+}
+var matrizIdCache;
+var init_communityContext = __esm({
+  async "server/utils/communityContext.ts"() {
+    "use strict";
+    await init_db();
+    init_schema();
+    matrizIdCache = null;
+  }
+});
+
 // server/storage.ts
 var storage_exports = {};
 __export(storage_exports, {
   DatabaseStorage: () => DatabaseStorage,
   storage: () => storage
 });
-import { eq as eq2, and, desc, count, sql as sql2, gte, lte, or, inArray } from "drizzle-orm";
+import { eq as eq3, and, desc, count, sql as sql2, gte, lte, or, inArray } from "drizzle-orm";
 import Database from "better-sqlite3";
 var DrizzleSQLiteFallback, DatabaseStorage, storage;
 var init_storage = __esm({
@@ -1675,6 +1749,7 @@ var init_storage = __esm({
     init_schema();
     await init_db();
     init_nameFormatter();
+    await init_communityContext();
     DrizzleSQLiteFallback = class {
       static sqliteDb = null;
       static getSQLiteDB() {
@@ -1751,7 +1826,7 @@ var init_storage = __esm({
       }
       // User operations (mandatory for Replit Auth)
       async getUser(id) {
-        const [user] = await db.select().from(users).where(eq2(users.id, id));
+        const [user] = await db.select().from(users).where(eq3(users.id, id));
         return user;
       }
       async upsertUser(userData) {
@@ -1791,8 +1866,9 @@ var init_storage = __esm({
           specialSkills: userData.specialSkills || null,
           liturgicalTraining: userData.liturgicalTraining || false,
           observations: userData.observations || null,
-          requiresPasswordChange: true
+          requiresPasswordChange: true,
           // Force password change for admin-created users
+          homeCommunityId: userData.homeCommunityId || await getMatrizCommunityId()
         }).returning();
         return user;
       }
@@ -1801,21 +1877,21 @@ var init_storage = __esm({
         if (updateData.name) {
           updateData.name = formatName(updateData.name);
         }
-        const [user] = await db.update(users).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(users.id, id)).returning();
+        const [user] = await db.update(users).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(users.id, id)).returning();
         return user;
       }
       async deleteUser(id) {
-        await db.delete(users).where(eq2(users.id, id));
+        await db.delete(users).where(eq3(users.id, id));
       }
       async getAllUsers() {
         return await db.select().from(users).orderBy(desc(users.createdAt));
       }
       async getUsersByRole(role) {
-        return await db.select().from(users).where(eq2(users.role, role));
+        return await db.select().from(users).where(eq3(users.role, role));
       }
       async getUsersPaginated(options) {
         const { limit, offset, status } = options;
-        const whereCondition = status ? eq2(users.status, status) : void 0;
+        const whereCondition = status ? eq3(users.status, status) : void 0;
         const [data, countResult] = await Promise.all([
           whereCondition ? db.select().from(users).where(whereCondition).orderBy(desc(users.createdAt)).limit(limit).offset(offset) : db.select().from(users).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
           whereCondition ? db.select({ count: count() }).from(users).where(whereCondition) : db.select({ count: count() }).from(users)
@@ -1830,8 +1906,8 @@ var init_storage = __esm({
       async getUsersByStatusPaginated(status, options) {
         const { limit, offset } = options;
         const [data, countResult] = await Promise.all([
-          db.select().from(users).where(eq2(users.status, status)).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
-          db.select({ count: count() }).from(users).where(eq2(users.status, status))
+          db.select().from(users).where(eq3(users.status, status)).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+          db.select({ count: count() }).from(users).where(eq3(users.status, status))
         ]);
         const total = countResult[0]?.count ?? 0;
         return {
@@ -1858,7 +1934,7 @@ var init_storage = __esm({
         return await db.select().from(questionnaires).orderBy(desc(questionnaires.createdAt));
       }
       async getQuestionnaireById(id) {
-        const [questionnaire] = await db.select().from(questionnaires).where(eq2(questionnaires.id, id));
+        const [questionnaire] = await db.select().from(questionnaires).where(eq3(questionnaires.id, id));
         return questionnaire;
       }
       async updateQuestionnaire(id, questionnaireData) {
@@ -1872,16 +1948,18 @@ var init_storage = __esm({
         if (questionnaireData.questions) updateData.questions = questionnaireData.questions;
         if (questionnaireData.deadline !== void 0) updateData.deadline = questionnaireData.deadline;
         if (questionnaireData.targetUserIds !== void 0) updateData.targetUserIds = questionnaireData.targetUserIds;
-        const [questionnaire] = await db.update(questionnaires).set(updateData).where(eq2(questionnaires.id, id)).returning();
+        const [questionnaire] = await db.update(questionnaires).set(updateData).where(eq3(questionnaires.id, id)).returning();
         return questionnaire;
       }
       async deleteQuestionnaire(id) {
-        await db.delete(questionnaires).where(eq2(questionnaires.id, id));
+        await db.delete(questionnaires).where(eq3(questionnaires.id, id));
       }
       // Questionnaire response operations
       async submitQuestionnaireResponse(responseData) {
         const [response] = await db.insert(questionnaireResponses).values({
           ...responseData,
+          // community_id herdado do questionário respondido (se não veio explícito)
+          communityId: responseData.communityId || await communityIdFromQuestionnaire(responseData.questionnaireId),
           isDeleted: false,
           // Garantir que não está marcado como deletado
           deletedAt: null
@@ -1913,7 +1991,7 @@ var init_storage = __esm({
         return response;
       }
       async getQuestionnaireResponses(questionnaireId) {
-        return await db.select().from(questionnaireResponses).where(eq2(questionnaireResponses.questionnaireId, questionnaireId));
+        return await db.select().from(questionnaireResponses).where(eq3(questionnaireResponses.questionnaireId, questionnaireId));
       }
       // Schedule operations
       async createSchedule(scheduleData) {
@@ -1987,7 +2065,7 @@ var init_storage = __esm({
           status: schedules.status,
           notes: schedules.notes,
           ministerName: users.name
-        }).from(schedules).leftJoin(users, eq2(schedules.ministerId, users.id)).where(eq2(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position, schedules.id);
+        }).from(schedules).leftJoin(users, eq3(schedules.ministerId, users.id)).where(eq3(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position, schedules.id);
         return assignments.map((a) => ({
           id: a.id,
           date: a.date,
@@ -2018,7 +2096,7 @@ var init_storage = __esm({
           status: schedules.status,
           type: schedules.type,
           location: schedules.location
-        }).from(schedules).leftJoin(users, eq2(schedules.ministerId, users.id)).where(and(
+        }).from(schedules).leftJoin(users, eq3(schedules.ministerId, users.id)).where(and(
           gte(schedules.date, startDate),
           lte(schedules.date, endDate)
         )).orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
@@ -2055,7 +2133,7 @@ var init_storage = __esm({
           responseMessage: substitutionRequests.responseMessage,
           createdAt: substitutionRequests.createdAt,
           updatedAt: substitutionRequests.updatedAt
-        }).from(substitutionRequests).innerJoin(schedules, eq2(substitutionRequests.scheduleId, schedules.id)).where(
+        }).from(substitutionRequests).innerJoin(schedules, eq3(substitutionRequests.scheduleId, schedules.id)).where(
           and(
             gte(schedules.date, firstDay.toISOString().split("T")[0]),
             lte(schedules.date, lastDay.toISOString().split("T")[0])
@@ -2064,18 +2142,18 @@ var init_storage = __esm({
         return substitutions;
       }
       async getScheduleById(id) {
-        const [schedule] = await db.select().from(schedules).where(eq2(schedules.id, id));
+        const [schedule] = await db.select().from(schedules).where(eq3(schedules.id, id));
         return schedule;
       }
       async getScheduleAssignments(scheduleId) {
         return [];
       }
       async updateSchedule(id, scheduleData) {
-        const [schedule] = await db.update(schedules).set({ ...scheduleData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(schedules.id, id)).returning();
+        const [schedule] = await db.update(schedules).set({ ...scheduleData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(schedules.id, id)).returning();
         return schedule;
       }
       async deleteSchedule(id) {
-        await db.delete(schedules).where(eq2(schedules.id, id));
+        await db.delete(schedules).where(eq3(schedules.id, id));
       }
       // Substitution request operations
       async createSubstitutionRequest(requestData) {
@@ -2083,29 +2161,32 @@ var init_storage = __esm({
         return request;
       }
       async getSubstitutionRequests(scheduleId) {
-        return await db.select().from(substitutionRequests).where(eq2(substitutionRequests.scheduleId, scheduleId));
+        return await db.select().from(substitutionRequests).where(eq3(substitutionRequests.scheduleId, scheduleId));
       }
       async updateSubstitutionRequest(id, requestData) {
-        const [request] = await db.update(substitutionRequests).set({ ...requestData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(substitutionRequests.id, id)).returning();
+        const [request] = await db.update(substitutionRequests).set({ ...requestData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(substitutionRequests.id, id)).returning();
         return request;
       }
       async deleteSubstitutionRequest(id) {
-        await db.delete(substitutionRequests).where(eq2(substitutionRequests.id, id));
+        await db.delete(substitutionRequests).where(eq3(substitutionRequests.id, id));
       }
       // Mass times operations
       async createMassTime(massTimeData) {
-        const [massTime] = await db.insert(massTimesConfig).values(massTimeData).returning();
+        const [massTime] = await db.insert(massTimesConfig).values({
+          ...massTimeData,
+          communityId: massTimeData.communityId || await getMatrizCommunityId()
+        }).returning();
         return massTime;
       }
       async getMassTimes() {
         return await db.select().from(massTimesConfig).orderBy(massTimesConfig.dayOfWeek, massTimesConfig.time);
       }
       async updateMassTime(id, massTimeData) {
-        const [massTime] = await db.update(massTimesConfig).set({ ...massTimeData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(massTimesConfig.id, id)).returning();
+        const [massTime] = await db.update(massTimesConfig).set({ ...massTimeData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(massTimesConfig.id, id)).returning();
         return massTime;
       }
       async deleteMassTime(id) {
-        await db.delete(massTimesConfig).where(eq2(massTimesConfig.id, id));
+        await db.delete(massTimesConfig).where(eq3(massTimesConfig.id, id));
       }
       // Notification operations
       async createNotification(notificationData) {
@@ -2113,13 +2194,13 @@ var init_storage = __esm({
         return notification;
       }
       async getUserNotifications(userId) {
-        return await db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+        return await db.select().from(notifications).where(eq3(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
       }
       async getUserNotificationsPaginated(userId, options) {
         const { limit, offset } = options;
         const [data, countResult] = await Promise.all([
-          db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset),
-          db.select({ count: count() }).from(notifications).where(eq2(notifications.userId, userId))
+          db.select().from(notifications).where(eq3(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset),
+          db.select({ count: count() }).from(notifications).where(eq3(notifications.userId, userId))
         ]);
         const total = countResult[0]?.count ?? 0;
         return {
@@ -2129,19 +2210,19 @@ var init_storage = __esm({
         };
       }
       async markNotificationAsRead(id) {
-        await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq2(notifications.id, id));
+        await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(eq3(notifications.id, id));
       }
       async getUnreadNotificationCount(userId) {
         const result = await db.select({ count: count() }).from(notifications).where(and(
-          eq2(notifications.userId, userId),
-          eq2(notifications.read, false)
+          eq3(notifications.userId, userId),
+          eq3(notifications.read, false)
         ));
         return result[0]?.count ?? 0;
       }
       async markAllNotificationsAsRead(userId) {
         await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and(
-          eq2(notifications.userId, userId),
-          eq2(notifications.read, false)
+          eq3(notifications.userId, userId),
+          eq3(notifications.read, false)
         ));
       }
       async deleteExpiredNotifications() {
@@ -2159,19 +2240,19 @@ var init_storage = __esm({
       }
       async getPushSubscriptionByEndpoint(endpoint) {
         await this.ensurePushSubscriptionTable();
-        const result = await db.select().from(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, endpoint)).limit(1);
+        const result = await db.select().from(pushSubscriptions).where(eq3(pushSubscriptions.endpoint, endpoint)).limit(1);
         return result[0];
       }
       async upsertPushSubscription(userId, subscription) {
         await this.ensurePushSubscriptionTable();
-        const existing = await db.select().from(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
+        const existing = await db.select().from(pushSubscriptions).where(eq3(pushSubscriptions.endpoint, subscription.endpoint)).limit(1);
         if (existing.length > 0) {
           const [updated] = await db.update(pushSubscriptions).set({
             userId,
             authKey: subscription.keys.auth,
             p256dhKey: subscription.keys.p256dh,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq2(pushSubscriptions.id, existing[0].id)).returning();
+          }).where(eq3(pushSubscriptions.id, existing[0].id)).returning();
           return updated;
         }
         const [created] = await db.insert(pushSubscriptions).values({
@@ -2184,11 +2265,11 @@ var init_storage = __esm({
       }
       async removePushSubscription(userId, endpoint) {
         await this.ensurePushSubscriptionTable();
-        await db.delete(pushSubscriptions).where(and(eq2(pushSubscriptions.userId, userId), eq2(pushSubscriptions.endpoint, endpoint)));
+        await db.delete(pushSubscriptions).where(and(eq3(pushSubscriptions.userId, userId), eq3(pushSubscriptions.endpoint, endpoint)));
       }
       async removePushSubscriptionByEndpoint(endpoint) {
         await this.ensurePushSubscriptionTable();
-        await db.delete(pushSubscriptions).where(eq2(pushSubscriptions.endpoint, endpoint));
+        await db.delete(pushSubscriptions).where(eq3(pushSubscriptions.endpoint, endpoint));
       }
       async getPushSubscriptionsByUserIds(userIds) {
         await this.ensurePushSubscriptionTable();
@@ -2200,17 +2281,17 @@ var init_storage = __esm({
       }
       // Dashboard statistics
       async getDashboardStats() {
-        const [totalMinistersResult] = await db.select({ count: count() }).from(users).where(and(eq2(users.status, "active"), eq2(users.role, "ministro")));
-        const [weeklyMassesResult] = await db.select({ count: count() }).from(massTimesConfig).where(eq2(massTimesConfig.isActive, true));
+        const [totalMinistersResult] = await db.select({ count: count() }).from(users).where(and(eq3(users.status, "active"), eq3(users.role, "ministro")));
+        const [weeklyMassesResult] = await db.select({ count: count() }).from(massTimesConfig).where(eq3(massTimesConfig.isActive, true));
         const [availableTodayResult] = await db.select({ count: count() }).from(users).where(and(
-          eq2(users.status, "active"),
-          eq2(users.role, "ministro"),
-          eq2(users.availableForSpecialEvents, true)
+          eq3(users.status, "active"),
+          eq3(users.role, "ministro"),
+          eq3(users.availableForSpecialEvents, true)
         ));
         const weekStart = /* @__PURE__ */ new Date();
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         const [substitutionsResult] = await db.select({ count: count() }).from(substitutionRequests).where(and(
-          eq2(substitutionRequests.status, "pending"),
+          eq3(substitutionRequests.status, "pending"),
           gte(substitutionRequests.createdAt, weekStart)
         ));
         return {
@@ -2223,13 +2304,13 @@ var init_storage = __esm({
       }
       // Family relationship operations
       async getFamilyMembers(userId) {
-        const relationships = await db.select().from(familyRelationships).where(eq2(familyRelationships.userId, userId));
+        const relationships = await db.select().from(familyRelationships).where(eq3(familyRelationships.userId, userId));
         return relationships;
       }
       async addFamilyMember(userId, relatedUserId, relationshipType) {
         const existingRelationship = await db.select().from(familyRelationships).where(and(
-          eq2(familyRelationships.userId, userId),
-          eq2(familyRelationships.relatedUserId, relatedUserId)
+          eq3(familyRelationships.userId, userId),
+          eq3(familyRelationships.relatedUserId, relatedUserId)
         ));
         if (existingRelationship.length > 0) {
           throw new Error("Relationship already exists");
@@ -2255,21 +2336,21 @@ var init_storage = __esm({
         return relationship;
       }
       async removeFamilyMember(relationshipId) {
-        const [relationship] = await db.select().from(familyRelationships).where(eq2(familyRelationships.id, relationshipId));
+        const [relationship] = await db.select().from(familyRelationships).where(eq3(familyRelationships.id, relationshipId));
         if (relationship) {
           await db.delete(familyRelationships).where(and(
-            eq2(familyRelationships.userId, relationship.relatedUserId),
-            eq2(familyRelationships.relatedUserId, relationship.userId)
+            eq3(familyRelationships.userId, relationship.relatedUserId),
+            eq3(familyRelationships.relatedUserId, relationship.userId)
           ));
         }
-        await db.delete(familyRelationships).where(eq2(familyRelationships.id, relationshipId));
+        await db.delete(familyRelationships).where(eq3(familyRelationships.id, relationshipId));
       }
       async getFamilyPreference(userId) {
         const user = await this.getUser(userId);
         if (!user || !user.familyId) {
           return null;
         }
-        const [family] = await db.select().from(families).where(eq2(families.id, user.familyId));
+        const [family] = await db.select().from(families).where(eq3(families.id, user.familyId));
         if (!family) {
           return null;
         }
@@ -2283,21 +2364,21 @@ var init_storage = __esm({
         if (!user || !user.familyId) {
           throw new Error("User has no family");
         }
-        await db.update(families).set({ preferServeTogether }).where(eq2(families.id, user.familyId));
+        await db.update(families).set({ preferServeTogether }).where(eq3(families.id, user.familyId));
       }
       // Family questionnaire sharing methods
       async getFamilyMembersForQuestionnaire(userId, questionnaireId) {
-        const relationships = await db.select().from(familyRelationships).where(eq2(familyRelationships.userId, userId));
+        const relationships = await db.select().from(familyRelationships).where(eq3(familyRelationships.userId, userId));
         const familyMembers = await Promise.all(
           relationships.map(async (rel) => {
             const user = await this.getUser(rel.relatedUserId);
             if (!user) return null;
             const response = await db.select().from(questionnaireResponses).where(and(
-              eq2(questionnaireResponses.questionnaireId, questionnaireId),
-              eq2(questionnaireResponses.userId, rel.relatedUserId),
-              eq2(questionnaireResponses.isSharedResponse, false),
+              eq3(questionnaireResponses.questionnaireId, questionnaireId),
+              eq3(questionnaireResponses.userId, rel.relatedUserId),
+              eq3(questionnaireResponses.isSharedResponse, false),
               // Only count direct responses
-              eq2(questionnaireResponses.isDeleted, false)
+              eq3(questionnaireResponses.isDeleted, false)
               // Exclude soft-deleted responses
             )).limit(1);
             return {
@@ -2314,21 +2395,21 @@ var init_storage = __esm({
       }
       async checkUserMinisterialActivity(userId) {
         try {
-          const responses = await db.select().from(questionnaireResponses).where(eq2(questionnaireResponses.userId, userId)).limit(1);
+          const responses = await db.select().from(questionnaireResponses).where(eq3(questionnaireResponses.userId, userId)).limit(1);
           if (responses.length > 0) {
             return {
               isUsed: true,
               reason: "Usu\xE1rio j\xE1 respondeu question\xE1rios"
             };
           }
-          const ministerAssignments = await db.select().from(schedules).where(eq2(schedules.ministerId, userId)).limit(1);
+          const ministerAssignments = await db.select().from(schedules).where(eq3(schedules.ministerId, userId)).limit(1);
           if (ministerAssignments.length > 0) {
             return {
               isUsed: true,
               reason: "Usu\xE1rio j\xE1 foi escalado para missas"
             };
           }
-          const substituteAssignments = await db.select().from(schedules).where(eq2(schedules.substituteId, userId)).limit(1);
+          const substituteAssignments = await db.select().from(schedules).where(eq3(schedules.substituteId, userId)).limit(1);
           if (substituteAssignments.length > 0) {
             return {
               isUsed: true,
@@ -2336,8 +2417,8 @@ var init_storage = __esm({
             };
           }
           const substitutionActivity = await db.select().from(substitutionRequests).where(or(
-            eq2(substitutionRequests.requesterId, userId),
-            eq2(substitutionRequests.substituteId, userId)
+            eq3(substitutionRequests.requesterId, userId),
+            eq3(substitutionRequests.substituteId, userId)
           )).limit(1);
           if (substitutionActivity.length > 0) {
             return {
@@ -2372,13 +2453,13 @@ var init_storage = __esm({
         );
       }
       async getFormationTrackById(id) {
-        const [track] = await db.select().from(formationTracks).where(eq2(formationTracks.id, id));
+        const [track] = await db.select().from(formationTracks).where(eq3(formationTracks.id, id));
         return track;
       }
       // Formation module operations
       async getFormationModules(trackId) {
         return await DrizzleSQLiteFallback.safeQuery(
-          () => db.select().from(formationModules).where(eq2(formationModules.trackId, trackId)).orderBy(formationModules.orderIndex, formationModules.title),
+          () => db.select().from(formationModules).where(eq3(formationModules.trackId, trackId)).orderBy(formationModules.orderIndex, formationModules.title),
           `SELECT * FROM formation_modules WHERE trackId = '${trackId}' ORDER BY orderIndex, title`,
           (row) => ({
             ...row,
@@ -2392,33 +2473,33 @@ var init_storage = __esm({
         return track;
       }
       async updateFormationTrack(id, trackData) {
-        const [track] = await db.update(formationTracks).set({ ...trackData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationTracks.id, id)).returning();
+        const [track] = await db.update(formationTracks).set({ ...trackData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(formationTracks.id, id)).returning();
         return track;
       }
       async deleteFormationTrack(id) {
-        await db.delete(formationTracks).where(eq2(formationTracks.id, id));
+        await db.delete(formationTracks).where(eq3(formationTracks.id, id));
       }
       // Formation lesson operations
       async getFormationLessons(trackId, moduleId) {
         const query = db.select().from(formationLessons);
         if (trackId && moduleId) {
-          return await query.where(and(eq2(formationLessons.trackId, trackId), eq2(formationLessons.moduleId, moduleId))).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(and(eq3(formationLessons.trackId, trackId), eq3(formationLessons.moduleId, moduleId))).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         } else if (trackId) {
-          return await query.where(eq2(formationLessons.trackId, trackId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(eq3(formationLessons.trackId, trackId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         } else if (moduleId) {
-          return await query.where(eq2(formationLessons.moduleId, moduleId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
+          return await query.where(eq3(formationLessons.moduleId, moduleId)).orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
         }
         return await query.orderBy(formationLessons.orderIndex, formationLessons.lessonNumber);
       }
       async getFormationLessonById(id) {
-        const [lesson] = await db.select().from(formationLessons).where(eq2(formationLessons.id, id));
+        const [lesson] = await db.select().from(formationLessons).where(eq3(formationLessons.id, id));
         return lesson;
       }
       async getFormationLessonByNumber(trackId, moduleId, lessonNumber) {
         const [lesson] = await db.select().from(formationLessons).where(and(
-          eq2(formationLessons.trackId, trackId),
-          eq2(formationLessons.moduleId, moduleId),
-          eq2(formationLessons.lessonNumber, lessonNumber)
+          eq3(formationLessons.trackId, trackId),
+          eq3(formationLessons.moduleId, moduleId),
+          eq3(formationLessons.lessonNumber, lessonNumber)
         ));
         return lesson;
       }
@@ -2446,18 +2527,18 @@ var init_storage = __esm({
         return lesson;
       }
       async updateFormationLesson(id, lessonData) {
-        const [lesson] = await db.update(formationLessons).set({ ...lessonData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationLessons.id, id)).returning();
+        const [lesson] = await db.update(formationLessons).set({ ...lessonData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(formationLessons.id, id)).returning();
         return lesson;
       }
       async deleteFormationLesson(id) {
-        await db.delete(formationLessons).where(eq2(formationLessons.id, id));
+        await db.delete(formationLessons).where(eq3(formationLessons.id, id));
       }
       // Formation lesson section operations
       async getFormationLessonSections(lessonId) {
-        return await db.select().from(formationLessonSections).where(eq2(formationLessonSections.lessonId, lessonId)).orderBy(formationLessonSections.orderIndex);
+        return await db.select().from(formationLessonSections).where(eq3(formationLessonSections.lessonId, lessonId)).orderBy(formationLessonSections.orderIndex);
       }
       async getFormationLessonSectionById(id) {
-        const [section] = await db.select().from(formationLessonSections).where(eq2(formationLessonSections.id, id));
+        const [section] = await db.select().from(formationLessonSections).where(eq3(formationLessonSections.id, id));
         return section;
       }
       async createFormationLessonSection(sectionData) {
@@ -2465,37 +2546,37 @@ var init_storage = __esm({
         return section;
       }
       async updateFormationLessonSection(id, sectionData) {
-        const [section] = await db.update(formationLessonSections).set({ ...sectionData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(formationLessonSections.id, id)).returning();
+        const [section] = await db.update(formationLessonSections).set({ ...sectionData, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(formationLessonSections.id, id)).returning();
         return section;
       }
       async deleteFormationLessonSection(id) {
-        await db.delete(formationLessonSections).where(eq2(formationLessonSections.id, id));
+        await db.delete(formationLessonSections).where(eq3(formationLessonSections.id, id));
       }
       // Formation lesson progress operations
       async getFormationLessonProgress(userId, lessonId) {
-        const query = db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.userId, userId));
+        const query = db.select().from(formationLessonProgress).where(eq3(formationLessonProgress.userId, userId));
         if (lessonId) {
-          return await query.where(and(eq2(formationLessonProgress.userId, userId), eq2(formationLessonProgress.lessonId, lessonId)));
+          return await query.where(and(eq3(formationLessonProgress.userId, userId), eq3(formationLessonProgress.lessonId, lessonId)));
         }
         return await query.orderBy(desc(formationLessonProgress.lastAccessedAt));
       }
       async getFormationLessonProgressById(id) {
-        const [progress] = await db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.id, id));
+        const [progress] = await db.select().from(formationLessonProgress).where(eq3(formationLessonProgress.id, id));
         return progress;
       }
       async getUserFormationProgress(userId, trackId) {
         if (trackId) {
-          return await db.select().from(formationLessonProgress).innerJoin(formationLessons, eq2(formationLessonProgress.lessonId, formationLessons.id)).where(and(
-            eq2(formationLessonProgress.userId, userId),
-            eq2(formationLessons.trackId, trackId)
+          return await db.select().from(formationLessonProgress).innerJoin(formationLessons, eq3(formationLessonProgress.lessonId, formationLessons.id)).where(and(
+            eq3(formationLessonProgress.userId, userId),
+            eq3(formationLessons.trackId, trackId)
           )).orderBy(desc(formationLessonProgress.lastAccessedAt));
         }
         return await this.getFormationLessonProgress(userId);
       }
       async createOrUpdateFormationLessonProgress(progressData) {
         const [existingProgress] = await db.select().from(formationLessonProgress).where(and(
-          eq2(formationLessonProgress.userId, progressData.userId),
-          eq2(formationLessonProgress.lessonId, progressData.lessonId)
+          eq3(formationLessonProgress.userId, progressData.userId),
+          eq3(formationLessonProgress.lessonId, progressData.lessonId)
         ));
         if (existingProgress) {
           const [progress] = await db.update(formationLessonProgress).set({
@@ -2506,7 +2587,7 @@ var init_storage = __esm({
             lastAccessedAt: /* @__PURE__ */ new Date(),
             completedAt: progressData.status === "completed" ? /* @__PURE__ */ new Date() : null,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq2(formationLessonProgress.id, existingProgress.id)).returning();
+          }).where(eq3(formationLessonProgress.id, existingProgress.id)).returning();
           return progress;
         } else {
           const [progress] = await db.insert(formationLessonProgress).values({
@@ -2519,14 +2600,14 @@ var init_storage = __esm({
       }
       async markLessonSectionCompleted(userId, lessonId, sectionId) {
         const [currentProgress] = await db.select().from(formationLessonProgress).where(and(
-          eq2(formationLessonProgress.userId, userId),
-          eq2(formationLessonProgress.lessonId, lessonId)
+          eq3(formationLessonProgress.userId, userId),
+          eq3(formationLessonProgress.lessonId, lessonId)
         ));
         const currentSections = currentProgress?.completedSections || [];
         if (!currentSections.includes(sectionId)) {
           currentSections.push(sectionId);
         }
-        const totalSections = await db.select({ count: count() }).from(formationLessonSections).where(eq2(formationLessonSections.lessonId, lessonId));
+        const totalSections = await db.select({ count: count() }).from(formationLessonSections).where(eq3(formationLessonSections.lessonId, lessonId));
         const progressPercentage = Math.round(currentSections.length / (totalSections[0]?.count || 1) * 100);
         const status = progressPercentage === 100 ? "completed" : "in_progress";
         return await this.createOrUpdateFormationLessonProgress({
@@ -2557,7 +2638,7 @@ var init_storage = __esm({
           db.select().from(formationModules).orderBy(formationModules.trackId, formationModules.orderIndex),
           db.select().from(formationLessons).orderBy(formationLessons.trackId, formationLessons.moduleId, formationLessons.lessonNumber)
         ]);
-        const progressRecords = userId ? await db.select().from(formationLessonProgress).where(eq2(formationLessonProgress.userId, userId)) : [];
+        const progressRecords = userId ? await db.select().from(formationLessonProgress).where(eq3(formationLessonProgress.userId, userId)) : [];
         const progressMap = new Map(
           progressRecords.map((record) => [record.lessonId, record])
         );
@@ -2665,16 +2746,16 @@ var init_storage = __esm({
       }
       async getAdorationDraws(year, month) {
         return await db.select().from(adorationDraws).where(and(
-          eq2(adorationDraws.year, year),
-          eq2(adorationDraws.month, month)
+          eq3(adorationDraws.year, year),
+          eq3(adorationDraws.month, month)
         )).orderBy(desc(adorationDraws.createdAt));
       }
       async getAdorationDrawById(id) {
-        const [draw] = await db.select().from(adorationDraws).where(eq2(adorationDraws.id, id)).limit(1);
+        const [draw] = await db.select().from(adorationDraws).where(eq3(adorationDraws.id, id)).limit(1);
         return draw || null;
       }
       async getAdorationDrawResults(drawId) {
-        return await db.select().from(adorationDrawResults).where(eq2(adorationDrawResults.drawId, drawId)).orderBy(adorationDrawResults.mondayOfWeek);
+        return await db.select().from(adorationDrawResults).where(eq3(adorationDrawResults.drawId, drawId)).orderBy(adorationDrawResults.mondayOfWeek);
       }
       async addAdorationDrawResult(drawId, ministerId, mondayOfWeek, isVoluntary) {
         const [result] = await db.insert(adorationDrawResults).values({
@@ -2686,14 +2767,14 @@ var init_storage = __esm({
         return result;
       }
       async deleteAdorationDraw(id) {
-        await db.delete(adorationDraws).where(eq2(adorationDraws.id, id));
+        await db.delete(adorationDraws).where(eq3(adorationDraws.id, id));
       }
       // Buscar resultado de adoração por ministro e sorteio
       async getAdorationDrawResultByMinister(drawId, ministerId) {
         const [result] = await db.select().from(adorationDrawResults).where(
           and(
-            eq2(adorationDrawResults.drawId, drawId),
-            eq2(adorationDrawResults.ministerId, ministerId)
+            eq3(adorationDrawResults.drawId, drawId),
+            eq3(adorationDrawResults.ministerId, ministerId)
           )
         ).limit(1);
         return result || null;
@@ -2702,21 +2783,68 @@ var init_storage = __esm({
       async updateAdorationDrawResultMonday(drawId, ministerId, newMondayOfWeek) {
         const [result] = await db.update(adorationDrawResults).set({ mondayOfWeek: newMondayOfWeek }).where(
           and(
-            eq2(adorationDrawResults.drawId, drawId),
-            eq2(adorationDrawResults.ministerId, ministerId)
+            eq3(adorationDrawResults.drawId, drawId),
+            eq3(adorationDrawResults.ministerId, ministerId)
           )
         ).returning();
         return result || null;
       }
       // Buscar familiares de um ministro para troca conjunta
       async getFamilyMemberIds(ministerId) {
-        const [user] = await db.select({ familyId: users.familyId }).from(users).where(eq2(users.id, ministerId)).limit(1);
+        const [user] = await db.select({ familyId: users.familyId }).from(users).where(eq3(users.id, ministerId)).limit(1);
         if (!user?.familyId) return [];
-        const familyMembers = await db.select({ id: users.id }).from(users).where(eq2(users.familyId, user.familyId));
+        const familyMembers = await db.select({ id: users.id }).from(users).where(eq3(users.familyId, user.familyId));
         return familyMembers.map((m) => m.id);
       }
     };
     storage = new DatabaseStorage();
+  }
+});
+
+// shared/roles.ts
+function isCoordinator(role) {
+  return COORDINATOR_ROLES.includes(norm(role));
+}
+function isAdmin(role) {
+  return ADMIN_ROLES.includes(norm(role));
+}
+function expandRoles(roles) {
+  const set = new Set(roles.map(norm));
+  if (roles.some((r) => COORDINATOR_ROLES.includes(norm(r)))) {
+    for (const r of COORDINATOR_ROLES) set.add(r);
+  }
+  return [...set];
+}
+var ROLES, COORDINATOR_ROLES, PARISH_WIDE_ROLES, ADMIN_ROLES, MANAGER_ROLES, norm;
+var init_roles = __esm({
+  "shared/roles.ts"() {
+    "use strict";
+    ROLES = {
+      GESTOR: "gestor",
+      REITOR: "reitor",
+      MINISTRO: "ministro",
+      COORDENADOR_PAROQUIAL: "coordenador_paroquial",
+      COORDENADOR_COMUNIDADE: "coordenador_comunidade",
+      /** @deprecated vocabulário pré-multi-comunidade; aceito por compatibilidade. */
+      COORDENADOR_LEGACY: "coordenador"
+    };
+    COORDINATOR_ROLES = [
+      ROLES.COORDENADOR_LEGACY,
+      ROLES.COORDENADOR_COMUNIDADE,
+      ROLES.COORDENADOR_PAROQUIAL
+    ];
+    PARISH_WIDE_ROLES = [
+      ROLES.GESTOR,
+      ROLES.REITOR,
+      ROLES.COORDENADOR_PAROQUIAL
+    ];
+    ADMIN_ROLES = [
+      ...COORDINATOR_ROLES,
+      ROLES.GESTOR,
+      ROLES.REITOR
+    ];
+    MANAGER_ROLES = [ROLES.GESTOR, ROLES.REITOR];
+    norm = (role) => (role ?? "").trim();
   }
 });
 
@@ -3122,6 +3250,7 @@ var init_emailService = __esm({
 // server/utils/pushNotifications.ts
 var pushNotifications_exports = {};
 __export(pushNotifications_exports, {
+  cleanupUserSubscriptions: () => cleanupUserSubscriptions,
   pushConfig: () => pushConfig,
   sendPushNotificationToUsers: () => sendPushNotificationToUsers
 });
@@ -3137,12 +3266,35 @@ async function sendPushNotificationToUsers(userIds, payload) {
   }
   const uniqueUserIds = Array.from(new Set(userIds));
   console.log("[PUSH] UserIds \xFAnicos:", uniqueUserIds.length);
-  console.log("[PUSH] Lista de UserIds:", uniqueUserIds);
-  const subscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
-  console.log("[PUSH] Subscriptions encontradas:", subscriptions.length);
-  console.log("[PUSH] Subscriptions por userId:", subscriptions.map((s) => ({ userId: s.userId, endpoint: s.endpoint.substring(0, 50) + "..." })));
-  if (subscriptions.length === 0) {
+  const allSubscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
+  console.log("[PUSH] Subscriptions encontradas:", allSubscriptions.length);
+  if (allSubscriptions.length === 0) {
     console.warn("[PUSH] Nenhuma subscription encontrada para os userIds fornecidos");
+    return;
+  }
+  const staleCutoff = /* @__PURE__ */ new Date();
+  staleCutoff.setDate(staleCutoff.getDate() - STALE_SUBSCRIPTION_DAYS);
+  const freshSubscriptions = [];
+  const staleSubscriptions = [];
+  for (const sub of allSubscriptions) {
+    const updatedAt = sub.updatedAt ? new Date(sub.updatedAt) : sub.createdAt ? new Date(sub.createdAt) : /* @__PURE__ */ new Date(0);
+    if (updatedAt < staleCutoff) {
+      staleSubscriptions.push(sub);
+    } else {
+      freshSubscriptions.push(sub);
+    }
+  }
+  if (staleSubscriptions.length > 0) {
+    console.log(`[PUSH] Removendo ${staleSubscriptions.length} subscriptions stale (sem atualiza\xE7\xE3o h\xE1 +${STALE_SUBSCRIPTION_DAYS} dias)`);
+    Promise.all(
+      staleSubscriptions.map((sub) => {
+        console.log(`[PUSH] Removendo stale: userId=${sub.userId}, endpoint=${sub.endpoint.substring(0, 50)}...`);
+        return storage.removePushSubscriptionByEndpoint(sub.endpoint);
+      })
+    ).catch((err) => console.error("[PUSH] Erro ao remover subscriptions stale:", err));
+  }
+  if (freshSubscriptions.length === 0) {
+    console.warn("[PUSH] Todas as subscriptions est\xE3o stale, nenhuma notifica\xE7\xE3o enviada");
     return;
   }
   const notificationPayload = JSON.stringify({
@@ -3153,7 +3305,7 @@ async function sendPushNotificationToUsers(userIds, payload) {
     data: payload.data ?? {}
   });
   const results = await Promise.all(
-    subscriptions.map(async (subscription) => {
+    freshSubscriptions.map(async (subscription) => {
       const pushSubscription = {
         endpoint: subscription.endpoint,
         keys: {
@@ -3168,11 +3320,11 @@ async function sendPushNotificationToUsers(userIds, payload) {
       } catch (error) {
         const pushError = error;
         const statusCode = pushError?.statusCode ?? pushError?.code;
-        if (statusCode === 404 || statusCode === 410) {
-          console.warn("[PUSH] Subscription expired, removing:", subscription.endpoint, "userId:", subscription.userId);
+        if (statusCode && INVALID_SUBSCRIPTION_STATUS_CODES.includes(statusCode)) {
+          console.warn(`[PUSH] Subscription inv\xE1lida (HTTP ${statusCode}), removendo: endpoint=${subscription.endpoint.substring(0, 50)}... userId=${subscription.userId}`);
           await storage.removePushSubscriptionByEndpoint(subscription.endpoint);
         } else {
-          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, error);
+          console.error("[PUSH] Failed to send notification to userId:", subscription.userId, "statusCode:", statusCode, error);
         }
         return { success: false, userId: subscription.userId, error: statusCode };
       }
@@ -3180,9 +3332,32 @@ async function sendPushNotificationToUsers(userIds, payload) {
   );
   const successCount = results.filter((r) => r.success).length;
   const failCount = results.filter((r) => !r.success).length;
-  console.log("[PUSH] Resumo: Sucesso:", successCount, "| Falha:", failCount);
+  console.log(`[PUSH] Resumo: Sucesso: ${successCount} | Falha: ${failCount} | Stale removidas: ${staleSubscriptions.length}`);
 }
-var webpush, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, pushConfig;
+async function cleanupUserSubscriptions(userId) {
+  const userSubs = await storage.getPushSubscriptionsByUserIds([userId]);
+  if (userSubs.length <= MAX_SUBSCRIPTIONS_PER_USER) {
+    return 0;
+  }
+  const sorted = userSubs.sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+  const toRemove = sorted.slice(MAX_SUBSCRIPTIONS_PER_USER);
+  let removed = 0;
+  for (const sub of toRemove) {
+    try {
+      await storage.removePushSubscriptionByEndpoint(sub.endpoint);
+      console.log(`[PUSH] Cleanup: removida subscription antiga userId=${userId}, endpoint=${sub.endpoint.substring(0, 50)}...`);
+      removed++;
+    } catch (err) {
+      console.error("[PUSH] Erro ao remover subscription no cleanup:", err);
+    }
+  }
+  return removed;
+}
+var webpush, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, pushConfig, INVALID_SUBSCRIPTION_STATUS_CODES, MAX_SUBSCRIPTIONS_PER_USER, STALE_SUBSCRIPTION_DAYS;
 var init_pushNotifications = __esm({
   async "server/utils/pushNotifications.ts"() {
     "use strict";
@@ -3204,11 +3379,23 @@ var init_pushNotifications = __esm({
       enabled: Boolean(webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
       publicKey: VAPID_PUBLIC_KEY || null
     };
+    INVALID_SUBSCRIPTION_STATUS_CODES = [
+      401,
+      // Unauthorized - chaves inválidas
+      403,
+      // Forbidden - subscription não autorizada
+      404,
+      // Not Found - endpoint não existe mais
+      410
+      // Gone - subscription expirou explicitamente
+    ];
+    MAX_SUBSCRIPTIONS_PER_USER = 3;
+    STALE_SUBSCRIPTION_DAYS = 45;
   }
 });
 
 // server/utils/saintNameMatching.ts
-import { eq as eq11 } from "drizzle-orm";
+import { eq as eq12 } from "drizzle-orm";
 async function loadAllSaintsData() {
   if (saintsCache) {
     return saintsCache;
@@ -3333,8 +3520,8 @@ var init_saintNameMatching = __esm({
 });
 
 // server/services/massConfigService.ts
-import { eq as eq12, and as and7, gte as gte3, lte as lte3, or as or5, isNull } from "drizzle-orm";
-import { format as format2, startOfMonth, endOfMonth, getDay as getDay2, getDate, addDays } from "date-fns";
+import { eq as eq13, and as and7, gte as gte3, lte as lte3, or as or5, isNull } from "drizzle-orm";
+import { format as format2, startOfMonth, endOfMonth, getDay as getDay2, getDate, addDays as addDays2 } from "date-fns";
 var MassConfigService, massConfigService;
 var init_massConfigService = __esm({
   async "server/services/massConfigService.ts"() {
@@ -3346,7 +3533,7 @@ var init_massConfigService = __esm({
        * Load all active mass configurations from the database
        */
       async loadMassConfigurations() {
-        return db.select().from(massConfigurations).where(eq12(massConfigurations.isActive, true));
+        return db.select().from(massConfigurations).where(eq13(massConfigurations.isActive, true));
       }
       /**
        * Load special events for a given month/year
@@ -3356,7 +3543,7 @@ var init_massConfigService = __esm({
         const endDate = format2(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
         return db.select().from(specialEvents).where(
           and7(
-            eq12(specialEvents.isActive, true),
+            eq13(specialEvents.isActive, true),
             gte3(specialEvents.eventDate, startDate),
             lte3(specialEvents.eventDate, endDate)
           )
@@ -3366,7 +3553,7 @@ var init_massConfigService = __esm({
        * Load question-mass mappings for a questionnaire
        */
       async loadQuestionMappings(questionnaireId) {
-        return db.select().from(questionMassMappings).where(eq12(questionMassMappings.questionnaireId, questionnaireId));
+        return db.select().from(questionMassMappings).where(eq13(questionMassMappings.questionnaireId, questionnaireId));
       }
       /**
        * Generate all mass instances for a given month based on configurations and events
@@ -3399,7 +3586,7 @@ var init_massConfigService = __esm({
           const dateStr = format2(currentDate, "yyyy-MM-dd");
           const excludedDates = config.excludedDates || [];
           if (excludedDates.includes(dateStr)) {
-            currentDate = addDays(currentDate, 1);
+            currentDate = addDays2(currentDate, 1);
             continue;
           }
           if (this.matchesRecurrence(currentDate, config)) {
@@ -3418,7 +3605,7 @@ var init_massConfigService = __esm({
               sourceId: config.id
             });
           }
-          currentDate = addDays(currentDate, 1);
+          currentDate = addDays2(currentDate, 1);
         }
         return instances;
       }
@@ -3466,7 +3653,7 @@ var init_massConfigService = __esm({
           const week = Math.ceil(dayOfMonth / 7);
           return week === occurrence;
         } else if (occurrence === -1) {
-          const nextSameDay = addDays(date2, 7);
+          const nextSameDay = addDays2(date2, 7);
           return nextSameDay.getMonth() !== date2.getMonth();
         }
         return false;
@@ -3535,8 +3722,8 @@ var init_massConfigService = __esm({
       async loadLearnedPatterns(ministerId) {
         return db.select().from(learnedPatterns).where(
           and7(
-            eq12(learnedPatterns.ministerId, ministerId),
-            eq12(learnedPatterns.isActive, true)
+            eq13(learnedPatterns.ministerId, ministerId),
+            eq13(learnedPatterns.isActive, true)
           )
         );
       }
@@ -3546,9 +3733,9 @@ var init_massConfigService = __esm({
       async loadLearnedPatternsForMass(massType, dayOfWeek, timeSlot) {
         return db.select().from(learnedPatterns).where(
           and7(
-            eq12(learnedPatterns.isActive, true),
+            eq13(learnedPatterns.isActive, true),
             or5(
-              eq12(learnedPatterns.massType, massType),
+              eq13(learnedPatterns.massType, massType),
               isNull(learnedPatterns.massType)
             )
           )
@@ -3563,10 +3750,38 @@ var init_massConfigService = __esm({
 var scheduleGenerator_exports = {};
 __export(scheduleGenerator_exports, {
   ScheduleGenerator: () => ScheduleGenerator,
-  generateAutomaticSchedule: () => generateAutomaticSchedule
+  generateAutomaticSchedule: () => generateAutomaticSchedule,
+  getMassDisplayName: () => getMassDisplayName
 });
-import { eq as eq13, and as and8, or as or6, sql as sql4, ne as ne2, inArray as inArray2, isNull as isNull2 } from "drizzle-orm";
-import { format as format3, addDays as addDays2, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2, getDay as getDay3, getDate as getDate2, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
+import { eq as eq14, and as and8, or as or6, sql as sql4, ne as ne2, inArray as inArray4, isNull as isNull2 } from "drizzle-orm";
+import { format as format3, addDays as addDays3, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2, getDay as getDay3, getDate as getDate2, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
+function getMassDisplayName(massTime) {
+  const t = massTime.type;
+  const hardcodedNames = {
+    "missa_diaria": "Missa Di\xE1ria",
+    "missa_dominical": "Missa Dominical",
+    "missa_sagrado_coracao": "Missa votiva ao Sagrado Cora\xE7\xE3o de Jesus",
+    "missa_imaculado_coracao": "Missa votiva ao Imaculado Cora\xE7\xE3o de Maria",
+    "missa_cura_libertacao": "Missa por Cura e Liberta\xE7\xE3o",
+    "missa_sao_judas": "Novena de S\xE3o Judas Tadeu",
+    "missa_sao_judas_festa": "Festa de S\xE3o Judas Tadeu",
+    "missa_sao_judas_mensal": "Missa Mensal a S\xE3o Judas Tadeu",
+    "missa_finados": "Missa de Finados (Cemit\xE9rio Memorial)",
+    "missa_puc": "Missa PUC \u2013 Consci\xEAncia Negra",
+    "adoracao_santissimo": "Adora\xE7\xE3o ao Sant\xEDssimo",
+    "sacred_heart_mass": "Missa votiva ao Sagrado Cora\xE7\xE3o de Jesus",
+    "immaculate_heart_mass": "Missa votiva ao Imaculado Cora\xE7\xE3o de Maria",
+    "healing_liberation_mass": "Missa por Cura e Liberta\xE7\xE3o",
+    "holy_thursday_mass": "Missa da Ceia do Senhor (Quinta-feira Santa)",
+    "good_friday_celebration": "Adora\xE7\xE3o da Cruz (Sexta-feira Santa)",
+    "easter_vigil_mass": "Vig\xEDlia Pascal (S\xE1bado Santo)"
+  };
+  if (t && hardcodedNames[t]) return hardcodedNames[t];
+  if (massTime.description) {
+    return massTime.description.replace(/^Você pode servir n[ao]\s+/i, "").replace(/\s*-\s*(?:domingo|segunda(?:-feira)?|terça(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sábado)\s*\(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\)\s*às\s*\d{1,2}h?\d{0,2}\??$/i, "").replace(/\?$/, "").trim();
+  }
+  return t || "Missa";
+}
 function isV2QuestionnaireData(data) {
   return data !== null && typeof data === "object" && "format_version" in data && data.format_version === "2.0";
 }
@@ -3629,6 +3844,9 @@ ${"=".repeat(60)}`);
 [STEP 1] \u{1F4CB} Loading ministers data...`);
           await this.loadMinistersData();
           console.timeEnd("[PERF] Step 1: Load ministers");
+          console.time("[PERF] Step 1b: Load historical counts");
+          await this.loadHistoricalAssignmentCounts(year, month);
+          console.timeEnd("[PERF] Step 1b: Load historical counts");
           console.log(`
 [VALIDATION] Ministers loaded:`, {
             count: this.ministers.length,
@@ -3792,11 +4010,11 @@ ${"=".repeat(60)}`);
 \u{1F3AF} FAIRNESS REPORT:`);
           const distributionMap = /* @__PURE__ */ new Map();
           this.ministers.forEach((m) => {
-            const count13 = m.monthlyAssignmentCount || 0;
-            if (!distributionMap.has(count13)) {
-              distributionMap.set(count13, []);
+            const count14 = m.monthlyAssignmentCount || 0;
+            if (!distributionMap.has(count14)) {
+              distributionMap.set(count14, []);
             }
-            distributionMap.get(count13).push(m);
+            distributionMap.get(count14).push(m);
           });
           console.log(`  Assignment Distribution:`);
           for (let i = 0; i <= 4; i++) {
@@ -3908,7 +4126,7 @@ ${"!".repeat(60)}`);
           }).from(users).where(
             and8(
               or6(
-                eq13(users.status, "active"),
+                eq14(users.status, "active"),
                 sql4`${users.status} IS NULL`
                 // Incluir usuários com status null
               ),
@@ -3975,7 +4193,7 @@ ${"!".repeat(60)}`);
             id: families.id,
             name: families.name,
             preferServeTogether: families.preferServeTogether
-          }).from(families).where(inArray2(families.id, uniqueFamilyIds));
+          }).from(families).where(inArray4(families.id, uniqueFamilyIds));
           for (const family of familiesData) {
             this.familyPreferences.set(family.id, family.preferServeTogether ?? true);
           }
@@ -3988,6 +4206,68 @@ ${"!".repeat(60)}`);
           const preferTogether = this.familyPreferences.get(familyId) ?? true;
           const preferenceText = preferTogether ? "(prefer together)" : "(prefer separate)";
           console.log(`[FAMILY_SYSTEM] Family ${familyId.substring(0, 8)}: ${memberNames} ${preferenceText}`);
+        }
+      }
+      /**
+       * 📊 HISTORICAL FAIRNESS: Load minister assignment counts from previous months
+       * Uses the last 3 months of schedules to seed monthlyAssignmentCount so that
+       * ministers who served more recently/frequently get a lower priority.
+       * Weights: current-1 month = 1.0, current-2 = 0.6, current-3 = 0.3
+       */
+      async loadHistoricalAssignmentCounts(year, month) {
+        if (!this.db) {
+          console.log("[HISTORICAL] No database connection, skipping historical counts");
+          return;
+        }
+        try {
+          const ranges = [];
+          const weights = [1, 0.6, 0.3];
+          for (let i = 1; i <= 3; i++) {
+            let m = month - i;
+            let y = year;
+            if (m <= 0) {
+              m += 12;
+              y -= 1;
+            }
+            const start = `${y}-${String(m).padStart(2, "0")}-01`;
+            const lastDay = new Date(y, m, 0).getDate();
+            const end = `${y}-${String(m).padStart(2, "0")}-${lastDay}`;
+            ranges.push({ start, end, weight: weights[i - 1] });
+          }
+          console.log(`[HISTORICAL] Loading assignment counts from previous 3 months...`);
+          const ministerWeightedCounts = /* @__PURE__ */ new Map();
+          for (const range of ranges) {
+            const rows = await this.db.execute(
+              sql4`SELECT minister_id, COUNT(*)::int as cnt
+              FROM schedules
+              WHERE date >= ${range.start} AND date <= ${range.end}
+                AND status IN ('scheduled', 'published')
+                AND minister_id IS NOT NULL
+              GROUP BY minister_id`
+            );
+            if (rows.rows) {
+              for (const row of rows.rows) {
+                const id = row.minister_id;
+                const cnt = row.cnt * range.weight;
+                ministerWeightedCounts.set(id, (ministerWeightedCounts.get(id) || 0) + cnt);
+              }
+            }
+          }
+          let applied = 0;
+          for (const minister of this.ministers) {
+            if (minister.id && ministerWeightedCounts.has(minister.id)) {
+              const weighted = ministerWeightedCounts.get(minister.id);
+              minister.monthlyAssignmentCount = Math.round(weighted / 3);
+              applied++;
+            }
+          }
+          console.log(`[HISTORICAL] \u2705 Applied historical counts to ${applied}/${this.ministers.length} ministers`);
+          const top = [...this.ministers].filter((m) => (m.monthlyAssignmentCount || 0) > 0).sort((a, b) => (b.monthlyAssignmentCount || 0) - (a.monthlyAssignmentCount || 0)).slice(0, 5);
+          top.forEach((m) => {
+            console.log(`[HISTORICAL]   ${m.name}: ${m.monthlyAssignmentCount} (weighted historical)`);
+          });
+        } catch (error) {
+          console.error("[HISTORICAL] Error loading historical counts:", error);
         }
       }
       /**
@@ -4335,8 +4615,8 @@ ${"!".repeat(60)}`);
         const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
           and8(
-            eq13(questionnaires.month, month),
-            eq13(questionnaires.year, year)
+            eq14(questionnaires.month, month),
+            eq14(questionnaires.year, year)
           )
         ).limit(1);
         if (!targetQuestionnaire) {
@@ -4357,21 +4637,29 @@ ${"!".repeat(60)}`);
           for (const q of questions) {
             const item = q;
             if (!item.id) continue;
-            const isCustom = item.id.startsWith("custom_") || item.id.startsWith("special_event");
+            const isCustom = item.id.startsWith("custom_") || item.id.startsWith("special_event") || item.category === "custom" || item.category === "special_event";
             if (!isCustom) continue;
-            if (item.metadata?.eventDate && item.metadata?.eventTime) {
+            if (item.metadata?.eventDate) {
               let date2 = item.metadata.eventDate;
               if (date2.includes("/")) {
                 const parts = date2.split("/");
                 date2 = `${year}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
               }
               let time2 = item.metadata.eventTime;
-              if (time2.includes("h")) {
-                const tp = time2.split("h");
-                time2 = `${tp[0].padStart(2, "0")}:${(tp[1] || "00").padStart(2, "0")}`;
+              if (!time2 && item.question) {
+                const timeFromText = item.question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+                if (timeFromText) {
+                  time2 = `${timeFromText[1].padStart(2, "0")}:${(timeFromText[2] || "00").padStart(2, "0")}`;
+                }
               }
-              customEventIdToDateTime.set(item.id, { date: date2, time: time2 });
-              continue;
+              if (time2) {
+                if (time2.includes("h")) {
+                  const tp = time2.split("h");
+                  time2 = `${tp[0].padStart(2, "0")}:${(tp[1] || "00").padStart(2, "0")}`;
+                }
+                customEventIdToDateTime.set(item.id, { date: date2, time: time2 });
+                continue;
+              }
             }
             const text2 = item.question || "";
             const dateMatch = text2.match(/(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
@@ -4390,7 +4678,7 @@ ${"!".repeat(60)}`);
         if (customEventIdToDateTime.size > 0) {
           console.log(`[SCHEDULE_GEN] \u{1F4CB} Custom event mappings:`, Object.fromEntries(customEventIdToDateTime));
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq13(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(eq14(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         console.log(`[SCHEDULE_GEN] \u{1F504} Using COMPATIBILITY LAYER for ${year}/${month}`);
         responses.forEach((r) => {
@@ -4575,7 +4863,7 @@ ${"!".repeat(60)}`);
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq13(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(eq14(massTimesConfig.isActive, true));
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -4818,7 +5106,7 @@ ${"!".repeat(60)}`);
               console.log(`[SCHEDULE_GEN] \u{1F64F} Adora\xE7\xE3o ao Sant\xEDssimo: ${dateStr} 22:00 (${adorationMinisters.length} ministros sorteados)`);
             }
           }
-          currentDate = addDays2(currentDate, 1);
+          currentDate = addDays3(currentDate, 1);
         }
         const specialMasses = await this.loadSpecialMassesFromQuestionnaire(year, month);
         monthlyTimes.push(...specialMasses);
@@ -4840,8 +5128,8 @@ ${"!".repeat(60)}`);
         try {
           const [questionnaire] = await this.db.select().from(questionnaires).where(
             and8(
-              eq13(questionnaires.month, month),
-              eq13(questionnaires.year, year)
+              eq14(questionnaires.month, month),
+              eq14(questionnaires.year, year)
             )
           ).limit(1);
           if (!questionnaire) {
@@ -4859,36 +5147,72 @@ ${"!".repeat(60)}`);
           console.log(`[SCHEDULE_GEN] Found ${customQuestions.length} custom/special event questions`);
           for (const question of customQuestions) {
             let massInfo = null;
-            if (question.metadata?.eventDate && question.metadata?.eventTime) {
+            if (question.metadata?.eventDate) {
               let eventDate = question.metadata.eventDate;
               if (eventDate.includes("/")) {
                 const parts = eventDate.split("/");
                 eventDate = `${year}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
               }
               let eventTime = question.metadata.eventTime;
-              if (eventTime.includes("h")) {
-                const timeParts = eventTime.split("h");
-                eventTime = `${timeParts[0].padStart(2, "0")}:${(timeParts[1] || "00").padStart(2, "0")}`;
+              if (!eventTime) {
+                const timeFromText = question.question.match(/(?:às|as|ás)\s*(\d{1,2})(?:h|:)(\d{0,2})?/i);
+                if (timeFromText) {
+                  eventTime = `${timeFromText[1].padStart(2, "0")}:${(timeFromText[2] || "00").padStart(2, "0")}`;
+                }
               }
-              const dateObj = /* @__PURE__ */ new Date(eventDate + "T12:00:00");
-              massInfo = {
-                date: eventDate,
-                time: eventTime,
-                dayOfWeek: dateObj.getDay()
-              };
-              console.log(`[SCHEDULE_GEN] \u{1F4CB} Using metadata: ${question.id} -> ${eventDate} ${eventTime} (${question.metadata.eventName || "sem nome"})`);
+              if (eventTime) {
+                if (eventTime.includes("h")) {
+                  const timeParts = eventTime.split("h");
+                  eventTime = `${timeParts[0].padStart(2, "0")}:${(timeParts[1] || "00").padStart(2, "0")}`;
+                }
+                const dateObj = /* @__PURE__ */ new Date(eventDate + "T12:00:00");
+                massInfo = {
+                  date: eventDate,
+                  time: eventTime,
+                  dayOfWeek: dateObj.getDay()
+                };
+                console.log(`[SCHEDULE_GEN] \u{1F4CB} Using metadata: ${question.id} -> ${eventDate} ${eventTime} (${question.metadata.eventName || "sem nome"})`);
+              }
             }
             if (!massInfo) {
               massInfo = this.extractMassInfoFromQuestion(question.question, year, month);
             }
             if (massInfo) {
+              const eventMinisterCounts = {
+                "holy_thursday_mass": 25,
+                // Quinta-feira Santa (Lava-pés)
+                "good_friday_celebration": 25,
+                // Sexta-feira Santa (Adoração da Cruz)
+                "easter_vigil_mass": 25,
+                // Vigília Pascal (Sábado Santo)
+                "healing_liberation_mass": 26,
+                // Missa por Cura e Libertação (1ª 5ª-feira)
+                "sacred_heart_mass": 6,
+                // Sagrado Coração de Jesus (1ª 6ª-feira)
+                "immaculate_heart_mass": 6
+                // Imaculado Coração de Maria (1º sábado)
+              };
+              const inferFromText = (text2) => {
+                const t = text2.toLowerCase();
+                if (/cura\s+e\s+liberta/.test(t)) return 26;
+                if (/novena.*pentecostes/.test(t)) return 15;
+                if (/finados.*cemit[eé]rio/.test(t)) return 10;
+                if (/dia\s+das\s+m[ãa]es.*cemit[eé]rio/.test(t)) return 10;
+                if (/s[ãa]o\s+judas/.test(t)) {
+                  if (/\b7h\b|\b07h\b|\b07:00\b/.test(t)) return 6;
+                  if (/\b15h\b|\b15:00\b/.test(t)) return 4;
+                  if (/19h?30|19:30/.test(t)) return 7;
+                }
+                return null;
+              };
+              const eventMinisters = eventMinisterCounts[question.id] || inferFromText(question.question) || massInfo.minMinisters || 7;
               specialMasses.push({
                 id: `custom-${question.id}`,
                 dayOfWeek: massInfo.dayOfWeek,
                 time: massInfo.time,
                 date: massInfo.date,
-                minMinisters: massInfo.minMinisters || 7,
-                maxMinisters: massInfo.maxMinisters || 7,
+                minMinisters: eventMinisters,
+                maxMinisters: eventMinisters,
                 type: question.id,
                 // Usar o ID da pergunta como tipo
                 description: question.metadata?.eventName || question.question
@@ -4910,14 +5234,14 @@ ${"!".repeat(60)}`);
        * 🔧 FIX 2026-01-30: Suporta anos com 2 ou 4 dígitos (ex: "18/02/26" ou "18/02/2026")
        */
       extractMassInfoFromQuestion(question, year, month) {
-        const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+        const dateMatch = question.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
         if (!dateMatch) {
           console.log(`[EXTRACT_MASS_INFO] \u26A0\uFE0F No date found in: ${question.substring(0, 80)}...`);
           return null;
         }
         const day = parseInt(dateMatch[1]);
         const monthFromQuestion = parseInt(dateMatch[2]);
-        let yearFromQuestion = parseInt(dateMatch[3]);
+        let yearFromQuestion = dateMatch[3] ? parseInt(dateMatch[3]) : year;
         if (yearFromQuestion < 100) {
           yearFromQuestion = 2e3 + yearFromQuestion;
           console.log(`[EXTRACT_MASS_INFO] \u{1F4C5} Converted 2-digit year: ${dateMatch[3]} \u2192 ${yearFromQuestion}`);
@@ -4996,8 +5320,18 @@ ${"!".repeat(60)}`);
               "missa_dominical",
               "missa_diaria"
             ];
+            const isCustomType = (t) => !!t && t.startsWith("custom_");
             let selected = conflicts[0];
             for (const mass of conflicts) {
+              const currentIsCustom = isCustomType(mass.type);
+              const selectedIsCustom = isCustomType(selected.type);
+              if (currentIsCustom && !selectedIsCustom) {
+                selected = mass;
+                continue;
+              }
+              if (!currentIsCustom && selectedIsCustom) {
+                continue;
+              }
               const currentPriority = priorityOrder.indexOf(mass.type || "missa_diaria");
               const selectedPriority = priorityOrder.indexOf(selected.type || "missa_diaria");
               if (currentPriority < selectedPriority) {
@@ -5017,7 +5351,7 @@ ${"!".repeat(60)}`);
         const startOfMonthDate = startOfMonth2(date2);
         let firstOccurrence = startOfMonthDate;
         while (getDay3(firstOccurrence) !== targetDayOfWeek) {
-          firstOccurrence = addDays2(firstOccurrence, 1);
+          firstOccurrence = addDays3(firstOccurrence, 1);
         }
         return format3(date2, "yyyy-MM-dd") === format3(firstOccurrence, "yyyy-MM-dd");
       }
@@ -5275,6 +5609,11 @@ ${"!".repeat(60)}`);
             return false;
           }
           if (massTime.dayOfWeek === 0) {
+            const isCustomSunday = massTime.type && (massTime.type.startsWith("custom_") || massTime.type.startsWith("special_event"));
+            if (isCustomSunday) {
+              console.log(`[AVAILABILITY_CHECK] \u2705 ${minister.name} dispon\xEDvel para missa custom de domingo (${massTime.type}) \u2014 pulando filtro availableSundays`);
+              return true;
+            }
             console.log(`[AVAILABILITY_CHECK] Verificando domingo ${massTime.date} ${massTime.time}`);
             const dateTimeKey = `${massTime.date} ${massTime.time}`;
             const dateOnlyKey = massTime.date;
@@ -5314,10 +5653,10 @@ ${"!".repeat(60)}`);
                       dateStr
                       // "05/10"
                     ];
-                    for (const format12 of possibleFormats) {
-                      if (availability.availableSundays.some((sunday) => sunday === format12)) {
+                    for (const format13 of possibleFormats) {
+                      if (availability.availableSundays.some((sunday) => sunday === format13)) {
                         availableForSunday = true;
-                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format12}`);
+                        console.log(`[AVAILABILITY_CHECK] Match encontrado no formato legado: ${format13}`);
                         break;
                       }
                     }
@@ -5410,11 +5749,17 @@ ${"!".repeat(60)}`);
           return hasAnyDailyAvailability;
         }
         const specialEvents3 = availability.specialEvents;
-        if (massType.startsWith("custom_") || massType.startsWith("healing_liberation") || massType.startsWith("sacred_heart") || massType.startsWith("immaculate_heart") || massType === "special_event_1" || massType.startsWith("adoration_")) {
+        if (massType.startsWith("custom_") || massType.startsWith("healing_liberation") || massType.startsWith("sacred_heart") || massType.startsWith("immaculate_heart") || massType === "special_event_1" || massType.startsWith("adoration_") || massType.startsWith("holy_thursday") || massType.startsWith("good_friday") || massType.startsWith("easter_vigil") || massType.startsWith("saint_judas_april")) {
           if (specialEvents3 && typeof specialEvents3 === "object") {
-            const response = specialEvents3[massType];
+            const v2KeyMap = {
+              "sacred_heart_mass": "first_friday",
+              "immaculate_heart_mass": "first_saturday",
+              "healing_liberation_mass": "healing_liberation"
+            };
+            const lookupKey = v2KeyMap[massType] || massType;
+            const response = specialEvents3[lookupKey] ?? specialEvents3[massType];
             const isAvailable = response === "Sim" || response === "sim" || response === true || response === "true" || response === 1;
-            console.log(`[SPECIAL_MASS] \u{1F3AF} ${ministerId} for CUSTOM event ${massType}: ${response} = ${isAvailable}`);
+            console.log(`[SPECIAL_MASS] \u{1F3AF} ${ministerId} for CUSTOM event ${massType} (lookup=${lookupKey}): ${response} = ${isAvailable}`);
             return isAvailable;
           }
           console.log(`[SPECIAL_MASS] \u274C ${ministerId}: No special events data for ${massType}`);
@@ -5557,6 +5902,9 @@ ${"!".repeat(60)}`);
         const targetCount = massTime.minMinisters;
         const MAX_MONTHLY_ASSIGNMENTS = 4;
         const isDailyMass = massTime.type === "missa_diaria";
+        const t = massTime.type || "";
+        const isSpecialEvent = t.startsWith("custom_") || t.startsWith("special_event") || t.endsWith("_mass") || t === "missa_sao_judas" || t === "missa_sao_judas_festa" || t === "missa_sao_judas_mensal" || t === "missa_cura_libertacao" || t === "missa_sagrado_coracao" || t === "missa_imaculado_coracao" || t === "missa_finados" || t === "missa_puc";
+        const skipMonthlyLimit = isDailyMass || isSpecialEvent;
         const isSunday2 = massTime.dayOfWeek === 0;
         console.log(`
 [FAIR_ALGORITHM] ========================================`);
@@ -5590,7 +5938,7 @@ ${"!".repeat(60)}`);
           if (!minister.id) return false;
           const assignmentCount = minister.monthlyAssignmentCount || 0;
           const alreadyServedToday = minister.lastAssignedDate === massTime.date;
-          if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
+          if (!skipMonthlyLimit && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) {
             console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: LIMIT REACHED (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS})`);
             return false;
           }
@@ -5598,14 +5946,28 @@ ${"!".repeat(60)}`);
             console.log(`[FAIR_ALGORITHM] \u274C ${minister.name}: ALREADY SERVED TODAY (${massTime.date})`);
             return false;
           }
-          if (isDailyMass) {
-            console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible for DAILY MASS (${assignmentCount} total assignments)`);
+          if (skipMonthlyLimit) {
+            console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible for ${isDailyMass ? "DAILY" : "SPECIAL"} MASS (${assignmentCount} total assignments)`);
           } else {
             console.log(`[FAIR_ALGORITHM] \u2705 ${minister.name}: Eligible (${assignmentCount}/${MAX_MONTHLY_ASSIGNMENTS} assignments)`);
           }
           return true;
         });
         console.log(`[FAIR_ALGORITHM] Eligible after filters: ${eligible.length}/${available.length}`);
+        if (eligible.length === 0 && isSunday2 && tierB.length > 0) {
+          console.log(`[SUNDAY_PRIORITY] \u26A0\uFE0F Tier A eligible empty \u2014 pulling from Tier B early`);
+          const tierBEligible = tierB.filter((minister) => {
+            if (!minister.id) return false;
+            const cnt = minister.monthlyAssignmentCount || 0;
+            if (!skipMonthlyLimit && cnt >= MAX_MONTHLY_ASSIGNMENTS) return false;
+            if (minister.lastAssignedDate === massTime.date) return false;
+            return true;
+          });
+          if (tierBEligible.length > 0) {
+            console.log(`[SUNDAY_PRIORITY] \u2705 ${tierBEligible.length} Tier B ministers eligible \u2014 using as primary pool`);
+            eligible.push(...tierBEligible);
+          }
+        }
         if (eligible.length === 0) {
           logger.error(`[FAIR_ALGORITHM] \u274C NO ELIGIBLE MINISTERS for ${massTime.date} ${massTime.time}!`);
           return [];
@@ -5697,7 +6059,7 @@ ${"!".repeat(60)}`);
               if (!minister.id) return false;
               const assignmentCount = minister.monthlyAssignmentCount || 0;
               const alreadyServedToday = minister.lastAssignedDate === massTime.date;
-              if (!isDailyMass && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
+              if (!skipMonthlyLimit && assignmentCount >= MAX_MONTHLY_ASSIGNMENTS) return false;
               if (alreadyServedToday) return false;
               if (used.has(minister.id)) return false;
               return true;
@@ -5736,10 +6098,36 @@ ${"!".repeat(60)}`);
             }
           }
           if (selected.length < targetCount) {
+            const stillNeeded = targetCount - selected.length;
+            console.log(`[FILL_TO_MIN] \u{1F198} Slot abaixo do m\xEDnimo (${selected.length}/${targetCount}), for\xE7ando preenchimento de ${stillNeeded} vagas...`);
+            const fillCandidates = available.filter((m) => {
+              if (!m.id) return false;
+              if (used.has(m.id)) return false;
+              if (m.lastAssignedDate === massTime.date) return false;
+              return true;
+            });
+            fillCandidates.sort((a, b) => {
+              const ca = a.monthlyAssignmentCount || 0;
+              const cb = b.monthlyAssignmentCount || 0;
+              if (ca !== cb) return ca - cb;
+              return (a.totalServices || 0) - (b.totalServices || 0);
+            });
+            for (const minister of fillCandidates) {
+              if (selected.length >= targetCount) break;
+              if (!minister.id) continue;
+              selected.push(minister);
+              used.add(minister.id);
+              minister.monthlyAssignmentCount = (minister.monthlyAssignmentCount || 0) + 1;
+              minister.lastAssignedDate = massTime.date;
+              console.log(`[FILL_TO_MIN] \u2705 Adicionado ${minister.name} (count agora ${minister.monthlyAssignmentCount}, ignorando limite/familia)`);
+            }
+            console.log(`[FILL_TO_MIN] \u{1F4CA} Ap\xF3s fill-to-min: ${selected.length}/${targetCount}`);
+          }
+          if (selected.length < targetCount) {
             const finalShortage = targetCount - selected.length;
             logger.warn(`\u26A0\uFE0F [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${finalShortage})`);
             console.log(`[FAIR_ALGORITHM] \u26A0\uFE0F INCOMPLETE: ${selected.length}/${targetCount}`);
-            console.log(`[FAIR_ALGORITHM] Reason: Only ${eligible.length} eligible ministers available`);
+            console.log(`[FAIR_ALGORITHM] Reason: Only ${available.length} ministers available in pool`);
             selected.forEach((m) => {
               m.scheduleIncomplete = true;
               m.requiredCount = targetCount;
@@ -5751,8 +6139,8 @@ ${"!".repeat(60)}`);
         }
         const distributionMap = /* @__PURE__ */ new Map();
         this.ministers.forEach((m) => {
-          const count13 = m.monthlyAssignmentCount || 0;
-          distributionMap.set(count13, (distributionMap.get(count13) || 0) + 1);
+          const count14 = m.monthlyAssignmentCount || 0;
+          distributionMap.set(count14, (distributionMap.get(count14) || 0) + 1);
         });
         console.log(`[FAIR_ALGORITHM] \u{1F4CA} Current monthly distribution:`);
         for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
@@ -5847,9 +6235,9 @@ ${"!".repeat(60)}`);
         try {
           const patterns = await this.db.select().from(learnedPatterns).where(
             and8(
-              eq13(learnedPatterns.isActive, true),
+              eq14(learnedPatterns.isActive, true),
               or6(
-                eq13(learnedPatterns.massType, massType),
+                eq14(learnedPatterns.massType, massType),
                 isNull2(learnedPatterns.massType)
               )
             )
@@ -5955,7 +6343,7 @@ ${"!".repeat(60)}`);
         const firstDayOfMonth = new Date(year, month, 1);
         let firstMonday = new Date(firstDayOfMonth);
         while (firstMonday.getDay() !== 1) {
-          firstMonday = addDays2(firstMonday, 1);
+          firstMonday = addDays3(firstMonday, 1);
         }
         const daysDiff = Math.floor((date2.getTime() - firstMonday.getTime()) / (1e3 * 60 * 60 * 24));
         const weekNumber = Math.floor(daysDiff / 7) + 1;
@@ -5972,8 +6360,8 @@ ${"!".repeat(60)}`);
         try {
           const [draw] = await this.db.select().from(adorationDraws).where(
             and8(
-              eq13(adorationDraws.year, year),
-              eq13(adorationDraws.month, month)
+              eq14(adorationDraws.year, year),
+              eq14(adorationDraws.month, month)
             )
           ).limit(1);
           if (!draw) {
@@ -5985,8 +6373,8 @@ ${"!".repeat(60)}`);
             isVoluntary: adorationDrawResults.isVoluntary
           }).from(adorationDrawResults).where(
             and8(
-              eq13(adorationDrawResults.drawId, draw.id),
-              eq13(adorationDrawResults.mondayOfWeek, mondayOfWeek)
+              eq14(adorationDrawResults.drawId, draw.id),
+              eq14(adorationDrawResults.mondayOfWeek, mondayOfWeek)
             )
           );
           if (results.length === 0) {
@@ -5995,8 +6383,8 @@ ${"!".repeat(60)}`);
           }
           const ministerIds = results.map((r) => r.ministerId);
           const ministersData = await this.db.select().from(users).where(and8(
-            inArray2(users.id, ministerIds),
-            eq13(users.status, "active")
+            inArray4(users.id, ministerIds),
+            eq14(users.status, "active")
           ));
           const ministers = ministersData.map((m) => ({
             id: m.id,
@@ -6039,8 +6427,8 @@ __export(websocket_exports, {
   notifyUsers: () => notifyUsers
 });
 import { WebSocketServer, WebSocket } from "ws";
-import { eq as eq19, and as and14, gte as gte8, lte as lte7, sql as sql9, or as or8 } from "drizzle-orm";
-import { format as format7, addDays as addDays5 } from "date-fns";
+import { eq as eq21, and as and15, gte as gte9, lte as lte8, sql as sql9, or as or8 } from "drizzle-orm";
+import { format as format8, addDays as addDays5 } from "date-fns";
 function initializeWebSocket(httpServer) {
   wss = new WebSocketServer({
     server: httpServer,
@@ -6058,7 +6446,7 @@ function initializeWebSocket(httpServer) {
         if (data.type === "AUTH") {
           ws.userId = data.userId;
           ws.userRole = data.userRole;
-          if (ws.userRole === "coordenador" || ws.userRole === "gestor") {
+          if (isAdmin(ws.userRole)) {
             const alerts = await getCriticalAlerts();
             ws.send(JSON.stringify({
               type: "ALERT_UPDATE",
@@ -6110,9 +6498,9 @@ async function getCriticalAlerts() {
     time: schedules.time,
     vacancies: sql9`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
   }).from(schedules).where(
-    and14(
-      gte8(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte7(schedules.date, format7(next12Hours, "yyyy-MM-dd"))
+    and15(
+      gte9(schedules.date, format8(now, "yyyy-MM-dd")),
+      lte8(schedules.date, format8(next12Hours, "yyyy-MM-dd"))
     )
   ).groupBy(schedules.date, schedules.time).having(sql9`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
   const criticalWithHours = criticalMasses.map((m) => ({
@@ -6131,14 +6519,14 @@ async function getCriticalAlerts() {
     status: substitutionRequests.status,
     massDate: schedules.date,
     massTime: schedules.time
-  }).from(substitutionRequests).innerJoin(users, eq19(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq19(substitutionRequests.scheduleId, schedules.id)).where(
-    and14(
+  }).from(substitutionRequests).innerJoin(users, eq21(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq21(substitutionRequests.scheduleId, schedules.id)).where(
+    and15(
       or8(
-        eq19(substitutionRequests.status, "pending"),
-        eq19(substitutionRequests.status, "available")
+        eq21(substitutionRequests.status, "pending"),
+        eq21(substitutionRequests.status, "available")
       ),
-      gte8(schedules.date, format7(now, "yyyy-MM-dd")),
-      lte7(schedules.date, format7(next48Hours, "yyyy-MM-dd"))
+      gte9(schedules.date, format8(now, "yyyy-MM-dd")),
+      lte8(schedules.date, format8(next48Hours, "yyyy-MM-dd"))
     )
   ).orderBy(schedules.date);
   return {
@@ -6154,7 +6542,7 @@ async function broadcastCriticalAlerts() {
   try {
     const alerts = await getCriticalAlerts();
     clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+      if (client.readyState === WebSocket.OPEN && isAdmin(client.userRole)) {
         client.send(JSON.stringify({
           type: "ALERT_UPDATE",
           data: alerts,
@@ -6173,7 +6561,7 @@ function notifySubstitutionRequest(substitutionData) {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
   clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+    if (client.readyState === WebSocket.OPEN && isAdmin(client.userRole)) {
       client.send(JSON.stringify(message));
     }
   });
@@ -6185,7 +6573,7 @@ function notifyCriticalMass(massData) {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
   clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN && (client.userRole === "coordenador" || client.userRole === "gestor")) {
+    if (client.readyState === WebSocket.OPEN && isAdmin(client.userRole)) {
       client.send(JSON.stringify(message));
     }
   });
@@ -6207,10 +6595,10 @@ function notifyUsers(userIds, notificationData) {
     }
   });
 }
-function notifyUnreadCount(userId, count13) {
+function notifyUnreadCount(userId, count14) {
   const message = {
     type: "UNREAD_COUNT",
-    data: { count: count13 },
+    data: { count: count14 },
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
   const messageStr = JSON.stringify(message);
@@ -6241,7 +6629,7 @@ function broadcastAuxiliaryPanelUpdate(updateData) {
   };
   const messageStr = JSON.stringify(message);
   clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN && client.userId && (client.userRole === "coordenador" || client.userRole === "gestor" || client.userRole === "auxiliar")) {
+    if (client.readyState === WebSocket.OPEN && client.userId && (isAdmin(client.userRole) || client.userRole === "auxiliar")) {
       client.send(messageStr);
     }
   });
@@ -6252,6 +6640,7 @@ var init_websocket = __esm({
     "use strict";
     await init_db();
     init_schema();
+    init_roles();
     wss = null;
     clients = /* @__PURE__ */ new Set();
   }
@@ -6263,7 +6652,7 @@ __export(formation_seed_exports, {
   default: () => formation_seed_default,
   seedFormation: () => seedFormation
 });
-import { eq as eq28 } from "drizzle-orm";
+import { eq as eq30 } from "drizzle-orm";
 async function seedFormation() {
   console.log("\u{1F331} Starting formation seed...");
   try {
@@ -6293,7 +6682,7 @@ async function seedFormation() {
     ];
     console.log("\u{1F4DA} Inserting tracks...");
     for (const track of tracks) {
-      const existing = await db.select().from(formationTracks).where(eq28(formationTracks.id, track.id)).limit(1);
+      const existing = await db.select().from(formationTracks).where(eq30(formationTracks.id, track.id)).limit(1);
       if (existing.length === 0) {
         await db.insert(formationTracks).values(track);
         console.log(`  \u2713 Created track: ${track.title}`);
@@ -7797,9 +8186,9 @@ __export(whatsappHandler_exports, {
 });
 import axios from "axios";
 import OpenAI from "openai";
-import { eq as eq34, and as and26, gte as gte16, asc as asc3, or as or11 } from "drizzle-orm";
-import { format as format10, startOfDay } from "date-fns";
-import { ptBR as ptBR3 } from "date-fns/locale";
+import { eq as eq36, and as and27, gte as gte17, asc as asc3, or as or11 } from "drizzle-orm";
+import { format as format11, startOfDay } from "date-fns";
+import { ptBR as ptBR4 } from "date-fns/locale";
 async function sendWhatsappMessage(phone, message) {
   try {
     const instance = process.env.ZAPI_INSTANCE;
@@ -7837,14 +8226,14 @@ async function findMinisterByPhone(normalizedPhone) {
     status: users.status
   }).from(users).where(
     or11(
-      eq34(users.phone, normalizedPhone),
-      eq34(users.whatsapp, normalizedPhone)
+      eq36(users.phone, normalizedPhone),
+      eq36(users.whatsapp, normalizedPhone)
     )
   ).limit(1);
   return minister;
 }
 async function getNextSchedule(ministerId) {
-  const today = format10(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
+  const today = format11(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
   const [nextSchedule] = await db.select({
     id: schedules.id,
     date: schedules.date,
@@ -7852,9 +8241,9 @@ async function getNextSchedule(ministerId) {
     position: schedules.position,
     location: schedules.location
   }).from(schedules).where(
-    and26(
-      eq34(schedules.ministerId, ministerId),
-      gte16(schedules.date, today)
+    and27(
+      eq36(schedules.ministerId, ministerId),
+      gte17(schedules.date, today)
     )
   ).orderBy(asc3(schedules.date), asc3(schedules.time)).limit(1);
   if (!nextSchedule) {
@@ -7868,7 +8257,7 @@ async function getNextSchedule(ministerId) {
   };
 }
 async function getAvailableSubstitutions() {
-  const today = format10(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
+  const today = format11(startOfDay(/* @__PURE__ */ new Date()), "yyyy-MM-dd");
   const substitutions = await db.select({
     id: substitutionRequests.id,
     scheduleId: substitutionRequests.scheduleId,
@@ -7876,10 +8265,10 @@ async function getAvailableSubstitutions() {
     requesterName: users.name,
     date: schedules.date,
     time: schedules.time
-  }).from(substitutionRequests).innerJoin(users, eq34(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq34(substitutionRequests.scheduleId, schedules.id)).where(
-    and26(
-      eq34(substitutionRequests.status, "available"),
-      gte16(schedules.date, today)
+  }).from(substitutionRequests).innerJoin(users, eq36(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq36(substitutionRequests.scheduleId, schedules.id)).where(
+    and27(
+      eq36(substitutionRequests.status, "available"),
+      gte17(schedules.date, today)
     )
   ).orderBy(asc3(schedules.date)).limit(5);
   return substitutions;
@@ -7901,7 +8290,7 @@ async function handleMessage(message) {
     let resposta = "";
     if (normalizedText.startsWith("/escala") || normalizedText.startsWith("/proxima")) {
       if (proximaEscala) {
-        const dataFormatada = format10(new Date(proximaEscala.date), "dd 'de' MMMM", { locale: ptBR3 });
+        const dataFormatada = format11(new Date(proximaEscala.date), "dd 'de' MMMM", { locale: ptBR4 });
         resposta = `Paz e bem, ${ministro?.name ?? "ministro(a)"} \u{1F64F}
 
 Sua pr\xF3xima escala \xE9:
@@ -7925,7 +8314,7 @@ N\xE3o encontrei nenhum cadastro para este n\xFAmero de telefone. Por favor, ent
       } else {
         resposta = "\u{1F4CB} *Substitui\xE7\xF5es Dispon\xEDveis:*\n\n";
         for (const sub of substitutions) {
-          const dataFormatada = format10(new Date(sub.date), "dd/MM", { locale: ptBR3 });
+          const dataFormatada = format11(new Date(sub.date), "dd/MM", { locale: ptBR4 });
           resposta += `\u2022 ${dataFormatada} \xE0s ${sub.time} (${sub.requesterName})
   Motivo: ${sub.reason || "N\xE3o informado"}
 
@@ -7979,7 +8368,7 @@ Desculpe, n\xE3o consegui processar sua mensagem no momento. Tente novamente mai
 }
 async function sendScheduleNotification(ministerId, scheduleDate, scheduleTime, location, position) {
   try {
-    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq34(users.id, ministerId)).limit(1);
+    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq36(users.id, ministerId)).limit(1);
     if (!minister) {
       console.warn(`\u26A0\uFE0F Ministro ${ministerId} n\xE3o encontrado para notifica\xE7\xE3o WhatsApp`);
       return false;
@@ -7989,7 +8378,7 @@ async function sendScheduleNotification(ministerId, scheduleDate, scheduleTime, 
       console.warn(`\u26A0\uFE0F Ministro ${minister.name} n\xE3o possui n\xFAmero de telefone cadastrado`);
       return false;
     }
-    const dataFormatada = format10(new Date(scheduleDate), "dd 'de' MMMM", { locale: ptBR3 });
+    const dataFormatada = format11(new Date(scheduleDate), "dd 'de' MMMM", { locale: ptBR4 });
     const message = `Paz e bem, ${minister.name}! \u{1F64F}
 
 \u{1F4C5} *Voc\xEA foi escalado para a missa:*
@@ -8009,11 +8398,11 @@ Por favor, confirme sua presen\xE7a no sistema. Deus aben\xE7oe!`;
 }
 async function sendSubstitutionAlert(ministerId, requesterName, scheduleDate, scheduleTime, reason) {
   try {
-    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq34(users.id, ministerId)).limit(1);
+    const [minister] = await db.select({ name: users.name, phone: users.phone, whatsapp: users.whatsapp }).from(users).where(eq36(users.id, ministerId)).limit(1);
     if (!minister) return false;
     const phoneNumber = minister.whatsapp || minister.phone;
     if (!phoneNumber) return false;
-    const dataFormatada = format10(new Date(scheduleDate), "dd/MM", { locale: ptBR3 });
+    const dataFormatada = format11(new Date(scheduleDate), "dd/MM", { locale: ptBR4 });
     const message = `\u{1F6A8} *Pedido de Substitui\xE7\xE3o*
 
 ${requesterName} precisa de substitui\xE7\xE3o:
@@ -8047,15 +8436,16 @@ import helmet from "helmet";
 await init_storage();
 import { createServer } from "http";
 import cookieParser from "cookie-parser";
-import crypto2 from "crypto";
 
 // server/auth.ts
 await init_db();
 init_schema();
 init_nameFormatter();
+init_roles();
+await init_communityContext();
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { eq as eq3 } from "drizzle-orm";
+import { eq as eq4 } from "drizzle-orm";
 function getJWTSecret() {
   if (!process.env.JWT_SECRET) {
     throw new Error(
@@ -8081,7 +8471,8 @@ function generateToken(user) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role
+      role: user.role,
+      homeCommunityId: user.homeCommunityId
     },
     JWT_SECRET,
     {
@@ -8100,8 +8491,9 @@ function authenticateToken(req, res, next) {
         email: users.email,
         name: users.name,
         role: users.role,
-        status: users.status
-      }).from(users).where(eq3(users.id, user.id)).limit(1);
+        status: users.status,
+        homeCommunityId: users.homeCommunityId
+      }).from(users).where(eq4(users.id, user.id)).limit(1);
       if (!currentUser || currentUser.status !== "active") {
         return res.status(403).json({ message: "Conta inativa ou pendente. Entre em contato com a coordena\xE7\xE3o." });
       }
@@ -8109,7 +8501,8 @@ function authenticateToken(req, res, next) {
         id: currentUser.id,
         email: currentUser.email,
         name: currentUser.name,
-        role: currentUser.role
+        role: currentUser.role,
+        homeCommunityId: currentUser.homeCommunityId
       };
       next();
     } catch (error) {
@@ -8138,11 +8531,12 @@ function authenticateToken(req, res, next) {
   });
 }
 function requireRole(roles) {
+  const allowed = expandRoles(roles);
   return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    if (!roles.includes(req.user.role)) {
+    if (!allowed.includes(req.user.role)) {
       return res.status(403).json({ message: "Permiss\xE3o insuficiente para esta a\xE7\xE3o" });
     }
     next();
@@ -8151,7 +8545,7 @@ function requireRole(roles) {
 async function login(email, password) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const [user] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
+    const [user] = await db.select().from(users).where(eq4(users.email, normalizedEmail)).limit(1);
     if (!user) {
       throw new Error("Usu\xE1rio ou senha errados, revise os dados e tente novamente.");
     }
@@ -8168,7 +8562,7 @@ async function login(email, password) {
     }
     const token = generateToken(user);
     try {
-      await db.update(users).set({ lastLogin: /* @__PURE__ */ new Date() }).where(eq3(users.id, user.id));
+      await db.update(users).set({ lastLogin: /* @__PURE__ */ new Date() }).where(eq4(users.id, user.id));
     } catch (updateError) {
     }
     const { passwordHash: _, ...userWithoutPassword } = user;
@@ -8183,12 +8577,13 @@ async function login(email, password) {
 async function register(userData) {
   try {
     const normalizedEmail = userData.email.trim().toLowerCase();
-    const [existingUser] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
+    const [existingUser] = await db.select().from(users).where(eq4(users.email, normalizedEmail)).limit(1);
     if (existingUser) {
       throw new Error("Este email j\xE1 est\xE1 cadastrado");
     }
     const passwordHash = await hashPassword(userData.password);
     const formattedName = formatName(userData.name);
+    const homeCommunityId = await getMatrizCommunityId();
     const [newUser] = await db.insert(users).values({
       email: normalizedEmail,
       passwordHash,
@@ -8197,7 +8592,8 @@ async function register(userData) {
       role: userData.role || "ministro",
       status: userData.status || "pending",
       observations: userData.observations || null,
-      requiresPasswordChange: false
+      requiresPasswordChange: false,
+      homeCommunityId
     }).returning();
     const { passwordHash: _, ...userWithoutPassword } = newUser;
     return userWithoutPassword;
@@ -8207,7 +8603,7 @@ async function register(userData) {
 }
 async function changePassword(userId, currentPassword, newPassword) {
   try {
-    const [user] = await db.select().from(users).where(eq3(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq4(users.id, userId)).limit(1);
     if (!user) {
       throw new Error("Usu\xE1rio n\xE3o encontrado");
     }
@@ -8220,7 +8616,7 @@ async function changePassword(userId, currentPassword, newPassword) {
       passwordHash: newPasswordHash,
       requiresPasswordChange: false,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq3(users.id, userId));
+    }).where(eq4(users.id, userId));
     return { message: "Senha alterada com sucesso" };
   } catch (error) {
     throw error;
@@ -8229,7 +8625,7 @@ async function changePassword(userId, currentPassword, newPassword) {
 async function resetPassword(email) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const [user] = await db.select().from(users).where(eq3(users.email, normalizedEmail)).limit(1);
+    const [user] = await db.select().from(users).where(eq4(users.email, normalizedEmail)).limit(1);
     if (!user) {
       return { message: "Se o email existir em nosso sistema, voc\xEA receber\xE1 instru\xE7\xF5es para redefinir sua senha." };
     }
@@ -8240,7 +8636,7 @@ async function resetPassword(email) {
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq3(users.id, user.id));
+    }).where(eq4(users.id, user.id));
     const { sendPasswordResetEmail: sendPasswordResetEmail2, getEmailProviderName: getEmailProviderName2 } = await Promise.resolve().then(() => (init_emailService(), emailService_exports));
     const emailResult = await sendPasswordResetEmail2(
       user.email,
@@ -8260,16 +8656,41 @@ async function resetPassword(email) {
 
 // server/authRoutes.ts
 import { Router as Router2 } from "express";
+
+// server/config/admins.ts
+var ADMIN_USER_IDS = [
+  // Marco Rossit (rossit@icloud.com) — owner / superadmin
+  "629a3fcc-96e2-4ac1-881f-2c8726fbd9d3"
+];
+function isAdminUser(userId) {
+  if (!userId) return false;
+  return ADMIN_USER_IDS.includes(userId);
+}
+function requireAdminUser() {
+  return (req, res, next) => {
+    const userId = req.user?.id;
+    if (!isAdminUser(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Acesso restrito \u2014 funcionalidade em fase de teste"
+      });
+    }
+    next();
+  };
+}
+
+// server/authRoutes.ts
+init_roles();
 await init_db();
 init_schema();
 import { z } from "zod";
-import { eq as eq6 } from "drizzle-orm";
+import { eq as eq7 } from "drizzle-orm";
 
 // server/routes/session.ts
 await init_db();
 init_schema();
 import { Router } from "express";
-import { eq as eq4, and as and2, sql as sql3 } from "drizzle-orm";
+import { eq as eq5, and as and2, sql as sql3 } from "drizzle-orm";
 import { nanoid } from "nanoid";
 var router = Router();
 var INACTIVITY_TIMEOUT_MINUTES = 10;
@@ -8291,8 +8712,8 @@ async function createSession(userId, ipAddress, userAgent) {
   try {
     await db.update(activeSessions).set({ isActive: false }).where(
       and2(
-        eq4(activeSessions.userId, userId),
-        eq4(activeSessions.isActive, true)
+        eq5(activeSessions.userId, userId),
+        eq5(activeSessions.isActive, true)
       )
     );
     await db.insert(activeSessions).values({
@@ -8313,7 +8734,7 @@ router.post("/destroy", async (req, res) => {
   const sessionToken = req.cookies?.session_token || req.body.sessionToken;
   if (sessionToken) {
     try {
-      await db.update(activeSessions).set({ isActive: false }).where(eq4(activeSessions.sessionToken, sessionToken));
+      await db.update(activeSessions).set({ isActive: false }).where(eq5(activeSessions.sessionToken, sessionToken));
       console.log("[SESSION] \u{1F6AA} Destroyed - Token:", sessionToken.substring(0, 10) + "...");
     } catch (error) {
       console.error("[SESSION] Error destroying:", error);
@@ -8326,13 +8747,13 @@ router.get("/cleanup", async (req, res) => {
   try {
     const inactiveResult = await db.update(activeSessions).set({ isActive: false }).where(
       and2(
-        eq4(activeSessions.isActive, true),
+        eq5(activeSessions.isActive, true),
         sql3`EXTRACT(EPOCH FROM (NOW() - ${activeSessions.lastActivityAt})) / 60 > ${INACTIVITY_TIMEOUT_MINUTES}`
       )
     ).returning({ id: activeSessions.id });
     const deleteResult = await db.delete(activeSessions).where(
       and2(
-        eq4(activeSessions.isActive, false),
+        eq5(activeSessions.isActive, false),
         sql3`${activeSessions.createdAt} < NOW() - INTERVAL '30 days'`
       )
     ).returning({ id: activeSessions.id });
@@ -8353,7 +8774,7 @@ var session_default = router;
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq5 } from "drizzle-orm";
+import { eq as eq6 } from "drizzle-orm";
 function sanitizeAuditData(data) {
   if (!data || typeof data !== "object") {
     return data;
@@ -8447,7 +8868,7 @@ async function auditLoginAttempt(email, success, req, reason, userId) {
   let resolvedUserId = userId;
   if (!resolvedUserId) {
     try {
-      const [foundUser] = await db.select({ id: users.id }).from(users).where(eq5(users.email, normalizedEmail)).limit(1);
+      const [foundUser] = await db.select({ id: users.id }).from(users).where(eq6(users.email, normalizedEmail)).limit(1);
       resolvedUserId = foundUser?.id;
     } catch (error) {
       logger.warn("[AUDIT] Failed to resolve userId for login attempt", {
@@ -8516,7 +8937,7 @@ var registerSchema = z.object({
   password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   phone: z.string().optional(),
-  role: z.enum(["gestor", "coordenador", "ministro"]).optional()
+  role: z.enum(["gestor", "reitor", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "ministro"]).optional()
 });
 var publicRegisterSchema = z.object({
   email: z.string().email("Email inv\xE1lido"),
@@ -8620,13 +9041,13 @@ router2.post("/register", async (req, res) => {
 router2.post("/admin-register", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const userData = registerSchema.parse(req.body);
-    if ((userData.role === "gestor" || userData.role === "coordenador") && req.user?.role !== "gestor") {
+    if (isAdmin(userData.role) && req.user?.role !== "gestor") {
       return res.status(403).json({
         success: false,
         message: "Apenas gestores podem criar coordenadores ou outros gestores"
       });
     }
-    if (req.user?.role === "coordenador" && userData.role !== "ministro") {
+    if (isCoordinator(req.user?.role) && userData.role !== "ministro") {
       return res.status(403).json({
         success: false,
         message: "Coordenadores s\xF3 podem criar ministros"
@@ -8697,7 +9118,7 @@ router2.get("/me", authenticateToken, async (req, res) => {
       lastName: users.lastName,
       phone: users.phone,
       photoUrl: users.photoUrl
-    }).from(users).where(eq6(users.id, userId)).limit(1);
+    }).from(users).where(eq7(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -8706,7 +9127,10 @@ router2.get("/me", authenticateToken, async (req, res) => {
     }
     res.json({
       success: true,
-      user
+      user: {
+        ...user,
+        isAdmin: isAdminUser(user.id)
+      }
     });
   } catch (error) {
     console.error("Erro ao buscar dados do usu\xE1rio:", error);
@@ -8714,8 +9138,9 @@ router2.get("/me", authenticateToken, async (req, res) => {
       success: true,
       user: {
         ...req.user,
-        status: "active"
+        status: "active",
         // Adiciona status padrão em caso de erro
+        isAdmin: isAdminUser(req.user?.id)
       }
     });
   }
@@ -8744,7 +9169,7 @@ router2.post("/logout", authenticateToken, async (req, res) => {
   if (sessionToken) {
     try {
       const { activeSessions: activeSessions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.update(activeSessions2).set({ isActive: false }).where(eq6(activeSessions2.sessionToken, sessionToken));
+      await db.update(activeSessions2).set({ isActive: false }).where(eq7(activeSessions2.sessionToken, sessionToken));
       console.log("[AUTH] Sess\xE3o marcada como inativa no logout");
     } catch (error) {
       console.error("[AUTH] Erro ao inativar sess\xE3o:", error);
@@ -8817,7 +9242,7 @@ var emailResetSchema = z.object({
 router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId, newPassword } = adminResetSchema.parse(req.body);
-    const [user] = await db.select().from(users).where(eq6(users.id, userId)).limit(1);
+    const [user] = await db.select().from(users).where(eq7(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -8825,7 +9250,7 @@ router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", 
       });
     }
     const currentUser = req.user;
-    if (currentUser?.role === "coordenador" && user.role === "gestor") {
+    if (isCoordinator(currentUser?.role) && user.role === "gestor") {
       return res.status(403).json({
         success: false,
         message: "Coordenadores n\xE3o podem resetar senha de gestores"
@@ -8836,7 +9261,7 @@ router2.post("/admin-reset-password", authenticateToken, requireRole(["gestor", 
       passwordHash,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq6(users.id, userId));
+    }).where(eq7(users.id, userId));
     await logAudit("USER_UPDATE" /* USER_UPDATE */, {
       userId: currentUser?.id,
       targetUserId: userId,
@@ -8917,7 +9342,8 @@ var authRoutes_default = router2;
 await init_db();
 init_schema();
 import { Router as Router3 } from "express";
-import { eq as eq7, and as and3, or as or2, desc as desc2 } from "drizzle-orm";
+import { eq as eq8, and as and3, desc as desc2, inArray as inArray2 } from "drizzle-orm";
+init_roles();
 var router3 = Router3();
 router3.post("/request-reset", async (req, res) => {
   try {
@@ -8928,7 +9354,7 @@ router3.post("/request-reset", async (req, res) => {
         message: "Email \xE9 obrigat\xF3rio"
       });
     }
-    const [user] = await db.select().from(users).where(eq7(users.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq8(users.email, email)).limit(1);
     if (!user) {
       return res.json({
         success: true,
@@ -8937,8 +9363,8 @@ router3.post("/request-reset", async (req, res) => {
     }
     const [existingRequest] = await db.select().from(passwordResetRequests).where(
       and3(
-        eq7(passwordResetRequests.userId, user.id),
-        eq7(passwordResetRequests.status, "pending")
+        eq8(passwordResetRequests.userId, user.id),
+        eq8(passwordResetRequests.status, "pending")
       )
     ).limit(1);
     if (existingRequest) {
@@ -8954,12 +9380,9 @@ router3.post("/request-reset", async (req, res) => {
     });
     const coordinators = await db.select().from(users).where(
       and3(
-        eq7(users.status, "active"),
-        // Notifica tanto coordenadores quanto gestores
-        or2(
-          eq7(users.role, "coordenador"),
-          eq7(users.role, "gestor")
-        )
+        eq8(users.status, "active"),
+        // Notifica todas as variantes de coordenador + gestor/reitor
+        inArray2(users.role, [...ADMIN_ROLES])
       )
     );
     for (const coordinator of coordinators) {
@@ -8994,7 +9417,7 @@ router3.get("/pending-requests", async (req, res) => {
       requestedAt: passwordResetRequests.requestedAt,
       reason: passwordResetRequests.reason,
       status: passwordResetRequests.status
-    }).from(passwordResetRequests).leftJoin(users, eq7(passwordResetRequests.userId, users.id)).where(eq7(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
+    }).from(passwordResetRequests).leftJoin(users, eq8(passwordResetRequests.userId, users.id)).where(eq8(passwordResetRequests.status, "pending")).orderBy(desc2(passwordResetRequests.requestedAt));
     res.json({ success: true, requests });
   } catch (error) {
     console.error("Erro ao buscar solicita\xE7\xF5es:", error);
@@ -9008,7 +9431,7 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq7(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq8(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -9022,13 +9445,13 @@ router3.post("/approve-reset/:requestId", async (req, res) => {
       passwordHash: hashedPassword,
       requiresPasswordChange: true,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq7(users.id, request.userId));
+    }).where(eq8(users.id, request.userId));
     await db.update(passwordResetRequests).set({
       status: "approved",
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes: adminNotes || "Senha resetada pelo administrador"
-    }).where(eq7(passwordResetRequests.id, requestId));
+    }).where(eq8(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Senha Resetada",
@@ -9056,7 +9479,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
   try {
     const { requestId } = req.params;
     const { adminId, adminNotes } = req.body;
-    const [request] = await db.select().from(passwordResetRequests).where(eq7(passwordResetRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(passwordResetRequests).where(eq8(passwordResetRequests.id, requestId)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -9068,7 +9491,7 @@ router3.post("/reject-reset/:requestId", async (req, res) => {
       processedBy: adminId,
       processedAt: /* @__PURE__ */ new Date(),
       adminNotes
-    }).where(eq7(passwordResetRequests.id, requestId));
+    }).where(eq8(passwordResetRequests.id, requestId));
     await db.insert(notifications).values({
       userId: request.userId,
       title: "Solicita\xE7\xE3o de Reset Negada",
@@ -9275,7 +9698,7 @@ await init_db();
 init_schema();
 import { Router as Router4 } from "express";
 import { z as z2 } from "zod";
-import { eq as eq8, and as and4, or as or3, ne, gte as gte2, lte as lte2 } from "drizzle-orm";
+import { eq as eq9, and as and4, ne, gte as gte2, lte as lte2, inArray as inArray3 } from "drizzle-orm";
 
 // server/utils/questionnaireGenerator.ts
 init_logger();
@@ -9393,6 +9816,132 @@ var LITURGICAL_THEMES = {
     patron: "Menino Jesus"
   }
 };
+
+// server/utils/liturgicalCalculations.ts
+function calculateEaster(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = (h + l - 7 * m + 114) % 31 + 1;
+  return new Date(year, month - 1, day);
+}
+function getLiturgicalCycle(year) {
+  const remainder = year % 3;
+  if (remainder === 0) return "A";
+  if (remainder === 1) return "B";
+  return "C";
+}
+function getAdventStart(year) {
+  const christmas = new Date(year, 11, 25);
+  const dayOfWeek = christmas.getDay();
+  const daysToSunday = dayOfWeek === 0 ? 7 : dayOfWeek;
+  const daysBack = 28 + daysToSunday;
+  const adventStart = new Date(year, 11, 25 - daysBack);
+  return adventStart;
+}
+function getMovableFeasts(year) {
+  const easter = calculateEaster(year);
+  return {
+    ashWednesday: addDays(easter, -46),
+    palmSunday: addDays(easter, -7),
+    holyThursday: addDays(easter, -3),
+    goodFriday: addDays(easter, -2),
+    holySaturday: addDays(easter, -1),
+    easterSunday: easter,
+    divineMercySunday: addDays(easter, 7),
+    ascension: addDays(easter, 39),
+    // or 43 in some regions
+    pentecost: addDays(easter, 49),
+    trinitySunday: addDays(easter, 56),
+    corpusChristi: addDays(easter, 60)
+    // or next Sunday in some regions
+  };
+}
+function getLiturgicalSeasons(year) {
+  const adventStart = getAdventStart(year);
+  const christmas = new Date(year, 11, 25);
+  const epiphany = new Date(year + 1, 0, 6);
+  const baptismOfTheLord = getNextSunday(epiphany);
+  const movableFeasts = getMovableFeasts(year + 1);
+  const ashWednesday = movableFeasts.ashWednesday;
+  const easterSunday = movableFeasts.easterSunday;
+  const pentecost = movableFeasts.pentecost;
+  const nextAdventStart = getAdventStart(year + 1);
+  return [
+    {
+      name: "Advent",
+      color: "purple",
+      startDate: adventStart,
+      endDate: addDays(christmas, -1)
+    },
+    {
+      name: "Christmas",
+      color: "white",
+      startDate: christmas,
+      endDate: baptismOfTheLord
+    },
+    {
+      name: "Ordinary Time I",
+      color: "green",
+      startDate: addDays(baptismOfTheLord, 1),
+      endDate: addDays(ashWednesday, -1)
+    },
+    {
+      name: "Lent",
+      color: "purple",
+      startDate: ashWednesday,
+      endDate: addDays(easterSunday, -1)
+    },
+    {
+      name: "Easter",
+      color: "white",
+      startDate: easterSunday,
+      endDate: pentecost
+    },
+    {
+      name: "Ordinary Time II",
+      color: "green",
+      startDate: addDays(pentecost, 1),
+      endDate: addDays(nextAdventStart, -1)
+    }
+  ];
+}
+function addDays(date2, days) {
+  const result = new Date(date2);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+function getNextSunday(date2) {
+  const result = new Date(date2);
+  const daysUntilSunday = (7 - result.getDay()) % 7;
+  result.setDate(result.getDate() + (daysUntilSunday === 0 ? 7 : daysUntilSunday));
+  return result;
+}
+function getCurrentLiturgicalSeason(date2 = /* @__PURE__ */ new Date()) {
+  const year = date2.getFullYear();
+  const seasons = getLiturgicalSeasons(year - 1);
+  seasons.push(...getLiturgicalSeasons(year));
+  const currentSeason = seasons.find(
+    (season) => date2 >= season.startDate && date2 <= season.endDate
+  );
+  if (!currentSeason) {
+    return { name: "Ordinary Time", color: "green", cycle: getLiturgicalCycle(year) };
+  }
+  return {
+    ...currentSeason,
+    cycle: getLiturgicalCycle(year)
+  };
+}
 
 // server/utils/questionnaireGenerator.ts
 function getFirstThursdayOfMonth(month, year) {
@@ -9815,6 +10364,126 @@ function generateQuestionnaireQuestions(month, year) {
       order: 9.7
     });
   }
+  const movableFeasts = getMovableFeasts(year);
+  const holyThursdayMonth = movableFeasts.holyThursday.getMonth() + 1;
+  const goodFridayMonth = movableFeasts.goodFriday.getMonth() + 1;
+  const holySaturdayMonth = movableFeasts.holySaturday.getMonth() + 1;
+  if (holyThursdayMonth === month) {
+    const htDay = movableFeasts.holyThursday.getDate().toString().padStart(2, "0");
+    const htMonth = holyThursdayMonth.toString().padStart(2, "0");
+    questions.push({
+      id: "holy_thursday_mass",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Missa do Lava-p\xE9s \u2013 Quinta-feira Santa (${htDay}/${htMonth}) \xE0s 19h30?`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: `${htDay}/${htMonth}`,
+        eventName: "Missa do Lava-p\xE9s \u2013 Quinta-feira Santa",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.01
+    });
+  }
+  if (goodFridayMonth === month) {
+    const gfDay = movableFeasts.goodFriday.getDate().toString().padStart(2, "0");
+    const gfMonth = goodFridayMonth.toString().padStart(2, "0");
+    questions.push({
+      id: "good_friday_celebration",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Sexta-feira Santa \u2013 Adora\xE7\xE3o da Cruz e Comunh\xE3o (${gfDay}/${gfMonth}) \xE0s 14h? (Participa\xE7\xE3o de todos os ministros)`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: `${gfDay}/${gfMonth}`,
+        eventName: "Sexta-feira Santa \u2013 Adora\xE7\xE3o da Cruz e Comunh\xE3o",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.02
+    });
+  }
+  if (holySaturdayMonth === month) {
+    const hsDay = movableFeasts.holySaturday.getDate().toString().padStart(2, "0");
+    const hsMonth = holySaturdayMonth.toString().padStart(2, "0");
+    questions.push({
+      id: "easter_vigil_mass",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Missa da Vig\xEDlia Pascal \u2013 S\xE1bado Santo (${hsDay}/${hsMonth}) \xE0s 18h?`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: `${hsDay}/${hsMonth}`,
+        eventName: "Missa da Vig\xEDlia Pascal \u2013 S\xE1bado Santo",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.03
+    });
+  }
+  if (month === 4) {
+    questions.push({
+      id: "saint_judas_april_7h",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Missa de S\xE3o Judas Tadeu - 28/04/${year} \xE0s 7h?`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: "28/04",
+        eventName: "Missa de S\xE3o Judas Tadeu - 7h",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.11
+    });
+    questions.push({
+      id: "saint_judas_april_15h",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Missa de S\xE3o Judas Tadeu - 28/04/${year} \xE0s 15h?`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: "28/04",
+        eventName: "Missa de S\xE3o Judas Tadeu - 15h",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.12
+    });
+    questions.push({
+      id: "saint_judas_april_19h30",
+      type: "multiple_choice",
+      question: `Voc\xEA pode servir na Missa de S\xE3o Judas Tadeu - 28/04/${year} \xE0s 19h30?`,
+      options: ["Sim", "N\xE3o"],
+      required: false,
+      category: "special_event",
+      metadata: {
+        eventDate: "28/04",
+        eventName: "Missa de S\xE3o Judas Tadeu - 19h30",
+        dependsOn: "monthly_availability",
+        showIf: "Sim",
+        alternativeDependsOn: "alternative_availability",
+        alternativeShowIf: "Sim"
+      },
+      order: 9.13
+    });
+  }
   const specialEvents3 = getSpecialEvents(month, year);
   const filteredEvents = specialEvents3.filter((event) => {
     if (month === 10 && event.name.includes("S\xE3o Judas Tadeu")) {
@@ -9913,6 +10582,7 @@ function getSpecialEvents(month, year) {
 }
 
 // server/routes/questionnaireAdmin.ts
+init_roles();
 await init_storage();
 await init_pushNotifications();
 init_logger();
@@ -10073,8 +10743,8 @@ router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -10090,6 +10760,7 @@ router4.get("/current", authenticateToken, requireRole(["gestor", "coordenador"]
       questions,
       status: "active",
       createdById: userId,
+      communityId: req.user.homeCommunityId,
       targetUserIds: [],
       notifiedUserIds: []
     }).returning();
@@ -10105,8 +10776,8 @@ router4.get("/templates/:year/:month", authenticateToken, requireRole(["gestor",
   const { year, month } = params;
   try {
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (template) {
@@ -10139,8 +10810,8 @@ router4.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
     const { month, year } = schema.parse(req.body);
     const userId = req.user?.id || req.session?.userId;
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
       // Ignorar templates deletados
     ));
@@ -10172,6 +10843,7 @@ router4.post("/templates/generate", authenticateToken, requireRole(["gestor", "c
       // JSONB não precisa stringify
       status: "draft",
       createdById: userId,
+      communityId: req.user.homeCommunityId,
       targetUserIds: [],
       // JSONB não precisa stringify
       notifiedUserIds: []
@@ -10230,8 +10902,8 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, data.month),
-      eq8(questionnaires.year, data.year)
+      eq9(questionnaires.month, data.month),
+      eq9(questionnaires.year, data.year)
     ));
     if (existingTemplate) {
       const currentVersion = existingTemplate.version ?? 1;
@@ -10256,8 +10928,8 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
             version: currentVersion + 1,
             updatedAt: /* @__PURE__ */ new Date()
           }).where(and4(
-            eq8(questionnaires.id, existingTemplate.id),
-            eq8(questionnaires.version, currentVersion)
+            eq9(questionnaires.id, existingTemplate.id),
+            eq9(questionnaires.version, currentVersion)
           )).returning();
           if (!updated2) {
             return res.status(409).json({
@@ -10282,8 +10954,8 @@ router4.post("/templates", authenticateToken, requireRole(["gestor", "coordenado
         version: currentVersion + 1,
         updatedAt: /* @__PURE__ */ new Date()
       }).where(and4(
-        eq8(questionnaires.id, existingTemplate.id),
-        eq8(questionnaires.version, currentVersion)
+        eq9(questionnaires.id, existingTemplate.id),
+        eq9(questionnaires.version, currentVersion)
       )).returning();
       if (!updated) {
         return res.status(409).json({
@@ -10342,8 +11014,8 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
     });
     const questionData = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -10370,8 +11042,8 @@ router4.post("/templates/:year/:month/questions", authenticateToken, requireRole
       version: currentVersion + 1,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(and4(
-      eq8(questionnaires.id, template.id),
-      eq8(questionnaires.version, currentVersion)
+      eq9(questionnaires.id, template.id),
+      eq9(questionnaires.version, currentVersion)
     )).returning();
     if (!updated) {
       return res.status(409).json({
@@ -10401,8 +11073,8 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
     });
     const updates = schema.parse(req.body);
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -10425,8 +11097,8 @@ router4.put("/templates/:year/:month/questions/:questionId", authenticateToken, 
       version: currentVersion + 1,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(and4(
-      eq8(questionnaires.id, template.id),
-      eq8(questionnaires.version, currentVersion)
+      eq9(questionnaires.id, template.id),
+      eq9(questionnaires.version, currentVersion)
     )).returning();
     if (!updated) {
       return res.status(409).json({
@@ -10450,8 +11122,8 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
   const questionId = req.params.questionId;
   try {
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -10469,8 +11141,8 @@ router4.delete("/templates/:year/:month/questions/:questionId", authenticateToke
       version: currentVersion + 1,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(and4(
-      eq8(questionnaires.id, template.id),
-      eq8(questionnaires.version, currentVersion)
+      eq9(questionnaires.id, template.id),
+      eq9(questionnaires.version, currentVersion)
     )).returning();
     if (!updated) {
       return res.status(409).json({
@@ -10506,8 +11178,8 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -10538,15 +11210,15 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
     };
-    const [updated] = await db.update(questionnaires).set(updateData).where(eq8(questionnaires.id, template.id)).returning();
+    const [updated] = await db.update(questionnaires).set(updateData).where(eq9(questionnaires.id, template.id)).returning();
     const isResend = template.status === "sent" && resend;
     const allMinisters = await db.select({
       id: users.id,
       name: users.name,
       email: users.email
     }).from(users).where(and4(
-      eq8(users.role, "ministro"),
-      eq8(users.status, "active")
+      eq9(users.role, "ministro"),
+      eq9(users.status, "active")
     ));
     const monthNames2 = [
       "Janeiro",
@@ -10601,16 +11273,16 @@ router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, templateId)).returning();
+    }).where(eq9(questionnaires.id, templateId)).returning();
     try {
-      const activeUsers = await db.select({ id: users.id, name: users.name }).from(users).where(eq8(users.status, "active"));
+      const activeUsers = await db.select({ id: users.id, name: users.name }).from(users).where(eq9(users.status, "active"));
       const questionnaireMonth = updated.month;
       const questionnaireYear = updated.year;
       const monthName = getMonthName(questionnaireMonth);
@@ -10658,7 +11330,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -10669,7 +11341,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
       status: "closed",
       // closedAt: new Date(), // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, templateId)).returning();
+    }).where(eq9(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -10685,7 +11357,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId));
+    const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId));
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -10702,7 +11374,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
       and4(
         gte2(schedules.date, startDateStr),
         lte2(schedules.date, endDateStr),
-        eq8(schedules.status, "published")
+        eq9(schedules.status, "published")
       )
     ).limit(1);
     console.log("[REOPEN] Escalas publicadas encontradas:", publishedSchedules.length);
@@ -10718,7 +11390,7 @@ router4.patch("/templates/:id/reopen", authenticateToken, requireRole(["gestor",
       status: "sent",
       // closedAt: null, // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, templateId)).returning();
+    }).where(eq9(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -10737,8 +11409,8 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!template) {
@@ -10750,12 +11422,12 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, template.id));
     if (responses.length > 0) {
       const [updated] = await db.update(questionnaires).set({
         status: "deleted",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq8(questionnaires.id, template.id)).returning();
+      }).where(eq9(questionnaires.id, template.id)).returning();
       res.json({
         message: "Template marcado como deletado. Respostas existentes foram preservadas.",
         template: {
@@ -10764,7 +11436,7 @@ router4.delete("/templates/:year/:month", authenticateToken, requireRole(["gesto
         }
       });
     } else {
-      await db.delete(questionnaires).where(eq8(questionnaires.id, template.id));
+      await db.delete(questionnaires).where(eq9(questionnaires.id, template.id));
       res.json({
         message: "Template deletado com sucesso!",
         deleted: true
@@ -10784,8 +11456,8 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.json({
@@ -10804,17 +11476,14 @@ router4.get("/responses-status/:year/:month", authenticateToken, requireRole(["g
       email: users.email,
       phone: users.phone
     }).from(users).where(and4(
-      or3(
-        eq8(users.role, "ministro"),
-        eq8(users.role, "coordenador")
-      ),
-      eq8(users.status, "active")
+      inArray3(users.role, ["ministro", ...COORDINATOR_ROLES]),
+      eq9(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
+    }).from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, template.id));
     const ministersWithResponses = allMinisters.map((minister) => {
       const response = responses.find((r) => r.userId === minister.id);
       if (response) {
@@ -10888,13 +11557,13 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [template] = await db.select().from(questionnaires).where(eq8(questionnaires.id, templateId)).limit(1);
+    const [template] = await db.select().from(questionnaires).where(eq9(questionnaires.id, templateId)).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and4(
-      eq8(questionnaireResponses.questionnaireId, templateId),
-      eq8(questionnaireResponses.userId, ministerId)
+      eq9(questionnaireResponses.questionnaireId, templateId),
+      eq9(questionnaireResponses.userId, ministerId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -10903,7 +11572,7 @@ router4.get("/responses/:templateId/:ministerId", authenticateToken, requireRole
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq8(users.id, ministerId)).limit(1);
+    }).from(users).where(eq9(users.id, ministerId)).limit(1);
     res.json({
       user: user || { name: "Usu\xE1rio n\xE3o encontrado", email: null, phone: null },
       response: {
@@ -10931,13 +11600,13 @@ router4.get("/responses-summary/:year/:month", authenticateToken, requireRole(["
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [template] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year)
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year)
     )).limit(1);
     if (!template) {
       return res.status(404).json({ error: "Template not found" });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, template.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, template.id));
     const summary = {};
     const questions = template.questions;
     responses.forEach((response) => {
@@ -11006,8 +11675,8 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, month),
-      eq8(questionnaires.year, year),
+      eq9(questionnaires.month, month),
+      eq9(questionnaires.year, year),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -11020,7 +11689,7 @@ router4.post("/open", authenticateToken, requireRole(["gestor", "coordenador"]),
       status: "sent",
       // 'sent' is the open status
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(questionnaires.id, questionnaire.id)).returning();
+    }).where(eq9(questionnaires.id, questionnaire.id)).returning();
     res.json({
       message: `Question\xE1rio de ${getMonthName(month)}/${year} aberto com sucesso`,
       questionnaire: {
@@ -11044,8 +11713,8 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, currentMonth),
-      eq8(questionnaires.year, currentYear),
+      eq9(questionnaires.month, currentMonth),
+      eq9(questionnaires.year, currentYear),
       ne(questionnaires.status, "deleted")
     ));
     const shouldAutoClose = currentDay >= 25;
@@ -11055,7 +11724,7 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
       const [updated] = await db.update(questionnaires).set({
         status: "closed",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq8(questionnaires.id, questionnaire.id)).returning();
+      }).where(eq9(questionnaires.id, questionnaire.id)).returning();
       autoCloseTriggered = true;
       return res.json({
         currentDay,
@@ -11109,8 +11778,8 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and4(
-      eq8(questionnaires.month, monthNum),
-      eq8(questionnaires.year, yearNum),
+      eq9(questionnaires.month, monthNum),
+      eq9(questionnaires.year, yearNum),
       ne(questionnaires.status, "deleted")
     ));
     if (!questionnaire) {
@@ -11131,11 +11800,8 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
     const activeUsers = await db.select({
       id: users.id
     }).from(users).where(and4(
-      or3(
-        eq8(users.role, "ministro"),
-        eq8(users.role, "coordenador")
-      ),
-      eq8(users.status, "active")
+      inArray3(users.role, ["ministro", ...COORDINATOR_ROLES]),
+      eq9(users.status, "active")
     ));
     const totalActiveUsers = activeUsers.length;
     const responses = await db.select({
@@ -11143,7 +11809,7 @@ router4.get("/stats", authenticateToken, requireRole(["gestor", "coordenador"]),
       userId: questionnaireResponses.userId,
       responses: questionnaireResponses.responses,
       submittedAt: questionnaireResponses.submittedAt
-    }).from(questionnaireResponses).where(eq8(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq9(questionnaireResponses.questionnaireId, questionnaire.id));
     const totalResponses = responses.length;
     const responseRate = totalActiveUsers > 0 ? parseFloat((totalResponses / totalActiveUsers * 100).toFixed(2)) : 0;
     const pendingResponses = totalActiveUsers - totalResponses;
@@ -11205,12 +11871,14 @@ await init_db();
 init_schema();
 import { Router as Router5 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq10, and as and6, or as or4 } from "drizzle-orm";
+import { eq as eq11, and as and6, or as or4 } from "drizzle-orm";
+init_roles();
+await init_communityContext();
 
 // server/utils/csvExporter.ts
 await init_db();
 init_schema();
-import { eq as eq9, and as and5 } from "drizzle-orm";
+import { eq as eq10, and as and5 } from "drizzle-orm";
 function convertResponsesToCSV(data) {
   if (data.length === 0) {
     return "Sem dados para exportar";
@@ -11323,14 +11991,14 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   if (!db) {
     throw new Error("Database not available");
   }
-  const [questionnaire] = await db.select().from(questionnaires).where(eq9(questionnaires.id, questionnaireId)).limit(1);
+  const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
   if (!questionnaire) {
     throw new Error("Questionnaire not found");
   }
   const responsesWithUsers = await db.select({
     response: questionnaireResponses,
     user: users
-  }).from(questionnaireResponses).innerJoin(users, eq9(questionnaireResponses.userId, users.id)).where(eq9(questionnaireResponses.questionnaireId, questionnaireId));
+  }).from(questionnaireResponses).innerJoin(users, eq10(questionnaireResponses.userId, users.id)).where(eq10(questionnaireResponses.questionnaireId, questionnaireId));
   const exportData = responsesWithUsers.map(({ response, user }) => {
     const formattedResponses = [];
     if (response.availableSundays && response.availableSundays.length > 0) {
@@ -11468,7 +12136,7 @@ async function getQuestionnaireResponsesForExport(questionnaireId) {
   });
   const respondedUserIds = new Set(responsesWithUsers.map((r) => r.user.id));
   if (questionnaire.targetUserIds && Array.isArray(questionnaire.targetUserIds)) {
-    const nonRespondents = await db.select().from(users).where(eq9(users.role, "ministro"));
+    const nonRespondents = await db.select().from(users).where(eq10(users.role, "ministro"));
     nonRespondents.filter((user) => !respondedUserIds.has(user.id)).forEach((user) => {
       exportData.push({
         ministerId: user.id,
@@ -11487,8 +12155,8 @@ async function getMonthlyResponsesForExport(month, year) {
     throw new Error("Database not available");
   }
   const [questionnaire] = await db.select().from(questionnaires).where(and5(
-    eq9(questionnaires.month, month),
-    eq9(questionnaires.year, year)
+    eq10(questionnaires.month, month),
+    eq10(questionnaires.year, year)
   )).limit(1);
   if (!questionnaire) {
     throw new Error(`No questionnaire found for ${month}/${year}`);
@@ -11589,9 +12257,13 @@ var QuestionnaireService = class {
       "primary_mass_time",
       /^saint_judas_feast_/,
       "saint_judas_novena",
+      /^saint_judas_april_/,
       "healing_liberation_mass",
       "sacred_heart_mass",
       "immaculate_heart_mass",
+      "holy_thursday_mass",
+      "good_friday_celebration",
+      "easter_vigil_mass",
       /^special_event_/,
       // Includes Finados, etc
       "daily_mass_availability",
@@ -11638,6 +12310,18 @@ var QuestionnaireService = class {
         processedQuestionIds.add(questionId);
       } else if (questionId === "adoration_monday") {
         standardized.special_events.adoration_monday = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "holy_thursday_mass") {
+        standardized.special_events.holy_thursday_mass = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "good_friday_celebration") {
+        standardized.special_events.good_friday_celebration = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId === "easter_vigil_mass") {
+        standardized.special_events.easter_vigil_mass = this.normalizeValue(answer);
+        processedQuestionIds.add(questionId);
+      } else if (questionId.startsWith("saint_judas_april_")) {
+        standardized.special_events[questionId] = this.normalizeValue(answer);
         processedQuestionIds.add(questionId);
       } else if (questionId.startsWith("special_event_")) {
         const metadataEventName = item.metadata?.eventName;
@@ -12062,15 +12746,15 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
       return res.status(503).json({ error: "Database service unavailable" });
     }
     const [existingTemplate] = await db.select().from(questionnaires).where(and6(
-      eq10(questionnaires.month, month),
-      eq10(questionnaires.year, year)
+      eq11(questionnaires.month, month),
+      eq11(questionnaires.year, year)
     )).limit(1);
     const questions = generateQuestionnaireQuestions(month, year);
     if (existingTemplate) {
       const [updated] = await db.update(questionnaires).set({
         questions,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq10(questionnaires.id, existingTemplate.id)).returning();
+      }).where(eq11(questionnaires.id, existingTemplate.id)).returning();
       res.json({
         ...updated,
         questions: updated.questions
@@ -12088,8 +12772,8 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
         name: users.name,
         email: users.email
       }).from(users).where(and6(
-        eq10(users.role, "ministro"),
-        eq10(users.status, "active")
+        eq11(users.role, "ministro"),
+        eq11(users.status, "active")
       ));
       for (const minister of allMinisters) {
         if (minister.id) {
@@ -12127,8 +12811,8 @@ router5.get("/templates/:year/:month", authenticateToken, async (req, res) => {
     }
     try {
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq10(questionnaires.month, month),
-        eq10(questionnaires.year, year)
+        eq11(questionnaires.month, month),
+        eq11(questionnaires.year, year)
       )).limit(1);
       if (!template) {
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado para este per\xEDodo" });
@@ -12198,7 +12882,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       return res.status(503).json({ error: "Database service temporarily unavailable. Please try again later." });
     }
     if (data.questionnaireId) {
-      const [template] = await db.select().from(questionnaires).where(eq10(questionnaires.id, data.questionnaireId)).limit(1);
+      const [template] = await db.select().from(questionnaires).where(eq11(questionnaires.id, data.questionnaireId)).limit(1);
       if (template && template.status === "closed") {
         return res.status(400).json({ error: "Este question\xE1rio foi encerrado e n\xE3o aceita mais respostas" });
       }
@@ -12206,7 +12890,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     console.log("[RESPONSES] Buscando usu\xE1rio para userId:", userId);
     let minister = null;
     try {
-      const [foundUser] = await db.select().from(users).where(eq10(users.id, userId)).limit(1);
+      const [foundUser] = await db.select().from(users).where(eq11(users.id, userId)).limit(1);
       console.log("[RESPONSES] Usu\xE1rio encontrado:", foundUser);
       if (foundUser && foundUser.role === "ministro") {
         minister = {
@@ -12215,7 +12899,7 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           name: foundUser.name,
           active: foundUser.status === "active"
         };
-      } else if (foundUser && ["coordenador", "gestor"].includes(foundUser.role)) {
+      } else if (foundUser && isAdmin(foundUser.role)) {
         console.log("[RESPONSES] Usu\xE1rio \xE9 coordenador/reitor, pode responder");
         minister = {
           id: foundUser.id,
@@ -12237,8 +12921,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     if (!templateId) {
       console.log("[RESPONSES] Buscando template para m\xEAs:", data.month, "ano:", data.year);
       const [template] = await db.select().from(questionnaires).where(and6(
-        eq10(questionnaires.month, data.month),
-        eq10(questionnaires.year, data.year)
+        eq11(questionnaires.month, data.month),
+        eq11(questionnaires.year, data.year)
       )).limit(1);
       if (template) {
         templateId = template.id;
@@ -12286,6 +12970,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
     const responseValues = {
       userId: minister.id,
       questionnaireId: templateId,
+      communityId: await communityIdFromQuestionnaire(templateId),
+      // herda do questionário
       responses: JSON.stringify(standardizedResponse),
       // SAVE STANDARDIZED V2.0 FORMAT
       availableSundays: extractedData.availableSundays,
@@ -12359,8 +13045,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
       for (const familyUserId of data.sharedWithFamilyIds) {
         try {
           const [familyMember] = await db.select({ id: users.id, name: users.name }).from(users).where(and6(
-            eq10(users.id, familyUserId),
-            eq10(users.status, "active")
+            eq11(users.id, familyUserId),
+            eq11(users.status, "active")
           )).limit(1);
           if (!familyMember) {
             console.warn(`[RESPONSES] Usu\xE1rio n\xE3o encontrado ou inativo: ${familyUserId}`);
@@ -12368,12 +13054,12 @@ router5.post("/responses", authenticateToken, async (req, res) => {
           }
           const [familyRelation] = await db.select().from(familyRelationships).where(or4(
             and6(
-              eq10(familyRelationships.userId, minister.id),
-              eq10(familyRelationships.relatedUserId, familyUserId)
+              eq11(familyRelationships.userId, minister.id),
+              eq11(familyRelationships.relatedUserId, familyUserId)
             ),
             and6(
-              eq10(familyRelationships.userId, familyUserId),
-              eq10(familyRelationships.relatedUserId, minister.id)
+              eq11(familyRelationships.userId, familyUserId),
+              eq11(familyRelationships.relatedUserId, minister.id)
             )
           )).limit(1);
           if (!familyRelation) {
@@ -12381,10 +13067,10 @@ router5.post("/responses", authenticateToken, async (req, res) => {
             continue;
           }
           const [existingPersonalResponse] = await db.select({ isSharedResponse: questionnaireResponses.isSharedResponse, sharedFromUserId: questionnaireResponses.sharedFromUserId }).from(questionnaireResponses).where(and6(
-            eq10(questionnaireResponses.userId, familyUserId),
-            eq10(questionnaireResponses.questionnaireId, templateId),
-            eq10(questionnaireResponses.isDeleted, false),
-            eq10(questionnaireResponses.isSharedResponse, false)
+            eq11(questionnaireResponses.userId, familyUserId),
+            eq11(questionnaireResponses.questionnaireId, templateId),
+            eq11(questionnaireResponses.isDeleted, false),
+            eq11(questionnaireResponses.isSharedResponse, false)
             // Only check for personal responses
           )).limit(1);
           if (existingPersonalResponse) {
@@ -12395,6 +13081,8 @@ router5.post("/responses", authenticateToken, async (req, res) => {
             await db.insert(questionnaireResponses).values({
               userId: familyUserId,
               questionnaireId: templateId,
+              communityId: await communityIdFromQuestionnaire(templateId),
+              // herda do questionário
               responses: JSON.stringify(standardizedResponse),
               availableSundays: extractedData.availableSundays,
               preferredMassTimes: extractedData.preferredMassTimes,
@@ -12472,8 +13160,8 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
       return res.json(null);
     }
     try {
-      const [user] = await db.select().from(users).where(eq10(users.id, userId)).limit(1);
-      const minister = user && (user.role === "ministro" || user.role === "coordenador" || user.role === "gestor") ? {
+      const [user] = await db.select().from(users).where(eq11(users.id, userId)).limit(1);
+      const minister = user && (user.role === "ministro" || isAdmin(user.role)) ? {
         id: user.id,
         userId: user.id
       } : null;
@@ -12490,7 +13178,7 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
         questionnaireId: questionnaireResponses.questionnaireId,
         month: questionnaires.month,
         year: questionnaires.year
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq10(questionnaireResponses.userId, minister.id));
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq11(questionnaireResponses.questionnaireId, questionnaires.id)).where(eq11(questionnaireResponses.userId, minister.id));
       console.log("[GET /responses] Todas as respostas do usu\xE1rio:", allUserResponses);
       const [response] = await db.select({
         id: questionnaireResponses.id,
@@ -12504,10 +13192,10 @@ router5.get("/responses/:year/:month", authenticateToken, async (req, res) => {
           questions: questionnaires.questions,
           status: questionnaires.status
         }
-      }).from(questionnaireResponses).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-        eq10(questionnaireResponses.userId, minister.id),
-        eq10(questionnaires.month, month),
-        eq10(questionnaires.year, year)
+      }).from(questionnaireResponses).leftJoin(questionnaires, eq11(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+        eq11(questionnaireResponses.userId, minister.id),
+        eq11(questionnaires.month, month),
+        eq11(questionnaires.year, year)
       )).limit(1);
       console.log("[GET /responses] Resposta encontrada:", response ? "Sim" : "N\xE3o");
       if (response) {
@@ -12544,15 +13232,15 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
     if (!params) return;
     const { year, month } = params;
     const userRole = req.user.role;
-    if (userRole !== "gestor" && userRole !== "coordenador") {
+    if (!isAdmin(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
     if (!db) {
       return res.json([]);
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq10(questionnaires.month, month),
-      eq10(questionnaires.year, year)
+      eq11(questionnaires.month, month),
+      eq11(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({
@@ -12572,14 +13260,14 @@ router5.get("/admin/responses-status/:year/:month", authenticateToken, async (re
       email: users.email,
       phone: users.phone
     }).from(users).where(and6(
-      eq10(users.role, "ministro"),
-      eq10(users.status, "active")
+      eq11(users.role, "ministro"),
+      eq11(users.status, "active")
     ));
     const responses = await db.select({
       userId: questionnaireResponses.userId,
       submittedAt: questionnaireResponses.submittedAt,
       responses: questionnaireResponses.responses
-    }).from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaire.id));
+    }).from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, questionnaire.id));
     const responseMap = new Map(responses.map((r) => [r.userId, r]));
     const ministerResponses = ministers.map((minister) => {
       const response = responseMap.get(minister.id);
@@ -12620,20 +13308,20 @@ router5.get("/admin/responses-summary/:year/:month", authenticateToken, async (r
     if (!params) return;
     const { year, month } = params;
     const userRole = req.user.role;
-    if (userRole !== "gestor" && userRole !== "coordenador") {
+    if (!isAdmin(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
     if (!db) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
     const [questionnaire] = await db.select().from(questionnaires).where(and6(
-      eq10(questionnaires.month, month),
-      eq10(questionnaires.year, year)
+      eq11(questionnaires.month, month),
+      eq11(questionnaires.year, year)
     )).limit(1);
     if (!questionnaire) {
       return res.json({ totalResponses: 0, questions: [], summary: {} });
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, questionnaire.id));
     const summary = {};
     const questions = questionnaire.questions;
     responses.forEach((response) => {
@@ -12662,13 +13350,13 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
   try {
     const { templateId, userId } = req.params;
     const userRole = req.user.role;
-    if (userRole !== "gestor" && userRole !== "coordenador") {
+    if (!isAdmin(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
     if (!db) {
       return res.status(500).json({ error: "Database not available" });
     }
-    const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq11(questionnaires.id, templateId)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
@@ -12676,13 +13364,13 @@ router5.get("/admin/responses/:templateId/:userId", authenticateToken, async (re
       name: users.name,
       email: users.email,
       phone: users.phone
-    }).from(users).where(eq10(users.id, userId)).limit(1);
+    }).from(users).where(eq11(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
     const [response] = await db.select().from(questionnaireResponses).where(and6(
-      eq10(questionnaireResponses.questionnaireId, templateId),
-      eq10(questionnaireResponses.userId, userId)
+      eq11(questionnaireResponses.questionnaireId, templateId),
+      eq11(questionnaireResponses.userId, userId)
     )).limit(1);
     if (!response) {
       return res.status(404).json({ error: "Response not found" });
@@ -12713,7 +13401,7 @@ router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
     if (!params) return;
     const { year, month } = params;
     const userRole = req.user.role;
-    if (userRole !== "gestor" && userRole !== "coordenador") {
+    if (!isAdmin(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
     if (!db) {
@@ -12735,9 +13423,9 @@ router5.get("/responses/all/:year/:month", authenticateToken, async (req, res) =
         month: questionnaires.month,
         year: questionnaires.year
       }
-    }).from(questionnaireResponses).leftJoin(users, eq10(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq10(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
-      eq10(questionnaires.month, month),
-      eq10(questionnaires.year, year)
+    }).from(questionnaireResponses).leftJoin(users, eq11(questionnaireResponses.userId, users.id)).leftJoin(questionnaires, eq11(questionnaireResponses.questionnaireId, questionnaires.id)).where(and6(
+      eq11(questionnaires.month, month),
+      eq11(questionnaires.year, year)
     ));
     res.json(responses);
   } catch (error) {
@@ -12749,13 +13437,13 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
   try {
     const userId = req.user?.id;
     const templateId = req.params.id;
-    if (!req.user || !["gestor", "coordenador"].includes(req.user.role)) {
+    if (!req.user || !isAdmin(req.user.role)) {
       return res.status(403).json({ error: "Unauthorized" });
     }
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq11(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -12765,7 +13453,7 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
     const [updated] = await db.update(questionnaires).set({
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq10(questionnaires.id, templateId)).returning();
+    }).where(eq11(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -12779,13 +13467,13 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
   try {
     const userId = req.user?.id;
     const templateId = req.params.id;
-    if (!req.user || !["gestor", "coordenador"].includes(req.user.role)) {
+    if (!req.user || !isAdmin(req.user.role)) {
       return res.status(403).json({ error: "Unauthorized" });
     }
     if (!db) {
       return res.status(503).json({ error: "Database service unavailable" });
     }
-    const [existingTemplate] = await db.select().from(questionnaires).where(eq10(questionnaires.id, templateId)).limit(1);
+    const [existingTemplate] = await db.select().from(questionnaires).where(eq11(questionnaires.id, templateId)).limit(1);
     if (!existingTemplate) {
       return res.status(404).json({ error: "Template not found" });
     }
@@ -12795,7 +13483,7 @@ router5.patch("/admin/templates/:id/reopen", authenticateToken, requireRole(["co
     const [updated] = await db.update(questionnaires).set({
       status: "sent",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq10(questionnaires.id, templateId)).returning();
+    }).where(eq11(questionnaires.id, templateId)).returning();
     res.json({
       ...updated,
       questions: updated.questions
@@ -12820,10 +13508,10 @@ router5.get("/family-sharing/:questionnaireId", authenticateToken, async (req, r
 router5.get("/:questionnaireId/export/csv", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { questionnaireId } = req.params;
-    const { format: format12 = "detailed" } = req.query;
+    const { format: format13 = "detailed" } = req.query;
     const exportData = await getQuestionnaireResponsesForExport(questionnaireId);
-    const csvContent = format12 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
-    const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
+    const csvContent = format13 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq11(questionnaires.id, questionnaireId)).limit(1);
     const filename = questionnaire ? `respostas_${questionnaire.title.replace(/\s+/g, "_")}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv` : `respostas_questionario_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -12838,9 +13526,9 @@ router5.get("/export/:year/:month/csv", authenticateToken, requireRole(["coorden
     const params = parseYearMonth(req, res);
     if (!params) return;
     const { year, month } = params;
-    const { format: format12 = "detailed" } = req.query;
+    const { format: format13 = "detailed" } = req.query;
     const exportData = await getMonthlyResponsesForExport(month, year);
-    const csvContent = format12 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
+    const csvContent = format13 === "detailed" ? createDetailedCSV(exportData) : convertResponsesToCSV(exportData);
     const monthName = monthNames[month - 1];
     const filename = `respostas_${monthName}_${year}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -12861,21 +13549,21 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
     console.log(`[REPROCESS] \u{1F504} Iniciando reprocessamento...`);
     console.log(`[REPROCESS] QuestionnaireId recebido:`, questionnaireId);
     if (questionnaireId) {
-      const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, questionnaireId)).limit(1);
+      const [questionnaire] = await db.select().from(questionnaires).where(eq11(questionnaires.id, questionnaireId)).limit(1);
       if (!questionnaire) {
         console.log(`[REPROCESS] \u274C Question\xE1rio ${questionnaireId} n\xE3o encontrado!`);
         return res.status(404).json({ error: "Question\xE1rio n\xE3o encontrado" });
       }
       console.log(`[REPROCESS] \u2705 Question\xE1rio encontrado: ${questionnaire.title} (${questionnaire.month}/${questionnaire.year})`);
     }
-    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq10(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
+    const allResponses = questionnaireId ? await db.select().from(questionnaireResponses).where(eq11(questionnaireResponses.questionnaireId, questionnaireId)) : await db.select().from(questionnaireResponses);
     console.log(`[REPROCESS] \u{1F4DD} Encontradas ${allResponses.length} respostas para reprocessar...`);
     let updated = 0;
     let errors = 0;
     for (const response of allResponses) {
       try {
         const responsesArray = safeParseJSON(response.responses, []);
-        const [questionnaire] = await db.select().from(questionnaires).where(eq10(questionnaires.id, response.questionnaireId)).limit(1);
+        const [questionnaire] = await db.select().from(questionnaires).where(eq11(questionnaires.id, response.questionnaireId)).limit(1);
         const processingResult = QuestionnaireService.standardizeResponseWithTracking(
           responsesArray,
           questionnaire?.month,
@@ -12909,7 +13597,7 @@ router5.post("/admin/reprocess-responses", authenticateToken, requireRole(["gest
           // 🛡️ SAFETY NET
           processingWarnings
           // 🛡️ SAFETY NET
-        }).where(eq10(questionnaireResponses.id, response.id));
+        }).where(eq11(questionnaireResponses.id, response.id));
         updated++;
       } catch (error) {
         console.error(`[REPROCESS] Erro ao processar resposta ${response.id}:`, getErrorMessage3(error));
@@ -12943,7 +13631,7 @@ await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and10, gte as gte5, lte as lte5, eq as eq15, sql as sql6, ne as ne3, desc as desc4, inArray as inArray3 } from "drizzle-orm";
+import { and as and10, gte as gte5, lte as lte5, eq as eq16, sql as sql6, ne as ne3, desc as desc4, inArray as inArray5 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format5 } from "date-fns";
 
@@ -13107,7 +13795,7 @@ var scheduleCache = new ScheduleCache();
 // server/services/learningService.ts
 await init_db();
 init_schema();
-import { eq as eq14, and as and9 } from "drizzle-orm";
+import { eq as eq15, and as and9 } from "drizzle-orm";
 import { getDay as getDay4 } from "date-fns";
 var LearningService = class {
   /**
@@ -13205,11 +13893,11 @@ var LearningService = class {
     }
     const existing = await db.select().from(learnedPatterns).where(
       and9(
-        eq14(learnedPatterns.ministerId, diff.ministerId),
-        eq14(learnedPatterns.patternType, patternType),
-        eq14(learnedPatterns.massType, diff.massType),
-        eq14(learnedPatterns.dayOfWeek, dayOfWeek),
-        eq14(learnedPatterns.timeSlot, diff.time)
+        eq15(learnedPatterns.ministerId, diff.ministerId),
+        eq15(learnedPatterns.patternType, patternType),
+        eq15(learnedPatterns.massType, diff.massType),
+        eq15(learnedPatterns.dayOfWeek, dayOfWeek),
+        eq15(learnedPatterns.timeSlot, diff.time)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -13228,7 +13916,7 @@ var LearningService = class {
         weightAdjustment,
         lastOccurrence: /* @__PURE__ */ new Date(),
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq14(learnedPatterns.id, pattern.id));
+      }).where(eq15(learnedPatterns.id, pattern.id));
       console.log(`[LearningService] Updated pattern ${pattern.id}: count=${newOccurrenceCount}, confidence=${newConfidence}%`);
     } else {
       const initialConfidence = 50;
@@ -13257,7 +13945,7 @@ var LearningService = class {
    * Get learning report for a month
    */
   async getLearningReport(year, month) {
-    const allPatterns = await db.select().from(learnedPatterns).where(eq14(learnedPatterns.isActive, true));
+    const allPatterns = await db.select().from(learnedPatterns).where(eq15(learnedPatterns.isActive, true));
     const patternsByType = {};
     for (const pattern of allPatterns) {
       patternsByType[pattern.patternType] = (patternsByType[pattern.patternType] || 0) + 1;
@@ -13283,8 +13971,8 @@ var LearningService = class {
   async getScoreAdjustments(ministerId, massType, dayOfWeek, time2) {
     const patterns = await db.select().from(learnedPatterns).where(
       and9(
-        eq14(learnedPatterns.ministerId, ministerId),
-        eq14(learnedPatterns.isActive, true)
+        eq15(learnedPatterns.ministerId, ministerId),
+        eq15(learnedPatterns.isActive, true)
       )
     );
     let totalAdjustment = 0;
@@ -13324,7 +14012,7 @@ var LearningService = class {
    * Publish schedule and learn from differences
    */
   async publishScheduleAndLearn(generationId, finalSchedule) {
-    const [generation] = await db.select().from(scheduleGenerations).where(eq14(scheduleGenerations.id, generationId)).limit(1);
+    const [generation] = await db.select().from(scheduleGenerations).where(eq15(scheduleGenerations.id, generationId)).limit(1);
     if (!generation) {
       throw new Error(`Schedule generation ${generationId} not found`);
     }
@@ -13336,7 +14024,7 @@ var LearningService = class {
       finalSchedule,
       differences,
       publishedAt: /* @__PURE__ */ new Date()
-    }).where(eq14(scheduleGenerations.id, generationId));
+    }).where(eq15(scheduleGenerations.id, generationId));
     console.log(`[LearningService] Published schedule ${generationId} with ${differences.length} learned differences`);
   }
 };
@@ -13414,8 +14102,8 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
     if (db) {
       const [targetQuestionnaire] = await db.select().from(questionnaires).where(
         and10(
-          eq15(questionnaires.month, month),
-          eq15(questionnaires.year, year)
+          eq16(questionnaires.month, month),
+          eq16(questionnaires.year, year)
         )
       ).limit(1);
       if (!targetQuestionnaire) {
@@ -13426,7 +14114,7 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           errorCode: "NO_QUESTIONNAIRE"
         });
       }
-      const responses = await db.select().from(questionnaireResponses).where(eq15(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+      const responses = await db.select().from(questionnaireResponses).where(eq16(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
       if (responses.length === 0) {
         logger.warn(`Tentativa de gerar escalas sem respostas: ${month}/${year}`);
         return res.status(400).json({
@@ -13488,10 +14176,17 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: schedule.massTime.type || "missa",
+          name: getMassDisplayName(schedule.massTime),
+          location: schedule.massTime.location || null,
           ministers: schedule.ministers.map((m, idx) => ({
             id: m.id,
             name: m.name,
             position: m.position || idx + 1
+          })),
+          backupMinisters: (schedule.backupMinisters || []).map((m, idx) => ({
+            id: m.id,
+            name: m.name,
+            position: m.position || schedule.ministers.length + idx + 1
           })),
           confidence: schedule.confidence
         }))
@@ -13508,9 +14203,9 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
       };
       const [existingGeneration] = await db.select().from(scheduleGenerations).where(
         and10(
-          eq15(scheduleGenerations.month, month),
-          eq15(scheduleGenerations.year, year),
-          eq15(scheduleGenerations.status, "draft")
+          eq16(scheduleGenerations.month, month),
+          eq16(scheduleGenerations.year, year),
+          eq16(scheduleGenerations.status, "draft")
         )
       ).limit(1);
       if (existingGeneration) {
@@ -13519,7 +14214,7 @@ router6.post("/generate", authenticateToken, requireRole(["gestor", "coordenador
           generationMetrics,
           createdAt: /* @__PURE__ */ new Date(),
           createdById: req.user?.id || null
-        }).where(eq15(scheduleGenerations.id, existingGeneration.id));
+        }).where(eq16(scheduleGenerations.id, existingGeneration.id));
         generationId = existingGeneration.id;
         logger.info(`Updated existing schedule_generation: ${generationId}`);
       } else {
@@ -13629,7 +14324,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
           const deletedSubstitutions = await db.delete(substitutionRequests).where(
-            inArray3(substitutionRequests.scheduleId, scheduleIds)
+            inArray5(substitutionRequests.scheduleId, scheduleIds)
           );
           console.log(`Deleted substitution requests`);
           const deletedSchedules = await db.delete(schedules).where(
@@ -13649,7 +14344,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
     )];
     const existingMinisterIds = /* @__PURE__ */ new Set();
     if (uniqueMinisterIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray3(users.id, uniqueMinisterIds));
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray5(users.id, uniqueMinisterIds));
       existingMinisters.forEach((m) => existingMinisterIds.add(m.id));
       console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
     }
@@ -13670,7 +14365,9 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
           ministerId: schedule.ministerId || null,
           position: schedule.position !== void 0 ? schedule.position : i + 1,
           status: "scheduled",
-          notes: schedule.notes || null
+          notes: schedule.notes || null,
+          // Comunidade do coordenador que está gerando a escala
+          communityId: req.user.homeCommunityId
           // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
         };
         const [inserted] = await db.insert(schedules).values(recordToInsert).returning();
@@ -13773,7 +14470,7 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
       }
     };
     if (db && analysis.ministerIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray3(users.id, analysis.ministerIds.slice(0, 50)));
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray5(users.id, analysis.ministerIds.slice(0, 50)));
       analysis.ministerIdsInDb = existingMinisters.length;
       analysis.ministerIdsRequested = analysis.ministerIds.length;
       const existingIds = new Set(existingMinisters.map((m) => m.id));
@@ -13823,7 +14520,7 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         const scheduleIds = existingSchedules.map((s) => s.id);
         console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), "...");
         const deletedSubstitutions = await db.delete(substitutionRequests).where(
-          inArray3(substitutionRequests.scheduleId, scheduleIds)
+          inArray5(substitutionRequests.scheduleId, scheduleIds)
         );
         console.log(`Deleted substitution requests:`, deletedSubstitutions);
         logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
@@ -13866,7 +14563,9 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         position: s.position ?? positionInGroup,
         // Use provided position or calculated group position
         notes: s.notes || null,
-        status: "scheduled"
+        status: "scheduled",
+        communityId: req.user.homeCommunityId
+        // comunidade do coordenador
         // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
       };
     });
@@ -13986,8 +14685,8 @@ router6.get("/generation/:year/:month", authenticateToken, requireRole(["gestor"
     }
     const [generation] = await db.select().from(scheduleGenerations).where(
       and10(
-        eq15(scheduleGenerations.month, month),
-        eq15(scheduleGenerations.year, year)
+        eq16(scheduleGenerations.month, month),
+        eq16(scheduleGenerations.year, year)
       )
     ).orderBy(desc4(scheduleGenerations.createdAt)).limit(1);
     if (!generation) {
@@ -14005,13 +14704,14 @@ router6.get("/generation/:year/:month", authenticateToken, requireRole(["gestor"
       date: schedules.date,
       time: schedules.time,
       type: schedules.type,
+      location: schedules.location,
       ministerId: schedules.ministerId,
       position: schedules.position,
       status: schedules.status,
       notes: schedules.notes,
       ministerName: users.name,
       scheduleDisplayName: users.scheduleDisplayName
-    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
       and10(
         gte5(schedules.date, startDate),
         lte5(schedules.date, endDate)
@@ -14028,19 +14728,32 @@ router6.get("/generation/:year/:month", authenticateToken, requireRole(["gestor"
     const savedScheduleData = generation.finalSchedule || generation.originalSchedule;
     const savedSchedules = savedScheduleData?.schedules || savedScheduleData || [];
     const backupsByKey = {};
+    const metaByKey = {};
     if (Array.isArray(savedSchedules)) {
       savedSchedules.forEach((s) => {
-        if (s.date && s.time && Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
-          backupsByKey[`${s.date}_${s.time}`] = s.backupMinisters;
+        if (!s.date || !s.time) return;
+        const key = `${s.date}_${s.time}`;
+        if (Array.isArray(s.backupMinisters) && s.backupMinisters.length > 0) {
+          backupsByKey[key] = s.backupMinisters;
         }
+        metaByKey[key] = {
+          name: s.name || void 0,
+          type: s.type || void 0,
+          location: s.location ?? void 0
+        };
       });
     }
     const formattedSchedules = Object.entries(groupedSchedules).map(([key, ministers]) => {
       const [date2, time2] = key.split("_");
+      const meta = metaByKey[key] || {};
+      const noteName = ministers[0]?.notes?.split(" | ")[0];
       return {
         date: date2,
         time: time2,
         dayOfWeek: new Date(date2).getDay(),
+        type: meta.type || ministers[0]?.type || "missa",
+        name: meta.name || (noteName && !noteName.startsWith("Gerado") ? noteName : void 0),
+        location: meta.location ?? ministers[0]?.location ?? null,
         ministers: ministers.map((m) => ({
           id: m.ministerId,
           name: m.scheduleDisplayName || m.ministerName || "VACANTE",
@@ -14090,7 +14803,7 @@ router6.post("/generation/:id/publish", authenticateToken, requireRole(["gestor"
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const [generation] = await db.select().from(scheduleGenerations).where(eq15(scheduleGenerations.id, id)).limit(1);
+    const [generation] = await db.select().from(scheduleGenerations).where(eq16(scheduleGenerations.id, id)).limit(1);
     if (!generation) {
       return res.status(404).json({
         success: false,
@@ -14115,7 +14828,7 @@ router6.post("/generation/:id/publish", authenticateToken, requireRole(["gestor"
       ministerId: schedules.ministerId,
       position: schedules.position,
       ministerName: users.name
-    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
       and10(
         gte5(schedules.date, startDate),
         lte5(schedules.date, endDate)
@@ -14178,7 +14891,7 @@ router6.post("/generation/:id/publish", authenticateToken, requireRole(["gestor"
       finalSchedule: finalScheduleJson,
       differences,
       publishedAt: /* @__PURE__ */ new Date()
-    }).where(eq15(scheduleGenerations.id, id));
+    }).where(eq16(scheduleGenerations.id, id));
     scheduleCache.invalidate(year, month);
     logger.info(`Gera\xE7\xE3o ${id} publicada com sucesso. Diferen\xE7as: ${differences.summary.totalChanges} altera\xE7\xF5es`);
     res.json({
@@ -14315,15 +15028,15 @@ router6.get("/debug/:year/:month", authenticateToken, requireRole(["gestor", "co
       totalServices: users.totalServices
     }).from(users).where(
       and10(
-        eq15(users.status, "active"),
+        eq16(users.status, "active"),
         ne3(users.role, "gestor")
       )
     );
-    const massTimesData = await db.select().from(massTimesConfig).where(eq15(massTimesConfig.isActive, true));
-    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq15(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    const massTimesData = await db.select().from(massTimesConfig).where(eq16(massTimesConfig.isActive, true));
+    const responsesData = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq16(questionnaireResponses.questionnaireId, questionnaires.id)).where(
       and10(
-        eq15(questionnaires.month, month),
-        eq15(questionnaires.year, year)
+        eq16(questionnaires.month, month),
+        eq16(questionnaires.year, year)
       )
     );
     res.json({
@@ -14367,7 +15080,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(
+    const existingSchedules = await db.select().from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(
       and10(
         sql6`EXTRACT(MONTH FROM ${schedules.date}) = ${month}`,
         sql6`EXTRACT(YEAR FROM ${schedules.date}) = ${year}`
@@ -14375,7 +15088,7 @@ router6.get("/quality-metrics/:year/:month", authenticateToken, requireRole(["ge
     );
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
-    const substitutions = await db.select().from(substitutionRequests).innerJoin(schedules, eq15(substitutionRequests.scheduleId, schedules.id)).where(
+    const substitutions = await db.select().from(substitutionRequests).innerJoin(schedules, eq16(substitutionRequests.scheduleId, schedules.id)).where(
       and10(
         gte5(schedules.date, firstDay.toISOString().split("T")[0]),
         lte5(schedules.date, lastDay.toISOString().split("T")[0])
@@ -14421,14 +15134,25 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
     for (const schedule of generatedSchedules) {
       if (!schedule.massTime.date) continue;
       if (replaceExisting) {
+        const oldScheduleIds = await tx.select({ id: schedules.id }).from(schedules).where(
+          and10(
+            eq16(schedules.date, schedule.massTime.date),
+            eq16(schedules.time, schedule.massTime.time)
+          )
+        );
+        if (oldScheduleIds.length > 0) {
+          const ids = oldScheduleIds.map((r) => r.id);
+          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, ids));
+        }
         await tx.delete(schedules).where(
           and10(
-            eq15(schedules.date, schedule.massTime.date),
-            eq15(schedules.time, schedule.massTime.time)
+            eq16(schedules.date, schedule.massTime.date),
+            eq16(schedules.time, schedule.massTime.time)
           )
         );
       }
       const validMinisters = schedule.ministers.filter((m) => m.id && m.id !== "VACANT");
+      const massName = getMassDisplayName(schedule.massTime);
       for (let i = 0; i < validMinisters.length; i++) {
         const minister = validMinisters[i];
         const ministerPosition = minister.position;
@@ -14436,11 +15160,11 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting) {
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: "missa",
-          location: null,
+          location: schedule.massTime.location || null,
           ministerId: minister.id,
           position: ministerPosition || i + 1,
           status: "scheduled",
-          notes: `Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
+          notes: `${massName} | Gerado automaticamente - Confian\xE7a: ${Math.round(schedule.confidence * 100)}%`
         });
         savedCount++;
       }
@@ -14511,6 +15235,8 @@ function formatSchedulesForAPI(schedules3) {
     dayOfWeek: schedule.massTime.dayOfWeek,
     type: schedule.massTime.type || "missa",
     // Incluir tipo da missa
+    name: getMassDisplayName(schedule.massTime),
+    location: schedule.massTime.location || null,
     ministers: schedule.ministers.map((m) => ({
       id: m.id,
       name: m.name,
@@ -14580,7 +15306,7 @@ router6.get("/by-date/:date", authenticateToken, async (req, res) => {
       notes: schedules.notes,
       ministerName: users.name,
       scheduleDisplayName: users.scheduleDisplayName
-    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(eq15(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position, schedules.id);
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(eq16(schedules.date, dateOnly)).orderBy(schedules.time, schedules.position, schedules.id);
     const formattedAssignments = assignments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -14625,9 +15351,9 @@ router6.get("/:date/:time", authenticateToken, async (req, res) => {
       type: schedules.type,
       location: schedules.location,
       position: schedules.position
-    }).from(schedules).leftJoin(users, eq15(schedules.ministerId, users.id)).where(and10(
-      eq15(schedules.date, date2),
-      eq15(schedules.time, time2)
+    }).from(schedules).leftJoin(users, eq16(schedules.ministerId, users.id)).where(and10(
+      eq16(schedules.date, date2),
+      eq16(schedules.time, time2)
     )).orderBy(schedules.position, schedules.id);
     res.json({
       date: date2,
@@ -14662,9 +15388,9 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
     if (!data.skipDuplicateCheck && data.ministerId) {
       logger.info(`[ADD_MINISTER] \u{1F50D} Verificando duplica\xE7\xE3o: date=${data.date}, time=${data.time}, ministerId=${data.ministerId}`);
       const [existing] = await db.select().from(schedules).where(and10(
-        eq15(schedules.date, data.date),
-        eq15(schedules.time, data.time),
-        eq15(schedules.ministerId, data.ministerId)
+        eq16(schedules.date, data.date),
+        eq16(schedules.time, data.time),
+        eq16(schedules.ministerId, data.ministerId)
       )).limit(1);
       if (existing) {
         logger.warn(`[ADD_MINISTER] \u26A0\uFE0F Ministro ${data.ministerId} j\xE1 escalado neste hor\xE1rio (ID do registro existente: ${existing.id})`);
@@ -14680,8 +15406,8 @@ router6.post("/add-minister", authenticateToken, requireRole(["gestor", "coorden
       logger.info(`[ADD_MINISTER] \u2705 Usando posi\xE7\xE3o fornecida: ${newPosition}`);
     } else {
       const existingMinisters = await db.select({ position: schedules.position }).from(schedules).where(and10(
-        eq15(schedules.date, data.date),
-        eq15(schedules.time, data.time)
+        eq16(schedules.date, data.date),
+        eq16(schedules.time, data.time)
       )).orderBy(desc4(schedules.position));
       newPosition = existingMinisters.length > 0 && existingMinisters[0].position ? existingMinisters[0].position + 1 : 1;
       logger.info(`[ADD_MINISTER] \u{1F522} Posi\xE7\xE3o calculada automaticamente: ${newPosition} (ministros existentes: ${existingMinisters.length})`);
@@ -14710,7 +15436,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
     if (!db) {
       return res.status(503).json({ error: "Database unavailable" });
     }
-    await db.delete(schedules).where(eq15(schedules.id, id));
+    await db.delete(schedules).where(eq16(schedules.id, id));
     res.json({ success: true, message: "Ministro removido da escala" });
   } catch (error) {
     logger.error("Error removing minister from schedule:", error);
@@ -14733,8 +15459,8 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     }
     console.log("[batch-update] Fetching existing schedules for:", { date: date2, time: time2 });
     const existingSchedules = await db.select().from(schedules).where(and10(
-      eq15(schedules.date, date2),
-      eq15(schedules.time, time2)
+      eq16(schedules.date, date2),
+      eq16(schedules.time, time2)
     )).orderBy(schedules.position, schedules.id);
     console.log(
       "[batch-update] Found existing schedules:",
@@ -14745,11 +15471,11 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     if (ministers.length === 0) {
       console.log("[batch-update] All ministers removed - deleting entire mass and related substitutions");
       for (const schedule of existingSchedules) {
-        await db.delete(substitutionRequests).where(eq15(substitutionRequests.scheduleId, schedule.id));
+        await db.delete(substitutionRequests).where(eq16(substitutionRequests.scheduleId, schedule.id));
       }
       await db.delete(schedules).where(and10(
-        eq15(schedules.date, date2),
-        eq15(schedules.time, time2)
+        eq16(schedules.date, date2),
+        eq16(schedules.time, time2)
       ));
       scheduleCache.invalidateByDate(date2);
       console.log(`[batch-update] Cache invalidated for date: ${date2}`);
@@ -14759,7 +15485,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
     const existingStatus = existingSchedules.length > 0 ? existingSchedules[0].status : "scheduled";
     const existingType = existingSchedules.length > 0 ? existingSchedules[0].type : "missa";
     for (let i = 0; i < existingSchedules.length; i++) {
-      await db.update(schedules).set({ position: -(i + 1) }).where(eq15(schedules.id, existingSchedules[i].id));
+      await db.update(schedules).set({ position: -(i + 1) }).where(eq16(schedules.id, existingSchedules[i].id));
     }
     for (let i = 0; i < ministers.length; i++) {
       const ministerId = ministers[i];
@@ -14769,7 +15495,7 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
         await db.update(schedules).set({
           ministerId,
           position
-        }).where(eq15(schedules.id, existingSchedules[i].id));
+        }).where(eq16(schedules.id, existingSchedules[i].id));
       } else {
         console.log(`[batch-update] Creating new schedule at position=${position}, minister=${ministerId?.substring(0, 8) || "null"}, status=${existingStatus}`);
         await db.insert(schedules).values({
@@ -14778,7 +15504,8 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
           ministerId,
           position,
           type: existingType,
-          status: existingStatus
+          status: existingStatus,
+          communityId: req.user.homeCommunityId
         });
       }
     }
@@ -14791,21 +15518,21 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
         schedulesToDelete.map((s) => s.id.substring(0, 8))
       );
       for (const schedule of schedulesToDelete) {
-        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq15(substitutionRequests.scheduleId, schedule.id)).limit(1);
+        const hasSubstitutions = await db.select().from(substitutionRequests).where(eq16(substitutionRequests.scheduleId, schedule.id)).limit(1);
         if (hasSubstitutions.length > 0) {
           console.log(`[batch-update] Schedule ${schedule.id.substring(0, 8)} has substitutions, setting ministerId to null`);
-          await db.update(schedules).set({ ministerId: null, position: ministers.length + schedulesToDelete.indexOf(schedule) + 1 }).where(eq15(schedules.id, schedule.id));
+          await db.update(schedules).set({ ministerId: null, position: ministers.length + schedulesToDelete.indexOf(schedule) + 1 }).where(eq16(schedules.id, schedule.id));
         } else {
           console.log(`[batch-update] Deleting schedule ${schedule.id.substring(0, 8)}`);
-          await db.delete(schedules).where(eq15(schedules.id, schedule.id));
+          await db.delete(schedules).where(eq16(schedules.id, schedule.id));
         }
       }
     }
     scheduleCache.invalidateByDate(date2);
     console.log(`[batch-update] Cache invalidated for date: ${date2}`);
     const finalSchedules = await db.select().from(schedules).where(and10(
-      eq15(schedules.date, date2),
-      eq15(schedules.time, time2)
+      eq16(schedules.date, date2),
+      eq16(schedules.time, time2)
     )).orderBy(schedules.position);
     console.log(
       "[batch-update] Final state:",
@@ -14823,148 +15550,450 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
 });
 var scheduleGeneration_default = router6;
 
+// server/routes/scheduleImportExport.ts
+import { Router as Router7 } from "express";
+import multer from "multer";
+import * as XLSX from "xlsx";
+import { format as format6 } from "date-fns";
+import { ptBR as ptBR3 } from "date-fns/locale";
+import { and as and11, eq as eq17, inArray as inArray6 } from "drizzle-orm";
+await init_db();
+init_schema();
+init_logger();
+var router7 = Router7();
+var SHEET_NAME = "Escala";
+var COLUMN_HEADERS = [
+  "Data",
+  "Dia da Semana",
+  "Hor\xE1rio",
+  "Missa",
+  "Tipo",
+  "Posi\xE7\xE3o",
+  "ID Ministro",
+  "Ministro",
+  "Email"
+];
+var ALL_GENERATIONS_QUERY_LIMIT = 1;
+var upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  // 5MB é mais que suficiente para escala
+  fileFilter: (_req, file, cb) => {
+    const ok = file.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || file.mimetype === "application/vnd.ms-excel" || file.originalname.toLowerCase().endsWith(".xlsx");
+    cb(null, ok);
+  }
+});
+async function loadGeneration(generationId) {
+  const [gen] = await db.select().from(scheduleGenerations).where(eq17(scheduleGenerations.id, generationId)).limit(ALL_GENERATIONS_QUERY_LIMIT);
+  return gen ?? null;
+}
+function getSavedSlots(gen) {
+  const data = gen.finalSchedule || gen.originalSchedule;
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data.schedules) ? data.schedules : [];
+}
+function dayOfWeekPt(dateStr) {
+  return format6(/* @__PURE__ */ new Date(dateStr + "T12:00:00"), "EEEE", { locale: ptBR3 });
+}
+router7.get(
+  "/generation/:id/export-xlsx",
+  authenticateToken,
+  requireAdminUser(),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const gen = await loadGeneration(id);
+      if (!gen) {
+        return res.status(404).json({ success: false, message: "Gera\xE7\xE3o n\xE3o encontrada" });
+      }
+      const slots = getSavedSlots(gen);
+      const allMinisterIds = /* @__PURE__ */ new Set();
+      for (const slot of slots) {
+        for (const m of slot.ministers || []) if (m.id) allMinisterIds.add(m.id);
+        for (const m of slot.backupMinisters || []) if (m.id) allMinisterIds.add(m.id);
+      }
+      const emailMap = /* @__PURE__ */ new Map();
+      if (allMinisterIds.size > 0) {
+        const rows2 = await db.select({ id: users.id, email: users.email }).from(users).where(inArray6(users.id, [...allMinisterIds]));
+        for (const r of rows2) if (r.id && r.email) emailMap.set(r.id, r.email);
+      }
+      const rows = [[...COLUMN_HEADERS]];
+      const sortedSlots = [...slots].sort((a, b) => {
+        const ka = `${a.date ?? ""} ${a.time ?? ""}`;
+        const kb = `${b.date ?? ""} ${b.time ?? ""}`;
+        return ka.localeCompare(kb);
+      });
+      for (const slot of sortedSlots) {
+        if (!slot.date || !slot.time) continue;
+        const massName = slot.name || slot.type || "Missa";
+        const dow = dayOfWeekPt(slot.date);
+        const titulares = (slot.ministers || []).slice().sort(
+          (a, b) => (a.position ?? 999) - (b.position ?? 999)
+        );
+        for (const m of titulares) {
+          rows.push([
+            slot.date,
+            dow,
+            slot.time,
+            massName,
+            "Titular",
+            m.position ?? "",
+            m.id ?? "",
+            m.name ?? "",
+            m.id && emailMap.get(m.id) || ""
+          ]);
+        }
+        const backups = (slot.backupMinisters || []).slice().sort(
+          (a, b) => (a.position ?? 999) - (b.position ?? 999)
+        );
+        for (const m of backups) {
+          rows.push([
+            slot.date,
+            dow,
+            slot.time,
+            massName,
+            "Backup",
+            "",
+            // backups não têm posição firme
+            m.id ?? "",
+            m.name ?? "",
+            m.id && emailMap.get(m.id) || ""
+          ]);
+        }
+      }
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      worksheet["!cols"] = [
+        { wch: 12 },
+        // Data
+        { wch: 16 },
+        // Dia da Semana
+        { wch: 10 },
+        // Horário
+        { wch: 50 },
+        // Missa
+        { wch: 10 },
+        // Tipo
+        { wch: 10 },
+        // Posição
+        { wch: 38 },
+        // ID Ministro
+        { wch: 35 },
+        // Ministro
+        { wch: 30 }
+        // Email
+      ];
+      XLSX.utils.book_append_sheet(workbook, worksheet, SHEET_NAME);
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const fileName = `escala-${gen.month?.toString().padStart(2, "0")}-${gen.year}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.send(buffer);
+    } catch (error) {
+      logger.error("Erro ao exportar xlsx:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao exportar escala"
+      });
+    }
+  }
+);
+function parseImportRows(buffer) {
+  const errors = [];
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  if (!sheet) {
+    errors.push("Planilha vazia ou ileg\xEDvel");
+    return { rows: [], errors };
+  }
+  const raw = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  const rows = [];
+  raw.forEach((r, i) => {
+    const rowIdx = i + 2;
+    const date2 = String(r["Data"] ?? "").trim();
+    const time2 = String(r["Hor\xE1rio"] ?? r["Horario"] ?? "").trim();
+    const tipo = String(r["Tipo"] ?? "").trim();
+    const ministerId = String(r["ID Ministro"] ?? r["IdMinistro"] ?? r["Id Ministro"] ?? "").trim();
+    const ministerName = String(r["Ministro"] ?? "").trim();
+    const email = String(r["Email"] ?? "").trim();
+    const positionRaw = r["Posi\xE7\xE3o"] ?? r["Posicao"] ?? "";
+    const position = positionRaw === "" ? null : Number(positionRaw);
+    if (!date2 || !time2) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date2)) {
+      errors.push(`Linha ${rowIdx}: data inv\xE1lida "${date2}" \u2014 esperado YYYY-MM-DD`);
+      return;
+    }
+    if (!/^\d{2}:\d{2}/.test(time2)) {
+      errors.push(`Linha ${rowIdx}: hor\xE1rio inv\xE1lido "${time2}" \u2014 esperado HH:MM`);
+      return;
+    }
+    if (tipo !== "Titular" && tipo !== "Backup") {
+      errors.push(`Linha ${rowIdx}: Tipo deve ser "Titular" ou "Backup", veio "${tipo}"`);
+      return;
+    }
+    if (!ministerId && !email) {
+      errors.push(`Linha ${rowIdx}: faltou ID Ministro ou Email`);
+      return;
+    }
+    rows.push({
+      rowIndex: rowIdx,
+      date: date2,
+      time: time2.substring(0, 5),
+      // HH:MM
+      type: tipo,
+      position: tipo === "Titular" && position !== null && !Number.isNaN(position) ? position : null,
+      ministerId: ministerId || null,
+      ministerName,
+      email: email || void 0
+    });
+  });
+  return { rows, errors };
+}
+async function resolveMinisterIds(rows) {
+  const errors = [];
+  const emailLookups = rows.filter((r) => !r.ministerId && r.email).map((r) => r.email.toLowerCase());
+  let emailToId = /* @__PURE__ */ new Map();
+  if (emailLookups.length > 0) {
+    const found = await db.select({ id: users.id, email: users.email }).from(users).where(inArray6(users.email, emailLookups));
+    emailToId = new Map(found.map((r) => [r.email.toLowerCase(), r.id]));
+  }
+  const idsToCheck = [...new Set(rows.filter((r) => r.ministerId).map((r) => r.ministerId))];
+  let knownIds = /* @__PURE__ */ new Set();
+  if (idsToCheck.length > 0) {
+    const found = await db.select({ id: users.id }).from(users).where(inArray6(users.id, idsToCheck));
+    knownIds = new Set(found.map((r) => r.id));
+  }
+  const resolved = [];
+  for (const r of rows) {
+    if (r.ministerId) {
+      if (!knownIds.has(r.ministerId)) {
+        errors.push(`Linha ${r.rowIndex}: ID Ministro "${r.ministerId}" n\xE3o existe`);
+        continue;
+      }
+      resolved.push(r);
+    } else if (r.email) {
+      const id = emailToId.get(r.email.toLowerCase());
+      if (!id) {
+        errors.push(`Linha ${r.rowIndex}: email "${r.email}" n\xE3o corresponde a nenhum ministro`);
+        continue;
+      }
+      resolved.push({ ...r, ministerId: id });
+    }
+  }
+  return { resolved, errors };
+}
+function groupIntoSlots(rows) {
+  const errors = [];
+  const map = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const key = `${r.date}_${r.time}`;
+    let slot = map.get(key);
+    if (!slot) {
+      slot = { date: r.date, time: r.time, ministers: [], backupMinisters: [] };
+      map.set(key, slot);
+    }
+    const entry = { id: r.ministerId, name: r.ministerName, position: r.position ?? 0 };
+    if (r.type === "Titular") {
+      if (slot.ministers.some((m) => m.id === entry.id)) {
+        errors.push(`Linha ${r.rowIndex}: ${r.ministerName} aparece como Titular duplicado em ${r.date} ${r.time}`);
+        continue;
+      }
+      slot.ministers.push(entry);
+    } else {
+      if (slot.backupMinisters.some((m) => m.id === entry.id)) {
+        errors.push(`Linha ${r.rowIndex}: ${r.ministerName} aparece como Backup duplicado em ${r.date} ${r.time}`);
+        continue;
+      }
+      slot.backupMinisters.push(entry);
+    }
+  }
+  const slots = [...map.values()];
+  for (const s of slots) {
+    s.ministers.sort((a, b) => (a.position || 999) - (b.position || 999));
+    s.ministers.forEach((m, idx) => {
+      m.position = m.position || idx + 1;
+    });
+  }
+  return { slots, errors };
+}
+function buildDiff(before, after) {
+  const beforeByKey = /* @__PURE__ */ new Map();
+  for (const s of before) {
+    if (s.date && s.time) beforeByKey.set(`${s.date}_${s.time}`, s);
+  }
+  const afterByKey = /* @__PURE__ */ new Map();
+  for (const s of after) afterByKey.set(`${s.date}_${s.time}`, s);
+  const allKeys = /* @__PURE__ */ new Set([...beforeByKey.keys(), ...afterByKey.keys()]);
+  const diffs = [];
+  for (const key of [...allKeys].sort()) {
+    const b = beforeByKey.get(key);
+    const a = afterByKey.get(key);
+    const [date2, time2] = key.split("_");
+    const beforeTit = (b?.ministers || []).map((m) => m.name || "").filter(Boolean);
+    const beforeBack = (b?.backupMinisters || []).map((m) => m.name || "").filter(Boolean);
+    const afterTit = (a?.ministers || []).map((m) => m.name || "").filter(Boolean);
+    const afterBack = (a?.backupMinisters || []).map((m) => m.name || "").filter(Boolean);
+    const changed = JSON.stringify(beforeTit) !== JSON.stringify(afterTit) || JSON.stringify(beforeBack) !== JSON.stringify(afterBack);
+    diffs.push({
+      date: date2,
+      time: time2,
+      before: { titulares: beforeTit, backups: beforeBack },
+      after: { titulares: afterTit, backups: afterBack },
+      changed
+    });
+  }
+  return diffs;
+}
+router7.post(
+  "/generation/:id/import-xlsx",
+  authenticateToken,
+  requireAdminUser(),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: "Arquivo .xlsx n\xE3o enviado" });
+      }
+      const gen = await loadGeneration(id);
+      if (!gen) {
+        return res.status(404).json({ success: false, message: "Gera\xE7\xE3o n\xE3o encontrada" });
+      }
+      const { rows, errors: parseErrors } = parseImportRows(req.file.buffer);
+      if (rows.length === 0 && parseErrors.length > 0) {
+        return res.status(400).json({ success: false, message: "Planilha sem linhas v\xE1lidas", errors: parseErrors });
+      }
+      const { resolved, errors: resolveErrors } = await resolveMinisterIds(rows);
+      const { slots: importedSlots, errors: groupErrors } = groupIntoSlots(resolved);
+      const allErrors = [...parseErrors, ...resolveErrors, ...groupErrors];
+      const before = getSavedSlots(gen);
+      const diffs = buildDiff(before, importedSlots);
+      res.json({
+        success: true,
+        data: {
+          generationId: id,
+          totalRows: rows.length,
+          totalSlots: importedSlots.length,
+          changedSlotsCount: diffs.filter((d) => d.changed).length,
+          errors: allErrors,
+          diffs,
+          // Mandamos os slots de volta para o cliente reenviar no apply, evitando
+          // estado intermediário no servidor.
+          importedSlots
+        }
+      });
+    } catch (error) {
+      logger.error("Erro ao importar xlsx (preview):", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao processar planilha"
+      });
+    }
+  }
+);
+router7.post(
+  "/generation/:id/import-xlsx/apply",
+  authenticateToken,
+  requireAdminUser(),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const importedSlots = req.body?.importedSlots;
+      if (!Array.isArray(importedSlots) || importedSlots.length === 0) {
+        return res.status(400).json({ success: false, message: "Nenhum slot recebido para aplicar" });
+      }
+      const gen = await loadGeneration(id);
+      if (!gen) {
+        return res.status(404).json({ success: false, message: "Gera\xE7\xE3o n\xE3o encontrada" });
+      }
+      if (gen.status !== "draft") {
+        return res.status(400).json({ success: false, message: "S\xF3 \xE9 poss\xEDvel importar em escalas em draft" });
+      }
+      const before = getSavedSlots(gen);
+      const beforeByKey = /* @__PURE__ */ new Map();
+      for (const s of before) if (s.date && s.time) beforeByKey.set(`${s.date}_${s.time}`, s);
+      const merged = before.map((s) => ({ ...s }));
+      for (const slot of importedSlots) {
+        const key = `${slot.date}_${slot.time}`;
+        const idx = merged.findIndex((s) => s.date === slot.date && s.time === slot.time);
+        const baseline = beforeByKey.get(key);
+        const newSlot = {
+          date: slot.date,
+          time: slot.time,
+          type: baseline?.type,
+          name: baseline?.name,
+          location: baseline?.location ?? null,
+          confidence: baseline?.confidence ?? 1,
+          ministers: slot.ministers.map((m, i) => ({ id: m.id, name: m.name, position: m.position || i + 1 })),
+          backupMinisters: slot.backupMinisters.map((m, i) => ({
+            id: m.id,
+            name: m.name,
+            position: m.position || slot.ministers.length + i + 1
+          }))
+        };
+        if (idx >= 0) merged[idx] = newSlot;
+        else merged.push(newSlot);
+      }
+      await db.transaction(async (tx) => {
+        const newJson = {
+          ...gen.originalSchedule ?? {},
+          month: gen.month,
+          year: gen.year,
+          totalMasses: merged.length,
+          schedules: merged,
+          generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          importedAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        await tx.update(scheduleGenerations).set({ originalSchedule: newJson }).where(eq17(scheduleGenerations.id, id));
+        for (const slot of importedSlots) {
+          const oldIds = await tx.select({ id: schedules.id }).from(schedules).where(and11(eq17(schedules.date, slot.date), eq17(schedules.time, slot.time)));
+          if (oldIds.length > 0) {
+            const idsArr = oldIds.map((r) => r.id);
+            await tx.delete(substitutionRequests).where(inArray6(substitutionRequests.scheduleId, idsArr));
+            await tx.delete(schedules).where(and11(eq17(schedules.date, slot.date), eq17(schedules.time, slot.time)));
+          }
+          for (let i = 0; i < slot.ministers.length; i++) {
+            const m = slot.ministers[i];
+            await tx.insert(schedules).values({
+              date: slot.date,
+              time: slot.time,
+              type: "missa",
+              location: null,
+              ministerId: m.id,
+              position: m.position || i + 1,
+              status: "scheduled",
+              notes: "Importado via xlsx"
+            });
+          }
+        }
+      });
+      res.json({ success: true, message: `Escala atualizada: ${importedSlots.length} slot(s)` });
+    } catch (error) {
+      logger.error("Erro ao aplicar import xlsx:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao aplicar import"
+      });
+    }
+  }
+);
+var scheduleImportExport_default = router7;
+
 // server/routes/smartScheduleGeneration.ts
 await init_db();
 init_schema();
-import { Router as Router7 } from "express";
+import { Router as Router8 } from "express";
 await init_scheduleGenerator();
-import { eq as eq16, and as and11, gte as gte6, lte as lte6, ne as ne4 } from "drizzle-orm";
-
-// server/utils/liturgicalCalculations.ts
-function calculateEaster(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = (h + l - 7 * m + 114) % 31 + 1;
-  return new Date(year, month - 1, day);
-}
-function getLiturgicalCycle(year) {
-  const remainder = year % 3;
-  if (remainder === 0) return "A";
-  if (remainder === 1) return "B";
-  return "C";
-}
-function getAdventStart(year) {
-  const christmas = new Date(year, 11, 25);
-  const dayOfWeek = christmas.getDay();
-  const daysToSunday = dayOfWeek === 0 ? 7 : dayOfWeek;
-  const daysBack = 28 + daysToSunday;
-  const adventStart = new Date(year, 11, 25 - daysBack);
-  return adventStart;
-}
-function getMovableFeasts(year) {
-  const easter = calculateEaster(year);
-  return {
-    ashWednesday: addDays3(easter, -46),
-    palmSunday: addDays3(easter, -7),
-    holyThursday: addDays3(easter, -3),
-    goodFriday: addDays3(easter, -2),
-    holySaturday: addDays3(easter, -1),
-    easterSunday: easter,
-    divineMercySunday: addDays3(easter, 7),
-    ascension: addDays3(easter, 39),
-    // or 43 in some regions
-    pentecost: addDays3(easter, 49),
-    trinitySunday: addDays3(easter, 56),
-    corpusChristi: addDays3(easter, 60)
-    // or next Sunday in some regions
-  };
-}
-function getLiturgicalSeasons(year) {
-  const adventStart = getAdventStart(year);
-  const christmas = new Date(year, 11, 25);
-  const epiphany = new Date(year + 1, 0, 6);
-  const baptismOfTheLord = getNextSunday(epiphany);
-  const movableFeasts = getMovableFeasts(year + 1);
-  const ashWednesday = movableFeasts.ashWednesday;
-  const easterSunday = movableFeasts.easterSunday;
-  const pentecost = movableFeasts.pentecost;
-  const nextAdventStart = getAdventStart(year + 1);
-  return [
-    {
-      name: "Advent",
-      color: "purple",
-      startDate: adventStart,
-      endDate: addDays3(christmas, -1)
-    },
-    {
-      name: "Christmas",
-      color: "white",
-      startDate: christmas,
-      endDate: baptismOfTheLord
-    },
-    {
-      name: "Ordinary Time I",
-      color: "green",
-      startDate: addDays3(baptismOfTheLord, 1),
-      endDate: addDays3(ashWednesday, -1)
-    },
-    {
-      name: "Lent",
-      color: "purple",
-      startDate: ashWednesday,
-      endDate: addDays3(easterSunday, -1)
-    },
-    {
-      name: "Easter",
-      color: "white",
-      startDate: easterSunday,
-      endDate: pentecost
-    },
-    {
-      name: "Ordinary Time II",
-      color: "green",
-      startDate: addDays3(pentecost, 1),
-      endDate: addDays3(nextAdventStart, -1)
-    }
-  ];
-}
-function addDays3(date2, days) {
-  const result = new Date(date2);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-function getNextSunday(date2) {
-  const result = new Date(date2);
-  const daysUntilSunday = (7 - result.getDay()) % 7;
-  result.setDate(result.getDate() + (daysUntilSunday === 0 ? 7 : daysUntilSunday));
-  return result;
-}
-function getCurrentLiturgicalSeason(date2 = /* @__PURE__ */ new Date()) {
-  const year = date2.getFullYear();
-  const seasons = getLiturgicalSeasons(year - 1);
-  seasons.push(...getLiturgicalSeasons(year));
-  const currentSeason = seasons.find(
-    (season) => date2 >= season.startDate && date2 <= season.endDate
-  );
-  if (!currentSeason) {
-    return { name: "Ordinary Time", color: "green", cycle: getLiturgicalCycle(year) };
-  }
-  return {
-    ...currentSeason,
-    cycle: getLiturgicalCycle(year)
-  };
-}
-
-// server/routes/smartScheduleGeneration.ts
-import { format as format6, startOfMonth as startOfMonth3, endOfMonth as endOfMonth3 } from "date-fns";
-var router7 = Router7();
+import { eq as eq18, and as and12, gte as gte7, lte as lte7, ne as ne4 } from "drizzle-orm";
+import { format as format7, startOfMonth as startOfMonth3, endOfMonth as endOfMonth3 } from "date-fns";
+var router8 = Router8();
 function getErrorMessage5(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Unknown error";
 }
-router7.post("/generate-smart", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/generate-smart", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { month, year, options } = req.body;
     if (!month || !year) {
@@ -15018,7 +16047,7 @@ router7.post("/generate-smart", authenticateToken, requireRole(["coordenador", "
     });
   }
 });
-router7.post("/preview", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/preview", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { month, year, options } = req.body;
     if (!month || !year) {
@@ -15053,7 +16082,7 @@ router7.post("/preview", authenticateToken, requireRole(["coordenador", "gestor"
     });
   }
 });
-router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.put("/manual-adjustment", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { date: date2, time: time2, ministerId, newPosition, oldPosition } = req.body;
     if (!date2 || !time2 || !ministerId) {
@@ -15072,9 +16101,9 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
       });
     }
     const existingAssignments = await db.select().from(schedules).where(
-      and11(
-        eq16(schedules.date, date2),
-        eq16(schedules.ministerId, ministerId),
+      and12(
+        eq18(schedules.date, date2),
+        eq18(schedules.ministerId, ministerId),
         ne4(schedules.time, time2)
       )
     );
@@ -15086,14 +16115,14 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
       });
     }
     const existing = await db.select().from(schedules).where(
-      and11(
-        eq16(schedules.date, date2),
-        eq16(schedules.time, time2),
-        eq16(schedules.ministerId, ministerId)
+      and12(
+        eq18(schedules.date, date2),
+        eq18(schedules.time, time2),
+        eq18(schedules.ministerId, ministerId)
       )
     );
     if (existing.length > 0) {
-      await db.update(schedules).set({ position: newPosition }).where(eq16(schedules.id, existing[0].id));
+      await db.update(schedules).set({ position: newPosition }).where(eq18(schedules.id, existing[0].id));
     } else {
       await db.insert(schedules).values({
         date: date2,
@@ -15121,7 +16150,7 @@ router7.put("/manual-adjustment", authenticateToken, requireRole(["coordenador",
     });
   }
 });
-router7.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { month, year, scheduleData } = req.body;
     if (!month || !year || !scheduleData) {
@@ -15139,7 +16168,7 @@ router7.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"
         data: { validation }
       });
     }
-    const savedCount = await saveScheduleToDatabase(scheduleData, month, year);
+    const savedCount = await saveScheduleToDatabase(scheduleData, month, year, req.user.homeCommunityId);
     const notificationResults = await sendMinisterNotifications(scheduleData, month, year);
     console.log(`[PUBLISH] Published ${savedCount} assignments, sent ${notificationResults.sent} notifications`);
     res.json({
@@ -15160,17 +16189,17 @@ router7.post("/publish", authenticateToken, requireRole(["coordenador", "gestor"
     });
   }
 });
-router7.get("/validation/:year/:month", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router8.get("/validation/:year/:month", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const { month, year } = req.params;
     const monthNum = parseInt(month);
     const yearNum = parseInt(year);
-    const startDate = format6(new Date(yearNum, monthNum - 1, 1), "yyyy-MM-dd");
-    const endDate = format6(endOfMonth3(new Date(yearNum, monthNum - 1, 1)), "yyyy-MM-dd");
+    const startDate = format7(new Date(yearNum, monthNum - 1, 1), "yyyy-MM-dd");
+    const endDate = format7(endOfMonth3(new Date(yearNum, monthNum - 1, 1)), "yyyy-MM-dd");
     const monthSchedules = await db.select().from(schedules).where(
-      and11(
-        gte6(schedules.date, startDate),
-        lte6(schedules.date, endDate)
+      and12(
+        gte7(schedules.date, startDate),
+        lte7(schedules.date, endDate)
       )
     );
     const validation = await validateScheduleBeforePublish(monthSchedules, monthNum, yearNum);
@@ -15208,16 +16237,16 @@ function calculateGenerationStatistics(schedules3, options) {
   }
   const coverage = totalPositions > 0 ? filledPositions / totalPositions : 0;
   const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum2, count13) => sum2 + count13, 0) / assignments.length : 0;
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum2, count14) => sum2 + count14, 0) / assignments.length : 0;
   const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum2, count13) => sum2 + Math.pow(count13 - avgAssignments, 2), 0) / assignments.length
+    assignments.reduce((sum2, count14) => sum2 + Math.pow(count14 - avgAssignments, 2), 0) / assignments.length
   ) / (avgAssignments || 1) : 0;
   const fairness = Math.max(0, 1 - variance);
   const maxAllowed = options.maxAssignmentsPerMinister || 4;
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count13]) => count13 > maxAllowed || count13 < 1).map(([ministerId, count13]) => ({
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count14]) => count14 > maxAllowed || count14 < 1).map(([ministerId, count14]) => ({
     ministerId,
-    count: count13,
-    reason: count13 > maxAllowed ? "too_many" : "too_few"
+    count: count14,
+    reason: count14 > maxAllowed ? "too_many" : "too_few"
   }));
   const conflicts = [];
   if (variance > 0.3) {
@@ -15237,18 +16266,18 @@ function calculateGenerationStatistics(schedules3, options) {
   };
 }
 async function checkMinisterAvailability(ministerId, date2, time2) {
-  const minister = await db.select().from(users).where(eq16(users.id, ministerId)).limit(1);
+  const minister = await db.select().from(users).where(eq18(users.id, ministerId)).limit(1);
   if (minister.length === 0) {
     return { available: false, reason: "Ministro n\xE3o encontrado" };
   }
   const dateObj = new Date(date2);
   const month = dateObj.getMonth() + 1;
   const year = dateObj.getFullYear();
-  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq16(questionnaireResponses.questionnaireId, questionnaires.id)).where(
-    and11(
-      eq16(questionnaireResponses.userId, ministerId),
-      eq16(questionnaires.month, month),
-      eq16(questionnaires.year, year)
+  const responses = await db.select().from(questionnaireResponses).innerJoin(questionnaires, eq18(questionnaireResponses.questionnaireId, questionnaires.id)).where(
+    and12(
+      eq18(questionnaireResponses.userId, ministerId),
+      eq18(questionnaires.month, month),
+      eq18(questionnaires.year, year)
     )
   );
   if (responses.length === 0) {
@@ -15258,7 +16287,7 @@ async function checkMinisterAvailability(ministerId, date2, time2) {
   const dayOfWeek = dateObj.getDay();
   if (dayOfWeek === 0) {
     const availableSundays = response.availableSundays || [];
-    const formattedDate = format6(dateObj, "yyyy-MM-dd");
+    const formattedDate = format7(dateObj, "yyyy-MM-dd");
     if (availableSundays.length > 0 && !availableSundays.includes(formattedDate)) {
       return { available: false, reason: "Ministro n\xE3o dispon\xEDvel neste domingo" };
     }
@@ -15300,12 +16329,12 @@ async function calculateFairnessImpact(ministerId, date2) {
   const dateObj = new Date(date2);
   const month = dateObj.getMonth() + 1;
   const year = dateObj.getFullYear();
-  const startDate = format6(startOfMonth3(dateObj), "yyyy-MM-dd");
-  const endDate = format6(endOfMonth3(dateObj), "yyyy-MM-dd");
+  const startDate = format7(startOfMonth3(dateObj), "yyyy-MM-dd");
+  const endDate = format7(endOfMonth3(dateObj), "yyyy-MM-dd");
   const allAssignments = await db.select().from(schedules).where(
-    and11(
-      gte6(schedules.date, startDate),
-      lte6(schedules.date, endDate)
+    and12(
+      gte7(schedules.date, startDate),
+      lte7(schedules.date, endDate)
     )
   );
   const counts = {};
@@ -15371,7 +16400,7 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
       }
     }
   }
-  const overAssigned = Object.entries(ministerCounts).filter(([_, count13]) => count13 > 4);
+  const overAssigned = Object.entries(ministerCounts).filter(([_, count14]) => count14 > 4);
   const noOverAssignments = overAssigned.length === 0;
   if (!noOverAssignments) {
     warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
@@ -15395,7 +16424,7 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
     errors
   };
 }
-async function saveScheduleToDatabase(scheduleData, month, year) {
+async function saveScheduleToDatabase(scheduleData, month, year, communityId) {
   let savedCount = 0;
   for (const schedule of scheduleData) {
     const date2 = schedule.date || schedule.massTime?.date;
@@ -15408,10 +16437,10 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
       const position = minister.position || 0;
       if (!ministerId) continue;
       const existing = await db.select().from(schedules).where(
-        and11(
-          eq16(schedules.date, date2),
-          eq16(schedules.time, time2),
-          eq16(schedules.ministerId, ministerId)
+        and12(
+          eq18(schedules.date, date2),
+          eq18(schedules.time, time2),
+          eq18(schedules.ministerId, ministerId)
         )
       );
       if (existing.length === 0) {
@@ -15421,7 +16450,8 @@ async function saveScheduleToDatabase(scheduleData, month, year) {
           type,
           ministerId,
           position,
-          status: "scheduled"
+          status: "scheduled",
+          communityId
         });
         savedCount++;
       }
@@ -15516,9 +16546,9 @@ async function getLiturgicalInfoForMonth(year, month) {
   const season = getCurrentLiturgicalSeason(startDate);
   const movableFeasts = getMovableFeasts(year);
   const celebrations = await db.select().from(liturgicalCelebrations).where(
-    and11(
-      gte6(liturgicalCelebrations.date, format6(startDate, "yyyy-MM-dd")),
-      lte6(liturgicalCelebrations.date, format6(endDate, "yyyy-MM-dd"))
+    and12(
+      gte7(liturgicalCelebrations.date, format7(startDate, "yyyy-MM-dd")),
+      lte7(liturgicalCelebrations.date, format7(endDate, "yyyy-MM-dd"))
     )
   );
   return {
@@ -15527,25 +16557,27 @@ async function getLiturgicalInfoForMonth(year, month) {
     specialCelebrations: celebrations
   };
 }
-var smartScheduleGeneration_default = router7;
+var smartScheduleGeneration_default = router8;
 
 // server/routes/schedules.ts
 await init_db();
 init_schema();
-import { Router as Router8 } from "express";
+import { Router as Router9 } from "express";
 import { z as z5 } from "zod";
-import { eq as eq20, and as and15, sql as sql10, gte as gte9, lte as lte8, desc as desc5 } from "drizzle-orm";
+init_roles();
+import { eq as eq22, and as and16, sql as sql10, gte as gte10, lte as lte9, desc as desc5 } from "drizzle-orm";
 
 // server/services/scheduleComparisonService.ts
 await init_db();
 init_schema();
-import { eq as eq18, and as and13, inArray as inArray5 } from "drizzle-orm";
+import { eq as eq20, and as and14, inArray as inArray9 } from "drizzle-orm";
 
 // server/services/reliabilityScoreService.ts
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq17, and as and12, sql as sql8 } from "drizzle-orm";
+init_roles();
+import { eq as eq19, and as and13, sql as sql8, inArray as inArray8 } from "drizzle-orm";
 var PENALTIES = {
   SUBSTITUTION_REQUEST: 5,
   // Each substitution request reduces score by 5 points
@@ -15591,7 +16623,7 @@ function getScoreCategory(score) {
 }
 async function getMinisterReliabilityScore(ministerId) {
   try {
-    const [minister] = await db.select().from(users).where(eq17(users.id, ministerId)).limit(1);
+    const [minister] = await db.select().from(users).where(eq19(users.id, ministerId)).limit(1);
     if (!minister) {
       return null;
     }
@@ -15616,7 +16648,7 @@ async function getMinisterReliabilityScore(ministerId) {
 }
 async function updateMinisterReliabilityScore(ministerId) {
   try {
-    const [minister] = await db.select().from(users).where(eq17(users.id, ministerId)).limit(1);
+    const [minister] = await db.select().from(users).where(eq19(users.id, ministerId)).limit(1);
     if (!minister) {
       logger.error(`Minister ${ministerId} not found for reliability update`);
       return null;
@@ -15634,7 +16666,7 @@ async function updateMinisterReliabilityScore(ministerId) {
     await db.update(users).set({
       reliabilityScore: scoreComponents.finalScore,
       lastReliabilityUpdate: /* @__PURE__ */ new Date()
-    }).where(eq17(users.id, ministerId));
+    }).where(eq19(users.id, ministerId));
     const metrics2 = {
       ministerId,
       ministerName: minister.name,
@@ -15658,7 +16690,7 @@ async function trackSubstitutionRequest(ministerId, scheduleId) {
   try {
     await db.update(users).set({
       substitutionRequestCount: sql8`${users.substitutionRequestCount} + 1`
-    }).where(eq17(users.id, ministerId));
+    }).where(eq19(users.id, ministerId));
     logger.info(`[RELIABILITY] Tracked substitution request for minister ${ministerId}`);
     await updateMinisterReliabilityScore(ministerId);
   } catch (error) {
@@ -15669,7 +16701,7 @@ async function trackSubstitutionFulfillment(substituteId, scheduleId) {
   try {
     await db.update(users).set({
       substitutionFulfilledCount: sql8`${users.substitutionFulfilledCount} + 1`
-    }).where(eq17(users.id, substituteId));
+    }).where(eq19(users.id, substituteId));
     logger.info(`[RELIABILITY] Tracked substitution fulfillment for minister ${substituteId} (BONUS)`);
     await updateMinisterReliabilityScore(substituteId);
   } catch (error) {
@@ -15681,7 +16713,7 @@ async function trackManualRemoval(ministerId, scheduleId, reason) {
     await db.update(users).set({
       manualRemovalCount: sql8`${users.manualRemovalCount} + 1`,
       reliabilityNotes: reason ? sql8`COALESCE(${users.reliabilityNotes}, '') || E'\n[' || NOW() || '] Manual removal: ' || ${reason}` : users.reliabilityNotes
-    }).where(eq17(users.id, ministerId));
+    }).where(eq19(users.id, ministerId));
     logger.warn(`[RELIABILITY] Tracked manual removal for minister ${ministerId}${reason ? `: ${reason}` : ""}`);
     await updateMinisterReliabilityScore(ministerId);
   } catch (error) {
@@ -15699,7 +16731,7 @@ async function getAllReliabilityMetrics() {
       manualRemovalCount: users.manualRemovalCount,
       noShowCount: users.noShowCount,
       lastReliabilityUpdate: users.lastReliabilityUpdate
-    }).from(users).where(eq17(users.status, "active"));
+    }).from(users).where(eq19(users.status, "active"));
     return ministers.map((m) => {
       const score = m.reliabilityScore || 100;
       return {
@@ -15748,9 +16780,9 @@ async function checkAndAlertLowReliability() {
       name: users.name,
       role: users.role
     }).from(users).where(
-      and12(
-        sql8`${users.role} IN ('coordenador', 'gestor')`,
-        eq17(users.status, "active")
+      and13(
+        inArray8(users.role, [...ADMIN_ROLES]),
+        eq19(users.status, "active")
       )
     );
     logger.info(`[ADAPTIVE ALERTS] Notifying ${coordinators.length} coordinators/gestors`);
@@ -15842,10 +16874,10 @@ async function compareAndLearn(month, year) {
     id: scheduleGenerations.id,
     differences: scheduleGenerations.differences
   }).from(scheduleGenerations).where(
-    and13(
-      eq18(scheduleGenerations.month, month),
-      eq18(scheduleGenerations.year, year),
-      eq18(scheduleGenerations.status, "published")
+    and14(
+      eq20(scheduleGenerations.month, month),
+      eq20(scheduleGenerations.year, year),
+      eq20(scheduleGenerations.status, "published")
     )
   );
   if (generations.length === 0) {
@@ -15910,7 +16942,7 @@ async function analyzeMonthlyPatterns(month, year) {
     additionCount: m.count,
     reliabilityScore: m.reliabilityScore
   }));
-  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count13]) => ({ time: time2, changeCount: count13 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
+  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count14]) => ({ time: time2, changeCount: count14 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
   let algorithmHealth;
   if (acceptanceRate >= 85) algorithmHealth = "excellent";
   else if (acceptanceRate >= 70) algorithmHealth = "good";
@@ -15952,7 +16984,7 @@ async function getMinisterDetails(counts) {
     id: users.id,
     name: users.name,
     reliabilityScore: users.reliabilityScore
-  }).from(users).where(inArray5(users.id, ministerIds));
+  }).from(users).where(inArray9(users.id, ministerIds));
   return ministers.map((m) => ({
     ministerId: m.id,
     ministerName: m.name,
@@ -15966,7 +16998,7 @@ async function getMinisterLearningInsights(ministerId) {
     name: users.name,
     reliabilityScore: users.reliabilityScore,
     manualRemovalCount: users.manualRemovalCount
-  }).from(users).where(eq18(users.id, ministerId)).limit(1);
+  }).from(users).where(eq20(users.id, ministerId)).limit(1);
   if (minister.length === 0) {
     throw new Error(`Minister ${ministerId} not found`);
   }
@@ -16020,8 +17052,8 @@ var isMissingSchedulesDateColumnError = (error) => {
   const message = error?.message?.toLowerCase() ?? "";
   return message.includes("does not exist") && message.includes('"date"') || message.includes("no such column: schedules.date") || message.includes("no such column: date");
 };
-var router8 = Router8();
-router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
+var router9 = Router9();
+router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -16035,15 +17067,15 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
       });
     }
     const targetMinisterId = queryValidation.data.ministerId || userId;
-    const minister = await db.select().from(users).where(eq20(users.id, targetMinisterId)).limit(1);
+    const minister = await db.select().from(users).where(eq22(users.id, targetMinisterId)).limit(1);
     if (minister.length === 0) {
       return res.json({ assignments: [] });
     }
     const ministerId = minister[0].id;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const loggedInUser = await db.select({ role: users.role }).from(users).where(eq20(users.id, userId)).limit(1);
-    const isAdmin = loggedInUser.length > 0 && (loggedInUser[0].role === "coordenador" || loggedInUser[0].role === "gestor");
+    const loggedInUser = await db.select({ role: users.role }).from(users).where(eq22(users.id, userId)).limit(1);
+    const isAdmin2 = loggedInUser.length > 0 && isAdmin(loggedInUser[0].role);
     const upcomingAssignments = await db.select({
       id: schedules.id,
       date: schedules.date,
@@ -16054,11 +17086,11 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and15(
-        eq20(schedules.ministerId, ministerId),
-        gte9(schedules.date, today.toISOString().split("T")[0]),
+      and16(
+        eq22(schedules.ministerId, ministerId),
+        gte10(schedules.date, today.toISOString().split("T")[0]),
         // Only show published schedules to regular ministers
-        isAdmin ? void 0 : eq20(schedules.status, "published")
+        isAdmin2 ? void 0 : eq22(schedules.status, "published")
       )
     ).orderBy(schedules.date, schedules.time, schedules.id).limit(10);
     const formattedAssignments = upcomingAssignments.map((assignment) => ({
@@ -16077,7 +17109,7 @@ router8.get("/minister/upcoming", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar pr\xF3ximas escalas" });
   }
 });
-router8.get("/by-date/:date", authenticateToken, async (req, res) => {
+router9.get("/by-date/:date", authenticateToken, async (req, res) => {
   try {
     const paramValidation = dateParamSchema.safeParse(req.params);
     if (!paramValidation.success) {
@@ -16088,10 +17120,10 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
     }
     const { date: date2 } = paramValidation.data;
     const userId = req.user?.id;
-    let isAdmin = false;
+    let isAdmin2 = false;
     if (userId) {
-      const userResult = await db.select({ role: users.role }).from(users).where(eq20(users.id, userId)).limit(1);
-      isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
+      const userResult = await db.select({ role: users.role }).from(users).where(eq22(users.id, userId)).limit(1);
+      isAdmin2 = userResult.length > 0 && isAdmin(userResult[0].role);
     }
     const targetDateStr = date2.includes("T") ? date2.split("T")[0] : date2.split(" ")[0];
     const massAssignmentsRaw = await db.select({
@@ -16109,10 +17141,10 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
       type: schedules.type,
       location: schedules.location,
       notes: schedules.notes
-    }).from(schedules).leftJoin(users, eq20(schedules.ministerId, users.id)).where(
-      and15(
-        eq20(schedules.date, targetDateStr),
-        isAdmin ? void 0 : eq20(schedules.status, "published")
+    }).from(schedules).leftJoin(users, eq22(schedules.ministerId, users.id)).where(
+      and16(
+        eq22(schedules.date, targetDateStr),
+        isAdmin2 ? void 0 : eq22(schedules.status, "published")
       )
     ).orderBy(schedules.time, schedules.position, schedules.id);
     const massAssignments = massAssignmentsRaw.map((a) => {
@@ -16132,7 +17164,7 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
         const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         const monthNum = targetDate.getMonth() + 1;
         const yearNum = targetDate.getFullYear();
-        const draws = await db.select().from(adorationDraws2).where(and15(eq20(adorationDraws2.month, monthNum), eq20(adorationDraws2.year, yearNum))).limit(1);
+        const draws = await db.select().from(adorationDraws2).where(and16(eq22(adorationDraws2.month, monthNum), eq22(adorationDraws2.year, yearNum))).limit(1);
         if (draws.length > 0) {
           const firstDayOfMonth = new Date(yearNum, monthNum - 1, 1);
           let mondayOfWeek = 0;
@@ -16158,9 +17190,9 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
             scheduleDisplayName: users.scheduleDisplayName,
             mondayOfWeek: adorationDrawResults2.mondayOfWeek,
             isVoluntary: adorationDrawResults2.isVoluntary
-          }).from(adorationDrawResults2).leftJoin(users, eq20(adorationDrawResults2.ministerId, users.id)).where(and15(
-            eq20(adorationDrawResults2.drawId, draws[0].id),
-            eq20(adorationDrawResults2.mondayOfWeek, mondayOfWeek)
+          }).from(adorationDrawResults2).leftJoin(users, eq22(adorationDrawResults2.ministerId, users.id)).where(and16(
+            eq22(adorationDrawResults2.drawId, draws[0].id),
+            eq22(adorationDrawResults2.mondayOfWeek, mondayOfWeek)
           ));
           adorationAssignments = drawResults.map((res2) => ({
             id: `adoracao-${res2.id}`,
@@ -16184,15 +17216,15 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
     }
     const allAssignments = [...massAssignments, ...adorationAssignments];
     let backupsByTime = {};
-    if (isAdmin) {
+    if (isAdmin2) {
       try {
         const [yearStr, monthStr] = targetDateStr.split("-");
         const genYear = parseInt(yearStr);
         const genMonth = parseInt(monthStr);
         const { scheduleGenerations: scheduleGenerations2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const [generation] = await db.select().from(scheduleGenerations2).where(and15(
-          eq20(scheduleGenerations2.year, genYear),
-          eq20(scheduleGenerations2.month, genMonth)
+        const [generation] = await db.select().from(scheduleGenerations2).where(and16(
+          eq22(scheduleGenerations2.year, genYear),
+          eq22(scheduleGenerations2.month, genMonth)
         )).orderBy(desc5(scheduleGenerations2.createdAt)).limit(1);
         if (generation) {
           const savedData = generation.finalSchedule || generation.originalSchedule;
@@ -16231,7 +17263,7 @@ router8.get("/by-date/:date", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar escala para a data" });
   }
 });
-router8.get("/", authenticateToken, async (req, res) => {
+router9.get("/", authenticateToken, async (req, res) => {
   try {
     const queryValidation = monthYearQuerySchema.safeParse(req.query);
     if (!queryValidation.success) {
@@ -16242,31 +17274,31 @@ router8.get("/", authenticateToken, async (req, res) => {
     }
     const { month, year } = queryValidation.data;
     const userId = req.user?.id;
-    let isAdmin = false;
+    let isAdmin2 = false;
     if (userId) {
-      const userResult = await db.select({ role: users.role }).from(users).where(eq20(users.id, userId)).limit(1);
-      isAdmin = userResult.length > 0 && (userResult[0].role === "coordenador" || userResult[0].role === "gestor");
+      const userResult = await db.select({ role: users.role }).from(users).where(eq22(users.id, userId)).limit(1);
+      isAdmin2 = userResult.length > 0 && isAdmin(userResult[0].role);
     }
     let query = db.select().from(schedules);
     if (month !== void 0 && year !== void 0) {
       const yearNum = year;
       const monthNum = month;
-      const cachedData = isAdmin ? scheduleCache.get(yearNum, monthNum) : null;
+      const cachedData = isAdmin2 ? scheduleCache.get(yearNum, monthNum) : null;
       if (cachedData) {
         console.log(`[SCHEDULES_API] \u26A1 Returning cached data for ${monthNum}/${yearNum}`);
         return res.json(cachedData);
       }
-      console.log(`[SCHEDULES_API] \u{1F50D} Cache miss - querying database for ${monthNum}/${yearNum} (isAdmin: ${isAdmin})`);
+      console.log(`[SCHEDULES_API] \u{1F50D} Cache miss - querying database for ${monthNum}/${yearNum} (isAdmin: ${isAdmin2})`);
       const startDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-01`;
       const lastDay = new Date(yearNum, monthNum, 0).getDate();
       const endDateStr = `${yearNum}-${monthNum.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
       let schedulesList = [];
       try {
         schedulesList = await db.select().from(schedules).where(
-          and15(
-            gte9(schedules.date, startDateStr),
-            lte8(schedules.date, endDateStr),
-            isAdmin ? void 0 : eq20(schedules.status, "published")
+          and16(
+            gte10(schedules.date, startDateStr),
+            lte9(schedules.date, endDateStr),
+            isAdmin2 ? void 0 : eq22(schedules.status, "published")
           )
         );
       } catch (error) {
@@ -16296,11 +17328,11 @@ router8.get("/", authenticateToken, async (req, res) => {
           photoUrl: users.photoUrl,
           notes: schedules.notes,
           status: schedules.status
-        }).from(schedules).leftJoin(users, eq20(schedules.ministerId, users.id)).where(
-          and15(
-            gte9(schedules.date, startDateStr),
-            lte8(schedules.date, endDateStr),
-            isAdmin ? void 0 : eq20(schedules.status, "published")
+        }).from(schedules).leftJoin(users, eq22(schedules.ministerId, users.id)).where(
+          and16(
+            gte10(schedules.date, startDateStr),
+            lte9(schedules.date, endDateStr),
+            isAdmin2 ? void 0 : eq22(schedules.status, "published")
           )
         ).orderBy(schedules.date, schedules.time, schedules.position, schedules.id);
         assignmentsList = rawAssignments.map((a) => {
@@ -16333,7 +17365,7 @@ router8.get("/", authenticateToken, async (req, res) => {
         status: substitutionRequests.status,
         reason: substitutionRequests.reason
       }).from(substitutionRequests).where(
-        and15(
+        and16(
           sql10`${substitutionRequests.scheduleId} IN (${sql10.join(
             schedulesList.map((s) => sql10`${s.id}`),
             sql10`, `
@@ -16344,7 +17376,7 @@ router8.get("/", authenticateToken, async (req, res) => {
       let adorationAssignments = [];
       try {
         const { adorationDraws: adorationDraws2, adorationDrawResults: adorationDrawResults2, users: users3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const draws = await db.select().from(adorationDraws2).where(and15(eq20(adorationDraws2.month, monthNum), eq20(adorationDraws2.year, yearNum))).limit(1);
+        const draws = await db.select().from(adorationDraws2).where(and16(eq22(adorationDraws2.month, monthNum), eq22(adorationDraws2.year, yearNum))).limit(1);
         if (draws.length > 0) {
           let getMondaysInMonth3 = function(year2, month2) {
             const mondays = [];
@@ -16364,7 +17396,7 @@ router8.get("/", authenticateToken, async (req, res) => {
             scheduleDisplayName: users3.scheduleDisplayName,
             mondayOfWeek: adorationDrawResults2.mondayOfWeek,
             isVoluntary: adorationDrawResults2.isVoluntary
-          }).from(adorationDrawResults2).leftJoin(users3, eq20(adorationDrawResults2.ministerId, users3.id)).where(eq20(adorationDrawResults2.drawId, draws[0].id));
+          }).from(adorationDrawResults2).leftJoin(users3, eq22(adorationDrawResults2.ministerId, users3.id)).where(eq22(adorationDrawResults2.drawId, draws[0].id));
           const mondaysInMonth = getMondaysInMonth3(yearNum, monthNum);
           adorationAssignments = drawResults.map((res2) => {
             const mondayDate = mondaysInMonth[res2.mondayOfWeek - 1];
@@ -16418,9 +17450,9 @@ router8.get("/", authenticateToken, async (req, res) => {
       const lastDay = new Date(fallbackYear, fallbackMonth, 0).getDate();
       const endDateStr = `${fallbackYear}-${fallbackMonth.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
       const fallbackSchedules = await db.select().from(schedules).where(
-        and15(
-          gte9(schedules.date, startDateStr),
-          lte8(schedules.date, endDateStr)
+        and16(
+          gte10(schedules.date, startDateStr),
+          lte9(schedules.date, endDateStr)
         )
       );
       res.json({ schedules: fallbackSchedules, assignments: [] });
@@ -16430,13 +17462,13 @@ router8.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar escalas" });
   }
 });
-router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router9.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq20(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
+    const user = await db.select().from(users).where(eq22(users.id, req.user.id)).limit(1);
+    if (user.length === 0 || !isAdmin(user[0].role)) {
       return res.status(403).json({ message: "Sem permiss\xE3o para criar escalas" });
     }
     const { date: date2, time: time2, type = "missa", location, ministerId } = req.body;
@@ -16447,9 +17479,9 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       return res.status(400).json({ message: "Data deve estar em formato v\xE1lido" });
     }
     const existing = await db.select().from(schedules).where(
-      and15(
-        eq20(schedules.date, date2),
-        eq20(schedules.time, time2)
+      and16(
+        eq22(schedules.date, date2),
+        eq22(schedules.time, time2)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -16479,17 +17511,17 @@ router8.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     res.status(500).json({ message: "Erro ao criar escala" });
   }
 });
-router8.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router9.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq20(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
+    const user = await db.select().from(users).where(eq22(users.id, req.user.id)).limit(1);
+    if (user.length === 0 || !isAdmin(user[0].role)) {
       return res.status(403).json({ message: "Sem permiss\xE3o para editar escalas" });
     }
     const { notes } = req.body;
-    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq20(schedules.id, req.params.id)).returning();
+    const updatedSchedule = await db.update(schedules).set({ notes }).where(eq22(schedules.id, req.params.id)).returning();
     if (updatedSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -16508,13 +17540,13 @@ router8.put("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), a
     res.status(500).json({ message: "Erro ao atualizar escala" });
   }
 });
-router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq20(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
+    const user = await db.select().from(users).where(eq22(users.id, req.user.id)).limit(1);
+    if (user.length === 0 || !isAdmin(user[0].role)) {
       return res.status(403).json({ message: "Sem permiss\xE3o para publicar escalas" });
     }
     const match = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
@@ -16532,9 +17564,9 @@ router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     const result = await db.update(schedules).set({
       status: "published"
     }).where(
-      and15(
-        gte9(schedules.date, startDateStr),
-        lte8(schedules.date, endDateStr)
+      and16(
+        gte10(schedules.date, startDateStr),
+        lte9(schedules.date, endDateStr)
       )
     ).returning();
     if (result.length === 0) {
@@ -16613,14 +17645,14 @@ router8.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
     res.status(500).json({ message: "Erro ao publicar escala" });
   }
 });
-router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router9.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     console.log("DELETE schedule request for ID:", req.params.id);
     if (!req.user?.id) {
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq20(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
+    const user = await db.select().from(users).where(eq22(users.id, req.user.id)).limit(1);
+    if (user.length === 0 || !isAdmin(user[0].role)) {
       return res.status(403).json({ message: "Sem permiss\xE3o para excluir escalas" });
     }
     const monthIdMatch = req.params.id.match(/^schedule-(\d{4})-(\d{1,2})$/);
@@ -16635,9 +17667,9 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       const lastDay = new Date(year, month, 0).getDate();
       const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
       const schedulesList = await db.select().from(schedules).where(
-        and15(
-          gte9(schedules.date, startDateStr),
-          lte8(schedules.date, endDateStr)
+        and16(
+          gte10(schedules.date, startDateStr),
+          lte9(schedules.date, endDateStr)
         )
       );
       if (schedulesList.length === 0) {
@@ -16649,13 +17681,13 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       }
       const scheduleIds = schedulesList.map((s) => s.id);
       for (const scheduleId of scheduleIds) {
-        await db.delete(substitutionRequests).where(eq20(substitutionRequests.scheduleId, scheduleId));
+        await db.delete(substitutionRequests).where(eq22(substitutionRequests.scheduleId, scheduleId));
       }
       console.log(`[DELETE_SCHEDULE] Deleted substitution requests for ${scheduleIds.length} schedules`);
       await db.delete(schedules).where(
-        and15(
-          gte9(schedules.date, startDateStr),
-          lte8(schedules.date, endDateStr)
+        and16(
+          gte10(schedules.date, startDateStr),
+          lte9(schedules.date, endDateStr)
         )
       );
       await logActivity2(
@@ -16668,16 +17700,16 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
       console.log(`[DELETE_SCHEDULE] Successfully deleted ${scheduleIds.length} schedules for ${month}/${year}`);
       res.json({ message: `${scheduleIds.length} escalas exclu\xEDdas com sucesso` });
     } else {
-      const schedule = await db.select().from(schedules).where(eq20(schedules.id, req.params.id)).limit(1);
+      const schedule = await db.select().from(schedules).where(eq22(schedules.id, req.params.id)).limit(1);
       if (schedule.length === 0) {
         return res.status(404).json({ message: "Escala n\xE3o encontrada" });
       }
       if (schedule[0].status === "published") {
         return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir uma escala publicada" });
       }
-      await db.delete(substitutionRequests).where(eq20(substitutionRequests.scheduleId, req.params.id));
+      await db.delete(substitutionRequests).where(eq22(substitutionRequests.scheduleId, req.params.id));
       console.log(`Deleted substitution requests for schedule: ${req.params.id}`);
-      await db.delete(schedules).where(eq20(schedules.id, req.params.id));
+      await db.delete(schedules).where(eq22(schedules.id, req.params.id));
       await logActivity2(
         req.user?.id,
         "schedule_deleted",
@@ -16695,7 +17727,7 @@ router8.delete("/:id", authenticateToken, requireRole(["coordenador", "gestor"])
     res.status(500).json({ message: "Erro ao excluir escala" });
   }
 });
-router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router9.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     console.log("[UNPUBLISH_API] Received request for ID:", req.params.id);
     console.log("[UNPUBLISH_API] User ID:", req.user?.id);
@@ -16703,8 +17735,8 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
       console.log("[UNPUBLISH_API] No user ID found");
       return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
     }
-    const user = await db.select().from(users).where(eq20(users.id, req.user.id)).limit(1);
-    if (user.length === 0 || user[0].role !== "coordenador" && user[0].role !== "gestor") {
+    const user = await db.select().from(users).where(eq22(users.id, req.user.id)).limit(1);
+    if (user.length === 0 || !isAdmin(user[0].role)) {
       console.log("[UNPUBLISH_API] User not authorized, role:", user[0]?.role);
       return res.status(403).json({ message: "Sem permiss\xE3o para cancelar publica\xE7\xE3o" });
     }
@@ -16727,9 +17759,9 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
     const result = await db.update(schedules).set({
       status: "scheduled"
     }).where(
-      and15(
-        gte9(schedules.date, startDateStr),
-        lte8(schedules.date, endDateStr)
+      and16(
+        gte10(schedules.date, startDateStr),
+        lte9(schedules.date, endDateStr)
       )
     ).returning();
     console.log("[UNPUBLISH_API] Updated", result.length, "schedules");
@@ -16754,32 +17786,33 @@ router8.patch("/:id/unpublish", authenticateToken, requireRole(["coordenador", "
     res.status(500).json({ message: "Erro ao cancelar publica\xE7\xE3o" });
   }
 });
-router8.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenador", "gestor"]), async (_req, res) => {
+router9.post("/:scheduleId/generate", authenticateToken, requireRole(["coordenador", "gestor"]), async (_req, res) => {
   res.status(501).json({
     message: "Use o endpoint POST /api/schedules/generate para gerar escalas autom\xE1ticas.",
     hint: "Este endpoint individual est\xE1 desativado. A gera\xE7\xE3o de escalas \xE9 feita por m\xEAs completo."
   });
 });
-var schedules_default = router8;
+var schedules_default = router9;
 
 // server/routes/auxiliaryPanel.ts
 await init_db();
 init_schema();
-import { Router as Router9 } from "express";
-import { eq as eq21, and as and16, inArray as inArray6, sql as sql11 } from "drizzle-orm";
-import { format as format8, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
+import { Router as Router10 } from "express";
+init_roles();
+import { eq as eq23, and as and17, inArray as inArray10, sql as sql11 } from "drizzle-orm";
+import { format as format9, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
 function getErrorMessage6(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Unknown error";
 }
-var router9 = Router9();
+var router10 = Router10();
 async function isAuxiliaryForMass(userId, scheduleId) {
   const assignment = await db.select().from(schedules).where(
-    and16(
-      eq21(schedules.id, scheduleId),
-      eq21(schedules.ministerId, userId),
-      inArray6(schedules.position, [1, 2])
+    and17(
+      eq23(schedules.id, scheduleId),
+      eq23(schedules.ministerId, userId),
+      inArray10(schedules.position, [1, 2])
     )
   ).limit(1);
   return assignment.length > 0;
@@ -16796,14 +17829,14 @@ function isWithinAllowedWindow(massDate, massTime) {
     return false;
   }
 }
-router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
+router10.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "N\xE3o autenticado" });
     }
-    const massSchedule = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
+    const massSchedule = await db.select().from(schedules).where(eq23(schedules.id, scheduleId)).limit(1);
     if (massSchedule.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -16816,8 +17849,8 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       return res.status(403).json({
         message: "Painel do Auxiliar dispon\xEDvel apenas de 1h antes at\xE9 2h depois da missa",
         allowedWindow: {
-          start: format8(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
-          end: format8(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
+          start: format9(subHours(parseISO(`${schedule.date}T${schedule.time}`), 1), "HH:mm"),
+          end: format9(addHours(parseISO(`${schedule.date}T${schedule.time}`), 2), "HH:mm")
         }
       });
     }
@@ -16830,14 +17863,14 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp,
       onSiteAdjustments: schedules.onSiteAdjustments
-    }).from(schedules).leftJoin(users, eq21(schedules.ministerId, users.id)).where(
-      and16(
-        eq21(schedules.date, schedule.date),
-        eq21(schedules.time, schedule.time),
-        eq21(schedules.status, "scheduled")
+    }).from(schedules).leftJoin(users, eq23(schedules.ministerId, users.id)).where(
+      and17(
+        eq23(schedules.date, schedule.date),
+        eq23(schedules.time, schedule.time),
+        eq23(schedules.status, "scheduled")
       )
     ).orderBy(schedules.position);
-    const checkIns = await db.select().from(ministerCheckIns).where(eq21(ministerCheckIns.scheduleId, scheduleId));
+    const checkIns = await db.select().from(ministerCheckIns).where(eq23(ministerCheckIns.scheduleId, scheduleId));
     const standbyList = await db.select({
       id: standbyMinisters.id,
       ministerId: standbyMinisters.ministerId,
@@ -16849,8 +17882,8 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
       calledAt: standbyMinisters.calledAt,
       response: standbyMinisters.response,
       assignedPosition: standbyMinisters.assignedPosition
-    }).from(standbyMinisters).leftJoin(users, eq21(standbyMinisters.ministerId, users.id)).where(eq21(standbyMinisters.scheduleId, scheduleId));
-    const executionLog = await db.select().from(massExecutionLogs).where(eq21(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    }).from(standbyMinisters).leftJoin(users, eq23(standbyMinisters.ministerId, users.id)).where(eq23(standbyMinisters.scheduleId, scheduleId));
+    const executionLog = await db.select().from(massExecutionLogs).where(eq23(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     const massDateTime = parseISO(`${schedule.date}T${schedule.time}`);
     const now = /* @__PURE__ */ new Date();
     const minutesUntilMass = Math.floor((massDateTime.getTime() - now.getTime()) / (1e3 * 60));
@@ -16907,7 +17940,7 @@ router9.get("/panel/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
+router10.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const userId = req.user?.id;
@@ -16918,7 +17951,7 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq23(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
@@ -16932,15 +17965,15 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
       totalServices: users.totalServices,
       lastService: users.lastService
     }).from(users).where(
-      and16(
-        eq21(users.status, "active"),
-        eq21(users.role, "ministro")
+      and17(
+        eq23(users.status, "active"),
+        eq23(users.role, "ministro")
       )
     ).limit(20);
     const assignedMinisters = await db.select({ ministerId: schedules.ministerId }).from(schedules).where(
-      and16(
-        eq21(schedules.date, date2),
-        eq21(schedules.time, time2)
+      and17(
+        eq23(schedules.date, date2),
+        eq23(schedules.time, time2)
       )
     );
     const assignedIds = new Set(assignedMinisters.map((a) => a.ministerId).filter(Boolean));
@@ -16958,7 +17991,7 @@ router9.get("/standby/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router9.post("/check-in", authenticateToken, async (req, res) => {
+router10.post("/check-in", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, ministerId, status, notes } = req.body;
     const userId = req.user?.id;
@@ -16970,9 +18003,9 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
     const assignment = await db.select().from(schedules).where(
-      and16(
-        eq21(schedules.id, scheduleId),
-        eq21(schedules.ministerId, ministerId)
+      and17(
+        eq23(schedules.id, scheduleId),
+        eq23(schedules.ministerId, ministerId)
       )
     ).limit(1);
     if (assignment.length === 0) {
@@ -16980,9 +18013,9 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
     }
     const position = assignment[0].position || 0;
     const existingCheckIn = await db.select().from(ministerCheckIns).where(
-      and16(
-        eq21(ministerCheckIns.scheduleId, scheduleId),
-        eq21(ministerCheckIns.ministerId, ministerId)
+      and17(
+        eq23(ministerCheckIns.scheduleId, scheduleId),
+        eq23(ministerCheckIns.ministerId, ministerId)
       )
     ).limit(1);
     if (existingCheckIn.length > 0) {
@@ -16990,7 +18023,7 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
         status,
         notes,
         checkedInAt: /* @__PURE__ */ new Date()
-      }).where(eq21(ministerCheckIns.id, existingCheckIn[0].id));
+      }).where(eq23(ministerCheckIns.id, existingCheckIn[0].id));
     } else {
       await db.insert(ministerCheckIns).values({
         scheduleId,
@@ -17003,7 +18036,7 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
     }
     try {
       const { broadcastAuxiliaryPanelUpdate: broadcastAuxiliaryPanelUpdate2 } = await init_websocket().then(() => websocket_exports);
-      const [minister] = await db.select({ name: users.name }).from(users).where(eq21(users.id, ministerId)).limit(1);
+      const [minister] = await db.select({ name: users.name }).from(users).where(eq23(users.id, ministerId)).limit(1);
       broadcastAuxiliaryPanelUpdate2({
         scheduleId,
         updateType: "check_in",
@@ -17027,7 +18060,7 @@ router9.post("/check-in", authenticateToken, async (req, res) => {
     });
   }
 });
-router9.put("/redistribute", authenticateToken, async (req, res) => {
+router10.put("/redistribute", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, changes } = req.body;
     const userId = req.user?.id;
@@ -17045,10 +18078,10 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
     for (const change of changes) {
       const { ministerId, fromPosition, toPosition, reason } = change;
       await db.update(schedules).set({ position: toPosition }).where(
-        and16(
-          eq21(schedules.id, scheduleId),
-          eq21(schedules.ministerId, ministerId),
-          eq21(schedules.position, fromPosition)
+        and17(
+          eq23(schedules.id, scheduleId),
+          eq23(schedules.ministerId, ministerId),
+          eq23(schedules.position, fromPosition)
         )
       );
       appliedChanges.push({
@@ -17060,12 +18093,12 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
         details: reason
       });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq21(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq23(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       const currentChanges = existingLog[0].changesMade || [];
       await db.update(massExecutionLogs).set({
         changesMade: [...currentChanges, ...appliedChanges]
-      }).where(eq21(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq23(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -17095,7 +18128,7 @@ router9.put("/redistribute", authenticateToken, async (req, res) => {
     });
   }
 });
-router9.post("/call-standby", authenticateToken, async (req, res) => {
+router10.post("/call-standby", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, ministerId, position } = req.body;
     const userId = req.user?.id;
@@ -17106,12 +18139,12 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const massInfo = await db.select().from(schedules).where(eq21(schedules.id, scheduleId)).limit(1);
+    const massInfo = await db.select().from(schedules).where(eq23(schedules.id, scheduleId)).limit(1);
     if (massInfo.length === 0) {
       return res.status(404).json({ message: "Escala n\xE3o encontrada" });
     }
     const { date: date2, time: time2 } = massInfo[0];
-    const auxiliary = await db.select({ name: users.name }).from(users).where(eq21(users.id, userId)).limit(1);
+    const auxiliary = await db.select({ name: users.name }).from(users).where(eq23(users.id, userId)).limit(1);
     const auxiliaryName = auxiliary[0]?.name || "Auxiliar";
     await db.insert(standbyMinisters).values({
       scheduleId,
@@ -17125,7 +18158,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
       userId: ministerId,
       type: "schedule",
       title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
-      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format8(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
+      message: `${auxiliaryName} est\xE1 convocando voc\xEA para a missa de ${format9(parseISO(date2), "dd/MM/yyyy")} \xE0s ${time2}. Posi\xE7\xE3o: ${position}`,
       priority: "high",
       data: {
         scheduleId,
@@ -17139,7 +18172,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
       const { sendPushNotificationToUsers: sendPushNotificationToUsers2 } = await init_pushNotifications().then(() => pushNotifications_exports);
       await sendPushNotificationToUsers2([ministerId], {
         title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
-        body: `${auxiliaryName} precisa de voc\xEA AGORA para a missa de ${format8(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
+        body: `${auxiliaryName} precisa de voc\xEA AGORA para a missa de ${format9(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
         url: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
         tag: `standby-${scheduleId}`,
         data: {
@@ -17154,7 +18187,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
       console.error("[AUXILIARY_CALL_STANDBY] Push notification error:", pushError);
     }
     try {
-      const ministerInfo = await db.select({ whatsapp: users.whatsapp, phone: users.phone, name: users.name }).from(users).where(eq21(users.id, ministerId)).limit(1);
+      const ministerInfo = await db.select({ whatsapp: users.whatsapp, phone: users.phone, name: users.name }).from(users).where(eq23(users.id, ministerId)).limit(1);
       const whatsappNumber = ministerInfo[0]?.whatsapp || ministerInfo[0]?.phone;
       if (whatsappNumber && process.env.ZAPI_INSTANCE && process.env.ZAPI_TOKEN) {
         const axios2 = (await import("axios")).default;
@@ -17167,7 +18200,7 @@ router9.post("/call-standby", authenticateToken, async (req, res) => {
 Ol\xE1 ${ministerInfo[0]?.name}!
 
 ${auxiliaryName} est\xE1 precisando de voc\xEA para a missa:
-\u{1F4C5} Data: ${format8(parseISO(date2), "dd/MM/yyyy")}
+\u{1F4C5} Data: ${format9(parseISO(date2), "dd/MM/yyyy")}
 \u23F0 Hor\xE1rio: ${time2}
 \u{1F4CD} Posi\xE7\xE3o: ${position}
 
@@ -17192,7 +18225,7 @@ Por favor, responda o mais r\xE1pido poss\xEDvel!`;
       notifyUsers2([ministerId], {
         id: `standby-${scheduleId}-${Date.now()}`,
         title: "\u{1F6A8} Chamada Urgente de Supl\xEAncia",
-        message: `Voc\xEA foi convocado para a missa de ${format8(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
+        message: `Voc\xEA foi convocado para a missa de ${format9(parseISO(date2), "dd/MM")} \xE0s ${time2}`,
         type: "schedule",
         actionUrl: `/auxiliary?respond=standby&scheduleId=${scheduleId}`,
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -17212,7 +18245,7 @@ Por favor, responda o mais r\xE1pido poss\xEDvel!`;
     });
   }
 });
-router9.post("/mass-report", authenticateToken, async (req, res) => {
+router10.post("/mass-report", authenticateToken, async (req, res) => {
   try {
     const {
       scheduleId,
@@ -17230,7 +18263,7 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
     if (!isAuxiliary) {
       return res.status(403).json({ message: "Acesso n\xE3o autorizado" });
     }
-    const existingLog = await db.select().from(massExecutionLogs).where(eq21(massExecutionLogs.scheduleId, scheduleId)).limit(1);
+    const existingLog = await db.select().from(massExecutionLogs).where(eq23(massExecutionLogs.scheduleId, scheduleId)).limit(1);
     if (existingLog.length > 0) {
       await db.update(massExecutionLogs).set({
         attendance,
@@ -17238,7 +18271,7 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
         comments,
         incidents,
         highlights
-      }).where(eq21(massExecutionLogs.id, existingLog[0].id));
+      }).where(eq23(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
         scheduleId,
@@ -17259,15 +18292,15 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
           await db.update(users).set({
             lastService: /* @__PURE__ */ new Date(),
             totalServices: sql11`${users.totalServices} + 1`
-          }).where(eq21(users.id, record.ministerId));
+          }).where(eq23(users.id, record.ministerId));
         }
       }
     }
     if (incidents && incidents.length > 0) {
       const coordinators = await db.select().from(users).where(
-        and16(
-          inArray6(users.role, ["coordenador", "gestor"]),
-          eq21(users.status, "active")
+        and17(
+          inArray10(users.role, [...ADMIN_ROLES]),
+          eq23(users.status, "active")
         )
       );
       for (const coordinator of coordinators) {
@@ -17292,18 +18325,18 @@ router9.post("/mass-report", authenticateToken, async (req, res) => {
     });
   }
 });
-var auxiliaryPanel_default = router9;
+var auxiliaryPanel_default = router10;
 
 // server/routes/upload.ts
 await init_db();
 init_schema();
-import { Router as Router10 } from "express";
-import multer from "multer";
+import { Router as Router11 } from "express";
+import multer2 from "multer";
 import sharp from "sharp";
-import { eq as eq22 } from "drizzle-orm";
-var router10 = Router10();
-var upload = multer({
-  storage: multer.memoryStorage(),
+import { eq as eq24 } from "drizzle-orm";
+var router11 = Router11();
+var upload2 = multer2({
+  storage: multer2.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024
     // 5MB
@@ -17340,7 +18373,7 @@ var handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-router10.post("/profile-photo", authenticateToken, upload.single("photo"), handleMulterError, async (req, res) => {
+router11.post("/profile-photo", authenticateToken, upload2.single("photo"), handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
@@ -17367,7 +18400,7 @@ router10.post("/profile-photo", authenticateToken, upload.single("photo"), handl
       photoUrl,
       imageData,
       imageContentType: contentType
-    }).where(eq22(users.id, userId));
+    }).where(eq24(users.id, userId));
     res.json({
       success: true,
       photoUrl,
@@ -17389,7 +18422,7 @@ router10.post("/profile-photo", authenticateToken, upload.single("photo"), handl
     res.status(500).json({ error: "Erro interno ao processar a foto. Tente novamente." });
   }
 });
-router10.delete("/profile-photo", authenticateToken, async (req, res) => {
+router11.delete("/profile-photo", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     if (!db) {
@@ -17399,7 +18432,7 @@ router10.delete("/profile-photo", authenticateToken, async (req, res) => {
       photoUrl: null,
       imageData: null,
       imageContentType: null
-    }).where(eq22(users.id, userId));
+    }).where(eq24(users.id, userId));
     res.json({
       success: true,
       message: "Foto de perfil removida com sucesso!"
@@ -17409,18 +18442,19 @@ router10.delete("/profile-photo", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro interno ao remover a foto. Tente novamente." });
   }
 });
-var upload_default = router10;
+var upload_default = router11;
 
 // server/routes/notifications.ts
-import { Router as Router11 } from "express";
+import { Router as Router12 } from "express";
 import { z as z6 } from "zod";
+init_roles();
 await init_db();
 await init_storage();
 init_schema();
 await init_pushNotifications();
 await init_websocket();
-import { eq as eq23, and as and17 } from "drizzle-orm";
-var router11 = Router11();
+import { eq as eq25, and as and18, inArray as inArray11 } from "drizzle-orm";
+var router12 = Router12();
 var internalUrlSchema = z6.string().refine(
   (url) => {
     if (url.startsWith("/")) return true;
@@ -17439,7 +18473,7 @@ var createNotificationSchema = z6.object({
   type: z6.enum(["info", "warning", "success", "error"]).default("info"),
   recipientIds: z6.array(z6.string()).optional(),
   // IDs específicos ou vazio para todos
-  recipientRole: z6.enum(["ministro", "coordenador", "gestor", "all"]).optional(),
+  recipientRole: z6.enum(["ministro", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "gestor", "reitor", "all"]).optional(),
   actionUrl: internalUrlSchema.optional()
 });
 var rawPushSubscriptionSchema = z6.object({
@@ -17470,13 +18504,13 @@ function mapNotificationType(frontendType) {
       return "announcement";
   }
 }
-router11.get("/push/config", authenticateToken, (req, res) => {
+router12.get("/push/config", authenticateToken, (req, res) => {
   res.json({
     enabled: pushConfig.enabled,
     publicKey: pushConfig.publicKey
   });
 });
-router11.post("/push/subscribe", authenticateToken, async (req, res) => {
+router12.post("/push/subscribe", authenticateToken, async (req, res) => {
   try {
     if (!pushConfig.enabled) {
       return res.status(503).json({ error: "Notifica\xE7\xF5es push n\xE3o est\xE3o configuradas no servidor" });
@@ -17497,7 +18531,7 @@ router11.post("/push/subscribe", authenticateToken, async (req, res) => {
     }
   }
 });
-router11.post("/push/unsubscribe", authenticateToken, async (req, res) => {
+router12.post("/push/unsubscribe", authenticateToken, async (req, res) => {
   try {
     const { endpoint } = unsubscribeSchema.parse(req.body);
     await storage.removePushSubscription(req.user.id, endpoint);
@@ -17511,7 +18545,7 @@ router11.post("/push/unsubscribe", authenticateToken, async (req, res) => {
     }
   }
 });
-router11.get("/", authenticateToken, async (req, res) => {
+router12.get("/", authenticateToken, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
@@ -17522,24 +18556,24 @@ router11.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar notifica\xE7\xF5es" });
   }
 });
-router11.get("/unread-count", authenticateToken, async (req, res) => {
+router12.get("/unread-count", authenticateToken, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       return res.json({ count: 0 });
     }
-    const count13 = await storage.getUnreadNotificationCount(req.user.id);
-    res.json({ count: count13 });
+    const count14 = await storage.getUnreadNotificationCount(req.user.id);
+    res.json({ count: count14 });
   } catch (error) {
     console.error("[NOTIFICATIONS] Error counting notifications:", error);
     res.json({ count: 0 });
   }
 });
-router11.patch("/:id/read", authenticateToken, async (req, res) => {
+router12.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await db.select().from(notifications).where(and17(
-      eq23(notifications.id, id),
-      eq23(notifications.userId, req.user.id)
+    const notification = await db.select().from(notifications).where(and18(
+      eq25(notifications.id, id),
+      eq25(notifications.userId, req.user.id)
     )).limit(1);
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
@@ -17551,7 +18585,7 @@ router11.patch("/:id/read", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router11.patch("/read-all", authenticateToken, async (req, res) => {
+router12.patch("/read-all", authenticateToken, async (req, res) => {
   try {
     await storage.markAllNotificationsAsRead(req.user.id);
     res.json({ message: "Todas as notifica\xE7\xF5es foram marcadas como lidas" });
@@ -17560,13 +18594,13 @@ router11.patch("/read-all", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao processar requisi\xE7\xE3o" });
   }
 });
-router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
+router12.post("/mass-invite", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
   try {
     const { massId, date: date2, time: time2, location, message, urgencyLevel } = req.body;
     console.log("Recebido pedido de notifica\xE7\xE3o para missa:", { massId, date: date2, time: time2, location, urgencyLevel });
     const title = urgencyLevel === "critical" ? "\u{1F534} URGENTE: Convoca\xE7\xE3o para Missa" : urgencyLevel === "high" ? "\u26A0\uFE0F IMPORTANTE: Ministros Necess\xE1rios" : "\u{1F4E2} Convite para Servir na Missa";
     const ministers = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(
-      eq23(users.status, "active")
+      eq25(users.status, "active")
     );
     console.log(`Encontrados ${ministers.length} usu\xE1rios ativos`);
     const mappedType = urgencyLevel === "critical" || urgencyLevel === "high" ? "reminder" : "announcement";
@@ -17614,7 +18648,7 @@ router11.post("/mass-invite", authenticateToken, requireRole(["coordenador", "ge
     res.status(500).json({ error: "Erro ao enviar convite", details: error instanceof Error ? error.message : "Unknown error" });
   }
 });
-router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
+router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), notificationRateLimiter, async (req, res) => {
   try {
     const data = createNotificationSchema.parse(req.body);
     console.log("[NOTIFICA\xC7\xD5ES] Dados recebidos:", {
@@ -17631,21 +18665,21 @@ router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), no
     } else if (data.recipientRole) {
       let recipients;
       if (data.recipientRole === "all") {
-        recipients = await db.select({ id: users.id }).from(users).where(eq23(users.status, "active"));
+        recipients = await db.select({ id: users.id }).from(users).where(eq25(users.status, "active"));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou TODOS os usu\xE1rios ativos:", recipients.length);
       } else {
-        recipients = await db.select({ id: users.id }).from(users).where(and17(
-          eq23(users.role, data.recipientRole),
-          eq23(users.status, "active")
+        recipients = await db.select({ id: users.id }).from(users).where(and18(
+          inArray11(users.role, expandRoles([data.recipientRole])),
+          eq25(users.status, "active")
         ));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou usu\xE1rios com role", data.recipientRole, ":", recipients.length);
       }
       recipientUserIds = recipients.map((r) => r.id);
       console.log("[NOTIFICA\xC7\xD5ES] IDs dos destinat\xE1rios:", recipientUserIds);
     } else {
-      const recipients = await db.select({ id: users.id }).from(users).where(and17(
-        eq23(users.role, "ministro"),
-        eq23(users.status, "active")
+      const recipients = await db.select({ id: users.id }).from(users).where(and18(
+        eq25(users.role, "ministro"),
+        eq25(users.status, "active")
       ));
       recipientUserIds = recipients.map((r) => r.id);
       console.log("[NOTIFICA\xC7\xD5ES] Sem filtro, usando ministros ativos por padr\xE3o:", recipientUserIds.length);
@@ -17714,28 +18748,28 @@ router11.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), no
     }
   }
 });
-router11.delete("/:id", authenticateToken, async (req, res) => {
+router12.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await storage.getUser(req.user.id);
-    const isCoordinator = user && ["coordenador", "gestor"].includes(user.role);
+    const isCoordinator2 = user && isAdmin(user.role);
     let notification;
-    if (isCoordinator) {
-      notification = await db.select().from(notifications).where(eq23(notifications.id, id)).limit(1);
+    if (isCoordinator2) {
+      notification = await db.select().from(notifications).where(eq25(notifications.id, id)).limit(1);
     } else {
-      notification = await db.select().from(notifications).where(and17(
-        eq23(notifications.id, id),
-        eq23(notifications.userId, req.user.id)
+      notification = await db.select().from(notifications).where(and18(
+        eq25(notifications.id, id),
+        eq25(notifications.userId, req.user.id)
       )).limit(1);
     }
     if (notification.length === 0) {
       return res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
     }
-    await db.delete(notifications).where(eq23(notifications.id, id));
+    await db.delete(notifications).where(eq25(notifications.id, id));
     console.log(`[Activity Log] notification_deleted: Excluiu notifica\xE7\xE3o: ${notification[0].title}`, {
       userId: req.user.id,
       notificationId: id,
-      isAdminDelete: isCoordinator && notification[0].userId !== req.user.id
+      isAdminDelete: isCoordinator2 && notification[0].userId !== req.user.id
     });
     res.json({ message: "Notifica\xE7\xE3o exclu\xEDda com sucesso" });
   } catch (error) {
@@ -17743,7 +18777,7 @@ router11.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao excluir notifica\xE7\xE3o" });
   }
 });
-router11.delete("/cleanup/expired", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router12.delete("/cleanup/expired", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const deletedCount = await storage.deleteExpiredNotifications();
     console.log(`[NOTIFICATIONS] Cleanup: ${deletedCount} expired notifications deleted by ${req.user.id}`);
@@ -17756,21 +18790,21 @@ router11.delete("/cleanup/expired", authenticateToken, requireRole(["coordenador
     res.status(500).json({ error: "Erro ao limpar notifica\xE7\xF5es expiradas" });
   }
 });
-var notifications_default = router11;
+var notifications_default = router12;
 
 // server/routes/reports.ts
 await init_db();
 init_schema();
-import { Router as Router12 } from "express";
+import { Router as Router13 } from "express";
 import { z as z7 } from "zod";
-import { eq as eq24, sql as sql12, and as and18, gte as gte11, lte as lte10, desc as desc7, asc, count as count4, avg } from "drizzle-orm";
+import { eq as eq26, sql as sql12, and as and19, gte as gte12, lte as lte11, desc as desc7, asc, count as count4, avg } from "drizzle-orm";
 
 // server/utils/reportExporter.ts
-import * as XLSX from "xlsx";
+import * as XLSX2 from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 function exportToExcel(data) {
-  const workbook = XLSX.utils.book_new();
+  const workbook = XLSX2.utils.book_new();
   const wsData = [];
   wsData.push([data.title]);
   if (data.subtitle) wsData.push([data.subtitle]);
@@ -17788,7 +18822,7 @@ function exportToExcel(data) {
   data.rows.forEach((row) => {
     wsData.push(row);
   });
-  const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+  const worksheet = XLSX2.utils.aoa_to_sheet(wsData);
   const colWidths = data.headers.map((header, i) => {
     const maxLength = Math.max(
       header.length,
@@ -17797,8 +18831,8 @@ function exportToExcel(data) {
     return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
   });
   worksheet["!cols"] = colWidths;
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Relat\xF3rio");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  XLSX2.utils.book_append_sheet(workbook, worksheet, "Relat\xF3rio");
+  const buffer = XLSX2.write(workbook, { type: "buffer", bookType: "xlsx" });
   return buffer;
 }
 function exportToPDF(data) {
@@ -17906,8 +18940,8 @@ function exportToCSV(data) {
   });
   return BOM + lines.join("\n");
 }
-function getMimeType(format12) {
-  switch (format12) {
+function getMimeType(format13) {
+  switch (format13) {
     case "xlsx":
       return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     case "pdf":
@@ -17918,8 +18952,8 @@ function getMimeType(format12) {
       return "application/octet-stream";
   }
 }
-function getFileExtension(format12) {
-  return format12;
+function getFileExtension(format13) {
+  return format13;
 }
 
 // server/routes/reports.ts
@@ -17940,8 +18974,8 @@ function getQueryNumber(value, defaultValue) {
   const num = parseInt(strValue, 10);
   return isNaN(num) ? defaultValue : num;
 }
-var router12 = Router12();
-router12.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+var router13 = Router13();
+router13.get("/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "availability" });
   try {
@@ -17959,10 +18993,10 @@ router12.get("/availability", authenticateToken, requireRole(["gestor", "coorden
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq24(users.id, questionnaireResponses.userId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(questionnaireResponses).leftJoin(users, eq26(users.id, questionnaireResponses.userId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(questionnaireResponses.userId, users.name).orderBy(desc7(sql12`available_days`)).limit(Number(limit));
     res.json({
@@ -17974,7 +19008,7 @@ router12.get("/availability", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch availability metrics" });
   }
 });
-router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "substitutions" });
   try {
@@ -17989,10 +19023,10 @@ router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
       pendingRequests: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'pending' THEN 1 END)
         `.as("pending_requests")
-    }).from(substitutionRequests).leftJoin(users, eq24(users.id, substitutionRequests.requesterId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(substitutionRequests).leftJoin(users, eq26(users.id, substitutionRequests.requesterId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name).orderBy(desc7(count4(substitutionRequests.id))).limit(10);
     const reliableServers = await db.select({
@@ -18005,11 +19039,11 @@ router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
            ${startDate ? sql12`AND ${substitutionRequests.createdAt} >= ${parseQueryDate(startDate)}` : sql12``}
            ${endDate ? sql12`AND ${substitutionRequests.createdAt} <= ${parseQueryDate(endDate)}` : sql12``})
         `.as("substitution_requests")
-    }).from(schedules).leftJoin(users, eq24(users.id, schedules.ministerId)).where(
-      and18(
-        schedules.status ? eq24(schedules.status, "published") : sql12`true`,
-        parseQueryDate(startDate) ? gte11(schedules.createdAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(schedules.createdAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(schedules).leftJoin(users, eq26(users.id, schedules.ministerId)).where(
+      and19(
+        schedules.status ? eq26(schedules.status, "published") : sql12`true`,
+        parseQueryDate(startDate) ? gte12(schedules.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(schedules.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(schedules.ministerId, users.name).having(sql12`COUNT(${schedules.id}) > 0`).orderBy(asc(sql12`substitution_requests`), desc7(count4(schedules.id))).limit(10);
     res.json({
@@ -18022,7 +19056,7 @@ router12.get("/substitutions", authenticateToken, requireRole(["gestor", "coorde
     res.status(500).json({ error: "Failed to fetch substitution metrics" });
   }
 });
-router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "engagement" });
   try {
@@ -18035,10 +19069,10 @@ router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
       uniqueDays: sql12`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq24(users.id, activityLogs.userId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(activityLogs).leftJoin(users, eq26(users.id, activityLogs.userId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(activityLogs.userId, users.name).orderBy(desc7(count4(activityLogs.id))).limit(Number(limit));
     const responseRates = await db.select({
@@ -18055,12 +19089,12 @@ router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
         `.as("response_rate")
     }).from(users).leftJoin(
       questionnaireResponses,
-      and18(
-        eq24(users.id, questionnaireResponses.userId),
-        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
+      and19(
+        eq26(users.id, questionnaireResponses.userId),
+        parseQueryDate(startDate) ? gte12(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
       )
-    ).where(eq24(users.status, "active"));
+    ).where(eq26(users.status, "active"));
     res.json({
       mostActive,
       responseRates: responseRates[0],
@@ -18071,7 +19105,7 @@ router12.get("/engagement", authenticateToken, requireRole(["gestor", "coordenad
     res.status(500).json({ error: "Failed to fetch engagement metrics" });
   }
 });
-router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "formation" });
   try {
@@ -18086,7 +19120,7 @@ router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq24(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc7(sql12`completed_modules`)).limit(Number(limit));
+    }).from(formationProgress).leftJoin(users, eq26(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name).orderBy(desc7(sql12`completed_modules`)).limit(Number(limit));
     const formationStats = await db.select({
       totalModules: sql12`
           (SELECT COUNT(*) FROM formation_modules)
@@ -18103,7 +19137,7 @@ router12.get("/formation", authenticateToken, requireRole(["gestor", "coordenado
     res.status(500).json({ error: "Failed to fetch formation metrics" });
   }
 });
-router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/families", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "families" });
   try {
@@ -18117,7 +19151,7 @@ router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador
       totalServices: sql12`
           COALESCE(SUM(${users.totalServices}), 0)
         `.as("total_services")
-    }).from(families).leftJoin(users, eq24(users.familyId, families.id)).groupBy(families.id, families.name).having(sql12`COUNT(${users.id}) > 1`).orderBy(desc7(sql12`active_members`), desc7(sql12`total_services`)).limit(10);
+    }).from(families).leftJoin(users, eq26(users.familyId, families.id)).groupBy(families.id, families.name).having(sql12`COUNT(${users.id}) > 1`).orderBy(desc7(sql12`active_members`), desc7(sql12`total_services`)).limit(10);
     res.json({
       activeFamilies
     });
@@ -18126,30 +19160,30 @@ router12.get("/families", authenticateToken, requireRole(["gestor", "coordenador
     res.status(500).json({ error: "Failed to fetch family metrics" });
   }
 });
-router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "summary" });
   try {
     const now = /* @__PURE__ */ new Date();
     const startOfMonth6 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth6 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq24(users.status, "active"));
+    const activeMinistersCount = await db.select({ count: count4() }).from(users).where(eq26(users.status, "active"));
     const monthSubstitutions = await db.select({
       total: count4(),
       approved: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)
         `.as("approved")
     }).from(substitutionRequests).where(
-      and18(
-        gte11(substitutionRequests.createdAt, startOfMonth6),
-        lte10(substitutionRequests.createdAt, endOfMonth6)
+      and19(
+        gte12(substitutionRequests.createdAt, startOfMonth6),
+        lte11(substitutionRequests.createdAt, endOfMonth6)
       )
     );
     const formationThisMonth = await db.select({ count: count4() }).from(formationProgress).where(
-      and18(
-        eq24(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte11(formationProgress.completedAt, startOfMonth6) : sql12`false`,
-        formationProgress.completedAt ? lte10(formationProgress.completedAt, endOfMonth6) : sql12`false`
+      and19(
+        eq26(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte12(formationProgress.completedAt, startOfMonth6) : sql12`false`,
+        formationProgress.completedAt ? lte11(formationProgress.completedAt, endOfMonth6) : sql12`false`
       )
     );
     const avgAvailability = await db.select({
@@ -18161,9 +19195,9 @@ router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
           )
         `.as("avg_days")
     }).from(questionnaireResponses).where(
-      and18(
-        gte11(questionnaireResponses.submittedAt, startOfMonth6),
-        lte10(questionnaireResponses.submittedAt, endOfMonth6)
+      and19(
+        gte12(questionnaireResponses.submittedAt, startOfMonth6),
+        lte11(questionnaireResponses.submittedAt, endOfMonth6)
       )
     );
     res.json({
@@ -18184,7 +19218,7 @@ router12.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch summary metrics" });
   }
 });
-router12.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "attendance" });
   try {
@@ -18198,17 +19232,17 @@ router12.get("/attendance", authenticateToken, requireRole(["gestor", "coordenad
       noShowCount: users.noShowCount,
       reliabilityScore: users.reliabilityScore,
       status: users.status
-    }).from(users).where(eq24(users.role, "ministro")).orderBy(desc7(users.totalServices));
+    }).from(users).where(eq26(users.role, "ministro")).orderBy(desc7(users.totalServices));
     const checkInStats = await db.select({
       ministerId: ministerCheckIns.ministerId,
       totalCheckIns: count4(),
       presentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as("present_count"),
       lateCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as("late_count"),
       absentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as("absent_count")
-    }).from(ministerCheckIns).leftJoin(schedules, eq24(ministerCheckIns.scheduleId, schedules.id)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+    }).from(ministerCheckIns).leftJoin(schedules, eq26(ministerCheckIns.scheduleId, schedules.id)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
       )
     ).groupBy(ministerCheckIns.ministerId);
     const checkInMap = new Map(checkInStats.map((c) => [c.ministerId, c]));
@@ -18262,7 +19296,7 @@ router12.get("/attendance", authenticateToken, requireRole(["gestor", "coordenad
     res.status(500).json({ error: "Failed to fetch attendance data" });
   }
 });
-router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "attendance_detail", ministerId: req.params.ministerId });
   try {
@@ -18276,7 +19310,7 @@ router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor"
       lastService: users.lastService,
       noShowCount: users.noShowCount,
       reliabilityScore: users.reliabilityScore
-    }).from(users).where(eq24(users.id, ministerId)).limit(1);
+    }).from(users).where(eq26(users.id, ministerId)).limit(1);
     if (!minister) {
       return res.status(404).json({ error: "Minister not found" });
     }
@@ -18288,11 +19322,11 @@ router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor"
       location: schedules.location,
       status: schedules.status
     }).from(schedules).where(
-      and18(
-        eq24(schedules.ministerId, ministerId),
-        eq24(schedules.status, "published"),
-        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+      and19(
+        eq26(schedules.ministerId, ministerId),
+        eq26(schedules.status, "published"),
+        parseQueryDate(startDate) ? gte12(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
       )
     ).orderBy(desc7(schedules.date), desc7(schedules.time)).limit(Number(limit));
     const scheduleIds = scheduledMasses.map((s) => s.scheduleId);
@@ -18302,8 +19336,8 @@ router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor"
       status: ministerCheckIns.status,
       notes: ministerCheckIns.notes
     }).from(ministerCheckIns).where(
-      and18(
-        eq24(ministerCheckIns.ministerId, ministerId),
+      and19(
+        eq26(ministerCheckIns.ministerId, ministerId),
         sql12`${ministerCheckIns.scheduleId} = ANY(${scheduleIds})`
       )
     ) : [];
@@ -18355,9 +19389,9 @@ router12.get("/attendance/:ministerId", authenticateToken, requireRole(["gestor"
     res.status(500).json({ error: "Failed to fetch minister attendance" });
   }
 });
-router12.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/attendance", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const { startDate, endDate } = req.query;
     const attendanceData = await db.select({
       odministerIdl: users.id,
@@ -18367,16 +19401,16 @@ router12.get("/export/attendance", authenticateToken, requireRole(["gestor", "co
       noShowCount: users.noShowCount,
       reliabilityScore: users.reliabilityScore,
       lastService: users.lastService
-    }).from(users).where(eq24(users.role, "ministro")).orderBy(desc7(users.totalServices));
+    }).from(users).where(eq26(users.role, "ministro")).orderBy(desc7(users.totalServices));
     const checkInStats = await db.select({
       ministerId: ministerCheckIns.ministerId,
       presentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as("present_count"),
       lateCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as("late_count"),
       absentCount: sql12`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as("absent_count")
-    }).from(ministerCheckIns).leftJoin(schedules, eq24(ministerCheckIns.scheduleId, schedules.id)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
+    }).from(ministerCheckIns).leftJoin(schedules, eq26(ministerCheckIns.scheduleId, schedules.id)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(schedules.date, parseQueryDate(startDate).toISOString().split("T")[0]) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(schedules.date, parseQueryDate(endDate).toISOString().split("T")[0]) : sql12`true`
       )
     ).groupBy(ministerCheckIns.ministerId);
     const checkInMap = new Map(checkInStats.map((c) => [c.ministerId, c]));
@@ -18410,15 +19444,15 @@ router12.get("/export/attendance", authenticateToken, requireRole(["gestor", "co
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `presenca_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `presenca_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18426,7 +19460,7 @@ router12.get("/export/attendance", authenticateToken, requireRole(["gestor", "co
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "trends" });
   try {
@@ -18447,30 +19481,30 @@ router12.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]
       const [substitutionsResult] = await db.select({
         total: count4(),
         approved: sql12`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as("approved")
-      }).from(substitutionRequests).where(and18(
-        gte11(substitutionRequests.createdAt, startOfMonth6),
-        lte10(substitutionRequests.createdAt, endOfMonth6)
+      }).from(substitutionRequests).where(and19(
+        gte12(substitutionRequests.createdAt, startOfMonth6),
+        lte11(substitutionRequests.createdAt, endOfMonth6)
       ));
-      const [schedulesResult] = await db.select({ total: count4() }).from(schedules).where(and18(
-        eq24(schedules.status, "published"),
-        gte11(schedules.createdAt, startOfMonth6),
-        lte10(schedules.createdAt, endOfMonth6)
+      const [schedulesResult] = await db.select({ total: count4() }).from(schedules).where(and19(
+        eq26(schedules.status, "published"),
+        gte12(schedules.createdAt, startOfMonth6),
+        lte11(schedules.createdAt, endOfMonth6)
       ));
-      const [responsesResult] = await db.select({ total: count4() }).from(questionnaireResponses).where(and18(
-        gte11(questionnaireResponses.submittedAt, startOfMonth6),
-        lte10(questionnaireResponses.submittedAt, endOfMonth6)
+      const [responsesResult] = await db.select({ total: count4() }).from(questionnaireResponses).where(and19(
+        gte12(questionnaireResponses.submittedAt, startOfMonth6),
+        lte11(questionnaireResponses.submittedAt, endOfMonth6)
       ));
       const [activityResult] = await db.select({
         total: count4(),
         uniqueUsers: sql12`COUNT(DISTINCT ${activityLogs.userId})`.as("unique_users")
-      }).from(activityLogs).where(and18(
-        gte11(activityLogs.createdAt, startOfMonth6),
-        lte10(activityLogs.createdAt, endOfMonth6)
+      }).from(activityLogs).where(and19(
+        gte12(activityLogs.createdAt, startOfMonth6),
+        lte11(activityLogs.createdAt, endOfMonth6)
       ));
-      const [formationResult] = await db.select({ total: count4() }).from(formationProgress).where(and18(
-        eq24(formationProgress.status, "completed"),
-        formationProgress.completedAt ? gte11(formationProgress.completedAt, startOfMonth6) : sql12`false`,
-        formationProgress.completedAt ? lte10(formationProgress.completedAt, endOfMonth6) : sql12`false`
+      const [formationResult] = await db.select({ total: count4() }).from(formationProgress).where(and19(
+        eq26(formationProgress.status, "completed"),
+        formationProgress.completedAt ? gte12(formationProgress.completedAt, startOfMonth6) : sql12`false`,
+        formationProgress.completedAt ? lte11(formationProgress.completedAt, endOfMonth6) : sql12`false`
       ));
       return {
         month: label,
@@ -18511,14 +19545,14 @@ router12.get("/trends", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch trends data" });
   }
 });
-router12.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/trends/availability-patterns", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "availability_patterns" });
   try {
     const dayOfWeekData = await db.select({
       dayOfWeek: sql12`EXTRACT(DOW FROM ${schedules.date}::date)`.as("day_of_week"),
       total: count4()
-    }).from(schedules).where(eq24(schedules.status, "published")).groupBy(sql12`EXTRACT(DOW FROM ${schedules.date}::date)`).orderBy(sql12`day_of_week`);
+    }).from(schedules).where(eq26(schedules.status, "published")).groupBy(sql12`EXTRACT(DOW FROM ${schedules.date}::date)`).orderBy(sql12`day_of_week`);
     const dayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
     const byDayOfWeek = dayOfWeekData.map((item) => ({
       day: dayNames[item.dayOfWeek] || "N/A",
@@ -18528,7 +19562,7 @@ router12.get("/trends/availability-patterns", authenticateToken, requireRole(["g
     const timeData = await db.select({
       time: schedules.time,
       total: count4()
-    }).from(schedules).where(eq24(schedules.status, "published")).groupBy(schedules.time).orderBy(schedules.time);
+    }).from(schedules).where(eq26(schedules.status, "published")).groupBy(schedules.time).orderBy(schedules.time);
     const byTime = timeData.map((item) => ({
       time: item.time || "N/A",
       schedules: item.total
@@ -18560,9 +19594,9 @@ function formatPeriod(startDate, endDate) {
   const endFormatted = end ? new Date(end).toLocaleDateString("pt-BR") : "hoje";
   return `${startFormatted} a ${endFormatted}`;
 }
-router12.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/availability", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const { startDate, endDate } = req.query;
     const availabilityData = await db.select({
       userId: questionnaireResponses.userId,
@@ -18578,10 +19612,10 @@ router12.get("/export/availability", authenticateToken, requireRole(["gestor", "
             ), 0
           )
         `.as("available_days")
-    }).from(questionnaireResponses).leftJoin(users, eq24(users.id, questionnaireResponses.userId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(questionnaireResponses).leftJoin(users, eq26(users.id, questionnaireResponses.userId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(questionnaireResponses.submittedAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(questionnaireResponses.submittedAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(questionnaireResponses.userId, users.name, users.email).orderBy(desc7(sql12`available_days`));
     const reportData = {
@@ -18603,15 +19637,15 @@ router12.get("/export/availability", authenticateToken, requireRole(["gestor", "
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18619,9 +19653,9 @@ router12.get("/export/availability", authenticateToken, requireRole(["gestor", "
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/substitutions", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const { startDate, endDate } = req.query;
     const substitutionsData = await db.select({
       userId: substitutionRequests.requesterId,
@@ -18637,10 +19671,10 @@ router12.get("/export/substitutions", authenticateToken, requireRole(["gestor", 
       rejectedRequests: sql12`
           COUNT(CASE WHEN ${substitutionRequests.status} = 'rejected' THEN 1 END)
         `.as("rejected_requests")
-    }).from(substitutionRequests).leftJoin(users, eq24(users.id, substitutionRequests.requesterId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(substitutionRequests).leftJoin(users, eq26(users.id, substitutionRequests.requesterId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(substitutionRequests.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(substitutionRequests.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(substitutionRequests.requesterId, users.name, users.email).orderBy(desc7(count4(substitutionRequests.id)));
     const totalRequests = substitutionsData.reduce((acc, item) => acc + (item.totalRequests || 0), 0);
@@ -18667,15 +19701,15 @@ router12.get("/export/substitutions", authenticateToken, requireRole(["gestor", 
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `substituicoes_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `substituicoes_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18683,9 +19717,9 @@ router12.get("/export/substitutions", authenticateToken, requireRole(["gestor", 
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/engagement", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const { startDate, endDate } = req.query;
     const engagementData = await db.select({
       userId: activityLogs.userId,
@@ -18696,10 +19730,10 @@ router12.get("/export/engagement", authenticateToken, requireRole(["gestor", "co
       uniqueDays: sql12`
           COUNT(DISTINCT DATE(${activityLogs.createdAt}))
         `.as("unique_days")
-    }).from(activityLogs).leftJoin(users, eq24(users.id, activityLogs.userId)).where(
-      and18(
-        parseQueryDate(startDate) ? gte11(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
-        parseQueryDate(endDate) ? lte10(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
+    }).from(activityLogs).leftJoin(users, eq26(users.id, activityLogs.userId)).where(
+      and19(
+        parseQueryDate(startDate) ? gte12(activityLogs.createdAt, parseQueryDate(startDate)) : sql12`true`,
+        parseQueryDate(endDate) ? lte11(activityLogs.createdAt, parseQueryDate(endDate)) : sql12`true`
       )
     ).groupBy(activityLogs.userId, users.name, users.email).orderBy(desc7(count4(activityLogs.id)));
     const reportData = {
@@ -18722,15 +19756,15 @@ router12.get("/export/engagement", authenticateToken, requireRole(["gestor", "co
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `engajamento_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `engajamento_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18738,9 +19772,9 @@ router12.get("/export/engagement", authenticateToken, requireRole(["gestor", "co
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/formation", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const formationData = await db.select({
       userId: formationProgress.userId,
       userName: users.name,
@@ -18752,7 +19786,7 @@ router12.get("/export/formation", authenticateToken, requireRole(["gestor", "coo
           COUNT(CASE WHEN ${formationProgress.status} = 'in_progress' THEN 1 END)
         `.as("in_progress_modules"),
       avgProgress: avg(formationProgress.progressPercentage)
-    }).from(formationProgress).leftJoin(users, eq24(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name, users.email).orderBy(desc7(sql12`completed_modules`));
+    }).from(formationProgress).leftJoin(users, eq26(users.id, formationProgress.userId)).groupBy(formationProgress.userId, users.name, users.email).orderBy(desc7(sql12`completed_modules`));
     const reportData = {
       title: "Relat\xF3rio de Forma\xE7\xE3o",
       subtitle: "Progresso dos ministros nos m\xF3dulos de forma\xE7\xE3o",
@@ -18772,15 +19806,15 @@ router12.get("/export/formation", authenticateToken, requireRole(["gestor", "coo
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `formacao_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `formacao_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18788,18 +19822,18 @@ router12.get("/export/formation", authenticateToken, requireRole(["gestor", "coo
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const format12 = exportFormatSchema.parse(req.query.format || "xlsx");
+    const format13 = exportFormatSchema.parse(req.query.format || "xlsx");
     const now = /* @__PURE__ */ new Date();
     const startOfMonth6 = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth6 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const [activeMinistersResult] = await db.select({ count: count4() }).from(users).where(eq24(users.status, "active"));
+    const [activeMinistersResult] = await db.select({ count: count4() }).from(users).where(eq26(users.status, "active"));
     const [substitutionsResult] = await db.select({
       total: count4(),
       approved: sql12`COUNT(CASE WHEN ${substitutionRequests.status} = 'approved' THEN 1 END)`.as("approved")
-    }).from(substitutionRequests).where(and18(gte11(substitutionRequests.createdAt, startOfMonth6), lte10(substitutionRequests.createdAt, endOfMonth6)));
-    const [formationResult] = await db.select({ count: count4() }).from(formationProgress).where(eq24(formationProgress.status, "completed"));
+    }).from(substitutionRequests).where(and19(gte12(substitutionRequests.createdAt, startOfMonth6), lte11(substitutionRequests.createdAt, endOfMonth6)));
+    const [formationResult] = await db.select({ count: count4() }).from(formationProgress).where(eq26(formationProgress.status, "completed"));
     const monthName = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
     const reportData = {
       title: "Relat\xF3rio Resumo Mensal",
@@ -18820,15 +19854,15 @@ router12.get("/export/summary", authenticateToken, requireRole(["gestor", "coord
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `resumo_mensal_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `resumo_mensal_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -18836,7 +19870,7 @@ router12.get("/export/summary", authenticateToken, requireRole(["gestor", "coord
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-router12.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("view_reports", { type: "availability_analysis" });
   try {
@@ -18854,13 +19888,13 @@ router12.get("/availability-analysis", authenticateToken, requireRole(["gestor",
       canSubstitute: questionnaireResponses.canSubstitute,
       month: questionnaires.month,
       year: questionnaires.year
-    }).from(questionnaireResponses).innerJoin(questionnaires, eq24(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq24(questionnaireResponses.userId, users.id)).where(
-      and18(
-        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
-        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq26(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq26(questionnaireResponses.userId, users.id)).where(
+      and19(
+        gte12(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
       )
     );
-    const massTimes = await db.select().from(massTimesConfig).where(eq24(massTimesConfig.isActive, true));
+    const massTimes = await db.select().from(massTimesConfig).where(eq26(massTimesConfig.isActive, true));
     const dayNames = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
     const timeAnalysis = massTimes.map((mt) => {
       const timeStr = mt.time;
@@ -19010,14 +20044,14 @@ router12.get("/availability-analysis", authenticateToken, requireRole(["gestor",
     res.status(500).json({ error: "Failed to fetch availability analysis" });
   }
 });
-router12.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/availability-analysis/by-time/:timeId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { timeId } = req.params;
     const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 3), 1), 12);
     const endDate = /* @__PURE__ */ new Date();
     const startDate = /* @__PURE__ */ new Date();
     startDate.setMonth(startDate.getMonth() - numMonths);
-    const [massTime] = await db.select().from(massTimesConfig).where(eq24(massTimesConfig.id, timeId));
+    const [massTime] = await db.select().from(massTimesConfig).where(eq26(massTimesConfig.id, timeId));
     if (!massTime) {
       return res.status(404).json({ error: "Mass time not found" });
     }
@@ -19029,10 +20063,10 @@ router12.get("/availability-analysis/by-time/:timeId", authenticateToken, requir
       canSubstitute: questionnaireResponses.canSubstitute,
       month: questionnaires.month,
       year: questionnaires.year
-    }).from(questionnaireResponses).innerJoin(questionnaires, eq24(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq24(questionnaireResponses.userId, users.id)).where(
-      and18(
-        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
-        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq26(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq26(questionnaireResponses.userId, users.id)).where(
+      and19(
+        gte12(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
       )
     );
     const timeStr = massTime.time;
@@ -19091,12 +20125,12 @@ router12.get("/availability-analysis/by-time/:timeId", authenticateToken, requir
     res.status(500).json({ error: "Failed to fetch time availability" });
   }
 });
-router12.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router13.get("/export/availability-analysis", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("export_report", { type: "availability_analysis" });
   try {
-    const format12 = getQueryString(req.query.format) || "xlsx";
-    if (!["xlsx", "pdf", "csv"].includes(format12)) {
+    const format13 = getQueryString(req.query.format) || "xlsx";
+    if (!["xlsx", "pdf", "csv"].includes(format13)) {
       return res.status(400).json({ error: "Invalid format" });
     }
     const numMonths = Math.min(Math.max(getQueryNumber(req.query.months, 6), 3), 12);
@@ -19112,10 +20146,10 @@ router12.get("/export/availability-analysis", authenticateToken, requireRole(["g
       canSubstitute: questionnaireResponses.canSubstitute,
       month: questionnaires.month,
       year: questionnaires.year
-    }).from(questionnaireResponses).innerJoin(questionnaires, eq24(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq24(questionnaireResponses.userId, users.id)).where(
-      and18(
-        gte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
-        lte10(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
+    }).from(questionnaireResponses).innerJoin(questionnaires, eq26(questionnaireResponses.questionnaireId, questionnaires.id)).innerJoin(users, eq26(questionnaireResponses.userId, users.id)).where(
+      and19(
+        gte12(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, startDate),
+        lte11(sql12`MAKE_DATE(${questionnaires.year}, ${questionnaires.month}, 1)`, endDate)
       )
     );
     const ministerMap = /* @__PURE__ */ new Map();
@@ -19163,15 +20197,15 @@ router12.get("/export/availability-analysis", authenticateToken, requireRole(["g
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `analise_disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `analise_disponibilidade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -19179,13 +20213,14 @@ router12.get("/export/availability-analysis", authenticateToken, requireRole(["g
     res.status(500).json({ error: "Failed to export report" });
   }
 });
-var reports_default = router12;
+var reports_default = router13;
 
 // server/routes/ministers.ts
 await init_db();
 init_schema();
-import { Router as Router13 } from "express";
-import { eq as eq25, and as and19, sql as sql13 } from "drizzle-orm";
+import { Router as Router14 } from "express";
+init_roles();
+import { eq as eq27, and as and20, inArray as inArray12 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -19204,8 +20239,8 @@ function formatMinisterName(name) {
 }
 
 // server/routes/ministers.ts
-var router13 = Router13();
-router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
+var router14 = Router14();
+router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const ministersList = await db.select({
       id: users.id,
@@ -19225,7 +20260,7 @@ router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
       totalServices: users.totalServices,
       createdAt: users.createdAt
     }).from(users).where(
-      sql13`${users.role} IN ('ministro', 'coordenador')`
+      inArray12(users.role, ["ministro", ...COORDINATOR_ROLES])
     );
     res.json(ministersList);
   } catch (error) {
@@ -19233,7 +20268,7 @@ router13.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
     res.status(500).json({ message: "Erro ao buscar ministros" });
   }
 });
-router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
+router14.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), async (req, res) => {
   try {
     const minister = await db.select({
       id: users.id,
@@ -19253,9 +20288,9 @@ router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), asy
       totalServices: users.totalServices,
       observations: users.observations,
       createdAt: users.createdAt
-    }).from(users).where(and19(
-      eq25(users.id, req.params.id),
-      eq25(users.role, "ministro")
+    }).from(users).where(and20(
+      eq27(users.id, req.params.id),
+      eq27(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -19266,11 +20301,11 @@ router13.get("/:id", authenticateToken, auditPersonalDataAccess("personal"), asy
     res.status(500).json({ message: "Erro ao buscar ministro" });
   }
 });
-router13.patch("/:id", authenticateToken, async (req, res) => {
+router14.patch("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.params.id;
     const currentUser = req.user;
-    if (currentUser.role !== "gestor" && currentUser.role !== "coordenador" && currentUser.id !== userId) {
+    if (!isAdmin(currentUser.role) && currentUser.id !== userId) {
       return res.status(403).json({ message: "Sem permiss\xE3o para editar este ministro" });
     }
     const allowedFields = [
@@ -19313,9 +20348,9 @@ router13.patch("/:id", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
     }
     updateData.updatedAt = /* @__PURE__ */ new Date();
-    const result = await db.update(users).set(updateData).where(and19(
-      eq25(users.id, userId),
-      eq25(users.role, "ministro")
+    const result = await db.update(users).set(updateData).where(and20(
+      eq27(users.id, userId),
+      eq27(users.role, "ministro")
     )).returning();
     if (result.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -19334,12 +20369,12 @@ router13.patch("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao atualizar ministro" });
   }
 });
-router13.get("/:id/stats", authenticateToken, async (req, res) => {
+router14.get("/:id/stats", authenticateToken, async (req, res) => {
   try {
     const ministerId = req.params.id;
-    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and19(
-      eq25(users.id, ministerId),
-      eq25(users.role, "ministro")
+    const minister = await db.select({ totalServices: users.totalServices }).from(users).where(and20(
+      eq27(users.id, ministerId),
+      eq27(users.role, "ministro")
     )).limit(1);
     if (minister.length === 0) {
       return res.status(404).json({ message: "Ministro n\xE3o encontrado" });
@@ -19356,17 +20391,19 @@ router13.get("/:id/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar estat\xEDsticas" });
   }
 });
-var ministers_default = router13;
+var ministers_default = router14;
 
 // server/routes/substitutions.ts
 await init_db();
 init_schema();
-import { Router as Router14 } from "express";
-import { eq as eq26, and as and20, sql as sql14, gte as gte12, desc as desc8, count as count5, notInArray, inArray as inArray7 } from "drizzle-orm";
+import { Router as Router15 } from "express";
+import { eq as eq28, and as and21, sql as sql14, gte as gte13, desc as desc8, count as count5, notInArray, inArray as inArray13 } from "drizzle-orm";
+init_roles();
+await init_communityContext();
 await init_pushNotifications();
 await init_storage();
 await init_websocket();
-var router14 = Router14();
+var router15 = Router15();
 function getErrorMessage7(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -19401,15 +20438,15 @@ async function countMonthlySubstitutions(requesterId) {
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDayOfMonth2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const result = await db.select({ count: count5() }).from(substitutionRequests).where(
-    and20(
-      eq26(substitutionRequests.requesterId, requesterId),
-      gte12(substitutionRequests.createdAt, firstDayOfMonth),
+    and21(
+      eq28(substitutionRequests.requesterId, requesterId),
+      gte13(substitutionRequests.createdAt, firstDayOfMonth),
       sql14`${substitutionRequests.createdAt} <= ${lastDayOfMonth2}`
     )
   );
   return result[0]?.count || 0;
 }
-router14.post("/", authenticateToken, async (req, res) => {
+router15.post("/", authenticateToken, async (req, res) => {
   try {
     const { scheduleId, substituteId, reason } = req.body;
     const requesterId = req.user.id;
@@ -19420,7 +20457,7 @@ router14.post("/", authenticateToken, async (req, res) => {
         message: "ID da escala \xE9 obrigat\xF3rio"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq26(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq28(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -19456,9 +20493,9 @@ router14.post("/", authenticateToken, async (req, res) => {
       });
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
-      and20(
-        eq26(substitutionRequests.scheduleId, scheduleId),
-        inArray7(substitutionRequests.status, ["pending", "available"])
+      and21(
+        eq28(substitutionRequests.scheduleId, scheduleId),
+        inArray13(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -19475,6 +20512,8 @@ router14.post("/", authenticateToken, async (req, res) => {
       scheduleId,
       requesterId,
       substituteId: finalSubstituteId,
+      communityId: await communityIdFromSchedule(scheduleId),
+      // herda do schedule pai
       reason: reason || null,
       status,
       urgency,
@@ -19491,7 +20530,7 @@ router14.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         profilePhoto: users.photoUrl
       }
-    }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).where(eq26(substitutionRequests.id, newRequest.id)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(eq28(substitutionRequests.id, newRequest.id)).limit(1);
     const [requestWithDetails] = await requestQuery;
     let substituteUser = null;
     if (finalSubstituteId) {
@@ -19501,7 +20540,7 @@ router14.post("/", authenticateToken, async (req, res) => {
         email: users.email,
         phone: users.phone,
         whatsapp: users.whatsapp
-      }).from(users).where(eq26(users.id, finalSubstituteId)).limit(1);
+      }).from(users).where(eq28(users.id, finalSubstituteId)).limit(1);
       substituteUser = substitute || null;
     }
     const responseData = {
@@ -19566,13 +20605,13 @@ router14.post("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router14.get("/", authenticateToken, async (req, res) => {
+router15.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
-    const isCoordinator = userRole === "coordenador" || userRole === "gestor";
+    const isCoordinator2 = isAdmin(userRole);
     let requests;
-    if (isCoordinator) {
+    if (isCoordinator2) {
       requests = await db.select({
         request: substitutionRequests,
         assignment: schedules,
@@ -19582,7 +20621,7 @@ router14.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).orderBy(desc8(substitutionRequests.createdAt));
+      }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).orderBy(desc8(substitutionRequests.createdAt));
     } else {
       requests = await db.select({
         request: substitutionRequests,
@@ -19593,7 +20632,7 @@ router14.get("/", authenticateToken, async (req, res) => {
           email: users.email,
           profilePhoto: users.photoUrl
         }
-      }).from(substitutionRequests).innerJoin(schedules, eq26(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq26(substitutionRequests.requesterId, users.id)).where(
+      }).from(substitutionRequests).innerJoin(schedules, eq28(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq28(substitutionRequests.requesterId, users.id)).where(
         sql14`${substitutionRequests.requesterId} = ${userId}
             OR ${substitutionRequests.substituteId} = ${userId}
             OR ${substitutionRequests.status} = 'available'`
@@ -19606,7 +20645,7 @@ router14.get("/", authenticateToken, async (req, res) => {
           const [substitute] = await db.select({
             id: users.id,
             name: users.name
-          }).from(users).where(eq26(users.id, reqRow.request.substituteId)).limit(1);
+          }).from(users).where(eq28(users.id, reqRow.request.substituteId)).limit(1);
           if (substitute) {
             substituteUser = substitute;
           }
@@ -19633,11 +20672,11 @@ router14.get("/", authenticateToken, async (req, res) => {
     });
   }
 });
-router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
+router15.get("/available/:scheduleId", authenticateToken, async (req, res) => {
   try {
     const { scheduleId } = req.params;
     console.log("[Substitutions] Buscando substitutos dispon\xEDveis para schedule:", scheduleId);
-    const [schedule] = await db.select().from(schedules).where(eq26(schedules.id, scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq28(schedules.id, scheduleId)).limit(1);
     if (!schedule) {
       console.log("[Substitutions] Escala n\xE3o encontrada:", scheduleId);
       return res.status(404).json({
@@ -19652,9 +20691,9 @@ router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
       email: users.email,
       photoUrl: users.photoUrl
     }).from(users).where(
-      and20(
-        eq26(users.status, "active"),
-        eq26(users.role, "ministro"),
+      and21(
+        eq28(users.status, "active"),
+        eq28(users.role, "ministro"),
         // Não está escalado no mesmo horário
         sql14`NOT EXISTS (
             SELECT 1 FROM ${schedules} s
@@ -19679,7 +20718,7 @@ router14.get("/available/:scheduleId", authenticateToken, async (req, res) => {
     });
   }
 });
-router14.post("/:id/respond", authenticateToken, async (req, res) => {
+router15.post("/:id/respond", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { response, responseMessage } = req.body;
@@ -19690,7 +20729,7 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
         message: "Resposta inv\xE1lida. Use 'accepted' ou 'rejected'"
       });
     }
-    const [request] = await db.select().from(substitutionRequests).where(eq26(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq28(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -19711,7 +20750,7 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
       });
     }
     const newStatus = response === "accepted" ? "approved" : "rejected";
-    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq26(schedules.id, request.scheduleId)).limit(1);
+    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq28(schedules.id, request.scheduleId)).limit(1);
     await db.transaction(async (tx) => {
       await tx.update(substitutionRequests).set({
         status: newStatus,
@@ -19719,12 +20758,12 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
         approvedAt: /* @__PURE__ */ new Date(),
         responseMessage: responseMessage || null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq26(substitutionRequests.id, id));
+      }).where(eq28(substitutionRequests.id, id));
       if (newStatus === "approved" && request.substituteId) {
         await tx.update(schedules).set({
           ministerId: request.substituteId,
           substituteId: request.requesterId
-        }).where(eq26(schedules.id, request.scheduleId));
+        }).where(eq28(schedules.id, request.scheduleId));
       }
     });
     if (newStatus === "approved" && request.substituteId) {
@@ -19734,7 +20773,7 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
       scheduleCache.invalidateByDate(schedule.date);
       console.log(`[CACHE] Invalidated cache after responding to substitution for ${schedule.date}`);
     }
-    const [substituteUser] = await db.select({ name: users.name }).from(users).where(eq26(users.id, userId)).limit(1);
+    const [substituteUser] = await db.select({ name: users.name }).from(users).where(eq28(users.id, userId)).limit(1);
     const substituteName = substituteUser?.name || "O ministro";
     const formattedDate = schedule?.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
     const notificationTitle = newStatus === "approved" ? "\u2705 Substitui\xE7\xE3o Aceita" : "\u274C Substitui\xE7\xE3o Recusada";
@@ -19773,12 +20812,12 @@ router14.post("/:id/respond", authenticateToken, async (req, res) => {
     });
   }
 });
-router14.post("/:id/claim", authenticateToken, async (req, res) => {
+router15.post("/:id/claim", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
     const { message } = req.body;
-    const [request] = await db.select().from(substitutionRequests).where(eq26(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq28(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -19798,7 +20837,7 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
         message: "Voc\xEA n\xE3o pode reivindicar sua pr\xF3pria solicita\xE7\xE3o"
       });
     }
-    const [schedule] = await db.select().from(schedules).where(eq26(schedules.id, request.scheduleId)).limit(1);
+    const [schedule] = await db.select().from(schedules).where(eq28(schedules.id, request.scheduleId)).limit(1);
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -19816,11 +20855,11 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
       });
     }
     const conflictingSchedule = await db.select().from(schedules).where(
-      and20(
-        eq26(schedules.ministerId, userId),
-        eq26(schedules.date, schedule.date),
-        eq26(schedules.time, schedule.time),
-        eq26(schedules.status, "scheduled")
+      and21(
+        eq28(schedules.ministerId, userId),
+        eq28(schedules.date, schedule.date),
+        eq28(schedules.time, schedule.time),
+        eq28(schedules.status, "scheduled")
       )
     ).limit(1);
     if (conflictingSchedule.length > 0) {
@@ -19830,7 +20869,7 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
       });
     }
     await db.transaction(async (tx) => {
-      const [currentRequest] = await tx.select().from(substitutionRequests).where(eq26(substitutionRequests.id, id)).limit(1);
+      const [currentRequest] = await tx.select().from(substitutionRequests).where(eq28(substitutionRequests.id, id)).limit(1);
       const stillAvailable = currentRequest && (currentRequest.status === "available" || currentRequest.status === "pending" && !currentRequest.substituteId);
       if (!stillAvailable) {
         throw new Error("SUBSTITUTION_ALREADY_CLAIMED");
@@ -19842,15 +20881,15 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
         approvedAt: /* @__PURE__ */ new Date(),
         responseMessage: message || null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq26(substitutionRequests.id, id));
+      }).where(eq28(substitutionRequests.id, id));
       await tx.update(schedules).set({
         ministerId: userId,
         substituteId: request.requesterId
-      }).where(eq26(schedules.id, request.scheduleId));
+      }).where(eq28(schedules.id, request.scheduleId));
     });
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after claiming substitution for ${schedule.date}`);
-    const [claimerUser] = await db.select({ name: users.name }).from(users).where(eq26(users.id, userId)).limit(1);
+    const [claimerUser] = await db.select({ name: users.name }).from(users).where(eq28(users.id, userId)).limit(1);
     const claimerName = claimerUser?.name || "Um ministro";
     const formattedDate = schedule?.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
     const notificationTitle = "\u2705 Substituto Encontrado!";
@@ -19895,11 +20934,11 @@ router14.post("/:id/claim", authenticateToken, async (req, res) => {
     });
   }
 });
-router14.delete("/:id", authenticateToken, async (req, res) => {
+router15.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const [request] = await db.select().from(substitutionRequests).where(eq26(substitutionRequests.id, id)).limit(1);
+    const [request] = await db.select().from(substitutionRequests).where(eq28(substitutionRequests.id, id)).limit(1);
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -19907,8 +20946,8 @@ router14.delete("/:id", authenticateToken, async (req, res) => {
       });
     }
     const isRequester = request.requesterId === userId;
-    const isCoordinator = req.user.role === "coordenador" || req.user.role === "gestor";
-    if (!isRequester && !isCoordinator) {
+    const isCoordinator2 = isAdmin(req.user.role);
+    if (!isRequester && !isCoordinator2) {
       return res.status(403).json({
         success: false,
         message: "Voc\xEA n\xE3o tem permiss\xE3o para cancelar esta solicita\xE7\xE3o"
@@ -19920,11 +20959,11 @@ router14.delete("/:id", authenticateToken, async (req, res) => {
         message: "Apenas solicita\xE7\xF5es pendentes ou dispon\xEDveis podem ser canceladas"
       });
     }
-    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq26(schedules.id, request.scheduleId)).limit(1);
+    const [schedule] = await db.select({ date: schedules.date }).from(schedules).where(eq28(schedules.id, request.scheduleId)).limit(1);
     await db.update(substitutionRequests).set({
       status: "cancelled",
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq26(substitutionRequests.id, id));
+    }).where(eq28(substitutionRequests.id, id));
     if (schedule) {
       scheduleCache.invalidateByDate(schedule.date);
       console.log(`[CACHE] Invalidated cache after canceling substitution for ${schedule.date}`);
@@ -19941,14 +20980,14 @@ router14.delete("/:id", authenticateToken, async (req, res) => {
     });
   }
 });
-var substitutions_default = router14;
+var substitutions_default = router15;
 
 // server/routes/mass-pendencies.ts
 await init_db();
 init_schema();
-import { Router as Router15 } from "express";
-import { eq as eq27, and as and21, gte as gte13, lte as lte11, sql as sql15 } from "drizzle-orm";
-var router15 = Router15();
+import { Router as Router16 } from "express";
+import { eq as eq29, and as and22, gte as gte14, lte as lte12, sql as sql15 } from "drizzle-orm";
+var router16 = Router16();
 var MINIMUM_MINISTERS = {
   "08:00:00": 12,
   // Missa das 8h - 12 ministros
@@ -19963,7 +21002,7 @@ var MINIMUM_MINISTERS = {
   "18:00:00": 10
   // Missa da tarde - 10 ministros
 };
-router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
+router16.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), async (req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -19981,11 +21020,11 @@ router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       position: schedules.position,
       status: schedules.status,
       id: schedules.id
-    }).from(schedules).leftJoin(users, eq27(schedules.ministerId, users.id)).where(
-      and21(
-        gte13(schedules.date, startDateStr),
-        lte11(schedules.date, endDateStr),
-        eq27(schedules.status, "scheduled")
+    }).from(schedules).leftJoin(users, eq29(schedules.ministerId, users.id)).where(
+      and22(
+        gte14(schedules.date, startDateStr),
+        lte12(schedules.date, endDateStr),
+        eq29(schedules.status, "scheduled")
       )
     ).orderBy(schedules.date, schedules.time);
     const scheduleIds = monthSchedules.map((s) => s.id);
@@ -19995,7 +21034,7 @@ router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       substituteId: substitutionRequests.substituteId,
       status: substitutionRequests.status
     }).from(substitutionRequests).where(
-      and21(
+      and22(
         sql15`${substitutionRequests.scheduleId} IN (${sql15.join(
           scheduleIds.map((id) => sql15`${id}`),
           sql15`, `
@@ -20020,9 +21059,9 @@ router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
       name: users.name,
       lastService: users.lastService
     }).from(users).where(
-      and21(
-        eq27(users.status, "active"),
-        eq27(users.role, "ministro")
+      and22(
+        eq29(users.status, "active"),
+        eq29(users.role, "ministro")
       )
     );
     const pendencies = [];
@@ -20109,14 +21148,15 @@ router15.get("/", authenticateToken, requireRole(["coordenador", "gestor"]), asy
     res.status(500).json({ message: "Erro ao buscar pend\xEAncias" });
   }
 });
-var mass_pendencies_default = router15;
+var mass_pendencies_default = router16;
 
 // server/routes/formationAdmin.ts
 await init_db();
 init_schema();
-import { Router as Router16 } from "express";
-import { eq as eq29, asc as asc2, count as count6 } from "drizzle-orm";
-var router16 = Router16();
+import { Router as Router17 } from "express";
+import { eq as eq31, asc as asc2, count as count6 } from "drizzle-orm";
+init_roles();
+var router17 = Router17();
 function getErrorMessage8(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -20127,7 +21167,7 @@ function getErrorStack3(error) {
   return void 0;
 }
 function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== "gestor" && req.user.role !== "coordenador") {
+  if (!req.user || !isAdmin(req.user.role)) {
     return res.status(403).json({
       error: "Acesso negado",
       message: "Apenas gestores e coordenadores podem acessar esta funcionalidade"
@@ -20135,8 +21175,8 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-router16.use(authenticateToken, requireAdmin);
-router16.post("/seed", async (req, res) => {
+router17.use(authenticateToken, requireAdmin);
+router17.post("/seed", async (req, res) => {
   try {
     const { default: seedFormation2 } = await init_formation_seed().then(() => formation_seed_exports);
     const result = await seedFormation2();
@@ -20154,7 +21194,7 @@ router16.post("/seed", async (req, res) => {
     });
   }
 });
-router16.get("/tracks", async (req, res) => {
+router17.get("/tracks", async (req, res) => {
   try {
     const tracks = await db.select().from(formationTracks).orderBy(asc2(formationTracks.orderIndex));
     res.json({ tracks });
@@ -20166,10 +21206,10 @@ router16.get("/tracks", async (req, res) => {
     });
   }
 });
-router16.get("/tracks/:id", async (req, res) => {
+router17.get("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const track = await db.select().from(formationTracks).where(eq29(formationTracks.id, id)).limit(1);
+    const track = await db.select().from(formationTracks).where(eq31(formationTracks.id, id)).limit(1);
     if (track.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -20185,7 +21225,7 @@ router16.get("/tracks/:id", async (req, res) => {
     });
   }
 });
-router16.post("/tracks", async (req, res) => {
+router17.post("/tracks", async (req, res) => {
   try {
     const trackData = req.body;
     const newTrack = await db.insert(formationTracks).values(trackData).returning();
@@ -20201,11 +21241,11 @@ router16.post("/tracks", async (req, res) => {
     });
   }
 });
-router16.patch("/tracks/:id", async (req, res) => {
+router17.patch("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(formationTracks.id, id)).returning();
+    const updated = await db.update(formationTracks).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationTracks.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -20224,17 +21264,17 @@ router16.patch("/tracks/:id", async (req, res) => {
     });
   }
 });
-router16.delete("/tracks/:id", async (req, res) => {
+router17.delete("/tracks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const modules = await db.select().from(formationModules).where(eq29(formationModules.trackId, id));
+    const modules = await db.select().from(formationModules).where(eq31(formationModules.trackId, id));
     if (modules.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta trilha possui m\xF3dulos. Delete os m\xF3dulos primeiro ou desative a trilha."
       });
     }
-    const deleted = await db.delete(formationTracks).where(eq29(formationTracks.id, id)).returning();
+    const deleted = await db.delete(formationTracks).where(eq31(formationTracks.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
@@ -20253,10 +21293,10 @@ router16.delete("/tracks/:id", async (req, res) => {
     });
   }
 });
-router16.get("/tracks/:trackId/modules", async (req, res) => {
+router17.get("/tracks/:trackId/modules", async (req, res) => {
   try {
     const { trackId } = req.params;
-    const modules = await db.select().from(formationModules).where(eq29(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
+    const modules = await db.select().from(formationModules).where(eq31(formationModules.trackId, trackId)).orderBy(asc2(formationModules.orderIndex));
     res.json({ modules });
   } catch (error) {
     console.error("Error fetching formation modules:", error);
@@ -20266,10 +21306,10 @@ router16.get("/tracks/:trackId/modules", async (req, res) => {
     });
   }
 });
-router16.get("/modules/:id", async (req, res) => {
+router17.get("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const module = await db.select().from(formationModules).where(eq29(formationModules.id, id)).limit(1);
+    const module = await db.select().from(formationModules).where(eq31(formationModules.id, id)).limit(1);
     if (module.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -20285,7 +21325,7 @@ router16.get("/modules/:id", async (req, res) => {
     });
   }
 });
-router16.post("/modules", async (req, res) => {
+router17.post("/modules", async (req, res) => {
   try {
     const moduleData = req.body;
     const newModule = await db.insert(formationModules).values(moduleData).returning();
@@ -20301,11 +21341,11 @@ router16.post("/modules", async (req, res) => {
     });
   }
 });
-router16.patch("/modules/:id", async (req, res) => {
+router17.patch("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationModules).set(updates).where(eq29(formationModules.id, id)).returning();
+    const updated = await db.update(formationModules).set(updates).where(eq31(formationModules.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -20324,17 +21364,17 @@ router16.patch("/modules/:id", async (req, res) => {
     });
   }
 });
-router16.delete("/modules/:id", async (req, res) => {
+router17.delete("/modules/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq29(formationLessons.moduleId, id));
+    const lessons = await db.select().from(formationLessons).where(eq31(formationLessons.moduleId, id));
     if (lessons.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Este m\xF3dulo possui li\xE7\xF5es. Delete as li\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationModules).where(eq29(formationModules.id, id)).returning();
+    const deleted = await db.delete(formationModules).where(eq31(formationModules.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "M\xF3dulo n\xE3o encontrado",
@@ -20353,10 +21393,10 @@ router16.delete("/modules/:id", async (req, res) => {
     });
   }
 });
-router16.get("/modules/:moduleId/lessons", async (req, res) => {
+router17.get("/modules/:moduleId/lessons", async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const lessons = await db.select().from(formationLessons).where(eq29(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
+    const lessons = await db.select().from(formationLessons).where(eq31(formationLessons.moduleId, moduleId)).orderBy(asc2(formationLessons.orderIndex));
     res.json({ lessons });
   } catch (error) {
     console.error("Error fetching formation lessons:", error);
@@ -20366,10 +21406,10 @@ router16.get("/modules/:moduleId/lessons", async (req, res) => {
     });
   }
 });
-router16.get("/lessons/:id", async (req, res) => {
+router17.get("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const lesson = await db.select().from(formationLessons).where(eq29(formationLessons.id, id)).limit(1);
+    const lesson = await db.select().from(formationLessons).where(eq31(formationLessons.id, id)).limit(1);
     if (lesson.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -20385,7 +21425,7 @@ router16.get("/lessons/:id", async (req, res) => {
     });
   }
 });
-router16.post("/lessons", async (req, res) => {
+router17.post("/lessons", async (req, res) => {
   try {
     const lessonData = req.body;
     const newLesson = await db.insert(formationLessons).values(lessonData).returning();
@@ -20401,11 +21441,11 @@ router16.post("/lessons", async (req, res) => {
     });
   }
 });
-router16.patch("/lessons/:id", async (req, res) => {
+router17.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(formationLessons.id, id)).returning();
+    const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationLessons.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -20424,17 +21464,17 @@ router16.patch("/lessons/:id", async (req, res) => {
     });
   }
 });
-router16.delete("/lessons/:id", async (req, res) => {
+router17.delete("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq29(formationLessonSections.lessonId, id));
+    const sections = await db.select().from(formationLessonSections).where(eq31(formationLessonSections.lessonId, id));
     if (sections.length > 0) {
       return res.status(400).json({
         error: "N\xE3o \xE9 poss\xEDvel deletar",
         message: "Esta li\xE7\xE3o possui se\xE7\xF5es. Delete as se\xE7\xF5es primeiro."
       });
     }
-    const deleted = await db.delete(formationLessons).where(eq29(formationLessons.id, id)).returning();
+    const deleted = await db.delete(formationLessons).where(eq31(formationLessons.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
@@ -20453,10 +21493,10 @@ router16.delete("/lessons/:id", async (req, res) => {
     });
   }
 });
-router16.get("/lessons/:lessonId/sections", async (req, res) => {
+router17.get("/lessons/:lessonId/sections", async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const sections = await db.select().from(formationLessonSections).where(eq29(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
+    const sections = await db.select().from(formationLessonSections).where(eq31(formationLessonSections.lessonId, lessonId)).orderBy(asc2(formationLessonSections.orderIndex));
     res.json({ sections });
   } catch (error) {
     console.error("Error fetching lesson sections:", error);
@@ -20466,10 +21506,10 @@ router16.get("/lessons/:lessonId/sections", async (req, res) => {
     });
   }
 });
-router16.get("/sections/:id", async (req, res) => {
+router17.get("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const section = await db.select().from(formationLessonSections).where(eq29(formationLessonSections.id, id)).limit(1);
+    const section = await db.select().from(formationLessonSections).where(eq31(formationLessonSections.id, id)).limit(1);
     if (section.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -20485,7 +21525,7 @@ router16.get("/sections/:id", async (req, res) => {
     });
   }
 });
-router16.post("/sections", async (req, res) => {
+router17.post("/sections", async (req, res) => {
   try {
     const sectionData = req.body;
     const newSection = await db.insert(formationLessonSections).values(sectionData).returning();
@@ -20501,11 +21541,11 @@ router16.post("/sections", async (req, res) => {
     });
   }
 });
-router16.patch("/sections/:id", async (req, res) => {
+router17.patch("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(formationLessonSections.id, id)).returning();
+    const updated = await db.update(formationLessonSections).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationLessonSections.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -20524,10 +21564,10 @@ router16.patch("/sections/:id", async (req, res) => {
     });
   }
 });
-router16.delete("/sections/:id", async (req, res) => {
+router17.delete("/sections/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.delete(formationLessonSections).where(eq29(formationLessonSections.id, id)).returning();
+    const deleted = await db.delete(formationLessonSections).where(eq31(formationLessonSections.id, id)).returning();
     if (deleted.length === 0) {
       return res.status(404).json({
         error: "Se\xE7\xE3o n\xE3o encontrada",
@@ -20546,7 +21586,7 @@ router16.delete("/sections/:id", async (req, res) => {
     });
   }
 });
-router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
+router17.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
   try {
     const { lessonId } = req.params;
     const { sectionIds } = req.body;
@@ -20557,7 +21597,7 @@ router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
       });
     }
     const updates = sectionIds.map(
-      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq29(formationLessonSections.id, id))
+      (id, index2) => db.update(formationLessonSections).set({ orderIndex: index2 }).where(eq31(formationLessonSections.id, id))
     );
     await Promise.all(updates);
     res.json({
@@ -20571,7 +21611,7 @@ router16.post("/lessons/:lessonId/sections/reorder", async (req, res) => {
     });
   }
 });
-router16.post("/tracks/reorder", async (req, res) => {
+router17.post("/tracks/reorder", async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids)) {
@@ -20581,7 +21621,7 @@ router16.post("/tracks/reorder", async (req, res) => {
       });
     }
     const updates = ids.map(
-      (id, index2) => db.update(formationTracks).set({ orderIndex: index2 }).where(eq29(formationTracks.id, id))
+      (id, index2) => db.update(formationTracks).set({ orderIndex: index2 }).where(eq31(formationTracks.id, id))
     );
     await Promise.all(updates);
     res.json({ message: "Ordem das trilhas atualizada com sucesso" });
@@ -20593,7 +21633,7 @@ router16.post("/tracks/reorder", async (req, res) => {
     });
   }
 });
-router16.post("/tracks/:trackId/modules/reorder", async (req, res) => {
+router17.post("/tracks/:trackId/modules/reorder", async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids)) {
@@ -20603,7 +21643,7 @@ router16.post("/tracks/:trackId/modules/reorder", async (req, res) => {
       });
     }
     const updates = ids.map(
-      (id, index2) => db.update(formationModules).set({ orderIndex: index2 }).where(eq29(formationModules.id, id))
+      (id, index2) => db.update(formationModules).set({ orderIndex: index2 }).where(eq31(formationModules.id, id))
     );
     await Promise.all(updates);
     res.json({ message: "Ordem dos m\xF3dulos atualizada com sucesso" });
@@ -20615,7 +21655,7 @@ router16.post("/tracks/:trackId/modules/reorder", async (req, res) => {
     });
   }
 });
-router16.post("/modules/:moduleId/lessons/reorder", async (req, res) => {
+router17.post("/modules/:moduleId/lessons/reorder", async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids)) {
@@ -20625,7 +21665,7 @@ router16.post("/modules/:moduleId/lessons/reorder", async (req, res) => {
       });
     }
     const updates = ids.map(
-      (id, index2) => db.update(formationLessons).set({ orderIndex: index2 }).where(eq29(formationLessons.id, id))
+      (id, index2) => db.update(formationLessons).set({ orderIndex: index2 }).where(eq31(formationLessons.id, id))
     );
     await Promise.all(updates);
     res.json({ message: "Ordem das li\xE7\xF5es atualizada com sucesso" });
@@ -20637,14 +21677,14 @@ router16.post("/modules/:moduleId/lessons/reorder", async (req, res) => {
     });
   }
 });
-router16.get("/stats", async (req, res) => {
+router17.get("/stats", async (req, res) => {
   try {
     const [tracksCount] = await db.select({ total: count6() }).from(formationTracks);
     const [modulesCount] = await db.select({ total: count6() }).from(formationModules);
     const [lessonsCount] = await db.select({ total: count6() }).from(formationLessons);
     const [sectionsCount] = await db.select({ total: count6() }).from(formationLessonSections);
-    const [activeTracksCount] = await db.select({ total: count6() }).from(formationTracks).where(eq29(formationTracks.isActive, true));
-    const [activeLessonsCount] = await db.select({ total: count6() }).from(formationLessons).where(eq29(formationLessons.isActive, true));
+    const [activeTracksCount] = await db.select({ total: count6() }).from(formationTracks).where(eq31(formationTracks.isActive, true));
+    const [activeLessonsCount] = await db.select({ total: count6() }).from(formationLessons).where(eq31(formationLessons.isActive, true));
     res.json({
       tracks: { total: tracksCount.total, active: activeTracksCount.total },
       modules: { total: modulesCount.total },
@@ -20659,17 +21699,17 @@ router16.get("/stats", async (req, res) => {
     });
   }
 });
-router16.patch("/tracks/:id/toggle-active", async (req, res) => {
+router17.patch("/tracks/:id/toggle-active", async (req, res) => {
   try {
     const { id } = req.params;
-    const [track] = await db.select().from(formationTracks).where(eq29(formationTracks.id, id)).limit(1);
+    const [track] = await db.select().from(formationTracks).where(eq31(formationTracks.id, id)).limit(1);
     if (!track) {
       return res.status(404).json({
         error: "Trilha n\xE3o encontrada",
         message: `Trilha com ID ${id} n\xE3o encontrada`
       });
     }
-    const updated = await db.update(formationTracks).set({ isActive: !track.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(formationTracks.id, id)).returning();
+    const updated = await db.update(formationTracks).set({ isActive: !track.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationTracks.id, id)).returning();
     res.json({
       message: `Trilha ${updated[0].isActive ? "ativada" : "desativada"} com sucesso`,
       track: updated[0]
@@ -20682,17 +21722,17 @@ router16.patch("/tracks/:id/toggle-active", async (req, res) => {
     });
   }
 });
-router16.patch("/lessons/:id/toggle-active", async (req, res) => {
+router17.patch("/lessons/:id/toggle-active", async (req, res) => {
   try {
     const { id } = req.params;
-    const [lesson] = await db.select().from(formationLessons).where(eq29(formationLessons.id, id)).limit(1);
+    const [lesson] = await db.select().from(formationLessons).where(eq31(formationLessons.id, id)).limit(1);
     if (!lesson) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
         message: `Li\xE7\xE3o com ID ${id} n\xE3o encontrada`
       });
     }
-    const updated = await db.update(formationLessons).set({ isActive: !lesson.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(formationLessons.id, id)).returning();
+    const updated = await db.update(formationLessons).set({ isActive: !lesson.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationLessons.id, id)).returning();
     res.json({
       message: `Li\xE7\xE3o ${updated[0].isActive ? "ativada" : "desativada"} com sucesso`,
       lesson: updated[0]
@@ -20705,30 +21745,31 @@ router16.patch("/lessons/:id/toggle-active", async (req, res) => {
     });
   }
 });
-var formationAdmin_default = router16;
+var formationAdmin_default = router17;
 
 // server/routes/version.ts
-import { Router as Router17 } from "express";
-var router17 = Router17();
+import { Router as Router18 } from "express";
+var router18 = Router18();
 var SYSTEM_VERSION = "5.4.2";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
-router17.get("/", (req, res) => {
+router18.get("/", (req, res) => {
   res.json({
     version: SYSTEM_VERSION,
     buildTime: BUILD_TIME,
     timestamp: Date.now()
   });
 });
-var version_default = router17;
+var version_default = router18;
 
 // server/routes/dashboard.ts
 await init_db();
 init_schema();
-import { Router as Router18 } from "express";
-import { eq as eq30, and as and22, gte as gte14, lte as lte12, sql as sql17, or as or9, isNull as isNull3, count as count7, desc as desc10 } from "drizzle-orm";
-import { format as format9, addDays as addDays6, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
-var router18 = Router18();
-router18.get("/urgent-alerts", async (req, res) => {
+init_roles();
+import { Router as Router19 } from "express";
+import { eq as eq32, and as and23, gte as gte15, lte as lte13, sql as sql17, or as or9, isNull as isNull3, count as count7, desc as desc10, inArray as inArray14 } from "drizzle-orm";
+import { format as format10, addDays as addDays6, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
+var router19 = Router19();
+router19.get("/urgent-alerts", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next48Hours = addDays6(now, 2);
@@ -20740,10 +21781,10 @@ router18.get("/urgent-alerts", async (req, res) => {
       filledSlots: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
       vacancies: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
     }).from(schedules).where(
-      and22(
-        eq30(schedules.status, "published"),
-        gte14(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format9(next7Days, "yyyy-MM-dd"))
+      and23(
+        eq32(schedules.status, "published"),
+        gte15(schedules.date, format10(now, "yyyy-MM-dd")),
+        lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
     const criticalMasses = incompleteMasses.filter((mass) => {
@@ -20770,14 +21811,14 @@ router18.get("/urgent-alerts", async (req, res) => {
       status: substitutionRequests.status,
       massDate: schedules.date,
       massTime: schedules.time
-    }).from(substitutionRequests).innerJoin(users, eq30(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq30(substitutionRequests.scheduleId, schedules.id)).where(
-      and22(
-        eq30(schedules.status, "published"),
+    }).from(substitutionRequests).innerJoin(users, eq32(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq32(substitutionRequests.scheduleId, schedules.id)).where(
+      and23(
+        eq32(schedules.status, "published"),
         or9(
-          eq30(substitutionRequests.status, "pending"),
-          eq30(substitutionRequests.status, "available")
+          eq32(substitutionRequests.status, "pending"),
+          eq32(substitutionRequests.status, "available")
         ),
-        gte14(schedules.date, format9(now, "yyyy-MM-dd"))
+        gte15(schedules.date, format10(now, "yyyy-MM-dd"))
       )
     ).orderBy(schedules.date);
     const urgentSubstitutions = pendingSubstitutions.filter((sub) => {
@@ -20806,7 +21847,7 @@ router18.get("/urgent-alerts", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch urgent alerts" });
   }
 });
-router18.get("/next-week-masses", async (req, res) => {
+router19.get("/next-week-masses", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next7Days = addDays6(now, 7);
@@ -20827,10 +21868,10 @@ router18.get("/next-week-masses", async (req, res) => {
           AND ${substitutionRequests.status} IN ('pending', 'available')
         )`
     }).from(schedules).where(
-      and22(
-        eq30(schedules.status, "published"),
-        gte14(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format9(next7Days, "yyyy-MM-dd"))
+      and23(
+        eq32(schedules.status, "published"),
+        gte15(schedules.date, format10(now, "yyyy-MM-dd")),
+        lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).orderBy(schedules.date, schedules.time);
     const massesWithStatus = masses.map((mass) => {
@@ -20860,19 +21901,16 @@ router18.get("/next-week-masses", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch next week masses" });
   }
 });
-router18.get("/ministry-stats", async (req, res) => {
+router19.get("/ministry-stats", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const thirtyDaysAgo = subDays(now, 30);
     const thisMonthStart = startOfMonth4(now);
     const thisMonthEnd = endOfMonth4(now);
     const [activeMinistersResult] = await db.select({ count: count7() }).from(users).where(
-      and22(
-        eq30(users.status, "active"),
-        or9(
-          eq30(users.role, "ministro"),
-          eq30(users.role, "coordenador")
-        )
+      and23(
+        eq32(users.status, "active"),
+        inArray14(users.role, ["ministro", ...COORDINATOR_ROLES])
       )
     );
     const inactiveMinisters = await db.select({
@@ -20881,14 +21919,11 @@ router18.get("/ministry-stats", async (req, res) => {
       lastService: users.lastService,
       daysSinceService: sql17`EXTRACT(DAY FROM NOW() - ${users.lastService})`
     }).from(users).where(
-      and22(
-        eq30(users.status, "active"),
+      and23(
+        eq32(users.status, "active"),
+        inArray14(users.role, ["ministro", ...COORDINATOR_ROLES]),
         or9(
-          eq30(users.role, "ministro"),
-          eq30(users.role, "coordenador")
-        ),
-        or9(
-          lte12(users.lastService, thirtyDaysAgo),
+          lte13(users.lastService, thirtyDaysAgo),
           isNull3(users.lastService)
         )
       )
@@ -20905,19 +21940,19 @@ router18.get("/ministry-stats", async (req, res) => {
           ) THEN (${schedules.date}, ${schedules.time})
         END)`
     }).from(schedules).where(
-      and22(
-        eq30(schedules.status, "published"),
-        gte14(schedules.date, format9(thisMonthStart, "yyyy-MM-dd")),
-        lte12(schedules.date, format9(thisMonthEnd, "yyyy-MM-dd"))
+      and23(
+        eq32(schedules.status, "published"),
+        gte15(schedules.date, format10(thisMonthStart, "yyyy-MM-dd")),
+        lte13(schedules.date, format10(thisMonthEnd, "yyyy-MM-dd"))
       )
     );
     const [currentQuestionnaire] = await db.select({
       id: questionnaires.id,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and22(
-        eq30(questionnaires.month, now.getMonth() + 1),
-        eq30(questionnaires.year, now.getFullYear())
+      and23(
+        eq32(questionnaires.month, now.getMonth() + 1),
+        eq32(questionnaires.year, now.getFullYear())
       )
     ).limit(1);
     let responseRate = 0;
@@ -20925,34 +21960,34 @@ router18.get("/ministry-stats", async (req, res) => {
     if (currentQuestionnaire) {
       const [responseStats] = await db.select({
         totalResponses: count7(questionnaireResponses.id)
-      }).from(questionnaireResponses).where(eq30(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
+      }).from(questionnaireResponses).where(eq32(questionnaireResponses.questionnaireId, currentQuestionnaire.id));
       responseRate = Math.round(
         responseStats.totalResponses / (activeMinistersResult.count || 1) * 100
       );
       const userId = req.user?.id;
       if (userId) {
-        const [userResponse] = await db.select().from(questionnaireResponses).where(and22(
-          eq30(questionnaireResponses.userId, userId),
-          eq30(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
-          eq30(questionnaireResponses.isDeleted, false)
+        const [userResponse] = await db.select().from(questionnaireResponses).where(and23(
+          eq32(questionnaireResponses.userId, userId),
+          eq32(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
+          eq32(questionnaireResponses.isDeleted, false)
         )).limit(1);
         hasResponded = !!userResponse;
       }
     }
     const [pendingSubsCount] = await db.select({ count: count7() }).from(substitutionRequests).where(
-      and22(
+      and23(
         or9(
-          eq30(substitutionRequests.status, "pending"),
-          eq30(substitutionRequests.status, "available")
+          eq32(substitutionRequests.status, "pending"),
+          eq32(substitutionRequests.status, "available")
         )
       )
     );
     const [incompleteMassesCount] = await db.select({
       count: sql17`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
     }).from(schedules).where(
-      and22(
-        eq30(schedules.status, "published"),
-        gte14(schedules.date, format9(now, "yyyy-MM-dd")),
+      and23(
+        eq32(schedules.status, "published"),
+        gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         isNull3(schedules.ministerId)
       )
     );
@@ -20978,7 +22013,7 @@ router18.get("/ministry-stats", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch ministry stats" });
   }
 });
-router18.get("/incomplete", async (req, res) => {
+router19.get("/incomplete", async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const now = /* @__PURE__ */ new Date();
@@ -20994,10 +22029,10 @@ router18.get("/incomplete", async (req, res) => {
           END
         ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
     }).from(schedules).where(
-      and22(
-        eq30(schedules.status, "published"),
-        gte14(schedules.date, format9(now, "yyyy-MM-dd")),
-        lte12(schedules.date, format9(futureDate, "yyyy-MM-dd"))
+      and23(
+        eq32(schedules.status, "published"),
+        gte15(schedules.date, format10(now, "yyyy-MM-dd")),
+        lte13(schedules.date, format10(futureDate, "yyyy-MM-dd"))
       )
     ).groupBy(schedules.date, schedules.time).having(sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
     res.json({
@@ -21015,14 +22050,14 @@ router18.get("/incomplete", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch incomplete schedules" });
   }
 });
-var dashboard_default = router18;
+var dashboard_default = router19;
 
 // server/routes/pushSubscriptions.ts
 await init_storage();
-import { Router as Router19 } from "express";
+import { Router as Router20 } from "express";
 await init_pushNotifications();
 import { z as z8 } from "zod";
-var router19 = Router19();
+var router20 = Router20();
 var pushSubscriptionSchema2 = z8.object({
   endpoint: z8.string().url(),
   keys: z8.object({
@@ -21030,13 +22065,13 @@ var pushSubscriptionSchema2 = z8.object({
     auth: z8.string()
   })
 });
-router19.get("/vapid-public-key", (req, res) => {
+router20.get("/vapid-public-key", (req, res) => {
   if (!pushConfig.enabled || !pushConfig.publicKey) {
     return res.status(503).json({ error: "Push notifications not configured" });
   }
   res.json({ publicKey: pushConfig.publicKey });
 });
-router19.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
+router20.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     if (!pushConfig.enabled) {
       return res.status(503).json({ error: "Push notifications not available" });
@@ -21050,6 +22085,10 @@ router19.post("/subscribe", csrfProtection, authenticateToken, async (req, res) 
         p256dh: validatedData.keys.p256dh
       }
     });
+    const removed = await cleanupUserSubscriptions(userId);
+    if (removed > 0) {
+      console.log(`[PUSH API] Cleanup: ${removed} subscriptions antigas removidas para userId: ${userId}`);
+    }
     console.log(`[PUSH API] Subscription upserted for userId: ${userId}, endpoint: ${validatedData.endpoint.substring(0, 60)}...`);
     res.json({ success: true, message: "Subscribed to push notifications" });
   } catch (error) {
@@ -21060,7 +22099,7 @@ router19.post("/subscribe", csrfProtection, authenticateToken, async (req, res) 
     res.status(500).json({ error: "Failed to subscribe" });
   }
 });
-router19.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
+router20.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     const { endpoint } = req.body;
     if (!endpoint) {
@@ -21073,7 +22112,7 @@ router19.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res
     res.status(500).json({ error: "Failed to unsubscribe" });
   }
 });
-router19.get("/subscriptions", authenticateToken, async (req, res) => {
+router20.get("/subscriptions", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const subscriptions = await storage.getPushSubscriptionsByUserIds([userId]);
@@ -21088,15 +22127,16 @@ router19.get("/subscriptions", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to get subscriptions" });
   }
 });
-var pushSubscriptions_default = router19;
+var pushSubscriptions_default = router20;
 
 // server/routes/certificates.ts
-import { Router as Router20 } from "express";
+import { Router as Router21 } from "express";
+init_roles();
 
 // server/services/certificateService.ts
 await init_db();
 init_schema();
-import { eq as eq31, and as and23, count as count8, sql as sql18 } from "drizzle-orm";
+import { eq as eq33, and as and24, count as count8, sql as sql18 } from "drizzle-orm";
 
 // server/utils/certificateGenerator.ts
 import { jsPDF as jsPDF2 } from "jspdf";
@@ -21283,7 +22323,7 @@ function generateVerificationCode() {
 
 // server/services/certificateService.ts
 async function getTrackCompletionStatus(userId, trackId) {
-  const tracksQuery = trackId ? db.select().from(formationTracks).where(eq31(formationTracks.id, trackId)) : db.select().from(formationTracks).where(eq31(formationTracks.isActive, true));
+  const tracksQuery = trackId ? db.select().from(formationTracks).where(eq33(formationTracks.id, trackId)) : db.select().from(formationTracks).where(eq33(formationTracks.isActive, true));
   const tracks = await tracksQuery;
   const results = [];
   for (const track of tracks) {
@@ -21291,9 +22331,9 @@ async function getTrackCompletionStatus(userId, trackId) {
       id: formationLessons.id,
       durationMinutes: formationLessons.durationMinutes
     }).from(formationLessons).where(
-      and23(
-        eq31(formationLessons.trackId, track.id),
-        eq31(formationLessons.isActive, true)
+      and24(
+        eq33(formationLessons.trackId, track.id),
+        eq33(formationLessons.isActive, true)
       )
     );
     const lessonIds = lessons.map((l) => l.id);
@@ -21306,8 +22346,8 @@ async function getTrackCompletionStatus(userId, trackId) {
         status: formationLessonProgress.status,
         completedAt: formationLessonProgress.completedAt
       }).from(formationLessonProgress).where(
-        and23(
-          eq31(formationLessonProgress.userId, userId),
+        and24(
+          eq33(formationLessonProgress.userId, userId),
           sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
         )
       );
@@ -21322,9 +22362,9 @@ async function getTrackCompletionStatus(userId, trackId) {
     }
     const isCompleted = lessonIds.length > 0 && completedLessons === lessonIds.length;
     const existingCert = await db.select({ id: formationCertificates.id }).from(formationCertificates).where(
-      and23(
-        eq31(formationCertificates.userId, userId),
-        eq31(formationCertificates.trackId, track.id)
+      and24(
+        eq33(formationCertificates.userId, userId),
+        eq33(formationCertificates.trackId, track.id)
       )
     ).limit(1);
     results.push({
@@ -21355,26 +22395,26 @@ async function issueCertificate(userId, trackId, issuedById) {
   }
   if (status.hasCertificate) {
     const existing = await db.select().from(formationCertificates).where(
-      and23(
-        eq31(formationCertificates.userId, userId),
-        eq31(formationCertificates.trackId, trackId)
+      and24(
+        eq33(formationCertificates.userId, userId),
+        eq33(formationCertificates.trackId, trackId)
       )
     ).limit(1);
     return { success: true, certificate: existing[0] };
   }
-  const [user] = await db.select({ name: users.name }).from(users).where(eq31(users.id, userId));
+  const [user] = await db.select({ name: users.name }).from(users).where(eq33(users.id, userId));
   if (!user) {
     return { success: false, error: "Usuario nao encontrado" };
   }
   const [certCount] = await db.select({ count: count8() }).from(formationCertificates);
   const certificateNumber = generateCertificateNumber((certCount?.count || 0) + 1);
   const verificationCode = generateVerificationCode();
-  const lessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(eq31(formationLessons.trackId, trackId));
+  const lessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(eq33(formationLessons.trackId, trackId));
   const lessonIds = lessons.map((l) => l.id);
   const completedProgress = await db.select({ lessonId: formationLessonProgress.lessonId }).from(formationLessonProgress).where(
-    and23(
-      eq31(formationLessonProgress.userId, userId),
-      eq31(formationLessonProgress.status, "completed"),
+    and24(
+      eq33(formationLessonProgress.userId, userId),
+      eq33(formationLessonProgress.status, "completed"),
       sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
     )
   );
@@ -21397,13 +22437,13 @@ async function issueCertificate(userId, trackId, issuedById) {
   return { success: true, certificate };
 }
 async function generateCertificatePDFById(certificateId) {
-  const [cert] = await db.select().from(formationCertificates).where(eq31(formationCertificates.id, certificateId));
+  const [cert] = await db.select().from(formationCertificates).where(eq33(formationCertificates.id, certificateId));
   if (!cert) {
     return null;
   }
   let issuerName;
   if (cert.issuedBy) {
-    const [issuer] = await db.select({ name: users.name }).from(users).where(eq31(users.id, cert.issuedBy));
+    const [issuer] = await db.select({ name: users.name }).from(users).where(eq33(users.id, cert.issuedBy));
     issuerName = issuer?.name;
   }
   const data = {
@@ -21421,20 +22461,20 @@ async function generateCertificatePDFById(certificateId) {
   return generateCertificatePDF(data);
 }
 async function verifyCertificate(verificationCode) {
-  const [cert] = await db.select().from(formationCertificates).where(eq31(formationCertificates.verificationCode, verificationCode.toUpperCase()));
+  const [cert] = await db.select().from(formationCertificates).where(eq33(formationCertificates.verificationCode, verificationCode.toUpperCase()));
   return cert || null;
 }
 async function getUserCertificates(userId) {
-  return db.select().from(formationCertificates).where(eq31(formationCertificates.userId, userId)).orderBy(formationCertificates.issuedAt);
+  return db.select().from(formationCertificates).where(eq33(formationCertificates.userId, userId)).orderBy(formationCertificates.issuedAt);
 }
 async function getCertificateById(certificateId) {
-  const [cert] = await db.select().from(formationCertificates).where(eq31(formationCertificates.id, certificateId));
+  const [cert] = await db.select().from(formationCertificates).where(eq33(formationCertificates.id, certificateId));
   return cert || null;
 }
 
 // server/routes/certificates.ts
-var router20 = Router20();
-router20.get("/status", authenticateToken, async (req, res) => {
+var router21 = Router21();
+router21.get("/status", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -21448,7 +22488,7 @@ router20.get("/status", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter status das trilhas" });
   }
 });
-router20.get("/", authenticateToken, async (req, res) => {
+router21.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -21461,7 +22501,7 @@ router20.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter certificados" });
   }
 });
-router20.post("/issue", authenticateToken, async (req, res) => {
+router21.post("/issue", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -21481,7 +22521,7 @@ router20.post("/issue", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao emitir certificado" });
   }
 });
-router20.get("/:id", authenticateToken, async (req, res) => {
+router21.get("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -21490,7 +22530,7 @@ router20.get("/:id", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Certificado nao encontrado" });
     }
     const userRole = req.user?.role;
-    if (certificate.userId !== userId && userRole !== "coordenador" && userRole !== "gestor") {
+    if (certificate.userId !== userId && !isAdmin(userRole)) {
       return res.status(403).json({ error: "Acesso negado" });
     }
     res.json(certificate);
@@ -21499,7 +22539,7 @@ router20.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter certificado" });
   }
 });
-router20.get("/:id/pdf", authenticateToken, async (req, res) => {
+router21.get("/:id/pdf", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -21508,7 +22548,7 @@ router20.get("/:id/pdf", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Certificado nao encontrado" });
     }
     const userRole = req.user?.role;
-    if (certificate.userId !== userId && userRole !== "coordenador" && userRole !== "gestor") {
+    if (certificate.userId !== userId && !isAdmin(userRole)) {
       return res.status(403).json({ error: "Acesso negado" });
     }
     const pdfBuffer = await generateCertificatePDFById(id);
@@ -21525,7 +22565,7 @@ router20.get("/:id/pdf", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar PDF do certificado" });
   }
 });
-router20.get("/verify/:code", async (req, res) => {
+router21.get("/verify/:code", async (req, res) => {
   try {
     const { code } = req.params;
     if (!code || code.length !== 6) {
@@ -21556,11 +22596,11 @@ router20.get("/verify/:code", async (req, res) => {
     res.status(500).json({ error: "Erro ao verificar certificado" });
   }
 });
-router20.post("/issue-for-user", authenticateToken, async (req, res) => {
+router21.post("/issue-for-user", authenticateToken, async (req, res) => {
   try {
     const issuerId = req.user?.id;
     const userRole = req.user?.role;
-    if (userRole !== "coordenador" && userRole !== "gestor") {
+    if (!isAdmin(userRole)) {
       return res.status(403).json({ error: "Apenas coordenadores podem emitir certificados para outros usuarios" });
     }
     const { userId, trackId } = req.body;
@@ -21577,15 +22617,15 @@ router20.post("/issue-for-user", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao emitir certificado" });
   }
 });
-var certificates_default = router20;
+var certificates_default = router21;
 
 // server/routes/insights.ts
-import { Router as Router21 } from "express";
+import { Router as Router22 } from "express";
 
 // server/services/insightsService.ts
 await init_db();
 init_schema();
-import { eq as eq32, and as and24, gte as gte15, lte as lte13, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
+import { eq as eq34, and as and25, gte as gte16, lte as lte14, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
 function calculateNoShowRisk(noShowCount, totalServices, reliabilityScore) {
   if (totalServices === 0) return "medium";
   const noShowRate = noShowCount / totalServices * 100;
@@ -21622,9 +22662,9 @@ async function getMinisterRiskProfiles() {
     lastService: users.lastService,
     lastLogin: users.lastLogin
   }).from(users).where(
-    and24(
-      eq32(users.status, "active"),
-      eq32(users.role, "ministro")
+    and25(
+      eq34(users.status, "active"),
+      eq34(users.role, "ministro")
     )
   );
   const profiles = [];
@@ -21687,21 +22727,21 @@ async function getMinisterRiskProfiles() {
   return profiles;
 }
 async function getTimeSlotInsights() {
-  const massTimes = await db.select().from(massTimesConfig).where(eq32(massTimesConfig.isActive, true));
+  const massTimes = await db.select().from(massTimesConfig).where(eq34(massTimesConfig.isActive, true));
   const now = /* @__PURE__ */ new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
   const [currentQuestionnaire] = await db.select().from(questionnaires).where(
-    and24(
-      eq32(questionnaires.month, currentMonth),
-      eq32(questionnaires.year, currentYear)
+    and25(
+      eq34(questionnaires.month, currentMonth),
+      eq34(questionnaires.year, currentYear)
     )
   ).limit(1);
   const [reliableCount] = await db.select({ count: count9() }).from(users).where(
-    and24(
-      eq32(users.status, "active"),
-      eq32(users.role, "ministro"),
-      gte15(users.reliabilityScore, 75)
+    and25(
+      eq34(users.status, "active"),
+      eq34(users.role, "ministro"),
+      gte16(users.reliabilityScore, 75)
     )
   );
   const insights = [];
@@ -21754,10 +22794,10 @@ async function getSubstitutionPatterns() {
     substitutionFulfilledCount: users.substitutionFulfilledCount,
     totalServices: users.totalServices
   }).from(users).where(
-    and24(
-      eq32(users.status, "active"),
-      eq32(users.role, "ministro"),
-      gte15(users.substitutionRequestCount, 1)
+    and25(
+      eq34(users.status, "active"),
+      eq34(users.role, "ministro"),
+      gte16(users.substitutionRequestCount, 1)
     )
   ).orderBy(desc11(users.substitutionRequestCount)).limit(20);
   const patterns = [];
@@ -21844,12 +22884,12 @@ async function getEngagementTrends() {
     const monthStart = new Date(date2.getFullYear(), date2.getMonth(), 1);
     const monthEnd = new Date(date2.getFullYear(), date2.getMonth() + 1, 0);
     const [activeCount] = await db.select({ count: count9() }).from(activityLogs).where(
-      and24(
-        gte15(activityLogs.createdAt, monthStart),
-        lte13(activityLogs.createdAt, monthEnd)
+      and25(
+        gte16(activityLogs.createdAt, monthStart),
+        lte14(activityLogs.createdAt, monthEnd)
       )
     );
-    const [avgScore] = await db.select({ avg: avg2(users.reliabilityScore) }).from(users).where(eq32(users.status, "active"));
+    const [avgScore] = await db.select({ avg: avg2(users.reliabilityScore) }).from(users).where(eq34(users.status, "active"));
     trends.push({
       period: monthName,
       activeUsers: Math.min(activeCount?.count || 0, 100),
@@ -21958,7 +22998,7 @@ async function getScheduleRiskAssessment(date2) {
     reliabilityScore: users.reliabilityScore,
     noShowCount: users.noShowCount,
     totalServices: users.totalServices
-  }).from(schedules).innerJoin(users, eq32(schedules.ministerId, users.id)).where(eq32(schedules.date, dateStr));
+  }).from(schedules).innerJoin(users, eq34(schedules.ministerId, users.id)).where(eq34(schedules.date, dateStr));
   const assignments = scheduled.map((s) => {
     const riskLevel = calculateNoShowRisk(
       s.noShowCount || 0,
@@ -21995,10 +23035,10 @@ async function getScheduleRiskAssessment(date2) {
 }
 
 // server/routes/insights.ts
-var router21 = Router21();
-router21.use(authenticateToken);
-router21.use(requireRole(["coordenador", "gestor"]));
-router21.get("/", async (req, res) => {
+var router22 = Router22();
+router22.use(authenticateToken);
+router22.use(requireRole(["coordenador", "gestor"]));
+router22.get("/", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     res.json(insights);
@@ -22007,7 +23047,7 @@ router21.get("/", async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar insights preditivos" });
   }
 });
-router21.get("/summary", async (req, res) => {
+router22.get("/summary", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     res.json({
@@ -22020,7 +23060,7 @@ router21.get("/summary", async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar resumo" });
   }
 });
-router21.get("/ministers", async (req, res) => {
+router22.get("/ministers", async (req, res) => {
   try {
     const riskFilter = req.query.risk;
     let profiles = await getMinisterRiskProfiles();
@@ -22036,7 +23076,7 @@ router21.get("/ministers", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter perfis de risco" });
   }
 });
-router21.get("/ministers/:id", async (req, res) => {
+router22.get("/ministers/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const profiles = await getMinisterRiskProfiles();
@@ -22050,7 +23090,7 @@ router21.get("/ministers/:id", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter perfil do ministro" });
   }
 });
-router21.get("/time-slots", async (req, res) => {
+router22.get("/time-slots", async (req, res) => {
   try {
     const insights = await getTimeSlotInsights();
     const grouped = {
@@ -22069,7 +23109,7 @@ router21.get("/time-slots", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter analise de horarios" });
   }
 });
-router21.get("/substitutions", async (req, res) => {
+router22.get("/substitutions", async (req, res) => {
   try {
     const patterns = await getSubstitutionPatterns();
     const avgFrequency = patterns.length > 0 ? patterns.reduce((sum2, p) => sum2 + p.requestFrequency, 0) / patterns.length : 0;
@@ -22089,7 +23129,7 @@ router21.get("/substitutions", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter padroes de substituicao" });
   }
 });
-router21.get("/seasonal", async (req, res) => {
+router22.get("/seasonal", async (req, res) => {
   try {
     const patterns = await getSeasonalPatterns();
     const highRiskMonths = patterns.filter((p) => p.isHighRisk).map((p) => p.monthName);
@@ -22103,7 +23143,7 @@ router21.get("/seasonal", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter padroes sazonais" });
   }
 });
-router21.get("/engagement", async (req, res) => {
+router22.get("/engagement", async (req, res) => {
   try {
     const trends = await getEngagementTrends();
     const latestTrend = trends.length > 0 ? trends[trends.length - 1].trend : "stable";
@@ -22117,7 +23157,7 @@ router21.get("/engagement", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter tendencias de engajamento" });
   }
 });
-router21.get("/schedule-risk/:date", async (req, res) => {
+router22.get("/schedule-risk/:date", async (req, res) => {
   try {
     const { date: date2 } = req.params;
     const dateObj = new Date(date2);
@@ -22131,7 +23171,7 @@ router21.get("/schedule-risk/:date", async (req, res) => {
     res.status(500).json({ error: "Erro ao avaliar risco da escala" });
   }
 });
-router21.get("/recommendations", async (req, res) => {
+router22.get("/recommendations", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     const categorized = {
@@ -22158,14 +23198,15 @@ router21.get("/recommendations", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter recomendacoes" });
   }
 });
-var insights_default = router21;
+var insights_default = router22;
 
 // server/routes/materials.ts
-import { Router as Router22 } from "express";
-import multer2 from "multer";
+import { Router as Router23 } from "express";
+import multer3 from "multer";
+init_roles();
 await init_db();
 init_schema();
-import { eq as eq33, desc as desc12, and as and25, ilike, or as or10, sql as sql20 } from "drizzle-orm";
+import { eq as eq35, desc as desc12, and as and26, ilike, or as or10, sql as sql20 } from "drizzle-orm";
 
 // server/services/aiContentAnalyzer.ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -22385,9 +23426,9 @@ ${content.slice(0, 1e4)}`
 }
 
 // server/routes/materials.ts
-var router22 = Router22();
-var upload2 = multer2({
-  storage: multer2.memoryStorage(),
+var router23 = Router23();
+var upload3 = multer3({
+  storage: multer3.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024
     // 10MB max
@@ -22423,8 +23464,8 @@ function getFileType(mimeType) {
   if (mimeType.startsWith("video/")) return "video";
   return "other";
 }
-router22.use(authenticateToken);
-router22.get("/", async (req, res) => {
+router23.use(authenticateToken);
+router23.get("/", async (req, res) => {
   try {
     const {
       category,
@@ -22438,26 +23479,26 @@ router22.get("/", async (req, res) => {
       limit = "50",
       offset = "0"
     } = req.query;
-    const conditions = [eq33(formationMaterials.isActive, true)];
+    const conditions = [eq35(formationMaterials.isActive, true)];
     if (category && category !== "all") {
-      conditions.push(eq33(formationMaterials.category, category));
+      conditions.push(eq35(formationMaterials.category, category));
     }
     if (trackId) {
-      conditions.push(eq33(formationMaterials.trackId, trackId));
+      conditions.push(eq35(formationMaterials.trackId, trackId));
     }
     if (type && type !== "all") {
-      conditions.push(eq33(formationMaterials.type, type));
+      conditions.push(eq35(formationMaterials.type, type));
     }
     if (aiStatus === "analyzed") {
-      conditions.push(eq33(formationMaterials.aiAnalyzed, true));
+      conditions.push(eq35(formationMaterials.aiAnalyzed, true));
     } else if (aiStatus === "pending") {
       conditions.push(or10(
-        eq33(formationMaterials.aiAnalyzed, false),
+        eq35(formationMaterials.aiAnalyzed, false),
         sql20`${formationMaterials.aiAnalyzed} IS NULL`
       ));
     }
     if (aiQuality && aiQuality !== "all") {
-      conditions.push(eq33(formationMaterials.aiContentQuality, aiQuality));
+      conditions.push(eq35(formationMaterials.aiContentQuality, aiQuality));
     }
     if (search) {
       conditions.push(
@@ -22469,8 +23510,8 @@ router22.get("/", async (req, res) => {
       );
     }
     const userRole = req.user?.role;
-    if (userRole !== "coordenador" && userRole !== "gestor") {
-      conditions.push(eq33(formationMaterials.isPublished, true));
+    if (!isAdmin(userRole)) {
+      conditions.push(eq35(formationMaterials.isPublished, true));
     }
     let orderByClause;
     const isDesc = sortOrder === "desc";
@@ -22507,8 +23548,8 @@ router22.get("/", async (req, res) => {
       aiContentQuality: formationMaterials.aiContentQuality,
       aiSummary: formationMaterials.aiSummary,
       aiKeyTopics: formationMaterials.aiKeyTopics
-    }).from(formationMaterials).leftJoin(users, eq33(formationMaterials.uploadedBy, users.id)).where(and25(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
-    const [countResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and25(...conditions));
+    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and26(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(...conditions));
     res.json({
       materials,
       total: countResult?.count || 0,
@@ -22520,20 +23561,20 @@ router22.get("/", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar materiais" });
   }
 });
-router22.get("/categories", async (req, res) => {
+router23.get("/categories", async (req, res) => {
   try {
     const tracks = await db.select({
       id: formationTracks.id,
       title: formationTracks.title,
       category: formationTracks.category
-    }).from(formationTracks).where(eq33(formationTracks.isActive, true));
+    }).from(formationTracks).where(eq35(formationTracks.isActive, true));
     res.json({ tracks });
   } catch (error) {
     console.error("Error fetching categories:", error);
     res.status(500).json({ error: "Erro ao buscar categorias" });
   }
 });
-router22.get("/:id", async (req, res) => {
+router23.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [material] = await db.select({
@@ -22552,9 +23593,9 @@ router22.get("/:id", async (req, res) => {
       isPublished: formationMaterials.isPublished,
       createdAt: formationMaterials.createdAt,
       uploaderName: users.name
-    }).from(formationMaterials).leftJoin(users, eq33(formationMaterials.uploadedBy, users.id)).where(and25(
-      eq33(formationMaterials.id, id),
-      eq33(formationMaterials.isActive, true)
+    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and26(
+      eq35(formationMaterials.id, id),
+      eq35(formationMaterials.isActive, true)
     ));
     if (!material) {
       return res.status(404).json({ error: "Material n\xE3o encontrado" });
@@ -22572,12 +23613,12 @@ router22.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar material" });
   }
 });
-router22.get("/:id/download", async (req, res) => {
+router23.get("/:id/download", async (req, res) => {
   try {
     const { id } = req.params;
-    const [material] = await db.select().from(formationMaterials).where(and25(
-      eq33(formationMaterials.id, id),
-      eq33(formationMaterials.isActive, true)
+    const [material] = await db.select().from(formationMaterials).where(and26(
+      eq35(formationMaterials.id, id),
+      eq35(formationMaterials.isActive, true)
     ));
     if (!material) {
       return res.status(404).json({ error: "Material n\xE3o encontrado" });
@@ -22589,7 +23630,7 @@ router22.get("/:id/download", async (req, res) => {
           userId: req.user.id,
           action: "download"
         });
-        await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq33(formationMaterials.id, id));
+        await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq35(formationMaterials.id, id));
       }
       return res.redirect(material.externalUrl);
     }
@@ -22602,7 +23643,7 @@ router22.get("/:id/download", async (req, res) => {
         userId: req.user.id,
         action: "download"
       });
-      await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq33(formationMaterials.id, id));
+      await db.update(formationMaterials).set({ downloadCount: (material.downloadCount || 0) + 1 }).where(eq35(formationMaterials.id, id));
     }
     const fileBuffer = Buffer.from(material.fileData, "base64");
     res.set({
@@ -22616,7 +23657,7 @@ router22.get("/:id/download", async (req, res) => {
     res.status(500).json({ error: "Erro ao baixar material" });
   }
 });
-router22.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, upload2.single("file"), async (req, res) => {
+router23.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, upload3.single("file"), async (req, res) => {
   try {
     const { title, description, category, trackId, tags, externalUrl, isPublished } = req.body;
     if (!title) {
@@ -22673,7 +23714,7 @@ router22.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, uploa
             category: category || analysis.suggestedCategory,
             tags: parsedTags.length > 0 ? parsedTags : analysis.suggestedTags,
             description: description || analysis.suggestedDescription || analysis.summary
-          }).where(eq33(formationMaterials.id, material.id));
+          }).where(eq35(formationMaterials.id, material.id));
           console.log(`AI analysis completed for material ${material.id}`);
         }
       }).catch((err) => {
@@ -22694,7 +23735,7 @@ router22.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, uploa
     res.status(500).json({ error: "Erro ao enviar material" });
   }
 });
-router22.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router23.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category, trackId, tags, isPublished } = req.body;
@@ -22707,7 +23748,7 @@ router22.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, asy
     if (trackId !== void 0) updateData.trackId = trackId || null;
     if (tags !== void 0) updateData.tags = typeof tags === "string" ? JSON.parse(tags) : tags;
     if (isPublished !== void 0) updateData.isPublished = isPublished;
-    const [material] = await db.update(formationMaterials).set(updateData).where(eq33(formationMaterials.id, id)).returning();
+    const [material] = await db.update(formationMaterials).set(updateData).where(eq35(formationMaterials.id, id)).returning();
     if (!material) {
       return res.status(404).json({ error: "Material n\xE3o encontrado" });
     }
@@ -22717,10 +23758,10 @@ router22.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, asy
     res.status(500).json({ error: "Erro ao atualizar material" });
   }
 });
-router22.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router23.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
-    const [material] = await db.update(formationMaterials).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(formationMaterials.id, id)).returning();
+    const [material] = await db.update(formationMaterials).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq35(formationMaterials.id, id)).returning();
     if (!material) {
       return res.status(404).json({ error: "Material n\xE3o encontrado" });
     }
@@ -22730,30 +23771,30 @@ router22.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, 
     res.status(500).json({ error: "Erro ao remover material" });
   }
 });
-router22.get("/stats/overview", async (req, res) => {
+router23.get("/stats/overview", async (req, res) => {
   try {
-    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(eq33(formationMaterials.isActive, true));
+    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(eq35(formationMaterials.isActive, true));
     const typeStats = await db.select({
       type: formationMaterials.type,
       count: sql20`count(*)`
-    }).from(formationMaterials).where(eq33(formationMaterials.isActive, true)).groupBy(formationMaterials.type);
+    }).from(formationMaterials).where(eq35(formationMaterials.isActive, true)).groupBy(formationMaterials.type);
     const categoryStats = await db.select({
       category: formationMaterials.category,
       count: sql20`count(*)`
-    }).from(formationMaterials).where(eq33(formationMaterials.isActive, true)).groupBy(formationMaterials.category);
-    const [aiAnalyzedResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and25(
-      eq33(formationMaterials.isActive, true),
-      eq33(formationMaterials.aiAnalyzed, true)
+    }).from(formationMaterials).where(eq35(formationMaterials.isActive, true)).groupBy(formationMaterials.category);
+    const [aiAnalyzedResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(
+      eq35(formationMaterials.isActive, true),
+      eq35(formationMaterials.aiAnalyzed, true)
     ));
     const qualityStats = await db.select({
       quality: formationMaterials.aiContentQuality,
       count: sql20`count(*)`
-    }).from(formationMaterials).where(and25(
-      eq33(formationMaterials.isActive, true),
-      eq33(formationMaterials.aiAnalyzed, true)
+    }).from(formationMaterials).where(and26(
+      eq35(formationMaterials.isActive, true),
+      eq35(formationMaterials.aiAnalyzed, true)
     )).groupBy(formationMaterials.aiContentQuality);
-    const [downloadResult] = await db.select({ total: sql20`coalesce(sum(download_count), 0)` }).from(formationMaterials).where(eq33(formationMaterials.isActive, true));
-    const [sizeResult] = await db.select({ total: sql20`coalesce(sum(file_size), 0)` }).from(formationMaterials).where(eq33(formationMaterials.isActive, true));
+    const [downloadResult] = await db.select({ total: sql20`coalesce(sum(download_count), 0)` }).from(formationMaterials).where(eq35(formationMaterials.isActive, true));
+    const [sizeResult] = await db.select({ total: sql20`coalesce(sum(file_size), 0)` }).from(formationMaterials).where(eq35(formationMaterials.isActive, true));
     const topMaterials = await db.select({
       id: formationMaterials.id,
       title: formationMaterials.title,
@@ -22761,7 +23802,7 @@ router22.get("/stats/overview", async (req, res) => {
       category: formationMaterials.category,
       downloadCount: formationMaterials.downloadCount,
       aiContentQuality: formationMaterials.aiContentQuality
-    }).from(formationMaterials).where(eq33(formationMaterials.isActive, true)).orderBy(desc12(formationMaterials.downloadCount)).limit(5);
+    }).from(formationMaterials).where(eq35(formationMaterials.isActive, true)).orderBy(desc12(formationMaterials.downloadCount)).limit(5);
     const recentMaterials = await db.select({
       id: formationMaterials.id,
       title: formationMaterials.title,
@@ -22769,7 +23810,7 @@ router22.get("/stats/overview", async (req, res) => {
       category: formationMaterials.category,
       createdAt: formationMaterials.createdAt,
       aiContentQuality: formationMaterials.aiContentQuality
-    }).from(formationMaterials).where(eq33(formationMaterials.isActive, true)).orderBy(desc12(formationMaterials.createdAt)).limit(5);
+    }).from(formationMaterials).where(eq35(formationMaterials.isActive, true)).orderBy(desc12(formationMaterials.createdAt)).limit(5);
     res.json({
       totalMaterials: totalResult?.count || 0,
       totalDownloads: downloadResult?.total || 0,
@@ -22786,13 +23827,13 @@ router22.get("/stats/overview", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar estat\xEDsticas" });
   }
 });
-router22.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router23.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(503).json({ error: "Servico de IA nao configurado" });
     }
-    const [material] = await db.select().from(formationMaterials).where(eq33(formationMaterials.id, id));
+    const [material] = await db.select().from(formationMaterials).where(eq35(formationMaterials.id, id));
     if (!material) {
       return res.status(404).json({ error: "Material nao encontrado" });
     }
@@ -22820,7 +23861,7 @@ router22.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtec
       aiQuizQuestions: analysis.quizQuestions,
       aiAnalyzedAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq33(formationMaterials.id, id));
+    }).where(eq35(formationMaterials.id, id));
     res.json({
       success: true,
       analysis: {
@@ -22838,7 +23879,7 @@ router22.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtec
     res.status(500).json({ error: "Erro ao analisar material" });
   }
 });
-router22.get("/:id/analysis", async (req, res) => {
+router23.get("/:id/analysis", async (req, res) => {
   try {
     const { id } = req.params;
     const [material] = await db.select({
@@ -22853,7 +23894,7 @@ router22.get("/:id/analysis", async (req, res) => {
       aiQualityNotes: formationMaterials.aiQualityNotes,
       aiQuizQuestions: formationMaterials.aiQuizQuestions,
       aiAnalyzedAt: formationMaterials.aiAnalyzedAt
-    }).from(formationMaterials).where(eq33(formationMaterials.id, id));
+    }).from(formationMaterials).where(eq35(formationMaterials.id, id));
     if (!material) {
       return res.status(404).json({ error: "Material nao encontrado" });
     }
@@ -22879,11 +23920,11 @@ router22.get("/:id/analysis", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar analise" });
   }
 });
-router22.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router23.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { applyCategory, applyTags, applyDescription } = req.body;
-    const [material] = await db.select().from(formationMaterials).where(eq33(formationMaterials.id, id));
+    const [material] = await db.select().from(formationMaterials).where(eq35(formationMaterials.id, id));
     if (!material) {
       return res.status(404).json({ error: "Material nao encontrado" });
     }
@@ -22900,21 +23941,21 @@ router22.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), 
     if (applyDescription && material.aiSummary) {
       updates.description = material.aiSummary;
     }
-    await db.update(formationMaterials).set(updates).where(eq33(formationMaterials.id, id));
+    await db.update(formationMaterials).set(updates).where(eq35(formationMaterials.id, id));
     res.json({ success: true, appliedUpdates: Object.keys(updates).filter((k) => k !== "updatedAt") });
   } catch (error) {
     console.error("Error applying suggestions:", error);
     res.status(500).json({ error: "Erro ao aplicar sugestoes" });
   }
 });
-router22.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router23.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { numQuestions = 5 } = req.body;
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(503).json({ error: "Servico de IA nao configurado" });
     }
-    const [material] = await db.select().from(formationMaterials).where(eq33(formationMaterials.id, id));
+    const [material] = await db.select().from(formationMaterials).where(eq35(formationMaterials.id, id));
     if (!material) {
       return res.status(404).json({ error: "Material nao encontrado" });
     }
@@ -22933,7 +23974,7 @@ router22.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrf
     await db.update(formationMaterials).set({
       aiQuizQuestions: questions,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq33(formationMaterials.id, id));
+    }).where(eq35(formationMaterials.id, id));
     res.json({
       success: true,
       questionsGenerated: questions.length,
@@ -22944,7 +23985,7 @@ router22.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrf
     res.status(500).json({ error: "Erro ao gerar quiz" });
   }
 });
-router22.get("/my-progress", async (req, res) => {
+router23.get("/my-progress", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -22954,7 +23995,7 @@ router22.get("/my-progress", async (req, res) => {
       materialId: materialAccessLogs.materialId,
       action: materialAccessLogs.action,
       accessedAt: materialAccessLogs.accessedAt
-    }).from(materialAccessLogs).where(eq33(materialAccessLogs.userId, userId)).orderBy(desc12(materialAccessLogs.accessedAt));
+    }).from(materialAccessLogs).where(eq35(materialAccessLogs.userId, userId)).orderBy(desc12(materialAccessLogs.accessedAt));
     const materialAccess = /* @__PURE__ */ new Map();
     for (const log2 of accessedMaterials) {
       if (!materialAccess.has(log2.materialId)) {
@@ -22965,9 +24006,9 @@ router22.get("/my-progress", async (req, res) => {
       if (log2.action === "download") access.downloads++;
       if (log2.action === "completed") access.completed = true;
     }
-    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and25(
-      eq33(formationMaterials.isActive, true),
-      eq33(formationMaterials.isPublished, true)
+    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(
+      eq35(formationMaterials.isActive, true),
+      eq35(formationMaterials.isPublished, true)
     ));
     const totalMaterials = totalResult?.count || 0;
     const accessedCount = materialAccess.size;
@@ -22984,14 +24025,14 @@ router22.get("/my-progress", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar progresso" });
   }
 });
-router22.post("/:id/mark-completed", csrfProtection, async (req, res) => {
+router23.post("/:id/mark-completed", csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Usuario nao autenticado" });
     }
-    const [material] = await db.select({ id: formationMaterials.id }).from(formationMaterials).where(eq33(formationMaterials.id, id));
+    const [material] = await db.select({ id: formationMaterials.id }).from(formationMaterials).where(eq35(formationMaterials.id, id));
     if (!material) {
       return res.status(404).json({ error: "Material nao encontrado" });
     }
@@ -23006,17 +24047,17 @@ router22.post("/:id/mark-completed", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao marcar como concluido" });
   }
 });
-router22.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
+router23.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Usuario nao autenticado" });
     }
-    await db.delete(materialAccessLogs).where(and25(
-      eq33(materialAccessLogs.materialId, id),
-      eq33(materialAccessLogs.userId, userId),
-      eq33(materialAccessLogs.action, "completed")
+    await db.delete(materialAccessLogs).where(and26(
+      eq35(materialAccessLogs.materialId, id),
+      eq35(materialAccessLogs.userId, userId),
+      eq35(materialAccessLogs.action, "completed")
     ));
     res.json({ success: true, message: "Marcacao removida" });
   } catch (error) {
@@ -23024,20 +24065,20 @@ router22.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao remover marcacao" });
   }
 });
-var materials_default = router22;
+var materials_default = router23;
 
 // server/routes/whatsapp-api.ts
 await init_db();
 init_schema();
-import { Router as Router23 } from "express";
-import { eq as eq35, and as and27, gte as gte17, desc as desc13, asc as asc4 } from "drizzle-orm";
+import { Router as Router24 } from "express";
+import { eq as eq37, and as and28, gte as gte18, desc as desc13, asc as asc4 } from "drizzle-orm";
 import { sql as sql21 } from "drizzle-orm";
 function getErrorMessage9(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Unknown error";
 }
-var router23 = Router23();
+var router24 = Router24();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
   const validApiKey = process.env.WHATSAPP_API_KEY;
@@ -23053,7 +24094,7 @@ var authenticateAPIKey = (req, res, next) => {
   }
   next();
 };
-router23.get("/health", (req, res) => {
+router24.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "MESC WhatsApp API",
@@ -23062,7 +24103,7 @@ router23.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router23.get("/webhook", (req, res) => {
+router24.get("/webhook", (req, res) => {
   res.json({
     status: "ok",
     message: "Webhook WhatsApp MESC est\xE1 ativo",
@@ -23073,7 +24114,7 @@ router23.get("/webhook", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router23.post("/webhook", async (req, res) => {
+router24.post("/webhook", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
   try {
     const message = req.body;
@@ -23087,7 +24128,7 @@ router23.post("/webhook", async (req, res) => {
     res.sendStatus(200);
   }
 });
-router23.use(authenticateAPIKey);
+router24.use(authenticateAPIKey);
 function normalizePhone(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
 }
@@ -23120,7 +24161,7 @@ function getDayOfWeek(dateStr) {
   const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
   return days[date2.getDay()];
 }
-router23.post("/escala", async (req, res) => {
+router24.post("/escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, data } = req.body;
@@ -23147,9 +24188,9 @@ router23.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and27(
-        eq35(schedules.ministerId, minister[0].id),
-        eq35(schedules.date, data)
+      and28(
+        eq37(schedules.ministerId, minister[0].id),
+        eq37(schedules.date, data)
       )
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca da escala:", schedule.length > 0 ? `Encontrada: ${formatTime(schedule[0].time)} - ${getPositionName(schedule[0].position || 0)}` : "N\xE3o encontrada");
@@ -23179,7 +24220,7 @@ router23.post("/escala", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/proximas", async (req, res) => {
+router24.post("/proximas", async (req, res) => {
   try {
     const { telefone } = req.body;
     if (!telefone) {
@@ -23200,9 +24241,9 @@ router23.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and27(
-        eq35(schedules.ministerId, minister[0].id),
-        gte17(schedules.date, today)
+      and28(
+        eq37(schedules.ministerId, minister[0].id),
+        gte18(schedules.date, today)
       )
     ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(3);
     if (!upcomingSchedules || upcomingSchedules.length === 0) {
@@ -23233,7 +24274,7 @@ router23.post("/proximas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/colegas", async (req, res) => {
+router24.post("/colegas", async (req, res) => {
   try {
     const { data, horario } = req.body;
     if (!data || !horario) {
@@ -23251,10 +24292,10 @@ router23.post("/colegas", async (req, res) => {
       scheduleDisplayName: users.scheduleDisplayName,
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
-    }).from(schedules).innerJoin(users, eq35(schedules.ministerId, users.id)).where(
-      and27(
-        eq35(schedules.date, data),
-        eq35(schedules.time, normalizedTime)
+    }).from(schedules).innerJoin(users, eq37(schedules.ministerId, users.id)).where(
+      and28(
+        eq37(schedules.date, data),
+        eq37(schedules.time, normalizedTime)
       )
     ).orderBy(asc4(schedules.position));
     if (!ministersInMass || ministersInMass.length === 0) {
@@ -23282,7 +24323,7 @@ router23.post("/colegas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.get("/substituicoes-abertas", async (req, res) => {
+router24.get("/substituicoes-abertas", async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 5, 20);
     const openSubstitutions = await db.select({
@@ -23297,7 +24338,7 @@ router23.get("/substituicoes-abertas", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       createdAt: substitutionRequests.createdAt
-    }).from(substitutionRequests).innerJoin(schedules, eq35(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq35(substitutionRequests.requesterId, users.id)).where(eq35(substitutionRequests.status, "available")).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(limite);
+    }).from(substitutionRequests).innerJoin(schedules, eq37(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq37(substitutionRequests.requesterId, users.id)).where(eq37(substitutionRequests.status, "available")).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(limite);
     if (!openSubstitutions || openSubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -23329,7 +24370,7 @@ router23.get("/substituicoes-abertas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/aceitar-substituicao", async (req, res) => {
+router24.post("/aceitar-substituicao", async (req, res) => {
   try {
     const { telefone, id_substituicao, mensagem } = req.body;
     if (!telefone || !id_substituicao) {
@@ -23357,7 +24398,7 @@ router23.post("/aceitar-substituicao", async (req, res) => {
       time: schedules.time,
       position: schedules.position,
       requesterName: users.name
-    }).from(substitutionRequests).innerJoin(schedules, eq35(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq35(substitutionRequests.requesterId, users.id)).where(eq35(substitutionRequests.id, id_substituicao)).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq37(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq37(substitutionRequests.requesterId, users.id)).where(eq37(substitutionRequests.id, id_substituicao)).limit(1);
     if (!substitution || substitution.length === 0) {
       return res.json({
         sucesso: false,
@@ -23381,7 +24422,7 @@ router23.post("/aceitar-substituicao", async (req, res) => {
       substituteId: substitute[0].id,
       status: "pending",
       responseMessage: mensagem || `Aceito via WhatsApp por ${substitute[0].name}`
-    }).where(eq35(substitutionRequests.id, id_substituicao));
+    }).where(eq37(substitutionRequests.id, id_substituicao));
     return res.json({
       sucesso: true,
       substituto: substitute[0].name,
@@ -23398,7 +24439,7 @@ router23.post("/aceitar-substituicao", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/minhas-substituicoes", async (req, res) => {
+router24.post("/minhas-substituicoes", async (req, res) => {
   try {
     const { telefone, tipo = "todas" } = req.body;
     if (!telefone) {
@@ -23419,9 +24460,9 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     }
     let whereCondition;
     if (tipo === "solicitadas") {
-      whereCondition = eq35(substitutionRequests.requesterId, minister[0].id);
+      whereCondition = eq37(substitutionRequests.requesterId, minister[0].id);
     } else if (tipo === "aceitas") {
-      whereCondition = eq35(substitutionRequests.substituteId, minister[0].id);
+      whereCondition = eq37(substitutionRequests.substituteId, minister[0].id);
     } else {
       whereCondition = sql21`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
     }
@@ -23436,7 +24477,7 @@ router23.post("/minhas-substituicoes", async (req, res) => {
       reason: substitutionRequests.reason,
       urgency: substitutionRequests.urgency,
       responseMessage: substitutionRequests.responseMessage
-    }).from(substitutionRequests).innerJoin(schedules, eq35(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq35(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc13(schedules.date), desc13(schedules.time)).limit(10);
+    }).from(substitutionRequests).innerJoin(schedules, eq37(substitutionRequests.scheduleId, schedules.id)).innerJoin(users, eq37(substitutionRequests.requesterId, users.id)).where(whereCondition).orderBy(desc13(schedules.date), desc13(schedules.time)).limit(10);
     if (!mySubstitutions || mySubstitutions.length === 0) {
       return res.json({
         encontrado: false,
@@ -23469,7 +24510,7 @@ router23.post("/minhas-substituicoes", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/proxima-escala", async (req, res) => {
+router24.post("/proxima-escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /proxima-escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone } = req.body;
@@ -23499,9 +24540,9 @@ router23.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and27(
-        eq35(schedules.ministerId, minister[0].id),
-        gte17(schedules.date, today)
+      and28(
+        eq37(schedules.ministerId, minister[0].id),
+        gte18(schedules.date, today)
       )
     ).orderBy(asc4(schedules.date), asc4(schedules.time)).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca:", nextSchedule.length > 0 ? `Encontrada: ${formatDateBR2(nextSchedule[0].date)} \xE0s ${formatTime(nextSchedule[0].time)}` : "N\xE3o encontrada");
@@ -23538,7 +24579,7 @@ router23.post("/proxima-escala", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router23.post("/escala-mes", async (req, res) => {
+router24.post("/escala-mes", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala-mes] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, mes, ano } = req.body;
@@ -23573,8 +24614,8 @@ router23.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and27(
-        eq35(schedules.ministerId, minister[0].id),
+      and28(
+        eq37(schedules.ministerId, minister[0].id),
         sql21`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
         sql21`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
       )
@@ -23622,15 +24663,15 @@ router23.post("/escala-mes", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-var whatsapp_api_default = router23;
+var whatsapp_api_default = router24;
 
 // server/routes/metrics.ts
-import { Router as Router24 } from "express";
+import { Router as Router25 } from "express";
 await init_db();
 init_schema();
-import { eq as eq36, count as count10, gte as gte18 } from "drizzle-orm";
+import { eq as eq38, count as count10, gte as gte19 } from "drizzle-orm";
 import os from "os";
-var router24 = Router24();
+var router25 = Router25();
 var metrics = {
   total: 0,
   success: 0,
@@ -23687,21 +24728,21 @@ function updateMetrics(statusCode, responseTime, route, method, errorMessage) {
     metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;
   }
 }
-router24.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router25.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
     const [usersCount] = await db.select({ count: count10() }).from(users);
-    const [activeUsersCount] = await db.select({ count: count10() }).from(users).where(eq36(users.status, "active"));
+    const [activeUsersCount] = await db.select({ count: count10() }).from(users).where(eq38(users.status, "active"));
     const [schedulesCount] = await db.select({ count: count10() }).from(schedules);
-    const [publishedSchedulesCount] = await db.select({ count: count10() }).from(schedules).where(eq36(schedules.status, "published"));
+    const [publishedSchedulesCount] = await db.select({ count: count10() }).from(schedules).where(eq38(schedules.status, "published"));
     const [responsesCount] = await db.select({ count: count10() }).from(questionnaireResponses);
     const [substitutionsCount] = await db.select({ count: count10() }).from(substitutionRequests);
-    const [pendingSubstitutions] = await db.select({ count: count10() }).from(substitutionRequests).where(eq36(substitutionRequests.status, "pending"));
+    const [pendingSubstitutions] = await db.select({ count: count10() }).from(substitutionRequests).where(eq38(substitutionRequests.status, "pending"));
     const thirtyDaysAgo = /* @__PURE__ */ new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const [recentUsersCount] = await db.select({ count: count10() }).from(users).where(gte18(users.createdAt, thirtyDaysAgo));
+    const [recentUsersCount] = await db.select({ count: count10() }).from(users).where(gte19(users.createdAt, thirtyDaysAgo));
     const sortedTimes = [...metrics.responseTimes].sort((a, b) => a - b);
     const p50 = sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0;
     const p95 = sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0;
@@ -23776,7 +24817,7 @@ router24.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
-router24.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router25.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const errors = [...metrics.errorLogs].reverse().map((error) => ({
       ...error,
@@ -23791,7 +24832,7 @@ router24.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch error logs" });
   }
 });
-router24.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router25.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const routes = Array.from(metrics.routeStats.entries()).map(([route, stats]) => ({
       route,
@@ -23810,7 +24851,7 @@ router24.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch slow routes" });
   }
 });
-router24.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router25.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   metrics.total = 0;
   metrics.success = 0;
   metrics.errors = 0;
@@ -23821,7 +24862,7 @@ router24.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, 
   metrics.lastReset = /* @__PURE__ */ new Date();
   res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
 });
-router24.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router25.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
     const cacheStats = scheduleCache.getStats();
     scheduleCache.clear();
@@ -23851,15 +24892,15 @@ function formatUptime(seconds) {
   parts.push(`${secs}s`);
   return parts.join(" ");
 }
-var metrics_default = router24;
+var metrics_default = router25;
 
 // server/routes/reliabilityMetrics.ts
-import { Router as Router25 } from "express";
+import { Router as Router26 } from "express";
 await init_db();
 init_schema();
-import { eq as eq37 } from "drizzle-orm";
-var router25 = Router25();
-router25.get(
+import { eq as eq39 } from "drizzle-orm";
+var router26 = Router26();
+router26.get(
   "/metrics",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -23887,7 +24928,7 @@ router25.get(
     }
   }
 );
-router25.get(
+router26.get(
   "/low",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -23916,7 +24957,7 @@ router25.get(
     }
   }
 );
-router25.get(
+router26.get(
   "/minister/:ministerId",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -23949,7 +24990,7 @@ router25.get(
     }
   }
 );
-router25.post(
+router26.post(
   "/minister/:ministerId/recalculate",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -23977,7 +25018,7 @@ router25.post(
     }
   }
 );
-router25.post(
+router26.post(
   "/minister/:ministerId/reset",
   authenticateToken,
   requireRole(["gestor"]),
@@ -23985,7 +25026,7 @@ router25.post(
     try {
       const { ministerId } = req.params;
       const { reason } = req.body;
-      const minister = await db.select().from(users).where(eq37(users.id, ministerId)).limit(1);
+      const minister = await db.select().from(users).where(eq39(users.id, ministerId)).limit(1);
       if (minister.length === 0) {
         return res.status(404).json({
           success: false,
@@ -24000,7 +25041,7 @@ router25.post(
         noShowCount: 0,
         lastReliabilityUpdate: /* @__PURE__ */ new Date(),
         reliabilityNotes: reason ? `Reset em ${(/* @__PURE__ */ new Date()).toISOString()} - Motivo: ${reason}` : `Reset em ${(/* @__PURE__ */ new Date()).toISOString()}`
-      }).where(eq37(users.id, ministerId)).returning();
+      }).where(eq39(users.id, ministerId)).returning();
       console.log(
         `[RELIABILITY API] \u267B\uFE0F Reset reliability for ${minister[0].name} by user ${req.user?.id}`
       );
@@ -24025,7 +25066,7 @@ router25.post(
     }
   }
 );
-router25.post(
+router26.post(
   "/minister/:ministerId/note",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -24039,7 +25080,7 @@ router25.post(
           message: "Nota \xE9 obrigat\xF3ria"
         });
       }
-      const minister = await db.select().from(users).where(eq37(users.id, ministerId)).limit(1);
+      const minister = await db.select().from(users).where(eq39(users.id, ministerId)).limit(1);
       if (minister.length === 0) {
         return res.status(404).json({
           success: false,
@@ -24055,7 +25096,7 @@ ${newNote}` : newNote;
       await db.update(users).set({
         reliabilityNotes: updatedNotes,
         lastReliabilityUpdate: /* @__PURE__ */ new Date()
-      }).where(eq37(users.id, ministerId));
+      }).where(eq39(users.id, ministerId));
       res.json({
         success: true,
         message: "Nota adicionada com sucesso",
@@ -24073,7 +25114,7 @@ ${newNote}` : newNote;
     }
   }
 );
-router25.get(
+router26.get(
   "/stats",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -24139,12 +25180,12 @@ router25.get(
     }
   }
 );
-var reliabilityMetrics_default = router25;
+var reliabilityMetrics_default = router26;
 
 // server/routes/cron.ts
-import { Router as Router26 } from "express";
+import { Router as Router27 } from "express";
 init_logger();
-var router26 = Router26();
+var router27 = Router27();
 function verifyCronKey(req, res, next) {
   const cronKey = req.headers["x-cron-key"] || req.query.key;
   const expectedKey = process.env.CRON_API_KEY || "development-cron-key";
@@ -24160,7 +25201,7 @@ function verifyCronKey(req, res, next) {
   }
   next();
 }
-router26.post("/reliability-check", verifyCronKey, async (req, res) => {
+router27.post("/reliability-check", verifyCronKey, async (req, res) => {
   try {
     logger.info("[CRON] \u{1F550} Starting scheduled reliability check...");
     const result = await checkAndAlertLowReliability();
@@ -24181,17 +25222,17 @@ router26.post("/reliability-check", verifyCronKey, async (req, res) => {
     });
   }
 });
-router26.get("/health", (req, res) => {
+router27.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Cron endpoints are healthy",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-var cron_default = router26;
+var cron_default = router27;
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-import { Router as Router27 } from "express";
+import { Router as Router28 } from "express";
 
 // server/escala-alternativa/services/pythonScheduleService.ts
 init_logger();
@@ -24280,7 +25321,7 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq38, and as and28 } from "drizzle-orm";
+import { eq as eq40, and as and29 } from "drizzle-orm";
 function getErrorMessage11(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -24292,12 +25333,12 @@ async function gerarEscalaAlternativa(req, res) {
     logger.info(`Gerando escala alternativa para ${month}/${year} usando Python`);
     let targetQuestionnaire;
     if (questionnaireId) {
-      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq38(questionnaires.id, questionnaireId)).limit(1);
+      [targetQuestionnaire] = await db.select().from(questionnaires).where(eq40(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
-        and28(
-          eq38(questionnaires.year, year),
-          eq38(questionnaires.month, month)
+        and29(
+          eq40(questionnaires.year, year),
+          eq40(questionnaires.month, month)
         )
       ).limit(1);
     }
@@ -24314,8 +25355,8 @@ async function gerarEscalaAlternativa(req, res) {
       role: users.role,
       preferredPositions: users.preferredTimes,
       avoidPositions: users.canServeAsCouple
-    }).from(users).where(eq38(users.status, "active"));
-    const responses = await db.select().from(questionnaireResponses).where(eq38(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+    }).from(users).where(eq40(users.status, "active"));
+    const responses = await db.select().from(questionnaireResponses).where(eq40(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
     logger.info(`Encontrados ${ministersData.length} ministros e ${responses.length} respostas`);
     const formattedUsers = ministersData.map((m) => ({
       id: m.id,
@@ -24409,31 +25450,32 @@ async function verificarPython(req, res) {
 }
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-var router27 = Router27();
-router27.get("/check-python", authenticateToken, verificarPython);
-router27.post(
+var router28 = Router28();
+router28.get("/check-python", authenticateToken, verificarPython);
+router28.post(
   "/gerar",
   authenticateToken,
   requireRole(["coordenador", "gestor"]),
   gerarEscalaAlternativa
 );
-router27.post(
+router28.post(
   "/comparar",
   authenticateToken,
   requireRole(["gestor"]),
   compararAlgoritmos
 );
-var escalaRoutes_default = router27;
+var escalaRoutes_default = router28;
 
 // server/routes/adoration.ts
-import { Router as Router28 } from "express";
+import { Router as Router29 } from "express";
 import { z as z9 } from "zod";
 await init_storage();
 init_logger();
 await init_db();
 init_schema();
-import { eq as eq39, and as and29, inArray as inArray9 } from "drizzle-orm";
-var router28 = Router28();
+init_roles();
+import { eq as eq41, and as and30, inArray as inArray16 } from "drizzle-orm";
+var router29 = Router29();
 function getErrorMessage12(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -24462,7 +25504,7 @@ var createDrawSchema = z9.object({
   totalMinistersToDraw: z9.number().min(1).max(100).optional()
   // Opcional, será calculado automaticamente
 });
-router28.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { month, year, totalMinistersToDraw } = createDrawSchema.parse(req.body);
     if (!req.user?.id) {
@@ -24478,9 +25520,9 @@ router28.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
       });
     }
     const allMinisters = await db.select().from(users).where(
-      and29(
-        eq39(users.status, "active"),
-        inArray9(users.role, ["ministro", "coordenador"])
+      and30(
+        eq41(users.status, "active"),
+        inArray16(users.role, ["ministro", ...COORDINATOR_ROLES])
       )
     );
     if (allMinisters.length === 0) {
@@ -24621,7 +25663,7 @@ router28.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     });
   }
 });
-router28.get("/results/:year/:month", authenticateToken, async (req, res) => {
+router29.get("/results/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -24637,7 +25679,7 @@ router28.get("/results/:year/:month", authenticateToken, async (req, res) => {
     const draw = draws[0];
     const results = await storage.getAdorationDrawResults(draw.id);
     const ministerIds = [...new Set(results.map((r) => r.ministerId))];
-    const ministers = await db.select().from(users).where(inArray9(users.id, ministerIds));
+    const ministers = await db.select().from(users).where(inArray16(users.id, ministerIds));
     const ministerMap = new Map(ministers.map((m) => [m.id, m]));
     const enrichedResults = results.map((result) => {
       const minister = ministerMap.get(result.ministerId);
@@ -24668,7 +25710,7 @@ router28.get("/results/:year/:month", authenticateToken, async (req, res) => {
     });
   }
 });
-router28.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router29.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { drawId } = req.params;
     await storage.deleteAdorationDraw(drawId);
@@ -24688,7 +25730,7 @@ router28.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coor
 var swapDaySchema = z9.object({
   newMondayOfWeek: z9.number().int().min(1).max(5)
 });
-router28.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
+router29.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
     const { newMondayOfWeek } = swapDaySchema.parse(req.body);
@@ -24711,7 +25753,7 @@ router28.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     }
     logger.info(`Troca de dia: ministro ${userId} de semana ${currentResult.mondayOfWeek} para ${newMondayOfWeek}`);
     await storage.updateAdorationDrawResultMonday(drawId, userId, newMondayOfWeek);
-    const [ministerUser] = await db.select().from(users).where(eq39(users.id, userId)).limit(1);
+    const [ministerUser] = await db.select().from(users).where(eq41(users.id, userId)).limit(1);
     const draw = await storage.getAdorationDrawById(drawId);
     let mondayDates = [];
     if (draw) {
@@ -24751,7 +25793,7 @@ router28.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     });
   }
 });
-router28.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
+router29.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -24790,7 +25832,7 @@ router28.get("/my-schedule/:year/:month", authenticateToken, async (req, res) =>
     const familyMembers = [];
     for (const memberId of familyMemberIds) {
       if (memberId !== userId) {
-        const memberUser = await db.select().from(users).where(eq39(users.id, memberId)).limit(1);
+        const memberUser = await db.select().from(users).where(eq41(users.id, memberId)).limit(1);
         if (memberUser[0]) {
           familyMembers.push({ id: memberId, name: memberUser[0].name });
         }
@@ -24833,15 +25875,15 @@ function getMondaysInMonth(year, month) {
 async function getVoluntaryMinistersForAdoration(year, month) {
   try {
     const [questionnaire] = await db.select().from(questionnaires).where(
-      and29(
-        eq39(questionnaires.year, year),
-        eq39(questionnaires.month, month)
+      and30(
+        eq41(questionnaires.year, year),
+        eq41(questionnaires.month, month)
       )
     ).limit(1);
     if (!questionnaire) {
       return [];
     }
-    const responses = await db.select().from(questionnaireResponses).where(eq39(questionnaireResponses.questionnaireId, questionnaire.id));
+    const responses = await db.select().from(questionnaireResponses).where(eq41(questionnaireResponses.questionnaireId, questionnaire.id));
     const voluntaryMinisterIds = responses.filter((response) => {
       const resp = response.responses;
       return resp?.extra_activities?.mondayAdoration === "yes" || resp?.extra_activities?.mondayAdoration === true || resp?.mondayAdoration === "yes" || resp?.mondayAdoration === true;
@@ -24850,9 +25892,9 @@ async function getVoluntaryMinistersForAdoration(year, month) {
       return [];
     }
     const voluntaryMinisters = await db.select().from(users).where(
-      and29(
-        inArray9(users.id, voluntaryMinisterIds),
-        eq39(users.status, "active")
+      and30(
+        inArray16(users.id, voluntaryMinisterIds),
+        eq41(users.status, "active")
       )
     );
     return voluntaryMinisters;
@@ -24861,14 +25903,15 @@ async function getVoluntaryMinistersForAdoration(year, month) {
     return [];
   }
 }
-var adoration_default = router28;
+var adoration_default = router29;
 
 // server/routes/activity.ts
 await init_db();
 init_schema();
-import { Router as Router29 } from "express";
-import { eq as eq40, sql as sql23, and as and30, gte as gte19, lte as lte14, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
-var router29 = Router29();
+import { Router as Router30 } from "express";
+import { eq as eq42, sql as sql23, and as and31, gte as gte20, lte as lte15, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
+init_roles();
+var router30 = Router30();
 function formatDateBR3(date2) {
   return date2.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -24937,7 +25980,7 @@ var actionCategories = {
   "notifications": ["send_notification", "view_notifications"],
   "dashboard": ["view_dashboard"]
 };
-router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router30.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
     const limitStr = typeof req.query.limit === "string" ? req.query.limit : "50";
@@ -24952,28 +25995,28 @@ router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     const offset = (pageNum - 1) * limitNum;
     const conditions = [];
     if (userId) {
-      conditions.push(eq40(activityLogs.userId, userId));
+      conditions.push(eq42(activityLogs.userId, userId));
     }
     if (action) {
-      conditions.push(eq40(activityLogs.action, action));
+      conditions.push(eq42(activityLogs.action, action));
     }
     if (category && actionCategories[category]) {
       const categoryActions = actionCategories[category];
       conditions.push(
-        or12(...categoryActions.map((a) => eq40(activityLogs.action, a)))
+        or12(...categoryActions.map((a) => eq42(activityLogs.action, a)))
       );
     }
     if (startDate) {
       const start = new Date(startDate);
       if (!isNaN(start.getTime())) {
-        conditions.push(gte19(activityLogs.createdAt, start));
+        conditions.push(gte20(activityLogs.createdAt, start));
       }
     }
     if (endDate) {
       const end = new Date(endDate);
       if (!isNaN(end.getTime())) {
         end.setHours(23, 59, 59, 999);
-        conditions.push(lte14(activityLogs.createdAt, end));
+        conditions.push(lte15(activityLogs.createdAt, end));
       }
     }
     if (search) {
@@ -24984,7 +26027,7 @@ router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
         )
       );
     }
-    const whereClause = conditions.length > 0 ? and30(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and31(...conditions) : void 0;
     const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(whereClause);
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
@@ -24997,7 +26040,7 @@ router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
       ipAddress: activityLogs.ipAddress,
       userAgent: activityLogs.userAgent,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).leftJoin(users, eq40(activityLogs.userId, users.id)).where(whereClause).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    }).from(activityLogs).leftJoin(users, eq42(activityLogs.userId, users.id)).where(whereClause).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
     const logsWithDescriptions = logs.map((log2) => ({
       ...log2,
       description: getActionDescription(log2.action, log2.details)
@@ -25017,7 +26060,7 @@ router29.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch activity logs" });
   }
 });
-router29.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const daysStr = typeof req.query.days === "string" ? req.query.days : "7";
     const numDays = Math.min(90, Math.max(1, parseInt(daysStr) || 7));
@@ -25026,26 +26069,26 @@ router29.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     const byAction = await db.select({
       action: activityLogs.action,
       count: count11()
-    }).from(activityLogs).where(gte19(activityLogs.createdAt, startDate)).groupBy(activityLogs.action).orderBy(desc14(count11()));
+    }).from(activityLogs).where(gte20(activityLogs.createdAt, startDate)).groupBy(activityLogs.action).orderBy(desc14(count11()));
     const byDay = await db.select({
       date: sql23`DATE(${activityLogs.createdAt})`.as("date"),
       count: count11()
-    }).from(activityLogs).where(gte19(activityLogs.createdAt, startDate)).groupBy(sql23`DATE(${activityLogs.createdAt})`).orderBy(sql23`DATE(${activityLogs.createdAt})`);
+    }).from(activityLogs).where(gte20(activityLogs.createdAt, startDate)).groupBy(sql23`DATE(${activityLogs.createdAt})`).orderBy(sql23`DATE(${activityLogs.createdAt})`);
     const topUsers = await db.select({
       userId: activityLogs.userId,
       userName: users.name,
       count: count11()
-    }).from(activityLogs).leftJoin(users, eq40(activityLogs.userId, users.id)).where(gte19(activityLogs.createdAt, startDate)).groupBy(activityLogs.userId, users.name).orderBy(desc14(count11())).limit(10);
+    }).from(activityLogs).leftJoin(users, eq42(activityLogs.userId, users.id)).where(gte20(activityLogs.createdAt, startDate)).groupBy(activityLogs.userId, users.name).orderBy(desc14(count11())).limit(10);
     const loginStats = await db.select({
       action: activityLogs.action,
       count: count11()
     }).from(activityLogs).where(
-      and30(
-        gte19(activityLogs.createdAt, startDate),
+      and31(
+        gte20(activityLogs.createdAt, startDate),
         or12(
-          eq40(activityLogs.action, "login"),
-          eq40(activityLogs.action, "logout"),
-          eq40(activityLogs.action, "login_failed")
+          eq42(activityLogs.action, "login"),
+          eq42(activityLogs.action, "logout"),
+          eq42(activityLogs.action, "login_failed")
         )
       )
     ).groupBy(activityLogs.action);
@@ -25074,11 +26117,11 @@ router29.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch activity summary" });
   }
 });
-router29.get("/recent", authenticateToken, async (req, res) => {
+router30.get("/recent", authenticateToken, async (req, res) => {
   try {
     const limitStr = typeof req.query.limit === "string" ? req.query.limit : "10";
     const limitNum = Math.min(50, Math.max(1, parseInt(limitStr) || 10));
-    const isAdmin = req.user?.role === "gestor" || req.user?.role === "coordenador";
+    const isAdmin2 = isAdmin(req.user?.role);
     const userId = req.user?.id;
     const logs = await db.select({
       id: activityLogs.id,
@@ -25087,7 +26130,7 @@ router29.get("/recent", authenticateToken, async (req, res) => {
       action: activityLogs.action,
       details: activityLogs.details,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).leftJoin(users, eq40(activityLogs.userId, users.id)).where(isAdmin || !userId ? void 0 : eq40(activityLogs.userId, userId)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum);
+    }).from(activityLogs).leftJoin(users, eq42(activityLogs.userId, users.id)).where(isAdmin2 || !userId ? void 0 : eq42(activityLogs.userId, userId)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum);
     const logsWithDescriptions = logs.map((log2) => ({
       id: log2.id,
       userId: log2.userId,
@@ -25103,7 +26146,7 @@ router29.get("/recent", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch recent activities" });
   }
 });
-router29.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId } = req.params;
     const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
@@ -25113,25 +26156,25 @@ router29.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
     const pageNum = Math.max(1, parseInt(pageStr) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
     const offset = (pageNum - 1) * limitNum;
-    const conditions = [eq40(activityLogs.userId, userId)];
+    const conditions = [eq42(activityLogs.userId, userId)];
     if (startDateStr) {
       const start = new Date(startDateStr);
       if (!isNaN(start.getTime())) {
-        conditions.push(gte19(activityLogs.createdAt, start));
+        conditions.push(gte20(activityLogs.createdAt, start));
       }
     }
     if (endDateStr) {
       const end = new Date(endDateStr);
       if (!isNaN(end.getTime())) {
         end.setHours(23, 59, 59, 999);
-        conditions.push(lte14(activityLogs.createdAt, end));
+        conditions.push(lte15(activityLogs.createdAt, end));
       }
     }
-    const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq40(users.id, userId));
+    const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq42(users.id, userId));
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and30(...conditions));
+    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and31(...conditions));
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
       id: activityLogs.id,
@@ -25139,7 +26182,7 @@ router29.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
       details: activityLogs.details,
       ipAddress: activityLogs.ipAddress,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).where(and30(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    }).from(activityLogs).where(and31(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
     const logsWithDescriptions = logs.map((log2) => ({
       ...log2,
       description: getActionDescription(log2.action, log2.details)
@@ -25159,47 +26202,47 @@ router29.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch user activity" });
   }
 });
-router29.get("/export", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router30.get("/export", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("export_report", { type: "activity_logs" });
   try {
-    const format12 = typeof req.query.format === "string" ? req.query.format : "xlsx";
+    const format13 = typeof req.query.format === "string" ? req.query.format : "xlsx";
     const startDateStr = typeof req.query.startDate === "string" ? req.query.startDate : void 0;
     const endDateStr = typeof req.query.endDate === "string" ? req.query.endDate : void 0;
     const category = typeof req.query.category === "string" ? req.query.category : void 0;
     const userId = typeof req.query.userId === "string" ? req.query.userId : void 0;
-    if (!["xlsx", "pdf", "csv"].includes(format12)) {
+    if (!["xlsx", "pdf", "csv"].includes(format13)) {
       return res.status(400).json({ error: "Invalid format" });
     }
     const conditions = [];
     if (userId) {
-      conditions.push(eq40(activityLogs.userId, userId));
+      conditions.push(eq42(activityLogs.userId, userId));
     }
     if (category && actionCategories[category]) {
       const categoryActions = actionCategories[category];
       conditions.push(
-        or12(...categoryActions.map((a) => eq40(activityLogs.action, a)))
+        or12(...categoryActions.map((a) => eq42(activityLogs.action, a)))
       );
     }
     if (startDateStr) {
       const start = new Date(startDateStr);
       if (!isNaN(start.getTime())) {
-        conditions.push(gte19(activityLogs.createdAt, start));
+        conditions.push(gte20(activityLogs.createdAt, start));
       }
     }
     if (endDateStr) {
       const end = new Date(endDateStr);
       if (!isNaN(end.getTime())) {
         end.setHours(23, 59, 59, 999);
-        conditions.push(lte14(activityLogs.createdAt, end));
+        conditions.push(lte15(activityLogs.createdAt, end));
       }
     }
     if (!startDateStr && !endDateStr) {
       const thirtyDaysAgo = /* @__PURE__ */ new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      conditions.push(gte19(activityLogs.createdAt, thirtyDaysAgo));
+      conditions.push(gte20(activityLogs.createdAt, thirtyDaysAgo));
     }
-    const whereClause = conditions.length > 0 ? and30(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and31(...conditions) : void 0;
     const logs = await db.select({
       id: activityLogs.id,
       userId: activityLogs.userId,
@@ -25209,7 +26252,7 @@ router29.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
       details: activityLogs.details,
       ipAddress: activityLogs.ipAddress,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).leftJoin(users, eq40(activityLogs.userId, users.id)).where(whereClause).orderBy(desc14(activityLogs.createdAt)).limit(1e4);
+    }).from(activityLogs).leftJoin(users, eq42(activityLogs.userId, users.id)).where(whereClause).orderBy(desc14(activityLogs.createdAt)).limit(1e4);
     const typedLogs = logs;
     const reportData = {
       title: "Logs de Atividade",
@@ -25230,15 +26273,15 @@ router29.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
       ]
     };
     let content;
-    if (format12 === "xlsx") {
+    if (format13 === "xlsx") {
       content = exportToExcel(reportData);
-    } else if (format12 === "pdf") {
+    } else if (format13 === "pdf") {
       content = exportToPDF(reportData);
     } else {
       content = exportToCSV(reportData);
     }
-    const filename = `logs_atividade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format12)}`;
-    res.setHeader("Content-Type", getMimeType(format12));
+    const filename = `logs_atividade_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.${getFileExtension(format13)}`;
+    res.setHeader("Content-Type", getMimeType(format13));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
   } catch (error) {
@@ -25246,18 +26289,18 @@ router29.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
     res.status(500).json({ error: "Failed to export activity logs" });
   }
 });
-var activity_default = router29;
+var activity_default = router30;
 
 // server/routes/gamification.ts
-import { Router as Router30 } from "express";
+import { Router as Router31 } from "express";
 await init_db();
 init_schema();
-import { eq as eq42, desc as desc16, and as and32, sql as sql25 } from "drizzle-orm";
+import { eq as eq44, desc as desc16, and as and33, sql as sql25 } from "drizzle-orm";
 
 // server/services/gamificationService.ts
 await init_db();
 init_schema();
-import { eq as eq41, desc as desc15, and as and31, sql as sql24 } from "drizzle-orm";
+import { eq as eq43, desc as desc15, and as and32, sql as sql24 } from "drizzle-orm";
 var POINT_VALUES = {
   mass_served: 50,
   substitution_offered: 20,
@@ -25472,7 +26515,7 @@ var DEFAULT_BADGES = [
   }
 ];
 async function initializeUserPoints(userId) {
-  const [existing] = await db.select().from(userPoints).where(eq41(userPoints.userId, userId));
+  const [existing] = await db.select().from(userPoints).where(eq43(userPoints.userId, userId));
   if (!existing) {
     await db.insert(userPoints).values({
       userId,
@@ -25493,7 +26536,7 @@ async function awardPoints(userId, action, customPoints, description, relatedEnt
     relatedEntityType,
     relatedEntityId
   });
-  const [userPointsRecord] = await db.select().from(userPoints).where(eq41(userPoints.userId, userId));
+  const [userPointsRecord] = await db.select().from(userPoints).where(eq43(userPoints.userId, userId));
   const newTotal = (userPointsRecord?.totalPoints || 0) + points;
   const currentLevel = userPointsRecord?.level || 1;
   const newLevel = calculateLevel(newTotal);
@@ -25512,7 +26555,7 @@ async function awardPoints(userId, action, customPoints, description, relatedEnt
     levelProgress,
     lastActivityAt: /* @__PURE__ */ new Date(),
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq41(userPoints.userId, userId));
+  }).where(eq43(userPoints.userId, userId));
   if (leveledUp && (newLevel === 5 || newLevel === 10)) {
     const badgeCode = newLevel === 5 ? "level_5" : "level_10";
     await awardBadge(userId, badgeCode);
@@ -25529,13 +26572,13 @@ function calculateLevel(points) {
 }
 async function getUserGamificationProfile(userId) {
   await initializeUserPoints(userId);
-  const [pointsRecord] = await db.select().from(userPoints).where(eq41(userPoints.userId, userId));
+  const [pointsRecord] = await db.select().from(userPoints).where(eq43(userPoints.userId, userId));
   const earnedBadges = await db.select({
     badge: badges,
     earnedAt: userBadges.earnedAt,
     isFeatured: userBadges.isFeatured
-  }).from(userBadges).innerJoin(badges, eq41(userBadges.badgeId, badges.id)).where(eq41(userBadges.userId, userId)).orderBy(desc15(userBadges.earnedAt));
-  const recentTransactions = await db.select().from(pointTransactions).where(eq41(pointTransactions.userId, userId)).orderBy(desc15(pointTransactions.createdAt)).limit(10);
+  }).from(userBadges).innerJoin(badges, eq43(userBadges.badgeId, badges.id)).where(eq43(userBadges.userId, userId)).orderBy(desc15(userBadges.earnedAt));
+  const recentTransactions = await db.select().from(pointTransactions).where(eq43(pointTransactions.userId, userId)).orderBy(desc15(pointTransactions.createdAt)).limit(10);
   const levelInfo = LEVEL_THRESHOLDS.find((l) => l.level === (pointsRecord?.level || 1));
   const nextLevelInfo = LEVEL_THRESHOLDS.find((l) => l.level === (pointsRecord?.level || 1) + 1);
   return {
@@ -25559,14 +26602,14 @@ async function getUserGamificationProfile(userId) {
   };
 }
 async function awardBadge(userId, badgeCode) {
-  const [badge] = await db.select().from(badges).where(eq41(badges.code, badgeCode));
+  const [badge] = await db.select().from(badges).where(eq43(badges.code, badgeCode));
   if (!badge) {
     console.warn(`Badge ${badgeCode} not found`);
     return false;
   }
-  const [existing] = await db.select().from(userBadges).where(and31(
-    eq41(userBadges.userId, userId),
-    eq41(userBadges.badgeId, badge.id)
+  const [existing] = await db.select().from(userBadges).where(and32(
+    eq43(userBadges.userId, userId),
+    eq43(userBadges.badgeId, badge.id)
   ));
   if (existing) {
     return false;
@@ -25594,7 +26637,7 @@ async function getLeaderboard(period = "alltime", limit = 10) {
     level: userPoints.level,
     userName: users.name,
     userPhotoUrl: users.photoUrl
-  }).from(userPoints).innerJoin(users, eq41(userPoints.userId, users.id)).where(eq41(users.status, "active")).orderBy(desc15(userPoints.totalPoints)).limit(limit);
+  }).from(userPoints).innerJoin(users, eq43(userPoints.userId, users.id)).where(eq43(users.status, "active")).orderBy(desc15(userPoints.totalPoints)).limit(limit);
   return leaderboardData.map((entry, index2) => ({
     rank: index2 + 1,
     userId: entry.userId,
@@ -25620,7 +26663,7 @@ async function getUserRank(userId) {
 }
 async function seedDefaultBadges() {
   for (const badge of DEFAULT_BADGES) {
-    const [existing] = await db.select().from(badges).where(eq41(badges.code, badge.code));
+    const [existing] = await db.select().from(badges).where(eq43(badges.code, badge.code));
     if (!existing) {
       await db.insert(badges).values(badge);
       console.log(`Badge '${badge.name}' created`);
@@ -25629,7 +26672,7 @@ async function seedDefaultBadges() {
 }
 async function seedLevelDefinitions() {
   for (const level of LEVEL_THRESHOLDS) {
-    const [existing] = await db.select().from(levelDefinitions).where(eq41(levelDefinitions.level, level.level));
+    const [existing] = await db.select().from(levelDefinitions).where(eq43(levelDefinitions.level, level.level));
     if (!existing) {
       await db.insert(levelDefinitions).values({
         level: level.level,
@@ -25642,9 +26685,9 @@ async function seedLevelDefinitions() {
 }
 
 // server/routes/gamification.ts
-var router30 = Router30();
-router30.use(authenticateToken);
-router30.get("/profile", async (req, res) => {
+var router31 = Router31();
+router31.use(authenticateToken);
+router31.get("/profile", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -25661,7 +26704,7 @@ router30.get("/profile", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar perfil de gamificacao" });
   }
 });
-router30.get("/profile/:userId", async (req, res) => {
+router31.get("/profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const profile = await getUserGamificationProfile(userId);
@@ -25681,7 +26724,7 @@ router30.get("/profile/:userId", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar perfil" });
   }
 });
-router30.get("/leaderboard", async (req, res) => {
+router31.get("/leaderboard", async (req, res) => {
   try {
     const { period = "alltime", limit = "10" } = req.query;
     const userId = req.user?.id;
@@ -25696,7 +26739,7 @@ router30.get("/leaderboard", async (req, res) => {
       if (!isInLeaderboard) {
         userRank = await getUserRank(userId);
         const profile = await getUserGamificationProfile(userId);
-        const [user] = await db.select({ name: users.name, photoUrl: users.photoUrl }).from(users).where(eq42(users.id, userId));
+        const [user] = await db.select({ name: users.name, photoUrl: users.photoUrl }).from(users).where(eq44(users.id, userId));
         userEntry = {
           rank: userRank,
           userId,
@@ -25717,13 +26760,13 @@ router30.get("/leaderboard", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar ranking" });
   }
 });
-router30.get("/badges", async (req, res) => {
+router31.get("/badges", async (req, res) => {
   try {
     const userId = req.user?.id;
-    const allBadges = await db.select().from(badges).where(eq42(badges.isActive, true)).orderBy(badges.category, badges.rarity);
+    const allBadges = await db.select().from(badges).where(eq44(badges.isActive, true)).orderBy(badges.category, badges.rarity);
     let earnedBadgeIds = [];
     if (userId) {
-      const earned = await db.select({ badgeId: userBadges.badgeId }).from(userBadges).where(eq42(userBadges.userId, userId));
+      const earned = await db.select({ badgeId: userBadges.badgeId }).from(userBadges).where(eq44(userBadges.userId, userId));
       earnedBadgeIds = earned.map((e) => e.badgeId);
     }
     const badgesWithStatus = allBadges.filter((b) => !b.isSecret || earnedBadgeIds.includes(b.id)).map((b) => ({
@@ -25736,7 +26779,7 @@ router30.get("/badges", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar badges" });
   }
 });
-router30.get("/levels", async (req, res) => {
+router31.get("/levels", async (req, res) => {
   try {
     res.json({ levels: LEVEL_THRESHOLDS });
   } catch (error) {
@@ -25744,7 +26787,7 @@ router30.get("/levels", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar niveis" });
   }
 });
-router30.get("/points-config", async (req, res) => {
+router31.get("/points-config", async (req, res) => {
   try {
     res.json({ pointValues: POINT_VALUES });
   } catch (error) {
@@ -25752,15 +26795,15 @@ router30.get("/points-config", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar configuracao de pontos" });
   }
 });
-router30.get("/history", async (req, res) => {
+router31.get("/history", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Usuario nao autenticado" });
     }
     const { limit = "50", offset = "0" } = req.query;
-    const transactions = await db.select().from(pointTransactions).where(eq42(pointTransactions.userId, userId)).orderBy(desc16(pointTransactions.createdAt)).limit(parseInt(limit)).offset(parseInt(offset));
-    const [countResult] = await db.select({ count: sql25`count(*)` }).from(pointTransactions).where(eq42(pointTransactions.userId, userId));
+    const transactions = await db.select().from(pointTransactions).where(eq44(pointTransactions.userId, userId)).orderBy(desc16(pointTransactions.createdAt)).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql25`count(*)` }).from(pointTransactions).where(eq44(pointTransactions.userId, userId));
     res.json({
       transactions,
       total: countResult?.count || 0,
@@ -25772,7 +26815,7 @@ router30.get("/history", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar historico" });
   }
 });
-router30.post("/feature-badge", csrfProtection, async (req, res) => {
+router31.post("/feature-badge", csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -25782,30 +26825,30 @@ router30.post("/feature-badge", csrfProtection, async (req, res) => {
     if (!badgeId) {
       return res.status(400).json({ error: "Badge ID obrigatorio" });
     }
-    const [userBadge] = await db.select().from(userBadges).where(and32(
-      eq42(userBadges.userId, userId),
-      eq42(userBadges.badgeId, badgeId)
+    const [userBadge] = await db.select().from(userBadges).where(and33(
+      eq44(userBadges.userId, userId),
+      eq44(userBadges.badgeId, badgeId)
     ));
     if (!userBadge) {
       return res.status(404).json({ error: "Badge nao encontrado" });
     }
     if (featured) {
-      const featuredCount = await db.select({ count: sql25`count(*)` }).from(userBadges).where(and32(
-        eq42(userBadges.userId, userId),
-        eq42(userBadges.isFeatured, true)
+      const featuredCount = await db.select({ count: sql25`count(*)` }).from(userBadges).where(and33(
+        eq44(userBadges.userId, userId),
+        eq44(userBadges.isFeatured, true)
       ));
       if ((featuredCount[0]?.count || 0) >= 3) {
         return res.status(400).json({ error: "Maximo de 3 badges em destaque" });
       }
     }
-    await db.update(userBadges).set({ isFeatured: featured }).where(eq42(userBadges.id, userBadge.id));
+    await db.update(userBadges).set({ isFeatured: featured }).where(eq44(userBadges.id, userBadge.id));
     res.json({ success: true });
   } catch (error) {
     console.error("Error featuring badge:", error);
     res.status(500).json({ error: "Erro ao destacar badge" });
   }
 });
-router30.post("/claim-daily", csrfProtection, async (req, res) => {
+router31.post("/claim-daily", csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -25813,9 +26856,9 @@ router30.post("/claim-daily", csrfProtection, async (req, res) => {
     }
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const [existingClaim] = await db.select().from(pointTransactions).where(and32(
-      eq42(pointTransactions.userId, userId),
-      eq42(pointTransactions.action, "login_bonus"),
+    const [existingClaim] = await db.select().from(pointTransactions).where(and33(
+      eq44(pointTransactions.userId, userId),
+      eq44(pointTransactions.action, "login_bonus"),
       sql25`${pointTransactions.createdAt} >= ${today}`
     ));
     if (existingClaim) {
@@ -25839,7 +26882,7 @@ router30.post("/claim-daily", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao coletar bonus" });
   }
 });
-router30.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router31.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const { userId, points, reason } = req.body;
     if (!userId || !points) {
@@ -25860,7 +26903,7 @@ router30.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csr
     res.status(500).json({ error: "Erro ao conceder pontos" });
   }
 });
-router30.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router31.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const { userId, badgeCode } = req.body;
     if (!userId || !badgeCode) {
@@ -25876,7 +26919,7 @@ router30.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrf
     res.status(500).json({ error: "Erro ao conceder badge" });
   }
 });
-router30.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req, res) => {
+router31.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req, res) => {
   try {
     await seedDefaultBadges();
     await seedLevelDefinitions();
@@ -25886,7 +26929,7 @@ router30.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req
     res.status(500).json({ error: "Erro ao criar dados de gamificacao" });
   }
 });
-router30.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) => {
+router31.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const [totalPointsResult] = await db.select({ total: sql25`COALESCE(SUM(total_points), 0)` }).from(userPoints);
     const [totalBadgesResult] = await db.select({ count: sql25`count(*)` }).from(userBadges);
@@ -25895,7 +26938,7 @@ router30.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) 
       badgeId: userBadges.badgeId,
       badgeName: badges.name,
       count: sql25`count(*)`
-    }).from(userBadges).innerJoin(badges, eq42(userBadges.badgeId, badges.id)).groupBy(userBadges.badgeId, badges.name).orderBy(desc16(sql25`count(*)`)).limit(10);
+    }).from(userBadges).innerJoin(badges, eq44(userBadges.badgeId, badges.id)).groupBy(userBadges.badgeId, badges.name).orderBy(desc16(sql25`count(*)`)).limit(10);
     const levelDistribution = await db.select({
       level: userPoints.level,
       count: sql25`count(*)`
@@ -25912,22 +26955,22 @@ router30.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) 
     res.status(500).json({ error: "Erro ao buscar estatisticas" });
   }
 });
-var gamification_default = router30;
+var gamification_default = router31;
 
 // server/routes/massConfig.ts
 await init_db();
 init_schema();
-import { Router as Router31 } from "express";
-import { eq as eq43 } from "drizzle-orm";
+import { Router as Router32 } from "express";
+import { eq as eq45 } from "drizzle-orm";
 import { z as z10 } from "zod";
-var router31 = Router31();
-router31.get("/", async (req, res) => {
+var router32 = Router32();
+router32.get("/", async (req, res) => {
   try {
     const { active } = req.query;
     let query = db.select().from(massConfigurations);
     if (active !== void 0) {
       const isActive = active === "true";
-      const configs2 = await db.select().from(massConfigurations).where(eq43(massConfigurations.isActive, isActive));
+      const configs2 = await db.select().from(massConfigurations).where(eq45(massConfigurations.isActive, isActive));
       return res.json(configs2);
     }
     const configs = await query;
@@ -25937,10 +26980,10 @@ router31.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to list mass configurations" });
   }
 });
-router31.get("/:id", async (req, res) => {
+router32.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [config] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [config] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!config) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
@@ -25950,12 +26993,14 @@ router31.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch mass configuration" });
   }
 });
-router31.post("/", async (req, res) => {
+router32.post("/", async (req, res) => {
   try {
     const validatedData = insertMassConfigurationSchema.parse(req.body);
     const insertData = {
       ...validatedData,
-      excludedDates: validatedData.excludedDates ? [...validatedData.excludedDates] : null
+      excludedDates: validatedData.excludedDates ? [...validatedData.excludedDates] : null,
+      communityId: req.user.homeCommunityId
+      // comunidade do coordenador
     };
     const [newConfig] = await db.insert(massConfigurations).values(insertData).returning();
     console.log(`[MassConfig] Created new configuration: ${newConfig.name} (${newConfig.id})`);
@@ -25968,10 +27013,10 @@ router31.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create mass configuration" });
   }
 });
-router31.put("/:id", async (req, res) => {
+router32.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [existing] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
@@ -25984,7 +27029,7 @@ router31.put("/:id", async (req, res) => {
     if (validatedData.excludedDates !== void 0) {
       updateData.excludedDates = validatedData.excludedDates ? [...validatedData.excludedDates] : null;
     }
-    const [updated] = await db.update(massConfigurations).set(updateData).where(eq43(massConfigurations.id, id)).returning();
+    const [updated] = await db.update(massConfigurations).set(updateData).where(eq45(massConfigurations.id, id)).returning();
     console.log(`[MassConfig] Updated configuration: ${updated.name} (${updated.id})`);
     res.json(updated);
   } catch (error) {
@@ -25995,19 +27040,19 @@ router31.put("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to update mass configuration" });
   }
 });
-router31.delete("/:id", async (req, res) => {
+router32.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
-    const [existing] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [existing] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
     if (hard === "true") {
-      await db.delete(massConfigurations).where(eq43(massConfigurations.id, id));
+      await db.delete(massConfigurations).where(eq45(massConfigurations.id, id));
       console.log(`[MassConfig] Hard deleted configuration: ${existing.name} (${id})`);
     } else {
-      await db.update(massConfigurations).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq43(massConfigurations.id, id));
+      await db.update(massConfigurations).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq45(massConfigurations.id, id));
       console.log(`[MassConfig] Soft deleted configuration: ${existing.name} (${id})`);
     }
     res.status(204).send();
@@ -26016,17 +27061,17 @@ router31.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete mass configuration" });
   }
 });
-router31.post("/:id/toggle", async (req, res) => {
+router32.post("/:id/toggle", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [existing] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
     const [updated] = await db.update(massConfigurations).set({
       isActive: !existing.isActive,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq43(massConfigurations.id, id)).returning();
+    }).where(eq45(massConfigurations.id, id)).returning();
     console.log(`[MassConfig] Toggled configuration ${id}: isActive=${updated.isActive}`);
     res.json(updated);
   } catch (error) {
@@ -26034,14 +27079,14 @@ router31.post("/:id/toggle", async (req, res) => {
     res.status(500).json({ error: "Failed to toggle mass configuration" });
   }
 });
-router31.post("/:id/exclude-date", async (req, res) => {
+router32.post("/:id/exclude-date", async (req, res) => {
   try {
     const { id } = req.params;
     const { date: date2 } = req.body;
     if (!date2 || !/^\d{4}-\d{2}-\d{2}$/.test(date2)) {
       return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
     }
-    const [existing] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [existing] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
@@ -26052,7 +27097,7 @@ router31.post("/:id/exclude-date", async (req, res) => {
     const [updated] = await db.update(massConfigurations).set({
       excludedDates,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq43(massConfigurations.id, id)).returning();
+    }).where(eq45(massConfigurations.id, id)).returning();
     console.log(`[MassConfig] Added excluded date ${date2} to configuration ${id}`);
     res.json(updated);
   } catch (error) {
@@ -26060,10 +27105,10 @@ router31.post("/:id/exclude-date", async (req, res) => {
     res.status(500).json({ error: "Failed to add excluded date" });
   }
 });
-router31.delete("/:id/exclude-date/:date", async (req, res) => {
+router32.delete("/:id/exclude-date/:date", async (req, res) => {
   try {
     const { id, date: date2 } = req.params;
-    const [existing] = await db.select().from(massConfigurations).where(eq43(massConfigurations.id, id)).limit(1);
+    const [existing] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Mass configuration not found" });
     }
@@ -26072,7 +27117,7 @@ router31.delete("/:id/exclude-date/:date", async (req, res) => {
     const [updated] = await db.update(massConfigurations).set({
       excludedDates: newExcludedDates,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq43(massConfigurations.id, id)).returning();
+    }).where(eq45(massConfigurations.id, id)).returning();
     console.log(`[MassConfig] Removed excluded date ${date2} from configuration ${id}`);
     res.json(updated);
   } catch (error) {
@@ -26080,22 +27125,22 @@ router31.delete("/:id/exclude-date/:date", async (req, res) => {
     res.status(500).json({ error: "Failed to remove excluded date" });
   }
 });
-var massConfig_default = router31;
+var massConfig_default = router32;
 
 // server/routes/specialEvents.ts
 await init_db();
 init_schema();
-import { Router as Router32 } from "express";
-import { eq as eq44, and as and34, gte as gte21, lte as lte16 } from "drizzle-orm";
+import { Router as Router33 } from "express";
+import { eq as eq46, and as and35, gte as gte22, lte as lte17 } from "drizzle-orm";
 import { z as z11 } from "zod";
-import { format as format11, startOfMonth as startOfMonth5, endOfMonth as endOfMonth5 } from "date-fns";
-var router32 = Router32();
-router32.get("/", async (req, res) => {
+import { format as format12, startOfMonth as startOfMonth5, endOfMonth as endOfMonth5 } from "date-fns";
+var router33 = Router33();
+router33.get("/", async (req, res) => {
   try {
     const { active } = req.query;
     if (active !== void 0) {
       const isActive = active === "true";
-      const events2 = await db.select().from(specialEvents).where(eq44(specialEvents.isActive, isActive));
+      const events2 = await db.select().from(specialEvents).where(eq46(specialEvents.isActive, isActive));
       return res.json(events2);
     }
     const events = await db.select().from(specialEvents);
@@ -26105,20 +27150,20 @@ router32.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to list special events" });
   }
 });
-router32.get("/month/:year/:month", async (req, res) => {
+router33.get("/month/:year/:month", async (req, res) => {
   try {
     const year = parseInt(req.params.year, 10);
     const month = parseInt(req.params.month, 10);
     if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
       return res.status(400).json({ error: "Invalid year or month" });
     }
-    const startDate = format11(startOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
-    const endDate = format11(endOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
+    const startDate = format12(startOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
+    const endDate = format12(endOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
     const events = await db.select().from(specialEvents).where(
-      and34(
-        eq44(specialEvents.isActive, true),
-        gte21(specialEvents.eventDate, startDate),
-        lte16(specialEvents.eventDate, endDate)
+      and35(
+        eq46(specialEvents.isActive, true),
+        gte22(specialEvents.eventDate, startDate),
+        lte17(specialEvents.eventDate, endDate)
       )
     );
     res.json(events);
@@ -26127,10 +27172,10 @@ router32.get("/month/:year/:month", async (req, res) => {
     res.status(500).json({ error: "Failed to list special events for month" });
   }
 });
-router32.get("/:id", async (req, res) => {
+router33.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [event] = await db.select().from(specialEvents).where(eq44(specialEvents.id, id)).limit(1);
+    const [event] = await db.select().from(specialEvents).where(eq46(specialEvents.id, id)).limit(1);
     if (!event) {
       return res.status(404).json({ error: "Special event not found" });
     }
@@ -26140,7 +27185,7 @@ router32.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch special event" });
   }
 });
-router32.post("/", async (req, res) => {
+router33.post("/", async (req, res) => {
   try {
     const userId = req.user?.id;
     const validatedData = insertSpecialEventSchema.parse({
@@ -26149,7 +27194,9 @@ router32.post("/", async (req, res) => {
     });
     const insertData = {
       ...validatedData,
-      suppressesMassTypes: validatedData.suppressesMassTypes ? [...validatedData.suppressesMassTypes] : null
+      suppressesMassTypes: validatedData.suppressesMassTypes ? [...validatedData.suppressesMassTypes] : null,
+      communityId: req.user?.homeCommunityId
+      // comunidade do coordenador
     };
     const [newEvent] = await db.insert(specialEvents).values(insertData).returning();
     console.log(`[SpecialEvents] Created new event: ${newEvent.name} on ${newEvent.eventDate}`);
@@ -26162,10 +27209,10 @@ router32.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create special event" });
   }
 });
-router32.put("/:id", async (req, res) => {
+router33.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(specialEvents).where(eq44(specialEvents.id, id)).limit(1);
+    const [existing] = await db.select().from(specialEvents).where(eq46(specialEvents.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Special event not found" });
     }
@@ -26178,7 +27225,7 @@ router32.put("/:id", async (req, res) => {
     if (validatedData.suppressesMassTypes !== void 0) {
       updateData.suppressesMassTypes = validatedData.suppressesMassTypes ? [...validatedData.suppressesMassTypes] : null;
     }
-    const [updated] = await db.update(specialEvents).set(updateData).where(eq44(specialEvents.id, id)).returning();
+    const [updated] = await db.update(specialEvents).set(updateData).where(eq46(specialEvents.id, id)).returning();
     console.log(`[SpecialEvents] Updated event: ${updated.name} (${updated.id})`);
     res.json(updated);
   } catch (error) {
@@ -26189,19 +27236,19 @@ router32.put("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to update special event" });
   }
 });
-router32.delete("/:id", async (req, res) => {
+router33.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
-    const [existing] = await db.select().from(specialEvents).where(eq44(specialEvents.id, id)).limit(1);
+    const [existing] = await db.select().from(specialEvents).where(eq46(specialEvents.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Special event not found" });
     }
     if (hard === "true") {
-      await db.delete(specialEvents).where(eq44(specialEvents.id, id));
+      await db.delete(specialEvents).where(eq46(specialEvents.id, id));
       console.log(`[SpecialEvents] Hard deleted event: ${existing.name} (${id})`);
     } else {
-      await db.update(specialEvents).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq44(specialEvents.id, id));
+      await db.update(specialEvents).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq46(specialEvents.id, id));
       console.log(`[SpecialEvents] Soft deleted event: ${existing.name} (${id})`);
     }
     res.status(204).send();
@@ -26210,7 +27257,7 @@ router32.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete special event" });
   }
 });
-router32.post("/batch", async (req, res) => {
+router33.post("/batch", async (req, res) => {
   try {
     const { events } = req.body;
     if (!Array.isArray(events) || events.length === 0) {
@@ -26225,7 +27272,9 @@ router32.post("/batch", async (req, res) => {
       });
       validatedEvents.push({
         ...validated,
-        suppressesMassTypes: validated.suppressesMassTypes ? [...validated.suppressesMassTypes] : null
+        suppressesMassTypes: validated.suppressesMassTypes ? [...validated.suppressesMassTypes] : null,
+        communityId: req.user?.homeCommunityId
+        // comunidade do coordenador
       });
     }
     const newEvents = await db.insert(specialEvents).values(validatedEvents).returning();
@@ -26239,32 +27288,32 @@ router32.post("/batch", async (req, res) => {
     res.status(500).json({ error: "Failed to create batch events" });
   }
 });
-var specialEvents_default = router32;
+var specialEvents_default = router33;
 
 // server/routes/questionMappings.ts
 await init_db();
 init_schema();
-import { Router as Router33 } from "express";
-import { eq as eq45, and as and35 } from "drizzle-orm";
+import { Router as Router34 } from "express";
+import { eq as eq47, and as and36 } from "drizzle-orm";
 import { z as z12 } from "zod";
-var router33 = Router33();
-router33.get("/questionnaire/:id", async (req, res) => {
+var router34 = Router34();
+router34.get("/questionnaire/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [questionnaire] = await db.select().from(questionnaires).where(eq45(questionnaires.id, id)).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(eq47(questionnaires.id, id)).limit(1);
     if (!questionnaire) {
       return res.status(404).json({ error: "Questionnaire not found" });
     }
-    const mappings = await db.select().from(questionMassMappings).where(eq45(questionMassMappings.questionnaireId, id));
+    const mappings = await db.select().from(questionMassMappings).where(eq47(questionMassMappings.questionnaireId, id));
     const enrichedMappings = await Promise.all(mappings.map(async (mapping) => {
       let massConfig = null;
       let specialEvent = null;
       if (mapping.massConfigurationId) {
-        const [config] = await db.select().from(massConfigurations).where(eq45(massConfigurations.id, mapping.massConfigurationId)).limit(1);
+        const [config] = await db.select().from(massConfigurations).where(eq47(massConfigurations.id, mapping.massConfigurationId)).limit(1);
         massConfig = config;
       }
       if (mapping.specialEventId) {
-        const [event] = await db.select().from(specialEvents).where(eq45(specialEvents.id, mapping.specialEventId)).limit(1);
+        const [event] = await db.select().from(specialEvents).where(eq47(specialEvents.id, mapping.specialEventId)).limit(1);
         specialEvent = event;
       }
       return {
@@ -26279,10 +27328,10 @@ router33.get("/questionnaire/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to list question mappings" });
   }
 });
-router33.get("/:id", async (req, res) => {
+router34.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [mapping] = await db.select().from(questionMassMappings).where(eq45(questionMassMappings.id, id)).limit(1);
+    const [mapping] = await db.select().from(questionMassMappings).where(eq47(questionMassMappings.id, id)).limit(1);
     if (!mapping) {
       return res.status(404).json({ error: "Question mapping not found" });
     }
@@ -26292,7 +27341,7 @@ router33.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch question mapping" });
   }
 });
-router33.post("/", async (req, res) => {
+router34.post("/", async (req, res) => {
   try {
     const validatedData = insertQuestionMassMappingSchema.parse(req.body);
     if (!validatedData.massConfigurationId && !validatedData.specialEventId && (!validatedData.targetDate || !validatedData.targetTime)) {
@@ -26301,9 +27350,9 @@ router33.post("/", async (req, res) => {
       });
     }
     const existing = await db.select().from(questionMassMappings).where(
-      and35(
-        eq45(questionMassMappings.questionnaireId, validatedData.questionnaireId),
-        eq45(questionMassMappings.questionId, validatedData.questionId)
+      and36(
+        eq47(questionMassMappings.questionnaireId, validatedData.questionnaireId),
+        eq47(questionMassMappings.questionId, validatedData.questionId)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -26323,10 +27372,10 @@ router33.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create question mapping" });
   }
 });
-router33.put("/:id", async (req, res) => {
+router34.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(questionMassMappings).where(eq45(questionMassMappings.id, id)).limit(1);
+    const [existing] = await db.select().from(questionMassMappings).where(eq47(questionMassMappings.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Question mapping not found" });
     }
@@ -26335,7 +27384,7 @@ router33.put("/:id", async (req, res) => {
     const [updated] = await db.update(questionMassMappings).set({
       ...validatedData,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq45(questionMassMappings.id, id)).returning();
+    }).where(eq47(questionMassMappings.id, id)).returning();
     console.log(`[QuestionMappings] Updated mapping ${id}`);
     res.json(updated);
   } catch (error) {
@@ -26346,14 +27395,14 @@ router33.put("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to update question mapping" });
   }
 });
-router33.delete("/:id", async (req, res) => {
+router34.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(questionMassMappings).where(eq45(questionMassMappings.id, id)).limit(1);
+    const [existing] = await db.select().from(questionMassMappings).where(eq47(questionMassMappings.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Question mapping not found" });
     }
-    await db.delete(questionMassMappings).where(eq45(questionMassMappings.id, id));
+    await db.delete(questionMassMappings).where(eq47(questionMassMappings.id, id));
     console.log(`[QuestionMappings] Deleted mapping ${id}`);
     res.status(204).send();
   } catch (error) {
@@ -26361,7 +27410,7 @@ router33.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete question mapping" });
   }
 });
-router33.post("/batch", async (req, res) => {
+router34.post("/batch", async (req, res) => {
   try {
     const { mappings } = req.body;
     if (!Array.isArray(mappings) || mappings.length === 0) {
@@ -26388,7 +27437,7 @@ router33.post("/batch", async (req, res) => {
     res.status(500).json({ error: "Failed to create batch mappings" });
   }
 });
-router33.post("/infer", async (req, res) => {
+router34.post("/infer", async (req, res) => {
   try {
     const { questionText } = req.body;
     if (!questionText) {
@@ -26461,27 +27510,27 @@ router33.post("/infer", async (req, res) => {
     res.status(500).json({ error: "Failed to infer mapping from question text" });
   }
 });
-var questionMappings_default = router33;
+var questionMappings_default = router34;
 
 // server/routes/learningPatterns.ts
 await init_db();
 init_schema();
-import { Router as Router34 } from "express";
-import { eq as eq46, and as and36, desc as desc17, sql as sql26 } from "drizzle-orm";
+import { Router as Router35 } from "express";
+import { eq as eq48, and as and37, desc as desc17, sql as sql26 } from "drizzle-orm";
 import { z as z13 } from "zod";
-var router34 = Router34();
-router34.get("/patterns", async (req, res) => {
+var router35 = Router35();
+router35.get("/patterns", async (req, res) => {
   try {
     const { active, type, ministerId, limit: limitParam } = req.query;
     let conditions = [];
     if (active !== void 0) {
-      conditions.push(eq46(learnedPatterns.isActive, active === "true"));
+      conditions.push(eq48(learnedPatterns.isActive, active === "true"));
     }
     if (type) {
-      conditions.push(eq46(learnedPatterns.patternType, type));
+      conditions.push(eq48(learnedPatterns.patternType, type));
     }
     if (ministerId) {
-      conditions.push(eq46(learnedPatterns.ministerId, ministerId));
+      conditions.push(eq48(learnedPatterns.ministerId, ministerId));
     }
     const limit = limitParam ? parseInt(limitParam, 10) : 100;
     const patterns = await db.select({
@@ -26499,14 +27548,14 @@ router34.get("/patterns", async (req, res) => {
       isActive: learnedPatterns.isActive,
       createdAt: learnedPatterns.createdAt,
       ministerName: users.name
-    }).from(learnedPatterns).leftJoin(users, eq46(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and36(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
+    }).from(learnedPatterns).leftJoin(users, eq48(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and37(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
     res.json(patterns);
   } catch (error) {
     console.error("[LearningPatterns] Error listing patterns:", error);
     res.status(500).json({ error: "Failed to list learned patterns" });
   }
 });
-router34.get("/patterns/:id", async (req, res) => {
+router35.get("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [pattern] = await db.select({
@@ -26524,7 +27573,7 @@ router34.get("/patterns/:id", async (req, res) => {
       isActive: learnedPatterns.isActive,
       createdAt: learnedPatterns.createdAt,
       ministerName: users.name
-    }).from(learnedPatterns).leftJoin(users, eq46(learnedPatterns.ministerId, users.id)).where(eq46(learnedPatterns.id, id)).limit(1);
+    }).from(learnedPatterns).leftJoin(users, eq48(learnedPatterns.ministerId, users.id)).where(eq48(learnedPatterns.id, id)).limit(1);
     if (!pattern) {
       return res.status(404).json({ error: "Pattern not found" });
     }
@@ -26534,7 +27583,7 @@ router34.get("/patterns/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch pattern" });
   }
 });
-router34.get("/report/:year/:month", async (req, res) => {
+router35.get("/report/:year/:month", async (req, res) => {
   try {
     const year = parseInt(req.params.year, 10);
     const month = parseInt(req.params.month, 10);
@@ -26571,16 +27620,16 @@ router34.get("/report/:year/:month", async (req, res) => {
     res.status(500).json({ error: "Failed to generate learning report" });
   }
 });
-router34.get("/minister/:id", async (req, res) => {
+router35.get("/minister/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const patterns = await db.select().from(learnedPatterns).where(
-      and36(
-        eq46(learnedPatterns.ministerId, id),
-        eq46(learnedPatterns.isActive, true)
+      and37(
+        eq48(learnedPatterns.ministerId, id),
+        eq48(learnedPatterns.isActive, true)
       )
     ).orderBy(desc17(learnedPatterns.lastOccurrence));
-    const [minister] = await db.select({ name: users.name }).from(users).where(eq46(users.id, id)).limit(1);
+    const [minister] = await db.select({ name: users.name }).from(users).where(eq48(users.id, id)).limit(1);
     res.json({
       ministerId: id,
       ministerName: minister?.name,
@@ -26597,7 +27646,7 @@ router34.get("/minister/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch minister patterns" });
   }
 });
-router34.post("/patterns", async (req, res) => {
+router35.post("/patterns", async (req, res) => {
   try {
     const validatedData = insertLearnedPatternSchema.parse(req.body);
     const [newPattern] = await db.insert(learnedPatterns).values(validatedData).returning();
@@ -26611,10 +27660,10 @@ router34.post("/patterns", async (req, res) => {
     res.status(500).json({ error: "Failed to create pattern" });
   }
 });
-router34.put("/patterns/:id", async (req, res) => {
+router35.put("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(learnedPatterns).where(eq46(learnedPatterns.id, id)).limit(1);
+    const [existing] = await db.select().from(learnedPatterns).where(eq48(learnedPatterns.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Pattern not found" });
     }
@@ -26623,7 +27672,7 @@ router34.put("/patterns/:id", async (req, res) => {
     const [updated] = await db.update(learnedPatterns).set({
       ...validatedData,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq46(learnedPatterns.id, id)).returning();
+    }).where(eq48(learnedPatterns.id, id)).returning();
     console.log(`[LearningPatterns] Updated pattern ${id}`);
     res.json(updated);
   } catch (error) {
@@ -26634,19 +27683,19 @@ router34.put("/patterns/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to update pattern" });
   }
 });
-router34.delete("/patterns/:id", async (req, res) => {
+router35.delete("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
-    const [existing] = await db.select().from(learnedPatterns).where(eq46(learnedPatterns.id, id)).limit(1);
+    const [existing] = await db.select().from(learnedPatterns).where(eq48(learnedPatterns.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "Pattern not found" });
     }
     if (hard === "true") {
-      await db.delete(learnedPatterns).where(eq46(learnedPatterns.id, id));
+      await db.delete(learnedPatterns).where(eq48(learnedPatterns.id, id));
       console.log(`[LearningPatterns] Hard deleted pattern ${id}`);
     } else {
-      await db.update(learnedPatterns).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq46(learnedPatterns.id, id));
+      await db.update(learnedPatterns).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq48(learnedPatterns.id, id));
       console.log(`[LearningPatterns] Soft deleted pattern ${id}`);
     }
     res.status(204).send();
@@ -26655,15 +27704,15 @@ router34.delete("/patterns/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete pattern" });
   }
 });
-router34.post("/reset-minister/:id", async (req, res) => {
+router35.post("/reset-minister/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
     if (hard === "true") {
-      const result = await db.delete(learnedPatterns).where(eq46(learnedPatterns.ministerId, id));
+      const result = await db.delete(learnedPatterns).where(eq48(learnedPatterns.ministerId, id));
       console.log(`[LearningPatterns] Hard deleted all patterns for minister ${id}`);
     } else {
-      await db.update(learnedPatterns).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq46(learnedPatterns.ministerId, id));
+      await db.update(learnedPatterns).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq48(learnedPatterns.ministerId, id));
       console.log(`[LearningPatterns] Soft deleted all patterns for minister ${id}`);
     }
     res.json({ success: true, message: `Patterns reset for minister ${id}` });
@@ -26672,9 +27721,9 @@ router34.post("/reset-minister/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to reset minister patterns" });
   }
 });
-router34.get("/stats", async (req, res) => {
+router35.get("/stats", async (req, res) => {
   try {
-    const allPatterns = await db.select().from(learnedPatterns).where(eq46(learnedPatterns.isActive, true));
+    const allPatterns = await db.select().from(learnedPatterns).where(eq48(learnedPatterns.isActive, true));
     const byType = {};
     const byMassType = {};
     let totalOccurrences = 0;
@@ -26702,14 +27751,587 @@ router34.get("/stats", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch learning stats" });
   }
 });
-var learningPatterns_default = router34;
+var learningPatterns_default = router35;
 
-// server/routes.ts
-init_schema();
+// server/routes/users.ts
+await init_storage();
+import { Router as Router36 } from "express";
+import crypto2 from "crypto";
+init_roles();
+
+// server/utils/routeHelpers.ts
 init_logger();
-await init_db();
+init_roles();
 import { z as z14 } from "zod";
-import { eq as eq47, count as count12, or as or13 } from "drizzle-orm";
+function stripHeavyFields(user) {
+  const { imageData, imageContentType, passwordHash, ...rest } = user;
+  return rest;
+}
+function sanitizeUserData(user, requestingUserRole) {
+  const cleanUser = stripHeavyFields(user);
+  if (isAdmin(requestingUserRole)) {
+    return cleanUser;
+  }
+  const {
+    reliabilityScore,
+    substitutionRequestCount,
+    substitutionFulfilledCount,
+    manualRemovalCount,
+    noShowCount,
+    lastReliabilityUpdate,
+    reliabilityNotes,
+    ...sanitizedUser
+  } = cleanUser;
+  return sanitizedUser;
+}
+function handleApiError(error, operation) {
+  if (error instanceof z14.ZodError) {
+    return {
+      status: 400,
+      message: `Dados inv\xE1lidos para ${operation}`,
+      errors: error.errors
+    };
+  }
+  const dbError = error;
+  if (dbError.code === "23505") {
+    return {
+      status: 409,
+      message: `J\xE1 existe um registro com estes dados para ${operation}`
+    };
+  }
+  if (dbError.code === "23503") {
+    return {
+      status: 400,
+      message: `Refer\xEAncia inv\xE1lida encontrada para ${operation}`
+    };
+  }
+  if (dbError.message && dbError.message.includes("n\xE3o encontrado")) {
+    return {
+      status: 404,
+      message: dbError.message
+    };
+  }
+  if (dbError.message && dbError.message.includes("n\xE3o autorizado")) {
+    return {
+      status: 403,
+      message: dbError.message
+    };
+  }
+  logger.error(`Error in ${operation}:`, error);
+  return {
+    status: 500,
+    message: `Erro interno do servidor durante ${operation}`
+  };
+}
+
+// server/routes/users.ts
+init_schema();
+await init_db();
+import { z as z15 } from "zod";
+import { eq as eq49, count as count12, or as or13 } from "drizzle-orm";
+var router36 = Router36();
+router36.get("/api/users/active", authenticateToken, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const result = await storage.getUsersByStatusPaginated("active", { limit, offset });
+    res.json({
+      ...result,
+      data: result.data.map(stripHeavyFields)
+    });
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar usu\xE1rios ativos");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const result = await storage.getUsersByStatusPaginated("pending", { limit, offset });
+    res.json({
+      ...result,
+      data: result.data.map(stripHeavyFields)
+    });
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar usu\xE1rios pendentes");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.get("/api/users", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "Surrogate-Control": "no-store"
+    });
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const status = req.query.status;
+    const result = await storage.getUsersPaginated({ limit, offset, status });
+    res.json({
+      ...result,
+      data: result.data.map(stripHeavyFields)
+    });
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar lista de usu\xE1rios");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.get("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const user = await storage.getUser(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    res.json(stripHeavyFields(user));
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.get("/api/users/:id/photo", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const [user] = await db.select({
+      imageData: users.imageData,
+      imageContentType: users.imageContentType
+    }).from(users).where(eq49(users.id, userId));
+    if (!user || !user.imageData) {
+      return res.status(404).json({ error: "Photo not found" });
+    }
+    const imageBuffer = Buffer.from(user.imageData, "base64");
+    const imageHash = crypto2.createHash("md5").update(user.imageData).digest("hex");
+    res.set({
+      "Content-Type": user.imageContentType || "image/jpeg",
+      "Content-Length": imageBuffer.length.toString(),
+      "Cache-Control": "public, max-age=3600",
+      // Cache por 1 hora apenas
+      "ETag": `"${userId}-${imageHash}"`,
+      // ETag baseado no hash completo da imagem
+      "Last-Modified": (/* @__PURE__ */ new Date()).toUTCString()
+      // Adicionar data de modificação
+    });
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error("Error serving profile photo:", error);
+    res.status(500).json({ error: "Failed to load photo" });
+  }
+});
+router36.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProtection, async (req, res) => {
+  try {
+    const userData = insertUserSchema.parse(req.body);
+    const safeUserData = {
+      ...userData,
+      role: userData.role || "ministro",
+      // padrão ministro
+      status: "pending"
+      // sempre pending para aprovação
+    };
+    const user = await storage.createUser(safeUserData);
+    res.status(201).json(user);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "criar usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const userData = insertUserSchema.partial().parse(req.body);
+    const { role, status, ...safeUserData } = userData;
+    const user = await storage.updateUser(req.params.id, safeUserData);
+    res.json(stripHeavyFields(user));
+  } catch (error) {
+    const errorResponse = handleApiError(error, "atualizar usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const statusUpdateSchema = z15.object({
+      status: z15.enum(["active", "inactive", "pending"], {
+        errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
+      })
+    });
+    const { status } = statusUpdateSchema.parse(req.body);
+    if (req.user?.id === req.params.id) {
+      return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel alterar seu pr\xF3prio status" });
+    }
+    if (status !== "active") {
+      const targetUser = await storage.getUser(req.params.id);
+      if (targetUser?.role === "gestor") {
+        const allUsers = await storage.getAllUsers();
+        const activeGestoresCount = allUsers.filter((u) => u.role === "gestor" && u.status === "active").length;
+        if (activeGestoresCount <= 1) {
+          return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel inativar o \xFAltimo gestor ativo do sistema" });
+        }
+      }
+    }
+    const user = await storage.updateUser(req.params.id, { status });
+    if (!user) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    res.json(user);
+  } catch (error) {
+    if (error instanceof z15.ZodError) {
+      return res.status(400).json({
+        message: "Dados inv\xE1lidos",
+        errors: error.errors
+      });
+    }
+    const errorResponse = handleApiError(error, "atualizar status do usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const roleUpdateSchema = z15.object({
+      role: z15.enum(["gestor", "reitor", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "ministro"], {
+        errorMap: () => ({ message: "Papel deve ser: gestor, reitor, coordenador (comunidade/paroquial) ou ministro" })
+      })
+    });
+    const { role } = roleUpdateSchema.parse(req.body);
+    if (req.user?.id === req.params.id) {
+      if (isCoordinator(req.user?.role)) {
+        if (isCoordinator(role)) {
+          return res.status(400).json({ message: "Voc\xEA j\xE1 \xE9 um coordenador" });
+        }
+      } else {
+        return res.status(400).json({ message: "Gestores n\xE3o podem alterar seu pr\xF3prio papel" });
+      }
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (role !== "gestor" && targetUser?.role === "gestor") {
+      const allUsers = await storage.getAllUsers();
+      const activeGestoresCount = allUsers.filter(
+        (u) => u.role === "gestor" && u.status === "active" && u.id !== req.params.id
+        // Excluir o usuário que será modificado da contagem
+      ).length;
+      if (activeGestoresCount < 1) {
+        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel remover o \xFAltimo gestor ativo do sistema" });
+      }
+    }
+    const user = await storage.updateUser(req.params.id, { role });
+    if (!user) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    res.json(user);
+  } catch (error) {
+    if (error instanceof z15.ZodError) {
+      return res.status(400).json({
+        message: "Dados inv\xE1lidos",
+        errors: error.errors
+      });
+    }
+    const errorResponse = handleApiError(error, "atualizar papel do usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    if (req.user?.id === req.params.id) {
+      return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear sua pr\xF3pria conta" });
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (targetUser?.role === "gestor") {
+      const allUsers = await storage.getAllUsers();
+      const activeGestoresCount = allUsers.filter((u) => u.role === "gestor" && u.status === "active").length;
+      if (activeGestoresCount <= 1) {
+        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear o \xFAltimo gestor ativo do sistema" });
+      }
+    }
+    const user = await storage.updateUser(req.params.id, { status: "inactive" });
+    if (!user) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    res.json(user);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "bloquear usu\xE1rio");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router36.get("/api/users/:id/check-usage", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    const activityCheck = await storage.checkUserMinisterialActivity(userId);
+    res.json({
+      isUsed: activityCheck.isUsed,
+      reason: activityCheck.reason
+    });
+  } catch (error) {
+    console.error("Error checking user usage:", error);
+    res.status(500).json({ message: "Erro ao verificar uso do usu\xE1rio" });
+  }
+});
+router36.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const currentUser = req.user;
+    if (currentUser?.id === userId) {
+      return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir sua pr\xF3pria conta" });
+    }
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
+    }
+    let hasMinisterialActivity = false;
+    let activityCheckReason = "";
+    try {
+      const activityCheck = await storage.checkUserMinisterialActivity(userId);
+      hasMinisterialActivity = activityCheck.isUsed;
+      activityCheckReason = activityCheck.reason;
+      if (!hasMinisterialActivity) {
+        console.log("Storage returned no activity, performing double-check via direct DB queries...");
+        const [questionnaireCount] = await db.select({ count: count12() }).from(questionnaireResponses).where(eq49(questionnaireResponses.userId, userId));
+        const [scheduleMinisterCount] = await db.select({ count: count12() }).from(schedules).where(eq49(schedules.ministerId, userId));
+        const [scheduleSubstituteCount] = await db.select({ count: count12() }).from(schedules).where(eq49(schedules.substituteId, userId));
+        const [substitutionCount] = await db.select({ count: count12() }).from(substitutionRequests).where(or13(
+          eq49(substitutionRequests.requesterId, userId),
+          eq49(substitutionRequests.substituteId, userId)
+        ));
+        const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
+        const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
+        const directScheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
+        const directSubstitutionActivity = (substitutionCount?.count || 0) > 0;
+        const directHasActivity = directQuestionnaireActivity || directScheduleMinisterActivity || directScheduleSubstituteActivity || directSubstitutionActivity;
+        if (directHasActivity) {
+          console.warn("DISCREPANCY DETECTED: Storage said no activity but direct query found activity", {
+            storageResult: activityCheck,
+            directChecks: {
+              questionnaires: directQuestionnaireActivity,
+              scheduleMinister: directScheduleMinisterActivity,
+              scheduleSubstitute: directScheduleSubstituteActivity,
+              substitutions: directSubstitutionActivity
+            }
+          });
+          hasMinisterialActivity = true;
+          const activities = [];
+          if (directQuestionnaireActivity) activities.push("question\xE1rios respondidos");
+          if (directScheduleMinisterActivity) activities.push("escalas como ministro");
+          if (directScheduleSubstituteActivity) activities.push("escalas como substituto");
+          if (directSubstitutionActivity) activities.push("solicita\xE7\xF5es de substitui\xE7\xE3o");
+          activityCheckReason = `ATEN\xC7\xC3O: Discrep\xE2ncia detectada entre m\xE9todos. Verifica\xE7\xE3o direta encontrou: ${activities.join(", ")}`;
+        }
+      }
+    } catch (storageError) {
+      console.error("Storage method failed, trying direct DB queries:", storageError);
+      try {
+        const [questionnaireCount] = await db.select({ count: count12() }).from(questionnaireResponses).where(eq49(questionnaireResponses.userId, userId));
+        const [scheduleMinisterCount] = await db.select({ count: count12() }).from(schedules).where(eq49(schedules.ministerId, userId));
+        const [scheduleSubstituteCount] = await db.select({ count: count12() }).from(schedules).where(eq49(schedules.substituteId, userId));
+        const [substitutionCount] = await db.select({ count: count12() }).from(substitutionRequests).where(or13(
+          eq49(substitutionRequests.requesterId, userId),
+          eq49(substitutionRequests.substituteId, userId)
+        ));
+        const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
+        const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
+        const scheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
+        const substitutionActivity = (substitutionCount?.count || 0) > 0;
+        hasMinisterialActivity = questionnaireActivity || scheduleMinisterActivity || scheduleSubstituteActivity || substitutionActivity;
+        if (hasMinisterialActivity) {
+          const activities = [];
+          if (questionnaireActivity) activities.push("question\xE1rios respondidos");
+          if (scheduleMinisterActivity) activities.push("escalas como ministro");
+          if (scheduleSubstituteActivity) activities.push("escalas como substituto");
+          if (substitutionActivity) activities.push("solicita\xE7\xF5es de substitui\xE7\xE3o");
+          activityCheckReason = `Usu\xE1rio tem atividade no sistema: ${activities.join(", ")}`;
+        } else {
+          activityCheckReason = "Nenhuma atividade ministerial encontrada - usu\xE1rio pode ser exclu\xEDdo";
+        }
+      } catch (directError) {
+        console.error("Direct DB query also failed:", directError);
+        return res.status(500).json({
+          message: "Erro interno ao verificar atividades do usu\xE1rio. Por seguran\xE7a, a exclus\xE3o foi bloqueada.",
+          shouldBlock: true,
+          code: "DATABASE_CONNECTIVITY_ERROR"
+        });
+      }
+    }
+    if (hasMinisterialActivity) {
+      return res.status(409).json({
+        message: activityCheckReason.includes("N\xE3o foi poss\xEDvel verificar") ? "Erro ao verificar uso do usu\xE1rio no banco de dados. N\xE3o \xE9 poss\xEDvel determinar se o usu\xE1rio pode ser exclu\xEDdo com seguran\xE7a." : activityCheckReason || "Usu\xE1rio n\xE3o pode ser exclu\xEDdo pois j\xE1 foi utilizado no sistema",
+        shouldBlock: true,
+        code: activityCheckReason.includes("N\xE3o foi poss\xEDvel verificar") ? "USAGE_CHECK_FAILED" : "USER_HAS_ACTIVITY"
+      });
+    }
+    if (isCoordinator(currentUser?.role) && targetUser.role === "gestor") {
+      return res.status(403).json({
+        message: "Coordenadores n\xE3o podem excluir gestores",
+        shouldBlock: true
+      });
+    }
+    if (targetUser.role === "gestor") {
+      const allUsers = await storage.getAllUsers();
+      const activeGestores = allUsers.filter((u) => u.role === "gestor" && u.status === "active");
+      if (activeGestores.length <= 1) {
+        return res.status(409).json({
+          message: "N\xE3o \xE9 poss\xEDvel excluir o \xFAltimo gestor ativo do sistema",
+          shouldBlock: true
+        });
+      }
+    }
+    await storage.deleteUser(userId);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    let errorMessage = "Failed to delete user";
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      errorMessage = `Failed to delete user: ${error.message}`;
+    }
+    res.status(500).json({
+      message: errorMessage,
+      debug: process.env.NODE_ENV === "development" ? error : void 0
+    });
+  }
+});
+var users_default = router36;
+
+// server/routes/health.ts
+await init_storage();
+import { Router as Router37 } from "express";
+init_schema();
+await init_db();
+import { eq as eq50, count as count13, or as or14 } from "drizzle-orm";
+var router37 = Router37();
+router37.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+});
+router37.head("/api/health", (req, res) => {
+  res.status(200).end();
+});
+router37.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const diagnostics = {
+      userExists: false,
+      canQueryUser: false,
+      canQueryQuestionnaireResponses: false,
+      canQueryScheduleAssignments: false,
+      canQuerySubstitutionRequests: false,
+      ministerialActivityCheck: null,
+      userError: null,
+      questionnaireError: null,
+      scheduleError: null,
+      substitutionError: null,
+      storageError: null,
+      questionnaireCount: 0,
+      scheduleMinisterCount: 0,
+      scheduleSubstituteCount: 0,
+      substitutionRequestCount: 0
+    };
+    try {
+      const user = await storage.getUser(userId);
+      diagnostics.userExists = !!user;
+      diagnostics.canQueryUser = true;
+    } catch (e) {
+      diagnostics.userError = `Error querying user: ${e}`;
+    }
+    try {
+      const [questionnaireCheck] = await db.select({ count: count13() }).from(questionnaireResponses).where(eq50(questionnaireResponses.userId, userId));
+      diagnostics.canQueryQuestionnaireResponses = true;
+      diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
+    } catch (e) {
+      diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
+    }
+    try {
+      const [scheduleMinisterCheck] = await db.select({ count: count13() }).from(schedules).where(eq50(schedules.ministerId, userId));
+      diagnostics.canQueryScheduleAssignments = true;
+      diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
+      const [scheduleSubstituteCheck] = await db.select({ count: count13() }).from(schedules).where(eq50(schedules.substituteId, userId));
+      diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
+    } catch (e) {
+      diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
+    }
+    try {
+      const [substitutionCheck] = await db.select({ count: count13() }).from(substitutionRequests).where(or14(
+        eq50(substitutionRequests.requesterId, userId),
+        eq50(substitutionRequests.substituteId, userId)
+      ));
+      diagnostics.canQuerySubstitutionRequests = true;
+      diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
+    } catch (e) {
+      diagnostics.substitutionError = `Error querying substitution requests: ${e}`;
+    }
+    try {
+      const result = await storage.checkUserMinisterialActivity(userId);
+      diagnostics.ministerialActivityCheck = result.isUsed;
+    } catch (e) {
+      diagnostics.storageError = `Error in checkUserMinisterialActivity: ${e}`;
+    }
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({ error: `Diagnostic failed: ${error}` });
+  }
+});
+var health_default = router37;
+
+// server/routes/mass-times.ts
+await init_storage();
+import { Router as Router38 } from "express";
+init_schema();
+import { z as z16 } from "zod";
+var router38 = Router38();
+router38.get("/api/mass-times", authenticateToken, async (req, res) => {
+  try {
+    const massTimes = await storage.getMassTimes();
+    res.json(massTimes);
+  } catch (error) {
+    console.error("Error fetching mass times:", error);
+    res.status(500).json({ message: "Failed to fetch mass times" });
+  }
+});
+router38.post("/api/mass-times", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    const massTimeData = insertMassTimeSchema.parse(req.body);
+    const massTime = await storage.createMassTime(massTimeData);
+    res.status(201).json(massTime);
+  } catch (error) {
+    console.error("Error creating mass time:", error);
+    if (error instanceof z16.ZodError) {
+      return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to create mass time" });
+  }
+});
+router38.put("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    const massTimeData = insertMassTimeSchema.partial().parse(req.body);
+    const massTime = await storage.updateMassTime(req.params.id, massTimeData);
+    res.json(massTime);
+  } catch (error) {
+    console.error("Error updating mass time:", error);
+    if (error instanceof z16.ZodError) {
+      return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to update mass time" });
+  }
+});
+router38.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    await storage.deleteMassTime(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting mass time:", error);
+    res.status(500).json({ message: "Failed to delete mass time" });
+  }
+});
+var mass_times_default = router38;
+
+// server/routes/formation.ts
+await init_storage();
+import { Router as Router39 } from "express";
+init_schema();
+import { z as z17 } from "zod";
 
 // server/services/formationService.ts
 await init_db();
@@ -27371,87 +28993,250 @@ async function listLessonProgressEntries(params) {
   }));
 }
 
-// server/routes.ts
-var formationProgressUpdateSchema = z14.object({
-  lessonId: z14.string(),
-  isCompleted: z14.boolean().optional(),
-  timeSpent: z14.number().int().min(0).optional(),
-  progressPercentage: z14.number().min(0).max(100).optional(),
-  completedSections: z14.array(z14.string()).optional(),
-  quizScore: z14.number().optional(),
-  notes: z14.string().optional()
+// server/routes/formation.ts
+var formationProgressUpdateSchema = z17.object({
+  lessonId: z17.string(),
+  isCompleted: z17.boolean().optional(),
+  timeSpent: z17.number().int().min(0).optional(),
+  progressPercentage: z17.number().min(0).max(100).optional(),
+  completedSections: z17.array(z17.string()).optional(),
+  quizScore: z17.number().optional(),
+  notes: z17.string().optional()
 });
-function stripHeavyFields(user) {
-  const { imageData, imageContentType, passwordHash, ...rest } = user;
-  return rest;
-}
-function sanitizeUserData(user, requestingUserRole) {
-  const cleanUser = stripHeavyFields(user);
-  if (requestingUserRole === "coordenador" || requestingUserRole === "gestor") {
-    return cleanUser;
+var router39 = Router39();
+router39.get("/api/formation/overview", authenticateToken, async (req, res) => {
+  try {
+    const overview = await getFormationOverview(req.user?.id);
+    res.json(overview);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar vis\xE3o geral da forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  const {
-    reliabilityScore,
-    substitutionRequestCount,
-    substitutionFulfilledCount,
-    manualRemovalCount,
-    noShowCount,
-    lastReliabilityUpdate,
-    reliabilityNotes,
-    ...sanitizedUser
-  } = cleanUser;
-  return sanitizedUser;
-}
-function handleApiError(error, operation) {
-  if (error instanceof z14.ZodError) {
-    return {
-      status: 400,
-      message: `Dados inv\xE1lidos para ${operation}`,
-      errors: error.errors
+});
+router39.get("/api/formation/tracks", authenticateToken, async (req, res) => {
+  try {
+    const tracks = await storage.getFormationTracks();
+    res.json(tracks);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar trilhas de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.get("/api/formation/tracks/:id", authenticateToken, async (req, res) => {
+  try {
+    const track = await storage.getFormationTrackById(req.params.id);
+    if (!track) {
+      return res.status(404).json({ message: "Trilha de forma\xE7\xE3o n\xE3o encontrada" });
+    }
+    res.json(track);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar trilha de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.get("/api/formation/modules/:trackId", authenticateToken, async (req, res) => {
+  try {
+    const { trackId } = req.params;
+    const trackIdMap = {
+      "liturgy": "liturgy-track-1",
+      "spirituality": "spirituality-track-1",
+      "practical": "practical-track-1",
+      "liturgia": "liturgy-track-1",
+      "espiritualidade": "spirituality-track-1",
+      "pratica": "practical-track-1"
     };
+    const fullTrackId = trackIdMap[trackId] || trackId;
+    const modules = await storage.getFormationModules(fullTrackId);
+    res.json(modules);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar m\xF3dulos de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  const dbError = error;
-  if (dbError.code === "23505") {
-    return {
-      status: 409,
-      message: `J\xE1 existe um registro com estes dados para ${operation}`
-    };
+});
+router39.get("/api/formation/lessons", authenticateToken, async (req, res) => {
+  try {
+    const { trackId, moduleId } = req.query;
+    const lessons = await storage.getFormationLessons(trackId, moduleId);
+    res.json(lessons);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar aulas de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  if (dbError.code === "23503") {
-    return {
-      status: 400,
-      message: `Refer\xEAncia inv\xE1lida encontrada para ${operation}`
-    };
+});
+router39.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
+  try {
+    const { trackId, moduleId } = req.params;
+    const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
+    if (!lessons || lessons.length === 0) {
+      return res.status(404).json({ message: "Aulas n\xE3o encontradas para este m\xF3dulo" });
+    }
+    res.json(lessons);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar aulas do m\xF3dulo");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  if (dbError.message && dbError.message.includes("n\xE3o encontrado")) {
-    return {
-      status: 404,
-      message: dbError.message
-    };
+});
+router39.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
+  try {
+    const lesson = await storage.getFormationLessonById(req.params.id);
+    if (!lesson) {
+      return res.status(404).json({ message: "Aula n\xE3o encontrada" });
+    }
+    res.json(lesson);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar aula");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  if (dbError.message && dbError.message.includes("n\xE3o autorizado")) {
-    return {
-      status: 403,
-      message: dbError.message
-    };
+});
+router39.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
+  try {
+    const { trackId, moduleId, lessonNumber } = req.params;
+    const detail = await getLessonDetail({
+      userId: req.user?.id,
+      trackId,
+      moduleId,
+      lessonNumber: parseInt(lessonNumber, 10)
+    });
+    if (!detail) {
+      return res.status(404).json({ message: "Aula n\xE3o encontrada" });
+    }
+    res.json(detail);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar aula completa");
+    res.status(errorResponse.status).json(errorResponse);
   }
-  logger.error(`Error in ${operation}:`, error);
-  return {
-    status: 500,
-    message: `Erro interno do servidor durante ${operation}`
-  };
-}
+});
+router39.get("/api/formation/lessons/:id/sections", authenticateToken, async (req, res) => {
+  try {
+    const sections = await storage.getFormationLessonSections(req.params.id);
+    res.json(sections);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar se\xE7\xF5es da aula");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.get("/api/formation/progress", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+    }
+    const { trackId } = req.query;
+    const progress = await listLessonProgressEntries({
+      userId,
+      trackId: trackId ? String(trackId) : void 0
+    });
+    res.json(progress);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar progresso de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/progress", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+    }
+    const progressData = formationProgressUpdateSchema.parse(req.body);
+    const progress = await upsertLessonProgressEntry({
+      userId,
+      lessonId: progressData.lessonId,
+      isCompleted: progressData.isCompleted,
+      timeSpent: progressData.timeSpent,
+      progressPercentage: progressData.progressPercentage,
+      completedSections: progressData.completedSections,
+      quizScore: progressData.quizScore,
+      notes: progressData.notes
+    });
+    res.json(progress);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "atualizar progresso de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+    }
+    const { lessonId, sectionId } = req.params;
+    const progress = await markLessonSectionCompleted({
+      userId,
+      lessonId,
+      sectionId
+    });
+    res.json(progress);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "marcar se\xE7\xE3o como completa");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/lessons/:lessonId/complete", authenticateToken, csrfProtection, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+    }
+    const { lessonId } = req.params;
+    const progress = await markLessonCompleted({
+      userId,
+      lessonId
+    });
+    res.json(progress);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "marcar aula como completa");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const trackData = insertFormationTrackSchema.parse(req.body);
+    const track = await storage.createFormationTrack(trackData);
+    res.status(201).json(track);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "criar trilha de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const lessonData = insertFormationLessonSchema.parse(req.body);
+    const lesson = await storage.createFormationLesson(lessonData);
+    res.status(201).json(lesson);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "criar aula");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router39.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+  try {
+    const sectionData = insertFormationLessonSectionSchema.parse({
+      ...req.body,
+      lessonId: req.params.id
+    });
+    const section = await storage.createFormationLessonSection(sectionData);
+    res.status(201).json(section);
+  } catch (error) {
+    const errorResponse = handleApiError(error, "criar se\xE7\xE3o da aula");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+var formation_default = router39;
+
+// server/routes.ts
+init_schema();
+init_logger();
+await init_db();
+import { z as z18 } from "zod";
+import { eq as eq51 } from "drizzle-orm";
 async function registerRoutes(app2) {
   app2.use(cookieParser());
   app2.use(noCacheHeaders);
   app2.use(csrfTokenGenerator);
   app2.get("/api/csrf-token", getCsrfToken);
-  app2.get("/api/health", (req, res) => {
-    res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
-  });
-  app2.head("/api/health", (req, res) => {
-    res.status(200).end();
-  });
+  app2.use(health_default);
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
   app2.use("/api/password-reset", passwordResetRateLimiter, router3);
   app2.use("/api/whatsapp", whatsapp_api_default);
@@ -27460,6 +29245,7 @@ async function registerRoutes(app2) {
   app2.use("/api/questionnaires/admin", csrfProtection, questionnaireAdmin_default);
   app2.use("/api/schedules", csrfProtection, schedules_default);
   app2.use("/api/schedules", csrfProtection, scheduleGeneration_default);
+  app2.use("/api/schedules", csrfProtection, scheduleImportExport_default);
   app2.use("/api/schedules", csrfProtection, smartScheduleGeneration_default);
   app2.use("/api/auxiliary", csrfProtection, auxiliaryPanel_default);
   app2.use("/api/upload", csrfProtection, upload_default);
@@ -27487,6 +29273,9 @@ async function registerRoutes(app2) {
   app2.use("/api/special-events", csrfProtection, authenticateToken, requireRole(["coordenador", "gestor"]), specialEvents_default);
   app2.use("/api/question-mappings", csrfProtection, authenticateToken, requireRole(["coordenador", "gestor"]), questionMappings_default);
   app2.use("/api/learning", csrfProtection, authenticateToken, requireRole(["coordenador", "gestor"]), learningPatterns_default);
+  app2.use(users_default);
+  app2.use(mass_times_default);
+  app2.use(formation_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -27623,34 +29412,6 @@ async function registerRoutes(app2) {
       res.status(errorResponse.status).json(errorResponse);
     }
   });
-  app2.get("/api/users/active", authenticateToken, async (req, res) => {
-    try {
-      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
-      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-      const result = await storage.getUsersByStatusPaginated("active", { limit, offset });
-      res.json({
-        ...result,
-        data: result.data.map(stripHeavyFields)
-      });
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar usu\xE1rios ativos");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
-    try {
-      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
-      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-      const result = await storage.getUsersByStatusPaginated("pending", { limit, offset });
-      res.json({
-        ...result,
-        data: result.data.map(stripHeavyFields)
-      });
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar usu\xE1rios pendentes");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
   app2.get("/api/dashboard/stats", authenticateToken, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
@@ -27658,406 +29419,6 @@ async function registerRoutes(app2) {
     } catch (error) {
       const errorResponse = handleApiError(error, "buscar estat\xEDsticas do dashboard");
       res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/users", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
-    try {
-      res.set({
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Surrogate-Control": "no-store"
-      });
-      const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
-      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-      const status = req.query.status;
-      const result = await storage.getUsersPaginated({ limit, offset, status });
-      res.json({
-        ...result,
-        data: result.data.map(stripHeavyFields)
-      });
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar lista de usu\xE1rios");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
-    try {
-      const user = await storage.getUser(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      res.json(stripHeavyFields(user));
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/users/:id/photo", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.params.id;
-      const [user] = await db.select({
-        imageData: users.imageData,
-        imageContentType: users.imageContentType
-      }).from(users).where(eq47(users.id, userId));
-      if (!user || !user.imageData) {
-        return res.status(404).json({ error: "Photo not found" });
-      }
-      const imageBuffer = Buffer.from(user.imageData, "base64");
-      const imageHash = crypto2.createHash("md5").update(user.imageData).digest("hex");
-      res.set({
-        "Content-Type": user.imageContentType || "image/jpeg",
-        "Content-Length": imageBuffer.length.toString(),
-        "Cache-Control": "public, max-age=3600",
-        // Cache por 1 hora apenas
-        "ETag": `"${userId}-${imageHash}"`,
-        // ETag baseado no hash completo da imagem
-        "Last-Modified": (/* @__PURE__ */ new Date()).toUTCString()
-        // Adicionar data de modificação
-      });
-      res.send(imageBuffer);
-    } catch (error) {
-      console.error("Error serving profile photo:", error);
-      res.status(500).json({ error: "Failed to load photo" });
-    }
-  });
-  app2.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProtection, async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      const safeUserData = {
-        ...userData,
-        role: userData.role || "ministro",
-        // padrão ministro
-        status: "pending"
-        // sempre pending para aprovação
-      };
-      const user = await storage.createUser(safeUserData);
-      res.status(201).json(user);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "criar usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const userData = insertUserSchema.partial().parse(req.body);
-      const { role, status, ...safeUserData } = userData;
-      const user = await storage.updateUser(req.params.id, safeUserData);
-      res.json(stripHeavyFields(user));
-    } catch (error) {
-      const errorResponse = handleApiError(error, "atualizar usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const statusUpdateSchema = z14.object({
-        status: z14.enum(["active", "inactive", "pending"], {
-          errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
-        })
-      });
-      const { status } = statusUpdateSchema.parse(req.body);
-      if (req.user?.id === req.params.id) {
-        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel alterar seu pr\xF3prio status" });
-      }
-      if (status !== "active") {
-        const targetUser = await storage.getUser(req.params.id);
-        if (targetUser?.role === "gestor") {
-          const allUsers = await storage.getAllUsers();
-          const activeGestoresCount = allUsers.filter((u) => u.role === "gestor" && u.status === "active").length;
-          if (activeGestoresCount <= 1) {
-            return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel inativar o \xFAltimo gestor ativo do sistema" });
-          }
-        }
-      }
-      const user = await storage.updateUser(req.params.id, { status });
-      if (!user) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      res.json(user);
-    } catch (error) {
-      if (error instanceof z14.ZodError) {
-        return res.status(400).json({
-          message: "Dados inv\xE1lidos",
-          errors: error.errors
-        });
-      }
-      const errorResponse = handleApiError(error, "atualizar status do usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const roleUpdateSchema = z14.object({
-        role: z14.enum(["gestor", "coordenador", "ministro"], {
-          errorMap: () => ({ message: "Papel deve ser: gestor, coordenador ou ministro" })
-        })
-      });
-      const { role } = roleUpdateSchema.parse(req.body);
-      if (req.user?.id === req.params.id) {
-        if (req.user?.role === "coordenador") {
-          if (role === "coordenador") {
-            return res.status(400).json({ message: "Voc\xEA j\xE1 \xE9 um coordenador" });
-          }
-        } else {
-          return res.status(400).json({ message: "Gestores n\xE3o podem alterar seu pr\xF3prio papel" });
-        }
-      }
-      const targetUser = await storage.getUser(req.params.id);
-      if (role !== "gestor" && targetUser?.role === "gestor") {
-        const allUsers = await storage.getAllUsers();
-        const activeGestoresCount = allUsers.filter(
-          (u) => u.role === "gestor" && u.status === "active" && u.id !== req.params.id
-          // Excluir o usuário que será modificado da contagem
-        ).length;
-        if (activeGestoresCount < 1) {
-          return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel remover o \xFAltimo gestor ativo do sistema" });
-        }
-      }
-      const user = await storage.updateUser(req.params.id, { role });
-      if (!user) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      res.json(user);
-    } catch (error) {
-      if (error instanceof z14.ZodError) {
-        return res.status(400).json({
-          message: "Dados inv\xE1lidos",
-          errors: error.errors
-        });
-      }
-      const errorResponse = handleApiError(error, "atualizar papel do usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      if (req.user?.id === req.params.id) {
-        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear sua pr\xF3pria conta" });
-      }
-      const targetUser = await storage.getUser(req.params.id);
-      if (targetUser?.role === "gestor") {
-        const allUsers = await storage.getAllUsers();
-        const activeGestoresCount = allUsers.filter((u) => u.role === "gestor" && u.status === "active").length;
-        if (activeGestoresCount <= 1) {
-          return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear o \xFAltimo gestor ativo do sistema" });
-        }
-      }
-      const user = await storage.updateUser(req.params.id, { status: "inactive" });
-      if (!user) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      res.json(user);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "bloquear usu\xE1rio");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/users/:id/check-usage", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
-    try {
-      const userId = req.params.id;
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      const activityCheck = await storage.checkUserMinisterialActivity(userId);
-      res.json({
-        isUsed: activityCheck.isUsed,
-        reason: activityCheck.reason
-      });
-    } catch (error) {
-      console.error("Error checking user usage:", error);
-      res.status(500).json({ message: "Erro ao verificar uso do usu\xE1rio" });
-    }
-  });
-  app2.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"]), async (req, res) => {
-    try {
-      const userId = req.params.userId;
-      const diagnostics = {
-        userExists: false,
-        canQueryUser: false,
-        canQueryQuestionnaireResponses: false,
-        canQueryScheduleAssignments: false,
-        canQuerySubstitutionRequests: false,
-        ministerialActivityCheck: null,
-        userError: null,
-        questionnaireError: null,
-        scheduleError: null,
-        substitutionError: null,
-        storageError: null,
-        questionnaireCount: 0,
-        scheduleMinisterCount: 0,
-        scheduleSubstituteCount: 0,
-        substitutionRequestCount: 0
-      };
-      try {
-        const user = await storage.getUser(userId);
-        diagnostics.userExists = !!user;
-        diagnostics.canQueryUser = true;
-      } catch (e) {
-        diagnostics.userError = `Error querying user: ${e}`;
-      }
-      try {
-        const [questionnaireCheck] = await db.select({ count: count12() }).from(questionnaireResponses).where(eq47(questionnaireResponses.userId, userId));
-        diagnostics.canQueryQuestionnaireResponses = true;
-        diagnostics.questionnaireCount = questionnaireCheck?.count || 0;
-      } catch (e) {
-        diagnostics.questionnaireError = `Error querying questionnaire responses: ${e}`;
-      }
-      try {
-        const [scheduleMinisterCheck] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.ministerId, userId));
-        diagnostics.canQueryScheduleAssignments = true;
-        diagnostics.scheduleMinisterCount = scheduleMinisterCheck?.count || 0;
-        const [scheduleSubstituteCheck] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.substituteId, userId));
-        diagnostics.scheduleSubstituteCount = scheduleSubstituteCheck?.count || 0;
-      } catch (e) {
-        diagnostics.scheduleError = `Error querying schedule assignments: ${e}`;
-      }
-      try {
-        const [substitutionCheck] = await db.select({ count: count12() }).from(substitutionRequests).where(or13(
-          eq47(substitutionRequests.requesterId, userId),
-          eq47(substitutionRequests.substituteId, userId)
-        ));
-        diagnostics.canQuerySubstitutionRequests = true;
-        diagnostics.substitutionRequestCount = substitutionCheck?.count || 0;
-      } catch (e) {
-        diagnostics.substitutionError = `Error querying substitution requests: ${e}`;
-      }
-      try {
-        const result = await storage.checkUserMinisterialActivity(userId);
-        diagnostics.ministerialActivityCheck = result.isUsed;
-      } catch (e) {
-        diagnostics.storageError = `Error in checkUserMinisterialActivity: ${e}`;
-      }
-      res.json(diagnostics);
-    } catch (error) {
-      res.status(500).json({ error: `Diagnostic failed: ${error}` });
-    }
-  });
-  app2.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const userId = req.params.id;
-      const currentUser = req.user;
-      if (currentUser?.id === userId) {
-        return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel excluir sua pr\xF3pria conta" });
-      }
-      const targetUser = await storage.getUser(userId);
-      if (!targetUser) {
-        return res.status(404).json({ message: "Usu\xE1rio n\xE3o encontrado" });
-      }
-      let hasMinisterialActivity = false;
-      let activityCheckReason = "";
-      try {
-        const activityCheck = await storage.checkUserMinisterialActivity(userId);
-        hasMinisterialActivity = activityCheck.isUsed;
-        activityCheckReason = activityCheck.reason;
-        if (!hasMinisterialActivity) {
-          console.log("Storage returned no activity, performing double-check via direct DB queries...");
-          const [questionnaireCount] = await db.select({ count: count12() }).from(questionnaireResponses).where(eq47(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count12() }).from(substitutionRequests).where(or13(
-            eq47(substitutionRequests.requesterId, userId),
-            eq47(substitutionRequests.substituteId, userId)
-          ));
-          const directQuestionnaireActivity = (questionnaireCount?.count || 0) > 0;
-          const directScheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
-          const directScheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
-          const directSubstitutionActivity = (substitutionCount?.count || 0) > 0;
-          const directHasActivity = directQuestionnaireActivity || directScheduleMinisterActivity || directScheduleSubstituteActivity || directSubstitutionActivity;
-          if (directHasActivity) {
-            console.warn("DISCREPANCY DETECTED: Storage said no activity but direct query found activity", {
-              storageResult: activityCheck,
-              directChecks: {
-                questionnaires: directQuestionnaireActivity,
-                scheduleMinister: directScheduleMinisterActivity,
-                scheduleSubstitute: directScheduleSubstituteActivity,
-                substitutions: directSubstitutionActivity
-              }
-            });
-            hasMinisterialActivity = true;
-            const activities = [];
-            if (directQuestionnaireActivity) activities.push("question\xE1rios respondidos");
-            if (directScheduleMinisterActivity) activities.push("escalas como ministro");
-            if (directScheduleSubstituteActivity) activities.push("escalas como substituto");
-            if (directSubstitutionActivity) activities.push("solicita\xE7\xF5es de substitui\xE7\xE3o");
-            activityCheckReason = `ATEN\xC7\xC3O: Discrep\xE2ncia detectada entre m\xE9todos. Verifica\xE7\xE3o direta encontrou: ${activities.join(", ")}`;
-          }
-        }
-      } catch (storageError) {
-        console.error("Storage method failed, trying direct DB queries:", storageError);
-        try {
-          const [questionnaireCount] = await db.select({ count: count12() }).from(questionnaireResponses).where(eq47(questionnaireResponses.userId, userId));
-          const [scheduleMinisterCount] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.ministerId, userId));
-          const [scheduleSubstituteCount] = await db.select({ count: count12() }).from(schedules).where(eq47(schedules.substituteId, userId));
-          const [substitutionCount] = await db.select({ count: count12() }).from(substitutionRequests).where(or13(
-            eq47(substitutionRequests.requesterId, userId),
-            eq47(substitutionRequests.substituteId, userId)
-          ));
-          const questionnaireActivity = (questionnaireCount?.count || 0) > 0;
-          const scheduleMinisterActivity = (scheduleMinisterCount?.count || 0) > 0;
-          const scheduleSubstituteActivity = (scheduleSubstituteCount?.count || 0) > 0;
-          const substitutionActivity = (substitutionCount?.count || 0) > 0;
-          hasMinisterialActivity = questionnaireActivity || scheduleMinisterActivity || scheduleSubstituteActivity || substitutionActivity;
-          if (hasMinisterialActivity) {
-            const activities = [];
-            if (questionnaireActivity) activities.push("question\xE1rios respondidos");
-            if (scheduleMinisterActivity) activities.push("escalas como ministro");
-            if (scheduleSubstituteActivity) activities.push("escalas como substituto");
-            if (substitutionActivity) activities.push("solicita\xE7\xF5es de substitui\xE7\xE3o");
-            activityCheckReason = `Usu\xE1rio tem atividade no sistema: ${activities.join(", ")}`;
-          } else {
-            activityCheckReason = "Nenhuma atividade ministerial encontrada - usu\xE1rio pode ser exclu\xEDdo";
-          }
-        } catch (directError) {
-          console.error("Direct DB query also failed:", directError);
-          return res.status(500).json({
-            message: "Erro interno ao verificar atividades do usu\xE1rio. Por seguran\xE7a, a exclus\xE3o foi bloqueada.",
-            shouldBlock: true,
-            code: "DATABASE_CONNECTIVITY_ERROR"
-          });
-        }
-      }
-      if (hasMinisterialActivity) {
-        return res.status(409).json({
-          message: activityCheckReason.includes("N\xE3o foi poss\xEDvel verificar") ? "Erro ao verificar uso do usu\xE1rio no banco de dados. N\xE3o \xE9 poss\xEDvel determinar se o usu\xE1rio pode ser exclu\xEDdo com seguran\xE7a." : activityCheckReason || "Usu\xE1rio n\xE3o pode ser exclu\xEDdo pois j\xE1 foi utilizado no sistema",
-          shouldBlock: true,
-          code: activityCheckReason.includes("N\xE3o foi poss\xEDvel verificar") ? "USAGE_CHECK_FAILED" : "USER_HAS_ACTIVITY"
-        });
-      }
-      if (currentUser?.role === "coordenador" && targetUser.role === "gestor") {
-        return res.status(403).json({
-          message: "Coordenadores n\xE3o podem excluir gestores",
-          shouldBlock: true
-        });
-      }
-      if (targetUser.role === "gestor") {
-        const allUsers = await storage.getAllUsers();
-        const activeGestores = allUsers.filter((u) => u.role === "gestor" && u.status === "active");
-        if (activeGestores.length <= 1) {
-          return res.status(409).json({
-            message: "N\xE3o \xE9 poss\xEDvel excluir o \xFAltimo gestor ativo do sistema",
-            shouldBlock: true
-          });
-        }
-      }
-      await storage.deleteUser(userId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      let errorMessage = "Failed to delete user";
-      if (error instanceof Error) {
-        console.error("Error details:", {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-        errorMessage = `Failed to delete user: ${error.message}`;
-      }
-      res.status(500).json({
-        message: errorMessage,
-        debug: process.env.NODE_ENV === "development" ? error : void 0
-      });
     }
   });
   app2.get("/api/questionnaires", authenticateToken, async (req, res) => {
@@ -28079,7 +29440,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z14.ZodError) {
+      if (error instanceof z18.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -28153,269 +29514,6 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch schedule assignments" });
     }
   });
-  app2.get("/api/mass-times", authenticateToken, async (req, res) => {
-    try {
-      const massTimes = await storage.getMassTimes();
-      res.json(massTimes);
-    } catch (error) {
-      console.error("Error fetching mass times:", error);
-      res.status(500).json({ message: "Failed to fetch mass times" });
-    }
-  });
-  app2.post("/api/mass-times", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      const massTimeData = insertMassTimeSchema.parse(req.body);
-      const massTime = await storage.createMassTime(massTimeData);
-      res.status(201).json(massTime);
-    } catch (error) {
-      console.error("Error creating mass time:", error);
-      if (error instanceof z14.ZodError) {
-        return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create mass time" });
-    }
-  });
-  app2.put("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      const massTimeData = insertMassTimeSchema.partial().parse(req.body);
-      const massTime = await storage.updateMassTime(req.params.id, massTimeData);
-      res.json(massTime);
-    } catch (error) {
-      console.error("Error updating mass time:", error);
-      if (error instanceof z14.ZodError) {
-        return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update mass time" });
-    }
-  });
-  app2.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      await storage.deleteMassTime(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting mass time:", error);
-      res.status(500).json({ message: "Failed to delete mass time" });
-    }
-  });
-  app2.get("/api/formation/overview", authenticateToken, async (req, res) => {
-    try {
-      const overview = await getFormationOverview(req.user?.id);
-      res.json(overview);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar vis\xE3o geral da forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/tracks", authenticateToken, async (req, res) => {
-    try {
-      const tracks = await storage.getFormationTracks();
-      res.json(tracks);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar trilhas de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/tracks/:id", authenticateToken, async (req, res) => {
-    try {
-      const track = await storage.getFormationTrackById(req.params.id);
-      if (!track) {
-        return res.status(404).json({ message: "Trilha de forma\xE7\xE3o n\xE3o encontrada" });
-      }
-      res.json(track);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar trilha de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/modules/:trackId", authenticateToken, async (req, res) => {
-    try {
-      const { trackId } = req.params;
-      const trackIdMap = {
-        "liturgy": "liturgy-track-1",
-        "spirituality": "spirituality-track-1",
-        "practical": "practical-track-1",
-        "liturgia": "liturgy-track-1",
-        "espiritualidade": "spirituality-track-1",
-        "pratica": "practical-track-1"
-      };
-      const fullTrackId = trackIdMap[trackId] || trackId;
-      const modules = await storage.getFormationModules(fullTrackId);
-      res.json(modules);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar m\xF3dulos de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/lessons", authenticateToken, async (req, res) => {
-    try {
-      const { trackId, moduleId } = req.query;
-      const lessons = await storage.getFormationLessons(trackId, moduleId);
-      res.json(lessons);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aulas de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
-    try {
-      const { trackId, moduleId } = req.params;
-      const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
-      if (!lessons || lessons.length === 0) {
-        return res.status(404).json({ message: "Aulas n\xE3o encontradas para este m\xF3dulo" });
-      }
-      res.json(lessons);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aulas do m\xF3dulo");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
-    try {
-      const lesson = await storage.getFormationLessonById(req.params.id);
-      if (!lesson) {
-        return res.status(404).json({ message: "Aula n\xE3o encontrada" });
-      }
-      res.json(lesson);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
-    try {
-      const { trackId, moduleId, lessonNumber } = req.params;
-      const detail = await getLessonDetail({
-        userId: req.user?.id,
-        trackId,
-        moduleId,
-        lessonNumber: parseInt(lessonNumber, 10)
-      });
-      if (!detail) {
-        return res.status(404).json({ message: "Aula n\xE3o encontrada" });
-      }
-      res.json(detail);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar aula completa");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/lessons/:id/sections", authenticateToken, async (req, res) => {
-    try {
-      const sections = await storage.getFormationLessonSections(req.params.id);
-      res.json(sections);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar se\xE7\xF5es da aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.get("/api/formation/progress", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
-      }
-      const { trackId } = req.query;
-      const progress = await listLessonProgressEntries({
-        userId,
-        trackId: trackId ? String(trackId) : void 0
-      });
-      res.json(progress);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "buscar progresso de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/progress", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
-      }
-      const progressData = formationProgressUpdateSchema.parse(req.body);
-      const progress = await upsertLessonProgressEntry({
-        userId,
-        lessonId: progressData.lessonId,
-        isCompleted: progressData.isCompleted,
-        timeSpent: progressData.timeSpent,
-        progressPercentage: progressData.progressPercentage,
-        completedSections: progressData.completedSections,
-        quizScore: progressData.quizScore,
-        notes: progressData.notes
-      });
-      res.json(progress);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "atualizar progresso de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
-      }
-      const { lessonId, sectionId } = req.params;
-      const progress = await markLessonSectionCompleted({
-        userId,
-        lessonId,
-        sectionId
-      });
-      res.json(progress);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "marcar se\xE7\xE3o como completa");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/lessons/:lessonId/complete", authenticateToken, csrfProtection, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
-      }
-      const { lessonId } = req.params;
-      const progress = await markLessonCompleted({
-        userId,
-        lessonId
-      });
-      res.json(progress);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "marcar aula como completa");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const trackData = insertFormationTrackSchema.parse(req.body);
-      const track = await storage.createFormationTrack(trackData);
-      res.status(201).json(track);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "criar trilha de forma\xE7\xE3o");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const lessonData = insertFormationLessonSchema.parse(req.body);
-      const lesson = await storage.createFormationLesson(lessonData);
-      res.status(201).json(lesson);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "criar aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
-  app2.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
-    try {
-      const sectionData = insertFormationLessonSectionSchema.parse({
-        ...req.body,
-        lessonId: req.params.id
-      });
-      const section = await storage.createFormationLessonSection(sectionData);
-      res.status(201).json(section);
-    } catch (error) {
-      const errorResponse = handleApiError(error, "criar se\xE7\xE3o da aula");
-      res.status(errorResponse.status).json(errorResponse);
-    }
-  });
   if (process.env.NODE_ENV === "development") {
     app2.post("/api/dev/switch-role", authenticateToken, async (req, res) => {
       try {
@@ -28424,7 +29522,7 @@ async function registerRoutes(app2) {
         if (!userId) {
           return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
         }
-        if (!["ministro", "coordenador", "gestor"].includes(role)) {
+        if (!["ministro", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "gestor", "reitor"].includes(role)) {
           return res.status(400).json({ message: "Role inv\xE1lido" });
         }
         await storage.updateUser(userId, { role });
@@ -28440,7 +29538,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull4, and: and37 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull4, and: and39 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -28448,8 +29546,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and37(
-          eq47(substitutionRequests.status, "pending"),
+        and39(
+          eq51(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );
@@ -28461,8 +29559,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and37(
-          eq47(substitutionRequests.status, "pending"),
+        and39(
+          eq51(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );
@@ -28776,6 +29874,7 @@ function errorHandler(err, req, res, _next) {
 
 // server/index.ts
 import path3 from "path";
+process.env.TZ = "America/Sao_Paulo";
 process.on("uncaughtException", (error) => {
   console.error("\u{1F6A8} Uncaught Exception:", error);
 });

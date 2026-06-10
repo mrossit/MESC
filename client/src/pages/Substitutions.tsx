@@ -1,4 +1,5 @@
 import { Layout } from "@/components/layout";
+import { isAdmin as isAdminRole } from "@shared/roles";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -159,7 +160,7 @@ export default function Substitutions() {
   const user = authData?.user;
   const queryClient = useQueryClient();
   
-  const isCoordinator = user?.role === "coordenador" || user?.role === "gestor";
+  const isCoordinator = isAdminRole(user?.role);
   
   // Set default tab based on user role
   const [activeTab, setActiveTab] = useState(isCoordinator ? "pendencies" : "substitutions");

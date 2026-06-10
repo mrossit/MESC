@@ -10,6 +10,7 @@ import { massConfigurations, insertMassConfigurationSchema } from '@shared/schem
 import type { MassConfiguration, InsertMassConfiguration } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import type { AuthRequest } from '../auth';
 
 const router = Router();
 
@@ -74,7 +75,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Convert readonly arrays to mutable arrays for Drizzle compatibility
     const insertData = {
       ...validatedData,
-      excludedDates: validatedData.excludedDates ? [...validatedData.excludedDates] : null
+      excludedDates: validatedData.excludedDates ? [...validatedData.excludedDates] : null,
+      communityId: (req as AuthRequest).user!.homeCommunityId // comunidade do coordenador
     };
 
     const [newConfig] = await db.insert(massConfigurations)

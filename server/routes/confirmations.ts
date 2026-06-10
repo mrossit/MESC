@@ -7,6 +7,7 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { isAdmin as isAdminRole, ADMIN_ROLES } from "@shared/roles";
 import { db } from "../db";
 import { scheduleConfirmations, schedules, users, notifications } from "@shared/schema";
 import { eq, and, desc, gte, lte, inArray, sql } from "drizzle-orm";
@@ -438,7 +439,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     }
 
     // Check permission: only the minister or coordinators can respond
-    if (confirmation.ministerId !== userId && !['gestor', 'coordenador'].includes(req.user?.role || '')) {
+    if (confirmation.ministerId !== userId && !isAdminRole(req.user?.role)) {
       return res.status(403).json({ message: "Sem permissão para responder esta confirmação" });
     }
 
@@ -466,7 +467,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       const coordinators = await db
         .select()
         .from(users)
-        .where(inArray(users.role, ['gestor', 'coordenador']));
+        .where(inArray(users.role, [...ADMIN_ROLES]));
 
       type CoordinatorRecord = typeof coordinators[number];
       const coordIds = coordinators.map((c: CoordinatorRecord) => c.id);

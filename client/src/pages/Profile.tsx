@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isCoordinator as isCoordinatorRole } from '@shared/roles';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -590,7 +591,7 @@ export default function Profile() {
                       </p>
                     )}
                     <div className="flex justify-center sm:justify-start">
-                      <Badge className="mt-2">{profile?.role === 'coordenador' ? 'Coordenador' : profile?.role}</Badge>
+                      <Badge className="mt-2">{isCoordinatorRole(profile?.role) ? 'Coordenador' : profile?.role}</Badge>
                     </div>
                   </div>
                 </div>

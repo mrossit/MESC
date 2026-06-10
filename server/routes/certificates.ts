@@ -6,6 +6,7 @@
 
 import { Router, Response } from 'express';
 import { authenticateToken, AuthRequest } from '../auth';
+import { isAdmin as isAdminRole } from '@shared/roles';
 import {
   getTrackCompletionStatus,
   issueCertificate,
@@ -103,7 +104,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
 
     // Only allow user to view their own certificates (unless coordinator)
     const userRole = req.user?.role;
-    if (certificate.userId !== userId && userRole !== 'coordenador' && userRole !== 'gestor') {
+    if (certificate.userId !== userId && !isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
@@ -132,7 +133,7 @@ router.get('/:id/pdf', authenticateToken, async (req: AuthRequest, res: Response
 
     // Only allow user to download their own certificates (unless coordinator)
     const userRole = req.user?.role;
-    if (certificate.userId !== userId && userRole !== 'coordenador' && userRole !== 'gestor') {
+    if (certificate.userId !== userId && !isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
@@ -205,7 +206,7 @@ router.post('/issue-for-user', authenticateToken, async (req: AuthRequest, res: 
     const issuerId = req.user?.id;
     const userRole = req.user?.role;
 
-    if (userRole !== 'coordenador' && userRole !== 'gestor') {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: 'Apenas coordenadores podem emitir certificados para outros usuarios' });
     }
 

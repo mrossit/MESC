@@ -327,7 +327,7 @@ router.post("/publish", requireAuth, requireRole(['coordenador', 'gestor']), asy
     }
 
     // Save all assignments to database
-    const savedCount = await saveScheduleToDatabase(scheduleData, month, year);
+    const savedCount = await saveScheduleToDatabase(scheduleData, month, year, req.user!.homeCommunityId);
 
     // Send notifications to ministers
     const notificationResults = await sendMinisterNotifications(scheduleData, month, year);
@@ -738,7 +738,8 @@ async function validateScheduleBeforePublish(
 async function saveScheduleToDatabase(
   scheduleData: ScheduleDataItem[],
   month: number,
-  year: number
+  year: number,
+  communityId: string
 ): Promise<number> {
   let savedCount = 0;
 
@@ -776,7 +777,8 @@ async function saveScheduleToDatabase(
           type: type as 'missa_dominical' | 'missa_diaria' | 'missa' | 'adoracao' | 'novena' | 'festa' | 'outro',
           ministerId,
           position,
-          status: 'scheduled'
+          status: 'scheduled',
+          communityId
         });
         savedCount++;
       }

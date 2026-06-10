@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { login, register, changePassword, resetPassword, authenticateToken, requireRole, AuthRequest, hashPassword } from './auth';
 import { isAdminUser } from './config/admins';
+import { isAdmin as isAdminRole, isCoordinator as isCoordinatorRole } from '@shared/roles';
 import { z } from 'zod';
 import { db } from './db';
 import { users } from '@shared/schema';
@@ -30,7 +31,7 @@ const registerSchema = z.object({
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   phone: z.string().optional(),
-  role: z.enum(['gestor', 'coordenador', 'ministro']).optional()
+  role: z.enum(['gestor', 'reitor', 'coordenador', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro']).optional()
 });
 
 // Schema de validação para registro público
@@ -164,7 +165,7 @@ router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coorde
     const userData = registerSchema.parse(req.body);
 
     // Apenas gestor pode criar outros coordenadores ou gestor
-    if ((userData.role === 'gestor' || userData.role === 'coordenador') && req.user?.role !== 'gestor') {
+    if (isAdminRole(userData.role) && req.user?.role !== 'gestor') {
       return res.status(403).json({
         success: false,
         message: 'Apenas gestores podem criar coordenadores ou outros gestores'
@@ -172,7 +173,7 @@ router.post('/admin-register', authenticateToken, requireRole(['gestor', 'coorde
     }
 
     // Coordenadores só podem criar ministros
-    if (req.user?.role === 'coordenador' && userData.role !== 'ministro') {
+    if (isCoordinatorRole(req.user?.role) && userData.role !== 'ministro') {
       return res.status(403).json({
         success: false,
         message: 'Coordenadores só podem criar ministros'
@@ -252,7 +253,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
       firstName: users.firstName,
       lastName: users.lastName,
       phone: users.phone,
-      photoUrl: users.photoUrl
+      photoUrl: users.photoUrl,
+      homeCommunityId: users.homeCommunityId
     })
     .from(users)
     .where(eq(users.id, userId))
@@ -429,7 +431,7 @@ router.post('/admin-reset-password', authenticateToken, requireRole(['gestor', '
 
     // Verificar se coordenador não está tentando resetar senha de gestor
     const currentUser = req.user;
-    if (currentUser?.role === 'coordenador' && user.role === 'gestor') {
+    if (isCoordinatorRole(currentUser?.role) && user.role === 'gestor') {
       return res.status(403).json({
         success: false,
         message: 'Coordenadores não podem resetar senha de gestores'

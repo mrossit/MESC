@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { logger } from "./logger";
 import type { User } from "@shared/schema";
+import { isAdmin as isAdminRole } from "@shared/roles";
 
 // Type for user data with optional reliability fields (allows null from database)
 export interface UserWithReliability extends Partial<User> {
@@ -41,7 +42,7 @@ export function sanitizeUserData(user: UserWithReliability, requestingUserRole?:
   const cleanUser = stripHeavyFields(user);
 
   // Coordinators and managers can see all data (minus heavy fields)
-  if (requestingUserRole === 'coordenador' || requestingUserRole === 'gestor') {
+  if (isAdminRole(requestingUserRole)) {
     return cleanUser;
   }
 

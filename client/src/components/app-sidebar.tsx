@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
+import { isAdmin as isAdminRole, isCoordinator as isCoordinatorRole, expandRoles } from "@shared/roles";
 import {
   Church,
   BarChart3,
@@ -119,7 +120,7 @@ export function AppSidebar() {
       if (!response.ok) return { data: [], total: 0, hasMore: false };
       return response.json();
     },
-    enabled: !!user && (user.role === "coordenador" || user.role === "gestor"),
+    enabled: !!user && isAdminRole(user.role),
   });
 
   const pendingUsersCount = pendingUsersData?.total ?? pendingUsersData?.data?.length ?? 0;
@@ -214,7 +215,7 @@ export function AppSidebar() {
   ];
 
   const filteredMenuItems = menuItems.filter(item => 
-    user && item.roles.includes(user.role)
+    user && expandRoles(item.roles).includes(user.role)
   );
 
   return (
@@ -292,7 +293,7 @@ export function AppSidebar() {
                       </Avatar>
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium leading-none">{user.name}</span>
-                        <span className="text-xs capitalize text-muted-foreground">{user.role === 'coordenador' ? 'Coordenador Sistema' : user.role}</span>
+                        <span className="text-xs capitalize text-muted-foreground">{isCoordinatorRole(user.role) ? 'Coordenador Sistema' : user.role}</span>
                       </div>
                     </Link>
                   </SidebarMenuButton>
@@ -330,7 +331,7 @@ export function AppSidebar() {
                         <CollapsibleContent>
                           <SidebarMenuSub>
                             {item.items
-                              .filter(subItem => user && subItem.roles.includes(user.role))
+                              .filter(subItem => user && expandRoles(subItem.roles).includes(user.role))
                               .map((subItem) => (
                                 <SidebarMenuSubItem key={subItem.href}>
                                   <SidebarMenuSubButton

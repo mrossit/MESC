@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isAdmin as isAdminRole } from '@shared/roles';
 import { Layout } from '../components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -129,7 +130,7 @@ export default function QuestionnaireUnified() {
   });
   
   const user = authData?.user;
-  const isAdmin = user?.role === 'gestor' || user?.role === 'coordenador';
+  const isAdmin = isAdminRole(user?.role);
   
   const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',

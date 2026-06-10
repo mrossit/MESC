@@ -1,6 +1,7 @@
 import { db } from './db';
 import { users } from '@shared/schema';
 import { hashPassword } from './auth';
+import { getMatrizCommunityId } from './utils/communityContext';
 
 async function seedAdmin() {
   try {
@@ -37,6 +38,7 @@ async function seedAdmin() {
         role: adminData.role,
         status: 'active',
         requiresPasswordChange: false, // Não força troca de senha
+        homeCommunityId: await getMatrizCommunityId(),
         createdAt: new Date(),
         updatedAt: new Date()
       })

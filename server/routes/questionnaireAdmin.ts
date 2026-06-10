@@ -2,9 +2,10 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { questionnaires, questionnaireResponses, users, notifications, schedules } from '@shared/schema';
-import { eq, and, or, ne, gte, lte } from 'drizzle-orm';
+import { eq, and, or, ne, gte, lte, inArray } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, requireRole, AuthRequest } from '../auth';
+import { COORDINATOR_ROLES } from '@shared/roles';
 import { storage } from '../storage';
 import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
 import { logger } from '../utils/logger';
@@ -104,6 +105,7 @@ router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), asyn
       questions,
       status: 'active',
       createdById: userId,
+      communityId: req.user!.homeCommunityId,
       targetUserIds: [],
       notifiedUserIds: []
     }).returning();
@@ -205,6 +207,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
       questions: questionsWithEditFlag,  // JSONB não precisa stringify
       status: 'draft',
       createdById: userId,
+      communityId: req.user!.homeCommunityId,
       targetUserIds: [],  // JSONB não precisa stringify
       notifiedUserIds: []  // JSONB não precisa stringify
     }).returning();
@@ -1065,10 +1068,7 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
       phone: users.phone
     }).from(users)
       .where(and(
-        or(
-          eq(users.role, 'ministro'),
-          eq(users.role, 'coordenador')
-        ),
+        inArray(users.role, ['ministro', ...COORDINATOR_ROLES]),
         eq(users.status, 'active')
       ));
     
@@ -1520,10 +1520,7 @@ router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async 
       id: users.id
     }).from(users)
       .where(and(
-        or(
-          eq(users.role, 'ministro'),
-          eq(users.role, 'coordenador')
-        ),
+        inArray(users.role, ['ministro', ...COORDINATOR_ROLES]),
         eq(users.status, 'active')
       ));
 

@@ -112,7 +112,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Convert readonly arrays to mutable arrays for Drizzle compatibility
     const insertData = {
       ...validatedData,
-      suppressesMassTypes: validatedData.suppressesMassTypes ? [...validatedData.suppressesMassTypes] : null
+      suppressesMassTypes: validatedData.suppressesMassTypes ? [...validatedData.suppressesMassTypes] : null,
+      communityId: (req as unknown as { user?: { homeCommunityId?: string } }).user?.homeCommunityId! // comunidade do coordenador
     };
 
     const [newEvent] = await db.insert(specialEvents)
@@ -234,7 +235,8 @@ router.post('/batch', async (req: Request, res: Response) => {
       // Convert readonly arrays to mutable arrays for Drizzle compatibility
       validatedEvents.push({
         ...validated,
-        suppressesMassTypes: validated.suppressesMassTypes ? [...validated.suppressesMassTypes] : null
+        suppressesMassTypes: validated.suppressesMassTypes ? [...validated.suppressesMassTypes] : null,
+        communityId: (req as unknown as { user?: { homeCommunityId?: string } }).user?.homeCommunityId! // comunidade do coordenador
       } as typeof specialEvents.$inferInsert);
     }
 

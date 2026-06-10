@@ -485,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Validate role
-        if (!['ministro', 'coordenador', 'gestor'].includes(role)) {
+        if (!['ministro', 'coordenador', 'coordenador_comunidade', 'coordenador_paroquial', 'gestor', 'reitor'].includes(role)) {
           return res.status(400).json({ message: 'Role inválido' });
         }
 
