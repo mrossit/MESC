@@ -154,7 +154,12 @@
       "Bash(PGPASSWORD='npg_3QKylioran9V' psql *)",
       "Bash(DATABASE_URL='postgresql://neondb_owner:npg_3QKylioran9V@ep-lingering-firefly-afak5e6q.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require' npx tsx *)",
       "Bash(NODE_PATH=/home/runner/workspace/node_modules node /tmp/diag.mjs)",
-      "Bash(sed 's/=.*$/=<set>/')"
+      "Bash(sed 's/=.*$/=<set>/')",
+      "Bash(awk '/^COPY public\\\\.schedules /{f=1;next} f&&/^\\\\\\\\\\\\.$/{f=0} f{print $3}' prod-sync-20260222-025231.sql)",
+      "Bash(sed 's/^/maior data de escala no backup Feb22: /')",
+      "Bash(awk '/^COPY public\\\\.schedules /{f=1;next} f&&/^\\\\\\\\\\\\.$/{f=0} f{c++} END{print \"linhas de schedules no backup Feb22: \" c}' prod-sync-20260222-025231.sql)",
+      "Bash(awk '/^COPY public\\\\.schedules /{f=1;next} f&&/^\\\\\\\\\\\\.$/{f=0} f{print $3}' prod-backup-20260130-061421.sql)",
+      "Bash(timeout 180 npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=/tmp/_build_check.js)"
     ],
     "deny": [],
     "ask": []
