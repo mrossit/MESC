@@ -159,7 +159,11 @@
       "Bash(sed 's/^/maior data de escala no backup Feb22: /')",
       "Bash(awk '/^COPY public\\\\.schedules /{f=1;next} f&&/^\\\\\\\\\\\\.$/{f=0} f{c++} END{print \"linhas de schedules no backup Feb22: \" c}' prod-sync-20260222-025231.sql)",
       "Bash(awk '/^COPY public\\\\.schedules /{f=1;next} f&&/^\\\\\\\\\\\\.$/{f=0} f{print $3}' prod-backup-20260130-061421.sql)",
-      "Bash(timeout 180 npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=/tmp/_build_check.js)"
+      "Bash(timeout 180 npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=/tmp/_build_check.js)",
+      "Bash(NODE_PATH=/home/runner/workspace/node_modules node *)",
+      "Bash(NODE_PATH=./node_modules node /tmp/neon_ro_check.cjs NEON_DATABASE_URL)",
+      "Bash(NODE_PATH=./node_modules node /tmp/neon_ro_check.cjs DATABASE_URL)",
+      "Bash(NODE_PATH=./node_modules node *)"
     ],
     "deny": [],
     "ask": []
