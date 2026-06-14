@@ -61,6 +61,8 @@ function parseFile(file) {
   );
   if (headerIdx < 0) throw new Error("cabeçalho (Data/Dia/Hora) não encontrado");
   const header = expandRow($, trs[headerIdx]);
+  // âncora: índice da coluna "Hora" no cabeçalho (posições começam logo após)
+  const headerTimeIdx = header.findIndex((c) => /^hora$/i.test(c));
 
   const records = [];
   const warnings = [];
@@ -72,19 +74,29 @@ function parseFile(file) {
     // linha de numeração (1,2,3,...) → ignorar
     if (row.slice(0, 5).every((c) => isDay(c) || c === "")) continue;
 
-    let day = row[0], time = row[2];
-    if (isDay(day)) lastDay = day; else day = lastDay; // rowspan/continuação
-    if (!isTime(time)) continue;                       // não é linha de missa
-    if (!day) { warnings.push(`linha ${i}: hora ${time} sem dia`); continue; }
+    // âncora na célula da Hora (robusto a rowspan de Data/Dia e a células vazias)
+    const timeIdx = row.findIndex((c) => isTime(c));
+    if (timeIdx < 0) continue;                          // não é linha de missa
+    const time = row[timeIdx];
 
-    const weekday = row[1] || "";
-    for (let c = 3; c < row.length; c++) {
+    // dia: alguma célula numérica ANTES da hora; senão herda (rowspan)
+    const dayCell = row.slice(0, timeIdx).find((c) => isDay(c));
+    if (dayCell) lastDay = dayCell;
+    const day = lastDay;
+    if (!day) { warnings.push(`linha ${i}: hora ${time} sem dia`); continue; }
+    const weekday = row.slice(0, timeIdx).find((c) => /feira|domingo|s[áa]bado/i.test(c)) || "";
+
+    // position = ordinal da coluna a partir da Hora (conta vagas → fiel ao banco)
+    for (let c = timeIdx + 1; c < row.length; c++) {
+      const pos = c - timeIdx;
       const minister = (row[c] || "").trim();
-      if (!minister) continue;
+      if (!minister) continue;                          // vaga: não vira linha (no banco = minister_id null)
       const date = month && year ? `${year}-${month}-${String(day).padStart(2, "0")}` : `(?)-${day}`;
+      const posName = headerTimeIdx >= 0 ? header[headerTimeIdx + pos] : null;
       records.push({
         date, time, weekday,
-        position: header[c] || `col${c}`,
+        pos,
+        position: posName || `col${pos}`,
         minister,
       });
     }
