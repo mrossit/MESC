@@ -1,27 +1,34 @@
 {
-  "_instrucoes": "Preencha 'escolha' com o NOME COMPLETO correto do banco (ou 'VACANTE' / 'IGNORAR'). Para ambíguos, copie uma das opções em 'candidatos'. Para sem-match, digite o nome completo de quem é o apelido. Este arquivo alimenta o import; nada é gravado sem sua confirmação.",
+  "_instrucoes": "Seções: 'confirmados' já resolvidos; 'a_confirmar' = minha proposta (corrija se errado); 'perguntas' = apelidos que só você sabe (preencha 'escolha').",
 
-  "ambiguos": {
-    "Alexandre L": { "candidatos": ["Alexandre Luis Ferreira Chagas", "Alexandre Luiz Lucio"], "escolha": "" },
-    "Amanda":      { "candidatos": ["Amanda Bergamo Antunes", "Amanda Germano de Aguiar"], "escolha": "" },
-    "André":       { "candidatos": ["Andre de Amorim", "Andréa Aparecida Colabuani dos Santos Oliveira"], "escolha": "" },
-    "Bruna":       { "candidatos": ["Bruna Michele Rubio Mariano Sanches", "Bruna Barros"], "escolha": "" },
-    "Carlos":      { "candidatos": ["Carlos Eduardo Antunes", "Carlos Augusto de Oliveira Santos"], "escolha": "" },
-    "Fabi":        { "candidatos": ["Fabiane Polo da Silva Scarpin", "Fabiana das Graças Campos Soares", "Fabio Luiz Vieira"], "escolha": "" },
-    "Gabriel":     { "candidatos": ["Gabriela Lourenço", "Gabriel Henrique Silva Martinez"], "escolha": "" },
-    "Joselane":    { "candidatos": ["Joselane de Faria Pereira", "José Almir Joaquim Rodrigues"], "escolha": "" },
-    "Josi":        { "candidatos": ["Josiane Maria Batista Soares", "Josimar Garcia"], "escolha": "" },
-    "Júlia":       { "candidatos": ["Juliana Albuquerque Abelaneda Martins", "Júlia Francisco Vaz", "Juliana El Hadi"], "escolha": "" },
-    "Marcelo M":   { "candidatos": ["Marcelo Tadeu Sanches", "Marcelo M e Silva"], "escolha": "" },
-    "Marco":       { "candidatos": ["Marcos Soares de Oliveira", "Marco Rossit"], "escolha": "" },
-    "Pedro":       { "candidatos": ["Pedro Paulo de Macedo Santos", "Pedro Diniz"], "escolha": "" },
-    "Rafael":      { "candidatos": ["Rafaella Sousa Gouveia", "Rafael Corrêa"], "escolha": "" },
-    "Ro":          { "candidatos": ["Rosana Ros Carvalho Silva", "Rosana Lé Machado Piazentin", "Rosana Vieira Soares", "Rogério Sousa Luiz", "Rogério Fernando da Silva", "Roseli Aparecida de Pontes Furquim", "Rogério Alves Silva"], "escolha": "" },
-    "Rogério S":   { "candidatos": ["Rogério Sousa Luiz", "Rogério Fernando da Silva", "Rogério Alves Silva", "Rogerio Scarpin"], "escolha": "" },
-    "Rosana Ros":  { "candidatos": ["Rosana Ros Carvalho Silva", "Rosana Lé Machado Piazentin", "Rosana Vieira Soares"], "escolha": "" }
+  "confirmados": {
+    "Andréia": "Andréa Aparecida Colabuani dos Santos Oliveira",
+    "Amanda": "Amanda Bergamo Antunes",
+    "André": "Andre de Amorim",
+    "Bruna": "Bruna Barros",
+    "Carlos": "Carlos Eduardo Antunes",
+    "Fabi": "Fabiana das Graças Campos Soares",
+    "Joselane": "Joselane de Faria Pereira",
+    "Josi": "Josiane Maria Batista Soares",
+    "Marcelo M": "Marcelo M e Silva",
+    "Marco": "Marco Rossit",
+    "Rafael": "Rafael Corrêa",
+    "Rosana Ros": "Rosana Ros Carvalho Silva"
   },
 
-  "sem_match": {
+  "a_confirmar": {
+    "_nota": "minha proposta por contexto — diga se algum está errado",
+    "Alexandre L": "Alexandre Luiz Lucio",
+    "Gabriel": "Gabriel Henrique Silva Martinez",
+    "Júlia": "Júlia Francisco Vaz",
+    "Doratea Savietto Petrucelli": "Dorotea Savietto Petrucelli (provável erro de grafia)"
+  },
+
+  "perguntas": {
+    "_nota": "preencha com o nome completo (ou 'criar novo ministro' / 'VACANTE')",
+    "Pedro":      { "candidatos": ["Pedro Paulo de Macedo Santos", "Pedro Diniz"], "escolha": "" },
+    "Rogério S":  { "candidatos": ["Rogério Sousa Luiz", "Rogério Alves Silva", "Rogerio Scarpin"], "escolha": "" },
+    "Ro":         { "escolha": "" },
     "Bel":        { "escolha": "" },
     "Bete":       { "escolha": "" },
     "Beth Ramos": { "escolha": "" },
@@ -29,18 +36,11 @@
     "Bia Nunes":  { "escolha": "" },
     "Cleide":     { "escolha": "" },
     "Dani Tatá":  { "escolha": "" },
-    "Doratea Savietto Petrucelli": { "escolha": "" },
-    "Dri":        { "escolha": "" },
-    "Duda":       { "escolha": "" },
-    "Mitiko Tokunaga": { "escolha": "" },
-    "Preta":      { "escolha": "" },
     "Tatá":       { "escolha": "" },
-    "Thiago Fogaça": { "escolha": "" }
-  },
-
-  "revisar_automaticos_suspeitos": {
-    "_nota": "Estes casaram automático mas parecem suspeitos — confirme:",
-    "Andréia": { "casou_com": "Andre de Amorim", "ok_ou_corrija": "" },
-    "Augusto": { "casou_com": "Carlos Augusto de Oliveira Santos", "ok_ou_corrija": "" }
+    "Duda":       { "escolha": "" },
+    "Dri":        { "escolha": "" },
+    "Preta":      { "escolha": "" },
+    "Mitiko Tokunaga": { "escolha": "" },
+    "Thiago Fogaça":   { "escolha": "" }
   }
 }
