@@ -1725,7 +1725,9 @@ export default function Schedules() {
                   const isUserScheduled = isUserScheduledOnDate(day);
                   const substitutionStatus = getUserSubstitutionStatus(day);
                   
-                  const standardMassTimes = getMassTimesForDate(day);
+                  // Normaliza para "HH:MM" (mesmo formato de actualMassTimes/badge)
+                  // p/ o Set deduplicar — senão "06:30:00" e "06:30" viram 2 badges.
+                  const standardMassTimes = getMassTimesForDate(day).map(formatMassTime);
                   const dateStr = format(day, "yyyy-MM-dd");
                   const actualMassTimes = Array.from(
                     new Set(
