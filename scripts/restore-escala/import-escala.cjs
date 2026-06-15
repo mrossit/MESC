@@ -29,7 +29,9 @@ const alias = JSON.parse(fs.readFileSync(path.join(__dirname, "alias-map.json"),
 delete alias._doc;
 
 function parse(file) {
-  execFileSync("node", [path.join(__dirname, "parse-escala-html.cjs"), "--json", "/tmp/_imp.json", file], { stdio: "ignore" });
+  const ext = path.extname(file).toLowerCase();
+  const parser = ext === ".xlsx" ? "parse-escala-xlsx.cjs" : ext === ".pdf" ? "parse-escala-pdf.cjs" : "parse-escala-html.cjs";
+  execFileSync("node", [path.join(__dirname, parser), "--json", "/tmp/_imp.json", file], { stdio: "ignore" });
   return JSON.parse(fs.readFileSync("/tmp/_imp.json", "utf8")).records;
 }
 
