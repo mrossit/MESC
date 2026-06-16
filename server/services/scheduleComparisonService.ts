@@ -236,7 +236,13 @@ export async function analyzeMonthlyPatterns(
   }
 
   // Get minister details
-  const frequentlyRemovedMinisters = await getMinisterDetails(removalCounts);
+  const removedMinistersRaw = await getMinisterDetails(removalCounts);
+  const frequentlyRemovedMinisters = removedMinistersRaw.map(m => ({
+    ministerId: m.ministerId,
+    ministerName: m.ministerName,
+    removalCount: m.count,
+    reliabilityScore: m.reliabilityScore,
+  }));
   const addedMinistersRaw = await getMinisterDetails(additionCounts);
   const frequentlyAddedMinisters = addedMinistersRaw.map(m => ({
     ministerId: m.ministerId,

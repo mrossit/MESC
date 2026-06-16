@@ -90,7 +90,7 @@ export async function gerarEscalaAlternativa(req: AuthRequest, res: Response) {
       preferred_times: r.preferredMassTimes || [],
       daily_mass_availability: r.dailyMassAvailability || [],
       weekdays: (r.responses as { weekdays?: Record<string, unknown> } | null)?.weekdays || {},
-      responses: r.responses || {}
+      responses: (r.responses || {}) as Record<string, unknown>
     }));
 
     // 5. Executar algoritmo Python

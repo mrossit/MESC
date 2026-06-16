@@ -667,7 +667,9 @@ export async function markLessonCompleted(params: {
               await db.execute(sql`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)
-            ).rows.map((row: { id: string }) => row.id)
+            ).rows
+              .map((row) => row.id)
+              .filter((id): id is string => typeof id === "string")
           : []),
       ])
     ),

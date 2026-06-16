@@ -7,7 +7,7 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
-import { isAdmin as isAdminRole, ADMIN_ROLES } from "@shared/roles";
+import { isAdmin as isAdminRole, DB_ADMIN_ROLES } from "@shared/roles";
 import { db } from "../db";
 import { scheduleConfirmations, schedules, users, notifications } from "@shared/schema";
 import { eq, and, desc, gte, lte, inArray, sql } from "drizzle-orm";
@@ -257,6 +257,7 @@ router.post("/", requireAuth, requireRole(['gestor', 'coordenador']), async (req
     const [confirmation] = await db
       .insert(scheduleConfirmations)
       .values({
+        communityId: schedule.communityId,
         scheduleId,
         ministerId,
         status: 'pending',
@@ -330,6 +331,7 @@ router.post("/bulk", requireAuth, requireRole(['gestor', 'coordenador']), async 
     const schedulesWithMinisters = await db
       .select({
         scheduleId: schedules.id,
+        communityId: schedules.communityId,
         ministerId: schedules.ministerId,
         date: schedules.date,
         time: schedules.time,
@@ -353,6 +355,7 @@ router.post("/bulk", requireAuth, requireRole(['gestor', 'coordenador']), async 
     const toCreate = schedulesWithMinisters
       .filter((s: ScheduleWithMinister) => s.ministerId && !existingSet.has(`${s.scheduleId}-${s.ministerId}`))
       .map((s: ScheduleWithMinister) => ({
+        communityId: s.communityId,
         scheduleId: s.scheduleId,
         ministerId: s.ministerId!,
         status: 'pending' as const,
@@ -467,7 +470,7 @@ router.patch("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       const coordinators = await db
         .select()
         .from(users)
-        .where(inArray(users.role, [...ADMIN_ROLES]));
+        .where(inArray(users.role, DB_ADMIN_ROLES));
 
       type CoordinatorRecord = typeof coordinators[number];
       const coordIds = coordinators.map((c: CoordinatorRecord) => c.id);

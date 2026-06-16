@@ -6,6 +6,7 @@ import { eq, and, sql, gte, lte, inArray, ne, or } from "drizzle-orm";
 import { generateAutomaticSchedule, ScheduleGenerator, GeneratedSchedule, Minister } from "../utils/scheduleGenerator";
 import { getCurrentLiturgicalSeason, getMovableFeasts } from "../utils/liturgicalCalculations";
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
+import { resolveWriteCommunityId } from "../utils/communityContext";
 
 const router = Router();
 
@@ -34,15 +35,19 @@ interface MassTimeDetails {
 // Schedule data item interface (supports multiple formats)
 interface ScheduleDataItem {
   id?: string;
-  ministerId?: string;
+  ministerId?: string | null;
   date?: string;
   time?: string;
-  position?: number;
-  type?: string;
+  position?: number | null;
+  type?: string | null;
   massTime?: MassTimeDetails;
   ministers?: MinisterAssignment[];
   assignments?: MinisterAssignment[];
   [key: string]: unknown;
+}
+
+function toScheduleType(value: string | null | undefined): 'missa' | 'celebracao' | 'evento' {
+  return value === 'celebracao' || value === 'evento' ? value : 'missa';
 }
 
 // Minister schedule entry for notifications
@@ -268,6 +273,7 @@ router.put("/manual-adjustment", requireAuth, requireRole(['coordenador', 'gesto
       await db
         .insert(schedules)
         .values({
+          communityId: await resolveWriteCommunityId(req.user),
           date,
           time,
           type: 'missa',
@@ -327,7 +333,12 @@ router.post("/publish", requireAuth, requireRole(['coordenador', 'gestor']), asy
     }
 
     // Save all assignments to database
-    const savedCount = await saveScheduleToDatabase(scheduleData, month, year, req.user!.homeCommunityId);
+    const savedCount = await saveScheduleToDatabase(
+      scheduleData,
+      month,
+      year,
+      await resolveWriteCommunityId(req.user)
+    );
 
     // Send notifications to ministers
     const notificationResults = await sendMinisterNotifications(scheduleData, month, year);
@@ -774,7 +785,7 @@ async function saveScheduleToDatabase(
         await db.insert(schedules).values({
           date,
           time,
-          type: type as 'missa_dominical' | 'missa_diaria' | 'missa' | 'adoracao' | 'novena' | 'festa' | 'outro',
+          type: toScheduleType(type),
           ministerId,
           position,
           status: 'scheduled',

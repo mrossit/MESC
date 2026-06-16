@@ -4,6 +4,7 @@ import { schedules, users } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
 import { isAdmin as isAdminRole } from "@shared/roles";
+import { resolveWriteCommunityId } from "../utils/communityContext";
 
 // Update data type for schedule updates
 interface ScheduleUpdateData {
@@ -177,6 +178,7 @@ router.post("/", authenticateToken, requireRole(['coordenador', 'gestor']), asyn
     const newAssignment = await db
       .insert(schedules)
       .values({
+        communityId: await resolveWriteCommunityId(req.user),
         ministerId,
         date,
         time,

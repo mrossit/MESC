@@ -66,7 +66,7 @@ export interface AvailabilityData {
   canSubstitute: boolean;
   dailyMassAvailability: string[];
   weekdayMasses?: string[];
-  specialEvents?: Record<string, string | boolean | number>;
+  specialEvents?: Record<string, string | boolean | number | string[]>;
   customEventsByDateTime?: Record<string, boolean>; // "2026-03-28_07:00" → true/false
 }
 
@@ -164,7 +164,7 @@ export class ScheduleGenerator {
   private ministers: Minister[] = [];
   private availabilityData: Map<string, AvailabilityData> = new Map();
   private massTimes: MassTime[] = [];
-  private db: typeof import('../db').db;
+  private db!: typeof import('../db').db;
   private dailyAssignments: Map<string, Set<string>> = new Map(); // Rastrear ministros já escalados por dia
   private saintBonusCache: Map<string, number> = new Map(); // Cache de bônus de santo: "ministerId:date" -> score
   private saintsData: Map<string, SaintInfo[]> | null = null; // Cache de santos: "MM-DD" -> saints[]
@@ -2750,17 +2750,20 @@ export class ScheduleGenerator {
       if (specialEvents && typeof specialEvents === 'object') {
         console.log(`[SPECIAL_MASS] 🔑 saint_judas_feast exists:`, !!specialEvents.saint_judas_feast, typeof specialEvents.saint_judas_feast);
         // 🔥 CRITICAL FIX: Para v2.0, procurar em saint_judas_feast com datetime key
-        if (specialEvents.saint_judas_feast && typeof specialEvents.saint_judas_feast === 'object') {
+        const saintJudasFeast = specialEvents.saint_judas_feast;
+        if (saintJudasFeast && typeof saintJudasFeast === 'object' && !Array.isArray(saintJudasFeast)) {
+          const saintJudasFeastByDateTime = saintJudasFeast as Record<string, unknown>;
           const datetimeKey = `${massDate}_${massTime}`; // e.g., "2025-10-28_10:00"
           console.log(`[SPECIAL_MASS] ✅ Checking key: ${datetimeKey}`);
-          let response = specialEvents.saint_judas_feast[datetimeKey];
+          let response = saintJudasFeastByDateTime[datetimeKey];
 
           // Também suportar estrutura aninhada { '2025-10-28': { '12:00': true } }
           if (response === undefined) {
-            const nestedByDate = specialEvents.saint_judas_feast[massDate];
-            if (nestedByDate && typeof nestedByDate === 'object') {
+            const nestedByDate = saintJudasFeastByDateTime[massDate];
+            if (nestedByDate && typeof nestedByDate === 'object' && !Array.isArray(nestedByDate)) {
+              const nestedByTime = nestedByDate as Record<string, unknown>;
               const normalizedTime = massTime.padStart(5, '0');
-              response = nestedByDate[massTime] ?? nestedByDate[normalizedTime];
+              response = nestedByTime[massTime] ?? nestedByTime[normalizedTime];
             }
           }
 

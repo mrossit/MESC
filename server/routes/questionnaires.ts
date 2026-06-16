@@ -12,7 +12,7 @@ import { eq, and, or } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
 import { isAdmin as isAdminRole } from '@shared/roles';
-import { communityIdFromQuestionnaire } from '../utils/communityContext';
+import { communityIdFromQuestionnaire, resolveWriteCommunityId } from '../utils/communityContext';
 import {
   getQuestionnaireResponsesForExport,
   getMonthlyResponsesForExport,
@@ -199,6 +199,7 @@ router.post('/templates', requireAuth, requireRole(['coordenador', 'gestor']), a
       const [created] = await db
         .insert(questionnaires)
         .values({
+          communityId: await resolveWriteCommunityId(req.user),
           title: `Questionário ${monthNames[month - 1]} ${year}`,
           month,
           year,
@@ -421,6 +422,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
         const [newTemplate] = await db
           .insert(questionnaires)
           .values({
+            communityId: await resolveWriteCommunityId(req.user),
             title: `Questionário ${monthNames[data.month - 1]} ${data.year}`,
             month: data.month,
             year: data.year,

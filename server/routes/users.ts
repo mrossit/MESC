@@ -2,7 +2,7 @@ import { Router } from "express";
 import crypto from "crypto";
 import { storage } from "../storage";
 import { authenticateToken, requireRole, AuthRequest } from "../auth";
-import { isCoordinator as isCoordinatorRole } from "@shared/roles";
+import { isCoordinator as isCoordinatorRole, normalizeRoleForPersistence } from "@shared/roles";
 import { csrfProtection } from "../middleware/csrf";
 import { stripHeavyFields, sanitizeUserData, handleApiError } from "../utils/routeHelpers";
 import { insertUserSchema, users, questionnaireResponses, schedules, substitutionRequests, type User } from "@shared/schema";
@@ -247,7 +247,9 @@ router.patch('/api/users/:id/role', authenticateToken, requireRole(['gestor', 'c
       }
     }
     
-    const user = await storage.updateUser(req.params.id, { role });
+    const user = await storage.updateUser(req.params.id, {
+      role: normalizeRoleForPersistence(role)
+    });
     
     if (!user) {
       return res.status(404).json({ message: "Usuário não encontrado" });
