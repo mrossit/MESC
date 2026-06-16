@@ -6,8 +6,13 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -9117,7 +9122,8 @@ router2.get("/me", authenticateToken, async (req, res) => {
       firstName: users.firstName,
       lastName: users.lastName,
       phone: users.phone,
-      photoUrl: users.photoUrl
+      photoUrl: users.photoUrl,
+      homeCommunityId: users.homeCommunityId
     }).from(users).where(eq7(users.id, userId)).limit(1);
     if (!user) {
       return res.status(404).json({
@@ -14043,6 +14049,12 @@ function getErrorStack(error) {
 
 // server/routes/scheduleGeneration.ts
 var router6 = Router6();
+var ScheduleSaveRollback = class extends Error {
+  constructor() {
+    super("SCHEDULE_SAVE_ROLLBACK");
+    this.name = "ScheduleSaveRollback";
+  }
+};
 function parseYearMonthParams2(req, res) {
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -14305,103 +14317,94 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
       });
     }
     console.log("First schedule sample:", JSON.stringify(schedulesInput[0], null, 2));
+    const communityId = req.user?.homeCommunityId ?? null;
+    if (schedulesInput.length > 0 && !communityId) {
+      return res.status(400).json({
+        success: false,
+        message: "Comunidade do coordenador n\xE3o identificada (homeCommunityId ausente). Opera\xE7\xE3o abortada para n\xE3o apagar escalas existentes."
+      });
+    }
     const results = [];
     const errors = [];
-    if (month && year) {
-      try {
+    await db.transaction(async (tx) => {
+      if (month && year) {
         console.log(`=== DELETING EXISTING SCHEDULES FOR ${month}/${year} ===`);
         const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
         const lastDay = new Date(year, month, 0).getDate();
         const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         console.log(`Date range: ${startDate} to ${endDate}`);
-        const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
-          and10(
-            gte5(schedules.date, startDate),
-            lte5(schedules.date, endDate)
-          )
-        );
+        const existingSchedules = await tx.select({ id: schedules.id }).from(schedules).where(and10(gte5(schedules.date, startDate), lte5(schedules.date, endDate)));
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
-          const deletedSubstitutions = await db.delete(substitutionRequests).where(
-            inArray5(substitutionRequests.scheduleId, scheduleIds)
-          );
-          console.log(`Deleted substitution requests`);
-          const deletedSchedules = await db.delete(schedules).where(
-            and10(
-              gte5(schedules.date, startDate),
-              lte5(schedules.date, endDate)
-            )
-          );
+          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, scheduleIds));
+          await tx.delete(schedules).where(and10(gte5(schedules.date, startDate), lte5(schedules.date, endDate)));
           console.log(`Deleted ${existingSchedules.length} schedules`);
         }
-      } catch (deleteErr) {
-        console.error("Error deleting existing schedules:", deleteErr);
       }
-    }
-    const uniqueMinisterIds = [...new Set(
-      schedulesInput.map((s) => s.ministerId).filter((id) => id !== null && id !== void 0)
-    )];
-    const existingMinisterIds = /* @__PURE__ */ new Set();
-    if (uniqueMinisterIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray5(users.id, uniqueMinisterIds));
-      existingMinisters.forEach((m) => existingMinisterIds.add(m.id));
-      console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
-    }
-    for (let i = 0; i < schedulesInput.length; i++) {
-      const schedule = schedulesInput[i];
-      try {
-        if (!schedule.date || !schedule.time) {
-          throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
-        }
-        if (schedule.ministerId && !existingMinisterIds.has(schedule.ministerId)) {
-          throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
-        }
-        const recordToInsert = {
-          date: schedule.date,
-          time: schedule.time,
-          type: schedule.type || "missa",
-          location: schedule.location || null,
-          ministerId: schedule.ministerId || null,
-          position: schedule.position !== void 0 ? schedule.position : i + 1,
-          status: "scheduled",
-          notes: schedule.notes || null,
-          // Comunidade do coordenador que está gerando a escala
-          communityId: req.user.homeCommunityId
-          // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
-        };
-        const [inserted] = await db.insert(schedules).values(recordToInsert).returning();
-        results.push({
-          success: true,
-          id: inserted.id,
-          index: i
-        });
-      } catch (err) {
-        const dbErr = err;
-        console.error(`[${i}] \u274C Failed to insert schedule:`, err);
-        console.error(`[${i}] Error type:`, typeof err);
-        console.error(`[${i}] Error message:`, dbErr?.message);
-        console.error(`[${i}] Error code:`, dbErr?.code);
-        console.error(`[${i}] Error stack:`, dbErr?.stack);
-        console.error(`[${i}] Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
-        errors.push({
-          success: false,
-          error: dbErr?.message || String(err),
-          code: dbErr?.code,
-          detail: dbErr?.detail,
-          constraint: dbErr?.constraint,
-          errorType: dbErr?.name,
-          fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
-          index: i,
-          schedule: {
+      const uniqueMinisterIds = [...new Set(
+        schedulesInput.map((s) => s.ministerId).filter((id) => id !== null && id !== void 0)
+      )];
+      const existingMinisterIds = /* @__PURE__ */ new Set();
+      if (uniqueMinisterIds.length > 0) {
+        const existingMinisters = await tx.select({ id: users.id }).from(users).where(inArray5(users.id, uniqueMinisterIds));
+        existingMinisters.forEach((m) => existingMinisterIds.add(m.id));
+        console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
+      }
+      for (let i = 0; i < schedulesInput.length; i++) {
+        const schedule = schedulesInput[i];
+        try {
+          if (!schedule.date || !schedule.time) {
+            throw new Error(`Missing required fields: date=${schedule.date}, time=${schedule.time}`);
+          }
+          if (schedule.ministerId && !existingMinisterIds.has(schedule.ministerId)) {
+            throw new Error(`Minister ID ${schedule.ministerId} does not exist in database`);
+          }
+          const recordToInsert = {
             date: schedule.date,
             time: schedule.time,
-            ministerId: schedule.ministerId,
-            position: schedule.position
-          }
-        });
+            type: schedule.type || "missa",
+            location: schedule.location || null,
+            ministerId: schedule.ministerId || null,
+            position: schedule.position !== void 0 ? schedule.position : i + 1,
+            status: "scheduled",
+            notes: schedule.notes || null,
+            // Comunidade do coordenador que está gerando a escala (validada acima)
+            communityId
+          };
+          const [inserted] = await tx.insert(schedules).values(recordToInsert).returning();
+          results.push({ success: true, id: inserted.id, index: i });
+        } catch (err) {
+          const dbErr = err;
+          console.error(`[${i}] \u274C Failed to insert schedule:`, err);
+          errors.push({
+            success: false,
+            error: dbErr?.message || String(err),
+            code: dbErr?.code,
+            detail: dbErr?.detail,
+            constraint: dbErr?.constraint,
+            errorType: dbErr?.name,
+            fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+            index: i,
+            schedule: {
+              date: schedule.date,
+              time: schedule.time,
+              ministerId: schedule.ministerId,
+              position: schedule.position
+            }
+          });
+        }
       }
-    }
+      if (errors.length > 0) {
+        throw new ScheduleSaveRollback();
+      }
+    }).catch((txErr) => {
+      if (txErr instanceof ScheduleSaveRollback) {
+        results.length = 0;
+        return;
+      }
+      throw txErr;
+    });
     const savedCount = results.filter((r) => r.success).length;
     const failedCount = errors.length;
     console.log(`=== EMERGENCY SAVE COMPLETE ===`);
@@ -14503,87 +14506,72 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         message: "Servi\xE7o de banco de dados indispon\xEDvel"
       });
     }
-    if (replaceExisting && schedulesToSave.length > 0) {
-      console.log("=== CASCADE DELETION START ===");
-      const sortedSchedules = [...schedulesToSave].sort((a, b) => a.date.localeCompare(b.date));
-      const firstDate = sortedSchedules[0].date;
-      const lastDate = sortedSchedules[sortedSchedules.length - 1].date;
-      console.log(`Date range: ${firstDate} to ${lastDate}`);
-      const existingSchedules = await db.select({ id: schedules.id }).from(schedules).where(
-        and10(
-          gte5(schedules.date, firstDate),
-          lte5(schedules.date, lastDate)
-        )
-      );
-      console.log(`Found ${existingSchedules.length} existing schedules to delete`);
-      if (existingSchedules.length > 0) {
-        const scheduleIds = existingSchedules.map((s) => s.id);
-        console.log(`Schedule IDs to delete:`, scheduleIds.slice(0, 5), "...");
-        const deletedSubstitutions = await db.delete(substitutionRequests).where(
-          inArray5(substitutionRequests.scheduleId, scheduleIds)
-        );
-        console.log(`Deleted substitution requests:`, deletedSubstitutions);
-        logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
-      }
-      const deletedSchedules = await db.delete(schedules).where(
-        and10(
-          gte5(schedules.date, firstDate),
-          lte5(schedules.date, lastDate)
-        )
-      );
-      console.log(`Deleted schedules:`, deletedSchedules);
-      logger.info(`Removidas escalas existentes entre ${firstDate} e ${lastDate}`);
-      console.log("=== CASCADE DELETION COMPLETE ===");
+    const communityId = req.user?.homeCommunityId ?? null;
+    if (schedulesToSave.length > 0 && !communityId) {
+      return res.status(400).json({
+        success: false,
+        message: "Comunidade do coordenador n\xE3o identificada (homeCommunityId ausente). Opera\xE7\xE3o abortada para n\xE3o apagar escalas existentes."
+      });
     }
-    const groupedByDateTime = {};
-    schedulesToSave.forEach((s, idx) => {
-      const key = `${s.date}_${s.time}`;
-      if (!groupedByDateTime[key]) {
-        groupedByDateTime[key] = [];
-      }
-      groupedByDateTime[key].push({ ...s, _index: idx });
-    });
-    const schedulesToInsert = schedulesToSave.map((s, globalIndex) => {
-      const key = `${s.date}_${s.time}`;
-      const group = groupedByDateTime[key];
-      let positionInGroup = 1;
-      for (let i = 0; i < group.length; i++) {
-        if (group[i]._index === globalIndex) {
-          positionInGroup = i + 1;
-          break;
+    const saved = await db.transaction(async (tx) => {
+      if (replaceExisting && schedulesToSave.length > 0) {
+        console.log("=== CASCADE DELETION START ===");
+        const sortedSchedules = [...schedulesToSave].sort((a, b) => a.date.localeCompare(b.date));
+        const firstDate = sortedSchedules[0].date;
+        const lastDate = sortedSchedules[sortedSchedules.length - 1].date;
+        console.log(`Date range: ${firstDate} to ${lastDate}`);
+        const existingSchedules = await tx.select({ id: schedules.id }).from(schedules).where(and10(gte5(schedules.date, firstDate), lte5(schedules.date, lastDate)));
+        console.log(`Found ${existingSchedules.length} existing schedules to delete`);
+        if (existingSchedules.length > 0) {
+          const scheduleIds = existingSchedules.map((s) => s.id);
+          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, scheduleIds));
+          logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
         }
+        await tx.delete(schedules).where(and10(gte5(schedules.date, firstDate), lte5(schedules.date, lastDate)));
+        logger.info(`Removidas escalas existentes entre ${firstDate} e ${lastDate}`);
+        console.log("=== CASCADE DELETION COMPLETE ===");
       }
-      return {
-        date: s.date,
-        time: s.time,
-        type: s.type,
-        location: s.location || null,
-        ministerId: s.ministerId,
-        // Drizzle will map this to minister_id
-        position: s.position ?? positionInGroup,
-        // Use provided position or calculated group position
-        notes: s.notes || null,
-        status: "scheduled",
-        communityId: req.user.homeCommunityId
-        // comunidade do coordenador
-        // NOT including fields that don't exist in DB: on_site_adjustments, mass_type, month, year
-      };
+      const groupedByDateTime = {};
+      schedulesToSave.forEach((s, idx) => {
+        const key = `${s.date}_${s.time}`;
+        if (!groupedByDateTime[key]) {
+          groupedByDateTime[key] = [];
+        }
+        groupedByDateTime[key].push({ ...s, _index: idx });
+      });
+      const schedulesToInsert = schedulesToSave.map((s, globalIndex) => {
+        const key = `${s.date}_${s.time}`;
+        const group = groupedByDateTime[key];
+        let positionInGroup = 1;
+        for (let i = 0; i < group.length; i++) {
+          if (group[i]._index === globalIndex) {
+            positionInGroup = i + 1;
+            break;
+          }
+        }
+        return {
+          date: s.date,
+          time: s.time,
+          type: s.type,
+          location: s.location || null,
+          ministerId: s.ministerId,
+          // Drizzle will map this to minister_id
+          position: s.position ?? positionInGroup,
+          // Use provided position or calculated group position
+          notes: s.notes || null,
+          status: "scheduled",
+          communityId
+          // comunidade do coordenador (validada acima)
+        };
+      });
+      console.log("=== INSERTING SCHEDULES ===");
+      console.log(`Inserting ${schedulesToInsert.length} schedules`);
+      return await tx.insert(schedules).values(schedulesToInsert).returning();
     });
-    console.log("=== INSERTING SCHEDULES ===");
-    console.log(`Inserting ${schedulesToInsert.length} schedules`);
-    console.log("Sample schedule to insert:", schedulesToInsert[0]);
-    const saved = await db.insert(schedules).values(schedulesToInsert).returning();
     console.log(`Successfully inserted ${saved.length} schedules`);
     logger.info(`Salvas ${saved.length} escalas no banco de dados`);
     const uniqueMonths = /* @__PURE__ */ new Set();
     saved.forEach((schedule) => {
-      const scheduleDate = new Date(schedule.date);
-      const year = scheduleDate.getFullYear();
-      const month = scheduleDate.getMonth() + 1;
-      const monthKey = `${year}-${month}`;
-      uniqueMonths.add(monthKey);
-    });
-    schedulesToInsert.forEach((schedule) => {
       const scheduleDate = new Date(schedule.date);
       const year = scheduleDate.getFullYear();
       const month = scheduleDate.getMonth() + 1;
@@ -28202,12 +28190,88 @@ import { Router as Router37 } from "express";
 init_schema();
 await init_db();
 import { eq as eq50, count as count13, or as or14 } from "drizzle-orm";
+
+// server/services/healthService.ts
+await init_db();
+import { sql as sql27 } from "drizzle-orm";
+function getErrorMessage13(error) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+async function checkDatabaseConnection() {
+  const healthQuery = sql27`SELECT 1 AS ready`;
+  const database = db;
+  if (typeof database.execute === "function") {
+    await database.execute(healthQuery);
+    return;
+  }
+  if (typeof database.get === "function") {
+    await Promise.resolve(database.get(healthQuery));
+    return;
+  }
+  throw new Error("Database adapter does not support health checks.");
+}
+async function withTimeout(promise, timeoutMs, label) {
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+async function getHealthStatus(options = {}) {
+  const status = {
+    status: "ok",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "unknown"
+  };
+  if (!options.includeDatabase) {
+    return status;
+  }
+  const startedAt = Date.now();
+  try {
+    await withTimeout(
+      checkDatabaseConnection(),
+      options.databaseTimeoutMs ?? 2500,
+      "Database health check"
+    );
+    status.database = {
+      status: "ok",
+      latencyMs: Date.now() - startedAt
+    };
+  } catch (error) {
+    status.status = "degraded";
+    status.database = {
+      status: "error",
+      latencyMs: Date.now() - startedAt,
+      message: getErrorMessage13(error)
+    };
+  }
+  return status;
+}
+
+// server/routes/health.ts
 var router37 = Router37();
-router37.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+router37.get("/api/health", async (_req, res) => {
+  res.status(200).json(await getHealthStatus());
 });
-router37.head("/api/health", (req, res) => {
+router37.head("/api/health", (_req, res) => {
   res.status(200).end();
+});
+router37.get("/api/health/ready", async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).json(health);
+});
+router37.head("/api/health/ready", async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).end();
 });
 router37.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
@@ -28336,7 +28400,7 @@ import { z as z17 } from "zod";
 // server/services/formationService.ts
 await init_db();
 import { randomUUID } from "node:crypto";
-import { sql as sql27 } from "drizzle-orm";
+import { sql as sql28 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -28413,7 +28477,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql27`
+    db.execute(sql28`
       SELECT
         id,
         title,
@@ -28429,7 +28493,7 @@ async function getFormationOverview(userId) {
       FROM formation_tracks
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql27`
+    db.execute(sql28`
       SELECT
         id,
         track_id AS "trackId",
@@ -28444,7 +28508,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql27`
+    db.execute(sql28`
       SELECT
         id,
         module_id AS "moduleId",
@@ -28461,7 +28525,7 @@ async function getFormationOverview(userId) {
       FROM formation_lessons
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql27`
+    userId ? db.execute(sql28`
           SELECT
             id,
             user_id AS "userId",
@@ -28563,7 +28627,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql27`
+  const lessonResult = await db.execute(sql28`
     SELECT
       id,
       module_id AS "moduleId",
@@ -28585,7 +28649,7 @@ async function getLessonDetail(params) {
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql27`
+  const sectionsResult = await db.execute(sql28`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -28624,7 +28688,7 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql27`
+    const progressResult = await db.execute(sql28`
       SELECT
         id,
         user_id AS "userId",
@@ -28660,7 +28724,7 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql27`
+  const result = await db.execute(sql28`
     SELECT
       id,
       user_id AS "userId",
@@ -28677,7 +28741,7 @@ async function ensureLessonProgressRecord(userId, lessonId) {
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql27`
+  const result = await db.execute(sql28`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -28698,7 +28762,7 @@ async function markLessonSectionCompleted(params) {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql27`
+    await db.execute(sql28`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${existing.isCompleted},
@@ -28710,7 +28774,7 @@ async function markLessonSectionCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql27`
+    await db.execute(sql28`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -28775,7 +28839,7 @@ async function markLessonCompleted(params) {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
         ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql27`
+        ...totalSections > 0 ? (await db.execute(sql28`
                 SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
               `)).rows.map((row) => row.id) : []
       ])
@@ -28784,7 +28848,7 @@ async function markLessonCompleted(params) {
   };
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    await db.execute(sql27`
+    await db.execute(sql28`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${true},
@@ -28796,7 +28860,7 @@ async function markLessonCompleted(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql27`
+    await db.execute(sql28`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -28865,7 +28929,7 @@ async function upsertLessonProgressEntry(params) {
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql27`
+    await db.execute(sql28`
       UPDATE formation_lesson_progress
       SET
         "isCompleted" = ${payload.isCompleted},
@@ -28877,7 +28941,7 @@ async function upsertLessonProgressEntry(params) {
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql27`
+    await db.execute(sql28`
       INSERT INTO formation_lesson_progress (
         id,
         "userId",
@@ -28932,7 +28996,7 @@ async function upsertLessonProgressEntry(params) {
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql27`
+  const query = trackId ? sql28`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -28950,7 +29014,7 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql27`
+      ` : sql28`
         SELECT
           p.id,
           p.user_id AS "userId",
@@ -29921,12 +29985,25 @@ app.use(
     referrerPolicy: { policy: "strict-origin-when-cross-origin" }
   })
 );
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    uptime: process.uptime()
-  });
+app.get("/health", async (_req, res) => {
+  res.status(200).json(await getHealthStatus());
+});
+app.head("/health", (_req, res) => {
+  res.status(200).end();
+});
+app.get("/health/live", async (_req, res) => {
+  res.status(200).json(await getHealthStatus());
+});
+app.head("/health/live", (_req, res) => {
+  res.status(200).end();
+});
+app.get("/health/ready", async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).json(health);
+});
+app.head("/health/ready", async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).end();
 });
 app.get("/", (_req, res, next) => {
   if (res.headersSent) return;

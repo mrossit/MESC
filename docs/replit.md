@@ -275,8 +275,20 @@ shared/schema.ts - Centralized schema definition
 **Environment Variables Required:**
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET` - Secret for JWT signing (required, no default)
+- `SESSION_SECRET` - Session cookie secret (production)
+- `ENCRYPTION_KEY` - 64-character hex key for sensitive data encryption
 - `PORT` - Server port (default: 5000)
 - `NODE_ENV` - Environment (development/production)
-- `ALLOWED_ORIGINS` - CORS whitelist (production)
+- `ALLOWED_ORIGINS` - Exact CORS origins (production; include native origins explicitly if needed)
+- `APP_URL` - Public HTTPS app URL used in email templates
+- `EMAIL_PROVIDER` - `resend`, `sendgrid`, or `smtp` in production
+
+Before promoting a deployment, run:
+```bash
+NODE_ENV=production npm run release:check:env
+PRODUCTION_BASE_URL=https://saojudastadeu.app npm run release:check:health
+DATABASE_URL="$STAGING_DATABASE_URL" npm run release:check:backup
+STAGING_DATABASE_URL="$STAGING_DATABASE_URL" npm run release:check:multi-parish
+```
 
 **Deployment Target:** Replit (with adaptability for other platforms)
