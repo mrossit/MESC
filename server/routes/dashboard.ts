@@ -14,7 +14,7 @@ import {
   questionnaireResponses
 } from '../../shared/schema';
 import { eq, and, gte, lte, sql, or, isNull, count, desc, inArray } from 'drizzle-orm';
-import { COORDINATOR_ROLES } from '@shared/roles';
+import { DB_MINISTER_AND_COORDINATOR_ROLES } from '@shared/roles';
 import { format, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 const router = Router();
@@ -243,7 +243,7 @@ router.get('/ministry-stats', async (req: AuthRequest, res) => {
       .where(
         and(
           eq(users.status, 'active'),
-          inArray(users.role, ['ministro', ...COORDINATOR_ROLES])
+          inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
         )
       );
 
@@ -259,7 +259,7 @@ router.get('/ministry-stats', async (req: AuthRequest, res) => {
       .where(
         and(
           eq(users.status, 'active'),
-          inArray(users.role, ['ministro', ...COORDINATOR_ROLES]),
+          inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
           or(
             lte(users.lastService, thirtyDaysAgo),
             isNull(users.lastService)

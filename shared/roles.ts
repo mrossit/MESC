@@ -30,6 +30,8 @@ export type Role =
   | 'coordenador_comunidade'
   | 'coordenador';
 
+export type DbRole = Exclude<Role, 'coordenador'>;
+
 // --- Grupos de papéis (usados nas checagens de permissão) ---------------------
 
 /** Qualquer variante de coordenador (inclui o legado). */
@@ -58,6 +60,33 @@ export const ADMIN_ROLES: readonly string[] = [
 
 /** Papéis restritos à gestão global da paróquia (sem coordenador de comunidade). */
 export const MANAGER_ROLES: readonly string[] = [ROLES.GESTOR, ROLES.REITOR];
+
+/** Variantes de coordenador que existem no enum do banco. */
+export const DB_COORDINATOR_ROLES = [
+  ROLES.COORDENADOR_COMUNIDADE,
+  ROLES.COORDENADOR_PAROQUIAL,
+] as const satisfies readonly DbRole[];
+
+/** Papéis administrativos válidos para filtros Drizzle sobre users.role. */
+export const DB_ADMIN_ROLES = [
+  ...DB_COORDINATOR_ROLES,
+  ROLES.GESTOR,
+  ROLES.REITOR,
+] as const satisfies readonly DbRole[];
+
+/** Usuários que podem responder questionários/entrar em escalas, sem alias legado. */
+export const DB_MINISTER_AND_COORDINATOR_ROLES = [
+  ROLES.MINISTRO,
+  ...DB_COORDINATOR_ROLES,
+] as const satisfies readonly DbRole[];
+
+const DB_ROLE_SET = new Set<string>([
+  ROLES.GESTOR,
+  ROLES.REITOR,
+  ROLES.MINISTRO,
+  ROLES.COORDENADOR_PAROQUIAL,
+  ROLES.COORDENADOR_COMUNIDADE,
+]);
 
 // --- Predicados ---------------------------------------------------------------
 
@@ -88,6 +117,20 @@ export function isAdmin(role: string | null | undefined): boolean {
   return ADMIN_ROLES.includes(norm(role));
 }
 
+export function isDbRole(role: string | null | undefined): role is DbRole {
+  return DB_ROLE_SET.has(norm(role));
+}
+
+export function normalizeRoleForPersistence(
+  role: string | null | undefined,
+  fallback: DbRole = ROLES.MINISTRO,
+): DbRole {
+  const value = norm(role);
+  if (value === ROLES.COORDENADOR_LEGACY) return ROLES.COORDENADOR_COMUNIDADE;
+  if (isDbRole(value)) return value;
+  return fallback;
+}
+
 /**
  * Expande uma lista de papéis permitidos para reconhecer o vocabulário novo:
  * se a lista cita 'coordenador' (legado), passa a aceitar TODAS as variantes de
@@ -101,6 +144,19 @@ export function expandRoles(roles: string[]): string[] {
   const set = new Set<string>(roles.map(norm));
   if (roles.some((r) => COORDINATOR_ROLES.includes(norm(r)))) {
     for (const r of COORDINATOR_ROLES) set.add(r);
+  }
+  return [...set];
+}
+
+export function expandRolesForDb(roles: string[]): DbRole[] {
+  const set = new Set<DbRole>();
+  for (const role of expandRoles(roles)) {
+    const value = norm(role);
+    if (value === ROLES.COORDENADOR_LEGACY) {
+      for (const coordinatorRole of DB_COORDINATOR_ROLES) set.add(coordinatorRole);
+      continue;
+    }
+    if (isDbRole(value)) set.add(value);
   }
   return [...set];
 }

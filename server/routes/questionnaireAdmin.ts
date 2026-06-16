@@ -5,7 +5,8 @@ import { questionnaires, questionnaireResponses, users, notifications, schedules
 import { eq, and, or, ne, gte, lte, inArray } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, requireRole, AuthRequest } from '../auth';
-import { COORDINATOR_ROLES } from '@shared/roles';
+import { DB_MINISTER_AND_COORDINATOR_ROLES } from '@shared/roles';
+import { resolveWriteCommunityId } from '../utils/communityContext';
 import { storage } from '../storage';
 import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
 import { logger } from '../utils/logger';
@@ -16,6 +17,8 @@ interface QuestionnaireQuestion {
   id: string;
   type: string;
   title: string;
+  question?: string;
+  category?: string;
   options?: string[];
   required?: boolean;
   canEdit?: boolean;
@@ -95,7 +98,7 @@ router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), asyn
 
     // Gerar novo template para o mês atual
     const questions = generateQuestionnaireQuestions(month, year);
-    const userId = req.user?.id || '0';
+    const userId = String(req.user?.id || '0');
     
     const [savedTemplate] = await db.insert(questionnaires).values({
       month,
@@ -105,7 +108,7 @@ router.get('/current', requireAuth, requireRole(['gestor', 'coordenador']), asyn
       questions,
       status: 'active',
       createdById: userId,
-      communityId: req.user!.homeCommunityId,
+      communityId: await resolveWriteCommunityId(req.user),
       targetUserIds: [],
       notifiedUserIds: []
     }).returning();
@@ -162,7 +165,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
     });
 
     const { month, year } = schema.parse(req.body);
-    const userId = req.user?.id || req.session?.userId;
+    const userId = String(req.user?.id || req.session?.userId || '');
     
     // Verificar se já existe template NÃO deletado
     const [existingTemplate] = await db.select().from(questionnaires)
@@ -207,7 +210,7 @@ router.post('/templates/generate', requireAuth, requireRole(['gestor', 'coordena
       questions: questionsWithEditFlag,  // JSONB não precisa stringify
       status: 'draft',
       createdById: userId,
-      communityId: req.user!.homeCommunityId,
+      communityId: await resolveWriteCommunityId(req.user),
       targetUserIds: [],  // JSONB não precisa stringify
       notifiedUserIds: []  // JSONB não precisa stringify
     }).returning();
@@ -265,7 +268,7 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
     });
 
     const data = schema.parse(req.body);
-    const userId = req.user?.id || req.session?.userId;
+    const userId = String(req.user?.id || req.session?.userId || '');
 
     if (!db) {
       return res.status(503).json({ error: 'Database service unavailable' });
@@ -374,6 +377,7 @@ router.post('/templates', requireAuth, requireRole(['gestor', 'coordenador']), a
           description: `Questionário de disponibilidade para ${getMonthName(data.month)} de ${data.year}`,
           status: 'draft',
           createdById: userId,
+          communityId: await resolveWriteCommunityId(req.user),
           version: 1,
           targetUserIds: [],
           notifiedUserIds: []
@@ -579,7 +583,7 @@ router.delete('/templates/:year/:month/questions/:questionId', requireAuth, requ
     const currentVersion = template.version ?? 1;
     const updatedQuestions = (template.questions as QuestionnaireQuestion[]).filter(q => q.id !== questionId);
 
-    console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question}" (categoria: ${questionToDelete.category}) do questionário ${month}/${year}`);
+    console.log(`[DELETE QUESTION] Deletando pergunta "${questionToDelete.question ?? questionToDelete.title}" (categoria: ${questionToDelete.category ?? questionToDelete.type}) do questionário ${month}/${year}`);
 
     const [updated] = await db
       .update(questionnaires)
@@ -1068,7 +1072,7 @@ router.get('/responses-status/:year/:month', requireAuth, requireRole(['gestor',
       phone: users.phone
     }).from(users)
       .where(and(
-        inArray(users.role, ['ministro', ...COORDINATOR_ROLES]),
+        inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
         eq(users.status, 'active')
       ));
     
@@ -1520,7 +1524,7 @@ router.get('/stats', requireAuth, requireRole(['gestor', 'coordenador']), async 
       id: users.id
     }).from(users)
       .where(and(
-        inArray(users.role, ['ministro', ...COORDINATOR_ROLES]),
+        inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
         eq(users.status, 'active')
       ));
 

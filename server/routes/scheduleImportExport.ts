@@ -26,6 +26,7 @@ import {
   substitutionRequests
 } from '@shared/schema';
 import { logger } from '../utils/logger.js';
+import { resolveWriteCommunityId } from '../utils/communityContext';
 
 const router = Router();
 
@@ -495,6 +496,7 @@ router.post(
       if (gen.status !== 'draft') {
         return res.status(400).json({ success: false, message: 'Só é possível importar em escalas em draft' });
       }
+      const communityId = await resolveWriteCommunityId(req.user);
 
       const before = getSavedSlots(gen);
       const beforeByKey = new Map<string, SavedScheduleSlot>();
@@ -564,6 +566,7 @@ router.post(
           for (let i = 0; i < slot.ministers.length; i++) {
             const m = slot.ministers[i];
             await tx.insert(schedules).values({
+              communityId,
               date: slot.date,
               time: slot.time,
               type: 'missa',

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { COORDINATOR_ROLES, isAdmin as isAdminRole } from "@shared/roles";
+import { DB_MINISTER_AND_COORDINATOR_ROLES, isAdmin as isAdminRole } from "@shared/roles";
 import { storage } from "../storage";
 import { formatMinisterName } from "../utils/formatters";
 import { auditPersonalDataAccess, logAudit, AuditAction } from "../middleware/auditLogger";
@@ -35,7 +35,7 @@ router.get("/", requireAuth, auditPersonalDataAccess('personal'), async (req: Au
       })
       .from(users)
       .where(
-        inArray(users.role, ['ministro', ...COORDINATOR_ROLES])
+        inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       );
 
     res.json(ministersList);

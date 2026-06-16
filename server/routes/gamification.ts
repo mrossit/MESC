@@ -70,7 +70,7 @@ router.get('/profile/:userId', async (req: AuthRequest, res: Response) => {
       level: profile.level,
       levelName: profile.levelName,
       levelColor: profile.levelColor,
-      badges: profile.badges.filter((b: { isSecret?: boolean }) => !b.isSecret),
+      badges: profile.badges.filter((b) => !b.isSecret),
       massesServed: profile.massesServed,
       currentStreak: profile.currentStreak,
       rank

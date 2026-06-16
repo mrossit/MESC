@@ -160,6 +160,11 @@ export class ResponseCompiler {
     // 3. Processar cada resposta
     for (const row of responses) {
       try {
+        if (!row.users) {
+          console.warn(`⚠️  Resposta ${row.questionnaire_responses.id} sem usuário associado; ignorando`);
+          continue;
+        }
+
         const compiledData = this.compileUserResponse(
           row.questionnaire_responses,
           row.users,
@@ -460,7 +465,7 @@ export class ResponseCompiler {
    */
   private static compileUserResponse(
     response: { responses: unknown },
-    user: { id: string; name: string; preferredPosition?: number; familyId?: string },
+    user: { id: string; name: string; preferredPosition?: number | null; familyId?: string | null },
     month: number,
     year: number,
     customQuestions: ParsedCustomQuestion[] = []  // 🔧 FIX: Accept custom questions
@@ -493,8 +498,8 @@ export class ResponseCompiler {
       metadata: {
         canSubstitute: false,
         substituteOnly: false,
-        preferredPosition: user.preferredPosition,
-        familyId: user.familyId
+        preferredPosition: user.preferredPosition ?? undefined,
+        familyId: user.familyId ?? undefined
       }
     };
 

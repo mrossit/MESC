@@ -213,7 +213,7 @@ function QuizEditor({
 
   const updateQuestion = (index: number, field: string, val: string) => {
     const updated = [...value.questions];
-    (updated[index] as Record<string, unknown>)[field] = val;
+    (updated[index] as unknown as Record<string, unknown>)[field] = val;
     onChange({ ...value, questions: updated });
   };
 

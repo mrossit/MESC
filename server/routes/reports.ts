@@ -692,6 +692,7 @@ router.get("/export/attendance", authenticateToken, requireRole(["gestor", "coor
     const checkInStats = await db
       .select({
         ministerId: ministerCheckIns.ministerId,
+        totalCheckIns: sql<number>`COUNT(*)`.as('total_check_ins'),
         presentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'present' THEN 1 END)`.as('present_count'),
         lateCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'late' THEN 1 END)`.as('late_count'),
         absentCount: sql<number>`COUNT(CASE WHEN ${ministerCheckIns.status} = 'absent' THEN 1 END)`.as('absent_count')

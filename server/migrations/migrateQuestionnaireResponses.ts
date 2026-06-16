@@ -91,8 +91,19 @@ async function migrateQuestionnaireResponses(options: MigrationOptions): Promise
         console.log(`  Questionnaire: ${questionnaire?.title || 'Unknown'} (${month}/${year})`);
 
         // Convert to V2.0 format
+        const legacyResponse = {
+          ...response,
+          availableSundays: response.availableSundays ?? undefined,
+          preferredMassTimes: response.preferredMassTimes ?? undefined,
+          alternativeTimes: response.alternativeTimes ?? undefined,
+          dailyMassAvailability: response.dailyMassAvailability ?? undefined,
+          sharedWithFamilyIds: response.sharedWithFamilyIds ?? undefined,
+          processingWarnings: response.processingWarnings ?? undefined,
+          unmappedResponses: response.unmappedResponses ?? undefined,
+        };
+
         const converted = ResponseParser.convertLegacyToV2(
-          response,
+          legacyResponse,
           year,
           month
         );
@@ -110,7 +121,6 @@ async function migrateQuestionnaireResponses(options: MigrationOptions): Promise
         if (!options.dryRun) {
           await db.update(questionnaireResponses)
             .set({
-              version: '2.0' as any,
               responses: converted.responses as any,
               updatedAt: new Date()
             })

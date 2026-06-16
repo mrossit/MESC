@@ -7,6 +7,7 @@ import { db } from '../db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { getMatrizCommunityId } from '../utils/communityContext';
 
 const TEST_ACCOUNTS = [
   {
@@ -20,7 +21,7 @@ const TEST_ACCOUNTS = [
   {
     email: 'test.coord@test.com',
     name: 'Coordenador Teste',
-    role: 'coordenador' as const,
+    role: 'coordenador_comunidade' as const,
     password: 'test123',
     phone: '15999999002',
     status: 'active' as const
@@ -43,6 +44,7 @@ export async function seedTestAccounts() {
   }
 
   console.log('[TEST ACCOUNTS] Creating test accounts...');
+  const homeCommunityId = await getMatrizCommunityId();
 
   for (const account of TEST_ACCOUNTS) {
     try {
@@ -69,6 +71,7 @@ export async function seedTestAccounts() {
         passwordHash,
         phone: account.phone,
         status: account.status,
+        homeCommunityId,
         createdAt: new Date()
       });
 

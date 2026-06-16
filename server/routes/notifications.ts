@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
-import { isAdmin as isAdminRole, expandRoles } from "@shared/roles";
+import { isAdmin as isAdminRole, expandRolesForDb } from "@shared/roles";
 import { notificationRateLimiter } from "../middleware/rateLimiter";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -307,7 +307,7 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
         recipients = await db.select({ id: users.id })
           .from(users)
           .where(and(
-            inArray(users.role, expandRoles([data.recipientRole])),
+            inArray(users.role, expandRolesForDb([data.recipientRole])),
             eq(users.status, "active")
           ));
         console.log('[NOTIFICAÇÕES] Buscou usuários com role', data.recipientRole, ':', recipients.length);
