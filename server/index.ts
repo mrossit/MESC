@@ -11,6 +11,7 @@ import { apiRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
 import { scheduleCache } from "./services/scheduleCache";
+import { getHealthStatus } from "./services/healthService";
 import path from "path";
 
 // =============================================
@@ -77,12 +78,30 @@ app.use(
 // =============================================
 //  Health & Root Routes
 // =============================================
-app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+app.get("/health", async (_req: Request, res: Response) => {
+  res.status(200).json(await getHealthStatus());
+});
+
+app.head("/health", (_req: Request, res: Response) => {
+  res.status(200).end();
+});
+
+app.get("/health/live", async (_req: Request, res: Response) => {
+  res.status(200).json(await getHealthStatus());
+});
+
+app.head("/health/live", (_req: Request, res: Response) => {
+  res.status(200).end();
+});
+
+app.get("/health/ready", async (_req: Request, res: Response) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).json(health);
+});
+
+app.head("/health/ready", async (_req: Request, res: Response) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).end();
 });
 
 app.get("/", (_req: Request, res: Response, next) => {

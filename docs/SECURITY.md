@@ -148,10 +148,16 @@ allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
 
 Via variável de ambiente:
 ```bash
-ALLOWED_ORIGINS=https://mesc.example.com,https://app.mesc.example.com
+ALLOWED_ORIGINS=https://saojudastadeu.app,capacitor://localhost
 ```
 
-Múltiplos domínios separados por vírgula.
+Múltiplas origens devem ser separadas por vírgula. Em produção, o servidor deve aceitar apenas origens exatas configuradas; previews Replit devem ficar fora de produção.
+
+Validação antes de publicar:
+```bash
+NODE_ENV=production npm run release:check:env
+PRODUCTION_BASE_URL=https://saojudastadeu.app npm run release:check:health
+```
 
 ---
 

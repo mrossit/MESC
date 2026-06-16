@@ -4,15 +4,26 @@ import { authenticateToken, requireRole, AuthRequest } from "../auth";
 import { questionnaireResponses, schedules, substitutionRequests } from "@shared/schema";
 import { db } from '../db';
 import { eq, count, or } from 'drizzle-orm';
+import { getHealthStatus } from "../services/healthService";
 
 const router = Router();
 
 // Health check endpoint for PWA connectivity checks
-router.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+router.get('/api/health', async (_req, res) => {
+  res.status(200).json(await getHealthStatus());
 });
-router.head('/api/health', (req, res) => {
+router.head('/api/health', (_req, res) => {
   res.status(200).end();
+});
+
+router.get('/api/health/ready', async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).json(health);
+});
+
+router.head('/api/health/ready', async (_req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  res.status(health.status === "ok" ? 200 : 503).end();
 });
 
 // Health check / diagnostic endpoint - útil para debugar problemas de produção
