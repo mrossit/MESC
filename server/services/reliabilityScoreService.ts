@@ -17,7 +17,7 @@ import { db } from '../db';
 import { users, substitutionRequests, notifications } from '../../shared/schema';
 import { eq, and, gte, sql, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
-import { ADMIN_ROLES } from '../../shared/roles';
+import { DB_ADMIN_ROLES } from '../../shared/roles';
 
 export interface ReliabilityMetrics {
   ministerId: string;
@@ -392,7 +392,7 @@ export async function checkAndAlertLowReliability(): Promise<{
       .from(users)
       .where(
         and(
-          inArray(users.role, [...ADMIN_ROLES]),
+          inArray(users.role, DB_ADMIN_ROLES),
           eq(users.status, 'active')
         )
       );
@@ -422,14 +422,14 @@ export async function checkAndAlertLowReliability(): Promise<{
         try {
           await db.insert(notifications).values({
             userId: coordinator.id,
-            type: isCritical ? 'alert' : 'info',
+            type: 'announcement',
             title: isCritical
               ? 'Alerta Crítico: Confiabilidade Muito Baixa'
               : 'Atenção: Confiabilidade Baixa',
             message,
             actionUrl: `/admin/users/${minister.ministerId}`, // Link to minister profile
             priority: isCritical ? 'high' : 'medium',
-            metadata: JSON.stringify({
+            data: {
               ministerId: minister.ministerId,
               ministerName: minister.ministerName,
               reliabilityScore: minister.reliabilityScore,
@@ -437,7 +437,7 @@ export async function checkAndAlertLowReliability(): Promise<{
               substitutionRequestCount: minister.substitutionRequestCount,
               manualRemovalCount: minister.manualRemovalCount,
               noShowCount: minister.noShowCount,
-            }),
+            },
           });
 
           alertsSent++;

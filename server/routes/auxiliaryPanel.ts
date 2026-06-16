@@ -8,10 +8,14 @@ import {
   ministerCheckIns,
   notifications
 } from "@shared/schema";
+import type { InsertMassExecutionLog } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
-import { ADMIN_ROLES } from "@shared/roles";
+import { DB_ADMIN_ROLES } from "@shared/roles";
 import { format, addHours, subHours, isWithinInterval, parseISO } from 'date-fns';
+import { communityIdFromSchedule } from "../utils/communityContext";
+
+type MassExecutionChange = NonNullable<InsertMassExecutionLog["changesMade"]>[number];
 
 // Helper to get error message
 function getErrorMessage(error: unknown): string {
@@ -369,6 +373,7 @@ router.post("/check-in", requireAuth, async (req: AuthRequest, res: Response) =>
     } else {
       // Create new
       await db.insert(ministerCheckIns).values({
+        communityId: assignment[0].communityId,
         scheduleId,
         ministerId,
         position,
@@ -394,7 +399,7 @@ router.post("/check-in", requireAuth, async (req: AuthRequest, res: Response) =>
         updateType: 'check_in',
         ministerId,
         ministerName: minister?.name || 'Ministro',
-        position,
+        position: String(position),
         status
       });
     } catch (wsError) {
@@ -440,7 +445,7 @@ router.put("/redistribute", requireAuth, async (req: AuthRequest, res: Response)
     }
 
     // Apply each change
-    const appliedChanges = [];
+    const appliedChanges: MassExecutionChange[] = [];
     for (const change of changes) {
       const { ministerId, fromPosition, toPosition, reason } = change;
 
@@ -483,6 +488,7 @@ router.put("/redistribute", requireAuth, async (req: AuthRequest, res: Response)
         .where(eq(massExecutionLogs.id, existingLog[0].id));
     } else {
       await db.insert(massExecutionLogs).values({
+        communityId: await communityIdFromSchedule(scheduleId),
         scheduleId,
         auxiliaryId: userId,
         changesMade: appliedChanges
@@ -545,7 +551,7 @@ router.post("/call-standby", requireAuth, async (req: AuthRequest, res: Response
       return res.status(404).json({ message: "Escala não encontrada" });
     }
 
-    const { date, time } = massInfo[0];
+    const { date, time, communityId } = massInfo[0];
 
     // Get auxiliary name
     const auxiliary = await db
@@ -558,6 +564,7 @@ router.post("/call-standby", requireAuth, async (req: AuthRequest, res: Response
 
     // Record standby call
     await db.insert(standbyMinisters).values({
+      communityId,
       scheduleId,
       ministerId,
       calledAt: new Date(),
@@ -721,6 +728,7 @@ router.post("/mass-report", requireAuth, async (req: AuthRequest, res: Response)
     } else {
       // Create new
       await db.insert(massExecutionLogs).values({
+        communityId: await communityIdFromSchedule(scheduleId),
         scheduleId,
         auxiliaryId: userId,
         attendance,
@@ -758,7 +766,7 @@ router.post("/mass-report", requireAuth, async (req: AuthRequest, res: Response)
         .from(users)
         .where(
           and(
-            inArray(users.role, [...ADMIN_ROLES]),
+            inArray(users.role, DB_ADMIN_ROLES),
             eq(users.status, 'active')
           )
         );

@@ -50,6 +50,8 @@ interface SubstitutionRequestData {
   requesterName?: string;
   massDate?: string;
   massTime?: string;
+  urgency?: string;
+  hoursUntil?: number;
 }
 
 interface CriticalMassData {

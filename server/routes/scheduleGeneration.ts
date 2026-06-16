@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { scheduleCache } from '../services/scheduleCache';
 import { learningService } from '../services/learningService';
+import { resolveWriteCommunityId } from '../utils/communityContext';
 import type {
   EmergencySaveScheduleInput,
   ScheduleSaveResult,
@@ -25,6 +26,10 @@ import type {
 import { getErrorMessage, getErrorStack } from '../types/schedules';
 
 const router = Router();
+
+function toScheduleType(value: string | null | undefined): 'missa' | 'celebracao' | 'evento' {
+  return value === 'celebracao' || value === 'evento' ? value : 'missa';
+}
 
 /**
  * Sentinela usada para forçar ROLLBACK de uma transação de "substituir escalas"
@@ -215,7 +220,11 @@ router.post('/generate', authenticateToken, requireRole(['gestor', 'coordenador'
 
     if (db) {
       // Save schedules to database
-      savedCount = await saveGeneratedSchedules(generatedSchedules, replaceExisting);
+      savedCount = await saveGeneratedSchedules(
+        generatedSchedules,
+        replaceExisting,
+        await resolveWriteCommunityId(req.user)
+      );
 
       // Build the original schedule JSON for learning/comparison
       const originalScheduleJson = {
@@ -1463,7 +1472,11 @@ router.get('/quality-metrics/:year/:month', authenticateToken, requireRole(['ges
 });
 
 // Funções auxiliares
-async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], replaceExisting: boolean): Promise<number> {
+async function saveGeneratedSchedules(
+  generatedSchedules: GeneratedSchedule[],
+  replaceExisting: boolean,
+  communityId: string
+): Promise<number> {
   if (!db) return 0;
 
   // Phase 1 - Data Integrity: Wrap entire operation in transaction
@@ -1513,6 +1526,7 @@ async function saveGeneratedSchedules(generatedSchedules: GeneratedSchedule[], r
         const minister = validMinisters[i];
         const ministerPosition = (minister as { position?: number }).position;
         await tx.insert(schedules).values({
+          communityId,
           date: schedule.massTime.date,
           time: schedule.massTime.time,
           type: 'missa',
@@ -1872,7 +1886,8 @@ router.post('/add-minister', authenticateToken, requireRole(['gestor', 'coordena
       .values({
         date: data.date,
         time: data.time,
-        type: data.type,
+        communityId: await resolveWriteCommunityId(req.user),
+        type: toScheduleType(data.type),
         location: data.location,
         ministerId: data.ministerId,
         position: newPosition,

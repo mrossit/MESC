@@ -12,6 +12,7 @@ import type { Schedule } from "@shared/schema";
 import { sendPushNotificationToUsers } from "../utils/pushNotifications";
 import { storage } from "../storage";
 import { notifyUsers } from "../websocket";
+import { resolveWriteCommunityId } from "../utils/communityContext";
 
 // Query parameter validation schemas
 const ministerIdQuerySchema = z.object({
@@ -679,6 +680,7 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), async (req
     const newSchedule = await db
       .insert(schedules)
       .values({
+        communityId: await resolveWriteCommunityId(req.user),
         date,
         time,
         type: type as 'missa' | 'celebracao' | 'evento',

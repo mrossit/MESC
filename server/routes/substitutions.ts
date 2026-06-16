@@ -366,6 +366,12 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
 
     // Mapear 'time' para 'massTime' para compatibilidade com o frontend
     const responseData = {
+      id: requestWithDetails.request.id,
+      scheduleId: requestWithDetails.request.scheduleId,
+      requesterId: requestWithDetails.request.requesterId,
+      requesterName: requestWithDetails.requestingUser?.name,
+      massDate: requestWithDetails.assignment.date,
+      massTime: requestWithDetails.assignment.time,
       ...requestWithDetails,
       assignment: {
         ...requestWithDetails.assignment,

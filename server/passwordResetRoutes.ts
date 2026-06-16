@@ -3,7 +3,7 @@ import { db } from "./db";
 import { passwordResetRequests, users, notifications } from "@shared/schema";
 import { eq, and, or, desc, inArray } from "drizzle-orm";
 import { hashPassword } from "./auth";
-import { ADMIN_ROLES } from "@shared/roles";
+import { DB_ADMIN_ROLES } from "@shared/roles";
 
 const router = Router();
 
@@ -68,7 +68,7 @@ router.post("/request-reset", async (req, res) => {
         and(
           eq(users.status, 'active'),
           // Notifica todas as variantes de coordenador + gestor/reitor
-          inArray(users.role, [...ADMIN_ROLES])
+          inArray(users.role, DB_ADMIN_ROLES)
         )
       );
 

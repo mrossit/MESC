@@ -48,7 +48,8 @@ import { db } from "./db";
 import { eq, and, desc, count, sql, gte, lte, or, inArray } from "drizzle-orm";
 import Database from 'better-sqlite3';
 import { formatName } from "./utils/nameFormatter";
-import { getMatrizCommunityId, communityIdFromQuestionnaire } from "./utils/communityContext";
+import { getMatrizCommunityId, communityIdFromQuestionnaire, communityIdFromSchedule } from "./utils/communityContext";
+import { normalizeRoleForPersistence } from "@shared/roles";
 
 // Type for SQLite row data
 type SQLiteRow = Record<string, unknown>;
@@ -143,7 +144,7 @@ export interface QuestionnaireResponseInput {
     questionId: string;
     question?: string;
     answer: unknown;
-    metadata?: unknown;
+    metadata?: Record<string, unknown>;
   }>;
   processingWarnings?: string[];
   sharedWithFamilyIds?: string[];
@@ -369,13 +370,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const persistedUserData = userData.role
+      ? { ...userData, role: normalizeRoleForPersistence(userData.role) }
+      : userData;
+
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(persistedUserData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...persistedUserData,
           updatedAt: new Date(),
         },
       })
@@ -404,7 +409,7 @@ export class DatabaseStorage implements IStorage {
         firstName: userData.firstName || null,
         lastName: userData.lastName || null,
         phone: userData.phone || null,
-        role: userData.role as any || 'ministro',
+        role: normalizeRoleForPersistence(userData.role),
         status: userData.status as any || 'pending',
         birthDate: userData.birthDate || null,
         address: userData.address || null,
@@ -428,6 +433,9 @@ export class DatabaseStorage implements IStorage {
     const updateData = { ...userData };
     if (updateData.name) {
       updateData.name = formatName(updateData.name);
+    }
+    if (updateData.role) {
+      updateData.role = normalizeRoleForPersistence(updateData.role);
     }
 
     const [user] = await db
@@ -507,6 +515,7 @@ export class DatabaseStorage implements IStorage {
         month: questionnaireData.month,
         year: questionnaireData.year,
         questions: questionnaireData.questions as any,
+        communityId: (questionnaireData as { communityId?: string }).communityId || await getMatrizCommunityId(),
         deadline: questionnaireData.deadline || null,
         targetUserIds: questionnaireData.targetUserIds as any || null,
         createdById: questionnaireData.createdById
@@ -525,7 +534,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuestionnaire(id: string, questionnaireData: Partial<InsertQuestionnaire>): Promise<Questionnaire> {
-    const updateData: Partial<InsertQuestionnaire> & { updatedAt: Date } = {
+    const updateData: Partial<typeof questionnaires.$inferInsert> & { updatedAt: Date } = {
       updatedAt: new Date(),
     };
     if (questionnaireData.title) updateData.title = questionnaireData.title;
@@ -534,7 +543,11 @@ export class DatabaseStorage implements IStorage {
     if (questionnaireData.year) updateData.year = questionnaireData.year;
     if (questionnaireData.questions) updateData.questions = questionnaireData.questions;
     if (questionnaireData.deadline !== undefined) updateData.deadline = questionnaireData.deadline;
-    if (questionnaireData.targetUserIds !== undefined) updateData.targetUserIds = questionnaireData.targetUserIds;
+    if (questionnaireData.targetUserIds !== undefined) {
+      updateData.targetUserIds = Array.isArray(questionnaireData.targetUserIds)
+        ? questionnaireData.targetUserIds.filter((id): id is string => typeof id === "string")
+        : null;
+    }
     
     const [questionnaire] = await db
       .update(questionnaires)
@@ -598,7 +611,10 @@ export class DatabaseStorage implements IStorage {
   async createSchedule(scheduleData: ScheduleInput): Promise<Schedule> {
     const [schedule] = await db
       .insert(schedules)
-      .values(scheduleData)
+      .values({
+        ...scheduleData,
+        communityId: (scheduleData as { communityId?: string }).communityId || await getMatrizCommunityId()
+      })
       .returning();
     return schedule;
   }
@@ -804,7 +820,7 @@ export class DatabaseStorage implements IStorage {
   async updateSchedule(id: string, scheduleData: Partial<ScheduleInput>): Promise<Schedule> {
     const [schedule] = await db
       .update(schedules)
-      .set({ ...scheduleData, updatedAt: new Date() })
+      .set(scheduleData)
       .where(eq(schedules.id, id))
       .returning();
     return schedule;
@@ -818,7 +834,10 @@ export class DatabaseStorage implements IStorage {
   async createSubstitutionRequest(requestData: SubstitutionRequestInput): Promise<SubstitutionRequest> {
     const [request] = await db
       .insert(substitutionRequests)
-      .values(requestData)
+      .values({
+        ...requestData,
+        communityId: (requestData as { communityId?: string }).communityId || await communityIdFromSchedule(requestData.scheduleId)
+      })
       .returning();
     return request;
   }
@@ -1498,13 +1517,16 @@ export class DatabaseStorage implements IStorage {
 
   // Formation lesson progress operations
   async getFormationLessonProgress(userId: string, lessonId?: string): Promise<FormationLessonProgress[]> {
-    const query = db.select().from(formationLessonProgress).where(eq(formationLessonProgress.userId, userId));
-    
+    const conditions = [eq(formationLessonProgress.userId, userId)];
     if (lessonId) {
-      return await query.where(and(eq(formationLessonProgress.userId, userId), eq(formationLessonProgress.lessonId, lessonId)));
+      conditions.push(eq(formationLessonProgress.lessonId, lessonId));
     }
-    
-    return await query.orderBy(desc(formationLessonProgress.lastAccessedAt));
+
+    return await db
+      .select()
+      .from(formationLessonProgress)
+      .where(and(...conditions))
+      .orderBy(desc(formationLessonProgress.lastAccessedAt));
   }
 
   async getFormationLessonProgressById(id: string): Promise<FormationLessonProgress | undefined> {
@@ -1515,8 +1537,8 @@ export class DatabaseStorage implements IStorage {
   async getUserFormationProgress(userId: string, trackId?: string): Promise<FormationLessonProgress[]> {
     if (trackId) {
       // Join with lessons to filter by trackId
-      return await db
-        .select()
+      const rows = await db
+        .select({ progress: formationLessonProgress })
         .from(formationLessonProgress)
         .innerJoin(formationLessons, eq(formationLessonProgress.lessonId, formationLessons.id))
         .where(and(
@@ -1524,6 +1546,7 @@ export class DatabaseStorage implements IStorage {
           eq(formationLessons.trackId, trackId)
         ))
         .orderBy(desc(formationLessonProgress.lastAccessedAt));
+      return rows.map((row) => row.progress);
     }
     
     return await this.getFormationLessonProgress(userId);
@@ -1579,7 +1602,9 @@ export class DatabaseStorage implements IStorage {
         eq(formationLessonProgress.lessonId, lessonId)
       ));
 
-    const currentSections = currentProgress?.completedSections || [];
+    const currentSections = Array.isArray(currentProgress?.completedSections)
+      ? [...(currentProgress.completedSections as string[])]
+      : [];
     
     // Add section if not already completed
     if (!currentSections.includes(sectionId)) {
