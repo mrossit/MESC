@@ -62,23 +62,23 @@ export const ADMIN_ROLES: readonly string[] = [
 export const MANAGER_ROLES: readonly string[] = [ROLES.GESTOR, ROLES.REITOR];
 
 /** Variantes de coordenador que existem no enum do banco. */
-export const DB_COORDINATOR_ROLES = [
+export const DB_COORDINATOR_ROLES: DbRole[] = [
   ROLES.COORDENADOR_COMUNIDADE,
   ROLES.COORDENADOR_PAROQUIAL,
-] as const satisfies readonly DbRole[];
+];
 
 /** Papéis administrativos válidos para filtros Drizzle sobre users.role. */
-export const DB_ADMIN_ROLES = [
+export const DB_ADMIN_ROLES: DbRole[] = [
   ...DB_COORDINATOR_ROLES,
   ROLES.GESTOR,
   ROLES.REITOR,
-] as const satisfies readonly DbRole[];
+];
 
 /** Usuários que podem responder questionários/entrar em escalas, sem alias legado. */
-export const DB_MINISTER_AND_COORDINATOR_ROLES = [
+export const DB_MINISTER_AND_COORDINATOR_ROLES: DbRole[] = [
   ROLES.MINISTRO,
   ...DB_COORDINATOR_ROLES,
-] as const satisfies readonly DbRole[];
+];
 
 const DB_ROLE_SET = new Set<string>([
   ROLES.GESTOR,
