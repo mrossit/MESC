@@ -6,13 +6,8 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-var __esm = (fn, res, err) => function __init() {
-  if (err) throw err[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err = [e], e;
-  }
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -180,7 +175,7 @@ var init_schema = __esm({
       ]
     );
     userRoleEnum = pgEnum("user_role", ["gestor", "reitor", "coordenador_comunidade", "coordenador_paroquial", "ministro"]);
-    userStatusEnum = pgEnum("user_status", ["active", "inactive", "pending"]);
+    userStatusEnum = pgEnum("user_status", ["active", "inactive", "pending", "deleted"]);
     scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published", "completed"]);
     scheduleTypeEnum = pgEnum("schedule_type", ["missa", "celebracao", "evento"]);
     substitutionStatusEnum = pgEnum("substitution_status", ["available", "pending", "approved", "rejected", "cancelled", "auto_approved"]);
@@ -8622,6 +8617,9 @@ async function login(email, password) {
     }
     if (user.status === "inactive") {
       throw new Error("Usu\xE1rio inativo. Entre em contato com a coordena\xE7\xE3o.");
+    }
+    if (user.status === "deleted") {
+      throw new Error("Esta conta foi exclu\xEDda.");
     }
     const passwordHash = user.passwordHash || "";
     const isValidPassword = await verifyPassword(password, passwordHash);
@@ -29403,12 +29401,213 @@ router39.post("/api/formation/lessons/:id/sections", authenticateToken, requireR
 });
 var formation_default = router39;
 
+// server/routes/account.ts
+await init_db();
+import { Router as Router40 } from "express";
+import { and as and38, eq as eq51, or as or15 } from "drizzle-orm";
+init_schema();
+var router40 = Router40();
+var CONFIRMATION_TEXT = "EXCLUIR MINHA CONTA";
+function clearAuthCookies(res) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== "development",
+    sameSite: "lax",
+    path: "/"
+  };
+  res.clearCookie("token", cookieOptions);
+  res.clearCookie("session_token", cookieOptions);
+}
+router40.get("/deletion-info", authenticateToken, async (_req, res) => {
+  res.json({
+    confirmationText: CONFIRMATION_TEXT,
+    retainedOperationalData: "Escalas e registros operacionais podem ser preservados sem dados pessoais identific\xE1veis para continuidade pastoral, auditoria e seguran\xE7a.",
+    deletedData: [
+      "nome, email, telefone, foto e dados sacramentais",
+      "notifica\xE7\xF5es e inscri\xE7\xF5es de push",
+      "sess\xF5es ativas",
+      "v\xEDnculos familiares",
+      "respostas de question\xE1rios e observa\xE7\xF5es pessoais",
+      "progresso de forma\xE7\xE3o, gamifica\xE7\xE3o e certificados vinculados \xE0 conta"
+    ]
+  });
+});
+router40.delete("/", authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ message: "Usu\xE1rio n\xE3o autenticado" });
+  }
+  const { confirmation, password } = req.body ?? {};
+  if (confirmation !== CONFIRMATION_TEXT) {
+    return res.status(400).json({
+      message: `Digite exatamente "${CONFIRMATION_TEXT}" para confirmar a exclus\xE3o.`
+    });
+  }
+  const [user] = await db.select().from(users).where(eq51(users.id, userId)).limit(1);
+  if (!user) {
+    clearAuthCookies(res);
+    return res.status(204).send();
+  }
+  if (user.status === "deleted") {
+    clearAuthCookies(res);
+    return res.status(204).send();
+  }
+  if (!password) {
+    return res.status(400).json({ message: "Informe sua senha atual para excluir a conta." });
+  }
+  const validPassword = await verifyPassword(String(password), user.passwordHash || "");
+  if (!validPassword) {
+    return res.status(403).json({ message: "Senha atual inv\xE1lida." });
+  }
+  const now = /* @__PURE__ */ new Date();
+  const anonymizedEmail = `deleted+${user.id}@deleted.saojudastadeu.app`;
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(questionnaireResponses).set({
+        responses: { accountDeleted: true },
+        availableSundays: [],
+        preferredMassTimes: [],
+        alternativeTimes: [],
+        dailyMassAvailability: [],
+        specialEvents: null,
+        canSubstitute: false,
+        notes: null,
+        unmappedResponses: [],
+        processingWarnings: ["Conta exclu\xEDda pelo titular."],
+        sharedWithFamilyIds: [],
+        isSharedResponse: false,
+        sharedFromUserId: null,
+        isDeleted: true,
+        deletedAt: now,
+        updatedAt: now
+      }).where(eq51(questionnaireResponses.userId, userId));
+      await tx.update(schedules).set({ ministerId: null }).where(eq51(schedules.ministerId, userId));
+      await tx.update(schedules).set({ substituteId: null }).where(eq51(schedules.substituteId, userId));
+      await tx.update(substitutionRequests).set({
+        substituteId: null,
+        reason: null,
+        responseMessage: null,
+        updatedAt: now
+      }).where(eq51(substitutionRequests.substituteId, userId));
+      await tx.update(substitutionRequests).set({
+        reason: null,
+        responseMessage: null,
+        status: "cancelled",
+        updatedAt: now
+      }).where(eq51(substitutionRequests.requesterId, userId));
+      await tx.delete(notifications).where(eq51(notifications.userId, userId));
+      await tx.delete(pushSubscriptions).where(eq51(pushSubscriptions.userId, userId));
+      await tx.delete(familyRelationships).where(
+        or15(
+          eq51(familyRelationships.userId, userId),
+          eq51(familyRelationships.relatedUserId, userId)
+        )
+      );
+      await tx.delete(formationProgress).where(eq51(formationProgress.userId, userId));
+      await tx.delete(formationLessonProgress).where(eq51(formationLessonProgress.userId, userId));
+      await tx.delete(formationCertificates).where(eq51(formationCertificates.userId, userId));
+      await tx.delete(materialAccessLogs).where(eq51(materialAccessLogs.userId, userId));
+      await tx.delete(userBadges).where(eq51(userBadges.userId, userId));
+      await tx.delete(userPoints).where(eq51(userPoints.userId, userId));
+      await tx.delete(pointTransactions).where(eq51(pointTransactions.userId, userId));
+      await tx.delete(leaderboardCache).where(eq51(leaderboardCache.userId, userId));
+      await tx.update(activeSessions).set({ isActive: false }).where(
+        and38(
+          eq51(activeSessions.userId, userId),
+          eq51(activeSessions.isActive, true)
+        )
+      );
+      await tx.update(activityLogs).set({
+        details: { accountDeleted: true },
+        ipAddress: null,
+        userAgent: null
+      }).where(eq51(activityLogs.userId, userId));
+      await tx.update(users).set({
+        email: anonymizedEmail,
+        firstName: null,
+        lastName: null,
+        profileImageUrl: null,
+        name: "Conta exclu\xEDda",
+        phone: null,
+        whatsapp: null,
+        passwordHash: `deleted:${user.id}`,
+        status: "deleted",
+        requiresPasswordChange: true,
+        lastLogin: null,
+        joinDate: null,
+        photoUrl: null,
+        imageData: null,
+        imageContentType: null,
+        familyId: null,
+        birthDate: null,
+        address: null,
+        city: null,
+        zipCode: null,
+        maritalStatus: null,
+        baptismDate: null,
+        baptismParish: null,
+        confirmationDate: null,
+        confirmationParish: null,
+        marriageDate: null,
+        marriageParish: null,
+        preferredPosition: null,
+        preferredPositions: [],
+        avoidPositions: [],
+        preferredTimes: [],
+        availableForSpecialEvents: false,
+        canServeAsCouple: false,
+        spouseMinisterId: null,
+        extraActivities: {
+          sickCommunion: false,
+          mondayAdoration: false,
+          helpOtherPastorals: false,
+          festiveEvents: false
+        },
+        ministryStartDate: null,
+        experience: null,
+        specialSkills: null,
+        liturgicalTraining: false,
+        lastService: null,
+        totalServices: 0,
+        formationCompleted: false,
+        reliabilityScore: null,
+        substitutionRequestCount: 0,
+        substitutionFulfilledCount: 0,
+        manualRemovalCount: 0,
+        noShowCount: 0,
+        lastReliabilityUpdate: null,
+        reliabilityNotes: null,
+        observations: "Conta exclu\xEDda pelo titular.",
+        scheduleDisplayName: "Conta exclu\xEDda",
+        ministerType: null,
+        rejectionReason: null,
+        updatedAt: now
+      }).where(eq51(users.id, userId));
+    });
+    await logAudit("PERSONAL_DATA_DELETE" /* PERSONAL_DATA_DELETE */, {
+      userId,
+      targetResource: "account",
+      reason: "self_service_account_deletion",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
+    clearAuthCookies(res);
+    return res.status(200).json({ success: true, message: "Conta exclu\xEDda com sucesso." });
+  } catch (error) {
+    console.error("[ACCOUNT_DELETE] Failed:", error);
+    return res.status(500).json({
+      message: "N\xE3o foi poss\xEDvel excluir a conta agora. Tente novamente ou fale com o DPO."
+    });
+  }
+});
+var account_default = router40;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
 import { z as z18 } from "zod";
-import { eq as eq51 } from "drizzle-orm";
+import { eq as eq52 } from "drizzle-orm";
 async function registerRoutes(app2) {
   app2.use(cookieParser());
   app2.use(noCacheHeaders);
@@ -29452,6 +29651,7 @@ async function registerRoutes(app2) {
   app2.use("/api/question-mappings", csrfProtection, authenticateToken, requireRole(["coordenador", "gestor"]), questionMappings_default);
   app2.use("/api/learning", csrfProtection, authenticateToken, requireRole(["coordenador", "gestor"]), learningPatterns_default);
   app2.use(users_default);
+  app2.use("/api/account", csrfProtection, account_default);
   app2.use(mass_times_default);
   app2.use(formation_default);
   app2.get("/api/auth/user", authenticateToken, async (req, res) => {
@@ -29716,7 +29916,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull4, and: and39 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull4, and: and40 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -29724,8 +29924,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and39(
-          eq51(substitutionRequests.status, "pending"),
+        and40(
+          eq52(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );
@@ -29737,8 +29937,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and39(
-          eq51(substitutionRequests.status, "pending"),
+        and40(
+          eq52(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );
@@ -29884,9 +30084,14 @@ function log(message, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 async function setupVite(app2, server) {
+  const hmrPort = Number(process.env.PORT || "5000");
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    hmr: {
+      server,
+      host: "localhost",
+      clientPort: hmrPort
+    },
     allowedHosts: true
   };
   const vite = await createViteServer({
@@ -29975,6 +30180,35 @@ function serveStatic(app2) {
 // server/middleware/errorHandler.ts
 init_logger();
 import { ZodError } from "zod";
+
+// server/services/errorMonitoring.ts
+import * as Sentry from "@sentry/node";
+var monitoringEnabled = false;
+function isPlaceholder(value) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "" || normalized.includes("your_sentry_dsn_here") || normalized.includes("change_me") || normalized.includes("placeholder");
+}
+function initErrorMonitoring() {
+  const dsn = process.env.SENTRY_DSN?.trim();
+  if (!dsn || isPlaceholder(dsn)) {
+    monitoringEnabled = false;
+    return false;
+  }
+  Sentry.init({
+    dsn,
+    environment: process.env.NODE_ENV || "development",
+    release: process.env.APP_VERSION || process.env.npm_package_version,
+    sendDefaultPii: false
+  });
+  monitoringEnabled = true;
+  return true;
+}
+function captureError(error, context) {
+  if (!monitoringEnabled) return;
+  Sentry.captureException(error, context);
+}
+
+// server/middleware/errorHandler.ts
 var ApiError = class _ApiError extends Error {
   statusCode;
   errorCode;
@@ -30026,6 +30260,16 @@ function errorHandler(err, req, res, _next) {
       userId: req.user?.id,
       body: req.body
     });
+    captureError(err, {
+      tags: {
+        method: req.method,
+        path: req.path,
+        statusCode: String(statusCode)
+      },
+      extra: {
+        errorCode: isApiError ? err.errorCode : void 0
+      }
+    });
   } else {
     logger.warn(`[WARN] ${req.method} ${req.path}: ${err.message}`, {
       statusCode,
@@ -30053,11 +30297,22 @@ function errorHandler(err, req, res, _next) {
 // server/index.ts
 import path3 from "path";
 process.env.TZ = "America/Sao_Paulo";
+var errorMonitoringEnabled = initErrorMonitoring();
+if (errorMonitoringEnabled) {
+  console.log("\u2705 Error monitoring enabled");
+}
 process.on("uncaughtException", (error) => {
   console.error("\u{1F6A8} Uncaught Exception:", error);
+  captureError(error, {
+    tags: { source: "uncaughtException" }
+  });
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("\u{1F6A8} Unhandled Rejection:", reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+    tags: { source: "unhandledRejection" },
+    extra: { promise: String(promise) }
+  });
 });
 var app = express2();
 app.set("trust proxy", true);
@@ -30132,12 +30387,22 @@ var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.s
   "http://localhost:3000",
   "http://127.0.0.1:5000"
 ];
+var isLocalDevelopmentOrigin = (origin) => {
+  if (process.env.NODE_ENV !== "development") return false;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const isAllowed = allowedOrigins.some((allowedOrigin) => {
         if (origin === allowedOrigin) return true;
+        if (isLocalDevelopmentOrigin(origin)) return true;
         if (origin.includes(".replit.dev") || origin.includes(".replit.com") || origin.includes(".replit.app")) {
           return true;
         }

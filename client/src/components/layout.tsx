@@ -37,12 +37,12 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-background dark:bg-dark-8">
+      <div className="app-shell flex w-full min-w-0 bg-background dark:bg-dark-8">
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="min-w-0 overflow-hidden dark:bg-dark-8">
           {/* Header */}
-          <header className="sticky top-0 z-40 border-b border-border bg-background dark:bg-dark-7 dark:border-dark-4">
-            <div className="flex h-14 items-center gap-3 px-4 sm:h-16 sm:px-6">
+          <header className="safe-area-top sticky top-0 z-40 border-b border-white/60 bg-background/90 backdrop-blur-xl dark:border-white/10 dark:bg-dark-7/90">
+            <div className="flex min-h-14 items-center gap-2 px-3 sm:min-h-16 sm:gap-3 sm:px-6">
               {/* MOBILE: Avatar no canto superior esquerdo (atalho do perfil) */}
               {isMobile && user && (
                 <Link href="/profile">
@@ -86,7 +86,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               </div>
 
               {/* Actions section - à direita */}
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                 {/* Command Search (busca) */}
                 {isMobile ? <CommandSearch /> : <CommandSearch />}
 
@@ -109,9 +109,9 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
           </header>
 
           {/* Main Content */}
-          <main className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-background dark:bg-dark-8 ${isMobile ? 'pb-20' : ''}`}>
+          <div className={`min-h-0 flex-1 overflow-y-auto bg-background px-3 py-3 dark:bg-dark-8 sm:p-6 ${isMobile ? 'pb-mobile-nav' : ''}`}>
             {children}
-          </main>
+          </div>
         </SidebarInset>
       </div>
 

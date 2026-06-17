@@ -131,27 +131,27 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-border/20 bg-card/95 backdrop-blur-sm">
-        <CardHeader className="text-center pb-4">
-          <div className="flex justify-center mb-4">
+    <div className="safe-area-top safe-area-bottom flex min-h-[100svh] w-full items-center justify-center overflow-x-hidden bg-gradient-responsive px-3 py-4 dark:bg-dark-8 sm:px-4">
+      <Card className="liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[25rem]">
+        <CardHeader className="px-4 pb-3 pt-5 text-center sm:px-6 sm:pt-6">
+          <div className="mb-3 flex justify-center">
             <img 
               src="/sjtlogo.png" 
               alt="Santuário São Judas Tadeu" 
-              className="h-72 w-full max-w-xs object-contain"
+              className="h-28 w-full max-w-[12rem] object-contain sm:h-36 sm:max-w-[14rem]"
             />
           </div>
-          <CardTitle className="text-3xl font-bold text-neutral-textDark dark:text-text-light mb-2">
+          <CardTitle className="mb-1 text-2xl font-bold text-neutral-textDark dark:text-text-light sm:text-3xl">
             MESC
           </CardTitle>
-          <p className="text-neutral-textMedium dark:text-gray-400 text-sm mb-1">
+          <p className="mb-1 text-sm text-neutral-textMedium dark:text-gray-400">
             Sistema de Gestão
           </p>
           <p className="text-neutral-textMedium dark:text-gray-400 text-xs">
             Ministério Extraordinário da Sagrada Comunhão
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-5 sm:px-6 sm:pb-6">
           {/* Alerta de timeout de inatividade */}
           {inactivityReason && (
             <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
@@ -163,7 +163,7 @@ export default function Login() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-neutral-textDark dark:text-text-light font-semibold text-sm">
                 Email
@@ -174,7 +174,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={credentials.email}
                 onChange={(e) => handleInputChange("email", e.target.value.toLowerCase().trim())}
-                className="bg-background border-border focus:border-primary focus:ring-primary transition-all duration-200"
+                className="min-h-11 bg-background text-base transition-all duration-200 focus:border-primary focus:ring-primary sm:text-sm"
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -195,7 +195,8 @@ export default function Login() {
                   placeholder="Sua senha"
                   value={credentials.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
+                  className="min-h-11 bg-background pr-12 text-base transition-all duration-200 focus:border-primary focus:ring-primary sm:text-sm"
+                  autoComplete="current-password"
                   required
                   data-testid="input-password"
                 />
@@ -205,6 +206,7 @@ export default function Login() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   data-testid="button-toggle-password"
                 >
                   {showPassword ? (
@@ -216,8 +218,8 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center space-x-2">
                 <Checkbox 
                   id="remember" 
                   checked={rememberMe}
@@ -233,7 +235,7 @@ export default function Login() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80 p-0"
+                className="h-auto p-0 text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80"
                 onClick={() => setShowForgotPassword(true)}
               >
                 Esqueci minha senha
@@ -242,7 +244,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full bg-neutral-neutral hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:hover:bg-dark-gold/90 text-neutral-cream dark:text-dark-10 font-semibold shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className="h-11 w-full bg-neutral-neutral font-semibold text-neutral-cream shadow-lg transition-all duration-200 hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:text-dark-10 dark:hover:bg-dark-gold/90"
               disabled={loginMutation.isPending}
               data-testid="button-login"
             >
@@ -250,7 +252,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-5 space-y-4">
             <div className="text-center">
               <p className="text-sm text-neutral-textMedium dark:text-gray-400">
                 Não tem uma conta?{" "}
@@ -262,7 +264,7 @@ export default function Login() {
               </p>
             </div>
 
-            <div className="text-center pt-2 border-t border-border/30">
+            <div className="border-t border-border/30 pt-3 text-center">
               <p className="text-xs text-neutral-textMedium dark:text-gray-500">
                 Ao entrar, você concorda com nossos{" "}
                 <Link href="/terms-of-use">
@@ -290,7 +292,7 @@ export default function Login() {
 
       {/* Dialog para usuário com conta pendente */}
       <Dialog open={showPendingDialog} onOpenChange={setShowPendingDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
@@ -347,7 +349,7 @@ export default function Login() {
 
       {/* Dialog para Esqueci a Senha */}
       <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 bg-neutral-accentWarm/10 dark:bg-dark-gold/20 rounded-full flex items-center justify-center">
@@ -373,7 +375,7 @@ export default function Login() {
                 value={forgotPasswordEmail}
                 onChange={(e) => setForgotPasswordEmail(e.target.value.toLowerCase().trim())}
                 required
-                className="bg-background border-border"
+                className="min-h-11 bg-background text-base sm:text-sm"
               />
             </div>
             <div className="bg-neutral-badgeWarm/20 dark:bg-dark-3 rounded-lg p-3">

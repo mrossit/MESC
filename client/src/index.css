@@ -187,9 +187,17 @@
   * {
     @apply border-border;
   }
+
+  html {
+    min-height: 100%;
+    background-color: rgb(var(--background));
+  }
   
   body {
     @apply font-sans antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
     font-weight: 400;
@@ -199,6 +207,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
   
   /* Tipografia elegante */
@@ -454,6 +467,51 @@
 }
 
 @layer utilities {
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  @supports (min-height: 100dvh) {
+    .app-shell {
+      min-height: 100dvh;
+    }
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pb-mobile-nav {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .ios-glass-bar {
+    background:
+      linear-gradient(180deg, rgba(248, 245, 238, 0.92), rgba(248, 245, 238, 0.76)),
+      rgba(var(--background), 0.82);
+    border-color: rgba(255, 255, 255, 0.58);
+    box-shadow:
+      0 -18px 46px rgba(55, 42, 28, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.64);
+    backdrop-filter: blur(22px) saturate(1.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  }
+
+  .dark .ios-glass-bar {
+    background:
+      linear-gradient(180deg, rgba(31, 20, 18, 0.9), rgba(19, 12, 11, 0.8)),
+      rgba(var(--background), 0.86);
+    border-color: rgba(255, 248, 240, 0.12);
+    box-shadow:
+      0 -18px 46px rgba(0, 0, 0, 0.36),
+      inset 0 1px 0 rgba(255, 248, 240, 0.10);
+  }
+
   /* Sidebar refinado - Sem bordas nas opções */
   [data-sidebar="sidebar"] {
     background: rgb(var(--sidebar-background)) !important;

@@ -14,6 +14,9 @@ export function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [location] = useLocation();
+  const hiddenOnPublicRoutes = ['/login', '/register', '/change-password'].some((route) =>
+    location.startsWith(route)
+  );
 
   useEffect(() => {
     // Check if app is already installed
@@ -79,8 +82,8 @@ export function PWAInstallPrompt() {
 
   // Don't show if already installed or previously dismissed recently, unless on install page
   useEffect(() => {
-    // Always hide on install page (has its own UI)
-    if (location === '/install') {
+    // Public/auth pages and the install page have their own focused UI.
+    if (location === '/install' || hiddenOnPublicRoutes) {
       setShowPrompt(false);
       return;
     }
@@ -94,30 +97,30 @@ export function PWAInstallPrompt() {
         setShowPrompt(false);
       }
     }
-  }, [location]);
+  }, [hiddenOnPublicRoutes, location]);
 
-  if (isInstalled || !showPrompt) {
+  if (isInstalled || !showPrompt || hiddenOnPublicRoutes) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-md">
-      <Card className="shadow-lg border-2 border-primary/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <CardContent className="p-4">
+    <div className="safe-area-bottom fixed inset-x-3 bottom-3 z-50 mx-auto max-w-sm md:left-auto md:right-4 md:max-w-md">
+      <Card className="ios-glass-bar border shadow-lg">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-1">
               <Download className="h-5 w-5 text-primary" />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-sm mb-1">Instalar MESC</h3>
               <p className="text-xs text-muted-foreground mb-3">
                 Instale o aplicativo MESC em seu dispositivo para acesso rápido e funcionamento offline.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   onClick={handleInstallClick}
-                  className="flex-1"
+                  className="min-w-32 flex-1"
                 >
                   Instalar
                 </Button>

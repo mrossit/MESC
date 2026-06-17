@@ -195,10 +195,10 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
     return times[time] || time;
   };
 
-  const getPositionLabel = (position: number) => {
+  const getCompactPositionLabel = (position: number) => {
     const liturgicalName = LITURGICAL_POSITIONS[position];
     if (liturgicalName) {
-      return `Posição ${position} (${liturgicalName})`;
+      return `P${position}: ${liturgicalName}`;
     }
     return `Posição ${position}`;
   };
@@ -227,11 +227,11 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
         onOpenChange={setIsPrayerOpen}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <Card className="liquid-glass border-0">
-          <CardContent className="p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1.45fr_0.95fr] lg:items-stretch">
-              <div className="flex min-h-[220px] flex-col justify-between rounded-lg bg-gradient-to-br from-white/40 via-white/20 to-sage/20 p-4 dark:from-white/10 dark:via-white/5 dark:to-amber-900/10">
+          <CardContent className="p-3 sm:p-5">
+            <div className="grid gap-3 sm:gap-4 lg:grid-cols-[1.45fr_0.95fr] lg:items-stretch">
+              <div className="flex flex-col justify-between rounded-lg bg-gradient-to-br from-white/50 via-white/25 to-sage/20 p-3 dark:from-white/10 dark:via-white/5 dark:to-amber-900/10 sm:min-h-[220px] sm:p-4">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="liquid-glass-chip border-0 px-2.5 py-1 text-[11px] font-semibold text-burgundy dark:text-amber-100">
@@ -243,7 +243,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Paz e bem, {firstName}</p>
-                    <h2 className="mt-1 text-2xl font-bold leading-tight text-foreground sm:text-3xl">
+                    <h2 className="mt-1 text-[1.4rem] font-bold leading-tight text-foreground sm:text-3xl">
                       Sua missão da semana em um só lugar
                     </h2>
                   </div>
@@ -256,7 +256,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setLocation("/schedules")}
-                    className="liquid-glass-chip liquid-glass-interactive rounded-lg px-3 py-3 text-left"
+                    className="liquid-glass-chip liquid-glass-interactive min-h-[5.25rem] rounded-lg px-3 py-3 text-left"
                   >
                     <Calendar className="mb-2 h-4 w-4 text-burgundy dark:text-amber-200" />
                     <span className="block text-xs font-semibold text-foreground">Escalas</span>
@@ -265,7 +265,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setLocation("/questionnaire")}
-                    className="liquid-glass-chip liquid-glass-interactive rounded-lg px-3 py-3 text-left"
+                    className="liquid-glass-chip liquid-glass-interactive min-h-[5.25rem] rounded-lg px-3 py-3 text-left"
                   >
                     <CheckCircle className="mb-2 h-4 w-4 text-sage-dark dark:text-sage-light" />
                     <span className="block text-xs font-semibold text-foreground">Responder</span>
@@ -274,7 +274,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setLocation("/schedules/substitutions")}
-                    className="liquid-glass-chip liquid-glass-interactive rounded-lg px-3 py-3 text-left"
+                    className="liquid-glass-chip liquid-glass-interactive min-h-[5.25rem] rounded-lg px-3 py-3 text-left"
                   >
                     <Users className="mb-2 h-4 w-4 text-purple-700 dark:text-purple-200" />
                     <span className="block text-xs font-semibold text-foreground">Substituir</span>
@@ -283,7 +283,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setIsPrayerOpen(true)}
-                    className="liquid-glass-chip liquid-glass-interactive rounded-lg px-3 py-3 text-left"
+                    className="liquid-glass-chip liquid-glass-interactive min-h-[5.25rem] rounded-lg px-3 py-3 text-left"
                   >
                     <Heart className="mb-2 h-4 w-4 text-red-700 dark:text-red-200" />
                     <span className="block text-xs font-semibold text-foreground">Oração</span>
@@ -292,13 +292,13 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-white/50 bg-white/40 p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+              <div className="rounded-lg border border-white/50 bg-white/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
                     <div className="liquid-glass-chip flex h-9 w-9 items-center justify-center rounded-lg">
                       <Sparkles className="h-4 w-4 text-burgundy dark:text-amber-200" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs font-medium uppercase text-muted-foreground">Próxima missão</p>
                       <p className="text-sm font-semibold text-foreground">
                         {nextSchedule ? "Você está escalado" : "Sem escala próxima"}
@@ -309,7 +309,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                     variant="ghost"
                     size="sm"
                     onClick={handleOpenTutorial}
-                    className="h-8 gap-1 px-2 text-xs"
+                    className="h-8 shrink-0 gap-1 px-2 text-xs"
                   >
                     <HelpCircle className="h-3.5 w-3.5" />
                     Ajuda
@@ -324,20 +324,20 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setLocation(`/schedules?date=${nextSchedule.date}`)}
-                    className="liquid-glass-interactive w-full rounded-lg border border-white/50 bg-white/30 p-4 text-left dark:border-white/10 dark:bg-white/5"
+                    className="liquid-glass-interactive w-full rounded-lg border border-white/50 bg-white/30 p-3 text-left dark:border-white/10 dark:bg-white/5 sm:p-4"
                   >
                     <p className="text-sm font-semibold capitalize text-foreground">{nextScheduleDate}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="liquid-glass-chip inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
-                        <Clock className="h-3.5 w-3.5" />
+                      <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
+                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                         {getMassTimeLabel(nextSchedule.massTime)}
                       </span>
-                      <span className="liquid-glass-chip inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {getPositionLabel(nextSchedule.position)}
+                      <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
+                        <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="min-w-0 truncate">{getCompactPositionLabel(nextSchedule.position)}</span>
                       </span>
                     </div>
-                    <div className="mt-4 flex items-center justify-between text-xs font-medium text-burgundy dark:text-amber-100">
+                    <div className="mt-4 flex items-center justify-between gap-3 text-xs font-medium text-burgundy dark:text-amber-100">
                       Abrir detalhes da escala
                       <ArrowRight className="h-4 w-4" />
                     </div>
@@ -365,13 +365,13 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
 
       {/* Próximas Escalas */}
       <Card className="liquid-glass border-0">
-        <CardHeader>
+        <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Calendar className="h-5 w-5 text-neutral-accentWarm dark:text-amber-600" />
             Minhas Próximas Escalas
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
           {loadingSchedules ? (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4 animate-pulse">
@@ -392,18 +392,19 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {upcomingSchedules.slice(0, 5).map((schedule) => (
-                <div
+                <button
                   key={schedule.id}
-                  className="liquid-glass-interactive flex cursor-pointer items-center justify-between rounded-lg border border-white/50 bg-white/30 p-3 transition-colors dark:border-white/10 dark:bg-white/5"
+                  type="button"
+                  className="liquid-glass-interactive flex w-full cursor-pointer flex-col gap-3 rounded-lg border border-white/50 bg-white/30 p-3 text-left transition-colors dark:border-white/10 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between"
                   onClick={() => setLocation(`/schedules?date=${schedule.date}`)}
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-foreground">
                         {format(parseScheduleDate(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
                       </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {getPositionLabel(schedule.position)}
+                      <Badge variant="secondary" className="max-w-full text-xs">
+                        <span className="truncate">{getCompactPositionLabel(schedule.position)}</span>
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -411,8 +412,8 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                       <span>{getMassTimeLabel(schedule.massTime)}</span>
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
+                  <ArrowRight className="h-4 w-4 self-end text-muted-foreground sm:self-center" />
+                </button>
               ))}
               {upcomingSchedules.length > 5 && (
                 <div className="text-center pt-2">
@@ -554,8 +555,8 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                         </div>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="text-xs mt-2">
-                      {getPositionLabel(schedule.position)}
+                    <Badge variant="secondary" className="mt-2 max-w-full text-xs">
+                      <span className="truncate">{getCompactPositionLabel(schedule.position)}</span>
                     </Badge>
                   </div>
                 ))}
