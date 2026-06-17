@@ -18,6 +18,7 @@ function validProductionEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
     EMAIL_PROVIDER: "resend",
     RESEND_API_KEY: `re_${"d".repeat(32)}`,
     SENTRY_DSN: "https://public@sentry.io/1",
+    VITE_SENTRY_DSN: "https://public@sentry.io/2",
     BACKUP_PASSWORD: "backup-password-with-enough-entropy",
     ...overrides,
   };
@@ -67,6 +68,17 @@ describe("production environment validation", () => {
     expect(result.ok).toBe(false);
     expect(result.errors).toContain(
       "EMAIL_PROVIDER precisa ser resend, sendgrid ou smtp em producao."
+    );
+  });
+
+  it("warns when frontend Sentry is missing while backend Sentry is configured", () => {
+    const result = validateProductionEnvironment(
+      validProductionEnv({ VITE_SENTRY_DSN: "" })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toContain(
+      "VITE_SENTRY_DSN nao esta configurado; erros do frontend nao serao enviados ao Sentry."
     );
   });
 

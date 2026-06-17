@@ -12,17 +12,30 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
 import { scheduleCache } from "./services/scheduleCache";
 import { getHealthStatus } from "./services/healthService";
+import { captureError, initErrorMonitoring } from "./services/errorMonitoring";
 import path from "path";
 
 // =============================================
 //  Global Error Handlers
 // =============================================
+const errorMonitoringEnabled = initErrorMonitoring();
+if (errorMonitoringEnabled) {
+  console.log("✅ Error monitoring enabled");
+}
+
 process.on("uncaughtException", (error) => {
   console.error("🚨 Uncaught Exception:", error);
+  captureError(error, {
+    tags: { source: "uncaughtException" },
+  });
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("🚨 Unhandled Rejection:", reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+    tags: { source: "unhandledRejection" },
+    extra: { promise: String(promise) },
+  });
 });
 
 const app = express();

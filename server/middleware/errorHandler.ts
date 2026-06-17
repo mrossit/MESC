@@ -2,6 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ZodError, type ZodIssue } from 'zod';
 import { logger } from '../utils/logger';
 import { AuthRequest } from '../auth';
+import { captureError } from '../services/errorMonitoring';
 
 // Database error interface (PostgreSQL/Drizzle)
 interface DatabaseError {
@@ -105,6 +106,16 @@ export function errorHandler(
       statusCode,
       userId: req.user?.id,
       body: req.body,
+    });
+    captureError(err, {
+      tags: {
+        method: req.method,
+        path: req.path,
+        statusCode: String(statusCode),
+      },
+      extra: {
+        errorCode: isApiError ? err.errorCode : undefined,
+      },
     });
   } else {
     logger.warn(`[WARN] ${req.method} ${req.path}: ${err.message}`, {

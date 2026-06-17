@@ -37,7 +37,7 @@ Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta 
 ## Warnings nao bloqueantes
 
 - `DATABASE_URL` recomenda `sslmode=require` explicito quando o provedor suportar.
-- `SENTRY_DSN` ainda nao esta configurado; recomendado antes da submissao publica.
+- Sentry esta integrado no backend/frontend, mas ainda exige `SENTRY_DSN` e `VITE_SENTRY_DSN` reais antes da submissao publica.
 - O `pg_dump` disponivel no Replit estava em major 16, enquanto Supabase staging estava em Postgres 17. Para dumps diretos de Supabase 17, usar `pg_dump` 17+.
 
 ## Evidencia de dados restaurados
@@ -48,7 +48,7 @@ Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta 
 
 ## Proximo bloco para loja
 
-1. Configurar `SENTRY_DSN` para monitoramento de erros antes de beta externo.
+1. Configurar `SENTRY_DSN` e `VITE_SENTRY_DSN` para monitoramento de erros antes de beta externo.
 2. Ajustar `DATABASE_URL` com `sslmode=require`, se o Neon/Replit aceitar essa query string.
 3. Aplicar migration `0006_account_deletion_compliance.sql` em producao antes do deploy da feature de exclusao.
 4. Rodar smoke test manual em iOS Safari e Android Chrome com fluxos de ministro, coordenador e exclusao de conta.

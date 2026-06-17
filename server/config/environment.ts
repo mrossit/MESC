@@ -336,6 +336,8 @@ export function validateProductionEnvironment(
 
   if (!env.SENTRY_DSN || isPlaceholderValue(env.SENTRY_DSN)) {
     warnings.push("SENTRY_DSN nao esta configurado; recomendavel antes de publicar nas lojas.");
+  } else if (!env.VITE_SENTRY_DSN || isPlaceholderValue(env.VITE_SENTRY_DSN)) {
+    warnings.push("VITE_SENTRY_DSN nao esta configurado; erros do frontend nao serao enviados ao Sentry.");
   }
 
   if (!env.BACKUP_PASSWORD || isPlaceholderValue(env.BACKUP_PASSWORD)) {
