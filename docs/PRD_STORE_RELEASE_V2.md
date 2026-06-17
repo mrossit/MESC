@@ -211,7 +211,7 @@ Multi-comunidades é o fato novo que justifica entusiasmo no teste: o MESC deixa
 
 ### Fase B - Pré-loja
 
-- Validar em staging a exclusão de conta com usuário de teste/reviewer.
+- Smoke-testar em staging a exclusão de conta com usuário de teste/reviewer.
 - Configurar Sentry.
 - Fechar `sslmode=require` no banco de produção.
 - Empacotar Capacitor iOS/Android.

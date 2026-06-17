@@ -97,4 +97,5 @@ O validador confere:
 - Restore em Supabase staging: OK (`users=141`, `questionnaires=9`, `schedules=2411`).
 - Restore em banco descartavel: OK (`users=141`, `questionnaires=9`, `schedules=2411`).
 - Multi-community em staging: OK, incluindo comunidades, indices, colunas e backfill.
+- Migration `0006_account_deletion_compliance.sql` em staging: OK (`user_status` inclui `deleted`).
 - Acesso temporario `mesc_release` usado na validacao Supabase foi revogado apos os testes.

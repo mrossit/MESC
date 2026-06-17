@@ -16,9 +16,11 @@ O app esta tecnicamente apto a avancar para preparacao de publicacao nas lojas, 
 - Restore em staging: OK.
 - Restore em banco descartavel: OK.
 - Validacao multi-community em staging: OK.
+- Migration de exclusao de conta em staging: OK (`user_status=deleted`).
 - Login temporario usado na validacao Supabase: revogado.
 - Fluxo de exclusao de conta: implementado no app em Configuracoes > Conta.
 - URL publica de exclusao de conta: `/account-deletion`.
+- Suite local de release: OK (`npm run check`, `npm run build`, `npm run test:run`).
 
 ## Warnings nao bloqueantes
 
@@ -36,7 +38,7 @@ O app esta tecnicamente apto a avancar para preparacao de publicacao nas lojas, 
 
 1. Configurar `SENTRY_DSN` para monitoramento de erros antes de beta externo.
 2. Ajustar `DATABASE_URL` com `sslmode=require`, se o Neon/Replit aceitar essa query string.
-3. Aplicar migration `0006_account_deletion_compliance.sql` em staging/producao antes do deploy da feature de exclusao.
+3. Aplicar migration `0006_account_deletion_compliance.sql` em producao antes do deploy da feature de exclusao.
 4. Rodar smoke test manual em iOS Safari e Android Chrome com fluxos de ministro, coordenador e exclusao de conta.
 5. Preparar materiais de loja: nome, descricao curta, descricao completa, politica de privacidade, screenshots, icone e categorias.
 6. Definir trilha de teste: TestFlight para iOS e Internal testing/Closed testing no Google Play.
