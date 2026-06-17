@@ -30,6 +30,13 @@ describe('Substitution Routes', () => {
   });
 
   describe('calculateUrgency', () => {
+    const toLocalDateString = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     function calculateUrgency(massDateStr: string, massTime: string): 'low' | 'medium' | 'high' | 'critical' {
       if (!massDateStr || !massTime) return 'low';
 
@@ -59,7 +66,7 @@ describe('Substitution Routes', () => {
     it('should return critical for mass in less than 12 hours', () => {
       const now = new Date();
       const massDate = new Date(now.getTime() + 6 * 60 * 60 * 1000); // 6 hours from now
-      const dateStr = massDate.toISOString().split('T')[0];
+      const dateStr = toLocalDateString(massDate);
       const timeStr = `${String(massDate.getHours()).padStart(2, '0')}:${String(massDate.getMinutes()).padStart(2, '0')}`;
 
       expect(calculateUrgency(dateStr, timeStr)).toBe('critical');
@@ -68,7 +75,7 @@ describe('Substitution Routes', () => {
     it('should return high for mass in 12-24 hours', () => {
       const now = new Date();
       const massDate = new Date(now.getTime() + 18 * 60 * 60 * 1000); // 18 hours from now
-      const dateStr = massDate.toISOString().split('T')[0];
+      const dateStr = toLocalDateString(massDate);
       const timeStr = `${String(massDate.getHours()).padStart(2, '0')}:${String(massDate.getMinutes()).padStart(2, '0')}`;
 
       expect(calculateUrgency(dateStr, timeStr)).toBe('high');
@@ -77,7 +84,7 @@ describe('Substitution Routes', () => {
     it('should return medium for mass in 24-72 hours', () => {
       const now = new Date();
       const massDate = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
-      const dateStr = massDate.toISOString().split('T')[0];
+      const dateStr = toLocalDateString(massDate);
       const timeStr = `${String(massDate.getHours()).padStart(2, '0')}:${String(massDate.getMinutes()).padStart(2, '0')}`;
 
       expect(calculateUrgency(dateStr, timeStr)).toBe('medium');
@@ -86,7 +93,7 @@ describe('Substitution Routes', () => {
     it('should return low for mass in more than 72 hours', () => {
       const now = new Date();
       const massDate = new Date(now.getTime() + 96 * 60 * 60 * 1000); // 96 hours from now
-      const dateStr = massDate.toISOString().split('T')[0];
+      const dateStr = toLocalDateString(massDate);
       const timeStr = `${String(massDate.getHours()).padStart(2, '0')}:${String(massDate.getMinutes()).padStart(2, '0')}`;
 
       expect(calculateUrgency(dateStr, timeStr)).toBe('low');
