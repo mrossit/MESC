@@ -21,6 +21,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "release:check:local": "npm run check -- --pretty false && npm run build && npm run test:run -- --reporter=dot",
     "release:check:env": "tsx scripts/validate-release-env.ts",
     "release:check:health": "tsx scripts/check-production-health.ts",
     "release:check:backup": "tsx scripts/validate-backup-restore.ts",

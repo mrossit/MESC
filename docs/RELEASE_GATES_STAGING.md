@@ -4,6 +4,24 @@ Data: 17/06/2026
 
 Este runbook valida backend, banco e multi-community antes de promover um build para producao/lojas.
 
+## 0. Release candidate no Replit Preview
+
+No Replit, garanta que a branch esteja atualizada e rode o gate local em comando unico:
+
+```bash
+git pull --ff-only
+npm run release:check:local
+```
+
+Resultado esperado:
+- TypeScript sem erros.
+- Build de producao gerado.
+- Suite Vitest aprovada.
+
+Use o Preview do Replit para smoke test web/PWA: login, logout, painel do ministro, resposta de questionario, visualizacao de escala, pedido de substituicao e exclusao de conta com usuario descartavel.
+
+Observacao: o Preview do Replit nao valida binario nativo iOS/Android. Antes de enviar para App Store/Google Play, ainda e necessario empacotar o app por Capacitor ou alternativa definida.
+
 ## 1. Ambiente
 
 ```bash

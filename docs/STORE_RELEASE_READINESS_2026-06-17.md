@@ -21,6 +21,18 @@ O app esta tecnicamente apto a avancar para preparacao de publicacao nas lojas, 
 - Fluxo de exclusao de conta: implementado no app em Configuracoes > Conta.
 - URL publica de exclusao de conta: `/account-deletion`.
 - Suite local de release: OK (`npm run check`, `npm run build`, `npm run test:run`).
+- Comando unico de release candidate: `npm run release:check:local`.
+
+## Preview Replit
+
+A versao desta branch pode ser testada no Preview do Replit como release candidate web/PWA depois de puxar o ultimo commit:
+
+```bash
+git pull --ff-only
+npm run release:check:local
+```
+
+Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta e comportamento PWA no navegador. Ele nao substitui o empacotamento nativo para App Store/Google Play; ainda falta criar/validar o wrapper nativo (Capacitor ou alternativa definida), com app id, icones, splash, permissoes e build iOS/Android.
 
 ## Warnings nao bloqueantes
 
@@ -43,6 +55,7 @@ O app esta tecnicamente apto a avancar para preparacao de publicacao nas lojas, 
 5. Preparar materiais de loja: nome, descricao curta, descricao completa, politica de privacidade, screenshots, icone e categorias.
 6. Definir trilha de teste: TestFlight para iOS e Internal testing/Closed testing no Google Play.
 7. Validar que o app nao menciona funcionalidades indisponiveis na listagem das lojas.
+8. Definir e criar o wrapper nativo iOS/Android antes da submissao oficial.
 
 ## Observacao de seguranca
 
