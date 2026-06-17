@@ -29,7 +29,7 @@ Configuracao inicial de loja:
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
 - Env local de assinatura Android: `.env.android-release.local`, ignorado pelo Git.
-- Google Play Console: a conta Google logada abriu o fluxo de criacao de conta de desenvolvedor; falta concluir tipo de conta, verificacao e pagamento antes de criar o app Android na loja.
+- Google Play Console: conta de desenvolvedor criada com ID `8424478179778617108`; a criacao de apps ainda esta bloqueada ate concluir verificacao de identidade, confirmacao de acesso a um aparelho Android real pelo app Play Console e verificacao do telefone de contato.
 
 ## Scripts
 
@@ -122,7 +122,7 @@ bundletool validate --bundle android/app/build/outputs/bundle/release/app-releas
 ## Pendencias nativas
 
 - App Store: preencher metadados de loja, privacidade, screenshots e informacoes de review.
-- Google Play: concluir criacao/verificacao da conta de desenvolvedor Play para a conta Google correta.
+- Google Play: concluir as verificacoes obrigatorias da conta de desenvolvedor Play (`identidade`, `aparelho Android real`, `telefone de contato`) para liberar o botao `Criar app`.
 - Google Play: criar app no Play Console, configurar Play App Signing, enviar o AAB assinado e montar trilha Internal testing.
 - Google Play: guardar backup seguro da upload key Android fora do repositorio.
 - Criar conta reviewer.
