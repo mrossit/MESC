@@ -276,6 +276,12 @@ export default function Login() {
                     Política de Privacidade
                   </span>
                 </Link>
+                {" "}e{" "}
+                <Link href="/account-deletion">
+                  <span className="text-neutral-accentWarm hover:underline dark:text-dark-gold cursor-pointer">
+                    Exclusão de Conta
+                  </span>
+                </Link>
               </p>
             </div>
           </div>

@@ -288,7 +288,13 @@ Before promoting a deployment, run:
 NODE_ENV=production npm run release:check:env
 PRODUCTION_BASE_URL=https://saojudastadeu.app npm run release:check:health
 DATABASE_URL="$STAGING_DATABASE_URL" npm run release:check:backup
+DATABASE_URL="$STAGING_DATABASE_URL" \
+RESTORE_DATABASE_URL="$RESTORE_DATABASE_URL" \
+ALLOW_DESTRUCTIVE_RESTORE=true \
+npm run release:check:backup -- --restore
 STAGING_DATABASE_URL="$STAGING_DATABASE_URL" npm run release:check:multi-parish
 ```
+
+If staging runs on Supabase Postgres 17, the Replit image must provide `pg_dump` 17+ to dump from staging directly. A verified existing dump can still be restored with `--backup-file=/path/to/backup.dump`.
 
 **Deployment Target:** Replit (with adaptability for other platforms)

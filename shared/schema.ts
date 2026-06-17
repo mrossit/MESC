@@ -51,7 +51,7 @@ export const communities = pgTable(
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['gestor', 'reitor', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro']);
-export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
+export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending', 'deleted']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
 export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
 export const substitutionStatusEnum = pgEnum('substitution_status', ['available', 'pending', 'approved', 'rejected', 'cancelled', 'auto_approved']);

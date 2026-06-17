@@ -22,7 +22,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: "gestor" | "reitor" | "coordenador" | "coordenador_comunidade" | "coordenador_paroquial" | "ministro";
-  status: "pending" | "active" | "inactive";
+  status: "pending" | "active" | "inactive" | "deleted";
   /** Comunidade-casa do usuário (multi-comunidade). Usado a partir da Fase 3. */
   homeCommunityId?: string;
   requiresPasswordChange?: boolean;
@@ -69,7 +69,7 @@ export function isValidAuthUser(user: unknown): user is AuthUser {
     typeof u.role === 'string' &&
     ['gestor', 'reitor', 'coordenador', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro'].includes(u.role as string) &&
     typeof u.status === 'string' &&
-    ['pending', 'active', 'inactive'].includes(u.status as string)
+    ['pending', 'active', 'inactive', 'deleted'].includes(u.status as string)
   );
 }
 

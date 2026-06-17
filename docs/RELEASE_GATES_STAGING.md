@@ -1,6 +1,6 @@
 # Gates de Staging para Publicacao
 
-Data: 15/06/2026
+Data: 17/06/2026
 
 Este runbook valida backend, banco e multi-community antes de promover um build para producao/lojas.
 
@@ -33,6 +33,19 @@ DATABASE_URL="$STAGING_DATABASE_URL" npm run release:check:backup
 ```
 
 O comando exige `pg_dump` e `pg_restore`, cria um dump custom-format e valida a estrutura do arquivo com `pg_restore --list`.
+
+Notas operacionais:
+- `pg_dump` deve ter a mesma versao major do PostgreSQL alvo ou uma versao mais nova. Exemplo: Supabase Postgres 17 exige `pg_dump` 17+ para criar dumps diretamente dele.
+- Em ambientes IPv4-only, a conexao direta do Supabase (`db.<ref>.supabase.co`) pode falhar. Use o Session Pooler (`<pooler>.pooler.supabase.com:5432`) quando necessario.
+- Se um dump ja foi criado e verificado, o restore pode ser validado sem novo dump:
+
+```bash
+RESTORE_DATABASE_URL="$RESTORE_DATABASE_URL" \
+ALLOW_DESTRUCTIVE_RESTORE=true \
+npm run release:check:backup -- \
+--restore \
+--backup-file=/caminho/backup-release.dump
+```
 
 ## 4. Restore em banco descartavel
 
@@ -75,3 +88,13 @@ O validador confere:
 - Todos os comandos acima passam.
 - O restore foi feito em banco descartavel e validou tabelas principais.
 - A migration multi-community passou em staging antes de qualquer aplicacao em producao.
+
+## Evidencia 17/06/2026
+
+- Health producao (`https://saojudastadeu.app`): OK em `/health`, `/health/ready`, `/api/health`, `/api/health/ready`.
+- Ambiente producao: OK. Warnings restantes: `DATABASE_URL` sem `sslmode=require` explicito e `SENTRY_DSN` ausente.
+- Backup do banco Replit/Neon: OK, dump custom-format verificado (`3.56 MB`).
+- Restore em Supabase staging: OK (`users=141`, `questionnaires=9`, `schedules=2411`).
+- Restore em banco descartavel: OK (`users=141`, `questionnaires=9`, `schedules=2411`).
+- Multi-community em staging: OK, incluindo comunidades, indices, colunas e backfill.
+- Acesso temporario `mesc_release` usado na validacao Supabase foi revogado apos os testes.

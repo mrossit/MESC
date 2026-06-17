@@ -46,6 +46,7 @@ import usersRoutes from "./routes/users";
 import healthRoutes from "./routes/health";
 import massTimesRoutes from "./routes/mass-times";
 import formationRoutes from "./routes/formation";
+import accountRoutes from "./routes/account";
 import { insertQuestionnaireSchema, substitutionRequests } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -171,6 +172,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Users routes (CRUD, status, role, block, delete, photo)
   app.use(usersRoutes);
+
+  // Account self-service compliance routes (App Store / Google Play)
+  app.use('/api/account', csrfProtection, accountRoutes);
 
   // Mass times routes (CRUD)
   app.use(massTimesRoutes);

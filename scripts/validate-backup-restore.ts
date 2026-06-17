@@ -90,9 +90,14 @@ function runCommand(
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
+        const versionMismatchHint =
+          command === "pg_dump" && stderr.includes("server version mismatch")
+            ? "\nDica: o pg_dump local precisa ter a mesma versao major do PostgreSQL alvo ou uma versao mais nova. Para validar restore sem novo dump, reutilize um dump ja verificado com --backup-file=/caminho/backup.dump."
+            : "";
+
         reject(
           new Error(
-            `${command} falhou com codigo ${code}.${stderr ? `\n${stderr}` : ""}`
+            `${command} falhou com codigo ${code}.${stderr ? `\n${stderr}` : ""}${versionMismatchHint}`
           )
         );
       }

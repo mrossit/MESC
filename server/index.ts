@@ -127,12 +127,24 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       "http://127.0.0.1:5000",
     ];
 
+const isLocalDevelopmentOrigin = (origin: string): boolean => {
+  if (process.env.NODE_ENV !== "development") return false;
+
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const isAllowed = allowedOrigins.some((allowedOrigin) => {
         if (origin === allowedOrigin) return true;
+        if (isLocalDevelopmentOrigin(origin)) return true;
         if (
           origin.includes(".replit.dev") ||
           origin.includes(".replit.com") ||

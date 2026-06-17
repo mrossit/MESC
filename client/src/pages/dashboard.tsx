@@ -296,7 +296,7 @@ export default function Dashboard() {
   if (user?.role === "ministro") {
     return (
       <Layout title={getTitle()} subtitle={getSubtitle()}>
-        <MinisterDashboard />
+        <MinisterDashboard userName={user.name} />
       </Layout>
     );
   }

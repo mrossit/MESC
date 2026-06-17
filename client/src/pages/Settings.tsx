@@ -5,13 +5,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Checkbox } from '../components/ui/checkbox';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
   Bell, Settings2, Heart, Church, Calendar, Users,
   Save, AlertCircle, CheckCircle, Sparkles, Clock,
-  HandHeart, PartyPopper, Code2, RefreshCw, Info
+  HandHeart, PartyPopper, Code2, RefreshCw, Info, Trash2, ShieldAlert
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
@@ -55,7 +64,11 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [switchingRole, setSwitchingRole] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const queryClient = useQueryClient();
+  const deleteAccountPhrase = 'EXCLUIR MINHA CONTA';
 
   // Dev mode detection
   const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
@@ -308,6 +321,40 @@ export default function Settings() {
     }
   };
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          confirmation: deleteConfirmation,
+          password: deletePassword || undefined
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ message: 'Erro ao excluir conta' }));
+        throw new Error(data.message || 'Erro ao excluir conta');
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('user');
+      sessionStorage.clear();
+      queryClient.clear();
+      window.location.href = '/login?accountDeleted=1';
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+      setDeleteDialogOpen(false);
+    }
+  });
+
   // Dev mode: Switch user role for testing
   const handleRoleSwitch = async (newRole: 'ministro' | 'coordenador' | 'gestor') => {
     if (!isDev) return;
@@ -396,7 +443,7 @@ export default function Settings() {
             )}
 
             <Tabs defaultValue="notifications" className="w-full">
-              <TabsList className={`grid w-full ${isDev ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <TabsList className={`grid w-full ${isDev ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="notifications" className="text-xs sm:text-sm">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Notificações
@@ -404,6 +451,10 @@ export default function Settings() {
                 <TabsTrigger value="availability" className="text-xs sm:text-sm">
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Disponibilidade
+                </TabsTrigger>
+                <TabsTrigger value="account" className="text-xs sm:text-sm">
+                  <ShieldAlert className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Conta
                 </TabsTrigger>
                 {isDev && (
                   <TabsTrigger value="dev" className="text-xs sm:text-sm">
@@ -623,6 +674,51 @@ export default function Settings() {
                 </Card>
               </TabsContent>
 
+              <TabsContent value="account" className="space-y-6 mt-6">
+                <Card className="border-destructive/40">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <ShieldAlert className="h-5 w-5 text-destructive" />
+                      Conta e dados pessoais
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      Gerencie a exclusão da sua conta MESC conforme as regras de privacidade das lojas.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription className="text-xs sm:text-sm">
+                        A exclusão remove ou anonimiza dados pessoais como nome, email, telefone, foto,
+                        dados sacramentais, notificações, vínculos familiares e respostas de questionários.
+                        Escalas e registros operacionais podem ser preservados sem identificação pessoal direta
+                        para continuidade pastoral, auditoria e segurança.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                      <h3 className="text-sm font-semibold text-destructive">Excluir minha conta</h3>
+                      <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                        Esta ação encerra sua sessão, desativa o acesso e remove os dados pessoais associados.
+                        Para voltar ao MESC depois disso, será necessário um novo cadastro/aprovação.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        className="mt-4 gap-2"
+                        onClick={() => {
+                          setDeleteConfirmation('');
+                          setDeletePassword('');
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir conta
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               {/* DEV MODE TAB - Only visible in development */}
               {isDev && (
                 <TabsContent value="dev" className="space-y-6 mt-6">
@@ -744,6 +840,60 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar exclusão da conta</DialogTitle>
+            <DialogDescription>
+              Esta ação remove ou anonimiza seus dados pessoais e não pode ser desfeita pelo app.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Digite <strong>{deleteAccountPhrase}</strong> para confirmar.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation">Frase de confirmação</Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder={deleteAccountPhrase}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-password">Senha atual</Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                placeholder="Sua senha"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmation !== deleteAccountPhrase || !deletePassword || deleteAccountMutation.isPending}
+              onClick={() => deleteAccountMutation.mutate()}
+            >
+              {deleteAccountMutation.isPending ? 'Excluindo...' : 'Excluir definitivamente'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
