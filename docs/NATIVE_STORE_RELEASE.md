@@ -23,11 +23,13 @@ Configuracao inicial de loja:
 ## Status em 17/06/2026
 
 - App Store Connect: app criado com Apple ID `6781440567`.
-- iOS: archive e export App Store OK; upload do build `5.4.3 (50403)` concluido e em processamento no TestFlight.
+- iOS: archive e export App Store OK; upload do build `5.4.3 (50403)` concluido.
+- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
 - Env local de assinatura Android: `.env.android-release.local`, ignorado pelo Git.
+- Google Play Console: a conta Google logada abriu o fluxo de criacao de conta de desenvolvedor; falta concluir tipo de conta, verificacao e pagamento antes de criar o app Android na loja.
 
 ## Scripts
 
@@ -74,7 +76,7 @@ xcodebuild -exportArchive \
   -allowProvisioningUpdates
 ```
 
-O upload atual foi aceito pelo App Store Connect. A etapa seguinte e aguardar o processamento do build, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
+O upload atual foi aceito pelo App Store Connect e o build foi adicionado ao grupo interno `MESC Interno`. A etapa seguinte e completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
 
 ## Android signing e AAB
 
@@ -119,7 +121,8 @@ bundletool validate --bundle android/app/build/outputs/bundle/release/app-releas
 
 ## Pendencias nativas
 
-- App Store: aguardar processamento do build no TestFlight e preencher metadados de loja.
+- App Store: preencher metadados de loja, privacidade, screenshots e informacoes de review.
+- Google Play: concluir criacao/verificacao da conta de desenvolvedor Play para a conta Google correta.
 - Google Play: criar app no Play Console, configurar Play App Signing, enviar o AAB assinado e montar trilha Internal testing.
 - Google Play: guardar backup seguro da upload key Android fora do repositorio.
 - Criar conta reviewer.
