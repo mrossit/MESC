@@ -22,7 +22,8 @@ O app esta tecnicamente apto a avancar para preparacao de publicacao nas lojas, 
 - URL publica de exclusao de conta: `/account-deletion`.
 - Suite local de release: OK (`npm run check`, `npm run build`, `npm run test:run`).
 - Comando unico de release candidate: `npm run release:check:local`.
-- Capacitor configurado para empacotamento nativo inicial (`app.saojudastadeu.mesc`) sem gerar ainda as pastas `ios/` e `android/`.
+- Capacitor configurado para empacotamento nativo inicial (`app.saojudastadeu.mesc`) com pastas `ios/` e `android/` geradas.
+- Versao nativa alinhada com o app web: `5.4.3` / build `50403`.
 
 ## Preview Replit
 
@@ -33,7 +34,7 @@ git pull --ff-only
 npm run release:check:local
 ```
 
-Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta e comportamento PWA no navegador. Ele nao substitui o empacotamento nativo para App Store/Google Play; a configuracao Capacitor inicial ja existe, mas ainda falta gerar/validar `ios/` e `android/`, icones, splash, permissoes e build em dispositivo real.
+Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta e comportamento PWA no navegador. Ele nao substitui o empacotamento nativo para App Store/Google Play; `ios/` e `android/` ja foram gerados, mas ainda falta validar icones, splash, assinatura, permissoes finais e build em dispositivo real.
 
 ## Warnings nao bloqueantes
 
@@ -56,7 +57,7 @@ Esse preview valida UX mobile, login, questionarios, escalas, exclusao de conta 
 5. Preparar materiais de loja: nome, descricao curta, descricao completa, politica de privacidade, screenshots, icone e categorias.
 6. Definir trilha de teste: TestFlight para iOS e Internal testing/Closed testing no Google Play.
 7. Validar que o app nao menciona funcionalidades indisponiveis na listagem das lojas.
-8. Confirmar bundle id e gerar `ios/`/`android/` com Capacitor antes da submissao oficial.
+8. Abrir Xcode/Android Studio, configurar assinatura oficial e validar builds em dispositivo real antes da submissao oficial.
 
 ## Observacao de seguranca
 

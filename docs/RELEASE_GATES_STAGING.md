@@ -20,12 +20,13 @@ Resultado esperado:
 
 Use o Preview do Replit para smoke test web/PWA: login, logout, painel do ministro, resposta de questionario, visualizacao de escala, pedido de substituicao e exclusao de conta com usuario descartavel.
 
-Observacao: o Preview do Replit nao valida binario nativo iOS/Android. Antes de enviar para App Store/Google Play, ainda e necessario gerar as plataformas Capacitor e validar em dispositivo real.
+Observacao: o Preview do Replit nao valida binario nativo iOS/Android. As plataformas Capacitor ja existem em `ios/` e `android/`, mas ainda e necessario validar assinatura, icones, splash e dispositivo real antes de enviar para App Store/Google Play.
 
 Gate nativo inicial:
 
 ```bash
-npm run mobile:doctor
+npm run mobile:sync
+npx cap doctor
 ```
 
 ## 1. Ambiente

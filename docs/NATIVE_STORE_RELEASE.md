@@ -8,10 +8,16 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 
 - App name: `MESC`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
+- Version: `5.4.3`
+- Native build number / Android version code: `50403`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
 O app id ainda pode ser alterado no repositorio antes de registrar o app nas lojas. Depois de registrar no App Store Connect ou Google Play Console, trate como definitivo.
+
+Configuracao inicial de loja:
+- iOS: alvo inicial iPhone-only, orientacao retrato.
+- Android: orientacao retrato, backup automatico desativado e cleartext desativado.
 
 ## Scripts
 
@@ -24,11 +30,10 @@ npm run mobile:doctor
 
 ## Gerar plataformas nativas
 
-Execute apenas quando for abrir Xcode/Android Studio e preparar os assets finais:
+As plataformas nativas ja foram geradas em `ios/` e `android/`. Para atualizar os assets antes de abrir Xcode/Android Studio:
 
 ```bash
-npm run mobile:add:ios
-npm run mobile:add:android
+npm run mobile:assets
 npm run mobile:sync
 ```
 
@@ -47,12 +52,14 @@ npm run mobile:open:android
 - `PRODUCTION_BASE_URL=https://saojudastadeu.app npm run release:check:health`
 - Smoke test no Replit Preview
 - Smoke test em dispositivo real iOS/Android apos `cap sync`
+- Validar build/archive no Xcode com a conta Apple Developer.
+- Validar Android App Bundle assinado no Android Studio/Play Console.
 
 ## Pendencias nativas
 
-- Gerar icone e splash finais.
+- Revisar icone e splash finais com o usuario antes da submissao publica.
 - Revisar nome exibido nas lojas.
-- Confirmar bundle id antes de registrar.
+- Confirmar bundle id antes de registrar nas lojas.
 - Criar conta reviewer.
 - Configurar screenshots, descricao curta, descricao completa, categoria e politica de privacidade.
 - Validar login, logout, sessao expirada, questionario, escala, substituicao e exclusao de conta em dispositivos reais.
