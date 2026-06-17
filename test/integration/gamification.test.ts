@@ -15,7 +15,9 @@ import {
   calculateLevel,
 } from '../../server/services/gamificationService';
 
-describe('Gamification Integration Tests', () => {
+const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeWithDatabase('Gamification Integration Tests', () => {
   beforeAll(async () => {
     const hasData = await testDataExists();
     if (!hasData) {

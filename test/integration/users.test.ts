@@ -17,7 +17,9 @@ import {
   randomEmail,
 } from '../helpers/testHelpers';
 
-describe('Users Integration Tests', () => {
+const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeWithDatabase('Users Integration Tests', () => {
   beforeAll(async () => {
     // Check if test data exists
     const hasData = await testDataExists();

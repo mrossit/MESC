@@ -16,7 +16,9 @@ import {
   getFutureDate,
 } from '../helpers/testHelpers';
 
-describe('Schedules Integration Tests', () => {
+const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeWithDatabase('Schedules Integration Tests', () => {
   beforeAll(async () => {
     const hasData = await testDataExists();
     if (!hasData) {

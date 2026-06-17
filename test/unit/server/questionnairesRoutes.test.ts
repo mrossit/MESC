@@ -114,7 +114,7 @@ describe('Questionnaires Routes', () => {
       const sundays = getSundaysInMonth(2025, 2); // February 2025
       expect(sundays.length).toBeGreaterThanOrEqual(4);
       sundays.forEach(sunday => {
-        expect(new Date(sunday).getDay()).toBe(0);
+        expect(new Date(`${sunday}T00:00:00`).getDay()).toBe(0);
       });
     });
 
@@ -146,7 +146,7 @@ describe('Questionnaires Routes', () => {
       };
 
       const allValid = response.availableSundays.every(date => {
-        const d = new Date(date);
+        const d = new Date(`${date}T00:00:00`);
         return d.getFullYear() === questionnaire.year &&
           d.getMonth() + 1 === questionnaire.month;
       });
