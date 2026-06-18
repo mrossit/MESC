@@ -17,14 +17,21 @@ Nao reescrever o app inteiro antes da loja. A rota mais segura para Apple e beta
 
 - `local.db` existe neste worktree, mas esta vazio. Se o preview/dev subir sem `DATABASE_URL`, o app fica sem ministros/escala.
 - Supabase `mesc-staging` esta ativo e possui dados de ministros:
-  - `users_total=141`
-  - `users_active=125`
+  - antes da importacao: `users_total=141`
+  - antes da importacao: `users_active=125`
   - `users_with_photo=95`
-  - `schedules_june_2026=0`
+  - antes da importacao: `schedules_june_2026=0`
 - A planilha `attached_assets/Escala_SaoJudasTadeu_Junho2026.xlsx` parseia corretamente:
   - 321 escalações
   - 26 datas
   - 117 ministros distintos
+- A escala oficial de junho/2026 foi importada no Supabase `mesc-staging` em 18/06/2026:
+  - `users_total=151`
+  - `users_active=135`
+  - `schedules_june_2026=321`
+  - `june_schedule_dates=26`
+  - `june_null_ministers=5`, correspondendo as linhas `VACANTE` da planilha
+  - 10 usuarios placeholder foram criados apenas em staging para ministros presentes na escala oficial mas ausentes da tabela `users`
 
 ## Novo gate de dados
 
@@ -65,7 +72,8 @@ O importador aborta se houver ministro nao resolvido ou se junho/2026 ja tiver e
 
 ## Proximo passo recomendado
 
-1. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
-2. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule`.
-3. Aguardar processamento do build iOS `5.4.3 (50409)` no App Store Connect.
-4. Trocar o grupo interno do TestFlight para `50409` e rodar smoke test: diretório, escala mensal, substituições e perfil.
+1. Confirmar que o preview/TestFlight esta apontando para o banco remoto correto; se subir sem `DATABASE_URL`, caira no `local.db` vazio.
+2. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
+3. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
+4. Aguardar processamento do build iOS `5.4.3 (50409)` no App Store Connect.
+5. Trocar o grupo interno do TestFlight para `50409` e rodar smoke test: diretório, escala mensal, substituições e perfil.
