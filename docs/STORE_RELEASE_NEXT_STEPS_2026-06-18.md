@@ -94,5 +94,5 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 2. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
 3. Rodar o dry-run com `--strict-mock-data`; se houver mocks, revisar a amostra antes de qualquer limpeza manual.
 4. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
-5. Enviar/processar o build iOS `5.4.3 (50410)` no App Store Connect.
+5. Aguardar processamento do build iOS `5.4.3 (50410)` enviado ao App Store Connect em 18/06/2026.
 6. Trocar o grupo interno do TestFlight para `50410` e rodar smoke test: login, diretório, escala mensal, substituições e perfil.
