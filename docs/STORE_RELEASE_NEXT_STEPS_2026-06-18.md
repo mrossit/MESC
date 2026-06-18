@@ -86,7 +86,8 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 - Login sem `safe-area-bottom` duplicado e com camada fixa herdando o mesmo background, evitando degradê picado.
 - Shell nativo com fundo continuo claro/escuro e header glass mais leve.
 - Rodape mobile com altura/padding reduzidos e rota ativa calculada sem querystring/hash.
-- Build nativo atualizado para `5.4.3 (50410)`.
+- Build nativo atualizado para `5.4.3 (50411)`.
+- Correção auth nativa: chamadas manuais `fetch('/api/...')` agora recebem `Authorization: Bearer` automaticamente quando houver token salvo; cache de usuário sem token não mantém a pessoa "meio logada".
 
 ## Proximo passo recomendado
 
@@ -94,5 +95,5 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 2. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
 3. Rodar o dry-run com `--strict-mock-data`; se houver mocks, revisar a amostra antes de qualquer limpeza manual.
 4. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
-5. Aguardar processamento do build iOS `5.4.3 (50410)` enviado ao App Store Connect em 18/06/2026.
-6. Trocar o grupo interno do TestFlight para `50410` e rodar smoke test: login, diretório, escala mensal, substituições e perfil.
+5. Aguardar processamento do build iOS `5.4.3 (50411)` enviado ao App Store Connect em 18/06/2026.
+6. Trocar o grupo interno do TestFlight para `50411` e rodar smoke test: login, diretório, escala mensal, substituições e perfil.
