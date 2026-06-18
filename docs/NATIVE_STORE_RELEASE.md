@@ -1,6 +1,6 @@
 # Native Store Release
 
-Data: 17/06/2026
+Data: 18/06/2026
 
 Este documento prepara o empacotamento nativo do MESC para App Store e Google Play usando Capacitor.
 
@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.3`
-- Native build number / Android version code: `50404`
+- Native build number / Android version code: `50405`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
@@ -20,12 +20,13 @@ Configuracao inicial de loja:
 - iOS: alvo inicial iPhone-only, orientacao retrato.
 - Android: orientacao retrato, backup automatico desativado e cleartext desativado.
 
-## Status em 17/06/2026
+## Status em 18/06/2026
 
 - App Store Connect: app criado com Apple ID `6781440567`.
 - iOS: archive e export App Store OK; upload inicial do build `5.4.3 (50403)` concluido.
 - iOS UX update: build `5.4.3 (50404)` enviado ao App Store Connect em 17/06/2026, delivery UUID `dfd19d5a-5c61-4337-a58b-f47af29915c7`; aguardando processamento/TestFlight aparecer no App Store Connect.
-- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50404` apos processamento.
+- iOS next pass: build `5.4.3 (50405)` enviado ao App Store Connect em 18/06/2026, delivery UUID `8d529ddb-a5a4-4f07-b87b-870bd90ef17d`; aguardando processamento/TestFlight aparecer no App Store Connect.
+- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50405` apos processamento.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
@@ -83,7 +84,7 @@ xcrun altool --upload-app \
   --api-issuer d1513888-2c5a-4569-9163-cf5c01460a33
 ```
 
-O upload `5.4.3 (50404)` foi aceito pelo App Store Connect. A etapa seguinte e aguardar o processamento, trocar o build do grupo `MESC Interno` para `50404`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
+O upload `5.4.3 (50405)` foi aceito pelo App Store Connect. A etapa seguinte e aguardar o processamento, trocar o build do grupo `MESC Interno` para `50405`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
 
 ## Android signing e AAB
 
