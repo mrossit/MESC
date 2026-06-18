@@ -20,13 +20,19 @@ import {
 import {
   Bell, Settings2, Heart, Church, Calendar, Users,
   Save, AlertCircle, CheckCircle, Sparkles, Clock,
-  HandHeart, PartyPopper, Code2, RefreshCw, Info, Trash2, ShieldAlert
+  Fingerprint, HandHeart, PartyPopper, Code2, RefreshCw, Info, Trash2, ShieldAlert
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
 import { APP_VERSION } from '@/lib/queryClient';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import {
+  disableNativeBiometricLogin,
+  enableNativeBiometricLogin,
+  getNativeBiometricStatus,
+  type NativeBiometricStatus,
+} from '@/lib/native-biometric-auth';
 
 type UserSettings = {
   pushNotifications: boolean;
@@ -67,6 +73,8 @@ export default function Settings() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
+  const [biometricStatus, setBiometricStatus] = useState<NativeBiometricStatus | null>(null);
+  const [biometricBusy, setBiometricBusy] = useState(false);
   const queryClient = useQueryClient();
   const deleteAccountPhrase = 'EXCLUIR MINHA CONTA';
 
@@ -158,6 +166,16 @@ export default function Settings() {
       setSettings(settingsData);
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    void refreshBiometricStatus();
+  }, []);
+
+  const refreshBiometricStatus = async () => {
+    const status = await getNativeBiometricStatus();
+    setBiometricStatus(status);
+    return status;
+  };
 
   // Controle de mudanças
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
@@ -321,6 +339,35 @@ export default function Settings() {
     }
   };
 
+  const handleBiometricToggle = async (checked: boolean) => {
+    setError(null);
+    setSuccess(null);
+    setBiometricBusy(true);
+
+    try {
+      let status: NativeBiometricStatus;
+      if (checked) {
+        const email = authData?.user?.email;
+        if (!email) {
+          throw new Error('Usuario autenticado nao encontrado. Recarregue o app e tente novamente.');
+        }
+        status = await enableNativeBiometricLogin(email);
+      } else {
+        status = await disableNativeBiometricLogin();
+      }
+
+      setBiometricStatus(status);
+      setSuccess(checked
+        ? `Entrada com ${status.label} ativada neste aparelho.`
+        : 'Entrada por biometria desativada neste aparelho.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel alterar a biometria.');
+      await refreshBiometricStatus();
+    } finally {
+      setBiometricBusy(false);
+    }
+  };
+
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/account', {
@@ -340,7 +387,8 @@ export default function Settings() {
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await disableNativeBiometricLogin().catch(() => undefined);
       localStorage.removeItem('token');
       localStorage.removeItem('auth_token');
       localStorage.removeItem('session_token');
@@ -675,6 +723,41 @@ export default function Settings() {
               </TabsContent>
 
               <TabsContent value="account" className="space-y-6 mt-6">
+                <Card className="liquid-glass border-0">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Fingerprint className="h-5 w-5 text-neutral-accentWarm dark:text-dark-gold" />
+                      Entrada com biometria
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      Use Face ID, Touch ID ou a biometria do aparelho para abrir o app com mais rapidez.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-start justify-between gap-4 rounded-lg border border-white/50 bg-white/30 p-4 dark:border-white/10 dark:bg-white/5">
+                      <div className="min-w-0 space-y-1">
+                        <Label htmlFor="biometric-login" className="text-sm font-semibold">
+                          {biometricStatus?.native ? `Entrar com ${biometricStatus.label}` : 'Entrar com biometria'}
+                        </Label>
+                        <p className="text-xs text-muted-foreground sm:text-sm">
+                          {biometricStatus?.detail || 'Verificando recursos do aparelho...'}
+                        </p>
+                        {biometricStatus?.native && biometricStatus.available && !biometricStatus.strongBiometryAvailable && (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">
+                            Este aparelho pode usar codigo como fallback. Para maior seguranca, configure biometria forte.
+                          </p>
+                        )}
+                      </div>
+                      <Switch
+                        id="biometric-login"
+                        checked={Boolean(biometricStatus?.enabled)}
+                        onCheckedChange={handleBiometricToggle}
+                        disabled={biometricBusy || !biometricStatus?.native || !biometricStatus?.available}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="border-destructive/40">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base sm:text-lg">

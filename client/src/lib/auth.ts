@@ -143,6 +143,9 @@ export const authAPI = {
   },
 
   async logout(): Promise<{ message: string }> {
+    const { disableNativeBiometricLogin } = await import("./native-biometric-auth");
+    await disableNativeBiometricLogin().catch(() => undefined);
+
     // Limpa todos os tokens antes de fazer logout
     localStorage.removeItem('token');
     localStorage.removeItem('auth_token');

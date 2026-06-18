@@ -26,6 +26,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID para entrar no MESC com seguranca neste aparelho.</string>
 	<key>UIRequiresFullScreen</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

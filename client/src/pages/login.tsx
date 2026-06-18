@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,18 +15,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Church, Eye, EyeOff, Clock, MessageCircle, UserCheck, Mail } from "lucide-react";
-import { authAPI } from "@/lib/auth";
+import { Eye, EyeOff, Clock, Fingerprint, MessageCircle, ShieldCheck, UserCheck, Mail } from "lucide-react";
+import { authAPI, type AuthUser } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
+import {
+  enableNativeBiometricLogin,
+  getNativeBiometricStatus,
+  unlockNativeBiometricLogin,
+  type NativeBiometricStatus,
+} from "@/lib/native-biometric-auth";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showPendingDialog, setShowPendingDialog] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [pendingUserEmail, setPendingUserEmail] = useState("");
+  const [pendingLoginUser, setPendingLoginUser] = useState<AuthUser | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const [biometricStatus, setBiometricStatus] = useState<NativeBiometricStatus | null>(null);
+  const [biometricBusy, setBiometricBusy] = useState(false);
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
@@ -37,6 +47,24 @@ export default function Login() {
   const inactivityReason = searchParams.get('reason') === 'inactivity';
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    void refreshBiometricStatus();
+  }, []);
+
+  const refreshBiometricStatus = async () => {
+    const status = await getNativeBiometricStatus();
+    setBiometricStatus(status);
+    return status;
+  };
+
+  const finishLogin = (user: AuthUser) => {
+    toast({
+      title: "Login realizado com sucesso",
+      description: `Bem-vindo(a), ${user.name}!`,
+    });
+    navigate("/dashboard");
+  };
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -72,7 +100,7 @@ export default function Login() {
     mutationFn: (creds: typeof credentials) => {
       return authAPI.login({ ...creds, rememberMe });
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       
       // Set the user data in the cache immediately
       queryClient.setQueryData(["/api/auth/me"], data);
@@ -85,11 +113,13 @@ export default function Login() {
         });
         navigate("/change-password");
       } else {
-        toast({
-          title: "Login realizado com sucesso",
-          description: `Bem-vindo(a), ${data.user.name}!`,
-        });
-        navigate("/dashboard");
+        const status = await refreshBiometricStatus();
+        if (status.native && status.available && !status.enabled) {
+          setPendingLoginUser(data.user);
+          setShowBiometricPrompt(true);
+          return;
+        }
+        finishLogin(data.user);
       }
     },
     onError: (error: Error) => {
@@ -130,6 +160,63 @@ export default function Login() {
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleBiometricUnlock = async () => {
+    setBiometricBusy(true);
+    try {
+      await unlockNativeBiometricLogin();
+      const data = await authAPI.getMe();
+      queryClient.setQueryData(["/api/auth/me"], data);
+      finishLogin(data.user);
+    } catch (error) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("session_token");
+      const message = error instanceof Error
+        ? error.message
+        : "Nao foi possivel entrar com biometria. Use email e senha.";
+      toast({
+        title: "Biometria indisponivel",
+        description: message,
+        variant: "destructive",
+      });
+      void refreshBiometricStatus();
+    } finally {
+      setBiometricBusy(false);
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    if (!pendingLoginUser) return;
+
+    setBiometricBusy(true);
+    try {
+      const status = await enableNativeBiometricLogin(pendingLoginUser.email);
+      setBiometricStatus(status);
+      toast({
+        title: "Biometria ativada",
+        description: `Na proxima entrada, voce podera usar ${status.label}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Nao foi possivel ativar",
+        description: error instanceof Error ? error.message : "Tente novamente em Configuracoes.",
+        variant: "destructive",
+      });
+    } finally {
+      setBiometricBusy(false);
+      setShowBiometricPrompt(false);
+      finishLogin(pendingLoginUser);
+      setPendingLoginUser(null);
+    }
+  };
+
+  const handleSkipBiometric = () => {
+    const user = pendingLoginUser;
+    setShowBiometricPrompt(false);
+    setPendingLoginUser(null);
+    if (user) finishLogin(user);
+  };
+
   return (
     <div className="login-screen flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">
       <Card className="login-card liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[24.5rem]">
@@ -161,6 +248,20 @@ export default function Login() {
                 Sua sessão foi encerrada após 10 minutos de inatividade. Por favor, faça login novamente.
               </AlertDescription>
             </Alert>
+          )}
+
+          {biometricStatus?.enabled && (
+            <Button
+              type="button"
+              variant="outline"
+              className="liquid-glass-chip mb-3 h-11 w-full border-0 font-semibold"
+              onClick={handleBiometricUnlock}
+              disabled={biometricBusy}
+              data-testid="button-biometric-login"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              {biometricBusy ? "Desbloqueando..." : `Entrar com ${biometricStatus.label}`}
+            </Button>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -342,6 +443,44 @@ export default function Login() {
               className="w-full sm:w-auto"
             >
               Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBiometricPrompt} onOpenChange={(open) => {
+        if (!open) handleSkipBiometric();
+      }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="mb-4 flex justify-center">
+              <div className="liquid-glass-chip flex h-16 w-16 items-center justify-center rounded-2xl">
+                <ShieldCheck className="h-8 w-8 text-neutral-accentWarm dark:text-dark-gold" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Ativar entrada rapida?</DialogTitle>
+            <DialogDescription className="text-center">
+              Use {biometricStatus?.label || "biometria"} neste aparelho para abrir o MESC sem digitar senha.
+              Sua senha nao fica salva no app.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSkipBiometric}
+              className="w-full sm:w-auto"
+            >
+              Agora nao
+            </Button>
+            <Button
+              type="button"
+              onClick={handleEnableBiometric}
+              disabled={biometricBusy}
+              className="w-full sm:w-auto"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              {biometricBusy ? "Ativando..." : "Ativar"}
             </Button>
           </DialogFooter>
         </DialogContent>
