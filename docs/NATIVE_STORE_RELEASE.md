@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.3`
-- Native build number / Android version code: `50411`
+- Native build number / Android version code: `50412`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
@@ -31,8 +31,9 @@ Configuracao inicial de loja:
 - iOS polish follow-up: build `5.4.3 (50409)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `2a48c4dc-1dbd-46b2-bd0e-15109254c9aa`; aguardando processamento/TestFlight aparecer no App Store Connect.
 - iOS notch/data follow-up: build `5.4.3 (50410)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `5f1a98a0-6338-4d2c-a4d4-a2bf422d1413`; inclui status bar transparente/overlay, fundo continuo no login, rodape mobile ajustado e auditoria de mocks no data doctor; validado em simulador iPhone 17 Pro claro/escuro.
 - iOS auth/data follow-up: build `5.4.3 (50411)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `7e841bb7-a274-4e97-bf27-e510deee8e4a`; corrige `401` em telas com `fetch` manual ao anexar automaticamente `Authorization: Bearer` para chamadas `/api` e impede uso de cache auth sem token.
+- iOS biometria/glass follow-up: build `5.4.3 (50412)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `9af15a9e-665e-4d7d-8684-88d6db87d08b`; adiciona entrada nativa com Face ID/Touch ID/biometria via Keychain/Keystore, painel em Configuracoes para ativar/desativar biometria, limpeza da credencial no logout/exclusao de conta e refinamento Liquid Glass em login/header/nav/cards.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
-- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50411` apos processamento.
+- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50412` apos processamento.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
@@ -90,7 +91,7 @@ xcrun altool --upload-app \
   --api-issuer d1513888-2c5a-4569-9163-cf5c01460a33
 ```
 
-O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. A etapa seguinte e aguardar o processamento do `50411`, trocar o build do grupo `MESC Interno`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
+O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. O build `5.4.3 (50412)` adiciona a primeira fatia de biometria nativa e melhora o Liquid Glass. A etapa seguinte e validar `50412` em TestFlight, trocar o build do grupo `MESC Interno`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
 
 ## Android signing e AAB
 
