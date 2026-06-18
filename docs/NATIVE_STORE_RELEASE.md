@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.3`
-- Native build number / Android version code: `50408`
+- Native build number / Android version code: `50409`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
@@ -27,8 +27,9 @@ Configuracao inicial de loja:
 - iOS UX update: build `5.4.3 (50404)` enviado ao App Store Connect em 17/06/2026, delivery UUID `dfd19d5a-5c61-4337-a58b-f47af29915c7`; aguardando processamento/TestFlight aparecer no App Store Connect.
 - iOS next pass: build `5.4.3 (50405)` enviado ao App Store Connect em 18/06/2026, delivery UUID `8d529ddb-a5a4-4f07-b87b-870bd90ef17d`; aguardando processamento/TestFlight aparecer no App Store Connect.
 - iOS responsive fix: build `5.4.3 (50406)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `90a12886-d8f2-40be-96af-01812b0f83d6`; aguardando processamento/TestFlight aparecer no App Store Connect.
-- iOS responsive final: build `5.4.3 (50408)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `66e54856-cefb-48f3-8a8d-b2c9a263695d`; aguardando processamento/TestFlight aparecer no App Store Connect.
-- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50408` apos processamento.
+- iOS responsive final: build `5.4.3 (50408)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `66e54856-cefb-48f3-8a8d-b2c9a263695d`.
+- iOS polish follow-up: build `5.4.3 (50409)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `2a48c4dc-1dbd-46b2-bd0e-15109254c9aa`; aguardando processamento/TestFlight aparecer no App Store Connect.
+- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50409` apos processamento.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
@@ -86,7 +87,7 @@ xcrun altool --upload-app \
   --api-issuer d1513888-2c5a-4569-9163-cf5c01460a33
 ```
 
-O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. A etapa seguinte e aguardar o processamento, trocar o build do grupo `MESC Interno` para `50408`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
+O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrige a selecao duplicada Escalas/Trocas no rodape, melhora superficies glass no shell nativo e adiciona o gate de dados para validar/importar a escala oficial de junho/2026. A etapa seguinte e processar `50409`, trocar o build do grupo `MESC Interno`, completar metadados, privacidade, screenshots, conta de reviewer e entao enviar para review.
 
 ## Android signing e AAB
 

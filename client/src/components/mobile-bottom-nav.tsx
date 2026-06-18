@@ -35,6 +35,9 @@ export function MobileBottomNav() {
       icon: UserRound,
     },
   ];
+  const activeHref = [...navItems]
+    .filter((item) => location === item.href || location.startsWith(item.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <nav
@@ -44,7 +47,7 @@ export function MobileBottomNav() {
       <div className="mobile-bottom-nav-inner mx-auto grid max-w-lg grid-cols-5 items-center">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location === item.href || location.startsWith(item.href + "/");
+          const isActive = activeHref === item.href;
 
           return (
             <Link

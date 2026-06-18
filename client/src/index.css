@@ -611,6 +611,70 @@
     box-shadow: none;
   }
 
+  .capacitor-native .app-content-scroll {
+    background:
+      linear-gradient(180deg, rgba(248, 244, 237, 0.94) 0%, rgba(236, 230, 218, 0.9) 100%),
+      rgb(var(--background));
+  }
+
+  .dark.capacitor-native .app-content-scroll {
+    background:
+      linear-gradient(180deg, rgba(20, 13, 12, 0.97) 0%, rgba(35, 22, 19, 0.92) 100%),
+      rgb(var(--background));
+  }
+
+  .capacitor-native .app-content-scroll .bg-card {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.22)),
+      rgba(var(--card), 0.72) !important;
+    border-color: rgba(84, 76, 64, 0.34) !important;
+    box-shadow:
+      0 16px 40px rgba(55, 42, 28, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.56);
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  .dark.capacitor-native .app-content-scroll .bg-card {
+    background:
+      linear-gradient(135deg, rgba(255, 248, 240, 0.11), rgba(255, 248, 240, 0.05)),
+      rgba(45, 33, 29, 0.72) !important;
+    border-color: rgba(255, 248, 240, 0.16) !important;
+    box-shadow:
+      0 16px 42px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 248, 240, 0.1);
+  }
+
+  .capacitor-native .app-content-scroll .bg-muted {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.16)),
+      rgba(var(--muted), 0.52) !important;
+    border: 0.5px solid rgba(84, 76, 64, 0.28);
+    backdrop-filter: blur(14px) saturate(1.14);
+    -webkit-backdrop-filter: blur(14px) saturate(1.14);
+  }
+
+  .dark.capacitor-native .app-content-scroll .bg-muted {
+    background:
+      linear-gradient(135deg, rgba(255, 248, 240, 0.09), rgba(255, 248, 240, 0.04)),
+      rgba(var(--muted), 0.44) !important;
+    border-color: rgba(255, 248, 240, 0.12);
+  }
+
+  .capacitor-native .app-content-scroll [data-state="active"].bg-background {
+    background: rgba(255, 255, 255, 0.48) !important;
+    box-shadow:
+      0 6px 16px rgba(55, 42, 28, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  }
+
+  .dark.capacitor-native .app-content-scroll [data-state="active"].bg-background {
+    background: rgba(255, 248, 240, 0.12) !important;
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 248, 240, 0.1);
+  }
+
   .ios-glass-bar {
     background:
       linear-gradient(180deg, rgba(248, 245, 238, 0.92), rgba(248, 245, 238, 0.76)),

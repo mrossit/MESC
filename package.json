@@ -25,6 +25,7 @@
     "release:check:env": "tsx scripts/validate-release-env.ts",
     "release:check:health": "tsx scripts/check-production-health.ts",
     "release:check:backup": "tsx scripts/validate-backup-restore.ts",
+    "release:check:data": "tsx scripts/release-data-doctor.ts",
     "release:check:multi-parish": "tsx scripts/validate-multi-parish-migration.ts",
     "build:mobile": "VITE_API_URL=https://saojudastadeu.app npm run build",
     "mobile:assets": "node scripts/generate-native-assets.mjs",
