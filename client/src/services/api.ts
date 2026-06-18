@@ -1,6 +1,5 @@
 import { ApiResponse } from '@/types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+import { apiUrl } from '@/lib/api-url';
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   params?: object;
@@ -11,7 +10,7 @@ class ApiService {
   private baseURL: string;
   private defaultHeaders: Record<string, string>;
 
-  constructor(baseURL: string = API_BASE_URL) {
+  constructor(baseURL: string = '') {
     this.baseURL = baseURL;
     this.defaultHeaders = {
       'Content-Type': 'application/json',
@@ -23,7 +22,7 @@ class ApiService {
   }
 
   private buildURL(endpoint: string, params?: object): string {
-    const url = new URL(`${this.baseURL}${endpoint}`, window.location.origin);
+    const url = new URL(apiUrl(`${this.baseURL}${endpoint}`), window.location.origin);
 
     if (params) {
       const paramsRecord = params as Record<string, unknown>;

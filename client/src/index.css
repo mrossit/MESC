@@ -95,6 +95,8 @@
   --radius: 0.375rem;
   --font-sans: 'Inter', -apple-system, sans-serif;
   --font-display: 'Playfair Display', serif;
+  --app-safe-area-top: env(safe-area-inset-top, 0px);
+  --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .dark {
@@ -226,6 +228,11 @@
   }
   
   /* Gradientes responsivos para dark mode */
+  .capacitor-native {
+    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 3.5rem);
+    --app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+  }
+
 .bg-gradient-responsive {
   background: linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%);
 }
@@ -344,6 +351,52 @@
   .dark .liquid-glass-chip {
     background: rgba(255, 248, 240, 0.08);
     border-color: rgba(255, 248, 240, 0.14);
+  }
+
+  .login-screen {
+    min-height: 100vh;
+    min-height: 100svh;
+    padding-top: calc(var(--app-safe-area-top) + 1rem);
+    padding-bottom: calc(var(--app-safe-area-bottom) + 1rem);
+    background:
+      radial-gradient(circle at 52% 18%, rgba(212, 196, 160, 0.36), transparent 32rem),
+      linear-gradient(145deg, #f9f4eb 0%, #ece0cc 52%, #dfd0ba 100%);
+  }
+
+  @supports (min-height: 100dvh) {
+    .login-screen {
+      min-height: 100dvh;
+    }
+  }
+
+  .dark .login-screen {
+    background:
+      radial-gradient(circle at 50% 21%, rgba(86, 58, 44, 0.58), transparent 30rem),
+      radial-gradient(circle at 82% 40%, rgba(142, 104, 42, 0.18), transparent 22rem),
+      linear-gradient(160deg, rgb(20, 13, 12) 0%, rgb(39, 25, 22) 47%, rgb(23, 14, 13) 100%);
+  }
+
+  .dark .login-card {
+    background:
+      linear-gradient(145deg, rgba(255, 248, 240, 0.13), rgba(255, 248, 240, 0.05)),
+      rgba(45, 33, 29, 0.82);
+    border-color: rgba(255, 248, 240, 0.16);
+  }
+
+  @media (max-height: 760px) {
+    .login-card-header {
+      padding-top: 0.875rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .login-card-content {
+      padding-bottom: 0.875rem;
+    }
+
+    .login-logo {
+      height: 5rem;
+      max-width: 10rem;
+    }
   }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -479,15 +532,37 @@
   }
 
   .safe-area-top {
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--app-safe-area-top);
   }
 
   .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--app-safe-area-bottom);
   }
 
   .pb-mobile-nav {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5.5rem + var(--app-safe-area-bottom));
+  }
+
+  .ios-glass-header {
+    background:
+      linear-gradient(180deg, rgba(248, 245, 238, 0.92), rgba(248, 245, 238, 0.78)),
+      rgba(var(--background), 0.88);
+    border-color: rgba(255, 255, 255, 0.58);
+    box-shadow:
+      0 14px 30px rgba(55, 42, 28, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(22px) saturate(1.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  }
+
+  .dark .ios-glass-header {
+    background:
+      linear-gradient(180deg, rgba(39, 25, 22, 0.92), rgba(22, 14, 13, 0.84)),
+      rgba(var(--background), 0.88);
+    border-color: rgba(255, 248, 240, 0.12);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 248, 240, 0.10);
   }
 
   .ios-glass-bar {

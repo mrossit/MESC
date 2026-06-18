@@ -22,6 +22,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { apiUrl } from '@/lib/api-url';
 import {
   Dialog,
   DialogContent,
@@ -82,7 +83,7 @@ export default function MinistersDirectory() {
       let hasMore = true;
 
       while (hasMore) {
-        const res = await fetch(`/api/users/active?limit=${limit}&offset=${offset}`, {
+        const res = await fetch(apiUrl(`/api/users/active?limit=${limit}&offset=${offset}`), {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
@@ -116,8 +117,8 @@ export default function MinistersDirectory() {
   const { data: familyData } = useQuery({
     queryKey: ['/api/profile/family'],
     queryFn: async () => {
-      const res = await fetch('/api/profile/family', { 
-        credentials: 'include' 
+      const res = await fetch(apiUrl('/api/profile/family'), {
+        credentials: 'include'
       });
       if (!res.ok) return [];
       return res.json();

@@ -41,8 +41,8 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
         <AppSidebar />
         <SidebarInset className="min-w-0 overflow-hidden dark:bg-dark-8">
           {/* Header */}
-          <header className="safe-area-top sticky top-0 z-40 border-b border-white/60 bg-background/90 backdrop-blur-xl dark:border-white/10 dark:bg-dark-7/90">
-            <div className="flex min-h-14 items-center gap-2 px-3 sm:min-h-16 sm:gap-3 sm:px-6">
+          <header className="safe-area-top ios-glass-header sticky top-0 z-40 border-b">
+            <div className="flex min-h-[3.35rem] items-center gap-2 px-3 sm:min-h-16 sm:gap-3 sm:px-6">
               {/* MOBILE: Avatar no canto superior esquerdo (atalho do perfil) */}
               {isMobile && user && (
                 <Link href="/profile">
@@ -62,12 +62,12 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               <div className="flex-1 min-w-0">
                 {title && (
                   <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate text-base font-semibold sm:text-lg md:text-xl lg:text-2xl">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 className="min-w-0 truncate text-sm font-semibold leading-tight sm:text-lg md:text-xl lg:text-2xl">
                         {title === "Escalas Litúrgicas" ? "Escala de Missas" : title}
                       </h2>
                       {/* Dev Mode: Show current role */}
-                      {(import.meta.env.DEV || window.location.hostname === 'localhost') && user && (
+                      {import.meta.env.DEV && user && (
                         <Badge
                           variant={isManagerRole(user.role) ? 'default' : isCoordinatorRole(user.role) ? 'secondary' : 'outline'}
                           className="text-[10px] sm:text-xs px-1.5 py-0 h-5"

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { apiUrl } from "./api-url";
 
 // CRITICAL: App version for cache invalidation
 // This VERSION changes on every build, forcing cache refresh
@@ -39,11 +40,7 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Construir URL da API corretamente para desenvolvimento e produção
-  const apiBaseURL = import.meta.env.VITE_API_URL || '';
-  const fullUrl = apiBaseURL ? `${apiBaseURL}${url}` : url;
-
-  const res = await fetch(fullUrl, {
+  const res = await fetch(apiUrl(url), {
     method,
     headers,
     body,
@@ -67,12 +64,9 @@ export const getQueryFn: <T>(options: {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Construir URL da API corretamente para desenvolvimento e produção
     const path = queryKey.join("/") as string;
-    const apiBaseURL = import.meta.env.VITE_API_URL || '';
-    const fullUrl = apiBaseURL ? `${apiBaseURL}${path}` : path;
 
-    const res = await fetch(fullUrl, {
+    const res = await fetch(apiUrl(path), {
       headers,
       credentials: "include",
     });

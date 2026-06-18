@@ -131,14 +131,14 @@ export default function Login() {
   };
 
   return (
-    <div className="safe-area-top safe-area-bottom flex min-h-[100svh] w-full items-center justify-center overflow-x-hidden bg-gradient-responsive px-3 py-4 dark:bg-dark-8 sm:px-4">
-      <Card className="liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[25rem]">
-        <CardHeader className="px-4 pb-3 pt-5 text-center sm:px-6 sm:pt-6">
-          <div className="mb-3 flex justify-center">
+    <div className="login-screen safe-area-bottom flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">
+      <Card className="login-card liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[24.5rem]">
+        <CardHeader className="login-card-header px-4 pb-2.5 pt-4 text-center sm:px-6 sm:pt-5">
+          <div className="mb-2.5 flex justify-center">
             <img 
               src="/sjtlogo.png" 
               alt="Santuário São Judas Tadeu" 
-              className="h-28 w-full max-w-[12rem] object-contain sm:h-36 sm:max-w-[14rem]"
+              className="login-logo h-24 w-full max-w-[11rem] object-contain sm:h-32 sm:max-w-[13rem]"
             />
           </div>
           <CardTitle className="mb-1 text-2xl font-bold text-neutral-textDark dark:text-text-light sm:text-3xl">
@@ -151,7 +151,7 @@ export default function Login() {
             Ministério Extraordinário da Sagrada Comunhão
           </p>
         </CardHeader>
-        <CardContent className="px-4 pb-5 sm:px-6 sm:pb-6">
+        <CardContent className="login-card-content px-4 pb-4 sm:px-6 sm:pb-5">
           {/* Alerta de timeout de inatividade */}
           {inactivityReason && (
             <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
@@ -252,7 +252,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-3.5">
             <div className="text-center">
               <p className="text-sm text-neutral-textMedium dark:text-gray-400">
                 Não tem uma conta?{" "}

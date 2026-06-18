@@ -1,7 +1,7 @@
 // AUTO-INJECTED: These values are automatically updated during build by scripts/inject-version.js
 const VERSION = '5.4.3'; // Injected from package.json
-const BUILD_TIME = '2026-06-17T22:36:33.516Z'; // Injected at build time
-const BUILD_TIMESTAMP = 1781735793517; // Injected at build time (used for cache busting)
+const BUILD_TIME = '2026-06-18T00:08:48.239Z'; // Injected at build time
+const BUILD_TIMESTAMP = 1781741328239; // Injected at build time (used for cache busting)
 const CACHE_NAME = `mesc-v${VERSION}-${BUILD_TIMESTAMP}`;
 
 // Lista de URLs para pré-cachear (apenas essenciais)
