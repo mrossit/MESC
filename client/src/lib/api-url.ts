@@ -1,6 +1,9 @@
 import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 
 const PRODUCTION_API_ORIGIN = "https://saojudastadeu.app";
+const LIGHT_STATUS_BAR_COLOR = "#F8F4ED";
+const DARK_STATUS_BAR_COLOR = "#140D0C";
 
 declare global {
   interface Window {
@@ -27,6 +30,30 @@ export function getApiOrigin(): string {
   const configured = normalizeOrigin(import.meta.env.VITE_API_URL);
   if (configured) return configured;
   return isNativeRuntime() ? PRODUCTION_API_ORIGIN : "";
+}
+
+function isDarkThemeActive(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
+
+export async function syncNativeStatusBarStyle() {
+  if (!isNativeRuntime()) return;
+
+  const isDark = isDarkThemeActive();
+  const color = isDark ? DARK_STATUS_BAR_COLOR : LIGHT_STATUS_BAR_COLOR;
+
+  await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+  await StatusBar.setBackgroundColor({ color });
+}
+
+async function configureNativeStatusBar() {
+  if (!isNativeRuntime() || Capacitor.getPlatform() !== "ios") return;
+
+  await StatusBar.show();
+  await StatusBar.setOverlaysWebView({ overlay: false });
+  document.documentElement.classList.add("status-bar-contained");
+  await syncNativeStatusBarStyle();
 }
 
 export function apiUrl(path: string): string {
@@ -65,6 +92,9 @@ export function configureClientRuntime() {
 
   if (isNativeRuntime()) {
     document.documentElement.classList.add("capacitor-native");
+    void configureNativeStatusBar().catch((error) => {
+      console.warn("Native status bar configuration failed", error);
+    });
   }
 
   if (window.__mescNativeApiFetchBridgeInstalled) return;

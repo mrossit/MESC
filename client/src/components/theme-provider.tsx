@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
+import { syncNativeStatusBarStyle } from "@/lib/api-url"
 
 type Theme = "dark" | "light" | "system"
 
@@ -47,10 +48,12 @@ export function ThemeProvider({
         : "light"
 
       root.classList.add(systemTheme)
+      void syncNativeStatusBarStyle().catch(() => undefined)
       return
     }
 
     root.classList.add(theme)
+    void syncNativeStatusBarStyle().catch(() => undefined)
   }, [theme])
 
   const value = {

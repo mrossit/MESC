@@ -97,6 +97,7 @@
   --font-display: 'Playfair Display', serif;
   --app-safe-area-top: env(safe-area-inset-top, 0px);
   --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --app-tab-bar-height: 3.75rem;
 }
 
 .dark {
@@ -228,9 +229,21 @@
   }
   
   /* Gradientes responsivos para dark mode */
+  .ios-runtime,
   .capacitor-native {
-    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 3.5rem);
+    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 3.25rem);
     --app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+    --app-tab-bar-height: 3.75rem;
+  }
+
+  .capacitor-native {
+    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 4.25rem);
+    --app-safe-area-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 0.875rem), 0.25rem);
+    --app-tab-bar-height: 3.6rem;
+  }
+
+  .capacitor-native.status-bar-contained {
+    --app-safe-area-top: 0.25rem;
   }
 
 .bg-gradient-responsive {
@@ -521,12 +534,16 @@
 
 @layer utilities {
   .app-shell {
+    height: 100vh;
     min-height: 100vh;
+    height: 100svh;
     min-height: 100svh;
+    overflow: hidden;
   }
 
-  @supports (min-height: 100dvh) {
+  @supports (height: 100dvh) {
     .app-shell {
+      height: 100dvh;
       min-height: 100dvh;
     }
   }
@@ -540,7 +557,20 @@
   }
 
   .pb-mobile-nav {
-    padding-bottom: calc(5.5rem + var(--app-safe-area-bottom));
+    padding-bottom: calc(var(--app-tab-bar-height) + var(--app-safe-area-bottom) + 1.25rem);
+    scroll-padding-bottom: calc(var(--app-tab-bar-height) + var(--app-safe-area-bottom) + 1.25rem);
+  }
+
+  .app-content-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-mobile-header {
+    padding-top: var(--app-safe-area-top);
+  }
+
+  .app-mobile-header-content {
+    min-height: 3.35rem;
   }
 
   .ios-glass-header {
@@ -565,6 +595,22 @@
       inset 0 1px 0 rgba(255, 248, 240, 0.10);
   }
 
+  .capacitor-native .ios-glass-header {
+    background:
+      linear-gradient(180deg, rgba(248, 244, 237, 0.99) 0%, rgba(248, 244, 237, 0.94) 62%, rgba(248, 244, 237, 0.82) 100%),
+      rgba(var(--background), 0.94);
+    border-bottom-color: transparent !important;
+    box-shadow: none;
+  }
+
+  .dark.capacitor-native .ios-glass-header {
+    background:
+      linear-gradient(180deg, rgba(20, 13, 12, 0.99) 0%, rgba(28, 18, 16, 0.94) 62%, rgba(22, 14, 13, 0.82) 100%),
+      rgba(var(--background), 0.94);
+    border-bottom-color: transparent !important;
+    box-shadow: none;
+  }
+
   .ios-glass-bar {
     background:
       linear-gradient(180deg, rgba(248, 245, 238, 0.92), rgba(248, 245, 238, 0.76)),
@@ -585,6 +631,17 @@
     box-shadow:
       0 -18px 46px rgba(0, 0, 0, 0.36),
       inset 0 1px 0 rgba(255, 248, 240, 0.10);
+  }
+
+  .mobile-bottom-nav {
+    box-sizing: border-box;
+    height: calc(var(--app-tab-bar-height) + var(--app-safe-area-bottom));
+    padding-bottom: var(--app-safe-area-bottom);
+  }
+
+  .mobile-bottom-nav-inner {
+    height: var(--app-tab-bar-height);
+    padding: 0.35rem 0.5rem 0.4rem;
   }
 
   /* Sidebar refinado - Sem bordas nas opções */

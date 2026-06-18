@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
     <title>MESC - Sistema de Gestão de Ministros da Sagrada Comunhão</title>
     
     <!-- Theme detection and initialization -->
@@ -12,9 +12,33 @@
         const theme = localStorage.getItem('mesc-ui-theme') || 'system';
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const shouldUseDark = theme === 'dark' || (theme === 'system' && prefersDark);
+        const isIOSDevice =
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const hasCapacitorBridge =
+          typeof window.Capacitor !== 'undefined' &&
+          (!window.Capacitor.getPlatform || window.Capacitor.getPlatform() !== 'web');
+        const isNativeScheme =
+          window.location.protocol === 'capacitor:' ||
+          window.location.protocol === 'ionic:';
+        const isNativeLocalhost =
+          isIOSDevice &&
+          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         
         if (shouldUseDark) {
           document.documentElement.classList.add('dark');
+        }
+
+        if (isIOSDevice) {
+          document.documentElement.classList.add('ios-runtime');
+        }
+
+        if (hasCapacitorBridge || isNativeScheme || isNativeLocalhost) {
+          document.documentElement.classList.add('capacitor-native');
+
+          if (isIOSDevice) {
+            document.documentElement.classList.add('status-bar-contained');
+          }
         }
       })();
     </script>
