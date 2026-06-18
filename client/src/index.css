@@ -231,19 +231,15 @@
   /* Gradientes responsivos para dark mode */
   .ios-runtime,
   .capacitor-native {
-    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 3.25rem);
-    --app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
-    --app-tab-bar-height: 3.75rem;
+    --app-safe-area-top: env(safe-area-inset-top, 0px);
+    --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --app-tab-bar-height: 3.5rem;
   }
 
-  .capacitor-native {
-    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 4.25rem);
-    --app-safe-area-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 0.875rem), 0.25rem);
-    --app-tab-bar-height: 3.6rem;
-  }
-
-  .capacitor-native.status-bar-contained {
-    --app-safe-area-top: 0.25rem;
+  .capacitor-native.capacitor-ios {
+    --app-safe-area-top: max(env(safe-area-inset-top, 0px), 2.75rem);
+    --app-safe-area-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 0.45rem), 0.35rem);
+    --app-tab-bar-height: 3.45rem;
   }
 
 .bg-gradient-responsive {
@@ -367,13 +363,29 @@
   }
 
   .login-screen {
+    position: relative;
+    isolation: isolate;
     min-height: 100vh;
     min-height: 100svh;
-    padding-top: calc(var(--app-safe-area-top) + 1rem);
-    padding-bottom: calc(var(--app-safe-area-bottom) + 1rem);
+    padding-top: calc(var(--app-safe-area-top) + clamp(0.85rem, 2.5vh, 1.25rem));
+    padding-bottom: calc(var(--app-safe-area-bottom) + clamp(0.85rem, 2.5vh, 1.25rem));
     background:
       radial-gradient(circle at 52% 18%, rgba(212, 196, 160, 0.36), transparent 32rem),
       linear-gradient(145deg, #f9f4eb 0%, #ece0cc 52%, #dfd0ba 100%);
+  }
+
+  .login-screen::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: inherit;
+  }
+
+  .login-screen > * {
+    position: relative;
+    z-index: 1;
   }
 
   @supports (min-height: 100dvh) {
@@ -539,6 +551,15 @@
     height: 100svh;
     min-height: 100svh;
     overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(248, 244, 237, 0.98) 0%, rgba(235, 230, 218, 0.94) 100%),
+      rgb(var(--background));
+  }
+
+  .dark .app-shell {
+    background:
+      linear-gradient(180deg, rgba(20, 13, 12, 0.98) 0%, rgba(12, 8, 7, 0.96) 100%),
+      rgb(var(--background));
   }
 
   @supports (height: 100dvh) {
@@ -570,7 +591,7 @@
   }
 
   .app-mobile-header-content {
-    min-height: 3.35rem;
+    min-height: 3.25rem;
   }
 
   .ios-glass-header {
@@ -597,16 +618,16 @@
 
   .capacitor-native .ios-glass-header {
     background:
-      linear-gradient(180deg, rgba(248, 244, 237, 0.99) 0%, rgba(248, 244, 237, 0.94) 62%, rgba(248, 244, 237, 0.82) 100%),
-      rgba(var(--background), 0.94);
+      linear-gradient(180deg, rgba(248, 244, 237, 0.82) 0%, rgba(248, 244, 237, 0.72) 58%, rgba(248, 244, 237, 0.54) 100%),
+      rgba(var(--background), 0.54);
     border-bottom-color: transparent !important;
     box-shadow: none;
   }
 
   .dark.capacitor-native .ios-glass-header {
     background:
-      linear-gradient(180deg, rgba(20, 13, 12, 0.99) 0%, rgba(28, 18, 16, 0.94) 62%, rgba(22, 14, 13, 0.82) 100%),
-      rgba(var(--background), 0.94);
+      linear-gradient(180deg, rgba(20, 13, 12, 0.84) 0%, rgba(28, 18, 16, 0.72) 58%, rgba(22, 14, 13, 0.54) 100%),
+      rgba(var(--background), 0.54);
     border-bottom-color: transparent !important;
     box-shadow: none;
   }
@@ -705,7 +726,7 @@
 
   .mobile-bottom-nav-inner {
     height: var(--app-tab-bar-height);
-    padding: 0.35rem 0.5rem 0.4rem;
+    padding: 0.2rem 0.5rem 0.18rem;
   }
 
   /* Sidebar refinado - Sem bordas nas opções */

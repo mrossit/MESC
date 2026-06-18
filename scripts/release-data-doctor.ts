@@ -20,6 +20,13 @@ type DbUser = {
   tokens: string[];
 };
 
+type MockUserSample = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+};
+
 type ResolvedMinister =
   | { status: "resolved"; id: string; name: string; fallback?: boolean }
   | { status: "vacant" }
@@ -84,6 +91,35 @@ function normalize(value: string): string {
 
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function qualifiedIdentifier(alias: string, identifier: string): string {
+  return `${quoteIdentifier(alias)}.${quoteIdentifier(identifier)}`;
+}
+
+function textColumn(alias: string, columns: Set<string>, column: string): string {
+  if (!columns.has(column)) return "''";
+  return `COALESCE(${qualifiedIdentifier(alias, column)}::text, '')`;
+}
+
+function mockUserFilter(alias: string, userColumns: Set<string>): string {
+  const clauses: string[] = [];
+
+  if (userColumns.has("email")) {
+    const email = `LOWER(${textColumn(alias, userColumns, "email")})`;
+    clauses.push(`${email} IN ('test.ministro@test.com', 'test.coord@test.com', 'test.gestor@test.com')`);
+    clauses.push(`${email} LIKE 'placeholder+%@saojudastadeu.app'`);
+    clauses.push(`${email} LIKE '%@example.%'`);
+    clauses.push(`${email} LIKE '%@demo.%'`);
+    clauses.push(`${email} LIKE '%@test.%'`);
+  }
+
+  if (userColumns.has("name")) {
+    const name = `LOWER(${textColumn(alias, userColumns, "name")})`;
+    clauses.push(`${name} ~ '(^|[[:space:]])(teste|demo|mock|placeholder)([[:space:]]|$)'`);
+  }
+
+  return clauses.length ? `(${clauses.join(" OR ")})` : "FALSE";
 }
 
 function normalizeRole(role: unknown): unknown {
@@ -208,6 +244,71 @@ async function loadDbUsers(sql: postgres.Sql): Promise<DbUser[]> {
   }));
 }
 
+async function auditMockData(
+  sql: postgres.Sql,
+  userColumns: Set<string>,
+  scheduleColumns: Set<string>
+): Promise<void> {
+  const usersFilter = mockUserFilter("users", userColumns);
+  const joinedUsersFilter = mockUserFilter("u", userColumns);
+  const hasStatus = userColumns.has("status");
+  const hasMinisterId = scheduleColumns.has("minister_id");
+
+  const mockUsers = await countRows(
+    sql,
+    `SELECT COUNT(*)::text AS count FROM users WHERE ${usersFilter}`
+  );
+  const activeMockUsers = hasStatus
+    ? await countRows(
+        sql,
+        `SELECT COUNT(*)::text AS count FROM users WHERE status = 'active' AND ${usersFilter}`
+      )
+    : 0;
+  const schedulesWithMockUsers = hasMinisterId
+    ? await countRows(
+        sql,
+        `SELECT COUNT(*)::text AS count
+         FROM schedules s
+         WHERE EXISTS (
+           SELECT 1
+           FROM users u
+           WHERE u.id = s.minister_id
+             AND ${joinedUsersFilter}
+         )`
+      )
+    : 0;
+
+  const sampleSelect = [
+    "users.id::text AS id",
+    `${textColumn("users", userColumns, "name")} AS name`,
+    `${textColumn("users", userColumns, "email")} AS email`,
+    `${textColumn("users", userColumns, "status")} AS status`,
+  ].join(", ");
+  const samples = await sql.unsafe<MockUserSample[]>(
+    `SELECT ${sampleSelect}
+     FROM users
+     WHERE ${usersFilter}
+     ORDER BY name ASC
+     LIMIT 12`
+  );
+
+  console.log("\nMock/placeholder audit:");
+  console.log(`- mock_users=${mockUsers}`);
+  console.log(`- active_mock_users=${activeMockUsers}`);
+  console.log(`- schedules_linked_to_mock_users=${schedulesWithMockUsers}`);
+
+  if (samples.length > 0) {
+    console.log("- sample:");
+    for (const user of samples) {
+      console.log(`  - ${user.name || "(sem nome)"} <${user.email || "sem email"}> status=${user.status || "n/a"}`);
+    }
+  }
+
+  if (hasFlag("strict-mock-data") && mockUsers > 0) {
+    throw new Error("Mock data audit falhou: ha usuarios mock/placeholder no banco alvo.");
+  }
+}
+
 async function importUsersFromAsset(
   sql: postgres.Sql,
   usersFile: string,
@@ -317,6 +418,8 @@ async function main() {
     console.log(`- users_with_photo=${usersWithPhotos}`);
     console.log(`- schedules_${monthStart.slice(0, 7)}=${existingJune}`);
     console.log(`- schedule_dates_${monthStart.slice(0, 7)}=${existingJuneDates}`);
+
+    await auditMockData(sql, userColumns, scheduleColumns);
 
     const scheduleRecords = parseScheduleFile(scheduleFile);
     const alias = loadAliasMap();

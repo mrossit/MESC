@@ -12,6 +12,7 @@ interface NavItem {
 export function MobileBottomNav() {
   const [location] = useLocation();
   const { setOpenMobile } = useSidebar();
+  const currentPath = location.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
 
   const navItems: NavItem[] = [
     {
@@ -36,7 +37,7 @@ export function MobileBottomNav() {
     },
   ];
   const activeHref = [...navItems]
-    .filter((item) => location === item.href || location.startsWith(item.href + "/"))
+    .filter((item) => currentPath === item.href || currentPath.startsWith(item.href + "/"))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (

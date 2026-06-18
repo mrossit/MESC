@@ -2,8 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
 const PRODUCTION_API_ORIGIN = "https://saojudastadeu.app";
-const LIGHT_STATUS_BAR_COLOR = "#F8F4ED";
-const DARK_STATUS_BAR_COLOR = "#140D0C";
+const TRANSPARENT_STATUS_BAR_COLOR = "#00000000";
 
 declare global {
   interface Window {
@@ -41,18 +40,16 @@ export async function syncNativeStatusBarStyle() {
   if (!isNativeRuntime()) return;
 
   const isDark = isDarkThemeActive();
-  const color = isDark ? DARK_STATUS_BAR_COLOR : LIGHT_STATUS_BAR_COLOR;
 
   await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
-  await StatusBar.setBackgroundColor({ color });
+  await StatusBar.setBackgroundColor({ color: TRANSPARENT_STATUS_BAR_COLOR });
 }
 
 async function configureNativeStatusBar() {
   if (!isNativeRuntime() || Capacitor.getPlatform() !== "ios") return;
 
   await StatusBar.show();
-  await StatusBar.setOverlaysWebView({ overlay: false });
-  document.documentElement.classList.add("status-bar-contained");
+  await StatusBar.setOverlaysWebView({ overlay: true });
   await syncNativeStatusBarStyle();
 }
 
@@ -91,7 +88,8 @@ export function configureClientRuntime() {
   if (typeof window === "undefined") return;
 
   if (isNativeRuntime()) {
-    document.documentElement.classList.add("capacitor-native");
+    const platform = Capacitor.getPlatform();
+    document.documentElement.classList.add("capacitor-native", `capacitor-${platform}`);
     void configureNativeStatusBar().catch((error) => {
       console.warn("Native status bar configuration failed", error);
     });

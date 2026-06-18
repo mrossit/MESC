@@ -5,6 +5,18 @@
 **Status:** Proposta cirúrgica para release nas lojas
 **Decisão central:** não reescrever o app inteiro antes da loja. Evoluir o produto atual com correções de alto impacto, gates de produção e empacotamento nativo controlado.
 
+## Addendum 18/06/2026 - escopo do build 50410
+
+Para a próxima rodada TestFlight, o release deve priorizar:
+
+- sensação nativa real no iOS: notch/Dynamic Island sem corte, header/rodapé sem sobreposição e login responsivo em claro/escuro;
+- dados reais no banco remoto: ministros com fotos e escala oficial de junho/2026, sem depender de `local.db`;
+- auditoria de mock/placeholder antes de qualquer escrita em produção;
+- área do ministro funcional e agradável, sem prometer reescrita completa neste ciclo;
+- multi-comunidades como fato novo de beta, mantendo escopo de dados validado por `community_id`.
+
+Fica fora deste build: apagar dados de produção sem dry-run auditável, trocar framework, refazer todo o design system ou alterar fluxos administrativos sem ligação direta com revisão de loja.
+
 ---
 
 ## 1. Objetivo

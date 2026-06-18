@@ -131,7 +131,7 @@ export default function Login() {
   };
 
   return (
-    <div className="login-screen safe-area-bottom flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">
+    <div className="login-screen flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">
       <Card className="login-card liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[24.5rem]">
         <CardHeader className="login-card-header px-4 pb-2.5 pt-4 text-center sm:px-6 sm:pt-5">
           <div className="mb-2.5 flex justify-center">

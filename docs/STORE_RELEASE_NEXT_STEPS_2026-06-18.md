@@ -16,6 +16,7 @@ Nao reescrever o app inteiro antes da loja. A rota mais segura para Apple e beta
 ## Diagnostico de dados
 
 - `local.db` existe neste worktree, mas esta vazio. Se o preview/dev subir sem `DATABASE_URL`, o app fica sem ministros/escala.
+- Nesta sessao local nao ha `DATABASE_URL`, `PRODUCTION_DATABASE_URL` ou `RELEASE_DATABASE_URL` carregadas. Portanto, qualquer preview local sem variaveis remotas vai parecer "sem dados".
 - Supabase `mesc-staging` esta ativo e possui dados de ministros:
   - antes da importacao: `users_total=141`
   - antes da importacao: `users_active=125`
@@ -70,10 +71,28 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --apply-june-
 
 O importador aborta se houver ministro nao resolvido ou se junho/2026 ja tiver escala no banco alvo, evitando duplicacao.
 
+O comando tambem audita candidatos obvios a dados mock/placeholder:
+
+```bash
+RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data
+RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock-data
+```
+
+`--strict-mock-data` falha quando encontra usuarios com padroes obvios de teste, exemplo `test.*@test.com`, `placeholder+*@saojudastadeu.app`, `*@example.*`, `*@demo.*` ou nome contendo `teste/demo/mock/placeholder`. A limpeza em producao deve ser feita somente depois desse dry-run listar os candidatos.
+
+## Correcoes nativas 50410
+
+- Status bar iOS transparente com `overlaysWebView=true`, para o fundo do login continuar por tras do notch/Dynamic Island.
+- Login sem `safe-area-bottom` duplicado e com camada fixa herdando o mesmo background, evitando degradê picado.
+- Shell nativo com fundo continuo claro/escuro e header glass mais leve.
+- Rodape mobile com altura/padding reduzidos e rota ativa calculada sem querystring/hash.
+- Build nativo atualizado para `5.4.3 (50410)`.
+
 ## Proximo passo recomendado
 
 1. Confirmar que o preview/TestFlight esta apontando para o banco remoto correto; se subir sem `DATABASE_URL`, caira no `local.db` vazio.
 2. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
-3. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
-4. Aguardar processamento do build iOS `5.4.3 (50409)` no App Store Connect.
-5. Trocar o grupo interno do TestFlight para `50409` e rodar smoke test: diretório, escala mensal, substituições e perfil.
+3. Rodar o dry-run com `--strict-mock-data`; se houver mocks, revisar a amostra antes de qualquer limpeza manual.
+4. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
+5. Enviar/processar o build iOS `5.4.3 (50410)` no App Store Connect.
+6. Trocar o grupo interno do TestFlight para `50410` e rodar smoke test: login, diretório, escala mensal, substituições e perfil.
