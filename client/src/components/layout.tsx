@@ -1,15 +1,15 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
-import { isManager as isManagerRole, isCoordinator as isCoordinatorRole } from "@shared/roles";
+import { isAdmin as isAdminRole, isManager as isManagerRole, isCoordinator as isCoordinatorRole } from "@shared/roles";
 import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 import { FloatingNotificationBell } from "@/components/floating-notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { InstallButton } from "@/components/install-button";
 import { CommandSearch } from "@/components/command-search";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { SoundToggle } from "@/components/sound-toggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
@@ -34,6 +34,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
   });
 
   const user = authData?.user;
+  const canUseSoundAlerts = isAdminRole(user?.role);
 
   return (
     <SidebarProvider>
@@ -86,12 +87,15 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               </div>
 
               {/* Actions section - à direita */}
-              <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
                 {/* Command Search (busca) */}
                 {isMobile ? <CommandSearch /> : <CommandSearch />}
 
                 {/* Theme Toggle */}
                 <ThemeToggle />
+
+                {/* Som dos alertas operacionais */}
+                {canUseSoundAlerts && <SoundToggle />}
 
                 {/* Notificações (sino) */}
                 <NotificationBell compact className="h-9 w-9" />

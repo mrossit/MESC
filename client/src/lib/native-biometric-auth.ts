@@ -149,7 +149,11 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
   });
 
   setEnabledFlag(true);
-  return getNativeBiometricStatus();
+  return {
+    ...status,
+    enabled: true,
+    detail: `Entrada rapida com ${status.label} neste aparelho.`,
+  };
 }
 
 export async function unlockNativeBiometricLogin(): Promise<{ email: string; token: string }> {
@@ -187,4 +191,3 @@ export async function disableNativeBiometricLogin(): Promise<NativeBiometricStat
   setEnabledFlag(false);
   return getNativeBiometricStatus();
 }
-

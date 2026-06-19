@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.3`
-- Native build number / Android version code: `50413`
+- Native build number / Android version code: `50414`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
@@ -20,7 +20,7 @@ Configuracao inicial de loja:
 - iOS: alvo inicial iPhone-only, orientacao retrato.
 - Android: orientacao retrato, backup automatico desativado e cleartext desativado.
 
-## Status em 18/06/2026
+## Status em 19/06/2026
 
 - App Store Connect: app criado com Apple ID `6781440567`.
 - iOS: archive e export App Store OK; upload inicial do build `5.4.3 (50403)` concluido.
@@ -33,10 +33,11 @@ Configuracao inicial de loja:
 - iOS auth/data follow-up: build `5.4.3 (50411)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `7e841bb7-a274-4e97-bf27-e510deee8e4a`; corrige `401` em telas com `fetch` manual ao anexar automaticamente `Authorization: Bearer` para chamadas `/api` e impede uso de cache auth sem token.
 - iOS biometria/glass follow-up: build `5.4.3 (50412)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `9af15a9e-665e-4d7d-8684-88d6db87d08b`; adiciona entrada nativa com Face ID/Touch ID/biometria via Keychain/Keystore, painel em Configuracoes para ativar/desativar biometria, limpeza da credencial no logout/exclusao de conta e refinamento Liquid Glass em login/header/nav/cards.
 - iOS sessao/biometria fix: build `5.4.3 (50413)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `141a195c-1b37-492a-abf9-51e586dcfd09`; corrige regressao da `50412` preservando credenciais biometricas no logout comum, mantendo `token`/`auth_token`/`session_token` durante limpeza de cache, restaurando sessao valida ao reabrir o app e impedindo popup automatico de Face ID logo apos tocar em Sair.
-- App Store version: `5.4.3` em `PREPARE_FOR_SUBMISSION`, build `50413` selecionada, release `AFTER_APPROVAL`.
+- iOS UX/auth follow-up: build `5.4.3 (50414)` validado e enviado ao App Store Connect em 19/06/2026, delivery UUID `1aabdea2-10e7-48ec-9e8f-389452bfbf6e`; reduz prompts repetidos de Face ID, move controle de som para o header, carrega fotos autenticadas por blob com token e refina o menu inferior para um padrao mais proximo do tab bar da App Store.
+- App Store version: `5.4.3` em `PREPARE_FOR_SUBMISSION`, build `50414` selecionada, release `AFTER_APPROVAL`.
 - App Store metadata pt-BR: nome, subtitulo, descricao, palavras-chave, texto promocional, URLs de marketing/suporte e privacy policy preenchidos em 18/06/2026.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
-- TestFlight: grupo interno `MESC Interno` contem o build `5.4.3 (50413)` em estado `VALID`; 1 tester interno (`marco@rosarial.com.br`) em estado `INSTALLED`.
+- TestFlight: grupo interno `MESC Interno` contem o build `5.4.3 (50414)` em estado `VALID`; 1 tester interno (`marco@rosarial.com.br`) em estado `INSTALLED`.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
@@ -94,7 +95,7 @@ xcrun altool --upload-app \
   --api-issuer d1513888-2c5a-4569-9163-cf5c01460a33
 ```
 
-O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. O build `5.4.3 (50412)` adiciona a primeira fatia de biometria nativa e melhora o Liquid Glass. O build `5.4.3 (50413)` corrige a regressao de sessao/biometria vista em TestFlight, esta valido, selecionado na versao App Store `5.4.3` e disponivel no grupo interno. A etapa seguinte e validar `50413` no aparelho, preencher review detail/conta demo, screenshots finais, declaracao de privacidade/IDFA e entao enviar para review.
+O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. O build `5.4.3 (50412)` adiciona a primeira fatia de biometria nativa e melhora o Liquid Glass. O build `5.4.3 (50413)` corrige a regressao de sessao/biometria vista em TestFlight. O build `5.4.3 (50414)` corrige a repeticao de prompts biometricos apos login manual, move o som para o header, busca fotos protegidas com token e ajusta o tab bar inferior; esta valido, selecionado na versao App Store `5.4.3` e disponivel no grupo interno. A etapa seguinte e validar `50414` no aparelho, preencher review detail/conta demo, screenshots finais, declaracao de privacidade/IDFA e entao enviar para review.
 
 ## Android signing e AAB
 

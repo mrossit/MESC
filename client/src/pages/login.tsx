@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,8 @@ import {
   type NativeBiometricStatus,
 } from "@/lib/native-biometric-auth";
 
+const AUTO_BIOMETRIC_ATTEMPTED_KEY = "mesc_auto_biometric_attempted";
+
 export default function Login() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
@@ -42,6 +44,10 @@ export default function Login() {
     email: "",
     password: "",
   });
+  const autoBiometricAttemptRef = useRef(false);
+  const manualLoginInProgressRef = useRef(false);
+  const userStartedTypingRef = useRef(false);
+  const biometricPromptResolvingRef = useRef(false);
 
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
@@ -98,6 +104,7 @@ export default function Login() {
       return authAPI.login({ ...creds, rememberMe });
     },
     onSuccess: async (data) => {
+      manualLoginInProgressRef.current = false;
       
       // Set the user data in the cache immediately
       queryClient.setQueryData(["/api/auth/me"], data);
@@ -120,6 +127,7 @@ export default function Login() {
       }
     },
     onError: (error: Error) => {
+      manualLoginInProgressRef.current = false;
       // Verifica se é erro de conta pendente
       if (error.message === "Account pending approval") {
         setPendingUserEmail(credentials.email);
@@ -136,6 +144,7 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    manualLoginInProgressRef.current = true;
     
     // Limpar tokens antigos antes de fazer novo login
     clearLocalSession();
@@ -151,6 +160,7 @@ export default function Login() {
   };
 
   const handleInputChange = (field: keyof typeof credentials, value: string) => {
+    userStartedTypingRef.current = true;
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
 
@@ -180,9 +190,10 @@ export default function Login() {
   const handleEnableBiometric = async () => {
     if (!pendingLoginUser) return;
 
+    const user = pendingLoginUser;
     setBiometricBusy(true);
     try {
-      const status = await enableNativeBiometricLogin(pendingLoginUser.email);
+      const status = await enableNativeBiometricLogin(user.email);
       setBiometricStatus(status);
       toast({
         title: "Biometria ativada",
@@ -195,10 +206,14 @@ export default function Login() {
         variant: "destructive",
       });
     } finally {
+      biometricPromptResolvingRef.current = true;
       setBiometricBusy(false);
       setShowBiometricPrompt(false);
-      finishLogin(pendingLoginUser);
       setPendingLoginUser(null);
+      finishLogin(user);
+      window.setTimeout(() => {
+        biometricPromptResolvingRef.current = false;
+      }, 0);
     }
   };
 
@@ -233,7 +248,30 @@ export default function Login() {
       }
 
       const skipAutoBiometric = consumeSkipAutoBiometricOnce();
-      if (!status.enabled || inactivityReason || skipAutoBiometric) return;
+      const alreadyAttempted = sessionStorage.getItem(AUTO_BIOMETRIC_ATTEMPTED_KEY) === "true";
+      if (
+        !status.enabled ||
+        inactivityReason ||
+        skipAutoBiometric ||
+        alreadyAttempted ||
+        autoBiometricAttemptRef.current ||
+        manualLoginInProgressRef.current ||
+        userStartedTypingRef.current
+      ) {
+        return;
+      }
+
+      autoBiometricAttemptRef.current = true;
+      sessionStorage.setItem(AUTO_BIOMETRIC_ATTEMPTED_KEY, "true");
+
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      if (
+        cancelled ||
+        manualLoginInProgressRef.current ||
+        userStartedTypingRef.current
+      ) {
+        return;
+      }
 
       setBiometricBusy(true);
       try {
@@ -488,7 +526,7 @@ export default function Login() {
       </Dialog>
 
       <Dialog open={showBiometricPrompt} onOpenChange={(open) => {
-        if (!open) handleSkipBiometric();
+        if (!open && !biometricPromptResolvingRef.current) handleSkipBiometric();
       }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>

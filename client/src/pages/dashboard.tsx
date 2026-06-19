@@ -18,8 +18,7 @@ import {
   FileQuestion,
   UserCheck,
   TrendingDown,
-  CalendarClock,
-  Volume2
+  CalendarClock
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -29,6 +28,7 @@ import { useEffect, useRef, useState, memo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { APP_VERSION } from "@/lib/queryClient";
 import { parseScheduleDate } from "@/lib/utils";
+import { useSoundPreference } from "@/hooks/useSoundPreference";
 
 // Browser compatibility for Safari's AudioContext
 interface WindowWithWebkit extends Window {
@@ -115,7 +115,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { soundEnabled, setSoundEnabled } = useSoundPreference();
   const audioContextRef = useRef<AudioContext | null>(null);
   const originalTitleRef = useRef<string>(document.title);
   const lastAlertTimeRef = useRef<number>(0);
@@ -310,21 +310,6 @@ export default function Dashboard() {
   return (
     <Layout title={getTitle()} subtitle={getSubtitle()}>
       <div className="space-y-6">
-        {/* Sound Control - Minimized, no version/connection status */}
-        {isCoordinator && (
-          <div className="flex items-center justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="gap-2"
-            >
-              <Volume2 className={`h-4 w-4 ${soundEnabled ? 'text-green-600' : 'text-gray-400'}`} />
-              <span className="text-xs">{soundEnabled ? 'Som ativo' : 'Som off'}</span>
-            </Button>
-          </div>
-        )}
-
         {/* URGENT ALERTS SECTION */}
         {hasCriticalAlerts && (
           <Alert variant="destructive" className="border-2">

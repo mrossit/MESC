@@ -45,7 +45,7 @@ export function MobileBottomNav() {
       aria-label="Navegação principal"
       className="mobile-bottom-nav ios-glass-bar fixed inset-x-0 bottom-0 z-50 border-t md:hidden"
     >
-      <div className="mobile-bottom-nav-inner mx-auto grid max-w-lg grid-cols-5 items-center">
+      <div className="mobile-bottom-nav-inner mx-auto grid max-w-lg grid-cols-5 items-stretch">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeHref === item.href;
@@ -56,8 +56,8 @@ export function MobileBottomNav() {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex h-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-0 px-1 transition-all",
-                "text-muted-foreground hover:bg-white/40 hover:text-foreground dark:hover:bg-white/10",
+                "mobile-tab-item flex h-full min-w-0 flex-col items-center justify-center gap-0.5 border-0 px-1 transition-colors",
+                "text-muted-foreground hover:text-foreground",
                 isActive
                   ? "font-semibold text-burgundy dark:text-dark-gold"
                   : "text-muted-foreground"
@@ -65,13 +65,13 @@ export function MobileBottomNav() {
             >
               <span
                 className={cn(
-                  "flex h-7 w-9 items-center justify-center rounded-md transition-colors",
-                  isActive && "bg-burgundy/10 text-burgundy dark:bg-dark-gold/15 dark:text-dark-gold"
+                  "mobile-tab-icon flex h-6 w-10 items-center justify-center transition-transform",
+                  isActive && "scale-105 text-burgundy dark:text-dark-gold"
                 )}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
+                <Icon className="h-[22px] w-[22px] flex-shrink-0 stroke-[2.1]" />
               </span>
-              <span className="w-full truncate px-0.5 text-center text-[10px] leading-none">{item.title}</span>
+              <span className="mobile-tab-label w-full truncate px-0.5 text-center text-[10.5px] leading-none">{item.title}</span>
             </Link>
           );
         })}
@@ -81,15 +81,16 @@ export function MobileBottomNav() {
           type="button"
           onClick={() => setOpenMobile(true)}
           className={cn(
-            "flex h-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-0 bg-transparent px-1 transition-all",
-            "text-muted-foreground hover:bg-white/40 hover:text-foreground dark:hover:bg-white/10",
+            "mobile-tab-item flex h-full min-w-0 flex-col items-center justify-center gap-0.5 border-0 bg-transparent px-1 transition-colors",
+            "text-muted-foreground hover:text-foreground",
             "text-muted-foreground"
           )}
+          aria-label="Abrir menu"
         >
-          <span className="flex h-7 w-9 items-center justify-center rounded-md">
-            <Menu className="h-5 w-5 flex-shrink-0" />
+          <span className="mobile-tab-icon flex h-6 w-10 items-center justify-center">
+            <Menu className="h-[22px] w-[22px] flex-shrink-0 stroke-[2.1]" />
           </span>
-          <span className="w-full truncate px-0.5 text-center text-[10px] leading-none">Menu</span>
+          <span className="mobile-tab-label w-full truncate px-0.5 text-center text-[10.5px] leading-none">Menu</span>
         </button>
       </div>
     </nav>

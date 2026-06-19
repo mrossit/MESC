@@ -10,6 +10,7 @@ const PRESERVED_LOCAL_STORAGE_KEYS = [
   "mesc-app-version",
   "app-cache-version",
   "minister-tutorial-dismissed",
+  "mesc_sound_enabled",
 ];
 const SKIP_AUTO_BIOMETRIC_KEY = "mesc_skip_auto_biometric_once";
 

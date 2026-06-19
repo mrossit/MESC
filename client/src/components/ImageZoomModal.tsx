@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { apiUrl } from "@/lib/api-url";
+import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 import { useState } from "react";
 
 interface ImageZoomModalProps {
@@ -13,7 +13,7 @@ interface ImageZoomModalProps {
 
 export function ImageZoomModal({ imageUrl, fallbackText, alt, children, stopPropagation = false }: ImageZoomModalProps) {
   const [open, setOpen] = useState(false);
-  const resolvedImageUrl = imageUrl ? apiUrl(imageUrl) : undefined;
+  const resolvedImageUrl = useAuthenticatedImageUrl(imageUrl);
 
   const handleClick = (e: React.MouseEvent) => {
     if (stopPropagation) {
