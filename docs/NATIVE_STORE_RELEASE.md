@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.3`
-- Native build number / Android version code: `50412`
+- Native build number / Android version code: `50413`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 
@@ -32,8 +32,9 @@ Configuracao inicial de loja:
 - iOS notch/data follow-up: build `5.4.3 (50410)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `5f1a98a0-6338-4d2c-a4d4-a2bf422d1413`; inclui status bar transparente/overlay, fundo continuo no login, rodape mobile ajustado e auditoria de mocks no data doctor; validado em simulador iPhone 17 Pro claro/escuro.
 - iOS auth/data follow-up: build `5.4.3 (50411)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `7e841bb7-a274-4e97-bf27-e510deee8e4a`; corrige `401` em telas com `fetch` manual ao anexar automaticamente `Authorization: Bearer` para chamadas `/api` e impede uso de cache auth sem token.
 - iOS biometria/glass follow-up: build `5.4.3 (50412)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `9af15a9e-665e-4d7d-8684-88d6db87d08b`; adiciona entrada nativa com Face ID/Touch ID/biometria via Keychain/Keystore, painel em Configuracoes para ativar/desativar biometria, limpeza da credencial no logout/exclusao de conta e refinamento Liquid Glass em login/header/nav/cards.
+- iOS sessao/biometria fix: build `5.4.3 (50413)` validado e enviado ao App Store Connect em 18/06/2026, delivery UUID `141a195c-1b37-492a-abf9-51e586dcfd09`; corrige regressao da `50412` preservando credenciais biometricas no logout comum, mantendo `token`/`auth_token`/`session_token` durante limpeza de cache, restaurando sessao valida ao reabrir o app e impedindo popup automatico de Face ID logo apos tocar em Sair.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
-- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50412` apos processamento.
+- TestFlight: build `5.4.3 (50403)` processado como `Ready to Submit`; grupo interno `MESC Interno` criado com 1 build e 1 tester convidado. Substituir por `50413` apos processamento.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.

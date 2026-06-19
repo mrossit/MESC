@@ -101,7 +101,7 @@ function fetchInputUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-function storedAuthToken(): string | null {
+export function getStoredAuthToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("token") || localStorage.getItem("auth_token");
 }
@@ -109,7 +109,7 @@ function storedAuthToken(): string | null {
 function withApiAuthorization(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {
   if (!isApiRequestUrl(fetchInputUrl(input))) return init;
 
-  const token = storedAuthToken();
+  const token = getStoredAuthToken();
   if (!token) return init;
 
   const headers = new Headers(input instanceof Request ? input.headers : undefined);

@@ -1,5 +1,6 @@
-import { apiRequest } from "./queryClient";
+import { apiRequest, queryClient } from "./queryClient";
 import { User } from "@shared/schema";
+import { clearLocalSession, markSkipAutoBiometricOnce } from "./persistent-storage";
 
 export interface LoginCredentials {
   email: string;
@@ -143,18 +144,20 @@ export const authAPI = {
   },
 
   async logout(): Promise<{ message: string }> {
-    const { disableNativeBiometricLogin } = await import("./native-biometric-auth");
-    await disableNativeBiometricLogin().catch(() => undefined);
+    let result: { message: string } = { message: "Logout realizado com sucesso" };
 
-    // Limpa todos os tokens antes de fazer logout
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('user');
-    sessionStorage.clear();
+    try {
+      const response = await apiRequest("POST", "/api/auth/logout");
+      result = await response.json();
+    } catch {
+      // Mesmo offline ou com sessao expirada, sair deve sempre limpar a sessao local.
+    } finally {
+      clearLocalSession();
+      markSkipAutoBiometricOnce();
+      queryClient.clear();
+    }
 
-    const response = await apiRequest("POST", "/api/auth/logout");
-    return response.json();
+    return result;
   },
 
   async getMe(): Promise<{ user: AuthUser }> {

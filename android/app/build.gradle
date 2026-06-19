@@ -13,7 +13,7 @@ android {
         applicationId "app.saojudastadeu.mesc"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 50412
+        versionCode 50413
         versionName "5.4.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

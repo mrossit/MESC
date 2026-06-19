@@ -18,6 +18,7 @@ import {
 import { Eye, EyeOff, Clock, Fingerprint, MessageCircle, ShieldCheck, UserCheck, Mail } from "lucide-react";
 import { authAPI, type AuthUser } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
+import { clearLocalSession, consumeSkipAutoBiometricOnce } from "@/lib/persistent-storage";
 import {
   enableNativeBiometricLogin,
   getNativeBiometricStatus,
@@ -47,10 +48,6 @@ export default function Login() {
   const inactivityReason = searchParams.get('reason') === 'inactivity';
 
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    void refreshBiometricStatus();
-  }, []);
 
   const refreshBiometricStatus = async () => {
     const status = await getNativeBiometricStatus();
@@ -141,10 +138,7 @@ export default function Login() {
     e.preventDefault();
     
     // Limpar tokens antigos antes de fazer novo login
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearLocalSession();
     
     loginMutation.mutate(credentials);
   };
@@ -168,9 +162,7 @@ export default function Login() {
       queryClient.setQueryData(["/api/auth/me"], data);
       finishLogin(data.user);
     } catch (error) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("session_token");
+      clearLocalSession();
       const message = error instanceof Error
         ? error.message
         : "Nao foi possivel entrar com biometria. Use email e senha.";
@@ -216,6 +208,53 @@ export default function Login() {
     setPendingLoginUser(null);
     if (user) finishLogin(user);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateLoginState = async () => {
+      const status = await getNativeBiometricStatus();
+      if (cancelled) return;
+      setBiometricStatus(status);
+
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      if (token && !inactivityReason) {
+        try {
+          localStorage.setItem("token", token);
+          localStorage.setItem("auth_token", token);
+          const data = await authAPI.getMe();
+          if (cancelled) return;
+          queryClient.setQueryData(["/api/auth/me"], data);
+          navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+          return;
+        } catch {
+          clearLocalSession();
+        }
+      }
+
+      const skipAutoBiometric = consumeSkipAutoBiometricOnce();
+      if (!status.enabled || inactivityReason || skipAutoBiometric) return;
+
+      setBiometricBusy(true);
+      try {
+        await unlockNativeBiometricLogin();
+        const data = await authAPI.getMe();
+        if (cancelled) return;
+        queryClient.setQueryData(["/api/auth/me"], data);
+        navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+      } catch {
+        clearLocalSession();
+      } finally {
+        if (!cancelled) setBiometricBusy(false);
+      }
+    };
+
+    void hydrateLoginState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inactivityReason, navigate, queryClient]);
 
   return (
     <div className="login-screen flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">

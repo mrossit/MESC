@@ -1,5 +1,5 @@
 import { ApiResponse } from '@/types';
-import { apiUrl } from '@/lib/api-url';
+import { apiUrl, getStoredAuthToken } from '@/lib/api-url';
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   params?: object;
@@ -18,7 +18,7 @@ class ApiService {
   }
 
   private getAuthToken(): string | null {
-    return localStorage.getItem('token');
+    return getStoredAuthToken();
   }
 
   private buildURL(endpoint: string, params?: object): string {
