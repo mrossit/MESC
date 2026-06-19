@@ -295,15 +295,18 @@ Itens:
 - privacy policy atualizada;
 - Sentry DSN em producao;
 - release notes TestFlight e App Store;
-- build novo apos Fase 1/2, sem mocks e sem erros 401.
+- build `5.4.3 (50413)` validado em TestFlight, sem mocks e sem erros 401.
 
 ## Proximo incremento recomendado
 
-Comecar pela Fase 1 em uma branch curta:
+A Fase 1 foi entregue ate o build `5.4.3 (50413)`: biometria nativa, ajustes Liquid Glass, auth nativo, dados reais e correcao de sessao/logout.
 
-1. Implementar arquitetura de biometria nativa.
-2. Refatorar tokens Liquid Glass e aplicar no login/dashboard/nav.
-3. Trocar estados de erro tecnico por estados humanos.
-4. Validar em navegador, iOS simulator/device e TestFlight.
+O proximo incremento recomendado e fechar os gates de loja antes de novas features:
 
-Depois disso, entrar na Fase 2 do questionario. Essa ordem da maior percepcao de valor para os ministros sem colocar a geracao de escala em risco antes de termos a UX e a autenticacao estabilizadas.
+1. Validar `50413` no aparelho e confirmar que escalas/ministros carregam.
+2. Criar conta demo de reviewer.
+3. Capturar screenshots finais.
+4. Preencher declaracao de privacidade/IDFA.
+5. Enviar para App Review.
+
+Depois disso, entrar na Fase 2 do questionario. Essa ordem reduz risco de rejeicao Apple e evita mudar geracao de escala antes da primeira submissao estar estabilizada.
