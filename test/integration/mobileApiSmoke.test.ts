@@ -54,7 +54,7 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     });
   });
 
-  it("runs login, refresh, mission, questionnaire, confirmation and substitution", async () => {
+  it("runs login, refresh, mission, notifications, questionnaire, confirmation and substitution", async () => {
     const client = new MescMobileApiClient({
       baseUrl,
       deviceId: "mobile-smoke-ios-device",
@@ -114,6 +114,23 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(mission.success).toBe(true);
     expect(mission.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
     expect(mission.nextMission?.id).toBe(MOBILE_P0_DEMO_IDS.scheduleA);
+
+    const notificationList = await client.listNotifications({ limit: 1 });
+    expect(notificationList.success).toBe(true);
+    expect(notificationList.unreadCount).toBe(1);
+    expect(notificationList.notifications.map((item) => item.id))
+      .toEqual([MOBILE_P0_DEMO_IDS.notificationAUnread]);
+
+    const readNotification = await client.markNotificationRead(MOBILE_P0_DEMO_IDS.notificationAUnread);
+    expect(readNotification.success).toBe(true);
+    expect(readNotification.notification.read).toBe(true);
+
+    const notificationListAfterRead = await client.listNotifications({ limit: 5 });
+    expect(notificationListAfterRead.unreadCount).toBe(0);
+    expect(notificationListAfterRead.notifications.map((item) => item.id))
+      .not.toContain(MOBILE_P0_DEMO_IDS.notificationBUnread);
+
+    await expect(client.markAllNotificationsRead()).resolves.toEqual({ success: true });
 
     const questionnaire = await client.getCurrentQuestionnaire({ month: MOBILE_P0_DEMO_MONTH });
     expect(questionnaire.success).toBe(true);

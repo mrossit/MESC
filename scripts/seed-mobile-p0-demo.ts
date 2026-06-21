@@ -62,6 +62,7 @@ async function seedPostgres(databaseUrl: string) {
       await tx`DELETE FROM schedules WHERE id IN ${tx(demo.schedules.map((item) => item.id))}`;
       await tx`DELETE FROM questionnaire_responses WHERE questionnaire_id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
       await tx`DELETE FROM questionnaires WHERE id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
+      await tx`DELETE FROM notifications WHERE id IN ${tx(demo.notifications.map((item) => item.id))}`;
       await tx`DELETE FROM users WHERE id IN ${tx(demo.users.map((item) => item.id))}`;
       await tx`DELETE FROM communities WHERE id IN ${tx(demo.communities.map((item) => item.id))}`;
 
@@ -89,6 +90,20 @@ async function seedPostgres(databaseUrl: string) {
             ${user.phone}, ${user.whatsapp}, ${user.homeCommunityId}, ${user.scheduleDisplayName},
             ${user.preferredPosition}, ${sql.json(user.preferredPositions)}, ${sql.json(user.avoidPositions)},
             ${user.requiresPasswordChange}, ${user.createdAt}, ${user.updatedAt}
+          )
+        `;
+      }
+
+      for (const notification of demo.notifications) {
+        await tx`
+          INSERT INTO notifications (
+            id, user_id, type, title, message, data, read, read_at,
+            action_url, priority, expires_at, created_at
+          ) VALUES (
+            ${notification.id}, ${notification.userId}, ${notification.type}, ${notification.title},
+            ${notification.message}, ${sql.json(notification.data)}, ${notification.read},
+            ${notification.readAt}, ${notification.actionUrl}, ${notification.priority},
+            ${notification.expiresAt}, ${notification.createdAt}
           )
         `;
       }
@@ -418,6 +433,7 @@ async function seedSqlite() {
     sqlite.prepare(`DELETE FROM schedules WHERE id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM questionnaire_responses WHERE questionnaire_id IN (${ids(demo.questionnaires.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM questionnaires WHERE id IN (${ids(demo.questionnaires.map((item) => item.id))})`).run();
+    sqlite.prepare(`DELETE FROM notifications WHERE id IN (${ids(demo.notifications.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM users WHERE id IN (${ids(demo.users.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM communities WHERE id IN (${ids(demo.communities.map((item) => item.id))})`).run();
   });
@@ -463,6 +479,27 @@ async function seedSqlite() {
         requiresPasswordChange: user.requiresPasswordChange ? 1 : 0,
         createdAt: toSqliteDate(user.createdAt),
         updatedAt: toSqliteDate(user.updatedAt),
+      });
+    }
+
+    const insertNotification = sqlite.prepare(`
+      INSERT INTO notifications (
+        id, user_id, type, title, message, data, read, read_at,
+        action_url, priority, expires_at, created_at
+      ) VALUES (
+        @id, @userId, @type, @title, @message, @data, @read, @readAt,
+        @actionUrl, @priority, @expiresAt, @createdAt
+      )
+    `);
+
+    for (const notification of demo.notifications) {
+      insertNotification.run({
+        ...notification,
+        data: toSqliteJson(notification.data),
+        read: notification.read ? 1 : 0,
+        readAt: toSqliteDate(notification.readAt),
+        expiresAt: toSqliteDate(notification.expiresAt),
+        createdAt: toSqliteDate(notification.createdAt),
       });
     }
 

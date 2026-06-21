@@ -73,13 +73,15 @@ async function validatePostgres(databaseUrl: string) {
         questionnaires: number;
         schedules: number;
         substitutions: number;
+        notifications: number;
       }[]>`
         SELECT
           (SELECT COUNT(*)::int FROM communities WHERE id IN ${sql(demo.communities.map((item) => item.id))}) AS communities,
           (SELECT COUNT(*)::int FROM users WHERE id IN ${sql(demo.users.map((item) => item.id))}) AS users,
           (SELECT COUNT(*)::int FROM questionnaires WHERE id IN ${sql(demo.questionnaires.map((item) => item.id))}) AS questionnaires,
           (SELECT COUNT(*)::int FROM schedules WHERE id IN ${sql(demo.schedules.map((item) => item.id))}) AS schedules,
-          (SELECT COUNT(*)::int FROM substitution_requests WHERE id IN ${sql(demo.substitutions.map((item) => item.id))}) AS substitutions
+          (SELECT COUNT(*)::int FROM substitution_requests WHERE id IN ${sql(demo.substitutions.map((item) => item.id))}) AS substitutions,
+          (SELECT COUNT(*)::int FROM notifications WHERE id IN ${sql(demo.notifications.map((item) => item.id))}) AS notifications
       `;
 
       results.push(
@@ -107,6 +109,11 @@ async function validatePostgres(databaseUrl: string) {
           label: "demo substitutions",
           ok: counts.substitutions === demo.substitutions.length,
           details: `${counts.substitutions}/${demo.substitutions.length}`,
+        },
+        {
+          label: "demo notifications",
+          ok: counts.notifications === demo.notifications.length,
+          details: `${counts.notifications}/${demo.notifications.length}`,
         },
       );
     }
@@ -160,6 +167,9 @@ async function validateSqlite() {
         substitutions: sqlite
           .prepare(`SELECT COUNT(*) AS count FROM substitution_requests WHERE id IN (${ids(demo.substitutions.map((item) => item.id))})`)
           .get() as { count: number },
+        notifications: sqlite
+          .prepare(`SELECT COUNT(*) AS count FROM notifications WHERE id IN (${ids(demo.notifications.map((item) => item.id))})`)
+          .get() as { count: number },
       };
 
       results.push(
@@ -187,6 +197,11 @@ async function validateSqlite() {
           label: "demo substitutions",
           ok: counts.substitutions.count === demo.substitutions.length,
           details: `${counts.substitutions.count}/${demo.substitutions.length}`,
+        },
+        {
+          label: "demo notifications",
+          ok: counts.notifications.count === demo.notifications.length,
+          details: `${counts.notifications.count}/${demo.notifications.length}`,
         },
       );
     }

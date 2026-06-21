@@ -70,11 +70,12 @@ Com a seed demo aplicada em ambiente demo:
 1. login mobile com ministro demo;
 2. refresh token rotativo;
 3. abrir Minha Missao;
-4. carregar questionario de julho/2026;
-5. enviar resposta com `Idempotency-Key`;
-6. confirmar presenca em escala publicada;
-7. pedir substituicao em escala futura sem substituicao ativa;
-8. reexecutar a mesma mutacao com a mesma `Idempotency-Key` e confirmar replay/sem duplicidade.
+4. abrir notificacoes, validar contador e marcar aviso como lido;
+5. carregar questionario de julho/2026;
+6. enviar resposta com `Idempotency-Key`;
+7. confirmar presenca em escala publicada;
+8. pedir substituicao em escala futura sem substituicao ativa;
+9. reexecutar a mesma mutacao com a mesma `Idempotency-Key` e confirmar replay/sem duplicidade.
 
 Conta demo local:
 

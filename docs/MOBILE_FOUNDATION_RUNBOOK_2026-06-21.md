@@ -13,7 +13,7 @@
 - refresh token rotativo;
 - idempotencia persistida por 24h para mutacoes criticas;
 - OpenAPI `/api/mobile/v1` alinhado com as rotas implementadas;
-- fixtures/demo P0 com duas comunidades;
+- fixtures/demo P0 com duas comunidades, notificacoes, questionarios, escalas e substituicoes;
 - teste de integracao anti-vazamento multi-comunidade;
 - seed local para exercitar MVP tecnico sem depender da UI nativa.
 
@@ -69,7 +69,8 @@ Dados criados:
 - 1 coordenador paroquial;
 - 2 questionarios publicados;
 - 3 escalas publicadas;
-- 2 pedidos de substituicao.
+- 2 pedidos de substituicao;
+- 3 notificacoes demo para validar listagem, badge e leitura.
 
 Credencial demo local:
 
@@ -116,6 +117,7 @@ npm run build
 - coordenador paroquial consegue alternar comunidade explicitamente;
 - questionario atual respeita comunidade ativa;
 - substituicoes nao vazam entre comunidades;
+- notificacoes retornam contador total de nao lidas e nao vazam entre usuarios;
 - mutacoes criticas exigem `Idempotency-Key`;
 - retries identicos recebem replay da resposta concluida;
 - reuse da mesma chave com outro payload retorna `409`;

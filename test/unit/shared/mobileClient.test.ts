@@ -18,6 +18,10 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.submitQuestionnaire("questionnaire/with slash"))
       .toBe("/questionnaires/questionnaire%2Fwith%20slash/response");
     expect(mobileEndpoints.confirmSchedule("schedule-1")).toBe("/schedules/schedule-1/confirm");
+    expect(mobileEndpoints.notifications({ limit: 5 })).toBe("/notifications?limit=5");
+    expect(mobileEndpoints.readNotification("notification/with slash"))
+      .toBe("/notifications/notification%2Fwith%20slash/read");
+    expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
   });
 
   it("sends native contract headers and stores auth state after login", async () => {
@@ -186,5 +190,109 @@ describe("mobileClient contract", () => {
   it("delegates Idempotency-Key generation to the native UUID provider", () => {
     expect(createMobileIdempotencyKey(() => "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
       .toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  });
+
+  it("exposes notification and device endpoints through typed client methods", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+
+      if (input.endsWith("/notifications?limit=5")) {
+        return new Response(JSON.stringify({
+          success: true,
+          notifications: [{
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            type: "schedule",
+            title: "Escala publicada",
+            message: "Confira sua escala.",
+            priority: "normal",
+            read: false,
+            readAt: null,
+            deepLink: "/dashboard",
+            createdAt: "2026-06-21T12:00:00.000Z",
+          }],
+          unreadCount: 1,
+        }), { status: 200 });
+      }
+
+      if (input.endsWith("/devices")) {
+        return new Response(JSON.stringify({ success: true, devices: [] }), { status: 200 });
+      }
+
+      if (input.endsWith("/devices/current")) {
+        return new Response(JSON.stringify({
+          success: true,
+          device: {
+            id: "device-db-1",
+            deviceId: "ios-device-1",
+            platform: "ios",
+            appVersion: "1.0.0",
+            pushEnabled: true,
+            pushProvider: "apns",
+            biometricCapable: true,
+            biometricEnabled: true,
+            lastSeenAt: null,
+            revokedAt: null,
+            createdAt: null,
+          },
+        }), { status: 200 });
+      }
+
+      if (input.endsWith("/devices/device-db-1")) {
+        return new Response(JSON.stringify({ success: true, revoked: true }), { status: 200 });
+      }
+
+      if (input.endsWith("/notifications/read-all")) {
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        notification: {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          read: true,
+          readAt: "2026-06-21T12:05:00.000Z",
+        },
+      }), { status: 200 });
+    };
+
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: fetcher,
+    });
+
+    await expect(client.listNotifications({ limit: 5 })).resolves.toMatchObject({ unreadCount: 1 });
+    await expect(client.markNotificationRead("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+      .resolves.toMatchObject({ notification: { read: true } });
+    await expect(client.markAllNotificationsRead()).resolves.toEqual({ success: true });
+    await expect(client.listDevices()).resolves.toEqual({ success: true, devices: [] });
+    await expect(client.updateCurrentDevice({
+      pushToken: "push-token-1",
+      pushProvider: "apns",
+      pushEnabled: true,
+      biometricCapable: true,
+      biometricEnabled: true,
+    })).resolves.toMatchObject({ device: { pushEnabled: true } });
+    await expect(client.revokeDevice("device-db-1")).resolves.toEqual({ success: true, revoked: true });
+
+    expect(requests.map((request) => [request.init.method, request.input])).toEqual([
+      ["GET", "https://example.test/api/mobile/v1/notifications?limit=5"],
+      ["PATCH", "https://example.test/api/mobile/v1/notifications/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/read"],
+      ["PATCH", "https://example.test/api/mobile/v1/notifications/read-all"],
+      ["GET", "https://example.test/api/mobile/v1/devices"],
+      ["PUT", "https://example.test/api/mobile/v1/devices/current"],
+      ["DELETE", "https://example.test/api/mobile/v1/devices/device-db-1"],
+    ]);
+    expect(JSON.parse(String(requests[4].init.body))).toEqual({
+      pushToken: "push-token-1",
+      pushProvider: "apns",
+      pushEnabled: true,
+      biometricCapable: true,
+      biometricEnabled: true,
+    });
   });
 });

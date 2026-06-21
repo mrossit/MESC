@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, asc, count, desc, eq, gte, inArray, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import {
   communities,
   notifications,
@@ -159,6 +159,10 @@ function getDeviceId(req: AuthRequest, fallback?: string | null): string | undef
 
 function dbBoolean(value: boolean) {
   return (process.env.DATABASE_URL ? value : value ? 1 : 0) as any;
+}
+
+function dbCurrentTimestamp() {
+  return sql`CURRENT_TIMESTAMP` as any;
 }
 
 function dbJson(value: unknown) {
@@ -925,6 +929,10 @@ router.get("/notifications", authenticateToken, async (req: AuthRequest, res) =>
       .where(eq(notifications.userId, user.id))
       .orderBy(desc(notifications.createdAt))
       .limit(limit);
+    const [unread] = await db
+      .select({ total: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, user.id), eq(notifications.read, dbBoolean(false))));
 
     res.json({
       success: true,
@@ -939,7 +947,7 @@ router.get("/notifications", authenticateToken, async (req: AuthRequest, res) =>
         deepLink: notification.actionUrl ?? "/notifications",
         createdAt: toIsoDate(notification.createdAt),
       })),
-      unreadCount: rows.filter((notification) => !notification.read).length,
+      unreadCount: Number(unread?.total ?? 0),
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar notificacoes");
@@ -955,7 +963,7 @@ router.patch("/notifications/read-all", authenticateToken, async (req: AuthReque
 
     await db
       .update(notifications)
-      .set({ read: true, readAt: new Date() })
+      .set({ read: dbBoolean(true), readAt: dbCurrentTimestamp() })
       .where(and(eq(notifications.userId, user.id), eq(notifications.read, dbBoolean(false))));
 
     res.json({ success: true });
@@ -973,7 +981,7 @@ router.patch("/notifications/:id/read", authenticateToken, async (req: AuthReque
 
     const [notification] = await db
       .update(notifications)
-      .set({ read: true, readAt: new Date() })
+      .set({ read: dbBoolean(true), readAt: dbCurrentTimestamp() })
       .where(and(eq(notifications.id, req.params.id), eq(notifications.userId, user.id)))
       .returning({
         id: notifications.id,

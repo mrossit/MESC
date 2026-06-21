@@ -6,6 +6,9 @@ import {
   MOBILE_AUTH_STORAGE_KEYS,
   mobileGetProfile,
   mobileGetCurrentQuestionnaire,
+  mobileListNotifications,
+  mobileMarkAllNotificationsRead,
+  mobileMarkNotificationRead,
   mobileListSubstitutions,
   mobileSubmitQuestionnaireResponse,
   mobileUpdateProfile,
@@ -310,6 +313,85 @@ describe("mobile auth session storage", () => {
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",
           "Content-Type": "application/json",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("loads and marks mobile notifications through the mobile contract", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        notifications: [{
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          type: "schedule",
+          title: "Escala publicada",
+          message: "Confira sua escala.",
+          priority: "normal",
+          read: false,
+          readAt: null,
+          deepLink: "/dashboard",
+          createdAt: "2026-06-21T12:00:00.000Z",
+        }],
+        unreadCount: 1,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        notification: {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          read: true,
+          readAt: "2026-06-21T12:05:00.000Z",
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+    await expect(mobileListNotifications({ limit: 5 }))
+      .resolves.toMatchObject({ unreadCount: 1 });
+    await expect(mobileMarkNotificationRead("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+      .resolves.toMatchObject({ notification: { read: true } });
+    await expect(mobileMarkAllNotificationsRead())
+      .resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/notifications?limit=5",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/mobile/v1/notifications/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/read",
+      expect.objectContaining({
+        method: "PATCH",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/mobile/v1/notifications/read-all",
+      expect.objectContaining({
+        method: "PATCH",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
           "X-Community-Id": "community-1",
           "X-Device-Id": "ios-device-1",
         }),

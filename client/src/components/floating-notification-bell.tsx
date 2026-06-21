@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@/hooks/use-navigate";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { mobileListNotifications, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 
 interface FloatingNotificationBellProps {
   className?: string;
@@ -14,10 +15,19 @@ export function FloatingNotificationBell({ className }: FloatingNotificationBell
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const useNativeNotifications = shouldUseMobileAuth();
 
   // Fetch unread count - shares cache with NotificationBell (WebSocket updates it)
   const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: useNativeNotifications
+      ? ["mobile", "notifications", "unread-count"]
+      : ["/api/notifications/unread-count"],
+    queryFn: useNativeNotifications
+      ? async () => {
+          const response = await mobileListNotifications({ limit: 1 });
+          return { count: response.unreadCount };
+        }
+      : undefined,
     refetchInterval: 120000, // 2min fallback (WebSocket provides real-time updates)
     staleTime: 60000, // Consider data fresh for 1 minute
   });

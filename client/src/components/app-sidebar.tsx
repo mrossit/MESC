@@ -64,6 +64,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "@/hooks/use-navigate";
 import { useState, type MouseEvent } from "react";
 import { MinisterTutorial } from "@/components/minister-tutorial";
+import { mobileListNotifications, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 
 // Interface para items do menu
 interface MenuItem {
@@ -87,6 +88,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const { setOpenMobile, isMobile } = useSidebar();
+  const useNativeNotifications = shouldUseMobileAuth();
   
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -101,8 +103,16 @@ export function AppSidebar() {
   
   // Fetch unread notification count
   const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
-    enabled: !!user,
+    queryKey: useNativeNotifications
+      ? ["mobile", "notifications", "unread-count"]
+      : ["/api/notifications/unread-count"],
+    queryFn: useNativeNotifications
+      ? async () => {
+          const response = await mobileListNotifications({ limit: 1 });
+          return { count: response.unreadCount };
+        }
+      : undefined,
+    enabled: useNativeNotifications || !!user,
   });
 
   // Fetch pending users count for coordinators

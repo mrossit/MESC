@@ -29728,7 +29728,7 @@ await init_db();
 import { Router as Router41 } from "express";
 import { randomUUID as randomUUID7 } from "crypto";
 import { z as z18 } from "zod";
-import { and as and41, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray18, lte as lte19, or as or16 } from "drizzle-orm";
+import { and as and41, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray18, lte as lte19, or as or16, sql as sql29 } from "drizzle-orm";
 
 // server/services/mobileIdempotencyService.ts
 init_schema();
@@ -30474,6 +30474,9 @@ function getDeviceId(req, fallback) {
 function dbBoolean2(value) {
   return process.env.DATABASE_URL ? value : value ? 1 : 0;
 }
+function dbCurrentTimestamp() {
+  return sql29`CURRENT_TIMESTAMP`;
+}
 function dbJson(value) {
   return process.env.DATABASE_URL ? value : JSON.stringify(value ?? null);
 }
@@ -31060,6 +31063,7 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
       actionUrl: notifications.actionUrl,
       createdAt: notifications.createdAt
     }).from(notifications).where(eq54(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(limit);
+    const [unread] = await db.select({ total: count14() }).from(notifications).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
     res.json({
       success: true,
       notifications: rows.map((notification) => ({
@@ -31073,7 +31077,7 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
         deepLink: notification.actionUrl ?? "/notifications",
         createdAt: toIsoDate(notification.createdAt)
       })),
-      unreadCount: rows.filter((notification) => !notification.read).length
+      unreadCount: Number(unread?.total ?? 0)
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar notificacoes");
@@ -31085,7 +31089,7 @@ router41.patch("/notifications/read-all", authenticateToken, async (req, res) =>
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
+    await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
     res.json({ success: true });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao marcar notificacoes como lidas");
@@ -31097,7 +31101,7 @@ router41.patch("/notifications/:id/read", authenticateToken, async (req, res) =>
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    const [notification] = await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.id, req.params.id), eq54(notifications.userId, user.id))).returning({
+    const [notification] = await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and41(eq54(notifications.id, req.params.id), eq54(notifications.userId, user.id))).returning({
       id: notifications.id,
       read: notifications.read,
       readAt: notifications.readAt

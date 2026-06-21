@@ -5,10 +5,16 @@ import {
   MescMobileApiError,
   type MobileAuthResponse,
   type MobileClientRequestOptions,
+  type MobileDeviceResponse,
+  type MobileDeviceUpdatePayload,
+  type MobileDevicesResponse,
   type MobileFetch,
   type MobileLoginPayload,
   type MobileMeResponse,
   type MobileMissionHomeResponse,
+  type MobileNotificationReadAllResponse,
+  type MobileNotificationReadResponse,
+  type MobileNotificationsResponse,
   type MobilePlatform,
   type MobileProfileResponse,
   type MobileProfileUpdatePayload,
@@ -272,6 +278,30 @@ async function runWithMobileAuthRetry<T>(
 
 export async function mobileGetMe(): Promise<MobileMeResponse> {
   return runWithMobileAuthRetry((client) => client.getMe());
+}
+
+export async function mobileListDevices(): Promise<MobileDevicesResponse> {
+  return runWithMobileAuthRetry((client) => client.listDevices());
+}
+
+export async function mobileUpdateCurrentDevice(payload: MobileDeviceUpdatePayload): Promise<MobileDeviceResponse> {
+  return runWithMobileAuthRetry((client) => client.updateCurrentDevice(payload));
+}
+
+export async function mobileRevokeDevice(deviceDbId: string) {
+  return runWithMobileAuthRetry((client) => client.revokeDevice(deviceDbId));
+}
+
+export async function mobileListNotifications(input: { limit?: number } = {}): Promise<MobileNotificationsResponse> {
+  return runWithMobileAuthRetry((client) => client.listNotifications(input));
+}
+
+export async function mobileMarkNotificationRead(id: string): Promise<MobileNotificationReadResponse> {
+  return runWithMobileAuthRetry((client) => client.markNotificationRead(id));
+}
+
+export async function mobileMarkAllNotificationsRead(): Promise<MobileNotificationReadAllResponse> {
+  return runWithMobileAuthRetry((client) => client.markAllNotificationsRead());
 }
 
 export async function mobileGetMissionHome(input: { month?: string } = {}): Promise<MobileMissionHomeResponse> {

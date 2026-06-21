@@ -127,6 +127,37 @@ export interface MobileNotice {
   createdAt: string | null;
 }
 
+export interface MobileNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  priority: string | null;
+  read: boolean;
+  readAt: string | null;
+  deepLink: string;
+  createdAt: string | null;
+}
+
+export interface MobileNotificationsResponse {
+  success: true;
+  notifications: MobileNotification[];
+  unreadCount: number;
+}
+
+export interface MobileNotificationReadResponse {
+  success: true;
+  notification: {
+    id: string;
+    read: boolean;
+    readAt: string | null;
+  };
+}
+
+export interface MobileNotificationReadAllResponse {
+  success: true;
+}
+
 export interface MobileMissionSchedule {
   id: string;
   date: string | null;
@@ -348,6 +379,21 @@ export interface MobileDeviceUpdatePayload {
   notificationPreferences?: Record<string, unknown>;
 }
 
+export interface MobileDevicesResponse {
+  success: true;
+  devices: MobileDevice[];
+}
+
+export interface MobileDeviceResponse {
+  success: true;
+  device: MobileDevice;
+}
+
+export interface MobileDeviceRevokeResponse {
+  success: true;
+  revoked: boolean;
+}
+
 export interface MobileClientRequestOptions {
   accessToken?: string | null;
   communityId?: string | null;
@@ -469,8 +515,10 @@ export const mobileEndpoints = {
   me: () => "/auth/me",
   devices: () => "/devices",
   currentDevice: () => "/devices/current",
+  revokeDevice: (id: string) => `/devices/${encodePathSegment(id)}`,
   profile: () => "/profile",
-  notifications: () => "/notifications",
+  notifications: (input: { limit?: number } = {}) =>
+    withQuery("/notifications", { limit: input.limit }),
   readAllNotifications: () => "/notifications/read-all",
   readNotification: (id: string) => `/notifications/${encodePathSegment(id)}/read`,
   currentQuestionnaire: (input: { month?: string } = {}) =>
@@ -631,6 +679,46 @@ export class MescMobileApiClient {
     });
   }
 
+  async listDevices(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileDevicesResponse>({
+      method: "GET",
+      path: mobileEndpoints.devices(),
+      ...options,
+    });
+  }
+
+  async revokeDevice(deviceDbId: string, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileDeviceRevokeResponse>({
+      method: "DELETE",
+      path: mobileEndpoints.revokeDevice(deviceDbId),
+      ...options,
+    });
+  }
+
+  async listNotifications(input: { limit?: number } = {}, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileNotificationsResponse>({
+      method: "GET",
+      path: mobileEndpoints.notifications(input),
+      ...options,
+    });
+  }
+
+  async markNotificationRead(id: string, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileNotificationReadResponse>({
+      method: "PATCH",
+      path: mobileEndpoints.readNotification(id),
+      ...options,
+    });
+  }
+
+  async markAllNotificationsRead(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileNotificationReadAllResponse>({
+      method: "PATCH",
+      path: mobileEndpoints.readAllNotifications(),
+      ...options,
+    });
+  }
+
   async getMissionHome(input: { month?: string } = {}, options: MobileClientRequestOptions = {}) {
     return this.request<MobileMissionHomeResponse>({
       method: "GET",
@@ -719,7 +807,7 @@ export class MescMobileApiClient {
   }
 
   async updateCurrentDevice(payload: MobileDeviceUpdatePayload, options: MobileClientRequestOptions = {}) {
-    return this.request<{ success: true; device: MobileDevice }>({
+    return this.request<MobileDeviceResponse>({
       method: "PUT",
       path: mobileEndpoints.currentDevice(),
       body: payload,

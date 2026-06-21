@@ -342,6 +342,14 @@ paths:
       responses:
         "200":
           description: Notifications marked as read.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
   /notifications/{id}/read:
     patch:
       summary: Mark one notification as read.
@@ -355,6 +363,25 @@ paths:
       responses:
         "200":
           description: Notification marked as read.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, notification]
+                properties:
+                  success:
+                    type: boolean
+                  notification:
+                    type: object
+                    required: [id, read, readAt]
+                    properties:
+                      id:
+                        type: string
+                      read:
+                        type: boolean
+                      readAt:
+                        type: string
+                        nullable: true
         "404":
           description: Notification not found for the current user.
   /privacy/account-deletion-info:
@@ -987,7 +1014,7 @@ components:
           nullable: true
     MobileNotification:
       type: object
-      required: [id, type, title, message, read, deepLink, createdAt]
+      required: [id, type, title, message, priority, read, readAt, deepLink, createdAt]
       properties:
         id:
           type: string

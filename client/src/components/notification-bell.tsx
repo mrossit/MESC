@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,15 +10,21 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  mobileListNotifications,
+  mobileMarkAllNotificationsRead,
+  mobileMarkNotificationRead,
+  shouldUseMobileAuth,
+} from "@/lib/mobile-auth-session";
 import { toast } from "@/hooks/use-toast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "@/hooks/use-navigate";
+import type { MobileNotification } from "@shared/mobileClient";
 import {
   Bell,
-  Check,
   CheckCheck,
   Info,
   AlertTriangle,
@@ -32,9 +38,18 @@ interface Notification {
   id: string;
   title: string;
   message: string;
-  type: "info" | "warning" | "success" | "error";
+  type: string;
   read: boolean;
-  createdAt: string;
+  createdAt: string | null;
+  actionUrl?: string | null;
+  canDelete?: boolean;
+}
+
+interface NotificationsQueryResponse {
+  data: Notification[];
+  total: number;
+  hasMore: boolean;
+  unreadCount?: number;
 }
 
 interface NotificationBellProps {
@@ -43,10 +58,41 @@ interface NotificationBellProps {
   className?: string;
 }
 
+function mobileNotificationToDisplay(notification: MobileNotification): Notification {
+  return {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    read: notification.read,
+    createdAt: notification.createdAt,
+    actionUrl: notification.deepLink,
+    canDelete: false,
+  };
+}
+
+function normalizeNotificationTarget(target?: string | null) {
+  if (!target || target === "/notifications") return null;
+  return target;
+}
+
+function formatNotificationDate(value: string | null) {
+  if (!value) return "Data indisponivel";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Data indisponivel";
+  return format(parsed, "dd/MM 'às' HH:mm", { locale: ptBR });
+}
+
 export function NotificationBell({ compact = false, showLabel = false, className = "" }: NotificationBellProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const useNativeNotifications = shouldUseMobileAuth();
+  const notificationsQueryKey = useNativeNotifications ? ["mobile", "notifications"] : ["/api/notifications"];
+  const unreadCountQueryKey = useNativeNotifications
+    ? ["mobile", "notifications", "unread-count"]
+    : ["/api/notifications/unread-count"];
   const {
     isSupported: pushSupported,
     status: pushStatus,
@@ -61,33 +107,54 @@ export function NotificationBell({ compact = false, showLabel = false, className
   // WebSocket callback for new notifications - invalidate queries for real-time update
   const handleUserNotification = useCallback(() => {
     // Invalidate both queries to refresh data
-    queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    queryClient.invalidateQueries({ queryKey: unreadCountQueryKey });
+  }, [notificationsQueryKey, queryClient, unreadCountQueryKey]);
 
   // WebSocket callback for unread count updates
   const handleUnreadCountUpdate = useCallback((count: number) => {
     // Update the cache directly for instant UI update
-    queryClient.setQueryData(["/api/notifications/unread-count"], { count });
-  }, [queryClient]);
+    queryClient.setQueryData(unreadCountQueryKey, { count });
+  }, [queryClient, unreadCountQueryKey]);
 
   // Connect to WebSocket for real-time notifications
   useWebSocket({
     onUserNotification: handleUserNotification,
     onUnreadCountUpdate: handleUnreadCountUpdate,
-    enabled: true
+    enabled: !useNativeNotifications
   });
 
   // Fetch notifications (paginated)
-  const { data: notificationsResponse, refetch: refetchNotifications } = useQuery<{ data: Notification[]; total: number; hasMore: boolean }>({
-    queryKey: ["/api/notifications"],
+  const { data: notificationsResponse, refetch: refetchNotifications } = useQuery<NotificationsQueryResponse>({
+    queryKey: notificationsQueryKey,
+    queryFn: useNativeNotifications
+      ? async () => {
+          const response = await mobileListNotifications({ limit: 20 });
+          return {
+            data: response.notifications.map(mobileNotificationToDisplay),
+            total: response.notifications.length,
+            hasMore: false,
+            unreadCount: response.unreadCount,
+          };
+        }
+      : undefined,
     enabled: open, // Only fetch when popover is open
   });
-  const notifications = notificationsResponse?.data ?? [];
+  const notifications = (notificationsResponse?.data ?? [])
+    .map((notification) => ({
+      ...notification,
+      canDelete: notification.canDelete ?? !useNativeNotifications,
+    }));
 
   // Fetch unread count - polling as fallback, WebSocket provides instant updates
   const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: unreadCountQueryKey,
+    queryFn: useNativeNotifications
+      ? async () => {
+          const response = await mobileListNotifications({ limit: 1 });
+          return { count: response.unreadCount };
+        }
+      : undefined,
     refetchInterval: 120000, // Reduced to 2min since WebSocket handles real-time
     staleTime: 60000, // Consider data fresh for 1 minute
   });
@@ -95,22 +162,24 @@ export function NotificationBell({ compact = false, showLabel = false, className
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (useNativeNotifications) return mobileMarkNotificationRead(id);
       return apiRequest("PATCH", `/api/notifications/${id}/read`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+      queryClient.invalidateQueries({ queryKey: unreadCountQueryKey });
     },
   });
 
   // Mark all as read mutation
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
+      if (useNativeNotifications) return mobileMarkAllNotificationsRead();
       return apiRequest("PATCH", "/api/notifications/read-all");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+      queryClient.invalidateQueries({ queryKey: unreadCountQueryKey });
       toast({
         title: "Todas marcadas como lidas",
         description: "Suas notificações foram atualizadas",
@@ -121,11 +190,12 @@ export function NotificationBell({ compact = false, showLabel = false, className
   // Delete notification mutation
   const deleteNotificationMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (useNativeNotifications) throw new Error("Exclusao de notificacao indisponivel no contrato mobile");
       return apiRequest("DELETE", `/api/notifications/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+      queryClient.invalidateQueries({ queryKey: unreadCountQueryKey });
     },
   });
 
@@ -144,6 +214,7 @@ export function NotificationBell({ compact = false, showLabel = false, className
 
   const unreadNotifications = notifications.filter(n => !n.read);
   const recentNotifications = notifications.slice(0, 5); // Show only 5 most recent
+  const totalUnreadCount = unreadCount?.count ?? notificationsResponse?.unreadCount ?? unreadNotifications.length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -159,11 +230,11 @@ export function NotificationBell({ compact = false, showLabel = false, className
         >
           <Bell className={compact ? "h-5 w-5" : "h-4 w-4"} />
           {showLabel && !compact && <span className="ml-2">Notificações</span>}
-          {unreadCount && unreadCount.count > 0 && (
+          {totalUnreadCount > 0 && (
             <Badge 
               className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs"
             >
-              {unreadCount.count > 9 ? "9+" : unreadCount.count}
+              {totalUnreadCount > 9 ? "9+" : totalUnreadCount}
             </Badge>
           )}
         </Button>
@@ -179,13 +250,13 @@ export function NotificationBell({ compact = false, showLabel = false, className
             <div>
               <h3 className="font-semibold text-sm text-neutral-textDark dark:text-text-light">Notificações</h3>
               <p className="text-xs text-neutral-textMedium dark:text-muted-foreground mt-1">
-                {unreadNotifications.length > 0 
-                  ? `${unreadNotifications.length} não lida(s)` 
+                {totalUnreadCount > 0
+                  ? `${totalUnreadCount} não lida(s)`
                   : "Todas lidas"}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {unreadNotifications.length > 0 && (
+              {totalUnreadCount > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -210,7 +281,7 @@ export function NotificationBell({ compact = false, showLabel = false, className
           </div>
         </div>
 
-        {pushSupported && (
+        {pushSupported && !useNativeNotifications && (
           <div className="px-4 py-3 border-b bg-muted/40 dark:bg-dark-6/70 text-xs text-muted-foreground space-y-2">
             {pushStatus === "missing-key" ? (
               <p>Notificações push indisponíveis neste ambiente.</p>
@@ -270,6 +341,11 @@ export function NotificationBell({ compact = false, showLabel = false, className
                       if (!notification.read) {
                         markAsReadMutation.mutate(notification.id);
                       }
+                      const target = normalizeNotificationTarget(notification.actionUrl);
+                      if (target) {
+                        setOpen(false);
+                        navigate(target);
+                      }
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -290,24 +366,26 @@ export function NotificationBell({ compact = false, showLabel = false, className
                               {notification.message}
                             </p>
                             <p className="text-xs text-neutral-textLight dark:text-muted-foreground/70 mt-2">
-                              {format(new Date(notification.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                              {formatNotificationDate(notification.createdAt)}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
                             {!notification.read && (
                               <div className="w-2 h-2 bg-blue-500 rounded-full" />
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNotificationMutation.mutate(notification.id);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3 text-muted-foreground" />
-                            </Button>
+                            {notification.canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNotificationMutation.mutate(notification.id);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3 text-muted-foreground" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
