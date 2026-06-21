@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,20 @@ import { LITURGICAL_POSITIONS } from "@shared/constants";
 import { useLocation } from "wouter";
 import { useDebugRender } from "@/lib/debug";
 import { parseScheduleDate } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import {
+  mobileConfirmSchedule,
+  mobileGetMissionHome,
+  mobileGetSchedulesMonth,
+  mobileRequestSubstitution,
+  shouldUseMobileAuth,
+} from "@/lib/mobile-auth-session";
+import {
+  createMobileIdempotencyKey,
+  type MobileMissionSchedule,
+  type MobileNotice,
+  type MobilePendingAction,
+} from "@shared/mobileClient";
 
 interface ScheduleAssignment {
   id: string;
@@ -33,6 +48,10 @@ interface ScheduleAssignment {
   position: number;
   confirmed: boolean;
   scheduleTitle: string;
+  confirmationStatus?: string | null;
+  canConfirm?: boolean;
+  canRequestSubstitution?: boolean;
+  source?: "web" | "mobile";
 }
 
 interface Notification {
@@ -68,9 +87,50 @@ interface MinisterDashboardProps {
   userName?: string;
 }
 
+function mobileScheduleToAssignment(schedule: MobileMissionSchedule): ScheduleAssignment {
+  return {
+    id: schedule.id,
+    date: schedule.date ?? "",
+    massTime: schedule.time,
+    position: schedule.position ?? 0,
+    confirmed: schedule.confirmationStatus === "confirmed",
+    scheduleTitle: schedule.type,
+    confirmationStatus: schedule.confirmationStatus,
+    canConfirm: schedule.canConfirm,
+    canRequestSubstitution: schedule.canRequestSubstitution,
+    source: "mobile",
+  };
+}
+
+function mobilePendingActionToNotification(action: MobilePendingAction): Notification {
+  return {
+    id: action.id,
+    title: action.title,
+    message: action.subtitle ?? "",
+    type: action.type,
+    read: false,
+    createdAt: action.dueAt ?? new Date().toISOString(),
+    actionUrl: action.deepLink,
+  };
+}
+
+function mobileNoticeToNotification(notice: MobileNotice): Notification {
+  return {
+    id: notice.id,
+    title: notice.title,
+    message: notice.message,
+    type: notice.type,
+    read: notice.read,
+    createdAt: notice.createdAt ?? new Date().toISOString(),
+    actionUrl: notice.deepLink,
+  };
+}
+
 export function MinisterDashboard({ userName }: MinisterDashboardProps) {
   // Track renders in debug panel (development only)
   useDebugRender('MinisterDashboard');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isPrayerOpen, setIsPrayerOpen] = useState(false);
   const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleAssignment[]>([]);
@@ -81,6 +141,104 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
   const [loadingFamily, setLoadingFamily] = useState(true);
   const shouldShowTutorial = useShouldShowTutorial();
   const [, setLocation] = useLocation();
+  const useNativeMission = shouldUseMobileAuth();
+  const mobileMissionMonth = format(new Date(), "yyyy-MM");
+
+  const mobileMissionQueryKey = ["mobile", "mission-home", mobileMissionMonth];
+  const mobileSchedulesQueryKey = ["mobile", "schedules-month", mobileMissionMonth];
+
+  const { data: mobileMissionHome, isLoading: loadingMobileMission } = useQuery({
+    queryKey: mobileMissionQueryKey,
+    queryFn: () => mobileGetMissionHome({ month: mobileMissionMonth }),
+    enabled: useNativeMission,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: mobileSchedulesMonth, isLoading: loadingMobileSchedules } = useQuery({
+    queryKey: mobileSchedulesQueryKey,
+    queryFn: () => mobileGetSchedulesMonth({ month: mobileMissionMonth }),
+    enabled: useNativeMission,
+    staleTime: 60 * 1000,
+  });
+
+  const confirmPresenceMutation = useMutation({
+    mutationFn: (scheduleId: string) => mobileConfirmSchedule(
+      scheduleId,
+      { status: "confirmed" },
+      { idempotencyKey: createMobileIdempotencyKey() },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: mobileMissionQueryKey }),
+        queryClient.invalidateQueries({ queryKey: mobileSchedulesQueryKey }),
+      ]);
+      toast({
+        title: "Presença confirmada",
+        description: "Sua confirmação foi registrada na escala.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Não foi possível confirmar",
+        description: error.message || "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const requestSubstitutionMutation = useMutation({
+    mutationFn: (scheduleId: string) => mobileRequestSubstitution(
+      {
+        scheduleId,
+        reason: "Solicitado pelo app nativo.",
+      },
+      { idempotencyKey: createMobileIdempotencyKey() },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: mobileMissionQueryKey }),
+        queryClient.invalidateQueries({ queryKey: mobileSchedulesQueryKey }),
+      ]);
+      toast({
+        title: "Substituição solicitada",
+        description: "A coordenação já pode acompanhar o pedido.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Não foi possível solicitar",
+        description: error.message || "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const mobileScheduleAssignments = useMemo(() => {
+    const byId = new Map<string, ScheduleAssignment>();
+
+    for (const schedule of mobileSchedulesMonth?.schedules ?? []) {
+      byId.set(schedule.id, mobileScheduleToAssignment(schedule));
+    }
+
+    if (mobileMissionHome?.nextMission) {
+      byId.set(
+        mobileMissionHome.nextMission.id,
+        mobileScheduleToAssignment(mobileMissionHome.nextMission),
+      );
+    }
+
+    return Array.from(byId.values())
+      .filter((schedule) => Boolean(schedule.date))
+      .sort((left, right) =>
+        `${left.date} ${left.massTime}`.localeCompare(`${right.date} ${right.massTime}`),
+      );
+  }, [mobileMissionHome?.nextMission, mobileSchedulesMonth?.schedules]);
+
+  const mobileNotifications = useMemo(() => {
+    const pending = mobileMissionHome?.pendingActions.map(mobilePendingActionToNotification) ?? [];
+    const notices = mobileMissionHome?.notices.map(mobileNoticeToNotification) ?? [];
+    return [...pending, ...notices].slice(0, 5);
+  }, [mobileMissionHome?.notices, mobileMissionHome?.pendingActions]);
 
   useEffect(() => {
     if (shouldShowTutorial) {
@@ -89,10 +247,12 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
   }, [shouldShowTutorial]);
 
   useEffect(() => {
+    if (useNativeMission) return;
+
     fetchUpcomingSchedules();
     fetchNotifications();
     fetchFamilySchedules();
-  }, []);
+  }, [useNativeMission]);
 
   const fetchUpcomingSchedules = async () => {
     try {
@@ -177,10 +337,21 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
     setIsTutorialOpen(true);
   };
 
-  const nextSchedule = upcomingSchedules[0];
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const displaySchedules = useNativeMission ? mobileScheduleAssignments : upcomingSchedules;
+  const displayNotifications = useNativeMission ? mobileNotifications : notifications;
+  const displayFamilySchedules = useNativeMission ? [] : familySchedules;
+  const displayLoadingSchedules = useNativeMission
+    ? loadingMobileMission || loadingMobileSchedules
+    : loadingSchedules;
+  const displayLoadingNotifications = useNativeMission
+    ? loadingMobileMission
+    : loadingNotifications;
+  const displayLoadingFamily = useNativeMission ? false : loadingFamily;
+
+  const nextSchedule = displaySchedules[0];
+  const unreadCount = displayNotifications.filter((notification) => !notification.read).length;
   const firstName = userName?.split(" ")[0] || "Ministro";
-  const nextScheduleDate = nextSchedule
+  const nextScheduleDate = nextSchedule?.date
     ? format(parseScheduleDate(nextSchedule.date), "EEEE, dd 'de' MMMM", { locale: ptBR })
     : null;
 
@@ -196,6 +367,8 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
   };
 
   const getCompactPositionLabel = (position: number) => {
+    if (!position) return "Posição a definir";
+
     const liturgicalName = LITURGICAL_POSITIONS[position];
     if (liturgicalName) {
       return `P${position}: ${liturgicalName}`;
@@ -260,7 +433,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   >
                     <Calendar className="mb-2 h-4 w-4 text-burgundy dark:text-amber-200" />
                     <span className="block text-xs font-semibold text-foreground">Escalas</span>
-                    <span className="block text-[11px] text-muted-foreground">{upcomingSchedules.length} próximas</span>
+                    <span className="block text-[11px] text-muted-foreground">{displaySchedules.length} próximas</span>
                   </button>
                   <button
                     type="button"
@@ -316,32 +489,75 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   </Button>
                 </div>
 
-                {loadingSchedules ? (
+                {displayLoadingSchedules ? (
                   <div className="flex min-h-[128px] items-center justify-center rounded-lg bg-white/30 text-sm text-muted-foreground dark:bg-white/5">
                     Carregando sua próxima escala...
                   </div>
                 ) : nextSchedule ? (
-                  <button
-                    type="button"
-                    onClick={() => setLocation(`/schedules?date=${nextSchedule.date}`)}
-                    className="liquid-glass-interactive w-full rounded-lg border border-white/50 bg-white/30 p-3 text-left dark:border-white/10 dark:bg-white/5 sm:p-4"
-                  >
-                    <p className="text-sm font-semibold capitalize text-foreground">{nextScheduleDate}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
-                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                        {getMassTimeLabel(nextSchedule.massTime)}
-                      </span>
-                      <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
-                        <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="min-w-0 truncate">{getCompactPositionLabel(nextSchedule.position)}</span>
-                      </span>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between gap-3 text-xs font-medium text-burgundy dark:text-amber-100">
-                      Abrir detalhes da escala
-                      <ArrowRight className="h-4 w-4" />
-                    </div>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setLocation(`/schedules?date=${nextSchedule.date}`)}
+                      className="liquid-glass-interactive w-full rounded-lg border border-white/50 bg-white/30 p-3 text-left dark:border-white/10 dark:bg-white/5 sm:p-4"
+                    >
+                      <p className="text-sm font-semibold capitalize text-foreground">
+                        {nextScheduleDate ?? "Data a confirmar"}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
+                          <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                          {getMassTimeLabel(nextSchedule.massTime)}
+                        </span>
+                        <span className="liquid-glass-chip inline-flex max-w-full items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium">
+                          <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="min-w-0 truncate">{getCompactPositionLabel(nextSchedule.position)}</span>
+                        </span>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between gap-3 text-xs font-medium text-burgundy dark:text-amber-100">
+                        Abrir detalhes da escala
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </button>
+
+                    {useNativeMission && (
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            !nextSchedule.canConfirm ||
+                            nextSchedule.confirmed ||
+                            confirmPresenceMutation.isPending
+                          }
+                          onClick={() => confirmPresenceMutation.mutate(nextSchedule.id)}
+                          className="h-9"
+                        >
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          {nextSchedule.confirmed
+                            ? "Presença confirmada"
+                            : confirmPresenceMutation.isPending
+                              ? "Confirmando..."
+                              : "Confirmar presença"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            !nextSchedule.canRequestSubstitution ||
+                            requestSubstitutionMutation.isPending
+                          }
+                          onClick={() => requestSubstitutionMutation.mutate(nextSchedule.id)}
+                          className="h-9"
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          {requestSubstitutionMutation.isPending
+                            ? "Solicitando..."
+                            : "Pedir substituição"}
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="rounded-lg border border-dashed border-sage/40 bg-white/30 p-4 text-sm text-muted-foreground dark:bg-white/5">
                     Nenhuma escala publicada para você nos próximos dias. Quando houver novidade, ela aparece aqui primeiro.
@@ -354,7 +570,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                     <p className="text-[11px] text-muted-foreground">avisos novos</p>
                   </div>
                   <div className="rounded-lg bg-white/30 px-3 py-2 dark:bg-white/5">
-                    <p className="text-lg font-bold text-foreground">{familySchedules.length}</p>
+                    <p className="text-lg font-bold text-foreground">{displayFamilySchedules.length}</p>
                     <p className="text-[11px] text-muted-foreground">escalas familiares</p>
                   </div>
                 </div>
@@ -372,14 +588,14 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
-          {loadingSchedules ? (
+          {displayLoadingSchedules ? (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4 animate-pulse">
                 <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
               </div>
               <p className="text-muted-foreground">Carregando escalas...</p>
             </div>
-          ) : upcomingSchedules.length === 0 ? (
+          ) : displaySchedules.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="w-16 h-16 bg-neutral-peachCream/30 rounded-full flex items-center justify-center mb-4">
                 <Calendar className="h-8 w-8 text-neutral-accentWarm/50 dark:text-gray-600" />
@@ -391,7 +607,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
             </div>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {upcomingSchedules.slice(0, 5).map((schedule) => (
+              {displaySchedules.slice(0, 5).map((schedule) => (
                 <button
                   key={schedule.id}
                   type="button"
@@ -401,7 +617,9 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <div className="flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-foreground">
-                        {format(parseScheduleDate(schedule.date), "dd 'de' MMMM", { locale: ptBR })}
+                        {schedule.date
+                          ? format(parseScheduleDate(schedule.date), "dd 'de' MMMM", { locale: ptBR })
+                          : "Data a confirmar"}
                       </p>
                       <Badge variant="secondary" className="max-w-full text-xs">
                         <span className="truncate">{getCompactPositionLabel(schedule.position)}</span>
@@ -415,14 +633,14 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                   <ArrowRight className="h-4 w-4 self-end text-muted-foreground sm:self-center" />
                 </button>
               ))}
-              {upcomingSchedules.length > 5 && (
+              {displaySchedules.length > 5 && (
                 <div className="text-center pt-2">
                   <Button 
                     variant="link" 
                     className="text-primary hover:text-primary/80"
                     onClick={() => setLocation('/schedules')}
                   >
-                    Ver todas ({upcomingSchedules.length} escalas)
+                    Ver todas ({displaySchedules.length} escalas)
                   </Button>
                 </div>
               )}
@@ -443,14 +661,14 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingNotifications ? (
+            {displayLoadingNotifications ? (
               <div className="flex flex-col items-center justify-center py-4">
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2 animate-pulse">
                   <Bell className="h-6 w-6 text-orange-500/70" />
                 </div>
                 <p className="text-sm text-muted-foreground">Carregando...</p>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : displayNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2">
                   <Bell className="h-6 w-6 text-orange-500/70" />
@@ -459,7 +677,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
               </div>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {notifications.map((notification) => (
+                {displayNotifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`liquid-glass-interactive cursor-pointer rounded-lg border p-2 transition-colors ${
@@ -488,7 +706,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                     </div>
                   </div>
                 ))}
-                {notifications.length > 0 && (
+                {displayNotifications.length > 0 && (
                   <Button
                     variant="link"
                     size="sm"
@@ -504,7 +722,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
         </Card>
 
         {/* Família MESC */}
-        {loadingFamily ? (
+        {displayLoadingFamily ? (
           <Card className="liquid-glass border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -521,7 +739,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
               </div>
             </CardContent>
           </Card>
-        ) : familySchedules.length > 0 ? (
+        ) : displayFamilySchedules.length > 0 ? (
           <Card className="liquid-glass border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -531,7 +749,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {familySchedules.map((schedule, index) => (
+                {displayFamilySchedules.map((schedule, index) => (
                   <div
                     key={index}
                     className="rounded-lg border border-purple-200 bg-purple-50/80 p-2 dark:border-purple-800 dark:bg-purple-900/10"

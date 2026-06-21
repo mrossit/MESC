@@ -116,6 +116,17 @@ export interface MobilePendingAction {
   dueAt?: string | null;
 }
 
+export interface MobileNotice {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  priority: string | null;
+  read: boolean;
+  deepLink: string;
+  createdAt: string | null;
+}
+
 export interface MobileMissionSchedule {
   id: string;
   date: string | null;
@@ -142,16 +153,7 @@ export interface MobileMissionHomeResponse {
     publishedAssignments: number;
     nextScheduleId: string | null;
   };
-  notices: Array<{
-    id: string;
-    type: string;
-    title: string;
-    message: string;
-    priority: string | null;
-    read: boolean;
-    deepLink: string;
-    createdAt: string | null;
-  }>;
+  notices: MobileNotice[];
   sync: {
     serverTime: string;
     cacheMaxAgeSeconds: number;

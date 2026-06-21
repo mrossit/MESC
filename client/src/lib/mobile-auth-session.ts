@@ -4,10 +4,17 @@ import {
   MescMobileApiClient,
   MescMobileApiError,
   type MobileAuthResponse,
+  type MobileClientRequestOptions,
   type MobileFetch,
   type MobileLoginPayload,
   type MobileMeResponse,
+  type MobileMissionHomeResponse,
   type MobilePlatform,
+  type MobileScheduleConfirmPayload,
+  type MobileScheduleConfirmResponse,
+  type MobileScheduleMonthResponse,
+  type MobileSubstitutionCreatePayload,
+  type MobileSubstitutionCreateResponse,
 } from "@shared/mobileClient";
 
 export const MOBILE_AUTH_STORAGE_KEYS = {
@@ -232,7 +239,9 @@ export async function refreshMobileAuthSession() {
   return response;
 }
 
-export async function mobileGetMe(): Promise<MobileMeResponse> {
+async function runWithMobileAuthRetry<T>(
+  operation: (client: MescMobileApiClient) => Promise<T>,
+): Promise<T> {
   if (!getStoredAuthToken() && hasStoredMobileRefreshToken()) {
     await refreshMobileAuthSession();
   }
@@ -240,19 +249,46 @@ export async function mobileGetMe(): Promise<MobileMeResponse> {
   const client = createClient();
 
   try {
-    return await client.getMe();
+    return await operation(client);
   } catch (error) {
     if (error instanceof MescMobileApiError && error.status === 401 && hasStoredMobileRefreshToken()) {
       const refreshed = await refreshMobileAuthSession();
-      return createClient({
+      return operation(createClient({
         accessToken: refreshed.auth.accessToken,
         communityId: refreshed.activeCommunityId,
         deviceId: refreshed.device.deviceId,
-      }).getMe();
+      }));
     }
 
     throw error;
   }
+}
+
+export async function mobileGetMe(): Promise<MobileMeResponse> {
+  return runWithMobileAuthRetry((client) => client.getMe());
+}
+
+export async function mobileGetMissionHome(input: { month?: string } = {}): Promise<MobileMissionHomeResponse> {
+  return runWithMobileAuthRetry((client) => client.getMissionHome(input));
+}
+
+export async function mobileGetSchedulesMonth(input: { month?: string } = {}): Promise<MobileScheduleMonthResponse> {
+  return runWithMobileAuthRetry((client) => client.getSchedulesMonth(input));
+}
+
+export async function mobileConfirmSchedule(
+  scheduleId: string,
+  payload: MobileScheduleConfirmPayload,
+  options: MobileClientRequestOptions,
+): Promise<MobileScheduleConfirmResponse> {
+  return runWithMobileAuthRetry((client) => client.confirmSchedule(scheduleId, payload, options));
+}
+
+export async function mobileRequestSubstitution(
+  payload: MobileSubstitutionCreatePayload,
+  options: MobileClientRequestOptions,
+): Promise<MobileSubstitutionCreateResponse> {
+  return runWithMobileAuthRetry((client) => client.requestSubstitution(payload, options));
 }
 
 export async function mobileLogout() {
