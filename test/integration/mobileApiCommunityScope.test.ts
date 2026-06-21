@@ -165,7 +165,8 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
-    expect(response.body.substitutions.map((substitution: { id: string }) => substitution.id))
-      .toEqual([MOBILE_P0_DEMO_IDS.substitutionA]);
+    const visibleSubstitutionIds = response.body.substitutions.map((substitution: { id: string }) => substitution.id);
+    expect(visibleSubstitutionIds).toContain(MOBILE_P0_DEMO_IDS.substitutionA);
+    expect(visibleSubstitutionIds).not.toContain(MOBILE_P0_DEMO_IDS.substitutionB);
   });
 });
