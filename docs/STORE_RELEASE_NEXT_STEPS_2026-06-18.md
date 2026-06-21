@@ -80,7 +80,7 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 
 `--strict-mock-data` falha quando encontra usuarios com padroes obvios de teste, exemplo `test.*@test.com`, `placeholder+*@saojudastadeu.app`, `*@example.*`, `*@demo.*` ou nome contendo `teste/demo/mock/placeholder`. A limpeza em producao deve ser feita somente depois desse dry-run listar os candidatos.
 
-## Correcoes nativas 50410-50414
+## Correcoes nativas 50410-50415
 
 - Status bar iOS transparente com `overlaysWebView=true`, para o fundo do login continuar por tras do notch/Dynamic Island.
 - Login sem `safe-area-bottom` duplicado e com camada fixa herdando o mesmo background, evitando degradê picado.
@@ -90,11 +90,13 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 - Correção auth nativa: chamadas manuais `fetch('/api/...')` agora recebem `Authorization: Bearer` automaticamente quando houver token salvo; cache de usuário sem token não mantém a pessoa "meio logada".
 - Correção sessão/biometria: logout comum não apaga credencial biométrica, cache/versionamento preserva `token`/`auth_token`/`session_token`, reabertura do app restaura sessão válida e o Face ID não abre automaticamente logo após tocar em Sair.
 - Correção UX/auth: login manual não dispara prompts biométricos repetidos, botão de som foi movido para o header, fotos protegidas são carregadas com token e o menu inferior foi refinado em padrão mais próximo da App Store.
+- MVP P0/TestFlight: build `5.4.3 (50415)` distribuido internamente com contrato mobile, notificacoes P0, seed/smoke tests, visual liturgico inicial e comandos `mobile:mvp:check`.
 
-## Estado App Store Connect em 19/06/2026
+## Estado App Store Connect em 21/06/2026
 
-- Build `5.4.3 (50414)` está `VALID`.
-- Grupo TestFlight `MESC Interno` já contém `50414`.
+- Build `5.4.3 (50415)` está `VALID` e distribuido para testers internos.
+- Delivery UUID `50415`: `1d9608d9-5bfb-4bd5-bfc8-b4551877c59e`.
+- Build anterior `5.4.3 (50414)` permanece como referencia instalada.
 - Tester interno `marco@rosarial.com.br` aparece como `INSTALLED`.
 - Versão App Store alinhada para `5.4.3`, estado `PREPARE_FOR_SUBMISSION`.
 - Build `50414` selecionada na versão de loja.
@@ -107,7 +109,7 @@ RELEASE_DATABASE_URL="$DATABASE_URL" npm run release:check:data -- --strict-mock
 2. Rodar o dry-run no banco real usado por `https://saojudastadeu.app`.
 3. Rodar o dry-run com `--strict-mock-data`; se houver mocks, revisar a amostra antes de qualquer limpeza manual.
 4. Se `schedules_2026-06=0`, aplicar `--apply-june-schedule` no banco real somente depois de revisar os 10 ministros que estavam ausentes em staging.
-5. Validar no aparelho o build iOS `5.4.3 (50414)`: login com senha, ativar Face ID, matar/reabrir app, Sair, entrar por Face ID, diretório, fotos dos ministros, escala mensal, substituições, som no header e perfil.
+5. Validar no aparelho o build iOS `5.4.3 (50415)`: login, Minha Missao, notificacoes com `eventKey`, questionario, confirmacao de escala, pedido de substituicao, biometria/sessao, diretório/fotos quando disponiveis e perfil.
 6. Criar/preencher conta demo de reviewer com dados reais seguros.
 7. Capturar screenshots finais iPhone para App Store.
 8. Preencher declaração de privacidade/IDFA no App Store Connect.
