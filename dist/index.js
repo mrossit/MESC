@@ -3913,7 +3913,7 @@ __export(scheduleGenerator_exports, {
   generateAutomaticSchedule: () => generateAutomaticSchedule,
   getMassDisplayName: () => getMassDisplayName
 });
-import { eq as eq14, and as and8, or as or6, sql as sql4, ne as ne2, inArray as inArray4, isNull as isNull2 } from "drizzle-orm";
+import { eq as eq14, and as and8, or as or6, sql as sql4, ne as ne2, inArray as inArray5, isNull as isNull2 } from "drizzle-orm";
 import { format as format3, addDays as addDays3, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2, getDay as getDay3, getDate as getDate2, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
 function getMassDisplayName(massTime) {
   const t = massTime.type;
@@ -4353,7 +4353,7 @@ ${"!".repeat(60)}`);
             id: families.id,
             name: families.name,
             preferServeTogether: families.preferServeTogether
-          }).from(families).where(inArray4(families.id, uniqueFamilyIds));
+          }).from(families).where(inArray5(families.id, uniqueFamilyIds));
           for (const family of familiesData) {
             this.familyPreferences.set(family.id, family.preferServeTogether ?? true);
           }
@@ -6546,7 +6546,7 @@ ${"!".repeat(60)}`);
           }
           const ministerIds = results.map((r) => r.ministerId);
           const ministersData = await this.db.select().from(users).where(and8(
-            inArray4(users.id, ministerIds),
+            inArray5(users.id, ministerIds),
             eq14(users.status, "active")
           ));
           const ministers = ministersData.map((m) => ({
@@ -8349,7 +8349,7 @@ __export(whatsappHandler_exports, {
 });
 import axios from "axios";
 import OpenAI from "openai";
-import { eq as eq36, and as and27, gte as gte17, asc as asc3, or as or11 } from "drizzle-orm";
+import { eq as eq36, and as and28, gte as gte17, asc as asc3, or as or11 } from "drizzle-orm";
 import { format as format11, startOfDay } from "date-fns";
 import { ptBR as ptBR4 } from "date-fns/locale";
 async function sendWhatsappMessage(phone, message) {
@@ -8404,7 +8404,7 @@ async function getNextSchedule(ministerId) {
     position: schedules.position,
     location: schedules.location
   }).from(schedules).where(
-    and27(
+    and28(
       eq36(schedules.ministerId, ministerId),
       gte17(schedules.date, today)
     )
@@ -8429,7 +8429,7 @@ async function getAvailableSubstitutions() {
     date: schedules.date,
     time: schedules.time
   }).from(substitutionRequests).innerJoin(users, eq36(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq36(substitutionRequests.scheduleId, schedules.id)).where(
-    and27(
+    and28(
       eq36(substitutionRequests.status, "available"),
       gte17(schedules.date, today)
     )
@@ -10766,6 +10766,44 @@ function getSpecialEvents(month, year) {
 
 // server/routes/questionnaireAdmin.ts
 init_roles();
+
+// shared/mobileNotificationEvents.ts
+var MOBILE_NOTIFICATION_EVENT_KEYS = [
+  "questionnaire_published",
+  "coordinator_announcement",
+  "questionnaire_closed",
+  "schedule_published",
+  "substitution_requested",
+  "substitute_accepted",
+  "formation_available",
+  "schedule_reminder"
+];
+function isMobileNotificationEventKey(value) {
+  return typeof value === "string" && MOBILE_NOTIFICATION_EVENT_KEYS.includes(value);
+}
+function mobileNotificationData(eventKey, data = {}) {
+  return {
+    ...data,
+    eventKey
+  };
+}
+function extractMobileNotificationEventKey(data) {
+  const parsed = typeof data === "string" ? safeJsonParse(data) : data;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const eventKey = parsed.eventKey;
+  return isMobileNotificationEventKey(eventKey) ? eventKey : null;
+}
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+// server/routes/questionnaireAdmin.ts
 await init_communityContext();
 await init_storage();
 await init_pushNotifications();
@@ -10903,6 +10941,50 @@ function getMonthName(month) {
     "Dezembro"
   ];
   return months[month - 1];
+}
+async function notifyQuestionnaireClosed(template) {
+  try {
+    const explicitTargetUserIds = Array.isArray(template.targetUserIds) ? template.targetUserIds.filter((id) => typeof id === "string" && id.length > 0) : [];
+    const targetUsers = explicitTargetUserIds.length > 0 ? await db.select({ id: users.id }).from(users).where(and4(
+      inArray3(users.id, explicitTargetUserIds),
+      eq9(users.status, "active")
+    )) : await db.select({ id: users.id }).from(users).where(and4(
+      eq9(users.role, "ministro"),
+      eq9(users.status, "active"),
+      template.communityId ? eq9(users.homeCommunityId, template.communityId) : void 0
+    ));
+    const recipientIds = [...new Set(targetUsers.map((user) => user.id))];
+    if (recipientIds.length === 0) {
+      return;
+    }
+    const title = "Question\xE1rio Encerrado";
+    const message = `O question\xE1rio ${template.title ?? "de disponibilidade"} foi encerrado. Novas respostas n\xE3o ser\xE3o aceitas.`;
+    await Promise.all(recipientIds.map(
+      (recipientId) => storage.createNotification({
+        userId: recipientId,
+        title,
+        message,
+        type: "announcement",
+        read: false,
+        actionUrl: "/questionnaires",
+        data: mobileNotificationData("questionnaire_closed", {
+          questionnaireId: template.id,
+          month: template.month ?? null,
+          year: template.year ?? null
+        })
+      })
+    ));
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(recipientIds, {
+        title,
+        body: message,
+        url: "/questionnaires",
+        tag: `questionnaire-closed-${template.id}`
+      });
+    }
+  } catch (error) {
+    logger.error("Erro ao enviar notifica\xE7\xF5es de encerramento do question\xE1rio:", error);
+  }
 }
 function parseYearMonthParams(req, res) {
   const year = parseInt(req.params.year);
@@ -11425,7 +11507,14 @@ router4.post("/templates/:year/:month/send", authenticateToken, requireRole(["ge
           userId: minister.id,
           title: isResend ? "Question\xE1rio Atualizado" : "Novo Question\xE1rio Dispon\xEDvel",
           message: isResend ? `O question\xE1rio de ${monthNames2[month - 1]} de ${year} foi atualizado. Por favor, revise e atualize suas respostas se necess\xE1rio.` : `O question\xE1rio de disponibilidade para ${monthNames2[month - 1]} de ${year} est\xE1 dispon\xEDvel. Por favor, responda o quanto antes.`,
-          type: "announcement"
+          type: "announcement",
+          actionUrl: "/questionnaires",
+          data: mobileNotificationData("questionnaire_published", {
+            questionnaireId: template.id,
+            month,
+            year,
+            isResend
+          })
         });
       }
     }
@@ -11478,7 +11567,12 @@ router4.post("/templates/:id/send", authenticateToken, requireRole(["gestor", "c
           message: `O question\xE1rio de disponibilidade para ${monthName}/${questionnaireYear} foi publicado. Por favor, preencha suas disponibilidades.`,
           type: "announcement",
           read: false,
-          actionUrl: "/questionnaires"
+          actionUrl: "/questionnaires",
+          data: mobileNotificationData("questionnaire_published", {
+            questionnaireId: templateId,
+            month: questionnaireMonth,
+            year: questionnaireYear
+          })
         })
       );
       await Promise.all(notificationPromises);
@@ -11527,6 +11621,7 @@ router4.patch("/templates/:id/close", authenticateToken, requireRole(["gestor", 
       // closedAt: new Date(), // Campo não existe no schema
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq9(questionnaires.id, templateId)).returning();
+    await notifyQuestionnaireClosed(updated);
     res.json({
       ...updated,
       questions: Array.isArray(updated.questions) ? updated.questions : JSON.parse(updated.questions)
@@ -11911,6 +12006,7 @@ router4.get("/current-status", authenticateToken, async (req, res) => {
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq9(questionnaires.id, questionnaire.id)).returning();
       autoCloseTriggered = true;
+      await notifyQuestionnaireClosed(updated);
       return res.json({
         currentDay,
         currentMonth,
@@ -12056,7 +12152,8 @@ await init_db();
 init_schema();
 import { Router as Router5 } from "express";
 import { z as z3 } from "zod";
-import { eq as eq11, and as and6, or as or4 } from "drizzle-orm";
+import { eq as eq11, and as and6, inArray as inArray4, or as or4 } from "drizzle-orm";
+await init_pushNotifications();
 init_roles();
 await init_communityContext();
 
@@ -12967,7 +13064,13 @@ router5.post("/templates", authenticateToken, requireRole(["coordenador", "gesto
             userId: minister.id,
             title: "Novo Question\xE1rio Dispon\xEDvel",
             message: `O question\xE1rio de disponibilidade para ${monthNames[month - 1]} de ${year} est\xE1 dispon\xEDvel. Por favor, responda o quanto antes.`,
-            type: "announcement"
+            type: "announcement",
+            actionUrl: "/questionnaires",
+            data: mobileNotificationData("questionnaire_published", {
+              questionnaireId: created.id,
+              month,
+              year
+            })
           });
         }
       }
@@ -13641,6 +13744,47 @@ router5.patch("/admin/templates/:id/close", authenticateToken, requireRole(["coo
       status: "closed",
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq11(questionnaires.id, templateId)).returning();
+    try {
+      const explicitTargetUserIds = Array.isArray(existingTemplate.targetUserIds) ? existingTemplate.targetUserIds.filter((id) => typeof id === "string" && id.length > 0) : [];
+      const targetUsers = explicitTargetUserIds.length > 0 ? await db.select({ id: users.id }).from(users).where(and6(
+        inArray4(users.id, explicitTargetUserIds),
+        eq11(users.status, "active")
+      )) : await db.select({ id: users.id }).from(users).where(and6(
+        eq11(users.role, "ministro"),
+        eq11(users.status, "active"),
+        existingTemplate.communityId ? eq11(users.homeCommunityId, existingTemplate.communityId) : void 0
+      ));
+      const recipientIds = [...new Set(targetUsers.map((user) => user.id))];
+      if (recipientIds.length > 0) {
+        const title = "Question\xE1rio Encerrado";
+        const message = `O question\xE1rio ${existingTemplate.title ?? "de disponibilidade"} foi encerrado. Novas respostas n\xE3o ser\xE3o aceitas.`;
+        await Promise.all(recipientIds.map(
+          (recipientId) => db.insert(notifications).values({
+            userId: recipientId,
+            title,
+            message,
+            type: "announcement",
+            read: false,
+            actionUrl: "/questionnaires",
+            data: mobileNotificationData("questionnaire_closed", {
+              questionnaireId: templateId,
+              month: existingTemplate.month,
+              year: existingTemplate.year
+            })
+          })
+        ));
+        if (pushConfig.enabled) {
+          await sendPushNotificationToUsers(recipientIds, {
+            title,
+            body: message,
+            url: "/questionnaires",
+            tag: `questionnaire-closed-${templateId}`
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error("Error sending questionnaire close notifications:", notificationError);
+    }
     res.json({
       ...updated,
       questions: updated.questions
@@ -13818,7 +13962,7 @@ await init_scheduleGenerator();
 init_logger();
 await init_db();
 init_schema();
-import { and as and10, gte as gte5, lte as lte5, eq as eq16, sql as sql6, ne as ne3, desc as desc4, inArray as inArray5 } from "drizzle-orm";
+import { and as and10, gte as gte5, lte as lte5, eq as eq16, sql as sql6, ne as ne3, desc as desc4, inArray as inArray6 } from "drizzle-orm";
 import { ptBR as ptBR2 } from "date-fns/locale";
 import { format as format5 } from "date-fns";
 
@@ -14528,7 +14672,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
-          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, scheduleIds));
+          await tx.delete(substitutionRequests).where(inArray6(substitutionRequests.scheduleId, scheduleIds));
           await tx.delete(schedules).where(and10(gte5(schedules.date, startDate), lte5(schedules.date, endDate)));
           console.log(`Deleted ${existingSchedules.length} schedules`);
         }
@@ -14538,7 +14682,7 @@ router6.post("/emergency-save", authenticateToken, requireRole(["gestor", "coord
       )];
       const existingMinisterIds = /* @__PURE__ */ new Set();
       if (uniqueMinisterIds.length > 0) {
-        const existingMinisters = await tx.select({ id: users.id }).from(users).where(inArray5(users.id, uniqueMinisterIds));
+        const existingMinisters = await tx.select({ id: users.id }).from(users).where(inArray6(users.id, uniqueMinisterIds));
         existingMinisters.forEach((m) => existingMinisterIds.add(m.id));
         console.log(`[BATCH_VALIDATION] Verified ${existingMinisterIds.size}/${uniqueMinisterIds.length} minister IDs exist`);
       }
@@ -14664,7 +14808,7 @@ router6.post("/inspect-save-data", authenticateToken, requireRole(["gestor", "co
       }
     };
     if (db && analysis.ministerIds.length > 0) {
-      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray5(users.id, analysis.ministerIds.slice(0, 50)));
+      const existingMinisters = await db.select({ id: users.id }).from(users).where(inArray6(users.id, analysis.ministerIds.slice(0, 50)));
       analysis.ministerIdsInDb = existingMinisters.length;
       analysis.ministerIdsRequested = analysis.ministerIds.length;
       const existingIds = new Set(existingMinisters.map((m) => m.id));
@@ -14715,7 +14859,7 @@ router6.post("/save-generated", authenticateToken, requireRole(["gestor", "coord
         console.log(`Found ${existingSchedules.length} existing schedules to delete`);
         if (existingSchedules.length > 0) {
           const scheduleIds = existingSchedules.map((s) => s.id);
-          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, scheduleIds));
+          await tx.delete(substitutionRequests).where(inArray6(substitutionRequests.scheduleId, scheduleIds));
           logger.info(`Removed substitution requests for ${scheduleIds.length} schedules`);
         }
         await tx.delete(schedules).where(and10(gte5(schedules.date, firstDate), lte5(schedules.date, lastDate)));
@@ -15321,7 +15465,7 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting, commu
         );
         if (oldScheduleIds.length > 0) {
           const ids = oldScheduleIds.map((r) => r.id);
-          await tx.delete(substitutionRequests).where(inArray5(substitutionRequests.scheduleId, ids));
+          await tx.delete(substitutionRequests).where(inArray6(substitutionRequests.scheduleId, ids));
         }
         await tx.delete(schedules).where(
           and10(
@@ -15737,7 +15881,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { format as format6 } from "date-fns";
 import { ptBR as ptBR3 } from "date-fns/locale";
-import { and as and11, eq as eq17, inArray as inArray6 } from "drizzle-orm";
+import { and as and11, eq as eq17, inArray as inArray7 } from "drizzle-orm";
 await init_db();
 init_schema();
 init_logger();
@@ -15797,7 +15941,7 @@ router7.get(
       }
       const emailMap = /* @__PURE__ */ new Map();
       if (allMinisterIds.size > 0) {
-        const rows2 = await db.select({ id: users.id, email: users.email }).from(users).where(inArray6(users.id, [...allMinisterIds]));
+        const rows2 = await db.select({ id: users.id, email: users.email }).from(users).where(inArray7(users.id, [...allMinisterIds]));
         for (const r of rows2) if (r.id && r.email) emailMap.set(r.id, r.email);
       }
       const rows = [[...COLUMN_HEADERS]];
@@ -15937,13 +16081,13 @@ async function resolveMinisterIds(rows) {
   const emailLookups = rows.filter((r) => !r.ministerId && r.email).map((r) => r.email.toLowerCase());
   let emailToId = /* @__PURE__ */ new Map();
   if (emailLookups.length > 0) {
-    const found = await db.select({ id: users.id, email: users.email }).from(users).where(inArray6(users.email, emailLookups));
+    const found = await db.select({ id: users.id, email: users.email }).from(users).where(inArray7(users.email, emailLookups));
     emailToId = new Map(found.map((r) => [r.email.toLowerCase(), r.id]));
   }
   const idsToCheck = [...new Set(rows.filter((r) => r.ministerId).map((r) => r.ministerId))];
   let knownIds = /* @__PURE__ */ new Set();
   if (idsToCheck.length > 0) {
-    const found = await db.select({ id: users.id }).from(users).where(inArray6(users.id, idsToCheck));
+    const found = await db.select({ id: users.id }).from(users).where(inArray7(users.id, idsToCheck));
     knownIds = new Set(found.map((r) => r.id));
   }
   const resolved = [];
@@ -16133,7 +16277,7 @@ router7.post(
           const oldIds = await tx.select({ id: schedules.id }).from(schedules).where(and11(eq17(schedules.date, slot.date), eq17(schedules.time, slot.time)));
           if (oldIds.length > 0) {
             const idsArr = oldIds.map((r) => r.id);
-            await tx.delete(substitutionRequests).where(inArray6(substitutionRequests.scheduleId, idsArr));
+            await tx.delete(substitutionRequests).where(inArray7(substitutionRequests.scheduleId, idsArr));
             await tx.delete(schedules).where(and11(eq17(schedules.date, slot.date), eq17(schedules.time, slot.time)));
           }
           for (let i = 0; i < slot.ministers.length; i++) {
@@ -16709,12 +16853,12 @@ async function sendMinisterNotifications(scheduleData, month, year) {
         message: `Sua escala foi publicada! Voc\xEA tem ${scheduleCount} missa(s) agendada(s) este m\xEAs.`,
         priority: "medium",
         actionUrl: `/schedules?month=${month}&year=${year}`,
-        data: {
+        data: mobileNotificationData("schedule_published", {
           month,
           year,
           scheduleCount,
           schedules: ministerSchedules[ministerId]
-        }
+        })
       });
       sent++;
     } catch (error) {
@@ -16764,14 +16908,14 @@ import { eq as eq22, and as and16, sql as sql10, gte as gte10, lte as lte9, desc
 // server/services/scheduleComparisonService.ts
 await init_db();
 init_schema();
-import { eq as eq20, and as and14, inArray as inArray9 } from "drizzle-orm";
+import { eq as eq20, and as and14, inArray as inArray10 } from "drizzle-orm";
 
 // server/services/reliabilityScoreService.ts
 await init_db();
 init_schema();
 init_logger();
 init_roles();
-import { eq as eq19, and as and13, sql as sql8, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq19, and as and13, sql as sql8, inArray as inArray9 } from "drizzle-orm";
 var PENALTIES = {
   SUBSTITUTION_REQUEST: 5,
   // Each substitution request reduces score by 5 points
@@ -16975,7 +17119,7 @@ async function checkAndAlertLowReliability() {
       role: users.role
     }).from(users).where(
       and13(
-        inArray8(users.role, DB_ADMIN_ROLES),
+        inArray9(users.role, DB_ADMIN_ROLES),
         eq19(users.status, "active")
       )
     );
@@ -17184,7 +17328,7 @@ async function getMinisterDetails(counts) {
     id: users.id,
     name: users.name,
     reliabilityScore: users.reliabilityScore
-  }).from(users).where(inArray9(users.id, ministerIds));
+  }).from(users).where(inArray10(users.id, ministerIds));
   return ministers.map((m) => ({
     ministerId: m.id,
     ministerName: m.name,
@@ -17817,7 +17961,11 @@ router9.patch("/:id/publish", authenticateToken, requireRole(["coordenador", "ge
             message: notificationMessage,
             type: "schedule",
             read: false,
-            actionUrl: "/schedules"
+            actionUrl: "/schedules",
+            data: mobileNotificationData("schedule_published", {
+              month,
+              year
+            })
           })
         ));
         await sendPushNotificationToUsers(uniqueMinisterIds, {
@@ -18002,7 +18150,7 @@ init_schema();
 import { Router as Router10 } from "express";
 init_roles();
 await init_communityContext();
-import { eq as eq23, and as and17, inArray as inArray10, sql as sql11 } from "drizzle-orm";
+import { eq as eq23, and as and17, inArray as inArray11, sql as sql11 } from "drizzle-orm";
 import { format as format9, addHours, subHours, isWithinInterval, parseISO } from "date-fns";
 function getErrorMessage6(error) {
   if (error instanceof Error) return error.message;
@@ -18015,7 +18163,7 @@ async function isAuxiliaryForMass(userId, scheduleId) {
     and17(
       eq23(schedules.id, scheduleId),
       eq23(schedules.ministerId, userId),
-      inArray10(schedules.position, [1, 2])
+      inArray11(schedules.position, [1, 2])
     )
   ).limit(1);
   return assignment.length > 0;
@@ -18506,7 +18654,7 @@ router10.post("/mass-report", authenticateToken, async (req, res) => {
     if (incidents && incidents.length > 0) {
       const coordinators = await db.select().from(users).where(
         and17(
-          inArray10(users.role, DB_ADMIN_ROLES),
+          inArray11(users.role, DB_ADMIN_ROLES),
           eq23(users.status, "active")
         )
       );
@@ -18660,7 +18808,7 @@ await init_storage();
 init_schema();
 await init_pushNotifications();
 await init_websocket();
-import { eq as eq25, and as and18, inArray as inArray11 } from "drizzle-orm";
+import { eq as eq25, and as and18, inArray as inArray12 } from "drizzle-orm";
 var router12 = Router12();
 var internalUrlSchema = z6.string().refine(
   (url) => {
@@ -18876,7 +19024,7 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), no
         console.log("[NOTIFICA\xC7\xD5ES] Buscou TODOS os usu\xE1rios ativos:", recipients.length);
       } else {
         recipients = await db.select({ id: users.id }).from(users).where(and18(
-          inArray11(users.role, expandRolesForDb([data.recipientRole])),
+          inArray12(users.role, expandRolesForDb([data.recipientRole])),
           eq25(users.status, "active")
         ));
         console.log("[NOTIFICA\xC7\xD5ES] Buscou usu\xE1rios com role", data.recipientRole, ":", recipients.length);
@@ -18909,7 +19057,10 @@ router12.post("/", authenticateToken, requireRole(["coordenador", "gestor"]), no
         message: data.message,
         type: mappedType,
         read: false,
-        actionUrl: data.actionUrl ?? null
+        actionUrl: data.actionUrl ?? null,
+        data: mobileNotificationData("coordinator_announcement", {
+          senderId: req.user.id
+        })
       })
     );
     const createdNotifications = await Promise.all(notificationPromises);
@@ -20428,7 +20579,7 @@ await init_db();
 init_schema();
 import { Router as Router14 } from "express";
 init_roles();
-import { eq as eq27, and as and20, inArray as inArray12 } from "drizzle-orm";
+import { eq as eq27, and as and20, inArray as inArray13 } from "drizzle-orm";
 
 // server/utils/formatters.ts
 function formatMinisterName(name) {
@@ -20468,7 +20619,7 @@ router14.get("/", authenticateToken, auditPersonalDataAccess("personal"), async 
       totalServices: users.totalServices,
       createdAt: users.createdAt
     }).from(users).where(
-      inArray12(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+      inArray13(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
     );
     res.json(ministersList);
   } catch (error) {
@@ -20605,7 +20756,7 @@ var ministers_default = router14;
 await init_db();
 init_schema();
 import { Router as Router15 } from "express";
-import { eq as eq28, and as and21, sql as sql14, gte as gte13, desc as desc8, count as count5, notInArray, inArray as inArray13 } from "drizzle-orm";
+import { eq as eq28, and as and21, sql as sql14, gte as gte13, desc as desc8, count as count5, notInArray, inArray as inArray14 } from "drizzle-orm";
 init_roles();
 await init_communityContext();
 await init_pushNotifications();
@@ -20703,7 +20854,7 @@ router15.post("/", authenticateToken, async (req, res) => {
     const [existingRequest] = await db.select().from(substitutionRequests).where(
       and21(
         eq28(substitutionRequests.scheduleId, scheduleId),
-        inArray13(substitutionRequests.status, ["pending", "available"])
+        inArray14(substitutionRequests.status, ["pending", "available"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -20716,12 +20867,12 @@ router15.post("/", authenticateToken, async (req, res) => {
     const monthlyCount = await countMonthlySubstitutions(requesterId);
     const finalSubstituteId = substituteId || null;
     const status = finalSubstituteId ? "pending" : "available";
+    const communityId = await communityIdFromSchedule(scheduleId);
     const [newRequest] = await db.insert(substitutionRequests).values({
       scheduleId,
       requesterId,
       substituteId: finalSubstituteId,
-      communityId: await communityIdFromSchedule(scheduleId),
-      // herda do schedule pai
+      communityId,
       reason: reason || null,
       status,
       urgency,
@@ -20781,7 +20932,13 @@ router15.post("/", authenticateToken, async (req, res) => {
         message: `${requesterName} solicitou que voc\xEA o substitua na missa de ${formattedDate} \xE0s ${schedule.time || "hor\xE1rio n\xE3o definido"}. Responda o mais breve poss\xEDvel.`,
         type: "substitution",
         read: false,
-        actionUrl: "/substitutions"
+        actionUrl: "/substitutions",
+        data: mobileNotificationData("substitution_requested", {
+          substitutionId: newRequest.id,
+          scheduleId,
+          requesterId,
+          directed: true
+        })
       });
       await sendPushNotificationToUsers([finalSubstituteId], {
         title: "\u{1F4CB} Pedido de Substitui\xE7\xE3o",
@@ -20797,6 +20954,48 @@ router15.post("/", authenticateToken, async (req, res) => {
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       });
       console.log(`[PUSH] Notifica\xE7\xE3o de substitui\xE7\xE3o enviada para ${finalSubstituteId}`);
+    } else {
+      const requesterName = requestWithDetails.requestingUser?.name || "Um ministro";
+      const formattedDate = schedule.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
+      const candidates = await db.select({ id: users.id }).from(users).where(and21(
+        eq28(users.role, "ministro"),
+        eq28(users.status, "active"),
+        eq28(users.homeCommunityId, communityId)
+      ));
+      const recipientIds = candidates.map((candidate) => candidate.id).filter((candidateId) => candidateId !== requesterId);
+      if (recipientIds.length > 0) {
+        const notificationTitle = "\u{1F4CB} Pedido de Substitui\xE7\xE3o";
+        const notificationMessage = `${requesterName} pediu substitui\xE7\xE3o para a missa de ${formattedDate} \xE0s ${schedule.time || "hor\xE1rio n\xE3o definido"}.`;
+        await Promise.all(recipientIds.map(
+          (recipientId) => storage.createNotification({
+            userId: recipientId,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: "substitution",
+            read: false,
+            actionUrl: "/substitutions",
+            data: mobileNotificationData("substitution_requested", {
+              substitutionId: newRequest.id,
+              scheduleId,
+              requesterId,
+              directed: false
+            })
+          })
+        ));
+        await sendPushNotificationToUsers(recipientIds, {
+          title: notificationTitle,
+          body: notificationMessage,
+          url: "/substitutions"
+        });
+        notifyUsers(recipientIds, {
+          id: "sub-request-" + newRequest.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: "warning",
+          actionUrl: "/substitutions",
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
     }
     scheduleCache.invalidateByDate(schedule.date);
     console.log(`[CACHE] Invalidated cache after creating substitution request for ${schedule.date}`);
@@ -20992,13 +21191,19 @@ router15.post("/:id/respond", authenticateToken, async (req, res) => {
     const formattedDate = schedule?.date ? (/* @__PURE__ */ new Date(schedule.date + "T12:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "data n\xE3o definida";
     const notificationTitle = newStatus === "approved" ? "\u2705 Substitui\xE7\xE3o Aceita" : "\u274C Substitui\xE7\xE3o Recusada";
     const notificationMessage = newStatus === "approved" ? `${substituteName} aceitou substituir voc\xEA na missa de ${formattedDate}. Voc\xEA est\xE1 liberado desta escala.` : `${substituteName} n\xE3o pode substituir voc\xEA na missa de ${formattedDate}. Procure outro substituto.`;
+    const mobileEventData = newStatus === "approved" ? mobileNotificationData("substitute_accepted", {
+      substitutionId: id,
+      scheduleId: request.scheduleId,
+      substituteId: userId
+    }) : void 0;
     await storage.createNotification({
       userId: request.requesterId,
       title: notificationTitle,
       message: notificationMessage,
       type: "substitution",
       read: false,
-      actionUrl: "/substitutions"
+      actionUrl: "/substitutions",
+      ...mobileEventData ? { data: mobileEventData } : {}
     });
     await sendPushNotificationToUsers([request.requesterId], {
       title: notificationTitle,
@@ -21114,7 +21319,12 @@ router15.post("/:id/claim", authenticateToken, async (req, res) => {
       message: notificationMessage,
       type: "substitution",
       read: false,
-      actionUrl: "/substitutions"
+      actionUrl: "/substitutions",
+      data: mobileNotificationData("substitute_accepted", {
+        substitutionId: id,
+        scheduleId: request.scheduleId,
+        substituteId: userId
+      })
     });
     await sendPushNotificationToUsers([request.requesterId], {
       title: notificationTitle,
@@ -21368,8 +21578,10 @@ var mass_pendencies_default = router16;
 await init_db();
 init_schema();
 import { Router as Router17 } from "express";
-import { eq as eq31, asc as asc2, count as count6 } from "drizzle-orm";
+import { and as and23, eq as eq31, asc as asc2, count as count6 } from "drizzle-orm";
 init_roles();
+await init_storage();
+await init_pushNotifications();
 var router17 = Router17();
 function getErrorMessage8(error) {
   if (error instanceof Error) return error.message;
@@ -21388,6 +21600,42 @@ function requireAdmin(req, res, next) {
     });
   }
   next();
+}
+async function notifyFormationAvailable(input) {
+  try {
+    const ministers = await db.select({ id: users.id }).from(users).where(and23(eq31(users.role, "ministro"), eq31(users.status, "active")));
+    const recipientIds = [...new Set(ministers.map((minister) => minister.id))];
+    if (recipientIds.length === 0) {
+      return;
+    }
+    const deepLink = input.trackId ? `/formation/${input.trackId}` : "/formation";
+    const title = "Novo Treinamento Dispon\xEDvel";
+    const message = `${input.title} j\xE1 est\xE1 dispon\xEDvel na forma\xE7\xE3o.`;
+    const data = mobileNotificationData("formation_available", {
+      trackId: input.trackId ?? null,
+      moduleId: input.moduleId ?? null,
+      lessonId: input.lessonId ?? null
+    });
+    await Promise.all(recipientIds.map(
+      (userId) => storage.createNotification({
+        userId,
+        title,
+        message,
+        type: "formation",
+        read: false,
+        actionUrl: deepLink,
+        data
+      })
+    ));
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: deepLink,
+      data
+    });
+  } catch (error) {
+    console.error("Error notifying formation availability:", error);
+  }
 }
 router17.use(authenticateToken, requireAdmin);
 router17.post("/seed", async (req, res) => {
@@ -21643,6 +21891,14 @@ router17.post("/lessons", async (req, res) => {
   try {
     const lessonData = req.body;
     const newLesson = await db.insert(formationLessons).values(lessonData).returning();
+    if (newLesson[0]?.isActive !== false) {
+      await notifyFormationAvailable({
+        title: newLesson[0].title,
+        trackId: newLesson[0].trackId,
+        moduleId: newLesson[0].moduleId,
+        lessonId: newLesson[0].id
+      });
+    }
     res.status(201).json({
       message: "Li\xE7\xE3o criada com sucesso",
       lesson: newLesson[0]
@@ -21659,11 +21915,20 @@ router17.patch("/lessons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const [existing] = await db.select().from(formationLessons).where(eq31(formationLessons.id, id)).limit(1);
     const updated = await db.update(formationLessons).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationLessons.id, id)).returning();
     if (updated.length === 0) {
       return res.status(404).json({
         error: "Li\xE7\xE3o n\xE3o encontrada",
         message: `Li\xE7\xE3o com ID ${id} n\xE3o encontrada`
+      });
+    }
+    if (updated[0].isActive === true && existing?.isActive === false) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].trackId,
+        moduleId: updated[0].moduleId,
+        lessonId: updated[0].id
       });
     }
     res.json({
@@ -21924,6 +22189,12 @@ router17.patch("/tracks/:id/toggle-active", async (req, res) => {
       });
     }
     const updated = await db.update(formationTracks).set({ isActive: !track.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationTracks.id, id)).returning();
+    if (updated[0].isActive === true) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].id
+      });
+    }
     res.json({
       message: `Trilha ${updated[0].isActive ? "ativada" : "desativada"} com sucesso`,
       track: updated[0]
@@ -21947,6 +22218,14 @@ router17.patch("/lessons/:id/toggle-active", async (req, res) => {
       });
     }
     const updated = await db.update(formationLessons).set({ isActive: !lesson.isActive, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(formationLessons.id, id)).returning();
+    if (updated[0].isActive === true) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].trackId,
+        moduleId: updated[0].moduleId,
+        lessonId: updated[0].id
+      });
+    }
     res.json({
       message: `Li\xE7\xE3o ${updated[0].isActive ? "ativada" : "desativada"} com sucesso`,
       lesson: updated[0]
@@ -21980,7 +22259,7 @@ await init_db();
 init_schema();
 init_roles();
 import { Router as Router19 } from "express";
-import { eq as eq32, and as and23, gte as gte15, lte as lte13, sql as sql17, or as or9, isNull as isNull3, count as count7, desc as desc10, inArray as inArray14 } from "drizzle-orm";
+import { eq as eq32, and as and24, gte as gte15, lte as lte13, sql as sql17, or as or9, isNull as isNull3, count as count7, desc as desc10, inArray as inArray15 } from "drizzle-orm";
 import { format as format10, addDays as addDays6, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
 var router19 = Router19();
 router19.get("/urgent-alerts", async (req, res) => {
@@ -21995,7 +22274,7 @@ router19.get("/urgent-alerts", async (req, res) => {
       filledSlots: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
       vacancies: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
     }).from(schedules).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
@@ -22026,7 +22305,7 @@ router19.get("/urgent-alerts", async (req, res) => {
       massDate: schedules.date,
       massTime: schedules.time
     }).from(substitutionRequests).innerJoin(users, eq32(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq32(substitutionRequests.scheduleId, schedules.id)).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         or9(
           eq32(substitutionRequests.status, "pending"),
@@ -22082,7 +22361,7 @@ router19.get("/next-week-masses", async (req, res) => {
           AND ${substitutionRequests.status} IN ('pending', 'available')
         )`
     }).from(schedules).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
@@ -22122,9 +22401,9 @@ router19.get("/ministry-stats", async (req, res) => {
     const thisMonthStart = startOfMonth4(now);
     const thisMonthEnd = endOfMonth4(now);
     const [activeMinistersResult] = await db.select({ count: count7() }).from(users).where(
-      and23(
+      and24(
         eq32(users.status, "active"),
-        inArray14(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+        inArray15(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     );
     const inactiveMinisters = await db.select({
@@ -22133,9 +22412,9 @@ router19.get("/ministry-stats", async (req, res) => {
       lastService: users.lastService,
       daysSinceService: sql17`EXTRACT(DAY FROM NOW() - ${users.lastService})`
     }).from(users).where(
-      and23(
+      and24(
         eq32(users.status, "active"),
-        inArray14(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+        inArray15(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
         or9(
           lte13(users.lastService, thirtyDaysAgo),
           isNull3(users.lastService)
@@ -22154,7 +22433,7 @@ router19.get("/ministry-stats", async (req, res) => {
           ) THEN (${schedules.date}, ${schedules.time})
         END)`
     }).from(schedules).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         gte15(schedules.date, format10(thisMonthStart, "yyyy-MM-dd")),
         lte13(schedules.date, format10(thisMonthEnd, "yyyy-MM-dd"))
@@ -22164,7 +22443,7 @@ router19.get("/ministry-stats", async (req, res) => {
       id: questionnaires.id,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and23(
+      and24(
         eq32(questionnaires.month, now.getMonth() + 1),
         eq32(questionnaires.year, now.getFullYear())
       )
@@ -22180,7 +22459,7 @@ router19.get("/ministry-stats", async (req, res) => {
       );
       const userId = req.user?.id;
       if (userId) {
-        const [userResponse] = await db.select().from(questionnaireResponses).where(and23(
+        const [userResponse] = await db.select().from(questionnaireResponses).where(and24(
           eq32(questionnaireResponses.userId, userId),
           eq32(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
           eq32(questionnaireResponses.isDeleted, false)
@@ -22189,7 +22468,7 @@ router19.get("/ministry-stats", async (req, res) => {
       }
     }
     const [pendingSubsCount] = await db.select({ count: count7() }).from(substitutionRequests).where(
-      and23(
+      and24(
         or9(
           eq32(substitutionRequests.status, "pending"),
           eq32(substitutionRequests.status, "available")
@@ -22199,7 +22478,7 @@ router19.get("/ministry-stats", async (req, res) => {
     const [incompleteMassesCount] = await db.select({
       count: sql17`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
     }).from(schedules).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         isNull3(schedules.ministerId)
@@ -22243,7 +22522,7 @@ router19.get("/incomplete", async (req, res) => {
           END
         ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
     }).from(schedules).where(
-      and23(
+      and24(
         eq32(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(futureDate, "yyyy-MM-dd"))
@@ -22350,7 +22629,7 @@ init_roles();
 // server/services/certificateService.ts
 await init_db();
 init_schema();
-import { eq as eq33, and as and24, count as count8, sql as sql18 } from "drizzle-orm";
+import { eq as eq33, and as and25, count as count8, sql as sql18 } from "drizzle-orm";
 
 // server/utils/certificateGenerator.ts
 import { jsPDF as jsPDF2 } from "jspdf";
@@ -22545,7 +22824,7 @@ async function getTrackCompletionStatus(userId, trackId) {
       id: formationLessons.id,
       durationMinutes: formationLessons.durationMinutes
     }).from(formationLessons).where(
-      and24(
+      and25(
         eq33(formationLessons.trackId, track.id),
         eq33(formationLessons.isActive, true)
       )
@@ -22560,7 +22839,7 @@ async function getTrackCompletionStatus(userId, trackId) {
         status: formationLessonProgress.status,
         completedAt: formationLessonProgress.completedAt
       }).from(formationLessonProgress).where(
-        and24(
+        and25(
           eq33(formationLessonProgress.userId, userId),
           sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
         )
@@ -22576,7 +22855,7 @@ async function getTrackCompletionStatus(userId, trackId) {
     }
     const isCompleted = lessonIds.length > 0 && completedLessons === lessonIds.length;
     const existingCert = await db.select({ id: formationCertificates.id }).from(formationCertificates).where(
-      and24(
+      and25(
         eq33(formationCertificates.userId, userId),
         eq33(formationCertificates.trackId, track.id)
       )
@@ -22609,7 +22888,7 @@ async function issueCertificate(userId, trackId, issuedById) {
   }
   if (status.hasCertificate) {
     const existing = await db.select().from(formationCertificates).where(
-      and24(
+      and25(
         eq33(formationCertificates.userId, userId),
         eq33(formationCertificates.trackId, trackId)
       )
@@ -22626,7 +22905,7 @@ async function issueCertificate(userId, trackId, issuedById) {
   const lessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(eq33(formationLessons.trackId, trackId));
   const lessonIds = lessons.map((l) => l.id);
   const completedProgress = await db.select({ lessonId: formationLessonProgress.lessonId }).from(formationLessonProgress).where(
-    and24(
+    and25(
       eq33(formationLessonProgress.userId, userId),
       eq33(formationLessonProgress.status, "completed"),
       sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
@@ -22839,7 +23118,7 @@ import { Router as Router22 } from "express";
 // server/services/insightsService.ts
 await init_db();
 init_schema();
-import { eq as eq34, and as and25, gte as gte16, lte as lte14, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
+import { eq as eq34, and as and26, gte as gte16, lte as lte14, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
 function calculateNoShowRisk(noShowCount, totalServices, reliabilityScore) {
   if (totalServices === 0) return "medium";
   const noShowRate = noShowCount / totalServices * 100;
@@ -22876,7 +23155,7 @@ async function getMinisterRiskProfiles() {
     lastService: users.lastService,
     lastLogin: users.lastLogin
   }).from(users).where(
-    and25(
+    and26(
       eq34(users.status, "active"),
       eq34(users.role, "ministro")
     )
@@ -22946,13 +23225,13 @@ async function getTimeSlotInsights() {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
   const [currentQuestionnaire] = await db.select().from(questionnaires).where(
-    and25(
+    and26(
       eq34(questionnaires.month, currentMonth),
       eq34(questionnaires.year, currentYear)
     )
   ).limit(1);
   const [reliableCount] = await db.select({ count: count9() }).from(users).where(
-    and25(
+    and26(
       eq34(users.status, "active"),
       eq34(users.role, "ministro"),
       gte16(users.reliabilityScore, 75)
@@ -23008,7 +23287,7 @@ async function getSubstitutionPatterns() {
     substitutionFulfilledCount: users.substitutionFulfilledCount,
     totalServices: users.totalServices
   }).from(users).where(
-    and25(
+    and26(
       eq34(users.status, "active"),
       eq34(users.role, "ministro"),
       gte16(users.substitutionRequestCount, 1)
@@ -23098,7 +23377,7 @@ async function getEngagementTrends() {
     const monthStart = new Date(date2.getFullYear(), date2.getMonth(), 1);
     const monthEnd = new Date(date2.getFullYear(), date2.getMonth() + 1, 0);
     const [activeCount] = await db.select({ count: count9() }).from(activityLogs).where(
-      and25(
+      and26(
         gte16(activityLogs.createdAt, monthStart),
         lte14(activityLogs.createdAt, monthEnd)
       )
@@ -23420,7 +23699,7 @@ import multer3 from "multer";
 init_roles();
 await init_db();
 init_schema();
-import { eq as eq35, desc as desc12, and as and26, ilike, or as or10, sql as sql20 } from "drizzle-orm";
+import { eq as eq35, desc as desc12, and as and27, ilike, or as or10, sql as sql20 } from "drizzle-orm";
 
 // server/services/aiContentAnalyzer.ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -23762,8 +24041,8 @@ router23.get("/", async (req, res) => {
       aiContentQuality: formationMaterials.aiContentQuality,
       aiSummary: formationMaterials.aiSummary,
       aiKeyTopics: formationMaterials.aiKeyTopics
-    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and26(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
-    const [countResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(...conditions));
+    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and27(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and27(...conditions));
     res.json({
       materials,
       total: countResult?.count || 0,
@@ -23807,7 +24086,7 @@ router23.get("/:id", async (req, res) => {
       isPublished: formationMaterials.isPublished,
       createdAt: formationMaterials.createdAt,
       uploaderName: users.name
-    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and26(
+    }).from(formationMaterials).leftJoin(users, eq35(formationMaterials.uploadedBy, users.id)).where(and27(
       eq35(formationMaterials.id, id),
       eq35(formationMaterials.isActive, true)
     ));
@@ -23830,7 +24109,7 @@ router23.get("/:id", async (req, res) => {
 router23.get("/:id/download", async (req, res) => {
   try {
     const { id } = req.params;
-    const [material] = await db.select().from(formationMaterials).where(and26(
+    const [material] = await db.select().from(formationMaterials).where(and27(
       eq35(formationMaterials.id, id),
       eq35(formationMaterials.isActive, true)
     ));
@@ -23996,14 +24275,14 @@ router23.get("/stats/overview", async (req, res) => {
       category: formationMaterials.category,
       count: sql20`count(*)`
     }).from(formationMaterials).where(eq35(formationMaterials.isActive, true)).groupBy(formationMaterials.category);
-    const [aiAnalyzedResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(
+    const [aiAnalyzedResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and27(
       eq35(formationMaterials.isActive, true),
       eq35(formationMaterials.aiAnalyzed, true)
     ));
     const qualityStats = await db.select({
       quality: formationMaterials.aiContentQuality,
       count: sql20`count(*)`
-    }).from(formationMaterials).where(and26(
+    }).from(formationMaterials).where(and27(
       eq35(formationMaterials.isActive, true),
       eq35(formationMaterials.aiAnalyzed, true)
     )).groupBy(formationMaterials.aiContentQuality);
@@ -24220,7 +24499,7 @@ router23.get("/my-progress", async (req, res) => {
       if (log2.action === "download") access.downloads++;
       if (log2.action === "completed") access.completed = true;
     }
-    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and26(
+    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and27(
       eq35(formationMaterials.isActive, true),
       eq35(formationMaterials.isPublished, true)
     ));
@@ -24268,7 +24547,7 @@ router23.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: "Usuario nao autenticado" });
     }
-    await db.delete(materialAccessLogs).where(and26(
+    await db.delete(materialAccessLogs).where(and27(
       eq35(materialAccessLogs.materialId, id),
       eq35(materialAccessLogs.userId, userId),
       eq35(materialAccessLogs.action, "completed")
@@ -24285,7 +24564,7 @@ var materials_default = router23;
 await init_db();
 init_schema();
 import { Router as Router24 } from "express";
-import { eq as eq37, and as and28, gte as gte18, desc as desc13, asc as asc4 } from "drizzle-orm";
+import { eq as eq37, and as and29, gte as gte18, desc as desc13, asc as asc4 } from "drizzle-orm";
 import { sql as sql21 } from "drizzle-orm";
 function getErrorMessage9(error) {
   if (error instanceof Error) return error.message;
@@ -24402,7 +24681,7 @@ router24.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and28(
+      and29(
         eq37(schedules.ministerId, minister[0].id),
         eq37(schedules.date, data)
       )
@@ -24455,7 +24734,7 @@ router24.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and28(
+      and29(
         eq37(schedules.ministerId, minister[0].id),
         gte18(schedules.date, today)
       )
@@ -24507,7 +24786,7 @@ router24.post("/colegas", async (req, res) => {
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
     }).from(schedules).innerJoin(users, eq37(schedules.ministerId, users.id)).where(
-      and28(
+      and29(
         eq37(schedules.date, data),
         eq37(schedules.time, normalizedTime)
       )
@@ -24754,7 +25033,7 @@ router24.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and28(
+      and29(
         eq37(schedules.ministerId, minister[0].id),
         gte18(schedules.date, today)
       )
@@ -24828,7 +25107,7 @@ router24.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and28(
+      and29(
         eq37(schedules.ministerId, minister[0].id),
         sql21`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
         sql21`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
@@ -25535,7 +25814,7 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq40, and as and29 } from "drizzle-orm";
+import { eq as eq40, and as and30 } from "drizzle-orm";
 function getErrorMessage11(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -25550,7 +25829,7 @@ async function gerarEscalaAlternativa(req, res) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(eq40(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
-        and29(
+        and30(
           eq40(questionnaires.year, year),
           eq40(questionnaires.month, month)
         )
@@ -25688,7 +25967,7 @@ init_logger();
 await init_db();
 init_schema();
 init_roles();
-import { eq as eq41, and as and30, inArray as inArray16 } from "drizzle-orm";
+import { eq as eq41, and as and31, inArray as inArray17 } from "drizzle-orm";
 var router29 = Router29();
 function getErrorMessage12(error) {
   if (error instanceof Error) return error.message;
@@ -25734,9 +26013,9 @@ router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
       });
     }
     const allMinisters = await db.select().from(users).where(
-      and30(
+      and31(
         eq41(users.status, "active"),
-        inArray16(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+        inArray17(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     );
     if (allMinisters.length === 0) {
@@ -25893,7 +26172,7 @@ router29.get("/results/:year/:month", authenticateToken, async (req, res) => {
     const draw = draws[0];
     const results = await storage.getAdorationDrawResults(draw.id);
     const ministerIds = [...new Set(results.map((r) => r.ministerId))];
-    const ministers = await db.select().from(users).where(inArray16(users.id, ministerIds));
+    const ministers = await db.select().from(users).where(inArray17(users.id, ministerIds));
     const ministerMap = new Map(ministers.map((m) => [m.id, m]));
     const enrichedResults = results.map((result) => {
       const minister = ministerMap.get(result.ministerId);
@@ -26089,7 +26368,7 @@ function getMondaysInMonth(year, month) {
 async function getVoluntaryMinistersForAdoration(year, month) {
   try {
     const [questionnaire] = await db.select().from(questionnaires).where(
-      and30(
+      and31(
         eq41(questionnaires.year, year),
         eq41(questionnaires.month, month)
       )
@@ -26106,8 +26385,8 @@ async function getVoluntaryMinistersForAdoration(year, month) {
       return [];
     }
     const voluntaryMinisters = await db.select().from(users).where(
-      and30(
-        inArray16(users.id, voluntaryMinisterIds),
+      and31(
+        inArray17(users.id, voluntaryMinisterIds),
         eq41(users.status, "active")
       )
     );
@@ -26123,7 +26402,7 @@ var adoration_default = router29;
 await init_db();
 init_schema();
 import { Router as Router30 } from "express";
-import { eq as eq42, sql as sql23, and as and31, gte as gte20, lte as lte15, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
+import { eq as eq42, sql as sql23, and as and32, gte as gte20, lte as lte15, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
 init_roles();
 var router30 = Router30();
 function formatDateBR3(date2) {
@@ -26241,7 +26520,7 @@ router30.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
         )
       );
     }
-    const whereClause = conditions.length > 0 ? and31(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and32(...conditions) : void 0;
     const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(whereClause);
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
@@ -26297,7 +26576,7 @@ router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
       action: activityLogs.action,
       count: count11()
     }).from(activityLogs).where(
-      and31(
+      and32(
         gte20(activityLogs.createdAt, startDate),
         or12(
           eq42(activityLogs.action, "login"),
@@ -26388,7 +26667,7 @@ router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and31(...conditions));
+    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and32(...conditions));
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
       id: activityLogs.id,
@@ -26396,7 +26675,7 @@ router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
       details: activityLogs.details,
       ipAddress: activityLogs.ipAddress,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).where(and31(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    }).from(activityLogs).where(and32(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
     const logsWithDescriptions = logs.map((log2) => ({
       ...log2,
       description: getActionDescription(log2.action, log2.details)
@@ -26456,7 +26735,7 @@ router30.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       conditions.push(gte20(activityLogs.createdAt, thirtyDaysAgo));
     }
-    const whereClause = conditions.length > 0 ? and31(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and32(...conditions) : void 0;
     const logs = await db.select({
       id: activityLogs.id,
       userId: activityLogs.userId,
@@ -26509,12 +26788,12 @@ var activity_default = router30;
 import { Router as Router31 } from "express";
 await init_db();
 init_schema();
-import { eq as eq44, desc as desc16, and as and33, sql as sql25 } from "drizzle-orm";
+import { eq as eq44, desc as desc16, and as and34, sql as sql25 } from "drizzle-orm";
 
 // server/services/gamificationService.ts
 await init_db();
 init_schema();
-import { eq as eq43, desc as desc15, and as and32, sql as sql24 } from "drizzle-orm";
+import { eq as eq43, desc as desc15, and as and33, sql as sql24 } from "drizzle-orm";
 var POINT_VALUES = {
   mass_served: 50,
   substitution_offered: 20,
@@ -26821,7 +27100,7 @@ async function awardBadge(userId, badgeCode) {
     console.warn(`Badge ${badgeCode} not found`);
     return false;
   }
-  const [existing] = await db.select().from(userBadges).where(and32(
+  const [existing] = await db.select().from(userBadges).where(and33(
     eq43(userBadges.userId, userId),
     eq43(userBadges.badgeId, badge.id)
   ));
@@ -27039,7 +27318,7 @@ router31.post("/feature-badge", csrfProtection, async (req, res) => {
     if (!badgeId) {
       return res.status(400).json({ error: "Badge ID obrigatorio" });
     }
-    const [userBadge] = await db.select().from(userBadges).where(and33(
+    const [userBadge] = await db.select().from(userBadges).where(and34(
       eq44(userBadges.userId, userId),
       eq44(userBadges.badgeId, badgeId)
     ));
@@ -27047,7 +27326,7 @@ router31.post("/feature-badge", csrfProtection, async (req, res) => {
       return res.status(404).json({ error: "Badge nao encontrado" });
     }
     if (featured) {
-      const featuredCount = await db.select({ count: sql25`count(*)` }).from(userBadges).where(and33(
+      const featuredCount = await db.select({ count: sql25`count(*)` }).from(userBadges).where(and34(
         eq44(userBadges.userId, userId),
         eq44(userBadges.isFeatured, true)
       ));
@@ -27070,7 +27349,7 @@ router31.post("/claim-daily", csrfProtection, async (req, res) => {
     }
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const [existingClaim] = await db.select().from(pointTransactions).where(and33(
+    const [existingClaim] = await db.select().from(pointTransactions).where(and34(
       eq44(pointTransactions.userId, userId),
       eq44(pointTransactions.action, "login_bonus"),
       sql25`${pointTransactions.createdAt} >= ${today}`
@@ -27345,7 +27624,7 @@ var massConfig_default = router32;
 await init_db();
 init_schema();
 import { Router as Router33 } from "express";
-import { eq as eq46, and as and35, gte as gte22, lte as lte17 } from "drizzle-orm";
+import { eq as eq46, and as and36, gte as gte22, lte as lte17 } from "drizzle-orm";
 import { z as z11 } from "zod";
 import { format as format12, startOfMonth as startOfMonth5, endOfMonth as endOfMonth5 } from "date-fns";
 var router33 = Router33();
@@ -27374,7 +27653,7 @@ router33.get("/month/:year/:month", async (req, res) => {
     const startDate = format12(startOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
     const endDate = format12(endOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
     const events = await db.select().from(specialEvents).where(
-      and35(
+      and36(
         eq46(specialEvents.isActive, true),
         gte22(specialEvents.eventDate, startDate),
         lte17(specialEvents.eventDate, endDate)
@@ -27508,7 +27787,7 @@ var specialEvents_default = router33;
 await init_db();
 init_schema();
 import { Router as Router34 } from "express";
-import { eq as eq47, and as and36 } from "drizzle-orm";
+import { eq as eq47, and as and37 } from "drizzle-orm";
 import { z as z12 } from "zod";
 var router34 = Router34();
 router34.get("/questionnaire/:id", async (req, res) => {
@@ -27564,7 +27843,7 @@ router34.post("/", async (req, res) => {
       });
     }
     const existing = await db.select().from(questionMassMappings).where(
-      and36(
+      and37(
         eq47(questionMassMappings.questionnaireId, validatedData.questionnaireId),
         eq47(questionMassMappings.questionId, validatedData.questionId)
       )
@@ -27730,7 +28009,7 @@ var questionMappings_default = router34;
 await init_db();
 init_schema();
 import { Router as Router35 } from "express";
-import { eq as eq48, and as and37, desc as desc17, sql as sql26 } from "drizzle-orm";
+import { eq as eq48, and as and38, desc as desc17, sql as sql26 } from "drizzle-orm";
 import { z as z13 } from "zod";
 var router35 = Router35();
 router35.get("/patterns", async (req, res) => {
@@ -27762,7 +28041,7 @@ router35.get("/patterns", async (req, res) => {
       isActive: learnedPatterns.isActive,
       createdAt: learnedPatterns.createdAt,
       ministerName: users.name
-    }).from(learnedPatterns).leftJoin(users, eq48(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and37(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
+    }).from(learnedPatterns).leftJoin(users, eq48(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and38(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
     res.json(patterns);
   } catch (error) {
     console.error("[LearningPatterns] Error listing patterns:", error);
@@ -27838,7 +28117,7 @@ router35.get("/minister/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const patterns = await db.select().from(learnedPatterns).where(
-      and37(
+      and38(
         eq48(learnedPatterns.ministerId, id),
         eq48(learnedPatterns.isActive, true)
       )
@@ -29520,7 +29799,7 @@ var formation_default = router39;
 // server/routes/account.ts
 await init_db();
 import { Router as Router40 } from "express";
-import { and as and38, eq as eq51, or as or15 } from "drizzle-orm";
+import { and as and39, eq as eq51, or as or15 } from "drizzle-orm";
 init_schema();
 var router40 = Router40();
 var CONFIRMATION_TEXT = "EXCLUIR MINHA CONTA";
@@ -29631,7 +29910,7 @@ router40.delete("/", authenticateToken, async (req, res) => {
       await tx.delete(pointTransactions).where(eq51(pointTransactions.userId, userId));
       await tx.delete(leaderboardCache).where(eq51(leaderboardCache.userId, userId));
       await tx.update(activeSessions).set({ isActive: false }).where(
-        and38(
+        and39(
           eq51(activeSessions.userId, userId),
           eq51(activeSessions.isActive, true)
         )
@@ -29724,17 +30003,17 @@ var account_default = router40;
 // server/routes/mobile.ts
 init_schema();
 init_roles();
-await init_db();
 import { Router as Router41 } from "express";
 import { randomUUID as randomUUID7 } from "crypto";
 import { z as z18 } from "zod";
-import { and as and41, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray18, lte as lte19, or as or16, sql as sql29 } from "drizzle-orm";
+import { and as and42, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray19, lte as lte19, or as or16, sql as sql29 } from "drizzle-orm";
+await init_db();
 
 // server/services/mobileIdempotencyService.ts
 init_schema();
 await init_db();
 import { createHash, randomUUID as randomUUID5 } from "crypto";
-import { and as and39, eq as eq52, lte as lte18 } from "drizzle-orm";
+import { and as and40, eq as eq52, lte as lte18 } from "drizzle-orm";
 var IDEMPOTENCY_TTL_HOURS = 24;
 var localTablesEnsured = false;
 var MobileIdempotencyError = class extends Error {
@@ -29824,7 +30103,7 @@ async function beginMobileIdempotency(input) {
   await ensureLocalMobileIdempotencyTable();
   const now = /* @__PURE__ */ new Date();
   await db.delete(mobileIdempotencyKeys).where(
-    and39(
+    and40(
       eq52(mobileIdempotencyKeys.userId, input.userId),
       eq52(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey),
       lte18(mobileIdempotencyKeys.expiresAt, now)
@@ -29853,7 +30132,7 @@ async function beginMobileIdempotency(input) {
     };
   }
   const [existing] = await db.select().from(mobileIdempotencyKeys).where(
-    and39(
+    and40(
       eq52(mobileIdempotencyKeys.userId, input.userId),
       eq52(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey)
     )
@@ -29900,7 +30179,7 @@ async function releaseMobileIdempotency(recordId) {
 init_schema();
 await init_db();
 import { createHash as createHash2, randomBytes, randomUUID as randomUUID6 } from "crypto";
-import { and as and40, desc as desc18, eq as eq53, isNull as isNull4 } from "drizzle-orm";
+import { and as and41, desc as desc18, eq as eq53, isNull as isNull4 } from "drizzle-orm";
 var REFRESH_TOKEN_PREFIX = "mesc_rt_";
 var REFRESH_TOKEN_BYTES = 48;
 var REFRESH_TOKEN_TTL_DAYS = 30;
@@ -30028,7 +30307,7 @@ async function createOrUpdateMobileDevice(input) {
   const now = /* @__PURE__ */ new Date();
   const deviceId = input.deviceId || createServerDeviceId();
   const platform = normalizeMobilePlatform(input.platform);
-  const [existing] = await db.select().from(mobileDevices).where(and40(eq53(mobileDevices.userId, input.userId), eq53(mobileDevices.deviceId, deviceId))).limit(1);
+  const [existing] = await db.select().from(mobileDevices).where(and41(eq53(mobileDevices.userId, input.userId), eq53(mobileDevices.deviceId, deviceId))).limit(1);
   const devicePatch = {
     platform,
     appVersion: input.appVersion ?? null,
@@ -30112,7 +30391,7 @@ async function createMobileSession(input) {
 async function revokeTokenFamily(tokenFamilyId, userId) {
   const now = /* @__PURE__ */ new Date();
   await db.update(mobileRefreshTokens).set({ revokedAt: now }).where(
-    and40(
+    and41(
       eq53(mobileRefreshTokens.tokenFamilyId, tokenFamilyId),
       userId ? eq53(mobileRefreshTokens.userId, userId) : void 0
     )
@@ -30152,7 +30431,7 @@ async function consumeMobileRefreshToken(input) {
   const now = /* @__PURE__ */ new Date();
   const [claimedToken] = await db.update(mobileRefreshTokens).set({
     rotatedAt: now
-  }).where(and40(
+  }).where(and41(
     eq53(mobileRefreshTokens.id, record.token.id),
     isNull4(mobileRefreshTokens.rotatedAt),
     isNull4(mobileRefreshTokens.revokedAt)
@@ -30189,7 +30468,7 @@ async function revokeMobileDeviceForUser(input) {
     input.deviceDbId ? eq53(mobileDevices.id, input.deviceDbId) : void 0,
     input.deviceId ? eq53(mobileDevices.deviceId, input.deviceId) : void 0
   ];
-  const [device] = await db.select().from(mobileDevices).where(and40(...conditions)).limit(1);
+  const [device] = await db.select().from(mobileDevices).where(and41(...conditions)).limit(1);
   if (!device) return false;
   const now = /* @__PURE__ */ new Date();
   await db.update(mobileDevices).set({ revokedAt: now, updatedAt: now }).where(eq53(mobileDevices.id, device.id));
@@ -30549,7 +30828,7 @@ async function loadMobileSubstitutionUsers(rows) {
     name: users.name,
     email: users.email,
     photoUrl: users.photoUrl
-  }).from(users).where(inArray18(users.id, userIds));
+  }).from(users).where(inArray19(users.id, userIds));
   return new Map(people.map((person) => [
     person.id,
     {
@@ -30628,7 +30907,7 @@ async function getAccessibleCommunities(user) {
     parishName: communities.parishName,
     isMatriz: communities.isMatriz
   }).from(communities).where(
-    and41(
+    and42(
       eq54(communities.active, dbBoolean2(true)),
       isParishWide(user.role) ? void 0 : eq54(communities.id, user.homeCommunityId)
     )
@@ -30653,7 +30932,7 @@ async function resolveActiveCommunity(req) {
     parishName: communities.parishName,
     isMatriz: communities.isMatriz
   }).from(communities).where(
-    and41(
+    and42(
       eq54(communities.id, communityScope.activeCommunityId),
       eq54(communities.active, dbBoolean2(true))
     )
@@ -31060,15 +31339,17 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
       priority: notifications.priority,
       read: notifications.read,
       readAt: notifications.readAt,
+      data: notifications.data,
       actionUrl: notifications.actionUrl,
       createdAt: notifications.createdAt
     }).from(notifications).where(eq54(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(limit);
-    const [unread] = await db.select({ total: count14() }).from(notifications).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
+    const [unread] = await db.select({ total: count14() }).from(notifications).where(and42(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
     res.json({
       success: true,
       notifications: rows.map((notification) => ({
         id: notification.id,
         type: notification.type,
+        eventKey: extractMobileNotificationEventKey(notification.data),
         title: notification.title,
         message: notification.message,
         priority: notification.priority,
@@ -31089,7 +31370,7 @@ router41.patch("/notifications/read-all", authenticateToken, async (req, res) =>
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
+    await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and42(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
     res.json({ success: true });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao marcar notificacoes como lidas");
@@ -31101,7 +31382,7 @@ router41.patch("/notifications/:id/read", authenticateToken, async (req, res) =>
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    const [notification] = await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and41(eq54(notifications.id, req.params.id), eq54(notifications.userId, user.id))).returning({
+    const [notification] = await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and42(eq54(notifications.id, req.params.id), eq54(notifications.userId, user.id))).returning({
       id: notifications.id,
       read: notifications.read,
       readAt: notifications.readAt
@@ -31155,7 +31436,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
       deadline: questionnaires.deadline,
       updatedAt: questionnaires.updatedAt
     }).from(questionnaires).where(
-      and41(
+      and42(
         eq54(questionnaires.communityId, activeCommunity.id),
         eq54(questionnaires.status, "published"),
         eq54(questionnaires.month, monthRange.month),
@@ -31176,7 +31457,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
       submittedAt: questionnaireResponses.submittedAt,
       updatedAt: questionnaireResponses.updatedAt
     }).from(questionnaireResponses).where(
-      and41(
+      and42(
         eq54(questionnaireResponses.questionnaireId, questionnaire.id),
         eq54(questionnaireResponses.userId, user.id),
         eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -31228,7 +31509,7 @@ router41.post("/questionnaires/:id/response", authenticateToken, async (req, res
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [questionnaire] = await db.select().from(questionnaires).where(and41(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(and42(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
@@ -31345,7 +31626,7 @@ router41.get("/substitutions", authenticateToken, async (req, res) => {
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
     }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(
-      and41(
+      and42(
         eq54(substitutionRequests.communityId, activeCommunity.id),
         admin ? void 0 : or16(
           eq54(substitutionRequests.requesterId, user.id),
@@ -31388,7 +31669,7 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [schedule] = await db.select().from(schedules).where(and41(eq54(schedules.id, parsed.scheduleId), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    const [schedule] = await db.select().from(schedules).where(and42(eq54(schedules.id, parsed.scheduleId), eq54(schedules.communityId, activeCommunity.id))).limit(1);
     if (!schedule) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -31399,10 +31680,10 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
       throw new MobileHttpError(400, "Nao e possivel solicitar substituicao para missa que ja passou");
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
-      and41(
+      and42(
         eq54(substitutionRequests.scheduleId, schedule.id),
         eq54(substitutionRequests.requesterId, user.id),
-        inArray18(substitutionRequests.status, ["available", "pending"])
+        inArray19(substitutionRequests.status, ["available", "pending"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -31477,7 +31758,7 @@ router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
       scheduleTime: schedules.time,
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
-    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(and41(eq54(substitutionRequests.id, req.params.id), eq54(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(and42(eq54(substitutionRequests.id, req.params.id), eq54(substitutionRequests.communityId, activeCommunity.id))).limit(1);
     if (!row) {
       throw new MobileHttpError(404, "Substituicao nao encontrada");
     }
@@ -31509,10 +31790,10 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     const activeCommunity = await resolveActiveCommunity(req);
     const monthRange = getRequestedMonth(req.query.month);
     const [activeMinistersResult] = await db.select({ total: count14() }).from(users).where(
-      and41(
+      and42(
         eq54(users.homeCommunityId, activeCommunity.id),
         eq54(users.status, "active"),
-        inArray18(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
+        inArray19(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
       )
     );
     const publishedSchedules = await db.select({
@@ -31525,7 +31806,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and41(
+      and42(
         eq54(schedules.communityId, activeCommunity.id),
         eq54(schedules.status, "published"),
         gte23(schedules.date, monthRange.startDate),
@@ -31537,7 +31818,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       title: questionnaires.title,
       targetUserIds: questionnaires.targetUserIds
     }).from(questionnaires).where(
-      and41(
+      and42(
         eq54(questionnaires.communityId, activeCommunity.id),
         eq54(questionnaires.status, "published"),
         eq54(questionnaires.month, monthRange.month),
@@ -31547,7 +31828,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     let responseCount = 0;
     if (currentQuestionnaire) {
       const [responseResult] = await db.select({ total: count14() }).from(questionnaireResponses).where(
-        and41(
+        and42(
           eq54(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
           eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
         )
@@ -31570,9 +31851,9 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
     }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(
-      and41(
+      and42(
         eq54(substitutionRequests.communityId, activeCommunity.id),
-        inArray18(substitutionRequests.status, ["available", "pending"])
+        inArray19(substitutionRequests.status, ["available", "pending"])
       )
     ).orderBy(desc19(substitutionRequests.createdAt)).limit(10);
     const coverageMap = /* @__PURE__ */ new Map();
@@ -31637,7 +31918,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       year: questionnaires.year,
       status: questionnaires.status,
       deadline: questionnaires.deadline
-    }).from(questionnaires).where(and41(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
+    }).from(questionnaires).where(and42(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
@@ -31657,7 +31938,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       ministerName: users.name,
       ministerPhotoUrl: users.photoUrl
     }).from(questionnaireResponses).innerJoin(users, eq54(questionnaireResponses.userId, users.id)).where(
-      and41(
+      and42(
         eq54(questionnaireResponses.questionnaireId, questionnaire.id),
         eq54(questionnaireResponses.communityId, activeCommunity.id),
         eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -31718,10 +31999,10 @@ router41.get("/admin/ministers", authenticateToken, async (req, res) => {
       preferredPositions: users.preferredPositions,
       avoidPositions: users.avoidPositions
     }).from(users).where(
-      and41(
+      and42(
         eq54(users.homeCommunityId, activeCommunity.id),
-        inArray18(users.status, ["active", "pending"]),
-        inArray18(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
+        inArray19(users.status, ["active", "pending"]),
+        inArray19(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
       )
     ).orderBy(asc5(users.name)).limit(200);
     res.json({
@@ -31768,12 +32049,12 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       confirmationStatus: scheduleConfirmations.status
     }).from(schedules).leftJoin(
       scheduleConfirmations,
-      and41(
+      and42(
         eq54(scheduleConfirmations.scheduleId, schedules.id),
         eq54(scheduleConfirmations.ministerId, user.id)
       )
     ).where(
-      and41(
+      and42(
         eq54(schedules.communityId, activeCommunity.id),
         eq54(schedules.ministerId, user.id),
         eq54(schedules.status, "published"),
@@ -31789,7 +32070,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and41(
+      and42(
         eq54(schedules.communityId, activeCommunity.id),
         eq54(schedules.ministerId, user.id),
         eq54(schedules.status, "published"),
@@ -31806,7 +32087,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       deadline: questionnaires.deadline,
       updatedAt: questionnaires.updatedAt
     }).from(questionnaires).where(
-      and41(
+      and42(
         eq54(questionnaires.communityId, activeCommunity.id),
         eq54(questionnaires.status, "published"),
         eq54(questionnaires.month, monthRange.month),
@@ -31816,7 +32097,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
     let pendingQuestionnaire = null;
     for (const questionnaire of questionnaireCandidates) {
       const [response] = await db.select({ id: questionnaireResponses.id }).from(questionnaireResponses).where(
-        and41(
+        and42(
           eq54(questionnaireResponses.questionnaireId, questionnaire.id),
           eq54(questionnaireResponses.userId, user.id),
           eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -31833,10 +32114,10 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       status: substitutionRequests.status,
       updatedAt: substitutionRequests.updatedAt
     }).from(substitutionRequests).where(
-      and41(
+      and42(
         eq54(substitutionRequests.communityId, activeCommunity.id),
         eq54(substitutionRequests.requesterId, user.id),
-        inArray18(substitutionRequests.status, ["available", "pending", "approved"])
+        inArray19(substitutionRequests.status, ["available", "pending", "approved"])
       )
     ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
     const notices = await db.select({
@@ -31846,6 +32127,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       message: notifications.message,
       priority: notifications.priority,
       read: notifications.read,
+      data: notifications.data,
       actionUrl: notifications.actionUrl,
       createdAt: notifications.createdAt
     }).from(notifications).where(eq54(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(5);
@@ -31882,6 +32164,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       notices: notices.map((notice) => ({
         id: notice.id,
         type: notice.type,
+        eventKey: extractMobileNotificationEventKey(notice.data),
         title: notice.title,
         message: notice.message,
         priority: notice.priority,
@@ -31916,7 +32199,7 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
       status: schedules.status,
       notes: schedules.notes
     }).from(schedules).where(
-      and41(
+      and42(
         eq54(schedules.communityId, activeCommunity.id),
         eq54(schedules.ministerId, user.id),
         eq54(schedules.status, "published"),
@@ -31964,7 +32247,7 @@ router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [schedule] = await db.select().from(schedules).where(and41(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    const [schedule] = await db.select().from(schedules).where(and42(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
     if (!schedule) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -32059,11 +32342,11 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
       confirmationStatus: scheduleConfirmations.status
     }).from(schedules).leftJoin(
       scheduleConfirmations,
-      and41(
+      and42(
         eq54(scheduleConfirmations.scheduleId, schedules.id),
         eq54(scheduleConfirmations.ministerId, user.id)
       )
-    ).where(and41(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    ).where(and42(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
     if (!row) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -32076,10 +32359,10 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
       substituteId: substitutionRequests.substituteId,
       updatedAt: substitutionRequests.updatedAt
     }).from(substitutionRequests).where(
-      and41(
+      and42(
         eq54(substitutionRequests.scheduleId, row.id),
         eq54(substitutionRequests.requesterId, user.id),
-        inArray18(substitutionRequests.status, ["available", "pending", "approved"])
+        inArray19(substitutionRequests.status, ["available", "pending", "approved"])
       )
     ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
     res.json({
@@ -32426,7 +32709,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull5, and: and43 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull5, and: and44 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -32434,7 +32717,7 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and43(
+        and44(
           eq55(substitutionRequests.status, "pending"),
           isNull5(substitutionRequests.substituteId)
         )
@@ -32447,7 +32730,7 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and43(
+        and44(
           eq55(substitutionRequests.status, "pending"),
           isNull5(substitutionRequests.substituteId)
         )

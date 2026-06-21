@@ -203,6 +203,7 @@ describe("mobileClient contract", () => {
           notifications: [{
             id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             type: "schedule",
+            eventKey: "schedule_published",
             title: "Escala publicada",
             message: "Confira sua escala.",
             priority: "normal",
@@ -265,7 +266,10 @@ describe("mobileClient contract", () => {
       fetch: fetcher,
     });
 
-    await expect(client.listNotifications({ limit: 5 })).resolves.toMatchObject({ unreadCount: 1 });
+    await expect(client.listNotifications({ limit: 5 })).resolves.toMatchObject({
+      unreadCount: 1,
+      notifications: [{ eventKey: "schedule_published" }],
+    });
     await expect(client.markNotificationRead("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
       .resolves.toMatchObject({ notification: { read: true } });
     await expect(client.markAllNotificationsRead()).resolves.toEqual({ success: true });

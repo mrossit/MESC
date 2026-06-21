@@ -1,3 +1,5 @@
+import type { MobileNotificationEventKey } from "./mobileNotificationEvents";
+
 export const MOBILE_API_BASE_PATH = "/api/mobile/v1" as const;
 export const MOBILE_IDEMPOTENCY_HEADER = "Idempotency-Key" as const;
 
@@ -119,6 +121,7 @@ export interface MobilePendingAction {
 export interface MobileNotice {
   id: string;
   type: string;
+  eventKey: MobileNotificationEventKey | null;
   title: string;
   message: string;
   priority: string | null;
@@ -130,6 +133,7 @@ export interface MobileNotice {
 export interface MobileNotification {
   id: string;
   type: string;
+  eventKey: MobileNotificationEventKey | null;
   title: string;
   message: string;
   priority: string | null;
@@ -138,6 +142,8 @@ export interface MobileNotification {
   deepLink: string;
   createdAt: string | null;
 }
+
+export type { MobileNotificationEventKey } from "./mobileNotificationEvents";
 
 export interface MobileNotificationsResponse {
   success: true;

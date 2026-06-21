@@ -357,7 +357,9 @@ Para mutacoes criticas, o backend registra `Idempotency-Key` por 24h. Se o app r
 
 **Saida de dados:** lista de avisos com deep link permitido.
 
-**API usada:** a definir em `/api/mobile/v1/notifications` ou incorporada em `mission/home` para P0 curto.
+**API usada:** `/api/mobile/v1/notifications` e resumo em `mission/home`.
+
+**Eventos minimos P0:** `questionnaire_published`, `coordinator_announcement`, `questionnaire_closed`, `schedule_published`, `substitution_requested`, `substitute_accepted`, `formation_available` e `schedule_reminder`.
 
 **Acoes primarias:** abrir aviso.
 

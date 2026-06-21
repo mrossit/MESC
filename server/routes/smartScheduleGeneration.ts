@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { schedules, users, questionnaireResponses, questionnaires, liturgicalCelebrations, familyRelationships } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
+import { mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { eq, and, sql, gte, lte, inArray, ne, or } from "drizzle-orm";
 import { generateAutomaticSchedule, ScheduleGenerator, GeneratedSchedule, Minister } from "../utils/scheduleGenerator";
 import { getCurrentLiturgicalSeason, getMovableFeasts } from "../utils/liturgicalCalculations";
@@ -864,12 +865,12 @@ async function sendMinisterNotifications(
         message: `Sua escala foi publicada! Você tem ${scheduleCount} missa(s) agendada(s) este mês.`,
         priority: 'medium',
         actionUrl: `/schedules?month=${month}&year=${year}`,
-        data: {
+        data: mobileNotificationData('schedule_published', {
           month,
           year,
           scheduleCount,
           schedules: ministerSchedules[ministerId]
-        }
+        })
       });
 
       sent++;

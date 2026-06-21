@@ -331,6 +331,7 @@ describe("mobile auth session storage", () => {
         notifications: [{
           id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           type: "schedule",
+          eventKey: "schedule_published",
           title: "Escala publicada",
           message: "Confira sua escala.",
           priority: "normal",
@@ -352,7 +353,10 @@ describe("mobile auth session storage", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
 
     await expect(mobileListNotifications({ limit: 5 }))
-      .resolves.toMatchObject({ unreadCount: 1 });
+      .resolves.toMatchObject({
+        unreadCount: 1,
+        notifications: [{ eventKey: "schedule_published" }],
+      });
     await expect(mobileMarkNotificationRead("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
       .resolves.toMatchObject({ notification: { read: true } });
     await expect(mobileMarkAllNotificationsRead())

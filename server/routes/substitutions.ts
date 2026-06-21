@@ -4,6 +4,7 @@ import { substitutionRequests, schedules, users, questionnaireResponses, questio
 import { eq, and, sql, gte, desc, count, notInArray, inArray } from "drizzle-orm";
 import { authenticateToken as requireAuth, AuthRequest } from "../auth";
 import { isAdmin as isAdminRole } from "@shared/roles";
+import { mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { communityIdFromSchedule } from "../utils/communityContext";
 import { scheduleCache } from "../services/scheduleCache";
 import { trackSubstitutionRequest, trackSubstitutionFulfillment } from "../services/reliabilityScoreService";
@@ -306,6 +307,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     // - Se tem substituteId (indicação direta) → 'pending' (aguarda aceitação do indicado)
     // - Se NÃO tem substituteId (aberto) → 'available' (vai para quadro público)
     const status = finalSubstituteId ? "pending" : "available";
+    const communityId = await communityIdFromSchedule(scheduleId);
 
     // Criar solicitação
     const [newRequest] = await db
@@ -314,7 +316,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         scheduleId,
         requesterId,
         substituteId: finalSubstituteId,
-        communityId: await communityIdFromSchedule(scheduleId), // herda do schedule pai
+        communityId,
         reason: reason || null,
         status,
         urgency,
@@ -407,7 +409,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         message: `${requesterName} solicitou que você o substitua na missa de ${formattedDate} às ${schedule.time || 'horário não definido'}. Responda o mais breve possível.`,
         type: 'substitution',
         read: false,
-        actionUrl: '/substitutions'
+        actionUrl: '/substitutions',
+        data: mobileNotificationData('substitution_requested', {
+          substitutionId: newRequest.id,
+          scheduleId,
+          requesterId,
+          directed: true,
+        })
       });
 
       // Enviar push notification
@@ -428,6 +436,59 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       });
 
       console.log(`[PUSH] Notificação de substituição enviada para ${finalSubstituteId}`);
+    } else {
+      const requesterName = requestWithDetails.requestingUser?.name || 'Um ministro';
+      const formattedDate = schedule.date ?
+        new Date(schedule.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) :
+        'data não definida';
+      const candidates = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(
+          eq(users.role, 'ministro'),
+          eq(users.status, 'active'),
+          eq(users.homeCommunityId, communityId)
+        ));
+      const recipientIds = candidates
+        .map((candidate) => candidate.id)
+        .filter((candidateId) => candidateId !== requesterId);
+
+      if (recipientIds.length > 0) {
+        const notificationTitle = '📋 Pedido de Substituição';
+        const notificationMessage = `${requesterName} pediu substituição para a missa de ${formattedDate} às ${schedule.time || 'horário não definido'}.`;
+
+        await Promise.all(recipientIds.map((recipientId) =>
+          storage.createNotification({
+            userId: recipientId,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: 'substitution',
+            read: false,
+            actionUrl: '/substitutions',
+            data: mobileNotificationData('substitution_requested', {
+              substitutionId: newRequest.id,
+              scheduleId,
+              requesterId,
+              directed: false,
+            })
+          })
+        ));
+
+        await sendPushNotificationToUsers(recipientIds, {
+          title: notificationTitle,
+          body: notificationMessage,
+          url: '/substitutions'
+        });
+
+        notifyUsers(recipientIds, {
+          id: 'sub-request-' + newRequest.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'warning',
+          actionUrl: '/substitutions',
+          createdAt: new Date().toISOString()
+        });
+      }
     }
 
     // Invalidate cache for the affected schedule month
@@ -736,6 +797,13 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
     const notificationMessage = newStatus === "approved"
       ? `${substituteName} aceitou substituir você na missa de ${formattedDate}. Você está liberado desta escala.`
       : `${substituteName} não pode substituir você na missa de ${formattedDate}. Procure outro substituto.`;
+    const mobileEventData = newStatus === "approved"
+      ? mobileNotificationData('substitute_accepted', {
+        substitutionId: id,
+        scheduleId: request.scheduleId,
+        substituteId: userId,
+      })
+      : undefined;
 
     // Criar notificação in-app
     await storage.createNotification({
@@ -744,7 +812,8 @@ router.post("/:id/respond", requireAuth, async (req: AuthRequest, res) => {
       message: notificationMessage,
       type: 'substitution',
       read: false,
-      actionUrl: '/substitutions'
+      actionUrl: '/substitutions',
+      ...(mobileEventData ? { data: mobileEventData } : {})
     });
 
     // Enviar push notification
@@ -939,7 +1008,12 @@ router.post("/:id/claim", requireAuth, async (req: AuthRequest, res) => {
       message: notificationMessage,
       type: 'substitution',
       read: false,
-      actionUrl: '/substitutions'
+      actionUrl: '/substitutions',
+      data: mobileNotificationData('substitute_accepted', {
+        substitutionId: id,
+        scheduleId: request.scheduleId,
+        substituteId: userId,
+      })
     });
 
     // Enviar push notification

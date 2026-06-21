@@ -8,6 +8,7 @@ import { Router, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { isAdmin as isAdminRole, DB_ADMIN_ROLES } from "@shared/roles";
+import { mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { db } from "../db";
 import { scheduleConfirmations, schedules, users, notifications } from "@shared/schema";
 import { eq, and, desc, gte, lte, inArray, sql } from "drizzle-orm";
@@ -279,7 +280,7 @@ router.post("/", requireAuth, requireRole(['gestor', 'coordenador']), async (req
       message: `Por favor confirme sua presença na missa de ${format(parseISO(schedule.date), 'dd/MM/yyyy', { locale: ptBR })} às ${schedule.time}`,
       priority: 'medium',
       actionUrl: '/confirmations',
-      data: { scheduleId, confirmationId: confirmation.id }
+      data: mobileNotificationData('schedule_reminder', { scheduleId, confirmationId: confirmation.id })
     });
 
     // Send push notification
@@ -392,6 +393,11 @@ router.post("/bulk", requireAuth, requireRole(['gestor', 'coordenador']), async 
           message: `Você tem ${toCreate.filter((c: ToCreateItem) => c.ministerId === ministerId).length} missa(s) aguardando confirmação`,
           priority: 'medium',
           actionUrl: '/confirmations',
+          data: mobileNotificationData('schedule_reminder', {
+            scheduleIds: toCreate
+              .filter((c: ToCreateItem) => c.ministerId === ministerId)
+              .map((c: ToCreateItem) => c.scheduleId),
+          }),
         });
       }
 
@@ -514,6 +520,7 @@ router.post("/:id/reminder", requireAuth, requireRole(['gestor', 'coordenador'])
       .select({
         id: scheduleConfirmations.id,
         ministerId: scheduleConfirmations.ministerId,
+        scheduleId: scheduleConfirmations.scheduleId,
         reminderCount: scheduleConfirmations.reminderCount,
         scheduleDate: schedules.date,
         scheduleTime: schedules.time,
@@ -543,6 +550,10 @@ router.post("/:id/reminder", requireAuth, requireRole(['gestor', 'coordenador'])
       message: `Por favor confirme sua presença na missa de ${format(parseISO(confirmation.scheduleDate), 'dd/MM/yyyy', { locale: ptBR })} às ${confirmation.scheduleTime}`,
       priority: 'high',
       actionUrl: '/confirmations',
+      data: mobileNotificationData('schedule_reminder', {
+        scheduleId: confirmation.scheduleId,
+        confirmationId: id,
+      }),
     });
 
     // Send push
@@ -578,6 +589,7 @@ router.post("/send-reminders", requireAuth, requireRole(['gestor', 'coordenador'
       .select({
         id: scheduleConfirmations.id,
         ministerId: scheduleConfirmations.ministerId,
+        scheduleId: scheduleConfirmations.scheduleId,
         scheduleDate: schedules.date,
         scheduleTime: schedules.time,
       })
@@ -620,6 +632,10 @@ router.post("/send-reminders", requireAuth, requireRole(['gestor', 'coordenador'
         message: `Você tem ${count} missa(s) aguardando confirmação de presença`,
         priority: 'high',
         actionUrl: '/confirmations',
+        data: mobileNotificationData('schedule_reminder', {
+          confirmationIds: confs.map((conf) => conf.id),
+          scheduleIds: confs.map((conf) => conf.scheduleId),
+        }),
       });
 
       // Update reminder count for all confirmations

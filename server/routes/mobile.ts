@@ -13,6 +13,7 @@ import {
   users,
 } from "@shared/schema";
 import { isAdmin, isParishWide } from "@shared/roles";
+import { extractMobileNotificationEventKey } from "@shared/mobileNotificationEvents";
 import { db } from "../db";
 import { authenticateToken, type AuthRequest, generateToken, login } from "../auth";
 import { authRateLimiter } from "../middleware/rateLimiter";
@@ -922,6 +923,7 @@ router.get("/notifications", authenticateToken, async (req: AuthRequest, res) =>
         priority: notifications.priority,
         read: notifications.read,
         readAt: notifications.readAt,
+        data: notifications.data,
         actionUrl: notifications.actionUrl,
         createdAt: notifications.createdAt,
       })
@@ -939,6 +941,7 @@ router.get("/notifications", authenticateToken, async (req: AuthRequest, res) =>
       notifications: rows.map((notification) => ({
         id: notification.id,
         type: notification.type,
+        eventKey: extractMobileNotificationEventKey(notification.data),
         title: notification.title,
         message: notification.message,
         priority: notification.priority,
@@ -1929,6 +1932,7 @@ router.get("/mission/home", authenticateToken, async (req: AuthRequest, res) => 
         message: notifications.message,
         priority: notifications.priority,
         read: notifications.read,
+        data: notifications.data,
         actionUrl: notifications.actionUrl,
         createdAt: notifications.createdAt,
       })
@@ -1973,6 +1977,7 @@ router.get("/mission/home", authenticateToken, async (req: AuthRequest, res) => 
       notices: notices.map((notice) => ({
         id: notice.id,
         type: notice.type,
+        eventKey: extractMobileNotificationEventKey(notice.data),
         title: notice.title,
         message: notice.message,
         priority: notice.priority,

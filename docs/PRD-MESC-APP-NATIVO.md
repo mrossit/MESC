@@ -422,7 +422,7 @@ Permissoes devem ser solicitadas apenas no momento de uso, com justificativa hum
 | Biometria | P0 | Face ID/Touch ID no iOS e BiometricPrompt no Android para desbloquear credenciais salvas. Primeiro login sempre exige senha. |
 | Sessao persistente | P0 | "Manter conectado" restaura sessao com refresh token rotativo, armazenamento seguro e logout remoto por dispositivo. Nao e token infinito. |
 | Push notification | P0 | Registrar dispositivo, token, plataforma e preferencias. Push abre a tela correta por deep link e respeita horario silencioso. |
-| Notificacoes de atualizacao | P0/P1 | P0 para escala, questionario, substituicao e comunicados. P1 para nova versao, atualizacao obrigatoria e notas de versao via configuracao remota. |
+| Notificacoes de atualizacao | P0/P1 | P0 para novo questionario, avisos dos coordenadores, encerramento de questionario, escala publicada, pedido de substituicao, substituto aceitou, novo treinamento e lembrete de escalacao. P1 para nova versao, atualizacao obrigatoria e notas de versao via configuracao remota. |
 | Geolocalizacao | P1 | Somente para check-in presencial, validacao de chegada ou sugestao de comunidade proxima. Sem rastreamento continuo em background. |
 | Apple Intelligence | P2 | Expor acoes seguras por App Intents/Siri/Shortcuts quando adequado. Nao enviar dados pastorais/sacramentais a modelos sem base legal e consentimento claro. |
 | Google Gemini | P2 | Avaliar Gemini API, Gemini Nano/AICore e AppFunctions. Priorizar casos locais/privados quando disponiveis e manter fallback sem IA. |

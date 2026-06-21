@@ -14,6 +14,7 @@
 - idempotencia persistida por 24h para mutacoes criticas;
 - OpenAPI `/api/mobile/v1` alinhado com as rotas implementadas;
 - fixtures/demo P0 com duas comunidades, notificacoes, questionarios, escalas e substituicoes;
+- eventos minimos de notificacao mobile versionados no contrato (`eventKey`);
 - teste de integracao anti-vazamento multi-comunidade;
 - seed local para exercitar MVP tecnico sem depender da UI nativa.
 
@@ -70,7 +71,7 @@ Dados criados:
 - 2 questionarios publicados;
 - 3 escalas publicadas;
 - 2 pedidos de substituicao;
-- 3 notificacoes demo para validar listagem, badge e leitura.
+- 8 notificacoes demo cobrindo novo questionario, aviso de coordenador, encerramento de questionario, escala publicada, pedido de substituicao, substituto aceitou, novo treinamento e lembrete de escalacao.
 
 Credencial demo local:
 
@@ -118,6 +119,7 @@ npm run build
 - questionario atual respeita comunidade ativa;
 - substituicoes nao vazam entre comunidades;
 - notificacoes retornam contador total de nao lidas e nao vazam entre usuarios;
+- notificacoes mobile expõem `eventKey` para os oito eventos P0 sem depender de texto do titulo;
 - mutacoes criticas exigem `Idempotency-Key`;
 - retries identicos recebem replay da resposta concluida;
 - reuse da mesma chave com outro payload retorna `409`;

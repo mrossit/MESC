@@ -71,6 +71,7 @@ Com a seed demo aplicada em ambiente demo:
 2. refresh token rotativo;
 3. abrir Minha Missao;
 4. abrir notificacoes, validar contador e marcar aviso como lido;
+   - validar que a resposta inclui `eventKey` (`schedule_published` na primeira notificacao demo);
 5. carregar questionario de julho/2026;
 6. enviar resposta com `Idempotency-Key`;
 7. confirmar presenca em escala publicada;

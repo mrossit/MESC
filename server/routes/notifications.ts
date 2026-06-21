@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { isAdmin as isAdminRole, expandRolesForDb } from "@shared/roles";
+import { mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { notificationRateLimiter } from "../middleware/rateLimiter";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -351,7 +352,10 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
         message: data.message,
         type: mappedType,
         read: false,
-        actionUrl: data.actionUrl ?? null
+        actionUrl: data.actionUrl ?? null,
+        data: mobileNotificationData("coordinator_announcement", {
+          senderId: req.user!.id,
+        })
       })
     );
 

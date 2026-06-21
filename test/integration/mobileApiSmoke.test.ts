@@ -120,6 +120,7 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(notificationList.unreadCount).toBe(1);
     expect(notificationList.notifications.map((item) => item.id))
       .toEqual([MOBILE_P0_DEMO_IDS.notificationAUnread]);
+    expect(notificationList.notifications[0].eventKey).toBe("schedule_published");
 
     const readNotification = await client.markNotificationRead(MOBILE_P0_DEMO_IDS.notificationAUnread);
     expect(readNotification.success).toBe(true);

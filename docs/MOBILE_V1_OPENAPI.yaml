@@ -1014,12 +1014,24 @@ components:
           nullable: true
     MobileNotification:
       type: object
-      required: [id, type, title, message, priority, read, readAt, deepLink, createdAt]
+      required: [id, type, eventKey, title, message, priority, read, readAt, deepLink, createdAt]
       properties:
         id:
           type: string
         type:
           type: string
+        eventKey:
+          type: string
+          nullable: true
+          enum:
+            - questionnaire_published
+            - coordinator_announcement
+            - questionnaire_closed
+            - schedule_published
+            - substitution_requested
+            - substitute_accepted
+            - formation_available
+            - schedule_reminder
         title:
           type: string
         message:
@@ -1453,12 +1465,24 @@ components:
           nullable: true
     Notice:
       type: object
-      required: [id, type, title, message, read, deepLink, createdAt]
+      required: [id, type, eventKey, title, message, read, deepLink, createdAt]
       properties:
         id:
           type: string
         type:
           type: string
+        eventKey:
+          type: string
+          nullable: true
+          enum:
+            - questionnaire_published
+            - coordinator_announcement
+            - questionnaire_closed
+            - schedule_published
+            - substitution_requested
+            - substitute_accepted
+            - formation_available
+            - schedule_reminder
         title:
           type: string
         message:
