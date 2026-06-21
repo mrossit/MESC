@@ -5,6 +5,30 @@
 
 ---
 
+## Decisao De Ambiente
+
+- PWA atual: manter em `https://saojudastadeu.replit.app`.
+- Novo ambiente nativo: usar `https://saojudastadeu.app`.
+- Banco do novo ambiente nativo: separado do banco atual do Replit, preferencialmente em um projeto Supabase proprio.
+
+Nao usar este checklist para reescrever ou substituir o MESC atual no Replit. Ele serve para preparar o ambiente do app nativo.
+
+---
+
+## 0. Bootstrap De Banco Nativo Novo
+
+Para um Supabase/Postgres novo e vazio:
+
+```bash
+CONFIRM_NATIVE_SCHEMA_BOOTSTRAP=true \
+DATABASE_URL="$NATIVE_DATABASE_URL" \
+npm run db:bootstrap:native
+```
+
+O comando aplica o schema atual com protecoes de ambiente e, em seguida, aplica/valida a fundacao mobile. Ele deve ser usado somente em banco novo, antes de importar dados reais ou demo.
+
+---
+
 ## 1. Antes De Rodar
 
 - confirmar qual banco sera usado: staging, demo ou producao;

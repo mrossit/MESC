@@ -13,6 +13,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - Native build number / Android version code: `50415`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
+- PWA atual durante a transicao: `https://saojudastadeu.replit.app`
 
 O app id ja foi registrado no App Store Connect. Trate `app.saojudastadeu.mesc` como definitivo para iOS.
 
@@ -39,6 +40,7 @@ Configuracao inicial de loja:
 - App Store metadata pt-BR: nome, subtitulo, descricao, palavras-chave, texto promocional, URLs de marketing/suporte e privacy policy preenchidos em 18/06/2026.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
 - TestFlight: build `5.4.3 (50415)` em estado `VALID`, `APP_STORE_ELIGIBLE`, distribuido para testers internos; build anterior `50414` permanece como referencia instalada.
+- Decisao de ambiente nativo: manter o MESC atual no Replit em `https://saojudastadeu.replit.app` e reservar `https://saojudastadeu.app` para o novo ambiente nativo com banco proprio. Ver `docs/NATIVE_ENVIRONMENT_SPLIT_2026-06-21.md`.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Upload key Android local: `android/keystores/mesc-upload-key.jks`, ignorada pelo Git.
@@ -52,7 +54,7 @@ npm run build:mobile
 npm run mobile:doctor
 ```
 
-`build:mobile` gera os assets web com `VITE_API_URL=https://saojudastadeu.app`, porque o app nativo roda em `capacitor://localhost` no iOS e `https://localhost` no Android; chamadas relativas para `/api` nao devem apontar para o WebView local.
+`build:mobile` gera os assets web com `VITE_API_URL=https://saojudastadeu.app`, porque o app nativo roda em `capacitor://localhost` no iOS e `https://localhost` no Android; chamadas relativas para `/api` nao devem apontar para o WebView local. Durante a transicao, o PWA atual permanece acessivel em `https://saojudastadeu.replit.app`.
 
 ## Gerar plataformas nativas
 
@@ -96,7 +98,7 @@ xcrun altool --upload-app \
   --api-issuer d1513888-2c5a-4569-9163-cf5c01460a33
 ```
 
-O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. O build `5.4.3 (50412)` adiciona a primeira fatia de biometria nativa e melhora o Liquid Glass. O build `5.4.3 (50413)` corrige a regressao de sessao/biometria vista em TestFlight. O build `5.4.3 (50414)` corrige a repeticao de prompts biometricos apos login manual, move o som para o header, busca fotos protegidas com token e ajusta o tab bar inferior. O build `5.4.3 (50415)` e o candidato MVP P0 distribuido no TestFlight interno; a etapa seguinte e garantir que backend/migrations do PR `#38` estejam no ambiente apontado pelo app e validar o fluxo mobile completo no aparelho.
+O upload `5.4.3 (50405)` foi aceito pelo App Store Connect, mas o TestFlight apontou problemas de responsividade no topo e na barra inferior. O build `5.4.3 (50408)` foi publicado com o ajuste final de safe-area/status bar, barra inferior e navegacao do menu lateral. O build `5.4.3 (50409)` corrigiu a selecao duplicada Escalas/Trocas no rodape, melhorou superficies glass no shell nativo e adicionou o gate de dados para validar/importar a escala oficial de junho/2026. O build `5.4.3 (50410)` corrige a causa raiz do corte no notch/login: status bar iOS em overlay transparente e CSS continuo por tras da Dynamic Island. O build `5.4.3 (50411)` corrige a causa raiz dos dados zerados/401 no app nativo: chamadas manuais para `/api` agora recebem o token JWT e o auth guard nao confia em usuario cacheado sem token. O build `5.4.3 (50412)` adiciona a primeira fatia de biometria nativa e melhora o Liquid Glass. O build `5.4.3 (50413)` corrige a regressao de sessao/biometria vista em TestFlight. O build `5.4.3 (50414)` corrige a repeticao de prompts biometricos apos login manual, move o som para o header, busca fotos protegidas com token e ajusta o tab bar inferior. O build `5.4.3 (50415)` e o candidato MVP P0 distribuido no TestFlight interno; a etapa seguinte e publicar o novo ambiente nativo em `https://saojudastadeu.app`, mantendo o PWA atual em `https://saojudastadeu.replit.app`, aplicar as migrations mobile no banco novo e validar o fluxo mobile completo no aparelho.
 
 ## Android signing e AAB
 
@@ -134,6 +136,7 @@ bundletool validate --bundle android/app/build/outputs/bundle/release/app-releas
 - `npm run mobile:doctor`
 - `NODE_ENV=production npm run release:check:env`
 - `PRODUCTION_BASE_URL=https://saojudastadeu.app npm run release:check:health`
+- `PRODUCTION_BASE_URL=https://saojudastadeu.replit.app npm run release:check:health` enquanto o PWA atual seguir no Replit
 - Smoke test no Replit Preview
 - Smoke test em dispositivo real iOS/Android apos `cap sync`
 - Validar build/archive no Xcode com a conta Apple Developer.

@@ -79,13 +79,15 @@ Por padrao, o build mobile usa producao:
 npm run build:mobile
 ```
 
+Para a transicao nativa, `https://saojudastadeu.app` fica reservado ao novo ambiente do app nativo. O PWA atual continua em `https://saojudastadeu.replit.app`.
+
 Para demo/staging, defina explicitamente a URL antes de sincronizar:
 
 ```bash
 VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 ```
 
-Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app`.
+Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
 ## Smoke Manual Do MVP
 
@@ -102,7 +104,8 @@ Com o ambiente demo/staging preparado:
 
 ## Bloqueios Para Beta Real
 
-- PR `#38` precisa estar mergeado/deployado no ambiente que servira a API do app.
+- PR `#38` ja foi mergeado em `main`; o codigo precisa ser publicado no novo ambiente que servira a API do app.
+- `https://saojudastadeu.app` precisa apontar para o ambiente nativo novo; o PWA atual permanece em `https://saojudastadeu.replit.app`.
 - Aplicar migrations mobile no banco alvo antes do teste.
 - Rodar seed demo somente em ambiente demo descartavel.
 - Para Android release, usar upload key local fora do Git.
