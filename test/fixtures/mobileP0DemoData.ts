@@ -132,10 +132,33 @@ export function getMobileP0DemoData() {
         status: "published",
         questions: [
           {
-            id: "q-availability",
+            id: "monthly_availability",
             type: "multiple_choice",
-            title: "Quais domingos voce pode servir?",
+            title: "Voce tem disponibilidade para servir em julho?",
+            options: ["Sim", "Nao"],
             required: true,
+          },
+          {
+            id: "available_sundays",
+            type: "checkbox",
+            title: "Quais domingos voce pode servir?",
+            options: ["Domingo 05/07", "Domingo 12/07", "Domingo 19/07", "Domingo 26/07"],
+            required: false,
+            metadata: {
+              dependsOn: "monthly_availability",
+              showIf: "Sim",
+            },
+          },
+          {
+            id: "main_service_time",
+            type: "multiple_choice",
+            title: "Qual horario voce prefere?",
+            options: ["08:00", "10:00", "19:00"],
+            required: false,
+            metadata: {
+              dependsOn: "monthly_availability",
+              showIf: "Sim",
+            },
           },
         ],
         deadline: new Date("2026-06-28T23:59:00.000Z"),
@@ -156,10 +179,33 @@ export function getMobileP0DemoData() {
         status: "published",
         questions: [
           {
-            id: "q-availability",
+            id: "monthly_availability",
             type: "multiple_choice",
-            title: "Quais domingos voce pode servir?",
+            title: "Voce tem disponibilidade para servir em julho?",
+            options: ["Sim", "Nao"],
             required: true,
+          },
+          {
+            id: "available_sundays",
+            type: "checkbox",
+            title: "Quais domingos voce pode servir?",
+            options: ["Domingo 05/07", "Domingo 12/07", "Domingo 19/07", "Domingo 26/07"],
+            required: false,
+            metadata: {
+              dependsOn: "monthly_availability",
+              showIf: "Sim",
+            },
+          },
+          {
+            id: "main_service_time",
+            type: "multiple_choice",
+            title: "Qual horario voce prefere?",
+            options: ["08:00", "10:00", "19:00"],
+            required: false,
+            metadata: {
+              dependsOn: "monthly_availability",
+              showIf: "Sim",
+            },
           },
         ],
         deadline: new Date("2026-06-28T23:59:00.000Z"),

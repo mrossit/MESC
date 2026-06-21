@@ -10,6 +10,9 @@ import {
   type MobileMeResponse,
   type MobileMissionHomeResponse,
   type MobilePlatform,
+  type MobileQuestionnaireCurrentResponse,
+  type MobileQuestionnaireSubmitPayload,
+  type MobileQuestionnaireSubmitResponse,
   type MobileScheduleConfirmPayload,
   type MobileScheduleConfirmResponse,
   type MobileScheduleMonthResponse,
@@ -270,6 +273,20 @@ export async function mobileGetMe(): Promise<MobileMeResponse> {
 
 export async function mobileGetMissionHome(input: { month?: string } = {}): Promise<MobileMissionHomeResponse> {
   return runWithMobileAuthRetry((client) => client.getMissionHome(input));
+}
+
+export async function mobileGetCurrentQuestionnaire(
+  input: { month?: string } = {},
+): Promise<MobileQuestionnaireCurrentResponse> {
+  return runWithMobileAuthRetry((client) => client.getCurrentQuestionnaire(input));
+}
+
+export async function mobileSubmitQuestionnaireResponse(
+  questionnaireId: string,
+  payload: MobileQuestionnaireSubmitPayload,
+  options: MobileClientRequestOptions,
+): Promise<MobileQuestionnaireSubmitResponse> {
+  return runWithMobileAuthRetry((client) => client.submitQuestionnaireResponse(questionnaireId, payload, options));
 }
 
 export async function mobileGetSchedulesMonth(input: { month?: string } = {}): Promise<MobileScheduleMonthResponse> {

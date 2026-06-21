@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoredMobileAuthSession,
   getOrCreateMobileDeviceId,
   hasStoredMobileRefreshToken,
   MOBILE_AUTH_STORAGE_KEYS,
+  mobileGetCurrentQuestionnaire,
+  mobileSubmitQuestionnaireResponse,
   readStoredMobileAuthSession,
   storeMobileAuthResponse,
 } from "../../../client/src/lib/mobile-auth-session";
@@ -60,6 +62,10 @@ describe("mobile auth session storage", () => {
     sessionStorage.clear();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("stores access, refresh, device and community data from mobile auth", () => {
     storeMobileAuthResponse(authResponse);
 
@@ -90,5 +96,81 @@ describe("mobile auth session storage", () => {
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.deviceId)).toBe("ios-device-1");
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBeNull();
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId)).toBeNull();
+  });
+
+  it("calls questionnaire endpoints with mobile auth headers and idempotency", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        community: authResponse.communities[0],
+        month: "2026-07",
+        questionnaire: {
+          id: "questionnaire-1",
+          title: "Disponibilidade Julho",
+          description: null,
+          month: 7,
+          year: 2026,
+          status: "published",
+          questions: [],
+          deadline: null,
+          responseStatus: "pending",
+          response: null,
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        response: {
+          id: "response-1",
+          questionnaireId: "questionnaire-1",
+          submittedAt: "2026-06-21T12:00:00.000Z",
+          updatedAt: "2026-06-21T12:00:00.000Z",
+          processingWarnings: [],
+          unmappedResponses: [],
+        },
+      }), { status: 200 }));
+
+    await expect(mobileGetCurrentQuestionnaire({ month: "2026-07" }))
+      .resolves.toMatchObject({ questionnaire: { id: "questionnaire-1" } });
+
+    await expect(mobileSubmitQuestionnaireResponse(
+      "questionnaire-1",
+      { responses: [{ questionId: "available_sundays", answer: ["Domingo 05/07"] }] },
+      { idempotencyKey: "idem-1" },
+    )).resolves.toMatchObject({ response: { id: "response-1" } });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/questionnaires/current?month=2026-07",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/mobile/v1/questionnaires/questionnaire-1/response",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          responses: [{ questionId: "available_sundays", answer: ["Domingo 05/07"] }],
+        }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "Idempotency-Key": "idem-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
   });
 });

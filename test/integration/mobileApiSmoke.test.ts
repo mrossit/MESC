@@ -125,8 +125,16 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       {
         responses: [
           {
-            questionId: "q-availability",
-            answer: ["2026-07-05", "2026-07-12"],
+            questionId: "monthly_availability",
+            answer: "Sim",
+          },
+          {
+            questionId: "available_sundays",
+            answer: ["Domingo 05/07", "Domingo 12/07"],
+          },
+          {
+            questionId: "main_service_time",
+            answer: "10:00",
           },
         ],
       },
