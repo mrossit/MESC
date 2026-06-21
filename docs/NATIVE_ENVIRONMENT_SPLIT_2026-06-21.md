@@ -52,6 +52,43 @@ Projeto criado em 2026-06-21:
 
 O projeto antigo `mesc-staging` foi removido/pausado antes da criacao deste ambiente para liberar o limite de projetos ativos.
 
+## Bootstrap Aplicado No Staging Nativo
+
+Status em 2026-06-21:
+
+- Projeto Supabase: `mesc-native-staging` (`sdochgpfjosmhrbztthr`).
+- Tabelas P0/runtime criadas: `communities`, `users`, `questionnaires`, `questionnaire_responses`, `schedules`, `schedule_confirmations`, `substitution_requests`, `notifications`, `mobile_devices`, `mobile_refresh_tokens`, `mobile_idempotency_keys`, `active_sessions`, `activity_logs`.
+- Migrations remotas aplicadas:
+  - `20260621211025 native_p0_minimal_schema`;
+  - `20260621211112 native_p0_enable_closed_rls`;
+  - `20260621211254 native_p0_explicit_data_api_denies`;
+  - `20260621211304 native_p0_fk_covering_indexes`;
+  - `20260621211625 native_p0_runtime_audit_sessions`.
+- RLS ativo nas 13 tabelas criadas.
+- Policies `deny_data_api_access` aplicadas nas 13 tabelas para bloquear acesso direto via `anon`/`authenticated`.
+- Security advisor do Supabase: sem lints.
+- Performance advisor: apenas `unused_index` informativo, esperado porque a base acabou de ser criada e ainda nao recebeu trafego real.
+
+O staging atual esta preparado para o smoke do MVP mobile, nao para substituir todos os modulos do PWA legado. A migracao completa do schema do MESC atual deve ser tratada separadamente quando formos migrar dados reais ou ativar telas fora do fluxo mobile P0.
+
+Seed demo aplicada no staging nativo:
+
+| Recurso | Total |
+| --- | ---: |
+| Comunidades | 2 |
+| Usuarios | 4 |
+| Questionarios | 2 |
+| Escalas | 3 |
+| Pedidos de substituicao | 2 |
+| Notificacoes | 8 |
+
+Estado intencional da seed:
+
+- `questionnaire_responses`: `0`, para permitir testar envio do questionario do zero;
+- `schedule_confirmations`: `0`, para permitir testar confirmacao de presenca do zero;
+- `mobile_devices`, `mobile_refresh_tokens` e `mobile_idempotency_keys`: `0`, para serem criados pelo login/refresh/mutacoes durante o smoke;
+- ministro demo A tem 1 notificacao nao lida, 2 escalas publicadas na Comunidade Matriz e 0 escalas vazadas da Comunidade Sao Lucas.
+
 ## Variaveis Do Novo Ambiente
 
 No ambiente nativo novo:

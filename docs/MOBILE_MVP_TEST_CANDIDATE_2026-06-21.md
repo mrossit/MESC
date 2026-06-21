@@ -6,6 +6,13 @@ PR: `#38`
 
 Este documento registra o primeiro caminho repetivel para transformar a fundacao mobile P0 em um MVP testavel no app nativo.
 
+Atualizacao de ambiente nativo:
+
+- Branch de separacao/infra: `codex/native-domain-split`.
+- PR de ambiente: `#39`.
+- Supabase staging criado: `mesc-native-staging` (`sdochgpfjosmhrbztthr`, `sa-east-1`).
+- Seed demo e schema P0/runtime aplicados no staging em 2026-06-21.
+
 ## Status Do Candidato
 
 - Contrato mobile, migrations, seed demo, smoke tests e notificacoes P0: cobertos no PR `#38`.
@@ -89,6 +96,8 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
+Status atual: o banco staging nativo ja existe e esta populado, mas ainda falta publicar a API apontando para esse banco e apontar `https://saojudastadeu.app` para o novo ambiente. Enquanto isso nao acontecer, o TestFlight `5.4.3 (50415)` ainda nao tera um backend nativo fiel para testar.
+
 ## Smoke Manual Do MVP
 
 Com o ambiente demo/staging preparado:
@@ -106,7 +115,6 @@ Com o ambiente demo/staging preparado:
 
 - PR `#38` ja foi mergeado em `main`; o codigo precisa ser publicado no novo ambiente que servira a API do app.
 - `https://saojudastadeu.app` precisa apontar para o ambiente nativo novo; o PWA atual permanece em `https://saojudastadeu.replit.app`.
-- Aplicar migrations mobile no banco alvo antes do teste.
-- Rodar seed demo somente em ambiente demo descartavel.
+- Supabase staging ja esta criado e populado; ainda falta configurar o deploy da API com `DATABASE_URL` desse banco.
 - Para Android release, usar upload key local fora do Git.
 - Para iOS TestFlight, gerar archive assinado no Xcode/App Store Connect.
