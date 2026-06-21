@@ -38,6 +38,20 @@ Isso significa que o build `50415` pode ser usado para validar o novo ambiente q
 - Dominio: `https://saojudastadeu.app`.
 - PWA atual: permanece em `https://saojudastadeu.replit.app`.
 
+## Supabase Nativo
+
+Projeto criado em 2026-06-21:
+
+- Nome: `mesc-native-staging`
+- Organizacao: `Rossit`
+- Project ref: `sdochgpfjosmhrbztthr`
+- Region: `sa-east-1`
+- API URL: `https://sdochgpfjosmhrbztthr.supabase.co`
+- Status inicial: `ACTIVE_HEALTHY`
+- Schema `public`: vazio antes do bootstrap
+
+O projeto antigo `mesc-staging` foi removido/pausado antes da criacao deste ambiente para liberar o limite de projetos ativos.
+
 ## Variaveis Do Novo Ambiente
 
 No ambiente nativo novo:
