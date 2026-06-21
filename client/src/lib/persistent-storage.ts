@@ -2,6 +2,13 @@ const PRESERVED_LOCAL_STORAGE_KEYS = [
   "token",
   "auth_token",
   "session_token",
+  "mesc_mobile_device_id",
+  "mesc_mobile_refresh_token",
+  "mesc_mobile_refresh_token_expires_at",
+  "mesc_mobile_active_community_id",
+  "mesc_mobile_communities",
+  "mesc_mobile_platform",
+  "mesc_mobile_app_version",
   "mesc_biometric_login_enabled",
   "mesc-ui-theme",
   "theme",
@@ -35,6 +42,12 @@ export function clearLocalSession(): void {
   localStorage.removeItem("auth_token");
   localStorage.removeItem("session_token");
   localStorage.removeItem("user");
+  localStorage.removeItem("mesc_mobile_refresh_token");
+  localStorage.removeItem("mesc_mobile_refresh_token_expires_at");
+  localStorage.removeItem("mesc_mobile_active_community_id");
+  localStorage.removeItem("mesc_mobile_communities");
+  localStorage.removeItem("mesc_mobile_platform");
+  localStorage.removeItem("mesc_mobile_app_version");
   sessionStorage.clear();
 }
 

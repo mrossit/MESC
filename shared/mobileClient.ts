@@ -75,6 +75,13 @@ export interface MobileAuthResponse {
   };
 }
 
+export interface MobileMeResponse {
+  success: true;
+  user: MobileUser;
+  communities: MobileCommunity[];
+  activeCommunityId: string;
+}
+
 export interface MobileLoginPayload {
   email: string;
   password: string;
@@ -87,6 +94,16 @@ export interface MobileLoginPayload {
 export interface MobileRefreshPayload {
   refreshToken: string;
   deviceId?: string;
+}
+
+export interface MobileLogoutPayload {
+  deviceId?: string;
+  deviceDbId?: string;
+}
+
+export interface MobileLogoutResponse {
+  success: true;
+  revoked: boolean;
 }
 
 export interface MobilePendingAction {
@@ -537,6 +554,26 @@ export class MescMobileApiClient {
     this.setCommunityId(response.activeCommunityId);
     this.setDeviceId(response.device.deviceId);
     return response;
+  }
+
+  async logout(payload: MobileLogoutPayload = {}, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileLogoutResponse>({
+      method: "POST",
+      path: mobileEndpoints.logout(),
+      body: {
+        ...payload,
+        deviceId: payload.deviceId ?? this.deviceId ?? undefined,
+      },
+      ...options,
+    });
+  }
+
+  async getMe(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileMeResponse>({
+      method: "GET",
+      path: mobileEndpoints.me(),
+      ...options,
+    });
   }
 
   async getMissionHome(input: { month?: string } = {}, options: MobileClientRequestOptions = {}) {

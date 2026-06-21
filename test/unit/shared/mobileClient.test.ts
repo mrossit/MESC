@@ -125,6 +125,64 @@ describe("mobileClient contract", () => {
     } satisfies Partial<MescMobileApiError>);
   });
 
+  it("exposes mobile auth me and logout endpoints with device context", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+
+      if (input.endsWith("/auth/me")) {
+        return new Response(JSON.stringify({
+          success: true,
+          user: {
+            id: "user-1",
+            email: "ministro@example.test",
+            name: "Ministro Demo",
+            role: "ministro",
+            homeCommunityId: "community-1",
+            requiresPasswordChange: false,
+            photoUrl: null,
+          },
+          communities: [],
+          activeCommunityId: "community-1",
+        }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        revoked: true,
+      }), { status: 200 });
+    };
+
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: fetcher,
+    });
+
+    await client.getMe();
+    await client.logout();
+
+    expect(requests[0].input).toBe("https://example.test/api/mobile/v1/auth/me");
+    expect(requests[0].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+    });
+
+    expect(requests[1].input).toBe("https://example.test/api/mobile/v1/auth/logout");
+    expect(requests[1].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Device-Id": "ios-device-1",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(String(requests[1].init.body))).toEqual({
+      deviceId: "ios-device-1",
+    });
+  });
+
   it("delegates Idempotency-Key generation to the native UUID provider", () => {
     expect(createMobileIdempotencyKey(() => "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
       .toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");

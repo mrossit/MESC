@@ -25,6 +25,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '@/lib/auth';
 import { APP_VERSION } from '@/lib/queryClient';
+import { clearLocalSession } from '@/lib/persistent-storage';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
@@ -389,11 +390,7 @@ export default function Settings() {
     },
     onSuccess: async () => {
       await disableNativeBiometricLogin().catch(() => undefined);
-      localStorage.removeItem('token');
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('user');
-      sessionStorage.clear();
+      clearLocalSession();
       queryClient.clear();
       window.location.href = '/login?accountDeleted=1';
     },

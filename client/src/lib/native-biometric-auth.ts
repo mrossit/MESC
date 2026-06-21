@@ -6,6 +6,11 @@ import {
   type AvailableResult,
 } from "@capgo/capacitor-native-biometric";
 import { isNativeRuntime } from "@/lib/api-url";
+import {
+  readStoredMobileAuthSession,
+  restoreMobileAuthSession,
+  type StoredMobileAuthSession,
+} from "@/lib/mobile-auth-session";
 
 const BIOMETRIC_SERVER = "app.saojudastadeu.mesc";
 const BIOMETRIC_ENABLED_KEY = "mesc_biometric_login_enabled";
@@ -23,6 +28,7 @@ export interface NativeBiometricStatus {
 interface StoredSession {
   token: string;
   sessionToken?: string | null;
+  mobile?: StoredMobileAuthSession | null;
   savedAt: string;
 }
 
@@ -69,7 +75,14 @@ function unavailableDetail(result?: AvailableResult): string {
 function readStoredSession(password: string): StoredSession {
   try {
     const parsed = JSON.parse(password) as StoredSession;
-    if (parsed?.token) return parsed;
+    if (parsed?.token) {
+      return {
+        token: parsed.token,
+        sessionToken: parsed.sessionToken ?? null,
+        mobile: parsed.mobile ?? null,
+        savedAt: parsed.savedAt ?? new Date().toISOString(),
+      };
+    }
   } catch {
     // Backward-compatible fallback if an older build stored only the token.
   }
@@ -138,6 +151,7 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
   const storedSession: StoredSession = {
     token,
     sessionToken: localStorage.getItem("session_token"),
+    mobile: readStoredMobileAuthSession(),
     savedAt: new Date().toISOString(),
   };
 
@@ -172,10 +186,14 @@ export async function unlockNativeBiometricLogin(): Promise<{ email: string; tok
   });
   const storedSession = readStoredSession(credentials.password);
 
-  localStorage.setItem("token", storedSession.token);
-  localStorage.setItem("auth_token", storedSession.token);
-  if (storedSession.sessionToken) {
-    localStorage.setItem("session_token", storedSession.sessionToken);
+  if (storedSession.mobile) {
+    restoreMobileAuthSession(storedSession.mobile);
+  } else {
+    localStorage.setItem("token", storedSession.token);
+    localStorage.setItem("auth_token", storedSession.token);
+    if (storedSession.sessionToken) {
+      localStorage.setItem("session_token", storedSession.sessionToken);
+    }
   }
 
   return {

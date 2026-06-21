@@ -19,6 +19,7 @@ import { Eye, EyeOff, Clock, Fingerprint, MessageCircle, ShieldCheck, UserCheck,
 import { authAPI, type AuthUser } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { clearLocalSession, consumeSkipAutoBiometricOnce } from "@/lib/persistent-storage";
+import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 import {
   enableNativeBiometricLogin,
   getNativeBiometricStatus,
@@ -248,7 +249,21 @@ export default function Login() {
       }
 
       const skipAutoBiometric = consumeSkipAutoBiometricOnce();
+      const canResumeMobileSession = shouldUseMobileAuth() && hasStoredMobileRefreshToken();
       const alreadyAttempted = sessionStorage.getItem(AUTO_BIOMETRIC_ATTEMPTED_KEY) === "true";
+
+      if (!token && canResumeMobileSession && !inactivityReason && !skipAutoBiometric) {
+        try {
+          const data = await authAPI.getMe();
+          if (cancelled) return;
+          queryClient.setQueryData(["/api/auth/me"], data);
+          navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+          return;
+        } catch {
+          clearLocalSession();
+        }
+      }
+
       if (
         !status.enabled ||
         inactivityReason ||
