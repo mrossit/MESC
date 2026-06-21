@@ -24,6 +24,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "ci:mobile-foundation": "npm run check -- --pretty false && npm run db:migrate:mobile && npm run db:seed:mobile-demo && npm run db:validate:mobile -- --expect-demo && npm run test:run -- test/unit/shared/mobileClient.test.ts test/unit/server/mobileContractService.test.ts test/unit/server/mobileSessionService.test.ts test/unit/server/mobileIdempotencyService.test.ts test/unit/server/mobileOpenApiContract.test.ts test/integration/mobileApiCommunityScope.test.ts test/integration/mobileApiSmoke.test.ts --reporter=dot && ruby -e \"require 'yaml'; YAML.load_file('docs/MOBILE_V1_OPENAPI.yaml'); puts 'yaml ok'\" && npm run build",
     "release:check:local": "npm run check -- --pretty false && npm run build && npm run test:run -- --reporter=dot",
     "release:check:env": "tsx scripts/validate-release-env.ts",
     "release:check:health": "tsx scripts/check-production-health.ts",
