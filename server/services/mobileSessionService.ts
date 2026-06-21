@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   mobileDevices,
   mobileRefreshTokens,
@@ -370,6 +370,24 @@ export async function consumeMobileRefreshToken(input: {
     throw new MobileSessionError(403, "Conta inativa ou pendente. Entre em contato com a coordenacao.");
   }
 
+  const now = new Date();
+  const [claimedToken] = await db
+    .update(mobileRefreshTokens)
+    .set({
+      rotatedAt: now,
+    })
+    .where(and(
+      eq(mobileRefreshTokens.id, record.token.id),
+      isNull(mobileRefreshTokens.rotatedAt),
+      isNull(mobileRefreshTokens.revokedAt),
+    ))
+    .returning();
+
+  if (!claimedToken) {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(401, "Sessao mobile ja utilizada. Entre novamente.");
+  }
+
   const nextToken = await createMobileRefreshToken({
     userId: record.user.id,
     deviceDbId: record.device.id,
@@ -378,11 +396,9 @@ export async function consumeMobileRefreshToken(input: {
     userAgent: input.userAgent,
   });
 
-  const now = new Date();
   await db
     .update(mobileRefreshTokens)
     .set({
-      rotatedAt: now,
       replacedByTokenId: nextToken.record.id,
     })
     .where(eq(mobileRefreshTokens.id, record.token.id));

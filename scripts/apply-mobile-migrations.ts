@@ -1,7 +1,7 @@
 /**
  * Applies the MESC Native mobile foundation migrations.
  *
- * - With DATABASE_URL: applies the Postgres SQL migration files 0007 and 0008.
+ * - With DATABASE_URL: applies the Postgres SQL migration files 0006, 0007 and 0008.
  * - Without DATABASE_URL: applies SQLite-compatible local DDL to local.db.
  *
  * This intentionally does not call drizzle-kit push.
@@ -10,6 +10,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const migrationFiles = [
+  "migrations/0006_account_deletion_compliance.sql",
   "migrations/0007_mobile_device_sessions.sql",
   "migrations/0008_mobile_idempotency_keys.sql",
 ];

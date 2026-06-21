@@ -615,13 +615,23 @@ router.get("/auth/me", authenticateToken, async (req: AuthRequest, res) => {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
 
-    const accessibleCommunities = await getAccessibleCommunities(user);
+    const [fullUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!fullUser) {
+      throw new MobileHttpError(404, "Usuario nao encontrado");
+    }
+
+    const accessibleCommunities = await getAccessibleCommunities(fullUser);
 
     res.json({
       success: true,
-      user: sanitizeMobileUser(user),
+      user: sanitizeMobileUser(fullUser),
       communities: accessibleCommunities,
-      activeCommunityId: user.homeCommunityId,
+      activeCommunityId: fullUser.homeCommunityId,
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao buscar usuario mobile");

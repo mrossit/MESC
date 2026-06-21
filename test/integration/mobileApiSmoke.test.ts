@@ -1,8 +1,11 @@
 import express from "express";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
+import { db } from "../../server/db";
+import { users } from "../../shared/schema";
 import {
   MOBILE_P0_DEMO_IDS,
   MOBILE_P0_DEMO_MONTH,
@@ -78,6 +81,34 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(refresh.auth.accessToken).toEqual(expect.any(String));
     expect(refresh.auth.refreshToken).toEqual(expect.any(String));
     expect(refresh.auth.refreshToken).not.toBe(login.auth.refreshToken);
+
+    await expect(client.refresh({
+      refreshToken: login.auth.refreshToken!,
+    })).rejects.toMatchObject({
+      status: 401,
+      retryable: false,
+    });
+
+    await db
+      .update(users)
+      .set({
+        requiresPasswordChange: 1 as any,
+        photoUrl: "https://example.test/mobile-demo-photo.jpg",
+      })
+      .where(eq(users.id, MOBILE_P0_DEMO_IDS.ministerA));
+
+    const me = await client.getMe();
+    expect(me.success).toBe(true);
+    expect(me.user.requiresPasswordChange).toBe(true);
+    expect(me.user.photoUrl).toBe("https://example.test/mobile-demo-photo.jpg");
+
+    await db
+      .update(users)
+      .set({
+        requiresPasswordChange: 0 as any,
+        photoUrl: null,
+      })
+      .where(eq(users.id, MOBILE_P0_DEMO_IDS.ministerA));
 
     const mission = await client.getMissionHome({ month: MOBILE_P0_DEMO_MONTH });
     expect(mission.success).toBe(true);

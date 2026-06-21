@@ -29900,7 +29900,7 @@ async function releaseMobileIdempotency(recordId) {
 init_schema();
 await init_db();
 import { createHash as createHash2, randomBytes, randomUUID as randomUUID6 } from "crypto";
-import { and as and40, desc as desc18, eq as eq53 } from "drizzle-orm";
+import { and as and40, desc as desc18, eq as eq53, isNull as isNull4 } from "drizzle-orm";
 var REFRESH_TOKEN_PREFIX = "mesc_rt_";
 var REFRESH_TOKEN_BYTES = 48;
 var REFRESH_TOKEN_TTL_DAYS = 30;
@@ -30149,6 +30149,18 @@ async function consumeMobileRefreshToken(input) {
     await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
     throw new MobileSessionError(403, "Conta inativa ou pendente. Entre em contato com a coordenacao.");
   }
+  const now = /* @__PURE__ */ new Date();
+  const [claimedToken] = await db.update(mobileRefreshTokens).set({
+    rotatedAt: now
+  }).where(and40(
+    eq53(mobileRefreshTokens.id, record.token.id),
+    isNull4(mobileRefreshTokens.rotatedAt),
+    isNull4(mobileRefreshTokens.revokedAt)
+  )).returning();
+  if (!claimedToken) {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(401, "Sessao mobile ja utilizada. Entre novamente.");
+  }
   const nextToken = await createMobileRefreshToken({
     userId: record.user.id,
     deviceDbId: record.device.id,
@@ -30156,9 +30168,7 @@ async function consumeMobileRefreshToken(input) {
     ipAddress: input.ipAddress,
     userAgent: input.userAgent
   });
-  const now = /* @__PURE__ */ new Date();
   await db.update(mobileRefreshTokens).set({
-    rotatedAt: now,
     replacedByTokenId: nextToken.record.id
   }).where(eq53(mobileRefreshTokens.id, record.token.id));
   const [updatedDevice] = await db.update(mobileDevices).set({
@@ -30810,12 +30820,16 @@ router41.get("/auth/me", authenticateToken, async (req, res) => {
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    const accessibleCommunities = await getAccessibleCommunities(user);
+    const [fullUser] = await db.select().from(users).where(eq54(users.id, user.id)).limit(1);
+    if (!fullUser) {
+      throw new MobileHttpError(404, "Usuario nao encontrado");
+    }
+    const accessibleCommunities = await getAccessibleCommunities(fullUser);
     res.json({
       success: true,
-      user: sanitizeMobileUser(user),
+      user: sanitizeMobileUser(fullUser),
       communities: accessibleCommunities,
-      activeCommunityId: user.homeCommunityId
+      activeCommunityId: fullUser.homeCommunityId
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao buscar usuario mobile");
@@ -32371,7 +32385,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull4, and: and43 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull5, and: and43 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -32381,7 +32395,7 @@ async function registerRoutes(app2) {
       }).from(substitutionRequests).where(
         and43(
           eq55(substitutionRequests.status, "pending"),
-          isNull4(substitutionRequests.substituteId)
+          isNull5(substitutionRequests.substituteId)
         )
       );
       if (affectedRequests.length === 0) {
@@ -32394,7 +32408,7 @@ async function registerRoutes(app2) {
       await db.update(substitutionRequests).set({ status: "available" }).where(
         and43(
           eq55(substitutionRequests.status, "pending"),
-          isNull4(substitutionRequests.substituteId)
+          isNull5(substitutionRequests.substituteId)
         )
       );
       logger.info("Migration: Fixed substitution status", {
