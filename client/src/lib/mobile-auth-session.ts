@@ -10,6 +10,8 @@ import {
   type MobileMeResponse,
   type MobileMissionHomeResponse,
   type MobilePlatform,
+  type MobileProfileResponse,
+  type MobileProfileUpdatePayload,
   type MobileQuestionnaireCurrentResponse,
   type MobileQuestionnaireSubmitPayload,
   type MobileQuestionnaireSubmitResponse,
@@ -311,6 +313,14 @@ export async function mobileRequestSubstitution(
 
 export async function mobileListSubstitutions(): Promise<MobileSubstitutionsResponse> {
   return runWithMobileAuthRetry((client) => client.listSubstitutions());
+}
+
+export async function mobileGetProfile(): Promise<MobileProfileResponse> {
+  return runWithMobileAuthRetry((client) => client.getProfile());
+}
+
+export async function mobileUpdateProfile(payload: MobileProfileUpdatePayload): Promise<MobileProfileResponse> {
+  return runWithMobileAuthRetry((client) => client.updateProfile(payload));
 }
 
 export async function mobileLogout() {

@@ -909,13 +909,24 @@ components:
         - id
         - email
         - name
+        - phone
+        - whatsapp
         - role
         - status
+        - photoUrl
         - homeCommunityId
+        - scheduleDisplayName
+        - ministryStartDate
+        - maritalStatus
+        - preferredPosition
         - preferredPositions
         - avoidPositions
         - preferredTimes
+        - availableForSpecialEvents
         - extraActivities
+        - requiresPasswordChange
+        - createdAt
+        - updatedAt
       properties:
         id:
           type: string

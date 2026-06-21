@@ -4,9 +4,11 @@ import {
   getOrCreateMobileDeviceId,
   hasStoredMobileRefreshToken,
   MOBILE_AUTH_STORAGE_KEYS,
+  mobileGetProfile,
   mobileGetCurrentQuestionnaire,
   mobileListSubstitutions,
   mobileSubmitQuestionnaireResponse,
+  mobileUpdateProfile,
   readStoredMobileAuthSession,
   storeMobileAuthResponse,
 } from "../../../client/src/lib/mobile-auth-session";
@@ -220,6 +222,94 @@ describe("mobile auth session storage", () => {
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",
           "Idempotency-Key": "idem-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("loads and updates mobile profile through the mobile contract", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const profile = {
+      id: "user-1",
+      email: "ministro@example.test",
+      name: "Ministro Demo",
+      phone: null,
+      whatsapp: null,
+      role: "ministro",
+      status: "active",
+      photoUrl: null,
+      homeCommunityId: "community-1",
+      scheduleDisplayName: null,
+      ministryStartDate: null,
+      maritalStatus: null,
+      preferredPosition: null,
+      preferredPositions: [],
+      avoidPositions: [],
+      preferredTimes: [],
+      availableForSpecialEvents: false,
+      extraActivities: {},
+      requiresPasswordChange: false,
+      createdAt: null,
+      updatedAt: null,
+    };
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        profile,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        profile: {
+          ...profile,
+          phone: "11999999999",
+          scheduleDisplayName: "M. Demo",
+        },
+      }), { status: 200 }));
+
+    await expect(mobileGetProfile())
+      .resolves.toMatchObject({ profile: { id: "user-1" } });
+    await expect(mobileUpdateProfile({
+      phone: "11999999999",
+      scheduleDisplayName: "M. Demo",
+    })).resolves.toMatchObject({
+      profile: {
+        phone: "11999999999",
+        scheduleDisplayName: "M. Demo",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/profile",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/mobile/v1/profile",
+      expect.objectContaining({
+        method: "PATCH",
+        credentials: "include",
+        body: JSON.stringify({
+          phone: "11999999999",
+          scheduleDisplayName: "M. Demo",
+        }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "Content-Type": "application/json",
           "X-Community-Id": "community-1",
           "X-Device-Id": "ios-device-1",
         }),

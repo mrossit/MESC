@@ -287,9 +287,53 @@ export interface MobileSubstitutionCreateResponse {
   substitution: MobileSubstitution;
 }
 
+export interface MobileProfile {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  whatsapp: string | null;
+  role: string;
+  status: string;
+  photoUrl: string | null;
+  homeCommunityId: string;
+  scheduleDisplayName: string | null;
+  ministryStartDate: string | null;
+  maritalStatus: string | null;
+  preferredPosition: number | null;
+  preferredPositions: number[];
+  avoidPositions: number[];
+  preferredTimes: string[];
+  availableForSpecialEvents: boolean;
+  extraActivities: Record<string, unknown>;
+  requiresPasswordChange: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface MobileProfileUpdatePayload {
+  name?: string;
+  phone?: string | null;
+  whatsapp?: string | null;
+  scheduleDisplayName?: string | null;
+  ministryStartDate?: string | null;
+  maritalStatus?: string | null;
+  preferredPosition?: number | null;
+  preferredPositions?: number[];
+  avoidPositions?: number[];
+  preferredTimes?: string[];
+  availableForSpecialEvents?: boolean;
+  extraActivities?: {
+    sickCommunion?: boolean;
+    mondayAdoration?: boolean;
+    helpOtherPastorals?: boolean;
+    festiveEvents?: boolean;
+  };
+}
+
 export interface MobileProfileResponse {
   success: true;
-  profile: Record<string, unknown>;
+  profile: MobileProfile;
 }
 
 export interface MobileDeviceUpdatePayload {
@@ -661,6 +705,15 @@ export class MescMobileApiClient {
     return this.request<MobileProfileResponse>({
       method: "GET",
       path: mobileEndpoints.profile(),
+      ...options,
+    });
+  }
+
+  async updateProfile(payload: MobileProfileUpdatePayload, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileProfileResponse>({
+      method: "PATCH",
+      path: mobileEndpoints.profile(),
+      body: payload,
       ...options,
     });
   }
