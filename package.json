@@ -16,6 +16,7 @@
     "db:studio": "drizzle-kit studio",
     "db:indexes": "NODE_ENV=production tsx scripts/add-database-indexes.ts",
     "db:migrate:mobile": "tsx scripts/apply-mobile-migrations.ts",
+    "db:validate:mobile": "tsx scripts/validate-mobile-foundation.ts",
     "db:seed:test": "NODE_ENV=development tsx test/fixtures/seedTestData.ts",
     "db:seed:mobile-demo": "tsx scripts/seed-mobile-p0-demo.ts",
     "test": "vitest",

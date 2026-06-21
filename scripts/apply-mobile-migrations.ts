@@ -71,6 +71,9 @@ async function applySqliteMigrations() {
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_revoked ON mobile_devices(revoked_at);
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_platform ON mobile_devices(platform);
 
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_mobile_devices_user_device
+        ON mobile_devices(user_id, device_id);
+
       CREATE TABLE IF NOT EXISTS mobile_refresh_tokens (
         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
         user_id TEXT NOT NULL${userReference},

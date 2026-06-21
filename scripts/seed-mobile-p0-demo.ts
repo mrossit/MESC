@@ -6,6 +6,7 @@ import { getMobileP0DemoData, MOBILE_P0_DEMO_IDS } from "../test/fixtures/mobile
 import { pathToFileURL } from "url";
 
 const demo = getMobileP0DemoData();
+const allowRemoteDemoSeed = process.env.MOBILE_DEMO_SEED === "true";
 
 function ids(values: string[]) {
   return values.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ");
@@ -20,14 +21,46 @@ function toSqliteDate(value: Date | string | null | undefined) {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+function ensureSqliteColumns(
+  sqlite: import("better-sqlite3").Database,
+  tableName: string,
+  columns: Record<string, string>,
+) {
+  const existingColumns = new Set(
+    (sqlite.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>)
+      .map((column) => column.name),
+  );
+
+  for (const [columnName, definition] of Object.entries(columns)) {
+    if (!existingColumns.has(columnName)) {
+      try {
+        sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/duplicate column name/i.test(message)) {
+          throw error;
+        }
+      }
+    }
+  }
+}
+
 async function seedPostgres(databaseUrl: string) {
+  if (!allowRemoteDemoSeed) {
+    throw new Error(
+      "Refusing to seed mobile demo data with DATABASE_URL unless MOBILE_DEMO_SEED=true is set.",
+    );
+  }
+
   const postgres = (await import("postgres")).default;
   const sql = postgres(databaseUrl, { max: 1 });
 
   try {
     await sql.begin(async (tx) => {
-      await tx`DELETE FROM substitution_requests WHERE id IN ${tx(demo.substitutions.map((item) => item.id))}`;
+      await tx`DELETE FROM substitution_requests WHERE schedule_id IN ${tx(demo.schedules.map((item) => item.id))}`;
+      await tx`DELETE FROM schedule_confirmations WHERE schedule_id IN ${tx(demo.schedules.map((item) => item.id))}`;
       await tx`DELETE FROM schedules WHERE id IN ${tx(demo.schedules.map((item) => item.id))}`;
+      await tx`DELETE FROM questionnaire_responses WHERE questionnaire_id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
       await tx`DELETE FROM questionnaires WHERE id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
       await tx`DELETE FROM users WHERE id IN ${tx(demo.users.map((item) => item.id))}`;
       await tx`DELETE FROM communities WHERE id IN ${tx(demo.communities.map((item) => item.id))}`;
@@ -126,19 +159,61 @@ async function ensureSqliteDemoSchema(sqlite: import("better-sqlite3").Database)
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
+      first_name TEXT,
+      last_name TEXT,
       password_hash TEXT,
       name TEXT NOT NULL,
       role TEXT NOT NULL,
       status TEXT NOT NULL,
       phone TEXT,
       whatsapp TEXT,
+      last_login TEXT,
+      join_date TEXT,
       photo_url TEXT,
+      image_data TEXT,
+      image_content_type TEXT,
+      family_id TEXT,
       profile_image_url TEXT,
       home_community_id TEXT NOT NULL,
+      birth_date TEXT,
+      address TEXT,
+      city TEXT,
+      zip_code TEXT,
+      marital_status TEXT,
+      baptism_date TEXT,
+      baptism_parish TEXT,
+      confirmation_date TEXT,
+      confirmation_parish TEXT,
+      marriage_date TEXT,
+      marriage_parish TEXT,
       schedule_display_name TEXT,
       preferred_position INTEGER,
       preferred_positions TEXT DEFAULT '[]',
       avoid_positions TEXT DEFAULT '[]',
+      preferred_times TEXT DEFAULT '[]',
+      available_for_special_events INTEGER DEFAULT 1,
+      can_serve_as_couple INTEGER DEFAULT 0,
+      spouse_minister_id TEXT,
+      extra_activities TEXT DEFAULT '{}',
+      ministry_start_date TEXT,
+      experience TEXT,
+      special_skills TEXT,
+      liturgical_training INTEGER DEFAULT 0,
+      last_service TEXT,
+      total_services INTEGER DEFAULT 0,
+      formation_completed INTEGER DEFAULT 0,
+      reliability_score INTEGER DEFAULT 100,
+      substitution_request_count INTEGER DEFAULT 0,
+      substitution_fulfilled_count INTEGER DEFAULT 0,
+      manual_removal_count INTEGER DEFAULT 0,
+      no_show_count INTEGER DEFAULT 0,
+      last_reliability_update TEXT,
+      reliability_notes TEXT,
+      observations TEXT,
+      minister_type TEXT,
+      approved_at TEXT,
+      approved_by_id TEXT,
+      rejection_reason TEXT,
       requires_password_change INTEGER DEFAULT 0,
       created_at TEXT,
       updated_at TEXT
@@ -183,8 +258,12 @@ async function ensureSqliteDemoSchema(sqlite: import("better-sqlite3").Database)
       submitted_at TEXT,
       updated_at TEXT,
       is_deleted INTEGER DEFAULT 0,
-      deleted_at TEXT
+      deleted_at TEXT,
+      UNIQUE(user_id, questionnaire_id)
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_questionnaire_responses_user_questionnaire
+      ON questionnaire_responses(user_id, questionnaire_id);
 
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY,
@@ -251,6 +330,23 @@ async function ensureSqliteDemoSchema(sqlite: import("better-sqlite3").Database)
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS active_sessions (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      user_id TEXT NOT NULL,
+      session_token TEXT UNIQUE NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      last_activity_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      expires_at TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      is_active INTEGER DEFAULT 1
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_active_sessions_user ON active_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_active_sessions_active ON active_sessions(is_active);
+    CREATE INDEX IF NOT EXISTS idx_active_sessions_expires ON active_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_active_sessions_activity ON active_sessions(last_activity_at);
+
     CREATE TABLE IF NOT EXISTS activity_logs (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       user_id TEXT NOT NULL,
@@ -262,6 +358,53 @@ async function ensureSqliteDemoSchema(sqlite: import("better-sqlite3").Database)
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  ensureSqliteColumns(sqlite, "users", {
+    first_name: "TEXT",
+    last_name: "TEXT",
+    profile_image_url: "TEXT",
+    last_login: "TEXT",
+    join_date: "TEXT",
+    photo_url: "TEXT",
+    image_data: "TEXT",
+    image_content_type: "TEXT",
+    family_id: "TEXT",
+    birth_date: "TEXT",
+    address: "TEXT",
+    city: "TEXT",
+    zip_code: "TEXT",
+    marital_status: "TEXT",
+    baptism_date: "TEXT",
+    baptism_parish: "TEXT",
+    confirmation_date: "TEXT",
+    confirmation_parish: "TEXT",
+    marriage_date: "TEXT",
+    marriage_parish: "TEXT",
+    preferred_times: "TEXT DEFAULT '[]'",
+    available_for_special_events: "INTEGER DEFAULT 1",
+    can_serve_as_couple: "INTEGER DEFAULT 0",
+    spouse_minister_id: "TEXT",
+    extra_activities: "TEXT DEFAULT '{}'",
+    ministry_start_date: "TEXT",
+    experience: "TEXT",
+    special_skills: "TEXT",
+    liturgical_training: "INTEGER DEFAULT 0",
+    last_service: "TEXT",
+    total_services: "INTEGER DEFAULT 0",
+    formation_completed: "INTEGER DEFAULT 0",
+    reliability_score: "INTEGER DEFAULT 100",
+    substitution_request_count: "INTEGER DEFAULT 0",
+    substitution_fulfilled_count: "INTEGER DEFAULT 0",
+    manual_removal_count: "INTEGER DEFAULT 0",
+    no_show_count: "INTEGER DEFAULT 0",
+    last_reliability_update: "TEXT",
+    reliability_notes: "TEXT",
+    observations: "TEXT",
+    minister_type: "TEXT",
+    approved_at: "TEXT",
+    approved_by_id: "TEXT",
+    rejection_reason: "TEXT",
+  });
 }
 
 async function seedSqlite() {
@@ -270,7 +413,7 @@ async function seedSqlite() {
   await ensureSqliteDemoSchema(sqlite);
 
   const deleteRows = sqlite.transaction(() => {
-    sqlite.prepare(`DELETE FROM substitution_requests WHERE id IN (${ids(demo.substitutions.map((item) => item.id))})`).run();
+    sqlite.prepare(`DELETE FROM substitution_requests WHERE schedule_id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM schedule_confirmations WHERE schedule_id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM schedules WHERE id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM questionnaire_responses WHERE questionnaire_id IN (${ids(demo.questionnaires.map((item) => item.id))})`).run();

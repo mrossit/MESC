@@ -8858,6 +8858,7 @@ init_schema();
 import { Router } from "express";
 import { eq as eq5, and as and2, sql as sql3 } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { randomUUID } from "crypto";
 var router = Router();
 var INACTIVITY_TIMEOUT_MINUTES = 10;
 var SESSION_EXPIRES_HOURS = 12;
@@ -8873,21 +8874,27 @@ router.post("/heartbeat", async (req, res) => {
 });
 async function createSession(userId, ipAddress, userAgent) {
   const sessionToken = nanoid(64);
+  const isPostgres = Boolean(process.env.DATABASE_URL);
+  const now = /* @__PURE__ */ new Date();
   const expiresAt = /* @__PURE__ */ new Date();
   expiresAt.setHours(expiresAt.getHours() + SESSION_EXPIRES_HOURS);
   try {
-    await db.update(activeSessions).set({ isActive: false }).where(
+    await db.update(activeSessions).set({ isActive: isPostgres ? false : 0 }).where(
       and2(
         eq5(activeSessions.userId, userId),
-        eq5(activeSessions.isActive, true)
+        eq5(activeSessions.isActive, isPostgres ? true : 1)
       )
     );
     await db.insert(activeSessions).values({
+      id: isPostgres ? void 0 : randomUUID(),
       userId,
       sessionToken,
+      createdAt: now,
+      lastActivityAt: now,
       expiresAt,
       ipAddress: ipAddress || null,
-      userAgent: userAgent || null
+      userAgent: userAgent || null,
+      isActive: isPostgres ? true : 1
     });
     console.log(`[SESSION] \u2705 Created - User ${userId}`);
     return sessionToken;
@@ -8940,6 +8947,7 @@ var session_default = router;
 await init_db();
 init_schema();
 init_logger();
+import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq6 } from "drizzle-orm";
 function sanitizeAuditData(data) {
   if (!data || typeof data !== "object") {
@@ -8981,14 +8989,18 @@ async function logAudit(action, metadata = {}) {
       });
       return;
     }
-    await db.insert(activityLogs).values({
+    const activityLogData = {
       userId,
       action,
       details: JSON.stringify(sanitizedMetadata),
       ipAddress: metadata.ipAddress || null,
       userAgent: metadata.userAgent || null,
       createdAt: /* @__PURE__ */ new Date()
-    });
+    };
+    if (!process.env.DATABASE_URL) {
+      activityLogData.id = randomUUID2();
+    }
+    await db.insert(activityLogs).values(activityLogData);
   } catch (error) {
     logger.error("[AUDIT] Failed to log audit entry", { error, action });
   }
@@ -9060,6 +9072,7 @@ async function auditLoginAttempt(email, success, req, reason, userId) {
 // server/utils/activityLogger.ts
 await init_db();
 init_schema();
+import { randomUUID as randomUUID3 } from "crypto";
 async function logActivity(userId, action, details, req) {
   try {
     const activityData = {
@@ -9068,6 +9081,9 @@ async function logActivity(userId, action, details, req) {
       details: details ? JSON.stringify(details) : null,
       createdAt: /* @__PURE__ */ new Date()
     };
+    if (!process.env.DATABASE_URL) {
+      activityData.id = randomUUID3();
+    }
     if (req) {
       activityData.ipAddress = req.ip || req.socket.remoteAddress || null;
       activityData.userAgent = req.get("user-agent") || null;
@@ -28611,7 +28627,7 @@ import { z as z17 } from "zod";
 
 // server/services/formationService.ts
 await init_db();
-import { randomUUID } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 import { sql as sql28 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
@@ -28999,7 +29015,7 @@ async function markLessonSectionCompleted(params) {
         "createdAt",
         "updatedAt"
       ) VALUES (
-        ${randomUUID()},
+        ${randomUUID4()},
         ${userId},
         ${lessonId},
         ${false},
@@ -29085,7 +29101,7 @@ async function markLessonCompleted(params) {
         "createdAt",
         "updatedAt"
       ) VALUES (
-        ${randomUUID()},
+        ${randomUUID4()},
         ${userId},
         ${lessonId},
         ${true},
@@ -29166,7 +29182,7 @@ async function upsertLessonProgressEntry(params) {
         "createdAt",
         "updatedAt"
       ) VALUES (
-        ${randomUUID()},
+        ${randomUUID4()},
         ${userId},
         ${lessonId},
         ${payload.isCompleted},
@@ -29710,13 +29726,14 @@ init_schema();
 init_roles();
 await init_db();
 import { Router as Router41 } from "express";
+import { randomUUID as randomUUID7 } from "crypto";
 import { z as z18 } from "zod";
 import { and as and41, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray18, lte as lte19, or as or16 } from "drizzle-orm";
 
 // server/services/mobileIdempotencyService.ts
 init_schema();
 await init_db();
-import { createHash, randomUUID as randomUUID2 } from "crypto";
+import { createHash, randomUUID as randomUUID5 } from "crypto";
 import { and as and39, eq as eq52, lte as lte18 } from "drizzle-orm";
 var IDEMPOTENCY_TTL_HOURS = 24;
 var localTablesEnsured = false;
@@ -29814,7 +29831,7 @@ async function beginMobileIdempotency(input) {
     )
   );
   const [created] = await db.insert(mobileIdempotencyKeys).values({
-    id: randomUUID2(),
+    id: randomUUID5(),
     userId: input.userId,
     idempotencyKey: input.idempotencyKey,
     method: input.method.toUpperCase(),
@@ -29882,7 +29899,7 @@ async function releaseMobileIdempotency(recordId) {
 // server/services/mobileSessionService.ts
 init_schema();
 await init_db();
-import { createHash as createHash2, randomBytes, randomUUID as randomUUID3 } from "crypto";
+import { createHash as createHash2, randomBytes, randomUUID as randomUUID6 } from "crypto";
 import { and as and40, desc as desc18, eq as eq53 } from "drizzle-orm";
 var REFRESH_TOKEN_PREFIX = "mesc_rt_";
 var REFRESH_TOKEN_BYTES = 48;
@@ -29906,11 +29923,14 @@ function getRefreshTokenExpiry(now = /* @__PURE__ */ new Date()) {
   return expiresAt;
 }
 function createServerDeviceId() {
-  return `server-${randomUUID3()}`;
+  return `server-${randomUUID6()}`;
 }
 function normalizeMobilePlatform(platform) {
   if (platform === "ios" || platform === "android") return platform;
   return "unknown";
+}
+function dbBoolean(value) {
+  return process.env.DATABASE_URL ? value : value ? 1 : 0;
 }
 function isExpired(value, now = /* @__PURE__ */ new Date()) {
   const expiresAt = value instanceof Date ? value : new Date(value);
@@ -29919,6 +29939,10 @@ function isExpired(value, now = /* @__PURE__ */ new Date()) {
 function toDate(value) {
   if (!value) return null;
   return value instanceof Date ? value : new Date(value);
+}
+function toSafeIsoDate(value) {
+  const date2 = toDate(value);
+  return date2 && !Number.isNaN(date2.getTime()) ? date2.toISOString() : null;
 }
 function sanitizeMobileDevice(device) {
   return {
@@ -29930,9 +29954,9 @@ function sanitizeMobileDevice(device) {
     pushProvider: device.pushProvider,
     biometricCapable: Boolean(device.biometricCapable),
     biometricEnabled: Boolean(device.biometricEnabled),
-    lastSeenAt: toDate(device.lastSeenAt)?.toISOString() ?? null,
-    revokedAt: toDate(device.revokedAt)?.toISOString() ?? null,
-    createdAt: toDate(device.createdAt)?.toISOString() ?? null
+    lastSeenAt: toSafeIsoDate(device.lastSeenAt),
+    revokedAt: toSafeIsoDate(device.revokedAt),
+    createdAt: toSafeIsoDate(device.createdAt)
   };
 }
 async function ensureLocalMobileTables() {
@@ -29968,6 +29992,8 @@ async function ensureLocalMobileTables() {
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_device ON mobile_devices(device_id);
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_revoked ON mobile_devices(revoked_at);
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_platform ON mobile_devices(platform);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_mobile_devices_user_device
+        ON mobile_devices(user_id, device_id);
 
       CREATE TABLE IF NOT EXISTS mobile_refresh_tokens (
         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -30012,9 +30038,9 @@ async function createOrUpdateMobileDevice(input) {
   };
   if (input.pushToken !== void 0) devicePatch.pushToken = input.pushToken;
   if (input.pushProvider !== void 0) devicePatch.pushProvider = input.pushProvider;
-  if (input.pushEnabled !== void 0) devicePatch.pushEnabled = input.pushEnabled;
-  if (input.biometricCapable !== void 0) devicePatch.biometricCapable = input.biometricCapable;
-  if (input.biometricEnabled !== void 0) devicePatch.biometricEnabled = input.biometricEnabled;
+  if (input.pushEnabled !== void 0) devicePatch.pushEnabled = dbBoolean(input.pushEnabled);
+  if (input.biometricCapable !== void 0) devicePatch.biometricCapable = dbBoolean(input.biometricCapable);
+  if (input.biometricEnabled !== void 0) devicePatch.biometricEnabled = dbBoolean(input.biometricEnabled);
   if (input.notificationPreferences !== void 0) {
     devicePatch.notificationPreferences = input.notificationPreferences;
   }
@@ -30023,17 +30049,19 @@ async function createOrUpdateMobileDevice(input) {
     return updated;
   }
   const [created] = await db.insert(mobileDevices).values({
+    ...!process.env.DATABASE_URL ? { id: randomUUID6() } : {},
     userId: input.userId,
     deviceId,
     platform,
     appVersion: input.appVersion ?? null,
     pushToken: input.pushToken ?? null,
     pushProvider: input.pushProvider ?? null,
-    pushEnabled: input.pushEnabled ?? false,
-    biometricCapable: input.biometricCapable ?? false,
-    biometricEnabled: input.biometricEnabled ?? false,
+    pushEnabled: dbBoolean(input.pushEnabled ?? false),
+    biometricCapable: dbBoolean(input.biometricCapable ?? false),
+    biometricEnabled: dbBoolean(input.biometricEnabled ?? false),
     notificationPreferences: input.notificationPreferences ?? {},
     lastSeenAt: now,
+    createdAt: now,
     updatedAt: now
   }).returning();
   return created;
@@ -30041,16 +30069,18 @@ async function createOrUpdateMobileDevice(input) {
 async function createMobileRefreshToken(input) {
   await ensureLocalMobileTables();
   const refreshToken = generateRefreshToken();
-  const tokenFamilyId = input.tokenFamilyId ?? randomUUID3();
+  const tokenFamilyId = input.tokenFamilyId ?? randomUUID6();
   const expiresAt = getRefreshTokenExpiry();
   const [record] = await db.insert(mobileRefreshTokens).values({
+    ...!process.env.DATABASE_URL ? { id: randomUUID6() } : {},
     userId: input.userId,
     deviceDbId: input.deviceDbId,
     tokenHash: hashRefreshToken(refreshToken),
     tokenFamilyId,
     expiresAt,
     ipAddress: input.ipAddress ?? null,
-    userAgent: input.userAgent ?? null
+    userAgent: input.userAgent ?? null,
+    createdAt: /* @__PURE__ */ new Date()
   }).returning();
   return {
     record,
@@ -30431,8 +30461,14 @@ function getHeader(req, name) {
 function getDeviceId(req, fallback) {
   return fallback ?? getHeader(req, "x-device-id") ?? void 0;
 }
-function dbBoolean(value) {
+function dbBoolean2(value) {
   return process.env.DATABASE_URL ? value : value ? 1 : 0;
+}
+function dbJson(value) {
+  return process.env.DATABASE_URL ? value : JSON.stringify(value ?? null);
+}
+function localUuid() {
+  return process.env.DATABASE_URL ? {} : { id: randomUUID7() };
 }
 function requireIdempotencyKey(req) {
   const idempotencyKey = parseMobileIdempotencyKey(getHeader(req, "idempotency-key"));
@@ -30556,7 +30592,7 @@ async function getAccessibleCommunities(user) {
     isMatriz: communities.isMatriz
   }).from(communities).where(
     and41(
-      eq54(communities.active, dbBoolean(true)),
+      eq54(communities.active, dbBoolean2(true)),
       isParishWide(user.role) ? void 0 : eq54(communities.id, user.homeCommunityId)
     )
   ).orderBy(desc19(communities.isMatriz), asc5(communities.name));
@@ -30582,7 +30618,7 @@ async function resolveActiveCommunity(req) {
   }).from(communities).where(
     and41(
       eq54(communities.id, communityScope.activeCommunityId),
-      eq54(communities.active, dbBoolean(true))
+      eq54(communities.active, dbBoolean2(true))
     )
   ).limit(1);
   if (!row) {
@@ -31011,7 +31047,7 @@ router41.patch("/notifications/read-all", authenticateToken, async (req, res) =>
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean(false))));
+    await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean2(false))));
     res.json({ success: true });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao marcar notificacoes como lidas");
@@ -31101,7 +31137,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
       and41(
         eq54(questionnaireResponses.questionnaireId, questionnaire.id),
         eq54(questionnaireResponses.userId, user.id),
-        eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+        eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
       )
     ).limit(1);
     res.json({
@@ -31173,22 +31209,23 @@ router41.post("/questionnaires/:id/response", authenticateToken, async (req, res
     delete standardizedResponse._alternativeTimes;
     delete standardizedResponse._preferredTime;
     const [saved] = await db.insert(questionnaireResponses).values({
+      ...localUuid(),
       userId: user.id,
       questionnaireId: questionnaire.id,
       communityId: questionnaire.communityId,
       responses: JSON.stringify(standardizedResponse),
-      availableSundays: extractedData.availableSundays,
-      preferredMassTimes: extractedData.preferredMassTimes,
-      alternativeTimes: extractedData.alternativeTimes,
-      dailyMassAvailability: extractedData.dailyMassAvailability,
-      specialEvents: extractedData.specialEvents,
-      canSubstitute: extractedData.canSubstitute,
+      availableSundays: dbJson(extractedData.availableSundays),
+      preferredMassTimes: dbJson(extractedData.preferredMassTimes),
+      alternativeTimes: dbJson(extractedData.alternativeTimes),
+      dailyMassAvailability: dbJson(extractedData.dailyMassAvailability),
+      specialEvents: dbJson(extractedData.specialEvents),
+      canSubstitute: dbBoolean2(Boolean(extractedData.canSubstitute)),
       notes: extractedData.notes,
-      unmappedResponses: processingResult.unmappedResponses,
-      processingWarnings: processingResult.warnings,
-      sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
-      isSharedResponse: false,
-      isDeleted: false,
+      unmappedResponses: dbJson(processingResult.unmappedResponses),
+      processingWarnings: dbJson(processingResult.warnings),
+      sharedWithFamilyIds: dbJson(parsed.sharedWithFamilyIds || []),
+      isSharedResponse: dbBoolean2(false),
+      isDeleted: dbBoolean2(false),
       deletedAt: null,
       submittedAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
@@ -31196,18 +31233,18 @@ router41.post("/questionnaires/:id/response", authenticateToken, async (req, res
       target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
       set: {
         responses: JSON.stringify(standardizedResponse),
-        availableSundays: extractedData.availableSundays,
-        preferredMassTimes: extractedData.preferredMassTimes,
-        alternativeTimes: extractedData.alternativeTimes,
-        dailyMassAvailability: extractedData.dailyMassAvailability,
-        specialEvents: extractedData.specialEvents,
-        canSubstitute: extractedData.canSubstitute,
+        availableSundays: dbJson(extractedData.availableSundays),
+        preferredMassTimes: dbJson(extractedData.preferredMassTimes),
+        alternativeTimes: dbJson(extractedData.alternativeTimes),
+        dailyMassAvailability: dbJson(extractedData.dailyMassAvailability),
+        specialEvents: dbJson(extractedData.specialEvents),
+        canSubstitute: dbBoolean2(Boolean(extractedData.canSubstitute)),
         notes: extractedData.notes,
-        unmappedResponses: processingResult.unmappedResponses,
-        processingWarnings: processingResult.warnings,
-        sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
-        isSharedResponse: false,
-        isDeleted: false,
+        unmappedResponses: dbJson(processingResult.unmappedResponses),
+        processingWarnings: dbJson(processingResult.warnings),
+        sharedWithFamilyIds: dbJson(parsed.sharedWithFamilyIds || []),
+        isSharedResponse: dbBoolean2(false),
+        isDeleted: dbBoolean2(false),
         deletedAt: null,
         submittedAt: /* @__PURE__ */ new Date(),
         updatedAt: /* @__PURE__ */ new Date()
@@ -31326,6 +31363,7 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
     }
     const finalSubstituteId = parsed.substituteId || null;
     const [created] = await db.insert(substitutionRequests).values({
+      ...localUuid(),
       scheduleId: schedule.id,
       requesterId: user.id,
       substituteId: finalSubstituteId,
@@ -31456,7 +31494,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       const [responseResult] = await db.select({ total: count14() }).from(questionnaireResponses).where(
         and41(
           eq54(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
-          eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+          eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
         )
       );
       responseCount = Number(responseResult?.total ?? 0);
@@ -31567,7 +31605,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       and41(
         eq54(questionnaireResponses.questionnaireId, questionnaire.id),
         eq54(questionnaireResponses.communityId, activeCommunity.id),
-        eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+        eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
       )
     ).orderBy(asc5(users.name));
     res.json({
@@ -31726,7 +31764,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
         and41(
           eq54(questionnaireResponses.questionnaireId, questionnaire.id),
           eq54(questionnaireResponses.userId, user.id),
-          eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+          eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
         )
       ).limit(1);
       if (!response) {
@@ -31886,13 +31924,16 @@ router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
     }
     const now = /* @__PURE__ */ new Date();
     const [confirmation] = await db.insert(scheduleConfirmations).values({
+      ...localUuid(),
       communityId: activeCommunity.id,
       scheduleId: schedule.id,
       ministerId: user.id,
       status: parsed.status,
+      requestedAt: now,
       respondedAt: now,
       declineReason: parsed.status === "declined" ? parsed.declineReason ?? null : null,
       notes: parsed.notes ?? null,
+      createdAt: now,
       updatedAt: now
     }).onConflictDoUpdate({
       target: [scheduleConfirmations.scheduleId, scheduleConfirmations.ministerId],

@@ -2,6 +2,7 @@ import { db } from "../db";
 import { activityLogs } from "@shared/schema";
 import { Request } from "express";
 import { AuthRequest } from "../auth";
+import { randomUUID } from "crypto";
 
 // Activity log insert data type
 interface ActivityLogData {
@@ -47,6 +48,10 @@ export async function logActivity(
       details: details ? JSON.stringify(details) : null,
       createdAt: new Date()
     };
+
+    if (!process.env.DATABASE_URL) {
+      (activityData as ActivityLogData & { id: string }).id = randomUUID();
+    }
 
     // Add request metadata if available
     if (req) {

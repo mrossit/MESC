@@ -15,6 +15,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import { db } from '../db';
 import { activityLogs, users } from '@shared/schema';
 import { AuthRequest } from '../auth';
@@ -151,15 +152,21 @@ export async function logAudit(
       return;
     }
 
-    // Salvar no banco de dados (activity_logs)
-    await db.insert(activityLogs).values({
+    const activityLogData: typeof activityLogs.$inferInsert = {
       userId,
       action,
       details: JSON.stringify(sanitizedMetadata),
       ipAddress: metadata.ipAddress || null,
       userAgent: metadata.userAgent || null,
       createdAt: new Date()
-    });
+    };
+
+    if (!process.env.DATABASE_URL) {
+      activityLogData.id = randomUUID();
+    }
+
+    // Salvar no banco de dados (activity_logs)
+    await db.insert(activityLogs).values(activityLogData);
   } catch (error) {
     // Não falhar a requisição se o log de auditoria falhar
     logger.error('[AUDIT] Failed to log audit entry', { error, action });

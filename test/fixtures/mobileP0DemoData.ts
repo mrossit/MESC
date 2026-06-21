@@ -1,4 +1,7 @@
 export const MOBILE_P0_DEMO_MONTH = "2026-07";
+export const MOBILE_P0_DEMO_PASSWORD = "MobileDemo123!";
+export const MOBILE_P0_DEMO_PASSWORD_HASH =
+  "$2b$10$NOj7/zdJacrcMeC3ZzShUuhWMpzJNdS0cqmkqzXY5wvGFSqpN2kwC";
 
 export const MOBILE_P0_DEMO_IDS = {
   communityA: "11111111-1111-4111-8111-111111111111",
@@ -10,6 +13,7 @@ export const MOBILE_P0_DEMO_IDS = {
   questionnaireA: "33333333-3333-4333-8333-333333333333",
   questionnaireB: "44444444-4444-4444-8444-444444444444",
   scheduleA: "55555555-5555-4555-8555-555555555555",
+  scheduleAForSubstitution: "99999999-9999-4999-8999-999999999999",
   scheduleB: "66666666-6666-4666-8666-666666666666",
   substitutionA: "77777777-7777-4777-8777-777777777777",
   substitutionB: "88888888-8888-4888-8888-888888888888",
@@ -47,7 +51,7 @@ export function getMobileP0DemoData() {
       {
         id: MOBILE_P0_DEMO_IDS.ministerA,
         email: "mobile.ministro.a@example.test",
-        passwordHash: "$2b$10$exampleMobileDemoHash",
+        passwordHash: MOBILE_P0_DEMO_PASSWORD_HASH,
         name: "Ana Ministra Demo",
         role: "ministro",
         status: "active",
@@ -65,7 +69,7 @@ export function getMobileP0DemoData() {
       {
         id: MOBILE_P0_DEMO_IDS.ministerB,
         email: "mobile.ministro.b@example.test",
-        passwordHash: "$2b$10$exampleMobileDemoHash",
+        passwordHash: MOBILE_P0_DEMO_PASSWORD_HASH,
         name: "Bruno Ministro Demo",
         role: "ministro",
         status: "active",
@@ -83,7 +87,7 @@ export function getMobileP0DemoData() {
       {
         id: MOBILE_P0_DEMO_IDS.coordinatorA,
         email: "mobile.coord.a@example.test",
-        passwordHash: "$2b$10$exampleMobileDemoHash",
+        passwordHash: MOBILE_P0_DEMO_PASSWORD_HASH,
         name: "Clara Coordenadora Demo",
         role: "coordenador_comunidade",
         status: "active",
@@ -101,7 +105,7 @@ export function getMobileP0DemoData() {
       {
         id: MOBILE_P0_DEMO_IDS.parishCoordinator,
         email: "mobile.paroquial@example.test",
-        passwordHash: "$2b$10$exampleMobileDemoHash",
+        passwordHash: MOBILE_P0_DEMO_PASSWORD_HASH,
         name: "Padrao Paroquial Demo",
         role: "coordenador_paroquial",
         status: "active",
@@ -192,6 +196,19 @@ export function getMobileP0DemoData() {
         position: 1,
         status: "published",
         notes: "Escala demo P0 comunidade B",
+        createdAt: now,
+      },
+      {
+        id: MOBILE_P0_DEMO_IDS.scheduleAForSubstitution,
+        communityId: MOBILE_P0_DEMO_IDS.communityA,
+        date: "2026-07-12",
+        time: "08:00",
+        type: "missa",
+        location: "Igreja Matriz",
+        ministerId: MOBILE_P0_DEMO_IDS.ministerA,
+        position: 1,
+        status: "published",
+        notes: "Escala demo livre para smoke de substituicao",
         createdAt: now,
       },
     ],

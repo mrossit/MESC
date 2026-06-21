@@ -73,6 +73,10 @@ export function normalizeMobilePlatform(platform: string | null | undefined): "i
   return "unknown";
 }
 
+function dbBoolean(value: boolean) {
+  return (process.env.DATABASE_URL ? value : value ? 1 : 0) as any;
+}
+
 export function isExpired(value: Date | string, now = new Date()): boolean {
   const expiresAt = value instanceof Date ? value : new Date(value);
   return expiresAt.getTime() <= now.getTime();
@@ -81,6 +85,11 @@ export function isExpired(value: Date | string, now = new Date()): boolean {
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   return value instanceof Date ? value : new Date(value);
+}
+
+function toSafeIsoDate(value: Date | string | null | undefined): string | null {
+  const date = toDate(value);
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 }
 
 export function sanitizeMobileDevice(device: MobileDevice) {
@@ -93,9 +102,9 @@ export function sanitizeMobileDevice(device: MobileDevice) {
     pushProvider: device.pushProvider,
     biometricCapable: Boolean(device.biometricCapable),
     biometricEnabled: Boolean(device.biometricEnabled),
-    lastSeenAt: toDate(device.lastSeenAt)?.toISOString() ?? null,
-    revokedAt: toDate(device.revokedAt)?.toISOString() ?? null,
-    createdAt: toDate(device.createdAt)?.toISOString() ?? null,
+    lastSeenAt: toSafeIsoDate(device.lastSeenAt),
+    revokedAt: toSafeIsoDate(device.revokedAt),
+    createdAt: toSafeIsoDate(device.createdAt),
   };
 }
 
@@ -134,6 +143,8 @@ async function ensureLocalMobileTables() {
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_device ON mobile_devices(device_id);
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_revoked ON mobile_devices(revoked_at);
       CREATE INDEX IF NOT EXISTS idx_mobile_devices_platform ON mobile_devices(platform);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_mobile_devices_user_device
+        ON mobile_devices(user_id, device_id);
 
       CREATE TABLE IF NOT EXISTS mobile_refresh_tokens (
         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -188,9 +199,9 @@ export async function createOrUpdateMobileDevice(input: MobileDeviceInput): Prom
 
   if (input.pushToken !== undefined) devicePatch.pushToken = input.pushToken;
   if (input.pushProvider !== undefined) devicePatch.pushProvider = input.pushProvider;
-  if (input.pushEnabled !== undefined) devicePatch.pushEnabled = input.pushEnabled;
-  if (input.biometricCapable !== undefined) devicePatch.biometricCapable = input.biometricCapable;
-  if (input.biometricEnabled !== undefined) devicePatch.biometricEnabled = input.biometricEnabled;
+  if (input.pushEnabled !== undefined) devicePatch.pushEnabled = dbBoolean(input.pushEnabled);
+  if (input.biometricCapable !== undefined) devicePatch.biometricCapable = dbBoolean(input.biometricCapable);
+  if (input.biometricEnabled !== undefined) devicePatch.biometricEnabled = dbBoolean(input.biometricEnabled);
   if (input.notificationPreferences !== undefined) {
     devicePatch.notificationPreferences = input.notificationPreferences;
   }
@@ -208,17 +219,19 @@ export async function createOrUpdateMobileDevice(input: MobileDeviceInput): Prom
   const [created] = await db
     .insert(mobileDevices)
     .values({
+      ...(!process.env.DATABASE_URL ? { id: randomUUID() } : {}),
       userId: input.userId,
       deviceId,
       platform,
       appVersion: input.appVersion ?? null,
       pushToken: input.pushToken ?? null,
       pushProvider: input.pushProvider ?? null,
-      pushEnabled: input.pushEnabled ?? false,
-      biometricCapable: input.biometricCapable ?? false,
-      biometricEnabled: input.biometricEnabled ?? false,
+      pushEnabled: dbBoolean(input.pushEnabled ?? false),
+      biometricCapable: dbBoolean(input.biometricCapable ?? false),
+      biometricEnabled: dbBoolean(input.biometricEnabled ?? false),
       notificationPreferences: input.notificationPreferences ?? {},
       lastSeenAt: now,
+      createdAt: now,
       updatedAt: now,
     })
     .returning();
@@ -242,6 +255,7 @@ async function createMobileRefreshToken(input: {
   const [record] = await db
     .insert(mobileRefreshTokens)
     .values({
+      ...(!process.env.DATABASE_URL ? { id: randomUUID() } : {}),
       userId: input.userId,
       deviceDbId: input.deviceDbId,
       tokenHash: hashRefreshToken(refreshToken),
@@ -249,6 +263,7 @@ async function createMobileRefreshToken(input: {
       expiresAt,
       ipAddress: input.ipAddress ?? null,
       userAgent: input.userAgent ?? null,
+      createdAt: new Date(),
     })
     .returning();
 

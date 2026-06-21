@@ -4,6 +4,7 @@ import { activeSessions, users } from '@shared/schema';
 import { eq, and, gt, sql } from 'drizzle-orm';
 import { authenticateToken, AuthRequest } from '../auth';
 import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 
@@ -33,8 +34,10 @@ router.post('/heartbeat', async (req, res) => {
 // POST /api/session/create - Cria sessão ao fazer login (chamada internamente)
 export async function createSession(userId: string, ipAddress?: string, userAgent?: string): Promise<string> {
   const sessionToken = nanoid(64);
+  const isPostgres = Boolean(process.env.DATABASE_URL);
 
   // Expira em 12 horas (JWT expiration)
+  const now = new Date();
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + SESSION_EXPIRES_HOURS);
 
@@ -42,21 +45,25 @@ export async function createSession(userId: string, ipAddress?: string, userAgen
     // IMPORTANTE: Desativar todas as sessões antigas deste usuário
     await db
       .update(activeSessions)
-      .set({ isActive: false })
+      .set({ isActive: (isPostgres ? false : 0) as any })
       .where(
         and(
           eq(activeSessions.userId, userId),
-          eq(activeSessions.isActive, true)
+          eq(activeSessions.isActive, (isPostgres ? true : 1) as any)
         )
       );
 
     // Criar nova sessão
     await db.insert(activeSessions).values({
+      id: isPostgres ? undefined : randomUUID(),
       userId,
       sessionToken,
+      createdAt: now,
+      lastActivityAt: now,
       expiresAt,
       ipAddress: ipAddress || null,
-      userAgent: userAgent || null
+      userAgent: userAgent || null,
+      isActive: (isPostgres ? true : 1) as any
     });
 
     console.log(`[SESSION] ✅ Created - User ${userId}`);

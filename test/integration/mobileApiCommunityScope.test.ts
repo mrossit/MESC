@@ -76,6 +76,8 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
   });
 
   afterAll(async () => {
+    if (!server) return;
+
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
         if (error) reject(error);
@@ -90,8 +92,10 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     });
 
     expect(allowed.status).toBe(200);
-    expect(allowed.body.schedules.map((schedule: { id: string }) => schedule.id))
-      .toEqual([MOBILE_P0_DEMO_IDS.scheduleA]);
+    const visibleScheduleIds = allowed.body.schedules.map((schedule: { id: string }) => schedule.id);
+    expect(visibleScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleA);
+    expect(visibleScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleAForSubstitution);
+    expect(visibleScheduleIds).not.toContain(MOBILE_P0_DEMO_IDS.scheduleB);
 
     const forbidden = await mobileGet(`/schedules/month?month=${MOBILE_P0_DEMO_MONTH}`, {
       userId: MOBILE_P0_DEMO_IDS.ministerA,

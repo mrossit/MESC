@@ -37,6 +37,12 @@ Sem `DATABASE_URL`, o comando cria as tabelas equivalentes em `local.db`:
 
 Nao usar `drizzle-kit push` em producao. O projeto ja contem guard contra esse fluxo.
 
+Validar tabelas e indices:
+
+```bash
+npm run db:validate:mobile
+```
+
 ---
 
 ## 3. Demo P0
@@ -47,6 +53,13 @@ Carregar fixtures/demo:
 npm run db:seed:mobile-demo
 ```
 
+Com `DATABASE_URL`, o seed demo e bloqueado por padrao. Em ambiente demo descartavel, usar:
+
+```bash
+MOBILE_DEMO_SEED=true DATABASE_URL="$DEMO_DATABASE_URL" npm run db:seed:mobile-demo
+MOBILE_DEMO_SEED=true DATABASE_URL="$DEMO_DATABASE_URL" npm run db:validate:mobile -- --expect-demo
+```
+
 Dados criados:
 
 - 2 comunidades;
@@ -55,8 +68,13 @@ Dados criados:
 - 1 coordenador de comunidade A;
 - 1 coordenador paroquial;
 - 2 questionarios publicados;
-- 2 escalas publicadas;
+- 3 escalas publicadas;
 - 2 pedidos de substituicao.
+
+Credencial demo local:
+
+- email: `mobile.ministro.a@example.test`;
+- senha: `MobileDemo123!`.
 
 Arquivo base: `test/fixtures/mobileP0DemoData.ts`.
 
@@ -74,6 +92,12 @@ Anti-vazamento multi-comunidade:
 
 ```bash
 npm run test:run -- test/integration/mobileApiCommunityScope.test.ts --reporter=dot
+```
+
+Smoke MVP mobile:
+
+```bash
+npm run test:run -- test/integration/mobileApiSmoke.test.ts --reporter=dot
 ```
 
 Build e tipos:

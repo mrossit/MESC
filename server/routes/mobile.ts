@@ -1,4 +1,5 @@
 import { Router, type Response } from "express";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { and, asc, count, desc, eq, gte, inArray, lte, or } from "drizzle-orm";
 import {
@@ -158,6 +159,14 @@ function getDeviceId(req: AuthRequest, fallback?: string | null): string | undef
 
 function dbBoolean(value: boolean) {
   return (process.env.DATABASE_URL ? value : value ? 1 : 0) as any;
+}
+
+function dbJson(value: unknown) {
+  return (process.env.DATABASE_URL ? value : JSON.stringify(value ?? null)) as any;
+}
+
+function localUuid() {
+  return process.env.DATABASE_URL ? {} : { id: randomUUID() };
 }
 
 function requireIdempotencyKey(req: AuthRequest): string {
@@ -1104,22 +1113,23 @@ router.post("/questionnaires/:id/response", authenticateToken, async (req: AuthR
     const [saved] = await db
       .insert(questionnaireResponses)
       .values({
+        ...localUuid(),
         userId: user.id,
         questionnaireId: questionnaire.id,
         communityId: questionnaire.communityId,
         responses: JSON.stringify(standardizedResponse) as any,
-        availableSundays: extractedData.availableSundays,
-        preferredMassTimes: extractedData.preferredMassTimes,
-        alternativeTimes: extractedData.alternativeTimes,
-        dailyMassAvailability: extractedData.dailyMassAvailability,
-        specialEvents: extractedData.specialEvents,
-        canSubstitute: extractedData.canSubstitute,
+        availableSundays: dbJson(extractedData.availableSundays),
+        preferredMassTimes: dbJson(extractedData.preferredMassTimes),
+        alternativeTimes: dbJson(extractedData.alternativeTimes),
+        dailyMassAvailability: dbJson(extractedData.dailyMassAvailability),
+        specialEvents: dbJson(extractedData.specialEvents),
+        canSubstitute: dbBoolean(Boolean(extractedData.canSubstitute)),
         notes: extractedData.notes,
-        unmappedResponses: processingResult.unmappedResponses,
-        processingWarnings: processingResult.warnings,
-        sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
-        isSharedResponse: false,
-        isDeleted: false,
+        unmappedResponses: dbJson(processingResult.unmappedResponses),
+        processingWarnings: dbJson(processingResult.warnings),
+        sharedWithFamilyIds: dbJson(parsed.sharedWithFamilyIds || []),
+        isSharedResponse: dbBoolean(false),
+        isDeleted: dbBoolean(false),
         deletedAt: null,
         submittedAt: new Date(),
         updatedAt: new Date(),
@@ -1128,18 +1138,18 @@ router.post("/questionnaires/:id/response", authenticateToken, async (req: AuthR
         target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
         set: {
           responses: JSON.stringify(standardizedResponse) as any,
-          availableSundays: extractedData.availableSundays,
-          preferredMassTimes: extractedData.preferredMassTimes,
-          alternativeTimes: extractedData.alternativeTimes,
-          dailyMassAvailability: extractedData.dailyMassAvailability,
-          specialEvents: extractedData.specialEvents,
-          canSubstitute: extractedData.canSubstitute,
+          availableSundays: dbJson(extractedData.availableSundays),
+          preferredMassTimes: dbJson(extractedData.preferredMassTimes),
+          alternativeTimes: dbJson(extractedData.alternativeTimes),
+          dailyMassAvailability: dbJson(extractedData.dailyMassAvailability),
+          specialEvents: dbJson(extractedData.specialEvents),
+          canSubstitute: dbBoolean(Boolean(extractedData.canSubstitute)),
           notes: extractedData.notes,
-          unmappedResponses: processingResult.unmappedResponses,
-          processingWarnings: processingResult.warnings,
-          sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
-          isSharedResponse: false,
-          isDeleted: false,
+          unmappedResponses: dbJson(processingResult.unmappedResponses),
+          processingWarnings: dbJson(processingResult.warnings),
+          sharedWithFamilyIds: dbJson(parsed.sharedWithFamilyIds || []),
+          isSharedResponse: dbBoolean(false),
+          isDeleted: dbBoolean(false),
           deletedAt: null,
           submittedAt: new Date(),
           updatedAt: new Date(),
@@ -1297,6 +1307,7 @@ router.post("/substitutions", authenticateToken, async (req: AuthRequest, res) =
     const [created] = await db
       .insert(substitutionRequests)
       .values({
+        ...localUuid(),
         scheduleId: schedule.id,
         requesterId: user.id,
         substituteId: finalSubstituteId,
@@ -2008,13 +2019,16 @@ router.post("/schedules/:id/confirm", authenticateToken, async (req: AuthRequest
     const [confirmation] = await db
       .insert(scheduleConfirmations)
       .values({
+        ...localUuid(),
         communityId: activeCommunity.id,
         scheduleId: schedule.id,
         ministerId: user.id,
         status: parsed.status,
+        requestedAt: now,
         respondedAt: now,
         declineReason: parsed.status === "declined" ? parsed.declineReason ?? null : null,
         notes: parsed.notes ?? null,
+        createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
