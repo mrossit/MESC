@@ -5,6 +5,7 @@ import {
   hasStoredMobileRefreshToken,
   MOBILE_AUTH_STORAGE_KEYS,
   mobileGetCurrentQuestionnaire,
+  mobileListSubstitutions,
   mobileSubmitQuestionnaireResponse,
   readStoredMobileAuthSession,
   storeMobileAuthResponse,
@@ -98,7 +99,7 @@ describe("mobile auth session storage", () => {
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId)).toBeNull();
   });
 
-  it("calls questionnaire endpoints with mobile auth headers and idempotency", async () => {
+  it("calls mobile contract endpoints with auth headers and idempotency", async () => {
     localStorage.setItem("token", "access-token-1");
     localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
     localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
@@ -123,6 +124,37 @@ describe("mobile auth session storage", () => {
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         success: true,
+        community: authResponse.communities[0],
+        substitutions: [{
+          id: "substitution-1",
+          scheduleId: "schedule-1",
+          requesterId: "user-1",
+          substituteId: null,
+          status: "available",
+          reason: "Teste",
+          urgency: "medium",
+          responseMessage: null,
+          schedule: {
+            id: "schedule-1",
+            date: "2026-07-05",
+            time: "10:00",
+            type: "Missa Dominical",
+            location: "Igreja Matriz",
+          },
+          requester: {
+            id: "user-1",
+            name: "Ministro Demo",
+            email: "ministro@example.test",
+            photoUrl: null,
+          },
+          substitute: null,
+          deepLink: "/substitutions/substitution-1",
+          createdAt: "2026-06-21T12:00:00.000Z",
+          updatedAt: "2026-06-21T12:00:00.000Z",
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
         response: {
           id: "response-1",
           questionnaireId: "questionnaire-1",
@@ -135,6 +167,14 @@ describe("mobile auth session storage", () => {
 
     await expect(mobileGetCurrentQuestionnaire({ month: "2026-07" }))
       .resolves.toMatchObject({ questionnaire: { id: "questionnaire-1" } });
+
+    await expect(mobileListSubstitutions())
+      .resolves.toMatchObject({
+        substitutions: [{
+          id: "substitution-1",
+          requester: { name: "Ministro Demo" },
+        }],
+      });
 
     await expect(mobileSubmitQuestionnaireResponse(
       "questionnaire-1",
@@ -157,6 +197,19 @@ describe("mobile auth session storage", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      "/api/mobile/v1/substitutions",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       "/api/mobile/v1/questionnaires/questionnaire-1/response",
       expect.objectContaining({
         method: "POST",

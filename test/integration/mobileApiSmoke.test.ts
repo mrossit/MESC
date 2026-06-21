@@ -167,5 +167,13 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(substitution.substitution.scheduleId)
       .toBe(MOBILE_P0_DEMO_IDS.scheduleAForSubstitution);
     expect(substitution.substitution.status).toBe("available");
+    expect(substitution.substitution.requester?.id).toBe(MOBILE_P0_DEMO_IDS.ministerA);
+
+    const substitutions = await client.listSubstitutions();
+    expect(substitutions.success).toBe(true);
+    expect(substitutions.substitutions.some((item) =>
+      item.id === substitution.substitution.id &&
+      item.requester?.id === MOBILE_P0_DEMO_IDS.ministerA,
+    )).toBe(true);
   });
 });

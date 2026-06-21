@@ -18,6 +18,7 @@ import {
   type MobileScheduleMonthResponse,
   type MobileSubstitutionCreatePayload,
   type MobileSubstitutionCreateResponse,
+  type MobileSubstitutionsResponse,
 } from "@shared/mobileClient";
 
 export const MOBILE_AUTH_STORAGE_KEYS = {
@@ -306,6 +307,10 @@ export async function mobileRequestSubstitution(
   options: MobileClientRequestOptions,
 ): Promise<MobileSubstitutionCreateResponse> {
   return runWithMobileAuthRetry((client) => client.requestSubstitution(payload, options));
+}
+
+export async function mobileListSubstitutions(): Promise<MobileSubstitutionsResponse> {
+  return runWithMobileAuthRetry((client) => client.listSubstitutions());
 }
 
 export async function mobileLogout() {

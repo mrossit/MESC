@@ -55,6 +55,17 @@ import { ptBR } from "date-fns/locale";
 import { cn, parseScheduleDate } from "@/lib/utils";
 import { formatMassTime, capitalizeFirst } from "@/features/schedules/utils/formatters";
 import { LITURGICAL_POSITIONS, getPositionDisplayName } from "@shared/constants";
+import {
+  mobileGetSchedulesMonth,
+  mobileListSubstitutions,
+  mobileRequestSubstitution,
+  shouldUseMobileAuth,
+} from "@/lib/mobile-auth-session";
+import {
+  createMobileIdempotencyKey,
+  type MobileMissionSchedule,
+  type MobileSubstitution,
+} from "@shared/mobileClient";
 
 // Definir mínimos de ministros por horário de missa
 const MINIMUM_MINISTERS: Record<string, number> = {
@@ -151,6 +162,83 @@ type SubstitutionGroup = {
   }>;
 };
 
+type CurrentUserSummary = {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  photoUrl?: string | null;
+  profilePhoto?: string | null;
+};
+
+function mobileScheduleToUpcomingAssignment(schedule: MobileMissionSchedule): UpcomingAssignment {
+  return {
+    id: schedule.id,
+    scheduleId: schedule.id,
+    date: schedule.date ?? "",
+    massTime: schedule.time,
+    position: schedule.position ?? 1,
+    confirmed: schedule.confirmationStatus === "confirmed",
+  };
+}
+
+function getMobileScheduleField(schedule: Record<string, unknown>, key: string) {
+  const value = schedule[key];
+  return typeof value === "string" ? value : "";
+}
+
+function getMobileSchedulePosition(schedule: Record<string, unknown>) {
+  const value = schedule.position;
+  return typeof value === "number" ? value : 1;
+}
+
+function mobileSubstitutionToRequest(
+  substitution: MobileSubstitution,
+  user: CurrentUserSummary | undefined,
+): SubstitutionRequest {
+  const requester = substitution.requester ?? (
+    substitution.requesterId === user?.id
+      ? {
+          id: user.id,
+          name: user.name ?? "Você",
+          email: user.email ?? "",
+          photoUrl: user.photoUrl ?? user.profilePhoto ?? null,
+        }
+      : null
+  );
+
+  return {
+    request: {
+      id: substitution.id,
+      scheduleId: substitution.scheduleId,
+      requesterId: substitution.requesterId,
+      substituteId: substitution.substituteId,
+      reason: substitution.reason ?? "Não especificado",
+      status: substitution.status as SubstitutionRequest["request"]["status"],
+      urgency: substitution.urgency,
+      createdAt: substitution.createdAt ?? new Date().toISOString(),
+      updatedAt: substitution.updatedAt ?? substitution.createdAt ?? new Date().toISOString(),
+    },
+    assignment: {
+      id: substitution.scheduleId,
+      date: getMobileScheduleField(substitution.schedule, "date"),
+      massTime: getMobileScheduleField(substitution.schedule, "time"),
+      position: getMobileSchedulePosition(substitution.schedule),
+    },
+    requestingUser: {
+      id: requester?.id ?? substitution.requesterId,
+      name: requester?.name ?? "Ministro",
+      email: requester?.email ?? "",
+      profilePhoto: requester?.photoUrl ?? null,
+    },
+    substituteUser: substitution.substitute
+      ? {
+          id: substitution.substitute.id,
+          name: substitution.substitute.name,
+        }
+      : undefined,
+  };
+}
+
 export default function Substitutions() {
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -161,6 +249,10 @@ export default function Substitutions() {
   const queryClient = useQueryClient();
   
   const isCoordinator = isAdminRole(user?.role);
+  const useNativeSubstitutions = shouldUseMobileAuth() && user?.role === "ministro";
+  const mobileSubstitutionsMonth = format(new Date(), "yyyy-MM");
+  const mobileSubstitutionsQueryKey = ["mobile", "substitutions"];
+  const mobileSchedulesQueryKey = ["mobile", "schedules-month", mobileSubstitutionsMonth];
   
   // Set default tab based on user role
   const [activeTab, setActiveTab] = useState(isCoordinator ? "pendencies" : "substitutions");
@@ -199,8 +291,29 @@ export default function Substitutions() {
       const data = await response.json();
       return data.assignments || [];
     },
-    enabled: !!user && !isCoordinator,
+    enabled: !!user && !isCoordinator && !useNativeSubstitutions,
   });
+
+  const { data: mobileSchedulesMonth, isLoading: loadingMobileSchedules } = useQuery({
+    queryKey: mobileSchedulesQueryKey,
+    queryFn: () => mobileGetSchedulesMonth({ month: mobileSubstitutionsMonth }),
+    enabled: useNativeSubstitutions,
+    staleTime: 60 * 1000,
+  });
+
+  const displayUpcomingAssignments = useMemo(() => {
+    if (!useNativeSubstitutions) return upcomingAssignments;
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return (mobileSchedulesMonth?.schedules ?? [])
+      .filter((schedule) => {
+        if (!schedule.date) return true;
+        const date = parseScheduleDate(schedule.date);
+        return Number.isNaN(date.getTime()) ? true : date >= now;
+      })
+      .map(mobileScheduleToUpcomingAssignment);
+  }, [mobileSchedulesMonth?.schedules, upcomingAssignments, useNativeSubstitutions]);
 
   // Fetch available substitutes for selected schedule
   const { data: availableSubstitutes = [], refetch: refetchAvailableSubstitutes } = useQuery<AvailableSubstitute[]>({
@@ -214,7 +327,7 @@ export default function Substitutions() {
       const result = await response.json();
       return result.data || [];
     },
-    enabled: !!selectedScheduleForRequest && requestType === "directed",
+    enabled: !!selectedScheduleForRequest && requestType === "directed" && !useNativeSubstitutions,
   });
 
   // Fetch mass pendencies (real data from backend)
@@ -232,7 +345,7 @@ export default function Substitutions() {
   });
 
   // Fetch substitution requests
-  const { data: substitutionRequests = [], isLoading: loadingRequests } = useQuery({
+  const { data: webSubstitutionRequests = [], isLoading: loadingWebRequests } = useQuery({
     queryKey: ["/api/substitutions"],
     queryFn: async () => {
       const response = await fetch("/api/substitutions", {
@@ -242,8 +355,23 @@ export default function Substitutions() {
       const data = await response.json();
       return data;
     },
-    enabled: !!user,
+    enabled: !!user && !useNativeSubstitutions,
   });
+
+  const { data: mobileSubstitutions, isLoading: loadingMobileRequests } = useQuery({
+    queryKey: mobileSubstitutionsQueryKey,
+    queryFn: () => mobileListSubstitutions(),
+    enabled: useNativeSubstitutions,
+    staleTime: 60 * 1000,
+  });
+
+  const substitutionRequests = useMemo(() => {
+    if (!useNativeSubstitutions) return webSubstitutionRequests as SubstitutionRequest[];
+    return (mobileSubstitutions?.substitutions ?? [])
+      .map((substitution) => mobileSubstitutionToRequest(substitution, user));
+  }, [mobileSubstitutions?.substitutions, useNativeSubstitutions, user, webSubstitutionRequests]);
+
+  const loadingRequests = useNativeSubstitutions ? loadingMobileRequests : loadingWebRequests;
 
   // Função auxiliar para converter horário para minutos (para ordenação)
   const timeToMinutes = (time: string): number => {
@@ -576,7 +704,7 @@ export default function Substitutions() {
       return;
     }
 
-    if (requestType === "directed" && !selectedSubstituteId) {
+    if (!useNativeSubstitutions && requestType === "directed" && !selectedSubstituteId) {
       toast({
         title: "Erro",
         description: "Por favor, selecione um ministro substituto",
@@ -587,6 +715,32 @@ export default function Substitutions() {
 
     setCreatingRequest(true);
     try {
+      if (useNativeSubstitutions) {
+        await mobileRequestSubstitution(
+          {
+            scheduleId: selectedScheduleForRequest.id,
+            reason: requestReason || null,
+          },
+          { idempotencyKey: createMobileIdempotencyKey() },
+        );
+
+        toast({
+          title: "Sucesso",
+          description: "Solicitação criada com sucesso",
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: mobileSubstitutionsQueryKey }),
+          queryClient.invalidateQueries({ queryKey: mobileSchedulesQueryKey }),
+          queryClient.invalidateQueries({ queryKey: ["mobile", "mission-home"], exact: false }),
+        ]);
+        setIsNewRequestDialogOpen(false);
+        setRequestReason("");
+        setSelectedScheduleForRequest(null);
+        setRequestType("open");
+        setSelectedSubstituteId("");
+        return;
+      }
+
       const response = await fetch("/api/substitutions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -817,7 +971,7 @@ export default function Substitutions() {
                       {/* Botões de ação */}
                       <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
                         {/* Botão para aceitar solicitação direcionada (pending com substituteId) */}
-                        {item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
+                        {!useNativeSubstitutions && item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
                           <Button
                             size="sm"
                             onClick={() => handleRespondToRequest(item)}
@@ -829,7 +983,7 @@ export default function Substitutions() {
                         )}
 
                         {/* Botão para reivindicar solicitação aberta (available OU pending sem substituteId) */}
-                        {(item.request.status === "available" || (item.request.status === "pending" && !isDirected)) && !isMyRequest && (
+                        {!useNativeSubstitutions && (item.request.status === "available" || (item.request.status === "pending" && !isDirected)) && !isMyRequest && (
                           <Button
                             size="sm"
                             variant="default"
@@ -875,7 +1029,7 @@ export default function Substitutions() {
                         )}
 
                         {/* Botão para cancelar solicitação (própria ou coordenador) */}
-                        {(item.request.status === "pending" || item.request.status === "available") && (isMyRequest || isCoordinator) && (
+                        {!useNativeSubstitutions && (item.request.status === "pending" || item.request.status === "available") && (isMyRequest || isCoordinator) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1393,7 +1547,7 @@ export default function Substitutions() {
               <Select
                 value={selectedScheduleForRequest?.id || ""}
                 onValueChange={(value) => {
-                  const schedule = upcomingAssignments.find(s => s.id === value);
+                  const schedule = displayUpcomingAssignments.find(s => s.id === value);
                   setSelectedScheduleForRequest(schedule || null);
                   if (requestType === "directed") {
                     refetchAvailableSubstitutes();
@@ -1404,7 +1558,7 @@ export default function Substitutions() {
                   <SelectValue placeholder="Escolha uma escala..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {upcomingAssignments.map((assignment) => {
+                  {displayUpcomingAssignments.map((assignment) => {
                     const assignDate = new Date(assignment.date);
                     const formattedDate = format(assignDate, "dd/MM/yyyy (EEEE)", { locale: ptBR });
                     return (
@@ -1417,30 +1571,32 @@ export default function Substitutions() {
               </Select>
             </div>
 
-            <div>
-              <Label>Tipo de Solicitação</Label>
-              <RadioGroup value={requestType} onValueChange={(value: "open" | "directed") => {
-                setRequestType(value);
-                if (value === "directed" && selectedScheduleForRequest) {
-                  refetchAvailableSubstitutes();
-                }
-              }}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="open" id="open" />
-                  <label htmlFor="open" className="text-sm font-medium cursor-pointer">
-                    Aberta (qualquer ministro pode aceitar)
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="directed" id="directed" />
-                  <label htmlFor="directed" className="text-sm font-medium cursor-pointer">
-                    Direcionada (escolher um ministro específico)
-                  </label>
-                </div>
-              </RadioGroup>
-            </div>
+            {!useNativeSubstitutions && (
+              <div>
+                <Label>Tipo de Solicitação</Label>
+                <RadioGroup value={requestType} onValueChange={(value: "open" | "directed") => {
+                  setRequestType(value);
+                  if (value === "directed" && selectedScheduleForRequest) {
+                    refetchAvailableSubstitutes();
+                  }
+                }}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="open" id="open" />
+                    <label htmlFor="open" className="text-sm font-medium cursor-pointer">
+                      Aberta (qualquer ministro pode aceitar)
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="directed" id="directed" />
+                    <label htmlFor="directed" className="text-sm font-medium cursor-pointer">
+                      Direcionada (escolher um ministro específico)
+                    </label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
 
-            {requestType === "directed" && selectedScheduleForRequest && (
+            {!useNativeSubstitutions && requestType === "directed" && selectedScheduleForRequest && (
               <div>
                 <Label>Ministro Substituto</Label>
                 {availableSubstitutes.length === 0 ? (

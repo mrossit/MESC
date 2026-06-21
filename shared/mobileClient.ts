@@ -256,9 +256,18 @@ export interface MobileSubstitution {
   urgency: "low" | "medium" | "high" | "critical";
   responseMessage: string | null;
   schedule: Record<string, unknown>;
+  requester: MobileSubstitutionUser | null;
+  substitute: MobileSubstitutionUser | null;
   deepLink: string;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+export interface MobileSubstitutionUser {
+  id: string;
+  name: string;
+  email: string;
+  photoUrl: string | null;
 }
 
 export interface MobileSubstitutionsResponse {

@@ -30534,6 +30534,28 @@ function parseStoredJson(value) {
     return value;
   }
 }
+async function loadMobileSubstitutionUsers(rows) {
+  const userIds = Array.from(new Set(
+    rows.flatMap((row) => [row.requesterId, row.substituteId]).filter((id) => Boolean(id))
+  ));
+  if (userIds.length === 0) {
+    return /* @__PURE__ */ new Map();
+  }
+  const people = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    photoUrl: users.photoUrl
+  }).from(users).where(inArray18(users.id, userIds));
+  return new Map(people.map((person) => [
+    person.id,
+    {
+      ...person,
+      name: formatMinisterName(person.name),
+      photoUrl: person.photoUrl ?? null
+    }
+  ]));
+}
 function toMobileSubstitution(row) {
   return {
     id: row.id,
@@ -30552,6 +30574,8 @@ function toMobileSubstitution(row) {
       location: row.scheduleLocation,
       deepLink: `/schedules/${row.scheduleId}`
     },
+    requester: row.requester ?? null,
+    substitute: row.substitute ?? null,
     deepLink: `/substitutions/${row.id}`,
     createdAt: toIsoDate(row.createdAt),
     updatedAt: toIsoDate(row.updatedAt)
@@ -31326,10 +31350,15 @@ router41.get("/substitutions", authenticateToken, async (req, res) => {
         )
       )
     ).orderBy(desc19(substitutionRequests.createdAt)).limit(50);
+    const usersById = await loadMobileSubstitutionUsers(rows);
     res.json({
       success: true,
       community: activeCommunity,
-      substitutions: rows.map(toMobileSubstitution)
+      substitutions: rows.map((row) => toMobileSubstitution({
+        ...row,
+        requester: usersById.get(row.requesterId) ?? null,
+        substitute: row.substituteId ? usersById.get(row.substituteId) ?? null : null
+      }))
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar substituicoes");
@@ -31397,6 +31426,7 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
       communityId: activeCommunity.id,
       idempotencyKey
     }, req);
+    const usersById = await loadMobileSubstitutionUsers([created]);
     const responseBody = {
       success: true,
       substitution: toMobileSubstitution({
@@ -31404,7 +31434,9 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
         scheduleDate: schedule.date,
         scheduleTime: schedule.time,
         scheduleType: schedule.type,
-        scheduleLocation: schedule.location
+        scheduleLocation: schedule.location,
+        requester: usersById.get(created.requesterId) ?? null,
+        substitute: created.substituteId ? usersById.get(created.substituteId) ?? null : null
       })
     };
     await completeMobileIdempotency({
@@ -31445,12 +31477,17 @@ router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
     if (!row) {
       throw new MobileHttpError(404, "Substituicao nao encontrada");
     }
-    if (!isAdmin(user.role) && row.requesterId !== user.id && row.substituteId !== user.id) {
+    if (!isAdmin(user.role) && row.requesterId !== user.id && row.substituteId !== user.id && row.status !== "available") {
       throw new MobileHttpError(403, "Sem permissao para ver esta substituicao");
     }
+    const usersById = await loadMobileSubstitutionUsers([row]);
     res.json({
       success: true,
-      substitution: toMobileSubstitution(row)
+      substitution: toMobileSubstitution({
+        ...row,
+        requester: usersById.get(row.requesterId) ?? null,
+        substitute: row.substituteId ? usersById.get(row.substituteId) ?? null : null
+      })
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar substituicao");

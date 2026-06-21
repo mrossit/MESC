@@ -1102,12 +1102,31 @@ components:
           nullable: true
         schedule:
           type: object
+        requester:
+          $ref: "#/components/schemas/SubstitutionUser"
+          nullable: true
+        substitute:
+          $ref: "#/components/schemas/SubstitutionUser"
+          nullable: true
         deepLink:
           type: string
         createdAt:
           type: string
           nullable: true
         updatedAt:
+          type: string
+          nullable: true
+    SubstitutionUser:
+      type: object
+      required: [id, name, email, photoUrl]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        photoUrl:
           type: string
           nullable: true
     ScheduleConfirmation:
