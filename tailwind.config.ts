@@ -57,15 +57,15 @@ export default {
                                 warm: '#D8DDA8'            // Mais quente
                         },
                         burgundy: {
-                                DEFAULT: '#6E130C',        // Vermelho escuro
-                                rich: '#8B1810',           // Variação mais rica
-                                deep: '#5A0F09',           // Mais profundo
-                                soft: '#A05850'            // Tom suave
+                                DEFAULT: '#722F37',        // Vinho litúrgico
+                                rich: '#8B0000',           // Vermelho litúrgico
+                                deep: '#4F1F28',           // Mais profundo
+                                soft: '#96525B'            // Tom suave
                         },
                         gold: {
-                                DEFAULT: '#D4AF37',
-                                soft: '#E6D7B8',
-                                shadow: 'rgba(212, 175, 55, 0.3)'
+                                DEFAULT: '#C5A059',
+                                soft: '#E0CC9E',
+                                shadow: 'rgba(197, 160, 89, 0.3)'
                         },
                         bronze: {
                                 DEFAULT: '#8B6F47',
@@ -78,11 +78,51 @@ export default {
                         },
                         charcoal: {
                                 DEFAULT: '#1A1A1A',
-                                brown: '#1F1B18'
+                                brown: '#222222'
                         },
                         gray: {
-                                dark: '#2A2A2A',
+                                dark: '#2C2C2C',
                                 lead: '#3E3E3E'
+                        },
+                        neutral: {
+                                peanut: 'rgb(var(--peanut) / <alpha-value>)',
+                                chalkBeige: 'rgb(var(--chalk-beige) / <alpha-value>)',
+                                whiteBeige: 'rgb(var(--white-beige) / <alpha-value>)',
+                                cream: 'rgb(var(--cream) / <alpha-value>)',
+                                neutral: 'rgb(var(--primary) / <alpha-value>)',
+                                peachCream: 'rgb(var(--peach-cream) / <alpha-value>)',
+                                textDark: 'rgb(var(--text-dark) / <alpha-value>)',
+                                textMedium: 'rgb(var(--text-medium) / <alpha-value>)',
+                                textLight: 'rgb(var(--text-light) / <alpha-value>)',
+                                accentWarm: 'rgb(var(--accent-warm) / <alpha-value>)',
+                                accentSoft: 'rgb(var(--accent-soft) / <alpha-value>)',
+                                accentNeutral: 'rgb(var(--accent-neutral) / <alpha-value>)',
+                                badgeWarm: 'rgb(var(--badge-warm) / <alpha-value>)',
+                                badgeNeutral: 'rgb(var(--badge-neutral) / <alpha-value>)',
+                                badgeLight: 'rgb(var(--badge-light) / <alpha-value>)',
+                                badgeSoft: 'rgb(var(--badge-soft) / <alpha-value>)',
+                                badgeGold: 'rgb(var(--badge-gold) / <alpha-value>)',
+                                border: 'rgb(var(--border) / <alpha-value>)'
+                        },
+                        dark: {
+                                '1': 'rgb(var(--dark-1) / <alpha-value>)',
+                                '2': 'rgb(var(--dark-2) / <alpha-value>)',
+                                '3': 'rgb(var(--dark-3) / <alpha-value>)',
+                                '4': 'rgb(var(--dark-4) / <alpha-value>)',
+                                '5': 'rgb(var(--dark-5) / <alpha-value>)',
+                                '6': 'rgb(var(--dark-6) / <alpha-value>)',
+                                '7': 'rgb(var(--dark-7) / <alpha-value>)',
+                                '8': 'rgb(var(--dark-8) / <alpha-value>)',
+                                '9': 'rgb(var(--dark-9) / <alpha-value>)',
+                                '10': 'rgb(var(--dark-10) / <alpha-value>)',
+                                gold: 'rgb(var(--dark-gold) / <alpha-value>)',
+                                terracotta: 'rgb(var(--dark-terracotta) / <alpha-value>)',
+                                copper: 'rgb(var(--dark-copper) / <alpha-value>)',
+                                bronze: 'rgb(var(--dark-bronze) / <alpha-value>)'
+                        },
+                        text: {
+                                light: 'rgb(var(--text-light) / <alpha-value>)',
+                                gold: 'rgb(var(--text-gold) / <alpha-value>)'
                         },
                         pastel: {
                                 blue: '#B8D4E3',
@@ -197,15 +237,15 @@ export default {
                         'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
                 },
                 boxShadow: {
-                        liturgical: '0 4px 20px rgba(92, 64, 51, 0.1)',
-                        sacred: '0 10px 25px -5px rgb(139 58 58 / 0.1), 0 4px 6px -2px rgb(139 58 58 / 0.05)',
-                        'sacred-lg': '0 20px 40px -5px rgb(139 58 58 / 0.15), 0 10px 15px -3px rgb(139 58 58 / 0.1)'
+                        liturgical: '0 4px 20px rgba(44, 44, 44, 0.1)',
+                        sacred: '0 10px 25px -5px rgb(114 47 55 / 0.12), 0 4px 6px -2px rgb(197 160 89 / 0.10)',
+                        'sacred-lg': '0 20px 40px -5px rgb(114 47 55 / 0.16), 0 10px 15px -3px rgb(44 44 44 / 0.10)'
                 },
                 backgroundImage: {
-                        'gradient-bg': 'linear-gradient(135deg, #F8F4ED 0%, #E9DCC9 100%)',
-                        'pattern-bg': 'radial-gradient(circle at 1px 1px, rgba(201, 168, 106, 0.1) 1px, transparent 0)',
-                        'sacred-gradient': 'linear-gradient(135deg, #8B3A3A 0%, #A05244 100%)',
-                        'gold-gradient': 'linear-gradient(135deg, #C9A86A 0%, #A07C48 100%)'
+                        'gradient-bg': 'linear-gradient(135deg, #FDFBF7 0%, #F2E9DA 100%)',
+                        'pattern-bg': 'radial-gradient(circle at 1px 1px, rgba(197, 160, 89, 0.1) 1px, transparent 0)',
+                        'sacred-gradient': 'linear-gradient(135deg, #722F37 0%, #8B0000 100%)',
+                        'gold-gradient': 'linear-gradient(135deg, #C5A059 0%, #B38F4D 100%)'
                 },
                 backgroundSize: {
                         pattern: '20px 20px'

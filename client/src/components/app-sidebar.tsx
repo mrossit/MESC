@@ -258,7 +258,7 @@ export function AppSidebar() {
               size="lg"
               asChild
               tooltip="MESC - Santuário São Judas - Ir para Dashboard"
-              className="cursor-pointer"
+              className="h-14 cursor-pointer"
             >
               <Link
                 href="/dashboard"
