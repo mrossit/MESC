@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { APP_VERSION, queryClient } from '@/lib/queryClient';
+import { clearLocalStoragePreservingSession } from '@/lib/persistent-storage';
 
 /**
  * CRITICAL: Version check hook to force cache refresh on version change
@@ -33,12 +34,8 @@ export function useVersionCheck() {
             await Promise.all(cacheNames.map(name => caches.delete(name)));
           }
 
-          // 3. Clear localStorage (preserve auth token)
-          const token = localStorage.getItem('token');
-          const userId = localStorage.getItem('userId');
-          localStorage.clear();
-          if (token) localStorage.setItem('token', token);
-          if (userId) localStorage.setItem('userId', userId);
+          // 3. Clear localStorage cache while preserving auth, biometrics and preferences.
+          clearLocalStoragePreservingSession();
 
           // 4. Update version
           localStorage.setItem('app_version', APP_VERSION);
@@ -95,12 +92,7 @@ export async function forceClearAllCaches(): Promise<void> {
     await Promise.all(cacheNames.map(name => caches.delete(name)));
   }
 
-  // Clear localStorage (preserve auth)
-  const token = localStorage.getItem('token');
-  const userId = localStorage.getItem('userId');
-  localStorage.clear();
-  if (token) localStorage.setItem('token', token);
-  if (userId) localStorage.setItem('userId', userId);
+  clearLocalStoragePreservingSession();
   localStorage.setItem('app_version', APP_VERSION);
 
   // Unregister Service Worker

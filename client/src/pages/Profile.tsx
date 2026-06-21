@@ -20,23 +20,40 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatPhoneNumber, unformatPhoneNumber } from '../utils/phone';
+import {
+  mobileGetProfile,
+  mobileUpdateProfile,
+  shouldUseMobileAuth,
+} from '../lib/mobile-auth-session';
 
 type UserProfile = {
   id: string;
   email: string;
   name: string;
-  phone?: string;
+  phone?: string | null;
   role: string;
-  profilePhoto?: string;
-  photoUrl?: string;
-  ministryStartDate?: string;
-  baptismDate?: string;
-  baptismParish?: string;
-  confirmationDate?: string;
-  confirmationParish?: string;
-  marriageDate?: string;
-  marriageParish?: string;
-  maritalStatus?: string;
+  profilePhoto?: string | null;
+  photoUrl?: string | null;
+  ministryStartDate?: string | null;
+  baptismDate?: string | null;
+  baptismParish?: string | null;
+  confirmationDate?: string | null;
+  confirmationParish?: string | null;
+  marriageDate?: string | null;
+  marriageParish?: string | null;
+  maritalStatus?: string | null;
+  scheduleDisplayName?: string | null;
+  whatsapp?: string | null;
+  homeCommunityId?: string;
+  preferredPosition?: number | null;
+  preferredPositions?: number[];
+  avoidPositions?: number[];
+  preferredTimes?: string[];
+  availableForSpecialEvents?: boolean;
+  extraActivities?: Record<string, unknown>;
+  requiresPasswordChange?: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 type FamilyMember = {
@@ -92,6 +109,8 @@ export default function Profile() {
   const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const useNativeProfile = shouldUseMobileAuth();
+  const profileQueryKey = useNativeProfile ? ['mobile', 'profile'] : ['/api/profile'];
   
   // Estado para adicionar familiar
   const [showAddFamily, setShowAddFamily] = useState(false);
@@ -100,8 +119,13 @@ export default function Profile() {
   
   // Buscar perfil do usuário
   const { data: userData, isLoading: userLoading } = useQuery({
-    queryKey: ['/api/profile'],
+    queryKey: profileQueryKey,
     queryFn: async () => {
+      if (useNativeProfile) {
+        const response = await mobileGetProfile();
+        return response.profile;
+      }
+
       const res = await fetch('/api/profile', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch profile');
       return res.json();
@@ -115,7 +139,8 @@ export default function Profile() {
       const res = await fetch('/api/profile/family', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch family');
       return res.json();
-    }
+    },
+    enabled: !useNativeProfile
   });
   
   // Buscar usuários disponíveis para adicionar como familiares
@@ -139,7 +164,7 @@ export default function Profile() {
 
       return allUsers;
     },
-    enabled: showAddFamily
+    enabled: showAddFamily && !useNativeProfile
   });
 
   // Buscar preferência da família
@@ -149,7 +174,8 @@ export default function Profile() {
       const res = await fetch('/api/profile/family-preference', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch family preference');
       return res.json();
-    }
+    },
+    enabled: !useNativeProfile
   });
 
   // Mutation para atualizar preferência da família
@@ -325,9 +351,26 @@ export default function Profile() {
         marriageDate: profile.marriageDate || null,
         marriageParish: profile.marriageParish || null,
         maritalStatus: profile.maritalStatus || null,
-        scheduleDisplayName: (profile as any).scheduleDisplayName || null
+        scheduleDisplayName: profile.scheduleDisplayName || null
       };
 
+      if (useNativeProfile) {
+        const updatedProfile = await mobileUpdateProfile({
+          name: dataToSend.name,
+          phone: dataToSend.phone,
+          scheduleDisplayName: dataToSend.scheduleDisplayName,
+          ministryStartDate: dataToSend.ministryStartDate,
+          maritalStatus: dataToSend.maritalStatus,
+        });
+
+        setProfile(updatedProfile.profile);
+        setOriginalProfile(updatedProfile.profile);
+        setSuccess('Perfil atualizado com sucesso!');
+        setIsEditing(false);
+        queryClient.invalidateQueries({ queryKey: profileQueryKey });
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+        return;
+      }
 
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -340,6 +383,7 @@ export default function Profile() {
       if (res.ok) {
         const updatedProfile = await res.json();
         setProfile(updatedProfile);
+        setOriginalProfile(updatedProfile);
         setSuccess('Perfil atualizado com sucesso!');
         setIsEditing(false);
         queryClient.invalidateQueries({ queryKey: ['/api/profile'] });
@@ -420,7 +464,7 @@ export default function Profile() {
     }
   };
   
-  const formatDate = (dateString?: string) => {
+  const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-';
     try {
       // Para evitar problemas de timezone, força horário local
@@ -469,9 +513,12 @@ export default function Profile() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
   
-  if (userLoading || familyLoading) {
+  if (userLoading || (!useNativeProfile && familyLoading)) {
     return (
-      <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
+      <Layout
+        title="Perfil do Usuário"
+        subtitle={useNativeProfile ? "Gerencie suas informações pessoais" : "Gerencie suas informações pessoais e familiares"}
+      >
         <div className="flex items-center justify-center h-96">
           <div className="text-center">Carregando perfil...</div>
         </div>
@@ -480,7 +527,10 @@ export default function Profile() {
   }
   
   return (
-    <Layout title="Perfil do Usuário" subtitle="Gerencie suas informações pessoais e familiares">
+    <Layout
+      title="Perfil do Usuário"
+      subtitle={useNativeProfile ? "Gerencie suas informações pessoais" : "Gerencie suas informações pessoais e familiares"}
+    >
       <div className="max-w-4xl mx-auto px-4 py-3 sm:p-6 overflow-x-hidden pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
         <Card className="border-opacity-30">
           <CardHeader>
@@ -488,7 +538,7 @@ export default function Profile() {
               <div className="min-w-0 flex-1">
                 <CardTitle>Meu Perfil</CardTitle>
                 <CardDescription>
-                  Gerencie suas informações pessoais e familiares
+                  {useNativeProfile ? 'Gerencie suas informações pessoais' : 'Gerencie suas informações pessoais e familiares'}
                 </CardDescription>
               </div>
               {!isEditing ? (
@@ -525,17 +575,21 @@ export default function Profile() {
             )}
             
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${useNativeProfile ? 'grid-cols-1' : 'grid-cols-3'}`}>
                 <TabsTrigger value="personal" className="text-xs sm:text-sm px-1 sm:px-3">
                   <span className="hidden sm:inline">Dados Pessoais</span>
                   <span className="sm:hidden">Dados</span>
                 </TabsTrigger>
-                <TabsTrigger value="sacraments" className="text-xs sm:text-sm px-1 sm:px-3">
-                  Sacramentos
-                </TabsTrigger>
-                <TabsTrigger value="family" className="text-xs sm:text-sm px-1 sm:px-3">
-                  Família
-                </TabsTrigger>
+                {!useNativeProfile && (
+                  <>
+                    <TabsTrigger value="sacraments" className="text-xs sm:text-sm px-1 sm:px-3">
+                      Sacramentos
+                    </TabsTrigger>
+                    <TabsTrigger value="family" className="text-xs sm:text-sm px-1 sm:px-3">
+                      Família
+                    </TabsTrigger>
+                  </>
+                )}
               </TabsList>
               
               <TabsContent value="personal" className="space-y-4">
@@ -543,12 +597,12 @@ export default function Profile() {
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <div className="relative">
                     <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
-                      <AvatarImage src={profile?.photoUrl} />
+                      <AvatarImage src={profile?.photoUrl ?? undefined} />
                       <AvatarFallback className="text-2xl">
                         {profile ? getInitials(profile.name) : '?'}
                       </AvatarFallback>
                     </Avatar>
-                    {isEditing && (
+                    {isEditing && !useNativeProfile && (
                       <>
                         <Button
                           size="sm"
@@ -619,8 +673,8 @@ export default function Profile() {
                     <Input
                       id="scheduleDisplayName"
                       type="text"
-                      value={(profile as any)?.scheduleDisplayName || ''}
-                      onChange={(e) => setProfile(prev => prev ? { ...prev, scheduleDisplayName: e.target.value } as any : null)}
+                      value={profile?.scheduleDisplayName || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, scheduleDisplayName: e.target.value } : null)}
                       disabled={!isEditing}
                       placeholder="Ex: M. Silva, João P."
                     />
@@ -659,7 +713,7 @@ export default function Profile() {
                     />
                   </div>
                   
-                  {profile?.maritalStatus === 'married' && (
+                  {!useNativeProfile && profile?.maritalStatus === 'married' && (
                     <div className="min-w-0">
                       <Label htmlFor="marriageDate">Data de Casamento</Label>
                       <Input
@@ -676,6 +730,8 @@ export default function Profile() {
                 </div>
               </TabsContent>
               
+              {!useNativeProfile && (
+                <>
               <TabsContent value="sacraments" className="space-y-4">
                 <div className="profile-form grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
                   <Card className="border min-w-0">
@@ -1005,6 +1061,8 @@ export default function Profile() {
                   </Alert>
                 )}
               </TabsContent>
+                </>
+              )}
             </Tabs>
           </CardContent>
         </Card>

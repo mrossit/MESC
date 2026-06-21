@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { getStoredAuthToken } from '@/lib/api-url';
+import { clearLocalSession } from '@/lib/persistent-storage';
 
 // Configuração: 10 MINUTOS FIXO
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutos em ms
@@ -28,11 +30,8 @@ export function useActivityMonitor() {
 
   const handleInactivity = useCallback(async () => {
 
-    // Limpa tokens e dados sensíveis
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('user');
-    sessionStorage.clear();
+    // Limpa tokens e dados sensíveis, preservando preferências e biometria.
+    clearLocalSession();
 
     // Mantém preferências do usuário (theme, etc)
     // localStorage.getItem('theme') permanece intacto
@@ -104,10 +103,7 @@ export function useActivityMonitor() {
         
         // Se estiver na página de login, apenas limpa o localStorage silenciosamente
         if (window.location.pathname === '/login') {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('session_token');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          clearLocalSession();
         } else {
           // Senão, faz o processo completo de logout
           await handleInactivity();
@@ -122,7 +118,7 @@ export function useActivityMonitor() {
   }, [handleInactivity]);
 
   const sendHeartbeat = useCallback(async () => {
-    const token = localStorage.getItem('auth_token');
+    const token = getStoredAuthToken();
 
     if (!token) return;
 

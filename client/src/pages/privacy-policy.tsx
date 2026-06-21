@@ -239,6 +239,10 @@ export default function PrivacyPolicy() {
               desnecessários ou tratados em desconformidade
             </li>
             <li>
+              <strong>Exclusão de conta:</strong> Iniciar a exclusão pelo app em
+              Configurações &gt; Conta ou pela página pública /account-deletion
+            </li>
+            <li>
               <strong>Portabilidade (V):</strong> Exportar seus dados em formato estruturado
             </li>
             <li>
@@ -392,6 +396,10 @@ export default function PrivacyPolicy() {
           <p className="mt-3">
             Você pode solicitar a exclusão antecipada dos seus dados a qualquer momento,
             ressalvados os casos de retenção obrigatória por lei.
+          </p>
+          <p className="mt-3">
+            A exclusão de conta também pode ser iniciada pelo app em Configurações &gt; Conta
+            ou pela página pública <strong>https://saojudastadeu.app/account-deletion</strong>.
           </p>
         </CardContent>
       </Card>

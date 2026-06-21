@@ -51,7 +51,7 @@ export const communities = pgTable(
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['gestor', 'reitor', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro']);
-export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending']);
+export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'pending', 'deleted']);
 export const scheduleStatusEnum = pgEnum('schedule_status', ['draft', 'published', 'completed']);
 export const scheduleTypeEnum = pgEnum('schedule_type', ['missa', 'celebracao', 'evento']);
 export const substitutionStatusEnum = pgEnum('substitution_status', ['available', 'pending', 'approved', 'rejected', 'cancelled', 'auto_approved']);
@@ -478,6 +478,86 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   uniqueIndex('push_subscriptions_endpoint_idx').on(table.endpoint),
   // Find all subscriptions for a user (sending push notifications)
   index('idx_push_subscriptions_user').on(table.userId)
+]);
+
+// Native mobile devices (iOS/Android)
+export const mobileDevices = pgTable('mobile_devices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceId: varchar('device_id', { length: 128 }).notNull(),
+  platform: varchar('platform', { length: 16 }).notNull(),
+  appVersion: varchar('app_version', { length: 64 }),
+  pushToken: text('push_token'),
+  pushProvider: varchar('push_provider', { length: 32 }),
+  pushEnabled: boolean('push_enabled').notNull().default(false),
+  notificationPreferences: jsonb('notification_preferences').$type<{
+    schedules?: boolean;
+    questionnaires?: boolean;
+    substitutions?: boolean;
+    announcements?: boolean;
+    quietHoursStart?: string;
+    quietHoursEnd?: string;
+  }>().default({}),
+  biometricCapable: boolean('biometric_capable').notNull().default(false),
+  biometricEnabled: boolean('biometric_enabled').notNull().default(false),
+  lastSeenAt: timestamp('last_seen_at').defaultNow(),
+  revokedAt: timestamp('revoked_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  unique('uq_mobile_devices_user_device').on(table.userId, table.deviceId),
+  index('idx_mobile_devices_user').on(table.userId),
+  index('idx_mobile_devices_device').on(table.deviceId),
+  index('idx_mobile_devices_revoked').on(table.revokedAt),
+  index('idx_mobile_devices_platform').on(table.platform)
+]);
+
+// Rotating refresh tokens for native mobile sessions.
+// Only hashes are stored; the plaintext token is returned once to the app.
+export const mobileRefreshTokens = pgTable('mobile_refresh_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceDbId: uuid('device_db_id').notNull().references(() => mobileDevices.id, { onDelete: 'cascade' }),
+  tokenHash: varchar('token_hash', { length: 128 }).notNull(),
+  tokenFamilyId: uuid('token_family_id').notNull().defaultRandom(),
+  replacedByTokenId: uuid('replaced_by_token_id'),
+  expiresAt: timestamp('expires_at').notNull(),
+  rotatedAt: timestamp('rotated_at'),
+  revokedAt: timestamp('revoked_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent')
+}, (table) => [
+  uniqueIndex('mobile_refresh_tokens_hash_idx').on(table.tokenHash),
+  index('idx_mobile_refresh_tokens_user').on(table.userId),
+  index('idx_mobile_refresh_tokens_device').on(table.deviceDbId),
+  index('idx_mobile_refresh_tokens_family').on(table.tokenFamilyId),
+  index('idx_mobile_refresh_tokens_expires').on(table.expiresAt),
+  index('idx_mobile_refresh_tokens_revoked').on(table.revokedAt)
+]);
+
+// Idempotency records for critical native mobile mutations.
+// Stores completed response bodies so clients can safely retry after network loss.
+export const mobileIdempotencyKeys = pgTable('mobile_idempotency_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  idempotencyKey: uuid('idempotency_key').notNull(),
+  method: varchar('method', { length: 10 }).notNull(),
+  path: varchar('path', { length: 255 }).notNull(),
+  requestHash: varchar('request_hash', { length: 128 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('in_progress'),
+  responseStatus: integer('response_status'),
+  responseBody: text('response_body'),
+  lockedAt: timestamp('locked_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  uniqueIndex('mobile_idempotency_keys_user_key_idx').on(table.userId, table.idempotencyKey),
+  index('idx_mobile_idempotency_user').on(table.userId),
+  index('idx_mobile_idempotency_status').on(table.status),
+  index('idx_mobile_idempotency_expires').on(table.expiresAt)
 ]);
 
 // Formation tracks (tracks like liturgia, espiritualidade, pratica)
@@ -1215,6 +1295,32 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   })
 }));
 
+export const mobileDevicesRelations = relations(mobileDevices, ({ one, many }) => ({
+  user: one(users, {
+    fields: [mobileDevices.userId],
+    references: [users.id]
+  }),
+  refreshTokens: many(mobileRefreshTokens)
+}));
+
+export const mobileRefreshTokensRelations = relations(mobileRefreshTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [mobileRefreshTokens.userId],
+    references: [users.id]
+  }),
+  device: one(mobileDevices, {
+    fields: [mobileRefreshTokens.deviceDbId],
+    references: [mobileDevices.id]
+  })
+}));
+
+export const mobileIdempotencyKeysRelations = relations(mobileIdempotencyKeys, ({ one }) => ({
+  user: one(users, {
+    fields: [mobileIdempotencyKeys.userId],
+    references: [users.id]
+  })
+}));
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   family: one(families, {
     fields: [users.familyId],
@@ -1232,6 +1338,9 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   formationProgress: many(formationProgress),
   activeSessions: many(activeSessions),
   activityLogs: many(activityLogs),
+  mobileDevices: many(mobileDevices),
+  mobileRefreshTokens: many(mobileRefreshTokens),
+  mobileIdempotencyKeys: many(mobileIdempotencyKeys),
   spouse: one(users, {
     fields: [users.spouseMinisterId],
     references: [users.id]
@@ -1653,6 +1762,12 @@ export type FamilyRelationship = typeof familyRelationships.$inferSelect;
 export type InsertFamilyRelationship = typeof familyRelationships.$inferInsert;
 export type ActiveSession = typeof activeSessions.$inferSelect;
 export type InsertActiveSession = typeof activeSessions.$inferInsert;
+export type MobileDevice = typeof mobileDevices.$inferSelect;
+export type InsertMobileDevice = typeof mobileDevices.$inferInsert;
+export type MobileRefreshToken = typeof mobileRefreshTokens.$inferSelect;
+export type InsertMobileRefreshToken = typeof mobileRefreshTokens.$inferInsert;
+export type MobileIdempotencyKey = typeof mobileIdempotencyKeys.$inferSelect;
+export type InsertMobileIdempotencyKey = typeof mobileIdempotencyKeys.$inferInsert;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type InsertQuestionnaire = z.infer<typeof insertQuestionnaireSchema>;
 export type QuestionnaireResponse = typeof questionnaireResponses.$inferSelect;

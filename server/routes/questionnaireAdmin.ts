@@ -6,6 +6,7 @@ import { eq, and, or, ne, gte, lte, inArray } from 'drizzle-orm';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, requireRole, AuthRequest } from '../auth';
 import { DB_MINISTER_AND_COORDINATOR_ROLES } from '@shared/roles';
+import { mobileNotificationData } from '@shared/mobileNotificationEvents';
 import { resolveWriteCommunityId } from '../utils/communityContext';
 import { storage } from '../storage';
 import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
@@ -47,6 +48,73 @@ function getMonthName(month: number): string {
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   return months[month - 1];
+}
+
+async function notifyQuestionnaireClosed(template: {
+  id: string;
+  title?: string | null;
+  month?: number | null;
+  year?: number | null;
+  targetUserIds?: unknown;
+  communityId?: string | null;
+}) {
+  try {
+    const explicitTargetUserIds = Array.isArray(template.targetUserIds)
+      ? template.targetUserIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+
+    const targetUsers = explicitTargetUserIds.length > 0
+      ? await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(
+          inArray(users.id, explicitTargetUserIds),
+          eq(users.status, 'active')
+        ))
+      : await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(
+          eq(users.role, 'ministro'),
+          eq(users.status, 'active'),
+          template.communityId ? eq(users.homeCommunityId, template.communityId) : undefined
+        ));
+
+    const recipientIds = [...new Set(targetUsers.map((user) => user.id))];
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const title = 'Questionário Encerrado';
+    const message = `O questionário ${template.title ?? 'de disponibilidade'} foi encerrado. Novas respostas não serão aceitas.`;
+
+    await Promise.all(recipientIds.map((recipientId) =>
+      storage.createNotification({
+        userId: recipientId,
+        title,
+        message,
+        type: 'announcement',
+        read: false,
+        actionUrl: '/questionnaires',
+        data: mobileNotificationData('questionnaire_closed', {
+          questionnaireId: template.id,
+          month: template.month ?? null,
+          year: template.year ?? null,
+        })
+      })
+    ));
+
+    if (pushConfig.enabled) {
+      await sendPushNotificationToUsers(recipientIds, {
+        title,
+        body: message,
+        url: '/questionnaires',
+        tag: `questionnaire-closed-${template.id}`,
+      });
+    }
+  } catch (error) {
+    logger.error('Erro ao enviar notificações de encerramento do questionário:', error);
+  }
 }
 
 /**
@@ -726,7 +794,14 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
           message: isResend 
             ? `O questionário de ${monthNames[month - 1]} de ${year} foi atualizado. Por favor, revise e atualize suas respostas se necessário.`
             : `O questionário de disponibilidade para ${monthNames[month - 1]} de ${year} está disponível. Por favor, responda o quanto antes.`,
-          type: 'announcement'
+          type: 'announcement',
+          actionUrl: '/questionnaires',
+          data: mobileNotificationData('questionnaire_published', {
+            questionnaireId: template.id,
+            month,
+            year,
+            isResend,
+          })
         });
       }
     }
@@ -808,7 +883,12 @@ router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordena
           message: `O questionário de disponibilidade para ${monthName}/${questionnaireYear} foi publicado. Por favor, preencha suas disponibilidades.`,
           type: 'announcement',
           read: false,
-          actionUrl: '/questionnaires'
+          actionUrl: '/questionnaires',
+          data: mobileNotificationData('questionnaire_published', {
+            questionnaireId: templateId,
+            month: questionnaireMonth,
+            year: questionnaireYear,
+          })
         })
       );
 
@@ -874,6 +954,8 @@ router.patch('/templates/:id/close', requireAuth, requireRole(['gestor', 'coorde
       })
       .where(eq(questionnaires.id, templateId))
       .returning();
+
+    await notifyQuestionnaireClosed(updated);
     
     res.json({
       ...updated,
@@ -1434,6 +1516,7 @@ router.get('/current-status', requireAuth, async (req: AuthRequest, res: Respons
         .returning();
 
       autoCloseTriggered = true;
+      await notifyQuestionnaireClosed(updated);
 
       return res.json({
         currentDay,

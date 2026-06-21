@@ -62,8 +62,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@/hooks/use-navigate";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { MinisterTutorial } from "@/components/minister-tutorial";
+import { mobileListNotifications, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 
 // Interface para items do menu
 interface MenuItem {
@@ -87,6 +88,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const { setOpenMobile, isMobile } = useSidebar();
+  const useNativeNotifications = shouldUseMobileAuth();
   
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -101,8 +103,16 @@ export function AppSidebar() {
   
   // Fetch unread notification count
   const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
-    enabled: !!user,
+    queryKey: useNativeNotifications
+      ? ["mobile", "notifications", "unread-count"]
+      : ["/api/notifications/unread-count"],
+    queryFn: useNativeNotifications
+      ? async () => {
+          const response = await mobileListNotifications({ limit: 1 });
+          return { count: response.unreadCount };
+        }
+      : undefined,
+    enabled: useNativeNotifications || !!user,
   });
 
   // Fetch pending users count for coordinators
@@ -128,6 +138,17 @@ export function AppSidebar() {
   const handleLogout = async () => {
     await authAPI.logout();
     navigate("/login");
+  };
+
+  const closeMobileSidebar = () => {
+    if (!isMobile) return;
+    window.requestAnimationFrame(() => setOpenMobile(false));
+  };
+
+  const navigateAndClose = (href: string, event?: MouseEvent<HTMLElement>) => {
+    event?.preventDefault();
+    navigate(href);
+    closeMobileSidebar();
   };
 
   const menuItems: MenuItem[] = [
@@ -237,15 +258,11 @@ export function AppSidebar() {
               size="lg"
               asChild
               tooltip="MESC - Santuário São Judas - Ir para Dashboard"
-              className="cursor-pointer"
+              className="h-14 cursor-pointer"
             >
-              <Link 
+              <Link
                 href="/dashboard"
-                onClick={() => {
-                  if (isMobile) {
-                    setOpenMobile(false);
-                  }
-                }}
+                onClick={(event) => navigateAndClose("/dashboard", event)}
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center">
                   <img
@@ -277,13 +294,9 @@ export function AppSidebar() {
                     tooltip={`${user.name} (${user.role})`}
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
                   >
-                    <Link 
+                    <Link
                       href="/profile"
-                      onClick={() => {
-                        if (isMobile) {
-                          setOpenMobile(false);
-                        }
-                      }}
+                      onClick={(event) => navigateAndClose("/profile", event)}
                     >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.photoUrl || undefined} />
@@ -338,13 +351,9 @@ export function AppSidebar() {
                                     asChild
                                     isActive={location === subItem.href}
                                   >
-                                    <Link 
+                                    <Link
                                       href={subItem.href}
-                                      onClick={() => {
-                                        if (isMobile) {
-                                          setOpenMobile(false);
-                                        }
-                                      }}
+                                      onClick={(event) => navigateAndClose(subItem.href, event)}
                                     >
                                       <span>{subItem.title}</span>
                                       {subItem.badge && (
@@ -368,13 +377,9 @@ export function AppSidebar() {
                       tooltip={item.title}
                       isActive={isActive}
                     >
-                      <Link 
+                      <Link
                         href={item.href!}
-                        onClick={() => {
-                          if (isMobile) {
-                            setOpenMobile(false);
-                          }
-                        }}
+                        onClick={(event) => navigateAndClose(item.href!, event)}
                       >
                         <item.icon />
                         <span>{item.title}</span>
@@ -405,19 +410,13 @@ export function AppSidebar() {
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
-                  navigate('/profile');
-                  if (isMobile) {
-                    setOpenMobile(false);
-                  }
+                  navigateAndClose('/profile');
                 }}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Meu Perfil</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  navigate('/settings');
-                  if (isMobile) {
-                    setOpenMobile(false);
-                  }
+                  navigateAndClose('/settings');
                 }}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
@@ -425,19 +424,14 @@ export function AppSidebar() {
                 {user?.role === "ministro" && (
                   <DropdownMenuItem onClick={() => {
                     setIsTutorialOpen(true);
-                    if (isMobile) {
-                      setOpenMobile(false);
-                    }
+                    closeMobileSidebar();
                   }}>
                     <HelpCircle className="mr-2 h-4 w-4" />
                     <span>Tutorial do Sistema</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => {
-                  navigate('/change-password');
-                  if (isMobile) {
-                    setOpenMobile(false);
-                  }
+                  navigateAndClose('/change-password');
                 }}>
                   <KeyRound className="mr-2 h-4 w-4" />
                   <span>Alterar Senha</span>

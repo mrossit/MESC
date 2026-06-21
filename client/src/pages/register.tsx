@@ -292,6 +292,12 @@ export default function Register() {
                     Política de Privacidade
                   </span>
                 </Link>
+                {" "}e{" "}
+                <Link href="/account-deletion">
+                  <span className="text-primary hover:underline cursor-pointer">
+                    Exclusão de Conta
+                  </span>
+                </Link>
               </p>
             </div>
           </div>

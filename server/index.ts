@@ -12,17 +12,30 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
 import { scheduleCache } from "./services/scheduleCache";
 import { getHealthStatus } from "./services/healthService";
+import { captureError, initErrorMonitoring } from "./services/errorMonitoring";
 import path from "path";
 
 // =============================================
 //  Global Error Handlers
 // =============================================
+const errorMonitoringEnabled = initErrorMonitoring();
+if (errorMonitoringEnabled) {
+  console.log("✅ Error monitoring enabled");
+}
+
 process.on("uncaughtException", (error) => {
   console.error("🚨 Uncaught Exception:", error);
+  captureError(error, {
+    tags: { source: "uncaughtException" },
+  });
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("🚨 Unhandled Rejection:", reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+    tags: { source: "unhandledRejection" },
+    extra: { promise: String(promise) },
+  });
 });
 
 const app = express();
@@ -127,12 +140,24 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       "http://127.0.0.1:5000",
     ];
 
+const isLocalDevelopmentOrigin = (origin: string): boolean => {
+  if (process.env.NODE_ENV !== "development") return false;
+
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const isAllowed = allowedOrigins.some((allowedOrigin) => {
         if (origin === allowedOrigin) return true;
+        if (isLocalDevelopmentOrigin(origin)) return true;
         if (
           origin.includes(".replit.dev") ||
           origin.includes(".replit.com") ||

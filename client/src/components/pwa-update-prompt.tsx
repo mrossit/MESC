@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, RefreshCw } from 'lucide-react';
+import { clearLocalStoragePreservingSession } from '@/lib/persistent-storage';
 
 export function PWAUpdatePrompt() {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -107,7 +108,7 @@ export function PWAUpdatePrompt() {
         names.forEach(name => caches.delete(name));
       });
     }
-    localStorage.clear();
+    clearLocalStoragePreservingSession();
     sessionStorage.clear();
     
     // Force hard reload after a short delay

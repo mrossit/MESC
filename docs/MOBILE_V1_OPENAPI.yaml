@@ -1,0 +1,1499 @@
+openapi: 3.0.3
+info:
+  title: MESC Mobile API
+  version: 1.0.0
+  description: Initial mobile-native contract for MESC Native MVP milestone 1.
+servers:
+  - url: /api/mobile/v1
+security:
+  - bearerAuth: []
+paths:
+  /app/config:
+    get:
+      summary: Read public mobile app configuration.
+      security: []
+      parameters:
+        - in: query
+          name: platform
+          schema:
+            type: string
+            enum: [ios, android]
+      responses:
+        "200":
+          description: Mobile runtime configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppConfig"
+  /auth/login:
+    post:
+      summary: Authenticate a mobile user with email and password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                keepSignedIn:
+                  type: boolean
+                  default: false
+                deviceId:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android]
+                appVersion:
+                  type: string
+      responses:
+        "200":
+          description: Authenticated mobile session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Invalid login payload.
+        "401":
+          description: Invalid credentials or inactive account.
+        "429":
+          description: Authentication rate limit exceeded.
+  /auth/refresh:
+    post:
+      summary: Rotate a mobile refresh token and return a new access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                deviceId:
+                  type: string
+      responses:
+        "200":
+          description: Rotated mobile session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Expired, reused, revoked, or invalid refresh token.
+        "429":
+          description: Refresh rate limit exceeded.
+  /auth/logout:
+    post:
+      summary: Revoke the current mobile device and its refresh tokens.
+      parameters:
+        - $ref: "#/components/parameters/DeviceHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                deviceDbId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Device session revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, revoked]
+                properties:
+                  success:
+                    type: boolean
+                  revoked:
+                    type: boolean
+  /auth/me:
+    get:
+      summary: Read the authenticated mobile user and available communities.
+      responses:
+        "200":
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, user, communities, activeCommunityId]
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/MobileUser"
+                  communities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Community"
+                  activeCommunityId:
+                    type: string
+  /devices:
+    get:
+      summary: List mobile devices registered by the authenticated user.
+      responses:
+        "200":
+          description: Registered devices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, devices]
+                properties:
+                  success:
+                    type: boolean
+                  devices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MobileDevice"
+  /devices/current:
+    put:
+      summary: Create or update the current native device registration.
+      parameters:
+        - $ref: "#/components/parameters/DeviceHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android]
+                appVersion:
+                  type: string
+                pushToken:
+                  type: string
+                  nullable: true
+                pushProvider:
+                  type: string
+                  enum: [apns, fcm]
+                  nullable: true
+                pushEnabled:
+                  type: boolean
+                biometricCapable:
+                  type: boolean
+                biometricEnabled:
+                  type: boolean
+                notificationPreferences:
+                  type: object
+      responses:
+        "200":
+          description: Current device registration.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, device]
+                properties:
+                  success:
+                    type: boolean
+                  device:
+                    $ref: "#/components/schemas/MobileDevice"
+  /devices/{id}:
+    delete:
+      summary: Revoke one registered mobile device.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Device revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, revoked]
+                properties:
+                  success:
+                    type: boolean
+                  revoked:
+                    type: boolean
+        "404":
+          description: Device not found.
+  /profile:
+    get:
+      summary: Read the authenticated user's mobile profile.
+      responses:
+        "200":
+          description: Mobile profile payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, profile]
+                properties:
+                  success:
+                    type: boolean
+                  profile:
+                    $ref: "#/components/schemas/MobileProfile"
+    patch:
+      summary: Update editable mobile profile fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                  nullable: true
+                whatsapp:
+                  type: string
+                  nullable: true
+                scheduleDisplayName:
+                  type: string
+                  nullable: true
+                ministryStartDate:
+                  type: string
+                  nullable: true
+                maritalStatus:
+                  type: string
+                  nullable: true
+                preferredPosition:
+                  type: integer
+                  nullable: true
+                preferredPositions:
+                  type: array
+                  items:
+                    type: integer
+                avoidPositions:
+                  type: array
+                  items:
+                    type: integer
+                preferredTimes:
+                  type: array
+                  items:
+                    type: string
+                availableForSpecialEvents:
+                  type: boolean
+                extraActivities:
+                  type: object
+      responses:
+        "200":
+          description: Updated mobile profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, profile]
+                properties:
+                  success:
+                    type: boolean
+                  profile:
+                    $ref: "#/components/schemas/MobileProfile"
+  /notifications:
+    get:
+      summary: List recent notifications for the authenticated user.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Notification list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, notifications, unreadCount]
+                properties:
+                  success:
+                    type: boolean
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MobileNotification"
+                  unreadCount:
+                    type: integer
+  /notifications/read-all:
+    patch:
+      summary: Mark all notifications as read.
+      responses:
+        "200":
+          description: Notifications marked as read.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+  /notifications/{id}/read:
+    patch:
+      summary: Mark one notification as read.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notification marked as read.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, notification]
+                properties:
+                  success:
+                    type: boolean
+                  notification:
+                    type: object
+                    required: [id, read, readAt]
+                    properties:
+                      id:
+                        type: string
+                      read:
+                        type: boolean
+                      readAt:
+                        type: string
+                        nullable: true
+        "404":
+          description: Notification not found for the current user.
+  /privacy/account-deletion-info:
+    get:
+      summary: Read account deletion instructions and retained/deleted data summary.
+      responses:
+        "200":
+          description: Account deletion information.
+          content:
+            application/json:
+              schema:
+                type: object
+  /questionnaires/current:
+    get:
+      summary: Read the current published questionnaire for the active community/month.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: query
+          name: month
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Current questionnaire or null when none is published.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, month, questionnaire]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  month:
+                    type: string
+                  questionnaire:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/Questionnaire"
+  /questionnaires/{id}/response:
+    post:
+      summary: Submit or update the authenticated user's questionnaire response.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [responses]
+              properties:
+                responses:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/QuestionnaireAnswer"
+                sharedWithFamilyIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Questionnaire response saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, response]
+                properties:
+                  success:
+                    type: boolean
+                  response:
+                    type: object
+        "400":
+          description: Invalid payload or missing/invalid Idempotency-Key.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /substitutions:
+    get:
+      summary: List visible substitution requests for the active community.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+      responses:
+        "200":
+          description: Visible substitution requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, substitutions]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  substitutions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Substitution"
+    post:
+      summary: Request a substitution for one of the user's schedules.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheduleId]
+              properties:
+                scheduleId:
+                  type: string
+                  format: uuid
+                substituteId:
+                  type: string
+                  nullable: true
+                reason:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Substitution request created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, substitution]
+                properties:
+                  success:
+                    type: boolean
+                  substitution:
+                    $ref: "#/components/schemas/Substitution"
+        "400":
+          description: Schedule already has an active substitution, is in the past, or Idempotency-Key is invalid.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /substitutions/{id}:
+    get:
+      summary: Read one visible substitution request.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Substitution details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, substitution]
+                properties:
+                  success:
+                    type: boolean
+                  substitution:
+                    $ref: "#/components/schemas/Substitution"
+        "403":
+          description: The user cannot see this substitution request.
+        "404":
+          description: Substitution not found.
+  /admin/community/home:
+    get:
+      summary: Read the lightweight coordinator community dashboard.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: query
+          name: month
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Coordinator community dashboard.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCommunityHome"
+        "403":
+          description: User is not a coordinator or manager.
+  /admin/questionnaires/{id}/responses:
+    get:
+      summary: Read questionnaire responses for the active coordinator community.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Questionnaire responses visible to the coordinator.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, questionnaire, responses]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  questionnaire:
+                    type: object
+                  responses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminQuestionnaireResponse"
+        "403":
+          description: User is not a coordinator or manager.
+        "404":
+          description: Questionnaire not found in the active community.
+  /admin/ministers:
+    get:
+      summary: Read a lightweight minister directory for the active community.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+      responses:
+        "200":
+          description: Community minister directory.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, ministers]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  ministers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminMinister"
+        "403":
+          description: User is not a coordinator or manager.
+  /mission/home:
+    get:
+      summary: Load the Minha Missao home payload.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: query
+          name: month
+          description: Month used for summary and current questionnaire.
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Mobile home payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionHome"
+        "401":
+          description: Missing or invalid bearer token.
+        "403":
+          description: Requested community is outside the user's scope.
+  /schedules/month:
+    get:
+      summary: List the authenticated minister's published schedules for a month.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: query
+          name: month
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Monthly schedule list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, month, schedules]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  month:
+                    type: string
+                  schedules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduleSummary"
+  /schedules/{id}:
+    get:
+      summary: Read a single schedule visible to the authenticated user.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Schedule details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, schedule]
+                properties:
+                  success:
+                    type: boolean
+                  schedule:
+                    $ref: "#/components/schemas/ScheduleDetail"
+        "403":
+          description: Schedule is outside the user's permission scope.
+        "404":
+          description: Schedule not found.
+  /schedules/{id}/confirm:
+    post:
+      summary: Confirm or decline the authenticated user's presence for a schedule.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, declined]
+                  default: confirmed
+                declineReason:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Confirmation created or updated idempotently for schedule and minister.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, confirmation, schedule]
+                properties:
+                  success:
+                    type: boolean
+                  confirmation:
+                    $ref: "#/components/schemas/ScheduleConfirmation"
+                  schedule:
+                    type: object
+        "400":
+          description: Schedule is unpublished, already in the past, or Idempotency-Key is invalid.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+        "403":
+          description: The user is not assigned to this schedule.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CommunityHeader:
+      in: header
+      name: X-Community-Id
+      schema:
+        type: string
+      required: false
+      description: Optional active community. Community-scoped users can only request their home community.
+    DeviceHeader:
+      in: header
+      name: X-Device-Id
+      schema:
+        type: string
+      required: false
+      description: Stable native device identifier generated by the app.
+    IdempotencyKeyHeader:
+      in: header
+      name: Idempotency-Key
+      schema:
+        type: string
+        format: uuid
+      required: true
+      description: UUID generated by the app for critical mobile mutations. Completed successful responses may be replayed for safe retries.
+  schemas:
+    AppConfig:
+      type: object
+      required: [apiVersion, serverTime, minimumSupported, featureFlags, links]
+      properties:
+        apiVersion:
+          type: string
+        serverTime:
+          type: string
+          format: date-time
+        platform:
+          type: string
+          nullable: true
+        minimumSupported:
+          type: object
+        featureFlags:
+          type: object
+          properties:
+            biometrics:
+              type: boolean
+            pushRegistration:
+              type: boolean
+            refreshTokenRotation:
+              type: boolean
+            coordinatorMobile:
+              type: boolean
+        links:
+          type: object
+    LoginResponse:
+      type: object
+      required: [success, auth, user, communities, activeCommunityId, device, capabilities]
+      properties:
+        success:
+          type: boolean
+        auth:
+          type: object
+          required: [tokenType, accessToken, refreshToken, refreshTokenExpiresAt, sessionToken, expiresInSeconds, keepSignedIn]
+          properties:
+            tokenType:
+              type: string
+              enum: [Bearer]
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+              nullable: true
+            refreshTokenExpiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            sessionToken:
+              type: string
+              nullable: true
+            expiresInSeconds:
+              type: integer
+              nullable: true
+            keepSignedIn:
+              type: boolean
+        user:
+          $ref: "#/components/schemas/MobileUser"
+        communities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Community"
+        activeCommunityId:
+          type: string
+        device:
+          allOf:
+            - $ref: "#/components/schemas/MobileDevice"
+            - type: object
+              properties:
+                registered:
+                  type: boolean
+        capabilities:
+          type: object
+    MobileUser:
+      type: object
+      required: [id, email, name, role, homeCommunityId, requiresPasswordChange, photoUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+        homeCommunityId:
+          type: string
+        requiresPasswordChange:
+          type: boolean
+        photoUrl:
+          type: string
+          nullable: true
+    MobileDevice:
+      type: object
+      required:
+        - id
+        - deviceId
+        - platform
+        - pushEnabled
+        - biometricCapable
+        - biometricEnabled
+        - lastSeenAt
+        - revokedAt
+        - createdAt
+      properties:
+        id:
+          type: string
+        deviceId:
+          type: string
+        platform:
+          type: string
+        appVersion:
+          type: string
+          nullable: true
+        pushEnabled:
+          type: boolean
+        pushProvider:
+          type: string
+          nullable: true
+        biometricCapable:
+          type: boolean
+        biometricEnabled:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    MobileProfile:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - phone
+        - whatsapp
+        - role
+        - status
+        - photoUrl
+        - homeCommunityId
+        - scheduleDisplayName
+        - ministryStartDate
+        - maritalStatus
+        - preferredPosition
+        - preferredPositions
+        - avoidPositions
+        - preferredTimes
+        - availableForSpecialEvents
+        - extraActivities
+        - requiresPasswordChange
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        whatsapp:
+          type: string
+          nullable: true
+        role:
+          type: string
+        status:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        homeCommunityId:
+          type: string
+        scheduleDisplayName:
+          type: string
+          nullable: true
+        ministryStartDate:
+          type: string
+          nullable: true
+        maritalStatus:
+          type: string
+          nullable: true
+        preferredPosition:
+          type: integer
+          nullable: true
+        preferredPositions:
+          type: array
+          items:
+            type: integer
+        avoidPositions:
+          type: array
+          items:
+            type: integer
+        preferredTimes:
+          type: array
+          items:
+            type: string
+        availableForSpecialEvents:
+          type: boolean
+        extraActivities:
+          type: object
+        requiresPasswordChange:
+          type: boolean
+        createdAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+    MobileNotification:
+      type: object
+      required: [id, type, eventKey, title, message, priority, read, readAt, deepLink, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        eventKey:
+          type: string
+          nullable: true
+          enum:
+            - questionnaire_published
+            - coordinator_announcement
+            - questionnaire_closed
+            - schedule_published
+            - substitution_requested
+            - substitute_accepted
+            - formation_available
+            - schedule_reminder
+        title:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        readAt:
+          type: string
+          nullable: true
+        deepLink:
+          type: string
+        createdAt:
+          type: string
+          nullable: true
+    Community:
+      type: object
+      required: [id, name, slug, colorHex, parishName, isMatriz]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        colorHex:
+          type: string
+        parishName:
+          type: string
+        isMatriz:
+          type: boolean
+    Questionnaire:
+      type: object
+      required:
+        - id
+        - title
+        - month
+        - year
+        - status
+        - questions
+        - deadline
+        - responseStatus
+        - response
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        month:
+          type: integer
+        year:
+          type: integer
+        status:
+          type: string
+        questions:
+          type: object
+        deadline:
+          type: string
+          nullable: true
+        responseStatus:
+          type: string
+          enum: [pending, answered]
+        response:
+          type: object
+          nullable: true
+    QuestionnaireAnswer:
+      type: object
+      required: [questionId, answer]
+      properties:
+        questionId:
+          type: string
+        answer:
+          oneOf:
+            - type: string
+            - type: boolean
+            - type: array
+              items:
+                type: string
+            - type: object
+        metadata:
+          type: object
+    Substitution:
+      type: object
+      required:
+        - id
+        - scheduleId
+        - requesterId
+        - status
+        - urgency
+        - schedule
+        - deepLink
+        - createdAt
+      properties:
+        id:
+          type: string
+        scheduleId:
+          type: string
+        requesterId:
+          type: string
+        substituteId:
+          type: string
+          nullable: true
+        status:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        urgency:
+          type: string
+          enum: [low, medium, high, critical]
+        responseMessage:
+          type: string
+          nullable: true
+        schedule:
+          type: object
+        requester:
+          $ref: "#/components/schemas/SubstitutionUser"
+          nullable: true
+        substitute:
+          $ref: "#/components/schemas/SubstitutionUser"
+          nullable: true
+        deepLink:
+          type: string
+        createdAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+    SubstitutionUser:
+      type: object
+      required: [id, name, email, photoUrl]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+    ScheduleConfirmation:
+      type: object
+      required: [id, scheduleId, ministerId, status, respondedAt]
+      properties:
+        id:
+          type: string
+        scheduleId:
+          type: string
+        ministerId:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, declined, no_response, no_show]
+        respondedAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+    AdminCommunityHome:
+      type: object
+      required: [success, community, month, metrics, questionnaire, coverage, substitutions]
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        month:
+          type: string
+        metrics:
+          type: object
+          required:
+            - activeMinisters
+            - publishedAssignments
+            - pendingSubstitutions
+            - questionnaireResponses
+            - questionnairePending
+          properties:
+            activeMinisters:
+              type: integer
+            publishedAssignments:
+              type: integer
+            pendingSubstitutions:
+              type: integer
+            questionnaireResponses:
+              type: integer
+            questionnairePending:
+              type: integer
+              nullable: true
+        questionnaire:
+          type: object
+          nullable: true
+        coverage:
+          type: array
+          items:
+            type: object
+            required: [date, time, type, assigned, vacancies, scheduleIds, status]
+            properties:
+              date:
+                type: string
+              time:
+                type: string
+              type:
+                type: string
+              location:
+                type: string
+                nullable: true
+              assigned:
+                type: integer
+              vacancies:
+                type: integer
+              scheduleIds:
+                type: array
+                items:
+                  type: string
+              status:
+                type: string
+                enum: [covered, needs_attention]
+        substitutions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Substitution"
+    AdminQuestionnaireResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - ministerName
+        - canSubstitute
+        - availableSundays
+        - preferredMassTimes
+        - responses
+        - submittedAt
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        ministerName:
+          type: string
+        ministerPhotoUrl:
+          type: string
+          nullable: true
+        canSubstitute:
+          type: boolean
+        availableSundays:
+          type: array
+          items:
+            type: string
+        preferredMassTimes:
+          type: array
+          items:
+            type: string
+        alternativeTimes:
+          type: array
+          items:
+            type: string
+        dailyMassAvailability:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+          nullable: true
+        processingWarnings:
+          type: array
+          items:
+            type: string
+        responses:
+          type: object
+        submittedAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+    AdminMinister:
+      type: object
+      required:
+        - id
+        - name
+        - displayName
+        - role
+        - status
+        - preferredPositions
+        - avoidPositions
+        - deepLink
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        whatsapp:
+          type: string
+          nullable: true
+        photoUrl:
+          type: string
+          nullable: true
+        preferredPosition:
+          type: integer
+          nullable: true
+        preferredPositions:
+          type: array
+          items:
+            type: integer
+        avoidPositions:
+          type: array
+          items:
+            type: integer
+        deepLink:
+          type: string
+    MissionHome:
+      type: object
+      required: [success, user, community, nextMission, pendingActions, monthlySummary, notices, sync]
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/MobileUser"
+        community:
+          $ref: "#/components/schemas/Community"
+        nextMission:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ScheduleDetail"
+        pendingActions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingAction"
+        monthlySummary:
+          type: object
+          required: [month, publishedAssignments, nextScheduleId]
+          properties:
+            month:
+              type: string
+            publishedAssignments:
+              type: integer
+            nextScheduleId:
+              type: string
+              nullable: true
+        notices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notice"
+        sync:
+          type: object
+          required: [serverTime, cacheMaxAgeSeconds]
+          properties:
+            serverTime:
+              type: string
+              format: date-time
+            cacheMaxAgeSeconds:
+              type: integer
+    ScheduleSummary:
+      type: object
+      required: [id, date, time, type, position, status, deepLink]
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          nullable: true
+        time:
+          type: string
+        type:
+          type: string
+        location:
+          type: string
+          nullable: true
+        position:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        deepLink:
+          type: string
+    ScheduleDetail:
+      allOf:
+        - $ref: "#/components/schemas/ScheduleSummary"
+        - type: object
+          properties:
+            confirmationStatus:
+              type: string
+              nullable: true
+            substitution:
+              type: object
+              nullable: true
+            canConfirm:
+              type: boolean
+            canRequestSubstitution:
+              type: boolean
+    PendingAction:
+      type: object
+      required: [id, type, title, priority, deepLink]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [questionnaire, substitution, notice]
+        title:
+          type: string
+        subtitle:
+          type: string
+        priority:
+          type: string
+          enum: [normal, high]
+        deepLink:
+          type: string
+        dueAt:
+          type: string
+          nullable: true
+    Notice:
+      type: object
+      required: [id, type, eventKey, title, message, read, deepLink, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        eventKey:
+          type: string
+          nullable: true
+          enum:
+            - questionnaire_published
+            - coordinator_announcement
+            - questionnaire_closed
+            - schedule_published
+            - substitution_requested
+            - substitute_accepted
+            - formation_available
+            - schedule_reminder
+        title:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        deepLink:
+          type: string
+        createdAt:
+          type: string
+          nullable: true

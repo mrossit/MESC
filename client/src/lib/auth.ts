@@ -1,5 +1,17 @@
-import { apiRequest } from "./queryClient";
-import { User } from "@shared/schema";
+import { apiRequest, queryClient } from "./queryClient";
+import { clearLocalSession, markSkipAutoBiometricOnce } from "./persistent-storage";
+import {
+  mobileGetMe,
+  mobileLogin,
+  mobileLogout,
+  shouldUseMobileAuth,
+} from "./mobile-auth-session";
+import type {
+  MobileAuthResponse,
+  MobileCommunity,
+  MobileMeResponse,
+  MobileUser,
+} from "@shared/mobileClient";
 
 export interface LoginCredentials {
   email: string;
@@ -22,7 +34,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: "gestor" | "reitor" | "coordenador" | "coordenador_comunidade" | "coordenador_paroquial" | "ministro";
-  status: "pending" | "active" | "inactive";
+  status: "pending" | "active" | "inactive" | "deleted";
   /** Comunidade-casa do usuário (multi-comunidade). Usado a partir da Fase 3. */
   homeCommunityId?: string;
   requiresPasswordChange?: boolean;
@@ -42,13 +54,18 @@ export interface AuthUser {
 export interface AuthResponse {
   success: boolean;
   user?: AuthUser;
+  communities?: MobileCommunity[];
+  activeCommunityId?: string;
   message?: string;
 }
 
 export interface LoginResponse {
   success: boolean;
   token?: string;
+  sessionToken?: string | null;
   user?: AuthUser;
+  communities?: MobileCommunity[];
+  activeCommunityId?: string;
   message?: string;
 }
 
@@ -69,7 +86,7 @@ export function isValidAuthUser(user: unknown): user is AuthUser {
     typeof u.role === 'string' &&
     ['gestor', 'reitor', 'coordenador', 'coordenador_comunidade', 'coordenador_paroquial', 'ministro'].includes(u.role as string) &&
     typeof u.status === 'string' &&
-    ['pending', 'active', 'inactive'].includes(u.status as string)
+    ['pending', 'active', 'inactive', 'deleted'].includes(u.status as string)
   );
 }
 
@@ -92,9 +109,66 @@ export function safeGetUserProperty<K extends keyof AuthUser>(
   return fallback;
 }
 
+const AUTH_ROLES: AuthUser["role"][] = [
+  "gestor",
+  "reitor",
+  "coordenador",
+  "coordenador_comunidade",
+  "coordenador_paroquial",
+  "ministro",
+];
+
+function toAuthRole(role: string): AuthUser["role"] {
+  return AUTH_ROLES.includes(role as AuthUser["role"])
+    ? role as AuthUser["role"]
+    : "ministro";
+}
+
+function mobileUserToAuthUser(user: MobileUser): AuthUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: toAuthRole(user.role),
+    status: "active",
+    homeCommunityId: user.homeCommunityId,
+    requiresPasswordChange: user.requiresPasswordChange,
+    photoUrl: user.photoUrl,
+    profilePhoto: user.photoUrl ?? undefined,
+  };
+}
+
+function mobileLoginToAuthResponse(response: MobileAuthResponse): LoginResponse & { user: AuthUser } {
+  return {
+    success: true,
+    token: response.auth.accessToken,
+    sessionToken: response.auth.sessionToken,
+    user: mobileUserToAuthUser(response.user),
+    communities: response.communities,
+    activeCommunityId: response.activeCommunityId,
+  };
+}
+
+function mobileMeToAuthResponse(response: MobileMeResponse): AuthResponse & { user: AuthUser } {
+  return {
+    success: true,
+    user: mobileUserToAuthUser(response.user),
+    communities: response.communities,
+    activeCommunityId: response.activeCommunityId,
+  };
+}
+
 export const authAPI = {
   async login(credentials: LoginCredentials): Promise<{ user: AuthUser }> {
     try {
+      if (shouldUseMobileAuth()) {
+        return mobileLoginToAuthResponse(await mobileLogin({
+          email: credentials.email,
+          password: credentials.password,
+          keepSignedIn: credentials.rememberMe ?? false,
+        }));
+      }
+
       const response = await apiRequest("POST", "/api/auth/login", credentials);
       const data = await response.json();
 
@@ -143,19 +217,32 @@ export const authAPI = {
   },
 
   async logout(): Promise<{ message: string }> {
-    // Limpa todos os tokens antes de fazer logout
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('user');
-    sessionStorage.clear();
+    let result: { message: string } = { message: "Logout realizado com sucesso" };
 
-    const response = await apiRequest("POST", "/api/auth/logout");
-    return response.json();
+    try {
+      if (shouldUseMobileAuth()) {
+        await mobileLogout();
+      } else {
+        const response = await apiRequest("POST", "/api/auth/logout");
+        result = await response.json();
+      }
+    } catch {
+      // Mesmo offline ou com sessao expirada, sair deve sempre limpar a sessao local.
+    } finally {
+      clearLocalSession();
+      markSkipAutoBiometricOnce();
+      queryClient.clear();
+    }
+
+    return result;
   },
 
   async getMe(): Promise<{ user: AuthUser }> {
     try {
+      if (shouldUseMobileAuth()) {
+        return mobileMeToAuthResponse(await mobileGetMe());
+      }
+
       const response = await apiRequest("GET", "/api/auth/me");
       const data = await response.json();
       return data;

@@ -8,7 +8,9 @@ import {
   notifications,
   familyRelationships
 } from '@shared/schema';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, inArray, or } from 'drizzle-orm';
+import { mobileNotificationData } from '@shared/mobileNotificationEvents';
+import { pushConfig, sendPushNotificationToUsers } from '../utils/pushNotifications';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
 import { isAdmin as isAdminRole } from '@shared/roles';
@@ -226,7 +228,13 @@ router.post('/templates', requireAuth, requireRole(['coordenador', 'gestor']), a
             userId: minister.id,
             title: 'Novo Questionário Disponível',
             message: `O questionário de disponibilidade para ${monthNames[month - 1]} de ${year} está disponível. Por favor, responda o quanto antes.`,
-            type: 'announcement'
+            type: 'announcement',
+            actionUrl: '/questionnaires',
+            data: mobileNotificationData('questionnaire_published', {
+              questionnaireId: created.id,
+              month,
+              year,
+            })
           });
         }
       }
@@ -1146,6 +1154,64 @@ router.patch('/admin/templates/:id/close', requireAuth, requireRole(['coordenado
       })
       .where(eq(questionnaires.id, templateId))
       .returning();
+
+    try {
+      const explicitTargetUserIds = Array.isArray(existingTemplate.targetUserIds)
+        ? existingTemplate.targetUserIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+        : [];
+
+      const targetUsers = explicitTargetUserIds.length > 0
+        ? await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(
+            inArray(users.id, explicitTargetUserIds),
+            eq(users.status, 'active')
+          ))
+        : await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(
+            eq(users.role, 'ministro'),
+            eq(users.status, 'active'),
+            existingTemplate.communityId
+              ? eq(users.homeCommunityId, existingTemplate.communityId)
+              : undefined
+          ));
+
+      const recipientIds = [...new Set(targetUsers.map((user) => user.id))];
+      if (recipientIds.length > 0) {
+        const title = 'Questionário Encerrado';
+        const message = `O questionário ${existingTemplate.title ?? 'de disponibilidade'} foi encerrado. Novas respostas não serão aceitas.`;
+
+        await Promise.all(recipientIds.map((recipientId) =>
+          db.insert(notifications).values({
+            userId: recipientId,
+            title,
+            message,
+            type: 'announcement',
+            read: false,
+            actionUrl: '/questionnaires',
+            data: mobileNotificationData('questionnaire_closed', {
+              questionnaireId: templateId,
+              month: existingTemplate.month,
+              year: existingTemplate.year,
+            })
+          })
+        ));
+
+        if (pushConfig.enabled) {
+          await sendPushNotificationToUsers(recipientIds, {
+            title,
+            body: message,
+            url: '/questionnaires',
+            tag: `questionnaire-closed-${templateId}`,
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error sending questionnaire close notifications:', notificationError);
+    }
 
     res.json({
       ...updated,

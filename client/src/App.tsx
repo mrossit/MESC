@@ -14,11 +14,30 @@ import { checkInactivityAndClear } from "@/lib/version";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { SessionIndicator } from "@/components/SessionIndicator";
+import { SentryErrorBoundary } from "@/lib/monitoring";
 
 // Loading fallback component
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
+
+const AppErrorFallback = () => (
+  <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
+    <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 text-center shadow-sm">
+      <h1 className="text-xl font-semibold">Algo saiu do previsto</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Recarregue a página. Se continuar acontecendo, a coordenação já poderá analisar o erro.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+      >
+        Recarregar
+      </button>
+    </div>
   </div>
 );
 
@@ -28,6 +47,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsOfUse from "@/pages/terms-of-use";
+import AccountDeletion from "@/pages/account-deletion";
 
 // Protected pages - lazy load to reduce initial bundle
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -71,6 +91,7 @@ function RouterWithHooks() {
         <Route path="/register" component={() => <Register />} />
         <Route path="/privacy-policy" component={() => <PrivacyPolicy />} />
         <Route path="/terms-of-use" component={() => <TermsOfUse />} />
+        <Route path="/account-deletion" component={() => <AccountDeletion />} />
 
         {/* Protected routes - lazy loaded */}
         <Route path="/change-password" component={() => <ChangePassword />} />
@@ -219,17 +240,19 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="mesc-ui-theme">
-        <TooltipProvider>
-          <SessionIndicator />
-          <Toaster />
-          <UpdateNotification />
-          <PWAInstallPrompt />
-          <RouterWithHooks />
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <SentryErrorBoundary fallback={<AppErrorFallback />}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="system" storageKey="mesc-ui-theme">
+          <TooltipProvider>
+            <SessionIndicator />
+            <Toaster />
+            <UpdateNotification />
+            <PWAInstallPrompt />
+            <RouterWithHooks />
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </SentryErrorBoundary>
   );
 }
 

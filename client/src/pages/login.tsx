@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,28 +15,60 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Church, Eye, EyeOff, Clock, MessageCircle, UserCheck, Mail } from "lucide-react";
-import { authAPI } from "@/lib/auth";
+import { Eye, EyeOff, Clock, Fingerprint, MessageCircle, ShieldCheck, UserCheck, Mail } from "lucide-react";
+import { authAPI, type AuthUser } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
+import { clearLocalSession, consumeSkipAutoBiometricOnce } from "@/lib/persistent-storage";
+import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
+import {
+  enableNativeBiometricLogin,
+  getNativeBiometricStatus,
+  unlockNativeBiometricLogin,
+  type NativeBiometricStatus,
+} from "@/lib/native-biometric-auth";
+
+const AUTO_BIOMETRIC_ATTEMPTED_KEY = "mesc_auto_biometric_attempted";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showPendingDialog, setShowPendingDialog] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [pendingUserEmail, setPendingUserEmail] = useState("");
+  const [pendingLoginUser, setPendingLoginUser] = useState<AuthUser | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const [biometricStatus, setBiometricStatus] = useState<NativeBiometricStatus | null>(null);
+  const [biometricBusy, setBiometricBusy] = useState(false);
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
   });
+  const autoBiometricAttemptRef = useRef(false);
+  const manualLoginInProgressRef = useRef(false);
+  const userStartedTypingRef = useRef(false);
+  const biometricPromptResolvingRef = useRef(false);
 
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
   const inactivityReason = searchParams.get('reason') === 'inactivity';
 
   const queryClient = useQueryClient();
+
+  const refreshBiometricStatus = async () => {
+    const status = await getNativeBiometricStatus();
+    setBiometricStatus(status);
+    return status;
+  };
+
+  const finishLogin = (user: AuthUser) => {
+    toast({
+      title: "Login realizado com sucesso",
+      description: `Bem-vindo(a), ${user.name}!`,
+    });
+    navigate("/dashboard");
+  };
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -72,7 +104,8 @@ export default function Login() {
     mutationFn: (creds: typeof credentials) => {
       return authAPI.login({ ...creds, rememberMe });
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      manualLoginInProgressRef.current = false;
       
       // Set the user data in the cache immediately
       queryClient.setQueryData(["/api/auth/me"], data);
@@ -85,14 +118,17 @@ export default function Login() {
         });
         navigate("/change-password");
       } else {
-        toast({
-          title: "Login realizado com sucesso",
-          description: `Bem-vindo(a), ${data.user.name}!`,
-        });
-        navigate("/dashboard");
+        const status = await refreshBiometricStatus();
+        if (status.native && status.available && !status.enabled) {
+          setPendingLoginUser(data.user);
+          setShowBiometricPrompt(true);
+          return;
+        }
+        finishLogin(data.user);
       }
     },
     onError: (error: Error) => {
+      manualLoginInProgressRef.current = false;
       // Verifica se é erro de conta pendente
       if (error.message === "Account pending approval") {
         setPendingUserEmail(credentials.email);
@@ -109,12 +145,10 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    manualLoginInProgressRef.current = true;
     
     // Limpar tokens antigos antes de fazer novo login
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearLocalSession();
     
     loginMutation.mutate(credentials);
   };
@@ -127,31 +161,176 @@ export default function Login() {
   };
 
   const handleInputChange = (field: keyof typeof credentials, value: string) => {
+    userStartedTypingRef.current = true;
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleBiometricUnlock = async () => {
+    setBiometricBusy(true);
+    try {
+      await unlockNativeBiometricLogin();
+      const data = await authAPI.getMe();
+      queryClient.setQueryData(["/api/auth/me"], data);
+      finishLogin(data.user);
+    } catch (error) {
+      clearLocalSession();
+      const message = error instanceof Error
+        ? error.message
+        : "Nao foi possivel entrar com biometria. Use email e senha.";
+      toast({
+        title: "Biometria indisponivel",
+        description: message,
+        variant: "destructive",
+      });
+      void refreshBiometricStatus();
+    } finally {
+      setBiometricBusy(false);
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    if (!pendingLoginUser) return;
+
+    const user = pendingLoginUser;
+    setBiometricBusy(true);
+    try {
+      const status = await enableNativeBiometricLogin(user.email);
+      setBiometricStatus(status);
+      toast({
+        title: "Biometria ativada",
+        description: `Na proxima entrada, voce podera usar ${status.label}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Nao foi possivel ativar",
+        description: error instanceof Error ? error.message : "Tente novamente em Configuracoes.",
+        variant: "destructive",
+      });
+    } finally {
+      biometricPromptResolvingRef.current = true;
+      setBiometricBusy(false);
+      setShowBiometricPrompt(false);
+      setPendingLoginUser(null);
+      finishLogin(user);
+      window.setTimeout(() => {
+        biometricPromptResolvingRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handleSkipBiometric = () => {
+    const user = pendingLoginUser;
+    setShowBiometricPrompt(false);
+    setPendingLoginUser(null);
+    if (user) finishLogin(user);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateLoginState = async () => {
+      const status = await getNativeBiometricStatus();
+      if (cancelled) return;
+      setBiometricStatus(status);
+
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      if (token && !inactivityReason) {
+        try {
+          localStorage.setItem("token", token);
+          localStorage.setItem("auth_token", token);
+          const data = await authAPI.getMe();
+          if (cancelled) return;
+          queryClient.setQueryData(["/api/auth/me"], data);
+          navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+          return;
+        } catch {
+          clearLocalSession();
+        }
+      }
+
+      const skipAutoBiometric = consumeSkipAutoBiometricOnce();
+      const canResumeMobileSession = shouldUseMobileAuth() && hasStoredMobileRefreshToken();
+      const alreadyAttempted = sessionStorage.getItem(AUTO_BIOMETRIC_ATTEMPTED_KEY) === "true";
+
+      if (!token && canResumeMobileSession && !inactivityReason && !skipAutoBiometric) {
+        try {
+          const data = await authAPI.getMe();
+          if (cancelled) return;
+          queryClient.setQueryData(["/api/auth/me"], data);
+          navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+          return;
+        } catch {
+          clearLocalSession();
+        }
+      }
+
+      if (
+        !status.enabled ||
+        inactivityReason ||
+        skipAutoBiometric ||
+        alreadyAttempted ||
+        autoBiometricAttemptRef.current ||
+        manualLoginInProgressRef.current ||
+        userStartedTypingRef.current
+      ) {
+        return;
+      }
+
+      autoBiometricAttemptRef.current = true;
+      sessionStorage.setItem(AUTO_BIOMETRIC_ATTEMPTED_KEY, "true");
+
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      if (
+        cancelled ||
+        manualLoginInProgressRef.current ||
+        userStartedTypingRef.current
+      ) {
+        return;
+      }
+
+      setBiometricBusy(true);
+      try {
+        await unlockNativeBiometricLogin();
+        const data = await authAPI.getMe();
+        if (cancelled) return;
+        queryClient.setQueryData(["/api/auth/me"], data);
+        navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
+      } catch {
+        clearLocalSession();
+      } finally {
+        if (!cancelled) setBiometricBusy(false);
+      }
+    };
+
+    void hydrateLoginState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inactivityReason, navigate, queryClient]);
+
   return (
-    <div className="min-h-screen bg-background dark:bg-dark-8 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-border/20 bg-card/95 backdrop-blur-sm">
-        <CardHeader className="text-center pb-4">
-          <div className="flex justify-center mb-4">
+    <div className="login-screen flex w-full items-center justify-center overflow-x-hidden px-3 sm:px-4">
+      <Card className="login-card liquid-glass w-full max-w-sm min-w-0 border-0 shadow-xl sm:max-w-[24.5rem]">
+        <CardHeader className="login-card-header px-4 pb-2.5 pt-4 text-center sm:px-6 sm:pt-5">
+          <div className="mb-2.5 flex justify-center">
             <img 
               src="/sjtlogo.png" 
               alt="Santuário São Judas Tadeu" 
-              className="h-72 w-full max-w-xs object-contain"
+              className="login-logo h-24 w-full max-w-[11rem] object-contain sm:h-32 sm:max-w-[13rem]"
             />
           </div>
-          <CardTitle className="text-3xl font-bold text-neutral-textDark dark:text-text-light mb-2">
+          <CardTitle className="mb-1 text-2xl font-bold text-neutral-textDark dark:text-text-light sm:text-3xl">
             MESC
           </CardTitle>
-          <p className="text-neutral-textMedium dark:text-gray-400 text-sm mb-1">
+          <p className="mb-1 text-sm text-neutral-textMedium dark:text-gray-400">
             Sistema de Gestão
           </p>
           <p className="text-neutral-textMedium dark:text-gray-400 text-xs">
             Ministério Extraordinário da Sagrada Comunhão
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="login-card-content px-4 pb-4 sm:px-6 sm:pb-5">
           {/* Alerta de timeout de inatividade */}
           {inactivityReason && (
             <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
@@ -163,7 +342,21 @@ export default function Login() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {biometricStatus?.enabled && (
+            <Button
+              type="button"
+              variant="outline"
+              className="liquid-glass-chip mb-3 h-11 w-full border-0 font-semibold"
+              onClick={handleBiometricUnlock}
+              disabled={biometricBusy}
+              data-testid="button-biometric-login"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              {biometricBusy ? "Desbloqueando..." : `Entrar com ${biometricStatus.label}`}
+            </Button>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-neutral-textDark dark:text-text-light font-semibold text-sm">
                 Email
@@ -174,7 +367,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={credentials.email}
                 onChange={(e) => handleInputChange("email", e.target.value.toLowerCase().trim())}
-                className="bg-background border-border focus:border-primary focus:ring-primary transition-all duration-200"
+                className="min-h-11 bg-background text-base transition-all duration-200 focus:border-primary focus:ring-primary sm:text-sm"
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -195,7 +388,8 @@ export default function Login() {
                   placeholder="Sua senha"
                   value={credentials.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className="bg-background border-border focus:border-primary focus:ring-primary pr-12 transition-all duration-200"
+                  className="min-h-11 bg-background pr-12 text-base transition-all duration-200 focus:border-primary focus:ring-primary sm:text-sm"
+                  autoComplete="current-password"
                   required
                   data-testid="input-password"
                 />
@@ -205,6 +399,7 @@ export default function Login() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   data-testid="button-toggle-password"
                 >
                   {showPassword ? (
@@ -216,8 +411,8 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center space-x-2">
                 <Checkbox 
                   id="remember" 
                   checked={rememberMe}
@@ -233,7 +428,7 @@ export default function Login() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80 p-0"
+                className="h-auto p-0 text-sm text-neutral-accentWarm hover:text-neutral-accentWarm/80 dark:text-dark-gold dark:hover:text-dark-gold/80"
                 onClick={() => setShowForgotPassword(true)}
               >
                 Esqueci minha senha
@@ -242,7 +437,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full bg-neutral-neutral hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:hover:bg-dark-gold/90 text-neutral-cream dark:text-dark-10 font-semibold shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className="h-11 w-full bg-neutral-neutral font-semibold text-neutral-cream shadow-lg transition-all duration-200 hover:bg-neutral-neutral/90 dark:bg-dark-gold dark:text-dark-10 dark:hover:bg-dark-gold/90"
               disabled={loginMutation.isPending}
               data-testid="button-login"
             >
@@ -250,7 +445,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 space-y-3.5">
             <div className="text-center">
               <p className="text-sm text-neutral-textMedium dark:text-gray-400">
                 Não tem uma conta?{" "}
@@ -262,7 +457,7 @@ export default function Login() {
               </p>
             </div>
 
-            <div className="text-center pt-2 border-t border-border/30">
+            <div className="border-t border-border/30 pt-3 text-center">
               <p className="text-xs text-neutral-textMedium dark:text-gray-500">
                 Ao entrar, você concorda com nossos{" "}
                 <Link href="/terms-of-use">
@@ -276,6 +471,12 @@ export default function Login() {
                     Política de Privacidade
                   </span>
                 </Link>
+                {" "}e{" "}
+                <Link href="/account-deletion">
+                  <span className="text-neutral-accentWarm hover:underline dark:text-dark-gold cursor-pointer">
+                    Exclusão de Conta
+                  </span>
+                </Link>
               </p>
             </div>
           </div>
@@ -284,7 +485,7 @@ export default function Login() {
 
       {/* Dialog para usuário com conta pendente */}
       <Dialog open={showPendingDialog} onOpenChange={setShowPendingDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
@@ -339,9 +540,47 @@ export default function Login() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showBiometricPrompt} onOpenChange={(open) => {
+        if (!open && !biometricPromptResolvingRef.current) handleSkipBiometric();
+      }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="mb-4 flex justify-center">
+              <div className="liquid-glass-chip flex h-16 w-16 items-center justify-center rounded-2xl">
+                <ShieldCheck className="h-8 w-8 text-neutral-accentWarm dark:text-dark-gold" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Ativar entrada rapida?</DialogTitle>
+            <DialogDescription className="text-center">
+              Use {biometricStatus?.label || "biometria"} neste aparelho para abrir o MESC sem digitar senha.
+              Sua senha nao fica salva no app.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSkipBiometric}
+              className="w-full sm:w-auto"
+            >
+              Agora nao
+            </Button>
+            <Button
+              type="button"
+              onClick={handleEnableBiometric}
+              disabled={biometricBusy}
+              className="w-full sm:w-auto"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              {biometricBusy ? "Ativando..." : "Ativar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog para Esqueci a Senha */}
       <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 bg-neutral-accentWarm/10 dark:bg-dark-gold/20 rounded-full flex items-center justify-center">
@@ -367,7 +606,7 @@ export default function Login() {
                 value={forgotPasswordEmail}
                 onChange={(e) => setForgotPasswordEmail(e.target.value.toLowerCase().trim())}
                 required
-                className="bg-background border-border"
+                className="min-h-11 bg-background text-base sm:text-sm"
               />
             </div>
             <div className="bg-neutral-badgeWarm/20 dark:bg-dark-3 rounded-lg p-3">

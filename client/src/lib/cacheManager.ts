@@ -4,6 +4,7 @@
  */
 
 import { queryClient } from './queryClient';
+import { clearLocalSession } from './persistent-storage';
 
 // Versão do cache - IMPORTANTE: incrementar a cada deploy que precise invalidar cache
 const CACHE_VERSION = '1.0.0';
@@ -36,7 +37,11 @@ export function clearAllCache(): void {
   // Limpa dados específicos do localStorage que podem estar obsoletos
   const keysToKeep = [
     'token', // Token de autenticação
+    'auth_token', // Token de autenticação usado por hooks legados
+    'session_token', // Sessão ativa para monitor de atividade
+    'mesc_biometric_login_enabled', // Preferência nativa de biometria
     'mesc-ui-theme', // Tema do usuário
+    'theme', // Tema legado
     CACHE_VERSION_KEY, // Versão do cache
     'minister-tutorial-dismissed', // Estado do tutorial
   ];
@@ -91,7 +96,7 @@ export function clearCacheOnLogout(): void {
   if (typeof window === 'undefined') return;
 
   clearAllCache();
-  localStorage.removeItem('token');
+  clearLocalSession();
 }
 
 /**

@@ -1,4 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { apiUrl, getStoredAuthToken } from "./api-url";
+import { clearLocalStoragePreservingSession } from "./persistent-storage";
 
 // CRITICAL: App version for cache invalidation
 // This VERSION changes on every build, forcing cache refresh
@@ -34,16 +36,12 @@ export async function apiRequest(
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
   
   // Adicionar token de autenticação se disponível
-  const token = localStorage.getItem('token');
+  const token = getStoredAuthToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Construir URL da API corretamente para desenvolvimento e produção
-  const apiBaseURL = import.meta.env.VITE_API_URL || '';
-  const fullUrl = apiBaseURL ? `${apiBaseURL}${url}` : url;
-
-  const res = await fetch(fullUrl, {
+  const res = await fetch(apiUrl(url), {
     method,
     headers,
     body,
@@ -62,17 +60,14 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     // Adicionar token de autenticação se disponível
     const headers: Record<string, string> = {};
-    const token = localStorage.getItem('token');
+    const token = getStoredAuthToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Construir URL da API corretamente para desenvolvimento e produção
     const path = queryKey.join("/") as string;
-    const apiBaseURL = import.meta.env.VITE_API_URL || '';
-    const fullUrl = apiBaseURL ? `${apiBaseURL}${path}` : path;
 
-    const res = await fetch(fullUrl, {
+    const res = await fetch(apiUrl(path), {
       headers,
       credentials: "include",
     });
@@ -115,10 +110,7 @@ if (typeof window !== 'undefined') {
     console.warn(`Version changed from ${storedVersion} to ${APP_VERSION} - clearing caches`);
     // Clear React Query cache
     queryClient.clear();
-    // Clear localStorage except auth token
-    const token = localStorage.getItem('token');
-    localStorage.clear();
-    if (token) localStorage.setItem('token', token);
+    clearLocalStoragePreservingSession();
     // Update version
     localStorage.setItem('app_version', APP_VERSION);
   }

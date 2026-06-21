@@ -5,13 +5,17 @@ import {
   formationModules,
   formationLessons,
   formationLessonSections,
+  users,
   type InsertFormationTrack,
   type InsertFormationLesson,
   type InsertFormationLessonSection
 } from '@shared/schema';
-import { eq, desc, asc, sql, count } from 'drizzle-orm';
+import { and, eq, desc, asc, sql, count } from 'drizzle-orm';
 import { authenticateToken, AuthRequest } from '../auth';
 import { isAdmin as isAdminRole } from '@shared/roles';
+import { mobileNotificationData } from '@shared/mobileNotificationEvents';
+import { storage } from '../storage';
+import { sendPushNotificationToUsers } from '../utils/pushNotifications';
 
 const router = Router();
 
@@ -36,6 +40,57 @@ function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
     });
   }
   next();
+}
+
+async function notifyFormationAvailable(input: {
+  title: string;
+  trackId?: string | null;
+  moduleId?: string | null;
+  lessonId?: string | null;
+}) {
+  try {
+    const ministers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.role, 'ministro'), eq(users.status, 'active')));
+    const recipientIds = [...new Set(ministers.map((minister) => minister.id))];
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const deepLink = input.trackId
+      ? `/formation/${input.trackId}`
+      : '/formation';
+    const title = 'Novo Treinamento Disponível';
+    const message = `${input.title} já está disponível na formação.`;
+    const data = mobileNotificationData('formation_available', {
+      trackId: input.trackId ?? null,
+      moduleId: input.moduleId ?? null,
+      lessonId: input.lessonId ?? null,
+    });
+
+    await Promise.all(recipientIds.map((userId) =>
+      storage.createNotification({
+        userId,
+        title,
+        message,
+        type: 'formation',
+        read: false,
+        actionUrl: deepLink,
+        data,
+      })
+    ));
+
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: deepLink,
+      data,
+    });
+  } catch (error: unknown) {
+    console.error('Error notifying formation availability:', error);
+  }
 }
 
 // Apply authentication and admin check to all routes
@@ -431,6 +486,15 @@ router.post('/lessons', async (req, res) => {
       .values(lessonData)
       .returning();
 
+    if (newLesson[0]?.isActive !== false) {
+      await notifyFormationAvailable({
+        title: newLesson[0].title,
+        trackId: newLesson[0].trackId,
+        moduleId: newLesson[0].moduleId,
+        lessonId: newLesson[0].id,
+      });
+    }
+
     res.status(201).json({
       message: 'Lição criada com sucesso',
       lesson: newLesson[0]
@@ -450,6 +514,12 @@ router.patch('/lessons/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    const [existing] = await db
+      .select()
+      .from(formationLessons)
+      .where(eq(formationLessons.id, id))
+      .limit(1);
+
     const updated = await db
       .update(formationLessons)
       .set({ ...updates, updatedAt: new Date() })
@@ -460,6 +530,15 @@ router.patch('/lessons/:id', async (req, res) => {
       return res.status(404).json({
         error: 'Lição não encontrada',
         message: `Lição com ID ${id} não encontrada`
+      });
+    }
+
+    if (updated[0].isActive === true && existing?.isActive === false) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].trackId,
+        moduleId: updated[0].moduleId,
+        lessonId: updated[0].id,
       });
     }
 
@@ -846,6 +925,13 @@ router.patch('/tracks/:id/toggle-active', async (req, res) => {
       .where(eq(formationTracks.id, id))
       .returning();
 
+    if (updated[0].isActive === true) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].id,
+      });
+    }
+
     res.json({
       message: `Trilha ${updated[0].isActive ? 'ativada' : 'desativada'} com sucesso`,
       track: updated[0]
@@ -882,6 +968,15 @@ router.patch('/lessons/:id/toggle-active', async (req, res) => {
       .set({ isActive: !lesson.isActive, updatedAt: new Date() })
       .where(eq(formationLessons.id, id))
       .returning();
+
+    if (updated[0].isActive === true) {
+      await notifyFormationAvailable({
+        title: updated[0].title,
+        trackId: updated[0].trackId,
+        moduleId: updated[0].moduleId,
+        lessonId: updated[0].id,
+      });
+    }
 
     res.json({
       message: `Lição ${updated[0].isActive ? 'ativada' : 'desativada'} com sucesso`,

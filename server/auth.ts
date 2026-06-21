@@ -185,6 +185,10 @@ export async function login(email: string, password: string) {
       throw new Error('Usuário inativo. Entre em contato com a coordenação.');
     }
 
+    if (user.status === 'deleted') {
+      throw new Error('Esta conta foi excluída.');
+    }
+
     // Verifica a senha
     const passwordHash = user.passwordHash || '';
     const isValidPassword = await verifyPassword(password, passwordHash);

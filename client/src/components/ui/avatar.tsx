@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
 
+import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl"
 import { cn } from "@/lib/utils"
 
 const Avatar = React.forwardRef<
@@ -23,13 +24,18 @@ Avatar.displayName = AvatarPrimitive.Root.displayName
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Image
-    ref={ref}
-    className={cn("aspect-square h-full w-full", className)}
-    {...props}
-  />
-))
+>(({ className, src, ...props }, ref) => {
+  const resolvedSrc = useAuthenticatedImageUrl(typeof src === "string" ? src : undefined)
+
+  return (
+    <AvatarPrimitive.Image
+      ref={ref}
+      className={cn("aspect-square h-full w-full", className)}
+      src={resolvedSrc}
+      {...props}
+    />
+  )
+})
 AvatarImage.displayName = AvatarPrimitive.Image.displayName
 
 const AvatarFallback = React.forwardRef<

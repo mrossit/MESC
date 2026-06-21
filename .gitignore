@@ -29,6 +29,12 @@ Thumbs.db
 .env.*.local
 .env.databases
 
+# Configuracoes locais de agentes/IDEs (podem conter comandos com secrets)
+.claude/settings.local.json
+
+# Anexos locais da conversa/replit (podem conter dados reais, imagens e chaves)
+attached_assets/
+
 # Bancos de dados (podem conter dados pessoais - LGPD)
 *.db
 *.db-journal
@@ -49,6 +55,7 @@ backup-*.json
 *.sql
 *.sql.gz
 *.dump
+!migrations/*.sql
 
 # Chaves privadas e certificados
 *.key

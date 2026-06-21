@@ -12,9 +12,13 @@ interface CachedAuthGuardProps {
 
 export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps) {
   const [location] = useLocation();
+  const hasStoredToken =
+    typeof window !== "undefined" &&
+    Boolean(localStorage.getItem("token") || localStorage.getItem("auth_token"));
   
   // Primeiro, tenta pegar dados do cache com type safety
   const cachedData = queryClient.getQueryData<AuthResponse>(["/api/auth/me"]);
+  const trustedCachedData = hasStoredToken && isAuthResponse(cachedData) ? cachedData : undefined;
   
   // Usa a mesma query key que o ProtectedRoute para compartilhar cache
   const { data, isLoading, error } = useQuery({
@@ -25,16 +29,16 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
     refetchOnMount: false, // NUNCA refetch se já tem dados
     refetchOnWindowFocus: false,
     // Se tem dados em cache válidos, usa eles
-    initialData: isAuthResponse(cachedData) ? cachedData : undefined,
+    initialData: trustedCachedData,
   });
   
   
   // Se tem dados em cache válidos, usa eles imediatamente
-  if (hasValidUser(cachedData)) {
-    const userData = cachedData.user;
+  if (hasValidUser(trustedCachedData)) {
+    const userData = trustedCachedData.user;
     
     // Verifica mudança de senha com safe access
-    const requiresPasswordChange = safeGetUserProperty(cachedData, 'requiresPasswordChange', false);
+    const requiresPasswordChange = safeGetUserProperty(trustedCachedData, 'requiresPasswordChange', false);
     if (requiresPasswordChange) {
       if (location !== "/change-password-required" && location !== "/change-password") {
         return <Redirect to="/change-password-required" />;
@@ -88,7 +92,7 @@ export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps
   // Verifica permissões com safe access
   if (allowedRoles && allowedRoles.length > 0) {
     const userRole = data.user.role;
-    const hasPermission = allowedRoles.includes(userRole);
+    const hasPermission = expandRoles(allowedRoles).includes(userRole);
     
     if (!hasPermission) {
       return <Redirect to="/dashboard" />;

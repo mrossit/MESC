@@ -22,6 +22,16 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '../lib/queryClient';
+import { authAPI } from '../lib/auth';
+import {
+  mobileGetCurrentQuestionnaire,
+  mobileSubmitQuestionnaireResponse,
+  shouldUseMobileAuth,
+} from '../lib/mobile-auth-session';
+import {
+  createMobileIdempotencyKey,
+  type MobileQuestionnaire,
+} from '@shared/mobileClient';
 
 type Question = {
   id: string;
@@ -64,9 +74,172 @@ type QuestionnaireTemplate = {
 
 type Response = {
   questionId: string;
-  answer: string | string[] | boolean;
+  answer: string | string[] | boolean | {
+    answer: string;
+    selectedOptions?: string[];
+  };
   metadata?: Record<string, unknown>;
 };
+
+const questionTypes = new Set<Question['type']>([
+  'multiple_choice',
+  'checkbox',
+  'text',
+  'time_selection',
+  'yes_no_with_options',
+]);
+
+const questionCategories = new Set<Question['category']>([
+  'regular',
+  'daily',
+  'special_event',
+  'custom',
+]);
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parsePossiblyJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeQuestionType(value: unknown): Question['type'] {
+  return typeof value === 'string' && questionTypes.has(value as Question['type'])
+    ? value as Question['type']
+    : 'text';
+}
+
+function normalizeQuestionCategory(value: unknown): Question['category'] {
+  return typeof value === 'string' && questionCategories.has(value as Question['category'])
+    ? value as Question['category']
+    : 'regular';
+}
+
+function normalizeQuestionnaireQuestions(value: unknown): Question[] {
+  const parsed = parsePossiblyJson(value);
+  const items = Array.isArray(parsed) ? parsed : [];
+
+  const questions = items.map((item, index): Question => {
+    const record = isRecord(item) ? item : {};
+    const options = Array.isArray(record.options)
+      ? record.options.map((option: unknown) => String(option))
+      : undefined;
+    const order = typeof record.order === 'number' ? record.order : undefined;
+    const metadata = isRecord(record.metadata) ? record.metadata as Question['metadata'] : undefined;
+
+    return {
+      id: typeof record.id === 'string' && record.id ? record.id : `question_${index + 1}`,
+      type: normalizeQuestionType(record.type),
+      question: String(record.question ?? record.title ?? `Pergunta ${index + 1}`),
+      options,
+      required: Boolean(record.required),
+      category: normalizeQuestionCategory(record.category),
+      editable: typeof record.editable === 'boolean' ? record.editable : undefined,
+      modified: typeof record.modified === 'boolean' ? record.modified : undefined,
+      order,
+      metadata,
+    };
+  }).sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+    if (a.order !== undefined) return -1;
+    if (b.order !== undefined) return 1;
+
+    const isAText = a.type === 'text';
+    const isBText = b.type === 'text';
+    if (isAText && !isBText) return 1;
+    if (!isAText && isBText) return -1;
+    return 0;
+  });
+
+  const simFlowOnly = ['main_service_time', 'available_sundays', 'other_times_available'];
+  questions.forEach((question) => {
+    if (question.category === 'custom' && !question.metadata?.dependsOn) {
+      question.metadata = {
+        ...(question.metadata || {}),
+        dependsOn: 'monthly_availability',
+        showIf: 'Sim',
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim',
+      };
+    } else if (
+      question.metadata?.dependsOn === 'monthly_availability' &&
+      question.metadata?.showIf === 'Sim' &&
+      !question.metadata?.alternativeDependsOn &&
+      !simFlowOnly.includes(question.id)
+    ) {
+      question.metadata = {
+        ...question.metadata,
+        alternativeDependsOn: 'alternative_availability',
+        alternativeShowIf: 'Sim',
+      };
+    }
+  });
+
+  return questions;
+}
+
+function createInitialResponses(questions: Question[]) {
+  const initialResponses: Record<string, any> = {};
+  questions.forEach((question) => {
+    if (question.type === 'checkbox') {
+      initialResponses[question.id] = [];
+    } else if (question.type === 'yes_no_with_options') {
+      initialResponses[question.id] = { answer: '', selectedOptions: [] };
+    } else {
+      initialResponses[question.id] = '';
+    }
+  });
+  return initialResponses;
+}
+
+function normalizeResponseEntries(value: unknown): Response[] {
+  const parsed = parsePossiblyJson(value);
+
+  if (Array.isArray(parsed)) {
+    return parsed
+      .filter((item): item is Record<string, any> => isRecord(item) && typeof item.questionId === 'string')
+      .map((item) => ({
+        questionId: item.questionId,
+        answer: item.answer,
+        metadata: isRecord(item.metadata) ? item.metadata : undefined,
+      }));
+  }
+
+  if (isRecord(parsed)) {
+    return Object.entries(parsed).map(([questionId, answer]) => ({
+      questionId,
+      answer: answer as Response['answer'],
+    }));
+  }
+
+  return [];
+}
+
+function mobileQuestionnaireStatusToTemplateStatus(status: string): QuestionnaireTemplate['status'] {
+  if (status === 'closed') return 'closed';
+  if (status === 'draft') return 'draft';
+  return 'sent';
+}
+
+function mobileQuestionnaireToTemplate(questionnaire: MobileQuestionnaire): QuestionnaireTemplate {
+  const questions = normalizeQuestionnaireQuestions(questionnaire.questions);
+
+  return {
+    id: questionnaire.id,
+    month: questionnaire.month,
+    year: questionnaire.year,
+    questions,
+    status: mobileQuestionnaireStatusToTemplateStatus(questionnaire.status),
+    closedAt: questionnaire.status === 'closed' ? questionnaire.deadline ?? undefined : undefined,
+    baseQuestions: JSON.parse(JSON.stringify(questions)),
+  };
+}
 
 export default function QuestionnaireUnified() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -122,15 +295,13 @@ export default function QuestionnaireUnified() {
   // Buscar informações do usuário
   const { data: authData } = useQuery({
     queryKey: ['/api/auth/me'],
-    queryFn: async () => {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch user');
-      return res.json();
-    }
+    queryFn: () => authAPI.getMe(),
   });
   
   const user = authData?.user;
   const isAdmin = isAdminRole(user?.role);
+  const useNativeQuestionnaire = shouldUseMobileAuth() && user?.role === 'ministro';
+  const selectedIsoMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   
   const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -138,8 +309,9 @@ export default function QuestionnaireUnified() {
   ];
 
   useEffect(() => {
+    if (!user) return;
     loadQuestionnaire();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, user?.id, useNativeQuestionnaire, isAdmin]);
 
   // Check auto-close status on page load
   useEffect(() => {
@@ -185,10 +357,17 @@ export default function QuestionnaireUnified() {
   // Carregar familiares quando o template existe, independentemente do modo
   // Isso permite que compartilhamento familiar funcione mesmo quando questionário é reaberto
   useEffect(() => {
+    if (useNativeQuestionnaire) {
+      setFamilyMembers([]);
+      setSelectedFamilyMembers([]);
+      setFamilySharingScenario('none');
+      return;
+    }
+
     if (template?.id && user?.id) {
       loadFamilyMembers();
     }
-  }, [template?.id, user?.id]);
+  }, [template?.id, user?.id, useNativeQuestionnaire]);
 
 
 
@@ -240,6 +419,45 @@ export default function QuestionnaireUnified() {
     
     
     try {
+      if (useNativeQuestionnaire) {
+        const data = await mobileGetCurrentQuestionnaire({ month: selectedIsoMonth });
+        const mobileQuestionnaire = data.questionnaire;
+
+        if (!mobileQuestionnaire) {
+          setTemplate(null);
+          setResponses({});
+          setExistingResponse(null);
+          setIsSubmitted(false);
+          setMode('view');
+          return;
+        }
+
+        const mobileTemplate = mobileQuestionnaireToTemplate(mobileQuestionnaire);
+        const initialResponses = createInitialResponses(mobileTemplate.questions);
+        const responseEntries = normalizeResponseEntries(mobileQuestionnaire.response?.responses);
+
+        if (mobileQuestionnaire.response) {
+          const restoredResponses = { ...initialResponses };
+          responseEntries.forEach((response) => {
+            if (response.questionId in restoredResponses) {
+              restoredResponses[response.questionId] = response.answer;
+            }
+          });
+          setExistingResponse({
+            ...mobileQuestionnaire.response,
+            responses: responseEntries,
+          });
+          setResponses(restoredResponses);
+        } else {
+          setExistingResponse(null);
+          setResponses(initialResponses);
+        }
+
+        setTemplate(mobileTemplate);
+        setIsSubmitted(false);
+        return;
+      }
+
       // Tentar carregar template existente
       const endpoint = isAdmin 
         ? `/api/questionnaires/admin/templates/${selectedYear}/${selectedMonth}`
@@ -278,73 +496,14 @@ export default function QuestionnaireUnified() {
           throw new Error('Invalid JSON response');
         }
         
-        // Aplicar ordenação às perguntas ao carregar
-        // Se houver ordem personalizada, usar ela; senão, aplicar padrão
-        const sortedQuestions = [...templateData.questions].sort((a, b) => {
-          // Se ambas têm ordem personalizada, usar essa ordem
-          if (a.order !== undefined && b.order !== undefined) {
-            return a.order - b.order;
-          }
-          
-          // Se apenas uma tem ordem personalizada, ela vem primeiro
-          if (a.order !== undefined) return -1;
-          if (b.order !== undefined) return 1;
-          
-          // Ordenação padrão: múltipla escolha antes de texto
-          const isAText = a.type === 'text';
-          const isBText = b.type === 'text';
-          
-          if (isAText && !isBText) return 1; // Texto vai para o final
-          if (!isAText && isBText) return -1; // Não-texto vem primeiro
-          
-          return 0; // Manter ordem relativa
-        });
-        
-        // Corrigir retroativamente perguntas sem alternativeDependsOn
-        // Perguntas exclusivas do fluxo "Sim" (não devem ter dependência alternativa)
-        const simFlowOnly = ['main_service_time', 'available_sundays', 'other_times_available'];
-        sortedQuestions.forEach(q => {
-          // Custom sem dependsOn: adicionar dependência completa
-          if (q.category === 'custom' && !q.metadata?.dependsOn) {
-            q.metadata = {
-              ...(q.metadata || {}),
-              dependsOn: 'monthly_availability',
-              showIf: 'Sim',
-              alternativeDependsOn: 'alternative_availability',
-              alternativeShowIf: 'Sim'
-            };
-          }
-          // Perguntas com dependsOn monthly_availability sem alternativeDependsOn
-          else if (
-            q.metadata?.dependsOn === 'monthly_availability' &&
-            q.metadata?.showIf === 'Sim' &&
-            !q.metadata?.alternativeDependsOn &&
-            !simFlowOnly.includes(q.id)
-          ) {
-            q.metadata = {
-              ...q.metadata,
-              alternativeDependsOn: 'alternative_availability',
-              alternativeShowIf: 'Sim'
-            };
-          }
-        });
-
+        const sortedQuestions = normalizeQuestionnaireQuestions(templateData.questions);
         templateData.questions = sortedQuestions;
         // Armazenar snapshot das perguntas para merge em caso de conflito
         templateData.baseQuestions = JSON.parse(JSON.stringify(sortedQuestions));
         setTemplate(templateData);
         
         // Inicializar respostas vazias
-        const initialResponses: Record<string, any> = {};
-        templateData.questions.forEach((q: Question) => {
-          if (q.type === 'checkbox') {
-            initialResponses[q.id] = [];
-          } else if (q.type === 'yes_no_with_options') {
-            initialResponses[q.id] = { answer: '', selectedOptions: [] };
-          } else {
-            initialResponses[q.id] = '';
-          }
-        });
+        const initialResponses = createInitialResponses(templateData.questions);
         setResponses(initialResponses);
       } else if (templateRes.status === 404) {
         // Template não existe
@@ -801,6 +960,40 @@ export default function QuestionnaireUnified() {
       if (payloadSize > 500) {
         setError(`O questionário é muito grande (${payloadSize.toFixed(0)}KB). Por favor, reduza o tamanho das respostas de texto.`);
         setSubmitting(false);
+        return;
+      }
+
+      if (useNativeQuestionnaire) {
+        if (!template.id) {
+          throw new Error('Questionário sem identificador para envio mobile');
+        }
+
+        const responseData = await mobileSubmitQuestionnaireResponse(
+          template.id,
+          {
+            responses: formattedResponses,
+            sharedWithFamilyIds: selectedFamilyMembers,
+          },
+          { idempotencyKey: createMobileIdempotencyKey() },
+        );
+
+        setSuccess('Questionário enviado com sucesso!');
+        setIsSubmitted(true);
+        setExistingResponse({
+          ...responseData.response,
+          responses: formattedResponses,
+          submittedAt: responseData.response.submittedAt ?? new Date().toISOString(),
+        });
+
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+
+        setTimeout(() => {
+          setIsSubmitted(false);
+        }, 5000);
+
         return;
       }
 

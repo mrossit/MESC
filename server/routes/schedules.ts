@@ -4,6 +4,7 @@ import { db } from "../db";
 import { schedules, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { isAdmin as isAdminRole } from "@shared/roles";
+import { mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { eq, and, sql, gte, lte, count, desc } from "drizzle-orm";
 import { scheduleCache } from "../services/scheduleCache";
 import { analyzeMonthlyPatterns } from "../services/scheduleComparisonService";
@@ -847,7 +848,11 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
             message: notificationMessage,
             type: 'schedule',
             read: false,
-            actionUrl: '/schedules'
+            actionUrl: '/schedules',
+            data: mobileNotificationData('schedule_published', {
+              month,
+              year,
+            })
           })
         ));
 
