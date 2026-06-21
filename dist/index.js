@@ -86,6 +86,12 @@ __export(schema_exports, {
   materialTypeEnum: () => materialTypeEnum,
   ministerCheckIns: () => ministerCheckIns,
   ministerCheckInsRelations: () => ministerCheckInsRelations,
+  mobileDevices: () => mobileDevices,
+  mobileDevicesRelations: () => mobileDevicesRelations,
+  mobileIdempotencyKeys: () => mobileIdempotencyKeys,
+  mobileIdempotencyKeysRelations: () => mobileIdempotencyKeysRelations,
+  mobileRefreshTokens: () => mobileRefreshTokens,
+  mobileRefreshTokensRelations: () => mobileRefreshTokensRelations,
   notificationTypeEnum: () => notificationTypeEnum,
   notifications: () => notifications,
   notificationsRelations: () => notificationsRelations,
@@ -143,7 +149,7 @@ import {
   pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var sessions, communities, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, materialTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, confirmationStatusEnum, recurrenceTypeEnum, massTypeEnum, learnedPatternTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, scheduleConfirmations, substitutionRequests, notifications, pushSubscriptions, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, formationCertificates, formationMaterials, materialAccessLogs, massTimesConfig, massConfigurations, specialEvents, questionMassMappings, learnedPatterns, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, badgeCategoryEnum, badgeRarityEnum, badges, userBadges, userPoints, pointActionEnum, pointTransactions, leaderboardCache, levelDefinitions, scheduleGenerationStatusEnum, scheduleGenerations, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, communitiesRelations, familiesRelations, activeSessionsRelations, activityLogsRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, formationMaterialsRelations, materialAccessLogsRelations, notificationsRelations, scheduleGenerationsRelations, massConfigurationsRelations, specialEventsRelations, questionMassMappingsRelations, learnedPatternsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertFormationMaterialSchema, insertAdorationDrawSchema, insertMassConfigurationSchema, insertSpecialEventSchema, insertQuestionMassMappingSchema, insertLearnedPatternSchema;
+var sessions, communities, userRoleEnum, userStatusEnum, scheduleStatusEnum, scheduleTypeEnum, substitutionStatusEnum, urgencyLevelEnum, notificationTypeEnum, formationCategoryEnum, formationStatusEnum, lessonContentTypeEnum, materialTypeEnum, liturgicalCycleEnum, liturgicalColorEnum, celebrationRankEnum, confirmationStatusEnum, recurrenceTypeEnum, massTypeEnum, learnedPatternTypeEnum, users, families, familyRelationships, questionnaires, questionnaireResponses, schedules, massExecutionLogs, standbyMinisters, ministerCheckIns, scheduleConfirmations, substitutionRequests, notifications, pushSubscriptions, mobileDevices, mobileRefreshTokens, mobileIdempotencyKeys, formationTracks, formationModules, formationProgress, formationLessons, formationLessonSections, formationLessonProgress, formationCertificates, formationMaterials, materialAccessLogs, massTimesConfig, massConfigurations, specialEvents, questionMassMappings, learnedPatterns, passwordResetRequests, adorationDraws, adorationDrawResults, activeSessions, activityLogs, badgeCategoryEnum, badgeRarityEnum, badges, userBadges, userPoints, pointActionEnum, pointTransactions, leaderboardCache, levelDefinitions, scheduleGenerationStatusEnum, scheduleGenerations, liturgicalYears, liturgicalSeasons, liturgicalCelebrations, liturgicalMassOverrides, saints, communitiesRelations, familiesRelations, activeSessionsRelations, activityLogsRelations, mobileDevicesRelations, mobileRefreshTokensRelations, mobileIdempotencyKeysRelations, usersRelations, questionnairesRelations, questionnaireResponsesRelations, schedulesRelations, massExecutionLogsRelations, standbyMinistersRelations, ministerCheckInsRelations, substitutionRequestsRelations, formationModulesRelations, formationProgressRelations, formationTracksRelations, formationLessonsRelations, formationLessonSectionsRelations, formationLessonProgressRelations, formationMaterialsRelations, materialAccessLogsRelations, notificationsRelations, scheduleGenerationsRelations, massConfigurationsRelations, specialEventsRelations, questionMassMappingsRelations, learnedPatternsRelations, insertUserSchema, insertQuestionnaireSchema, insertMassTimeSchema, insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema, insertFormationLessonProgressSchema, insertFormationMaterialSchema, insertAdorationDrawSchema, insertMassConfigurationSchema, insertSpecialEventSchema, insertQuestionMassMappingSchema, insertLearnedPatternSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -538,6 +544,71 @@ var init_schema = __esm({
       uniqueIndex("push_subscriptions_endpoint_idx").on(table.endpoint),
       // Find all subscriptions for a user (sending push notifications)
       index("idx_push_subscriptions_user").on(table.userId)
+    ]);
+    mobileDevices = pgTable("mobile_devices", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      deviceId: varchar("device_id", { length: 128 }).notNull(),
+      platform: varchar("platform", { length: 16 }).notNull(),
+      appVersion: varchar("app_version", { length: 64 }),
+      pushToken: text("push_token"),
+      pushProvider: varchar("push_provider", { length: 32 }),
+      pushEnabled: boolean("push_enabled").notNull().default(false),
+      notificationPreferences: jsonb("notification_preferences").$type().default({}),
+      biometricCapable: boolean("biometric_capable").notNull().default(false),
+      biometricEnabled: boolean("biometric_enabled").notNull().default(false),
+      lastSeenAt: timestamp("last_seen_at").defaultNow(),
+      revokedAt: timestamp("revoked_at"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      unique("uq_mobile_devices_user_device").on(table.userId, table.deviceId),
+      index("idx_mobile_devices_user").on(table.userId),
+      index("idx_mobile_devices_device").on(table.deviceId),
+      index("idx_mobile_devices_revoked").on(table.revokedAt),
+      index("idx_mobile_devices_platform").on(table.platform)
+    ]);
+    mobileRefreshTokens = pgTable("mobile_refresh_tokens", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      deviceDbId: uuid("device_db_id").notNull().references(() => mobileDevices.id, { onDelete: "cascade" }),
+      tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+      tokenFamilyId: uuid("token_family_id").notNull().defaultRandom(),
+      replacedByTokenId: uuid("replaced_by_token_id"),
+      expiresAt: timestamp("expires_at").notNull(),
+      rotatedAt: timestamp("rotated_at"),
+      revokedAt: timestamp("revoked_at"),
+      createdAt: timestamp("created_at").defaultNow(),
+      ipAddress: varchar("ip_address", { length: 45 }),
+      userAgent: text("user_agent")
+    }, (table) => [
+      uniqueIndex("mobile_refresh_tokens_hash_idx").on(table.tokenHash),
+      index("idx_mobile_refresh_tokens_user").on(table.userId),
+      index("idx_mobile_refresh_tokens_device").on(table.deviceDbId),
+      index("idx_mobile_refresh_tokens_family").on(table.tokenFamilyId),
+      index("idx_mobile_refresh_tokens_expires").on(table.expiresAt),
+      index("idx_mobile_refresh_tokens_revoked").on(table.revokedAt)
+    ]);
+    mobileIdempotencyKeys = pgTable("mobile_idempotency_keys", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      idempotencyKey: uuid("idempotency_key").notNull(),
+      method: varchar("method", { length: 10 }).notNull(),
+      path: varchar("path", { length: 255 }).notNull(),
+      requestHash: varchar("request_hash", { length: 128 }).notNull(),
+      status: varchar("status", { length: 20 }).notNull().default("in_progress"),
+      responseStatus: integer("response_status"),
+      responseBody: text("response_body"),
+      lockedAt: timestamp("locked_at").defaultNow(),
+      completedAt: timestamp("completed_at"),
+      expiresAt: timestamp("expires_at").notNull(),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      uniqueIndex("mobile_idempotency_keys_user_key_idx").on(table.userId, table.idempotencyKey),
+      index("idx_mobile_idempotency_user").on(table.userId),
+      index("idx_mobile_idempotency_status").on(table.status),
+      index("idx_mobile_idempotency_expires").on(table.expiresAt)
     ]);
     formationTracks = pgTable("formation_tracks", {
       id: varchar("id").primaryKey(),
@@ -1220,6 +1291,29 @@ var init_schema = __esm({
         references: [users.id]
       })
     }));
+    mobileDevicesRelations = relations(mobileDevices, ({ one, many }) => ({
+      user: one(users, {
+        fields: [mobileDevices.userId],
+        references: [users.id]
+      }),
+      refreshTokens: many(mobileRefreshTokens)
+    }));
+    mobileRefreshTokensRelations = relations(mobileRefreshTokens, ({ one }) => ({
+      user: one(users, {
+        fields: [mobileRefreshTokens.userId],
+        references: [users.id]
+      }),
+      device: one(mobileDevices, {
+        fields: [mobileRefreshTokens.deviceDbId],
+        references: [mobileDevices.id]
+      })
+    }));
+    mobileIdempotencyKeysRelations = relations(mobileIdempotencyKeys, ({ one }) => ({
+      user: one(users, {
+        fields: [mobileIdempotencyKeys.userId],
+        references: [users.id]
+      })
+    }));
     usersRelations = relations(users, ({ many, one }) => ({
       family: one(families, {
         fields: [users.familyId],
@@ -1237,6 +1331,9 @@ var init_schema = __esm({
       formationProgress: many(formationProgress),
       activeSessions: many(activeSessions),
       activityLogs: many(activityLogs),
+      mobileDevices: many(mobileDevices),
+      mobileRefreshTokens: many(mobileRefreshTokens),
+      mobileIdempotencyKeys: many(mobileIdempotencyKeys),
       spouse: one(users, {
         fields: [users.spouseMinisterId],
         references: [users.id]
@@ -1741,6 +1838,9 @@ var init_communityContext = __esm({
 // shared/roles.ts
 function isCoordinator(role) {
   return COORDINATOR_ROLES.includes(norm(role));
+}
+function isParishWide(role) {
+  return PARISH_WIDE_ROLES.includes(norm(role));
 }
 function isAdmin(role) {
   return ADMIN_ROLES.includes(norm(role));
@@ -4070,11 +4170,11 @@ ${"=".repeat(60)}`);
 \u{1F3AF} FAIRNESS REPORT:`);
           const distributionMap = /* @__PURE__ */ new Map();
           this.ministers.forEach((m) => {
-            const count14 = m.monthlyAssignmentCount || 0;
-            if (!distributionMap.has(count14)) {
-              distributionMap.set(count14, []);
+            const count15 = m.monthlyAssignmentCount || 0;
+            if (!distributionMap.has(count15)) {
+              distributionMap.set(count15, []);
             }
-            distributionMap.get(count14).push(m);
+            distributionMap.get(count15).push(m);
           });
           console.log(`  Assignment Distribution:`);
           for (let i = 0; i <= 4; i++) {
@@ -6202,8 +6302,8 @@ ${"!".repeat(60)}`);
         }
         const distributionMap = /* @__PURE__ */ new Map();
         this.ministers.forEach((m) => {
-          const count14 = m.monthlyAssignmentCount || 0;
-          distributionMap.set(count14, (distributionMap.get(count14) || 0) + 1);
+          const count15 = m.monthlyAssignmentCount || 0;
+          distributionMap.set(count15, (distributionMap.get(count15) || 0) + 1);
         });
         console.log(`[FAIR_ALGORITHM] \u{1F4CA} Current monthly distribution:`);
         for (let i = 0; i <= MAX_MONTHLY_ASSIGNMENTS; i++) {
@@ -6658,10 +6758,10 @@ function notifyUsers(userIds, notificationData) {
     }
   });
 }
-function notifyUnreadCount(userId, count14) {
+function notifyUnreadCount(userId, count15) {
   const message = {
     type: "UNREAD_COUNT",
-    data: { count: count14 },
+    data: { count: count15 },
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
   const messageStr = JSON.stringify(message);
@@ -16315,16 +16415,16 @@ function calculateGenerationStatistics(schedules3, options) {
   }
   const coverage = totalPositions > 0 ? filledPositions / totalPositions : 0;
   const assignments = Object.values(assignmentsPerMinister);
-  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum2, count14) => sum2 + count14, 0) / assignments.length : 0;
+  const avgAssignments = assignments.length > 0 ? assignments.reduce((sum2, count15) => sum2 + count15, 0) / assignments.length : 0;
   const variance = assignments.length > 0 ? Math.sqrt(
-    assignments.reduce((sum2, count14) => sum2 + Math.pow(count14 - avgAssignments, 2), 0) / assignments.length
+    assignments.reduce((sum2, count15) => sum2 + Math.pow(count15 - avgAssignments, 2), 0) / assignments.length
   ) / (avgAssignments || 1) : 0;
   const fairness = Math.max(0, 1 - variance);
   const maxAllowed = options.maxAssignmentsPerMinister || 4;
-  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count14]) => count14 > maxAllowed || count14 < 1).map(([ministerId, count14]) => ({
+  const outliers = Object.entries(assignmentsPerMinister).filter(([_, count15]) => count15 > maxAllowed || count15 < 1).map(([ministerId, count15]) => ({
     ministerId,
-    count: count14,
-    reason: count14 > maxAllowed ? "too_many" : "too_few"
+    count: count15,
+    reason: count15 > maxAllowed ? "too_many" : "too_few"
   }));
   const conflicts = [];
   if (variance > 0.3) {
@@ -16478,7 +16578,7 @@ async function validateScheduleBeforePublish(scheduleData, month, year) {
       }
     }
   }
-  const overAssigned = Object.entries(ministerCounts).filter(([_, count14]) => count14 > 4);
+  const overAssigned = Object.entries(ministerCounts).filter(([_, count15]) => count15 > 4);
   const noOverAssignments = overAssigned.length === 0;
   if (!noOverAssignments) {
     warnings.push(`${overAssigned.length} ministros com mais de 4 atribui\xE7\xF5es`);
@@ -17026,7 +17126,7 @@ async function analyzeMonthlyPatterns(month, year) {
     additionCount: m.count,
     reliabilityScore: m.reliabilityScore
   }));
-  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count14]) => ({ time: time2, changeCount: count14 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
+  const massTimesWithMostChanges = Array.from(massTimeChanges.entries()).map(([time2, count15]) => ({ time: time2, changeCount: count15 })).sort((a, b) => b.changeCount - a.changeCount).slice(0, 5);
   let algorithmHealth;
   if (acceptanceRate >= 85) algorithmHealth = "excellent";
   else if (acceptanceRate >= 70) algorithmHealth = "good";
@@ -18652,8 +18752,8 @@ router12.get("/unread-count", authenticateToken, async (req, res) => {
     if (!req.user || !req.user.id) {
       return res.json({ count: 0 });
     }
-    const count14 = await storage.getUnreadNotificationCount(req.user.id);
-    res.json({ count: count14 });
+    const count15 = await storage.getUnreadNotificationCount(req.user.id);
+    res.json({ count: count15 });
   } catch (error) {
     console.error("[NOTIFICATIONS] Error counting notifications:", error);
     res.json({ count: 0 });
@@ -29496,6 +29596,9 @@ router40.delete("/", authenticateToken, async (req, res) => {
         updatedAt: now
       }).where(eq51(substitutionRequests.requesterId, userId));
       await tx.delete(notifications).where(eq51(notifications.userId, userId));
+      await tx.delete(mobileIdempotencyKeys).where(eq51(mobileIdempotencyKeys.userId, userId));
+      await tx.delete(mobileRefreshTokens).where(eq51(mobileRefreshTokens.userId, userId));
+      await tx.delete(mobileDevices).where(eq51(mobileDevices.userId, userId));
       await tx.delete(pushSubscriptions).where(eq51(pushSubscriptions.userId, userId));
       await tx.delete(familyRelationships).where(
         or15(
@@ -29602,12 +29705,2322 @@ router40.delete("/", authenticateToken, async (req, res) => {
 });
 var account_default = router40;
 
+// server/routes/mobile.ts
+init_schema();
+init_roles();
+await init_db();
+import { Router as Router41 } from "express";
+import { z as z18 } from "zod";
+import { and as and41, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray18, lte as lte19, or as or16 } from "drizzle-orm";
+
+// server/services/mobileIdempotencyService.ts
+init_schema();
+await init_db();
+import { createHash, randomUUID as randomUUID2 } from "crypto";
+import { and as and39, eq as eq52, lte as lte18 } from "drizzle-orm";
+var IDEMPOTENCY_TTL_HOURS = 24;
+var localTablesEnsured = false;
+var MobileIdempotencyError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+};
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const entries = Object.entries(value).sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
+  return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
+}
+function safeParseResponseBody(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+function getIdempotencyExpiry(now = /* @__PURE__ */ new Date()) {
+  const expiresAt = new Date(now);
+  expiresAt.setUTCHours(expiresAt.getUTCHours() + IDEMPOTENCY_TTL_HOURS);
+  return expiresAt;
+}
+async function ensureLocalMobileIdempotencyTable() {
+  if (localTablesEnsured || process.env.DATABASE_URL) {
+    localTablesEnsured = true;
+    return;
+  }
+  try {
+    const Database2 = await import("better-sqlite3");
+    const sqlite = new Database2.default("local.db");
+    const usersTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+    const existingForeignKeys = sqlite.prepare("PRAGMA foreign_key_list(mobile_idempotency_keys)").all();
+    if (!usersTable && existingForeignKeys.length > 0) {
+      sqlite.exec("DROP TABLE IF EXISTS mobile_idempotency_keys");
+    }
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS mobile_idempotency_keys (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        user_id TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        method TEXT NOT NULL,
+        path TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'in_progress',
+        response_status INTEGER,
+        response_body TEXT,
+        locked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT,
+        expires_at TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, idempotency_key)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_idempotency_user
+        ON mobile_idempotency_keys(user_id);
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_idempotency_status
+        ON mobile_idempotency_keys(status);
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_idempotency_expires
+        ON mobile_idempotency_keys(expires_at);
+    `);
+  } catch (error) {
+    console.error("[Mobile Idempotency] Failed to ensure local table:", error);
+  }
+  localTablesEnsured = true;
+}
+function buildMobileRequestFingerprint(input) {
+  return createHash("sha256").update(stableStringify({
+    method: input.method.toUpperCase(),
+    path: input.path,
+    communityId: input.communityId ?? null,
+    body: input.body ?? null
+  })).digest("hex");
+}
+async function beginMobileIdempotency(input) {
+  await ensureLocalMobileIdempotencyTable();
+  const now = /* @__PURE__ */ new Date();
+  await db.delete(mobileIdempotencyKeys).where(
+    and39(
+      eq52(mobileIdempotencyKeys.userId, input.userId),
+      eq52(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey),
+      lte18(mobileIdempotencyKeys.expiresAt, now)
+    )
+  );
+  const [created] = await db.insert(mobileIdempotencyKeys).values({
+    id: randomUUID2(),
+    userId: input.userId,
+    idempotencyKey: input.idempotencyKey,
+    method: input.method.toUpperCase(),
+    path: input.path,
+    requestHash: input.requestHash,
+    status: "in_progress",
+    lockedAt: now,
+    expiresAt: getIdempotencyExpiry(now),
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoNothing({
+    target: [mobileIdempotencyKeys.userId, mobileIdempotencyKeys.idempotencyKey]
+  }).returning();
+  if (created) {
+    return {
+      kind: "started",
+      recordId: created.id,
+      idempotencyKey: input.idempotencyKey
+    };
+  }
+  const [existing] = await db.select().from(mobileIdempotencyKeys).where(
+    and39(
+      eq52(mobileIdempotencyKeys.userId, input.userId),
+      eq52(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey)
+    )
+  ).limit(1);
+  if (!existing) {
+    throw new MobileIdempotencyError(409, "Mutacao mobile em conflito. Tente novamente.");
+  }
+  if (existing.requestHash !== input.requestHash) {
+    throw new MobileIdempotencyError(
+      409,
+      "Idempotency-Key ja usado para outra mutacao"
+    );
+  }
+  if (existing.status === "completed" && existing.responseStatus) {
+    return {
+      kind: "replay",
+      idempotencyKey: input.idempotencyKey,
+      responseStatus: existing.responseStatus,
+      responseBody: safeParseResponseBody(existing.responseBody)
+    };
+  }
+  throw new MobileIdempotencyError(
+    409,
+    "Mutacao identica ainda em processamento. Tente novamente em instantes."
+  );
+}
+async function completeMobileIdempotency(input) {
+  await ensureLocalMobileIdempotencyTable();
+  const now = /* @__PURE__ */ new Date();
+  await db.update(mobileIdempotencyKeys).set({
+    status: "completed",
+    responseStatus: input.responseStatus,
+    responseBody: JSON.stringify(input.responseBody),
+    completedAt: now,
+    updatedAt: now
+  }).where(eq52(mobileIdempotencyKeys.id, input.recordId));
+}
+async function releaseMobileIdempotency(recordId) {
+  await ensureLocalMobileIdempotencyTable();
+  await db.delete(mobileIdempotencyKeys).where(eq52(mobileIdempotencyKeys.id, recordId));
+}
+
+// server/services/mobileSessionService.ts
+init_schema();
+await init_db();
+import { createHash as createHash2, randomBytes, randomUUID as randomUUID3 } from "crypto";
+import { and as and40, desc as desc18, eq as eq53 } from "drizzle-orm";
+var REFRESH_TOKEN_PREFIX = "mesc_rt_";
+var REFRESH_TOKEN_BYTES = 48;
+var REFRESH_TOKEN_TTL_DAYS = 30;
+var localTablesEnsured2 = false;
+var MobileSessionError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+};
+function generateRefreshToken() {
+  return `${REFRESH_TOKEN_PREFIX}${randomBytes(REFRESH_TOKEN_BYTES).toString("base64url")}`;
+}
+function hashRefreshToken(token) {
+  return createHash2("sha256").update(token, "utf8").digest("hex");
+}
+function getRefreshTokenExpiry(now = /* @__PURE__ */ new Date()) {
+  const expiresAt = new Date(now);
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + REFRESH_TOKEN_TTL_DAYS);
+  return expiresAt;
+}
+function createServerDeviceId() {
+  return `server-${randomUUID3()}`;
+}
+function normalizeMobilePlatform(platform) {
+  if (platform === "ios" || platform === "android") return platform;
+  return "unknown";
+}
+function isExpired(value, now = /* @__PURE__ */ new Date()) {
+  const expiresAt = value instanceof Date ? value : new Date(value);
+  return expiresAt.getTime() <= now.getTime();
+}
+function toDate(value) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+function sanitizeMobileDevice(device) {
+  return {
+    id: device.id,
+    deviceId: device.deviceId,
+    platform: device.platform,
+    appVersion: device.appVersion,
+    pushEnabled: Boolean(device.pushEnabled),
+    pushProvider: device.pushProvider,
+    biometricCapable: Boolean(device.biometricCapable),
+    biometricEnabled: Boolean(device.biometricEnabled),
+    lastSeenAt: toDate(device.lastSeenAt)?.toISOString() ?? null,
+    revokedAt: toDate(device.revokedAt)?.toISOString() ?? null,
+    createdAt: toDate(device.createdAt)?.toISOString() ?? null
+  };
+}
+async function ensureLocalMobileTables() {
+  if (localTablesEnsured2 || process.env.DATABASE_URL) {
+    localTablesEnsured2 = true;
+    return;
+  }
+  try {
+    const Database2 = await import("better-sqlite3");
+    const sqlite = new Database2.default("local.db");
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS mobile_devices (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        user_id TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        app_version TEXT,
+        push_token TEXT,
+        push_provider TEXT,
+        push_enabled INTEGER NOT NULL DEFAULT 0,
+        notification_preferences TEXT DEFAULT '{}',
+        biometric_capable INTEGER NOT NULL DEFAULT 0,
+        biometric_enabled INTEGER NOT NULL DEFAULT 0,
+        last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        revoked_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, device_id),
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_devices_user ON mobile_devices(user_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_devices_device ON mobile_devices(device_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_devices_revoked ON mobile_devices(revoked_at);
+      CREATE INDEX IF NOT EXISTS idx_mobile_devices_platform ON mobile_devices(platform);
+
+      CREATE TABLE IF NOT EXISTS mobile_refresh_tokens (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        user_id TEXT NOT NULL,
+        device_db_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_family_id TEXT NOT NULL,
+        replaced_by_token_id TEXT,
+        expires_at TEXT NOT NULL,
+        rotated_at TEXT,
+        revoked_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        ip_address TEXT,
+        user_agent TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(device_db_id) REFERENCES mobile_devices(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_refresh_tokens_user ON mobile_refresh_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_refresh_tokens_device ON mobile_refresh_tokens(device_db_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_refresh_tokens_family ON mobile_refresh_tokens(token_family_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_refresh_tokens_expires ON mobile_refresh_tokens(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_mobile_refresh_tokens_revoked ON mobile_refresh_tokens(revoked_at);
+    `);
+  } catch (error) {
+    console.error("[Mobile Session] Failed to ensure local mobile tables:", error);
+  }
+  localTablesEnsured2 = true;
+}
+async function createOrUpdateMobileDevice(input) {
+  await ensureLocalMobileTables();
+  const now = /* @__PURE__ */ new Date();
+  const deviceId = input.deviceId || createServerDeviceId();
+  const platform = normalizeMobilePlatform(input.platform);
+  const [existing] = await db.select().from(mobileDevices).where(and40(eq53(mobileDevices.userId, input.userId), eq53(mobileDevices.deviceId, deviceId))).limit(1);
+  const devicePatch = {
+    platform,
+    appVersion: input.appVersion ?? null,
+    lastSeenAt: now,
+    updatedAt: now,
+    revokedAt: null
+  };
+  if (input.pushToken !== void 0) devicePatch.pushToken = input.pushToken;
+  if (input.pushProvider !== void 0) devicePatch.pushProvider = input.pushProvider;
+  if (input.pushEnabled !== void 0) devicePatch.pushEnabled = input.pushEnabled;
+  if (input.biometricCapable !== void 0) devicePatch.biometricCapable = input.biometricCapable;
+  if (input.biometricEnabled !== void 0) devicePatch.biometricEnabled = input.biometricEnabled;
+  if (input.notificationPreferences !== void 0) {
+    devicePatch.notificationPreferences = input.notificationPreferences;
+  }
+  if (existing) {
+    const [updated] = await db.update(mobileDevices).set(devicePatch).where(eq53(mobileDevices.id, existing.id)).returning();
+    return updated;
+  }
+  const [created] = await db.insert(mobileDevices).values({
+    userId: input.userId,
+    deviceId,
+    platform,
+    appVersion: input.appVersion ?? null,
+    pushToken: input.pushToken ?? null,
+    pushProvider: input.pushProvider ?? null,
+    pushEnabled: input.pushEnabled ?? false,
+    biometricCapable: input.biometricCapable ?? false,
+    biometricEnabled: input.biometricEnabled ?? false,
+    notificationPreferences: input.notificationPreferences ?? {},
+    lastSeenAt: now,
+    updatedAt: now
+  }).returning();
+  return created;
+}
+async function createMobileRefreshToken(input) {
+  await ensureLocalMobileTables();
+  const refreshToken = generateRefreshToken();
+  const tokenFamilyId = input.tokenFamilyId ?? randomUUID3();
+  const expiresAt = getRefreshTokenExpiry();
+  const [record] = await db.insert(mobileRefreshTokens).values({
+    userId: input.userId,
+    deviceDbId: input.deviceDbId,
+    tokenHash: hashRefreshToken(refreshToken),
+    tokenFamilyId,
+    expiresAt,
+    ipAddress: input.ipAddress ?? null,
+    userAgent: input.userAgent ?? null
+  }).returning();
+  return {
+    record,
+    refreshToken,
+    expiresAt
+  };
+}
+async function createMobileSession(input) {
+  const device = await createOrUpdateMobileDevice(input);
+  if (!input.keepSignedIn) {
+    return {
+      device,
+      refreshToken: null,
+      refreshTokenExpiresAt: null
+    };
+  }
+  const token = await createMobileRefreshToken({
+    userId: input.userId,
+    deviceDbId: device.id,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent
+  });
+  return {
+    device,
+    refreshToken: token.refreshToken,
+    refreshTokenExpiresAt: token.expiresAt
+  };
+}
+async function revokeTokenFamily(tokenFamilyId, userId) {
+  const now = /* @__PURE__ */ new Date();
+  await db.update(mobileRefreshTokens).set({ revokedAt: now }).where(
+    and40(
+      eq53(mobileRefreshTokens.tokenFamilyId, tokenFamilyId),
+      userId ? eq53(mobileRefreshTokens.userId, userId) : void 0
+    )
+  );
+}
+async function consumeMobileRefreshToken(input) {
+  await ensureLocalMobileTables();
+  const tokenHash = hashRefreshToken(input.refreshToken);
+  const [record] = await db.select({
+    token: mobileRefreshTokens,
+    device: mobileDevices,
+    user: users
+  }).from(mobileRefreshTokens).innerJoin(mobileDevices, eq53(mobileRefreshTokens.deviceDbId, mobileDevices.id)).innerJoin(users, eq53(mobileRefreshTokens.userId, users.id)).where(eq53(mobileRefreshTokens.tokenHash, tokenHash)).limit(1);
+  if (!record) {
+    throw new MobileSessionError(401, "Sessao mobile invalida");
+  }
+  if (record.token.rotatedAt || record.token.revokedAt) {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(401, "Sessao mobile ja utilizada. Entre novamente.");
+  }
+  if (isExpired(record.token.expiresAt)) {
+    await db.update(mobileRefreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(eq53(mobileRefreshTokens.id, record.token.id));
+    throw new MobileSessionError(401, "Sessao mobile expirada");
+  }
+  if (record.device.revokedAt) {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(401, "Dispositivo revogado. Entre novamente.");
+  }
+  if (input.deviceId && input.deviceId !== record.device.deviceId) {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(401, "Token nao pertence a este dispositivo");
+  }
+  if (record.user.status !== "active") {
+    await revokeTokenFamily(record.token.tokenFamilyId, record.token.userId);
+    throw new MobileSessionError(403, "Conta inativa ou pendente. Entre em contato com a coordenacao.");
+  }
+  const nextToken = await createMobileRefreshToken({
+    userId: record.user.id,
+    deviceDbId: record.device.id,
+    tokenFamilyId: record.token.tokenFamilyId,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent
+  });
+  const now = /* @__PURE__ */ new Date();
+  await db.update(mobileRefreshTokens).set({
+    rotatedAt: now,
+    replacedByTokenId: nextToken.record.id
+  }).where(eq53(mobileRefreshTokens.id, record.token.id));
+  const [updatedDevice] = await db.update(mobileDevices).set({
+    lastSeenAt: now,
+    updatedAt: now
+  }).where(eq53(mobileDevices.id, record.device.id)).returning();
+  return {
+    user: record.user,
+    device: updatedDevice ?? record.device,
+    refreshToken: nextToken.refreshToken,
+    refreshTokenExpiresAt: nextToken.expiresAt
+  };
+}
+async function revokeMobileDeviceForUser(input) {
+  await ensureLocalMobileTables();
+  const conditions = [
+    eq53(mobileDevices.userId, input.userId),
+    input.deviceDbId ? eq53(mobileDevices.id, input.deviceDbId) : void 0,
+    input.deviceId ? eq53(mobileDevices.deviceId, input.deviceId) : void 0
+  ];
+  const [device] = await db.select().from(mobileDevices).where(and40(...conditions)).limit(1);
+  if (!device) return false;
+  const now = /* @__PURE__ */ new Date();
+  await db.update(mobileDevices).set({ revokedAt: now, updatedAt: now }).where(eq53(mobileDevices.id, device.id));
+  await db.update(mobileRefreshTokens).set({ revokedAt: now }).where(eq53(mobileRefreshTokens.deviceDbId, device.id));
+  return true;
+}
+async function listMobileDevicesForUser(userId) {
+  await ensureLocalMobileTables();
+  return db.select().from(mobileDevices).where(eq53(mobileDevices.userId, userId)).orderBy(desc18(mobileDevices.lastSeenAt));
+}
+
+// server/services/mobileContractService.ts
+init_roles();
+var UUID_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function sanitizeMobileUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    homeCommunityId: user.homeCommunityId,
+    requiresPasswordChange: Boolean(user.requiresPasswordChange),
+    photoUrl: user.photoUrl ?? user.profileImageUrl ?? null
+  };
+}
+function parseMobileIdempotencyKey(value) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string") return null;
+  const key = raw.trim().toLowerCase();
+  if (!key || !UUID_FORMAT.test(key)) return null;
+  return key;
+}
+function resolveMobileCommunityScope(user, requestedCommunityId) {
+  const requested = requestedCommunityId?.trim() || null;
+  const homeCommunityId = user.homeCommunityId?.trim() || null;
+  const scope = isParishWide(user.role) ? "parish" : "home";
+  if (scope === "parish") {
+    const activeCommunityId = requested ?? homeCommunityId;
+    if (!activeCommunityId) {
+      return {
+        allowed: false,
+        status: 400,
+        message: "Informe X-Community-Id para selecionar a comunidade ativa",
+        scope
+      };
+    }
+    return {
+      allowed: true,
+      activeCommunityId,
+      scope
+    };
+  }
+  if (!homeCommunityId) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Usuario sem comunidade principal configurada",
+      scope
+    };
+  }
+  if (requested && requested !== homeCommunityId) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Comunidade fora do escopo do usuario",
+      scope
+    };
+  }
+  return {
+    allowed: true,
+    activeCommunityId: homeCommunityId,
+    scope
+  };
+}
+function toIsoDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  return value;
+}
+function toDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  }
+  return value.includes("T") ? value.slice(0, 10) : value;
+}
+function parseJwtExpirySeconds(expiresIn) {
+  if (!expiresIn) return null;
+  const match = expiresIn.trim().match(/^(\d+)([smhd])?$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const unit = (match[2] ?? "s").toLowerCase();
+  switch (unit) {
+    case "s":
+      return amount;
+    case "m":
+      return amount * 60;
+    case "h":
+      return amount * 60 * 60;
+    case "d":
+      return amount * 24 * 60 * 60;
+    default:
+      return null;
+  }
+}
+function parseMobileMonth(value, now = /* @__PURE__ */ new Date()) {
+  const fallbackYear = now.getUTCFullYear();
+  const fallbackMonth = now.getUTCMonth() + 1;
+  const raw = typeof value === "string" ? value : void 0;
+  const parsed = raw?.match(/^(\d{4})-(\d{2})$/);
+  const year = parsed ? Number(parsed[1]) : fallbackYear;
+  const month = parsed ? Number(parsed[2]) : fallbackMonth;
+  if (month < 1 || month > 12) {
+    throw new Error("Mes invalido. Use o formato YYYY-MM.");
+  }
+  const isoMonth = `${year}-${String(month).padStart(2, "0")}`;
+  const startDate = `${isoMonth}-01`;
+  const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  return {
+    year,
+    month,
+    isoMonth,
+    startDate,
+    endDate
+  };
+}
+function isLocalScheduleDateTimePast(date2, time2, now = /* @__PURE__ */ new Date()) {
+  const dateParts = date2.split("-").map(Number);
+  const timeParts = time2.split(":").map(Number);
+  const year = dateParts[0] || 0;
+  const month = dateParts[1] || 1;
+  const day = dateParts[2] || 1;
+  const hours = timeParts[0] || 0;
+  const minutes = timeParts[1] || 0;
+  return new Date(year, month - 1, day, hours, minutes, 0, 0).getTime() < now.getTime();
+}
+function calculateScheduleUrgency(date2, time2, now = /* @__PURE__ */ new Date()) {
+  const dateParts = date2.split("-").map(Number);
+  const timeParts = time2.split(":").map(Number);
+  const massDateTime = new Date(
+    dateParts[0] || 0,
+    (dateParts[1] || 1) - 1,
+    dateParts[2] || 1,
+    timeParts[0] || 0,
+    timeParts[1] || 0,
+    0,
+    0
+  );
+  const hoursUntilMass = (massDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
+  if (hoursUntilMass < 12) return "critical";
+  if (hoursUntilMass < 24) return "high";
+  if (hoursUntilMass < 72) return "medium";
+  return "low";
+}
+function buildMissionPendingActions(input) {
+  const actions = [];
+  if (input.questionnaire) {
+    actions.push({
+      id: input.questionnaire.id,
+      type: "questionnaire",
+      title: "Responder questionario",
+      subtitle: input.questionnaire.title,
+      priority: "high",
+      deepLink: `/questionnaires/${input.questionnaire.id}`,
+      dueAt: toIsoDate(input.questionnaire.deadline)
+    });
+  }
+  if (input.substitution) {
+    actions.push({
+      id: input.substitution.id,
+      type: "substitution",
+      title: "Acompanhar substituicao",
+      subtitle: `Status: ${input.substitution.status}`,
+      priority: input.substitution.status === "pending" ? "high" : "normal",
+      deepLink: `/substitutions/${input.substitution.id}`
+    });
+  }
+  if ((input.unreadNoticesCount ?? 0) > 0) {
+    actions.push({
+      id: "notices-unread",
+      type: "notice",
+      title: "Avisos nao lidos",
+      subtitle: `${input.unreadNoticesCount} aviso(s) aguardando leitura`,
+      priority: "normal",
+      deepLink: "/notices"
+    });
+  }
+  return actions;
+}
+
+// server/routes/mobile.ts
+var router41 = Router41();
+var loginSchema2 = z18.object({
+  email: z18.string().email("Email invalido"),
+  password: z18.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  keepSignedIn: z18.boolean().optional().default(false),
+  deviceId: z18.string().min(8).max(128).optional(),
+  platform: z18.enum(["ios", "android"]).optional(),
+  appVersion: z18.string().max(64).optional()
+});
+var refreshSchema = z18.object({
+  refreshToken: z18.string().min(32),
+  deviceId: z18.string().min(8).max(128).optional()
+});
+var logoutSchema = z18.object({
+  deviceId: z18.string().min(8).max(128).optional(),
+  deviceDbId: z18.string().uuid().optional()
+});
+var deviceSchema = z18.object({
+  deviceId: z18.string().min(8).max(128).optional(),
+  platform: z18.enum(["ios", "android"]).optional(),
+  appVersion: z18.string().max(64).optional(),
+  pushToken: z18.string().nullable().optional(),
+  pushProvider: z18.enum(["apns", "fcm"]).nullable().optional(),
+  pushEnabled: z18.boolean().optional(),
+  biometricCapable: z18.boolean().optional(),
+  biometricEnabled: z18.boolean().optional(),
+  notificationPreferences: z18.record(z18.unknown()).optional()
+});
+var questionnaireResponseSchema = z18.object({
+  responses: z18.array(z18.object({
+    questionId: z18.string(),
+    answer: z18.union([
+      z18.string(),
+      z18.array(z18.string()),
+      z18.boolean(),
+      z18.object({
+        answer: z18.string(),
+        selectedOptions: z18.array(z18.string()).optional()
+      })
+    ]),
+    metadata: z18.any().optional()
+  })),
+  sharedWithFamilyIds: z18.array(z18.string()).optional()
+});
+var substitutionCreateSchema = z18.object({
+  scheduleId: z18.string().uuid(),
+  substituteId: z18.string().optional().nullable(),
+  reason: z18.string().max(1e3).optional().nullable()
+});
+var confirmationSchema = z18.object({
+  status: z18.enum(["confirmed", "declined"]).default("confirmed"),
+  declineReason: z18.string().max(1e3).optional().nullable(),
+  notes: z18.string().max(1e3).optional().nullable()
+});
+var profileUpdateSchema = z18.object({
+  name: z18.string().min(3).max(255).optional(),
+  phone: z18.string().max(20).nullable().optional(),
+  whatsapp: z18.string().max(20).nullable().optional(),
+  scheduleDisplayName: z18.string().max(100).nullable().optional(),
+  ministryStartDate: z18.string().nullable().optional(),
+  maritalStatus: z18.string().max(20).nullable().optional(),
+  preferredPosition: z18.number().int().min(1).max(30).nullable().optional(),
+  preferredPositions: z18.array(z18.number().int().min(1).max(30)).optional(),
+  avoidPositions: z18.array(z18.number().int().min(1).max(30)).optional(),
+  preferredTimes: z18.array(z18.string()).optional(),
+  availableForSpecialEvents: z18.boolean().optional(),
+  extraActivities: z18.object({
+    sickCommunion: z18.boolean().optional(),
+    mondayAdoration: z18.boolean().optional(),
+    helpOtherPastorals: z18.boolean().optional(),
+    festiveEvents: z18.boolean().optional()
+  }).optional()
+});
+var mobilePlatformSchema = z18.enum(["ios", "android"]).optional();
+var MobileHttpError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+};
+function getHeader(req, name) {
+  const value = req.headers[name.toLowerCase()];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+function getDeviceId(req, fallback) {
+  return fallback ?? getHeader(req, "x-device-id") ?? void 0;
+}
+function dbBoolean(value) {
+  return process.env.DATABASE_URL ? value : value ? 1 : 0;
+}
+function requireIdempotencyKey(req) {
+  const idempotencyKey = parseMobileIdempotencyKey(getHeader(req, "idempotency-key"));
+  if (!idempotencyKey) {
+    throw new MobileHttpError(400, "Informe Idempotency-Key valido para esta mutacao");
+  }
+  return idempotencyKey;
+}
+async function startMobileMutationIdempotency(input) {
+  const idempotencyKey = requireIdempotencyKey(input.req);
+  const path4 = (input.req.originalUrl || `${input.req.baseUrl}${input.req.path}`).split("?")[0];
+  const requestHash = buildMobileRequestFingerprint({
+    method: input.req.method,
+    path: path4,
+    communityId: input.communityId,
+    body: input.body ?? input.req.body ?? null
+  });
+  return beginMobileIdempotency({
+    userId: input.userId,
+    idempotencyKey,
+    method: input.req.method,
+    path: path4,
+    requestHash
+  });
+}
+async function releaseMobileIdempotencyQuietly(recordId) {
+  if (!recordId) return;
+  try {
+    await releaseMobileIdempotency(recordId);
+  } catch (error) {
+    console.error("[Mobile API] Failed to release idempotency record:", error);
+  }
+}
+function todayDateOnly() {
+  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+}
+function getRequestedMonth(value) {
+  if (typeof value === "string" && !/^\d{4}-\d{2}$/.test(value)) {
+    throw new MobileHttpError(400, "Mes invalido. Use o formato YYYY-MM.");
+  }
+  try {
+    return parseMobileMonth(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Mes invalido. Use o formato YYYY-MM.";
+    throw new MobileHttpError(400, message);
+  }
+}
+function parseStoredJson(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+function toMobileSubstitution(row) {
+  return {
+    id: row.id,
+    scheduleId: row.scheduleId,
+    requesterId: row.requesterId,
+    substituteId: row.substituteId,
+    status: row.status,
+    reason: row.reason,
+    urgency: row.urgency,
+    responseMessage: row.responseMessage,
+    schedule: {
+      id: row.scheduleId,
+      date: row.scheduleDate,
+      time: row.scheduleTime,
+      type: row.scheduleType,
+      location: row.scheduleLocation,
+      deepLink: `/schedules/${row.scheduleId}`
+    },
+    deepLink: `/substitutions/${row.id}`,
+    createdAt: toIsoDate(row.createdAt),
+    updatedAt: toIsoDate(row.updatedAt)
+  };
+}
+function toMobileCommunity(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    colorHex: row.colorHex,
+    parishName: row.parishName,
+    isMatriz: row.isMatriz
+  };
+}
+function toMobileProfile(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone,
+    whatsapp: user.whatsapp,
+    role: user.role,
+    status: user.status,
+    photoUrl: user.photoUrl ?? user.profileImageUrl ?? null,
+    homeCommunityId: user.homeCommunityId,
+    scheduleDisplayName: user.scheduleDisplayName,
+    ministryStartDate: toDateOnly(user.ministryStartDate),
+    maritalStatus: user.maritalStatus,
+    preferredPosition: user.preferredPosition,
+    preferredPositions: user.preferredPositions ?? [],
+    avoidPositions: user.avoidPositions ?? [],
+    preferredTimes: user.preferredTimes ?? [],
+    availableForSpecialEvents: Boolean(user.availableForSpecialEvents),
+    extraActivities: user.extraActivities ?? {},
+    requiresPasswordChange: Boolean(user.requiresPasswordChange),
+    createdAt: toIsoDate(user.createdAt),
+    updatedAt: toIsoDate(user.updatedAt)
+  };
+}
+async function getAccessibleCommunities(user) {
+  const rows = await db.select({
+    id: communities.id,
+    name: communities.name,
+    slug: communities.slug,
+    colorHex: communities.colorHex,
+    parishName: communities.parishName,
+    isMatriz: communities.isMatriz
+  }).from(communities).where(
+    and41(
+      eq54(communities.active, dbBoolean(true)),
+      isParishWide(user.role) ? void 0 : eq54(communities.id, user.homeCommunityId)
+    )
+  ).orderBy(desc19(communities.isMatriz), asc5(communities.name));
+  return rows.map(toMobileCommunity);
+}
+async function resolveActiveCommunity(req) {
+  const user = req.user;
+  if (!user) {
+    throw new MobileHttpError(401, "Usuario nao autenticado");
+  }
+  const requestedCommunityId = getHeader(req, "x-community-id");
+  const communityScope = resolveMobileCommunityScope(user, requestedCommunityId);
+  if (!communityScope.allowed) {
+    throw new MobileHttpError(communityScope.status, communityScope.message);
+  }
+  const [row] = await db.select({
+    id: communities.id,
+    name: communities.name,
+    slug: communities.slug,
+    colorHex: communities.colorHex,
+    parishName: communities.parishName,
+    isMatriz: communities.isMatriz
+  }).from(communities).where(
+    and41(
+      eq54(communities.id, communityScope.activeCommunityId),
+      eq54(communities.active, dbBoolean(true))
+    )
+  ).limit(1);
+  if (!row) {
+    throw new MobileHttpError(404, "Comunidade nao encontrada ou inativa");
+  }
+  return toMobileCommunity(row);
+}
+function handleMobileError(res, error, fallbackMessage) {
+  if (error instanceof MobileHttpError) {
+    return res.status(error.status).json({ success: false, message: error.message });
+  }
+  if (error instanceof MobileSessionError) {
+    return res.status(error.status).json({ success: false, message: error.message });
+  }
+  if (error instanceof MobileIdempotencyError) {
+    return res.status(error.status).json({ success: false, message: error.message });
+  }
+  if (error instanceof z18.ZodError) {
+    return res.status(400).json({
+      success: false,
+      message: "Dados invalidos",
+      errors: error.errors
+    });
+  }
+  console.error(`[Mobile API] ${fallbackMessage}:`, error);
+  return res.status(500).json({
+    success: false,
+    message: fallbackMessage
+  });
+}
+router41.get("/app/config", (req, res) => {
+  const platform = mobilePlatformSchema.safeParse(
+    req.query.platform ?? req.headers["x-platform"]
+  );
+  res.json({
+    apiVersion: "mobile-v1",
+    serverTime: (/* @__PURE__ */ new Date()).toISOString(),
+    platform: platform.success ? platform.data ?? null : null,
+    minimumSupported: {
+      ios: { version: "1.0.0", build: 1 },
+      android: { version: "1.0.0", build: 1 }
+    },
+    featureFlags: {
+      biometrics: true,
+      pushRegistration: true,
+      refreshTokenRotation: true,
+      coordinatorMobile: false
+    },
+    links: {
+      privacy: "/privacy-policy",
+      terms: "/terms-of-use",
+      accountDeletion: "/account-deletion",
+      support: "mailto:suporte@saojudastadeu.app"
+    }
+  });
+});
+router41.post("/auth/login", authRateLimiter, async (req, res) => {
+  let parsed;
+  try {
+    parsed = loginSchema2.parse(req.body);
+    const result = await login(parsed.email, parsed.password);
+    await auditLoginAttempt(parsed.email, true, req, void 0, result.user.id);
+    await logActivity(result.user.id, "login", {
+      platform: parsed.platform ?? req.get("x-platform") ?? "unknown",
+      appVersion: parsed.appVersion ?? req.get("x-app-version") ?? "unknown",
+      source: "mobile-v1"
+    }, req);
+    const sessionToken = await createSession(
+      result.user.id,
+      req.ip || req.socket.remoteAddress,
+      req.get("user-agent")
+    );
+    const mobileSession = await createMobileSession({
+      userId: result.user.id,
+      deviceId: getDeviceId(req, parsed.deviceId),
+      platform: parsed.platform ?? req.get("x-platform"),
+      appVersion: parsed.appVersion ?? req.get("x-app-version"),
+      keepSignedIn: parsed.keepSignedIn,
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.get("user-agent")
+    });
+    const mobileUser = sanitizeMobileUser(result.user);
+    const accessibleCommunities = await getAccessibleCommunities(result.user);
+    res.json({
+      success: true,
+      auth: {
+        tokenType: "Bearer",
+        accessToken: result.token,
+        refreshToken: mobileSession.refreshToken,
+        refreshTokenExpiresAt: mobileSession.refreshTokenExpiresAt?.toISOString() ?? null,
+        sessionToken,
+        expiresInSeconds: parseJwtExpirySeconds(process.env.JWT_EXPIRES_IN || "24h"),
+        keepSignedIn: parsed.keepSignedIn
+      },
+      user: mobileUser,
+      communities: accessibleCommunities,
+      activeCommunityId: mobileUser.homeCommunityId,
+      device: {
+        ...sanitizeMobileDevice(mobileSession.device),
+        registered: true
+      },
+      capabilities: {
+        biometricUnlock: true,
+        refreshTokenRotation: true,
+        remoteDeviceLogout: true
+      }
+    });
+  } catch (error) {
+    if (parsed?.email) {
+      const message2 = error instanceof Error ? error.message : "Credenciais invalidas";
+      await auditLoginAttempt(parsed.email, false, req, message2);
+    }
+    if (error instanceof z18.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Dados invalidos",
+        errors: error.errors
+      });
+    }
+    const message = error instanceof Error ? error.message : "Erro ao fazer login";
+    return res.status(401).json({
+      success: false,
+      message
+    });
+  }
+});
+router41.post("/auth/refresh", authRateLimiter, async (req, res) => {
+  try {
+    const parsed = refreshSchema.parse(req.body);
+    const refreshed = await consumeMobileRefreshToken({
+      refreshToken: parsed.refreshToken,
+      deviceId: getDeviceId(req, parsed.deviceId),
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.get("user-agent")
+    });
+    const accessToken = generateToken(refreshed.user);
+    const mobileUser = sanitizeMobileUser(refreshed.user);
+    const accessibleCommunities = await getAccessibleCommunities(refreshed.user);
+    res.json({
+      success: true,
+      auth: {
+        tokenType: "Bearer",
+        accessToken,
+        refreshToken: refreshed.refreshToken,
+        refreshTokenExpiresAt: refreshed.refreshTokenExpiresAt.toISOString(),
+        sessionToken: null,
+        expiresInSeconds: parseJwtExpirySeconds(process.env.JWT_EXPIRES_IN || "24h"),
+        keepSignedIn: true
+      },
+      user: mobileUser,
+      communities: accessibleCommunities,
+      activeCommunityId: mobileUser.homeCommunityId,
+      device: {
+        ...sanitizeMobileDevice(refreshed.device),
+        registered: true
+      }
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao renovar sessao mobile");
+  }
+});
+router41.post("/auth/logout", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = logoutSchema.parse(req.body ?? {});
+    const deviceId = getDeviceId(req, parsed.deviceId);
+    if (!deviceId && !parsed.deviceDbId) {
+      throw new MobileHttpError(400, "Informe X-Device-Id ou deviceDbId para encerrar a sessao mobile");
+    }
+    const revoked = await revokeMobileDeviceForUser({
+      userId: user.id,
+      deviceDbId: parsed.deviceDbId,
+      deviceId
+    });
+    res.json({
+      success: true,
+      revoked
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao encerrar sessao mobile");
+  }
+});
+router41.get("/auth/me", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const accessibleCommunities = await getAccessibleCommunities(user);
+    res.json({
+      success: true,
+      user: sanitizeMobileUser(user),
+      communities: accessibleCommunities,
+      activeCommunityId: user.homeCommunityId
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao buscar usuario mobile");
+  }
+});
+router41.get("/devices", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const devices = await listMobileDevicesForUser(user.id);
+    res.json({
+      success: true,
+      devices: devices.map(sanitizeMobileDevice)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao listar dispositivos");
+  }
+});
+router41.put("/devices/current", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = deviceSchema.parse(req.body ?? {});
+    const deviceId = getDeviceId(req, parsed.deviceId);
+    if (!deviceId) {
+      throw new MobileHttpError(400, "Informe X-Device-Id ou deviceId para registrar o dispositivo");
+    }
+    const device = await createOrUpdateMobileDevice({
+      userId: user.id,
+      deviceId,
+      platform: parsed.platform ?? getHeader(req, "x-platform"),
+      appVersion: parsed.appVersion ?? getHeader(req, "x-app-version"),
+      pushToken: parsed.pushToken,
+      pushProvider: parsed.pushProvider,
+      pushEnabled: parsed.pushEnabled,
+      biometricCapable: parsed.biometricCapable,
+      biometricEnabled: parsed.biometricEnabled,
+      notificationPreferences: parsed.notificationPreferences
+    });
+    res.json({
+      success: true,
+      device: sanitizeMobileDevice(device)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao registrar dispositivo");
+  }
+});
+router41.delete("/devices/:id", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const revoked = await revokeMobileDeviceForUser({
+      userId: user.id,
+      deviceDbId: req.params.id
+    });
+    if (!revoked) {
+      throw new MobileHttpError(404, "Dispositivo nao encontrado");
+    }
+    res.json({
+      success: true,
+      revoked
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao revogar dispositivo");
+  }
+});
+router41.get("/profile", authenticateToken, async (req, res) => {
+  try {
+    const authUser = req.user;
+    if (!authUser) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const [user] = await db.select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      phone: users.phone,
+      whatsapp: users.whatsapp,
+      role: users.role,
+      status: users.status,
+      photoUrl: users.photoUrl,
+      profileImageUrl: users.profileImageUrl,
+      homeCommunityId: users.homeCommunityId,
+      scheduleDisplayName: users.scheduleDisplayName,
+      ministryStartDate: users.ministryStartDate,
+      maritalStatus: users.maritalStatus,
+      preferredPosition: users.preferredPosition,
+      preferredPositions: users.preferredPositions,
+      avoidPositions: users.avoidPositions,
+      preferredTimes: users.preferredTimes,
+      availableForSpecialEvents: users.availableForSpecialEvents,
+      extraActivities: users.extraActivities,
+      requiresPasswordChange: users.requiresPasswordChange,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt
+    }).from(users).where(eq54(users.id, authUser.id)).limit(1);
+    if (!user) {
+      throw new MobileHttpError(404, "Perfil nao encontrado");
+    }
+    res.json({
+      success: true,
+      profile: toMobileProfile(user)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar perfil");
+  }
+});
+router41.patch("/profile", authenticateToken, async (req, res) => {
+  try {
+    const authUser = req.user;
+    if (!authUser) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = profileUpdateSchema.parse(req.body ?? {});
+    const updateData = {};
+    if (parsed.name !== void 0) updateData.name = parsed.name.trim();
+    if (parsed.phone !== void 0) updateData.phone = parsed.phone;
+    if (parsed.whatsapp !== void 0) updateData.whatsapp = parsed.whatsapp;
+    if (parsed.scheduleDisplayName !== void 0) {
+      updateData.scheduleDisplayName = parsed.scheduleDisplayName ? formatMinisterName(parsed.scheduleDisplayName) : null;
+    }
+    if (parsed.ministryStartDate !== void 0) updateData.ministryStartDate = parsed.ministryStartDate;
+    if (parsed.maritalStatus !== void 0) updateData.maritalStatus = parsed.maritalStatus;
+    if (parsed.preferredPosition !== void 0) updateData.preferredPosition = parsed.preferredPosition;
+    if (parsed.preferredPositions !== void 0) updateData.preferredPositions = parsed.preferredPositions;
+    if (parsed.avoidPositions !== void 0) updateData.avoidPositions = parsed.avoidPositions;
+    if (parsed.preferredTimes !== void 0) updateData.preferredTimes = parsed.preferredTimes;
+    if (parsed.availableForSpecialEvents !== void 0) {
+      updateData.availableForSpecialEvents = parsed.availableForSpecialEvents;
+    }
+    if (parsed.extraActivities !== void 0) {
+      const [currentUser] = await db.select({ extraActivities: users.extraActivities }).from(users).where(eq54(users.id, authUser.id)).limit(1);
+      const currentExtraActivities = currentUser?.extraActivities ?? {};
+      updateData.extraActivities = {
+        sickCommunion: false,
+        mondayAdoration: false,
+        helpOtherPastorals: false,
+        festiveEvents: false,
+        ...currentExtraActivities,
+        ...parsed.extraActivities
+      };
+    }
+    updateData.updatedAt = /* @__PURE__ */ new Date();
+    const [updated] = await db.update(users).set(updateData).where(eq54(users.id, authUser.id)).returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      phone: users.phone,
+      whatsapp: users.whatsapp,
+      role: users.role,
+      status: users.status,
+      photoUrl: users.photoUrl,
+      profileImageUrl: users.profileImageUrl,
+      homeCommunityId: users.homeCommunityId,
+      scheduleDisplayName: users.scheduleDisplayName,
+      ministryStartDate: users.ministryStartDate,
+      maritalStatus: users.maritalStatus,
+      preferredPosition: users.preferredPosition,
+      preferredPositions: users.preferredPositions,
+      avoidPositions: users.avoidPositions,
+      preferredTimes: users.preferredTimes,
+      availableForSpecialEvents: users.availableForSpecialEvents,
+      extraActivities: users.extraActivities,
+      requiresPasswordChange: users.requiresPasswordChange,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt
+    });
+    if (!updated) {
+      throw new MobileHttpError(404, "Perfil nao encontrado");
+    }
+    await logActivity(authUser.id, "update_profile", {
+      source: "mobile-v1",
+      changedFields: Object.keys(parsed)
+    }, req);
+    res.json({
+      success: true,
+      profile: toMobileProfile(updated)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao atualizar perfil");
+  }
+});
+router41.get("/notifications", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const rows = await db.select({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      message: notifications.message,
+      priority: notifications.priority,
+      read: notifications.read,
+      readAt: notifications.readAt,
+      actionUrl: notifications.actionUrl,
+      createdAt: notifications.createdAt
+    }).from(notifications).where(eq54(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(limit);
+    res.json({
+      success: true,
+      notifications: rows.map((notification) => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        priority: notification.priority,
+        read: Boolean(notification.read),
+        readAt: toIsoDate(notification.readAt),
+        deepLink: notification.actionUrl ?? "/notifications",
+        createdAt: toIsoDate(notification.createdAt)
+      })),
+      unreadCount: rows.filter((notification) => !notification.read).length
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar notificacoes");
+  }
+});
+router41.patch("/notifications/read-all", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.userId, user.id), eq54(notifications.read, dbBoolean(false))));
+    res.json({ success: true });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao marcar notificacoes como lidas");
+  }
+});
+router41.patch("/notifications/:id/read", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const [notification] = await db.update(notifications).set({ read: true, readAt: /* @__PURE__ */ new Date() }).where(and41(eq54(notifications.id, req.params.id), eq54(notifications.userId, user.id))).returning({
+      id: notifications.id,
+      read: notifications.read,
+      readAt: notifications.readAt
+    });
+    if (!notification) {
+      throw new MobileHttpError(404, "Notificacao nao encontrada");
+    }
+    res.json({
+      success: true,
+      notification: {
+        id: notification.id,
+        read: Boolean(notification.read),
+        readAt: toIsoDate(notification.readAt)
+      }
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao marcar notificacao como lida");
+  }
+});
+router41.get("/privacy/account-deletion-info", authenticateToken, (_req, res) => {
+  res.json({
+    success: true,
+    confirmationText: "EXCLUIR MINHA CONTA",
+    retainedOperationalData: "Escalas e registros operacionais podem ser preservados sem dados pessoais identificaveis para continuidade pastoral, auditoria e seguranca.",
+    deletedData: [
+      "nome, email, telefone, foto e dados sacramentais",
+      "notificacoes e inscricoes de push",
+      "sessoes ativas e dispositivos moveis",
+      "vinculos familiares",
+      "respostas de questionarios e observacoes pessoais",
+      "progresso de formacao, gamificacao e certificados vinculados a conta"
+    ]
+  });
+});
+router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const [questionnaire] = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      description: questionnaires.description,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      status: questionnaires.status,
+      questions: questionnaires.questions,
+      deadline: questionnaires.deadline,
+      updatedAt: questionnaires.updatedAt
+    }).from(questionnaires).where(
+      and41(
+        eq54(questionnaires.communityId, activeCommunity.id),
+        eq54(questionnaires.status, "published"),
+        eq54(questionnaires.month, monthRange.month),
+        eq54(questionnaires.year, monthRange.year)
+      )
+    ).orderBy(desc19(questionnaires.updatedAt)).limit(1);
+    if (!questionnaire) {
+      return res.json({
+        success: true,
+        community: activeCommunity,
+        month: monthRange.isoMonth,
+        questionnaire: null
+      });
+    }
+    const [response] = await db.select({
+      id: questionnaireResponses.id,
+      responses: questionnaireResponses.responses,
+      submittedAt: questionnaireResponses.submittedAt,
+      updatedAt: questionnaireResponses.updatedAt
+    }).from(questionnaireResponses).where(
+      and41(
+        eq54(questionnaireResponses.questionnaireId, questionnaire.id),
+        eq54(questionnaireResponses.userId, user.id),
+        eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+      )
+    ).limit(1);
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        description: questionnaire.description,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        questions: questionnaire.questions,
+        deadline: toIsoDate(questionnaire.deadline),
+        responseStatus: response ? "answered" : "pending",
+        response: response ? {
+          id: response.id,
+          responses: parseStoredJson(response.responses),
+          submittedAt: toIsoDate(response.submittedAt),
+          updatedAt: toIsoDate(response.updatedAt)
+        } : null
+      }
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar questionario atual");
+  }
+});
+router41.post("/questionnaires/:id/response", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = questionnaireResponseSchema.parse(req.body);
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+    const [questionnaire] = await db.select().from(questionnaires).where(and41(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    if (questionnaire.status === "closed") {
+      throw new MobileHttpError(400, "Este questionario foi encerrado e nao aceita respostas");
+    }
+    if (questionnaire.status !== "published") {
+      throw new MobileHttpError(400, "Questionario ainda nao esta publicado");
+    }
+    const processingResult = QuestionnaireService.standardizeResponseWithTracking(
+      parsed.responses,
+      questionnaire.month,
+      questionnaire.year
+    );
+    const standardizedResponse = processingResult.standardized;
+    const extractedData = QuestionnaireService.extractStructuredData(standardizedResponse);
+    if (extractedData.alternativeTimes && Array.isArray(extractedData.alternativeTimes)) {
+      standardizedResponse.alternative_times = extractedData.alternativeTimes;
+    }
+    delete standardizedResponse._alternativeTimes;
+    delete standardizedResponse._preferredTime;
+    const [saved] = await db.insert(questionnaireResponses).values({
+      userId: user.id,
+      questionnaireId: questionnaire.id,
+      communityId: questionnaire.communityId,
+      responses: JSON.stringify(standardizedResponse),
+      availableSundays: extractedData.availableSundays,
+      preferredMassTimes: extractedData.preferredMassTimes,
+      alternativeTimes: extractedData.alternativeTimes,
+      dailyMassAvailability: extractedData.dailyMassAvailability,
+      specialEvents: extractedData.specialEvents,
+      canSubstitute: extractedData.canSubstitute,
+      notes: extractedData.notes,
+      unmappedResponses: processingResult.unmappedResponses,
+      processingWarnings: processingResult.warnings,
+      sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
+      isSharedResponse: false,
+      isDeleted: false,
+      deletedAt: null,
+      submittedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).onConflictDoUpdate({
+      target: [questionnaireResponses.userId, questionnaireResponses.questionnaireId],
+      set: {
+        responses: JSON.stringify(standardizedResponse),
+        availableSundays: extractedData.availableSundays,
+        preferredMassTimes: extractedData.preferredMassTimes,
+        alternativeTimes: extractedData.alternativeTimes,
+        dailyMassAvailability: extractedData.dailyMassAvailability,
+        specialEvents: extractedData.specialEvents,
+        canSubstitute: extractedData.canSubstitute,
+        notes: extractedData.notes,
+        unmappedResponses: processingResult.unmappedResponses,
+        processingWarnings: processingResult.warnings,
+        sharedWithFamilyIds: parsed.sharedWithFamilyIds || [],
+        isSharedResponse: false,
+        isDeleted: false,
+        deletedAt: null,
+        submittedAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    }).returning();
+    await logActivity(user.id, "respond_questionnaire", {
+      source: "mobile-v1",
+      questionnaireId: questionnaire.id,
+      communityId: activeCommunity.id,
+      idempotencyKey
+    }, req);
+    const responseBody = {
+      success: true,
+      response: {
+        id: saved.id,
+        questionnaireId: questionnaire.id,
+        submittedAt: toIsoDate(saved.submittedAt),
+        updatedAt: toIsoDate(saved.updatedAt),
+        processingWarnings: processingResult.warnings,
+        unmappedResponses: processingResult.unmappedResponses
+      }
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody
+    });
+    idempotencyRecordId = null;
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao salvar resposta do questionario");
+  }
+});
+router41.get("/substitutions", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const admin = isAdmin(user.role);
+    const rows = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      substituteId: substitutionRequests.substituteId,
+      status: substitutionRequests.status,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      responseMessage: substitutionRequests.responseMessage,
+      createdAt: substitutionRequests.createdAt,
+      updatedAt: substitutionRequests.updatedAt,
+      scheduleDate: schedules.date,
+      scheduleTime: schedules.time,
+      scheduleType: schedules.type,
+      scheduleLocation: schedules.location
+    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(
+      and41(
+        eq54(substitutionRequests.communityId, activeCommunity.id),
+        admin ? void 0 : or16(
+          eq54(substitutionRequests.requesterId, user.id),
+          eq54(substitutionRequests.substituteId, user.id),
+          eq54(substitutionRequests.status, "available")
+        )
+      )
+    ).orderBy(desc19(substitutionRequests.createdAt)).limit(50);
+    res.json({
+      success: true,
+      community: activeCommunity,
+      substitutions: rows.map(toMobileSubstitution)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar substituicoes");
+  }
+});
+router41.post("/substitutions", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = substitutionCreateSchema.parse(req.body);
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+    const [schedule] = await db.select().from(schedules).where(and41(eq54(schedules.id, parsed.scheduleId), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    if (!schedule) {
+      throw new MobileHttpError(404, "Escala nao encontrada");
+    }
+    if (schedule.ministerId !== user.id) {
+      throw new MobileHttpError(403, "Voce nao esta escalado para esta missa");
+    }
+    if (isLocalScheduleDateTimePast(schedule.date, schedule.time)) {
+      throw new MobileHttpError(400, "Nao e possivel solicitar substituicao para missa que ja passou");
+    }
+    const [existingRequest] = await db.select().from(substitutionRequests).where(
+      and41(
+        eq54(substitutionRequests.scheduleId, schedule.id),
+        eq54(substitutionRequests.requesterId, user.id),
+        inArray18(substitutionRequests.status, ["available", "pending"])
+      )
+    ).limit(1);
+    if (existingRequest) {
+      throw new MobileHttpError(400, "Ja existe uma solicitacao pendente para esta escala");
+    }
+    const finalSubstituteId = parsed.substituteId || null;
+    const [created] = await db.insert(substitutionRequests).values({
+      scheduleId: schedule.id,
+      requesterId: user.id,
+      substituteId: finalSubstituteId,
+      communityId: activeCommunity.id,
+      reason: parsed.reason || null,
+      status: finalSubstituteId ? "pending" : "available",
+      urgency: calculateScheduleUrgency(schedule.date, schedule.time),
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).returning();
+    await trackSubstitutionRequest(user.id, schedule.id);
+    scheduleCache.invalidateByDate(schedule.date);
+    await logActivity(user.id, "request_substitution", {
+      source: "mobile-v1",
+      scheduleId: schedule.id,
+      substitutionId: created.id,
+      communityId: activeCommunity.id,
+      idempotencyKey
+    }, req);
+    const responseBody = {
+      success: true,
+      substitution: toMobileSubstitution({
+        ...created,
+        scheduleDate: schedule.date,
+        scheduleTime: schedule.time,
+        scheduleType: schedule.type,
+        scheduleLocation: schedule.location
+      })
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 201,
+      responseBody
+    });
+    idempotencyRecordId = null;
+    res.status(201).json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao pedir substituicao");
+  }
+});
+router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const [row] = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      substituteId: substitutionRequests.substituteId,
+      status: substitutionRequests.status,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      responseMessage: substitutionRequests.responseMessage,
+      createdAt: substitutionRequests.createdAt,
+      updatedAt: substitutionRequests.updatedAt,
+      scheduleDate: schedules.date,
+      scheduleTime: schedules.time,
+      scheduleType: schedules.type,
+      scheduleLocation: schedules.location
+    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(and41(eq54(substitutionRequests.id, req.params.id), eq54(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+    if (!row) {
+      throw new MobileHttpError(404, "Substituicao nao encontrada");
+    }
+    if (!isAdmin(user.role) && row.requesterId !== user.id && row.substituteId !== user.id) {
+      throw new MobileHttpError(403, "Sem permissao para ver esta substituicao");
+    }
+    res.json({
+      success: true,
+      substitution: toMobileSubstitution(row)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar substituicao");
+  }
+});
+router41.get("/admin/community/home", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const [activeMinistersResult] = await db.select({ total: count14() }).from(users).where(
+      and41(
+        eq54(users.homeCommunityId, activeCommunity.id),
+        eq54(users.status, "active"),
+        inArray18(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
+      )
+    );
+    const publishedSchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      status: schedules.status
+    }).from(schedules).where(
+      and41(
+        eq54(schedules.communityId, activeCommunity.id),
+        eq54(schedules.status, "published"),
+        gte23(schedules.date, monthRange.startDate),
+        lte19(schedules.date, monthRange.endDate)
+      )
+    ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
+    const [currentQuestionnaire] = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      targetUserIds: questionnaires.targetUserIds
+    }).from(questionnaires).where(
+      and41(
+        eq54(questionnaires.communityId, activeCommunity.id),
+        eq54(questionnaires.status, "published"),
+        eq54(questionnaires.month, monthRange.month),
+        eq54(questionnaires.year, monthRange.year)
+      )
+    ).orderBy(desc19(questionnaires.updatedAt)).limit(1);
+    let responseCount = 0;
+    if (currentQuestionnaire) {
+      const [responseResult] = await db.select({ total: count14() }).from(questionnaireResponses).where(
+        and41(
+          eq54(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
+          eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+        )
+      );
+      responseCount = Number(responseResult?.total ?? 0);
+    }
+    const pendingSubstitutions = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      substituteId: substitutionRequests.substituteId,
+      status: substitutionRequests.status,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      responseMessage: substitutionRequests.responseMessage,
+      createdAt: substitutionRequests.createdAt,
+      updatedAt: substitutionRequests.updatedAt,
+      scheduleDate: schedules.date,
+      scheduleTime: schedules.time,
+      scheduleType: schedules.type,
+      scheduleLocation: schedules.location
+    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(
+      and41(
+        eq54(substitutionRequests.communityId, activeCommunity.id),
+        inArray18(substitutionRequests.status, ["available", "pending"])
+      )
+    ).orderBy(desc19(substitutionRequests.createdAt)).limit(10);
+    const coverageMap = /* @__PURE__ */ new Map();
+    for (const schedule of publishedSchedules) {
+      const key = `${schedule.date}|${schedule.time}|${schedule.type}|${schedule.location ?? ""}`;
+      const current = coverageMap.get(key) ?? {
+        date: schedule.date,
+        time: schedule.time,
+        type: schedule.type,
+        location: schedule.location,
+        assigned: 0,
+        vacancies: 0,
+        scheduleIds: []
+      };
+      if (schedule.ministerId) current.assigned += 1;
+      else current.vacancies += 1;
+      current.scheduleIds.push(schedule.id);
+      coverageMap.set(key, current);
+    }
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      metrics: {
+        activeMinisters: Number(activeMinistersResult?.total ?? 0),
+        publishedAssignments: publishedSchedules.length,
+        pendingSubstitutions: pendingSubstitutions.length,
+        questionnaireResponses: responseCount,
+        questionnairePending: currentQuestionnaire ? Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0) : null
+      },
+      questionnaire: currentQuestionnaire ? {
+        id: currentQuestionnaire.id,
+        title: currentQuestionnaire.title,
+        responses: responseCount,
+        pending: Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0),
+        deepLink: `/admin/questionnaires/${currentQuestionnaire.id}/responses`
+      } : null,
+      coverage: Array.from(coverageMap.values()).map((item) => ({
+        ...item,
+        status: item.vacancies > 0 ? "needs_attention" : "covered"
+      })),
+      substitutions: pendingSubstitutions.map(toMobileSubstitution)
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar painel da comunidade");
+  }
+});
+router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const [questionnaire] = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      status: questionnaires.status,
+      deadline: questionnaires.deadline
+    }).from(questionnaires).where(and41(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    const rows = await db.select({
+      responseId: questionnaireResponses.id,
+      userId: questionnaireResponses.userId,
+      responses: questionnaireResponses.responses,
+      canSubstitute: questionnaireResponses.canSubstitute,
+      availableSundays: questionnaireResponses.availableSundays,
+      preferredMassTimes: questionnaireResponses.preferredMassTimes,
+      alternativeTimes: questionnaireResponses.alternativeTimes,
+      dailyMassAvailability: questionnaireResponses.dailyMassAvailability,
+      notes: questionnaireResponses.notes,
+      processingWarnings: questionnaireResponses.processingWarnings,
+      submittedAt: questionnaireResponses.submittedAt,
+      updatedAt: questionnaireResponses.updatedAt,
+      ministerName: users.name,
+      ministerPhotoUrl: users.photoUrl
+    }).from(questionnaireResponses).innerJoin(users, eq54(questionnaireResponses.userId, users.id)).where(
+      and41(
+        eq54(questionnaireResponses.questionnaireId, questionnaire.id),
+        eq54(questionnaireResponses.communityId, activeCommunity.id),
+        eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+      )
+    ).orderBy(asc5(users.name));
+    res.json({
+      success: true,
+      community: activeCommunity,
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        deadline: toIsoDate(questionnaire.deadline)
+      },
+      responses: rows.map((row) => ({
+        id: row.responseId,
+        userId: row.userId,
+        ministerName: row.ministerName,
+        ministerPhotoUrl: row.ministerPhotoUrl,
+        canSubstitute: Boolean(row.canSubstitute),
+        availableSundays: row.availableSundays ?? [],
+        preferredMassTimes: row.preferredMassTimes ?? [],
+        alternativeTimes: row.alternativeTimes ?? [],
+        dailyMassAvailability: row.dailyMassAvailability ?? [],
+        notes: row.notes,
+        processingWarnings: row.processingWarnings ?? [],
+        responses: parseStoredJson(row.responses),
+        submittedAt: toIsoDate(row.submittedAt),
+        updatedAt: toIsoDate(row.updatedAt)
+      }))
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar respostas do questionario");
+  }
+});
+router41.get("/admin/ministers", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const rows = await db.select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      status: users.status,
+      phone: users.phone,
+      whatsapp: users.whatsapp,
+      photoUrl: users.photoUrl,
+      scheduleDisplayName: users.scheduleDisplayName,
+      preferredPosition: users.preferredPosition,
+      preferredPositions: users.preferredPositions,
+      avoidPositions: users.avoidPositions
+    }).from(users).where(
+      and41(
+        eq54(users.homeCommunityId, activeCommunity.id),
+        inArray18(users.status, ["active", "pending"]),
+        inArray18(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
+      )
+    ).orderBy(asc5(users.name)).limit(200);
+    res.json({
+      success: true,
+      community: activeCommunity,
+      ministers: rows.map((minister) => ({
+        id: minister.id,
+        name: minister.name,
+        displayName: minister.scheduleDisplayName || minister.name,
+        role: minister.role,
+        status: minister.status,
+        phone: minister.phone,
+        whatsapp: minister.whatsapp,
+        photoUrl: minister.photoUrl,
+        preferredPosition: minister.preferredPosition,
+        preferredPositions: minister.preferredPositions ?? [],
+        avoidPositions: minister.avoidPositions ?? [],
+        deepLink: `/admin/ministers/${minister.id}`
+      }))
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar diretorio de ministros");
+  }
+});
+router41.get("/mission/home", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const today = todayDateOnly();
+    const [nextMission] = await db.select({
+      id: schedules.id,
+      communityId: schedules.communityId,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      confirmationStatus: scheduleConfirmations.status
+    }).from(schedules).leftJoin(
+      scheduleConfirmations,
+      and41(
+        eq54(scheduleConfirmations.scheduleId, schedules.id),
+        eq54(scheduleConfirmations.ministerId, user.id)
+      )
+    ).where(
+      and41(
+        eq54(schedules.communityId, activeCommunity.id),
+        eq54(schedules.ministerId, user.id),
+        eq54(schedules.status, "published"),
+        gte23(schedules.date, today)
+      )
+    ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position)).limit(1);
+    const monthlySchedules = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      position: schedules.position,
+      status: schedules.status
+    }).from(schedules).where(
+      and41(
+        eq54(schedules.communityId, activeCommunity.id),
+        eq54(schedules.ministerId, user.id),
+        eq54(schedules.status, "published"),
+        gte23(schedules.date, monthRange.startDate),
+        lte19(schedules.date, monthRange.endDate)
+      )
+    ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
+    const questionnaireCandidates = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      description: questionnaires.description,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      deadline: questionnaires.deadline,
+      updatedAt: questionnaires.updatedAt
+    }).from(questionnaires).where(
+      and41(
+        eq54(questionnaires.communityId, activeCommunity.id),
+        eq54(questionnaires.status, "published"),
+        eq54(questionnaires.month, monthRange.month),
+        eq54(questionnaires.year, monthRange.year)
+      )
+    ).orderBy(desc19(questionnaires.updatedAt)).limit(5);
+    let pendingQuestionnaire = null;
+    for (const questionnaire of questionnaireCandidates) {
+      const [response] = await db.select({ id: questionnaireResponses.id }).from(questionnaireResponses).where(
+        and41(
+          eq54(questionnaireResponses.questionnaireId, questionnaire.id),
+          eq54(questionnaireResponses.userId, user.id),
+          eq54(questionnaireResponses.isDeleted, dbBoolean(false))
+        )
+      ).limit(1);
+      if (!response) {
+        pendingQuestionnaire = questionnaire;
+        break;
+      }
+    }
+    const [activeSubstitution] = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      status: substitutionRequests.status,
+      updatedAt: substitutionRequests.updatedAt
+    }).from(substitutionRequests).where(
+      and41(
+        eq54(substitutionRequests.communityId, activeCommunity.id),
+        eq54(substitutionRequests.requesterId, user.id),
+        inArray18(substitutionRequests.status, ["available", "pending", "approved"])
+      )
+    ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
+    const notices = await db.select({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      message: notifications.message,
+      priority: notifications.priority,
+      read: notifications.read,
+      actionUrl: notifications.actionUrl,
+      createdAt: notifications.createdAt
+    }).from(notifications).where(eq54(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(5);
+    const unreadNoticesCount = notices.filter((notice) => !notice.read).length;
+    const pendingActions = buildMissionPendingActions({
+      questionnaire: pendingQuestionnaire,
+      substitution: activeSubstitution,
+      unreadNoticesCount
+    });
+    res.json({
+      success: true,
+      user: sanitizeMobileUser(user),
+      community: activeCommunity,
+      nextMission: nextMission ? {
+        id: nextMission.id,
+        date: toDateOnly(nextMission.date),
+        time: nextMission.time,
+        type: nextMission.type,
+        location: nextMission.location,
+        position: nextMission.position,
+        status: nextMission.status,
+        notes: nextMission.notes,
+        confirmationStatus: nextMission.confirmationStatus ?? null,
+        canConfirm: !nextMission.confirmationStatus || nextMission.confirmationStatus === "pending",
+        canRequestSubstitution: true,
+        deepLink: `/schedules/${nextMission.id}`
+      } : null,
+      pendingActions,
+      monthlySummary: {
+        month: monthRange.isoMonth,
+        publishedAssignments: monthlySchedules.length,
+        nextScheduleId: nextMission?.id ?? null
+      },
+      notices: notices.map((notice) => ({
+        id: notice.id,
+        type: notice.type,
+        title: notice.title,
+        message: notice.message,
+        priority: notice.priority,
+        read: Boolean(notice.read),
+        deepLink: notice.actionUrl ?? "/notices",
+        createdAt: toIsoDate(notice.createdAt)
+      })),
+      sync: {
+        serverTime: (/* @__PURE__ */ new Date()).toISOString(),
+        cacheMaxAgeSeconds: 300
+      }
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar Minha Missao");
+  }
+});
+router41.get("/schedules/month", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const rows = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes
+    }).from(schedules).where(
+      and41(
+        eq54(schedules.communityId, activeCommunity.id),
+        eq54(schedules.ministerId, user.id),
+        eq54(schedules.status, "published"),
+        gte23(schedules.date, monthRange.startDate),
+        lte19(schedules.date, monthRange.endDate)
+      )
+    ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      schedules: rows.map((schedule) => ({
+        id: schedule.id,
+        date: toDateOnly(schedule.date),
+        time: schedule.time,
+        type: schedule.type,
+        location: schedule.location,
+        position: schedule.position,
+        status: schedule.status,
+        notes: schedule.notes,
+        deepLink: `/schedules/${schedule.id}`
+      }))
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar escalas do mes");
+  }
+});
+router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = confirmationSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+    const [schedule] = await db.select().from(schedules).where(and41(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    if (!schedule) {
+      throw new MobileHttpError(404, "Escala nao encontrada");
+    }
+    if (schedule.ministerId !== user.id) {
+      throw new MobileHttpError(403, "Voce nao esta escalado para esta missa");
+    }
+    if (schedule.status !== "published") {
+      throw new MobileHttpError(400, "Esta escala ainda nao esta publicada para confirmacao");
+    }
+    if (isLocalScheduleDateTimePast(schedule.date, schedule.time)) {
+      throw new MobileHttpError(400, "Nao e possivel confirmar missa que ja passou");
+    }
+    const now = /* @__PURE__ */ new Date();
+    const [confirmation] = await db.insert(scheduleConfirmations).values({
+      communityId: activeCommunity.id,
+      scheduleId: schedule.id,
+      ministerId: user.id,
+      status: parsed.status,
+      respondedAt: now,
+      declineReason: parsed.status === "declined" ? parsed.declineReason ?? null : null,
+      notes: parsed.notes ?? null,
+      updatedAt: now
+    }).onConflictDoUpdate({
+      target: [scheduleConfirmations.scheduleId, scheduleConfirmations.ministerId],
+      set: {
+        status: parsed.status,
+        respondedAt: now,
+        declineReason: parsed.status === "declined" ? parsed.declineReason ?? null : null,
+        notes: parsed.notes ?? null,
+        updatedAt: now
+      }
+    }).returning();
+    await logActivity(user.id, "view_schedule", {
+      source: "mobile-v1",
+      action: "confirm_schedule",
+      scheduleId: schedule.id,
+      confirmationId: confirmation.id,
+      status: parsed.status,
+      communityId: activeCommunity.id,
+      idempotencyKey
+    }, req);
+    const responseBody = {
+      success: true,
+      confirmation: {
+        id: confirmation.id,
+        scheduleId: confirmation.scheduleId,
+        ministerId: confirmation.ministerId,
+        status: confirmation.status,
+        respondedAt: toIsoDate(confirmation.respondedAt),
+        updatedAt: toIsoDate(confirmation.updatedAt)
+      },
+      schedule: {
+        id: schedule.id,
+        date: schedule.date,
+        time: schedule.time,
+        deepLink: `/schedules/${schedule.id}`
+      }
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody
+    });
+    idempotencyRecordId = null;
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao confirmar presenca");
+  }
+});
+router41.get("/schedules/:id", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const [row] = await db.select({
+      id: schedules.id,
+      communityId: schedules.communityId,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      ministerId: schedules.ministerId,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      confirmationStatus: scheduleConfirmations.status
+    }).from(schedules).leftJoin(
+      scheduleConfirmations,
+      and41(
+        eq54(scheduleConfirmations.scheduleId, schedules.id),
+        eq54(scheduleConfirmations.ministerId, user.id)
+      )
+    ).where(and41(eq54(schedules.id, req.params.id), eq54(schedules.communityId, activeCommunity.id))).limit(1);
+    if (!row) {
+      throw new MobileHttpError(404, "Escala nao encontrada");
+    }
+    if (row.ministerId !== user.id && !isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Sem permissao para ver esta escala");
+    }
+    const [substitution] = await db.select({
+      id: substitutionRequests.id,
+      status: substitutionRequests.status,
+      substituteId: substitutionRequests.substituteId,
+      updatedAt: substitutionRequests.updatedAt
+    }).from(substitutionRequests).where(
+      and41(
+        eq54(substitutionRequests.scheduleId, row.id),
+        eq54(substitutionRequests.requesterId, user.id),
+        inArray18(substitutionRequests.status, ["available", "pending", "approved"])
+      )
+    ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
+    res.json({
+      success: true,
+      schedule: {
+        id: row.id,
+        date: toDateOnly(row.date),
+        time: row.time,
+        type: row.type,
+        location: row.location,
+        position: row.position,
+        status: row.status,
+        notes: row.notes,
+        deepLink: `/schedules/${row.id}`,
+        confirmationStatus: row.confirmationStatus ?? null,
+        substitution: substitution ? {
+          id: substitution.id,
+          status: substitution.status,
+          substituteId: substitution.substituteId,
+          updatedAt: toIsoDate(substitution.updatedAt)
+        } : null,
+        canConfirm: row.ministerId === user.id && (!row.confirmationStatus || row.confirmationStatus === "pending"),
+        canRequestSubstitution: row.ministerId === user.id && !substitution
+      }
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar escala");
+  }
+});
+var mobile_default = router41;
+
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
-import { z as z18 } from "zod";
-import { eq as eq52 } from "drizzle-orm";
+import { z as z19 } from "zod";
+import { eq as eq55 } from "drizzle-orm";
 async function registerRoutes(app2) {
   app2.use(cookieParser());
   app2.use(noCacheHeaders);
@@ -29634,6 +32047,7 @@ async function registerRoutes(app2) {
   app2.use("/api/mass-pendencies", mass_pendencies_default);
   app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
   app2.use("/api/version", version_default);
+  app2.use("/api/mobile/v1", mobile_default);
   app2.use("/api/dashboard", authenticateToken, dashboard_default);
   app2.use("/api/schedules/incomplete", authenticateToken, dashboard_default);
   app2.use("/api/push-subscriptions", pushSubscriptions_default);
@@ -29818,7 +32232,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z18.ZodError) {
+      if (error instanceof z19.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -29916,7 +32330,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull4, and: and40 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull4, and: and43 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -29924,8 +32338,8 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and40(
-          eq52(substitutionRequests.status, "pending"),
+        and43(
+          eq55(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );
@@ -29937,8 +32351,8 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and40(
-          eq52(substitutionRequests.status, "pending"),
+        and43(
+          eq55(substitutionRequests.status, "pending"),
           isNull4(substitutionRequests.substituteId)
         )
       );

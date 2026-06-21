@@ -12,6 +12,9 @@ import {
   formationProgress,
   leaderboardCache,
   materialAccessLogs,
+  mobileDevices,
+  mobileIdempotencyKeys,
+  mobileRefreshTokens,
   notifications,
   pointTransactions,
   pushSubscriptions,
@@ -146,6 +149,9 @@ router.delete("/", authenticateToken, async (req: AuthRequest, res) => {
         .where(eq(substitutionRequests.requesterId, userId));
 
       await tx.delete(notifications).where(eq(notifications.userId, userId));
+      await tx.delete(mobileIdempotencyKeys).where(eq(mobileIdempotencyKeys.userId, userId));
+      await tx.delete(mobileRefreshTokens).where(eq(mobileRefreshTokens.userId, userId));
+      await tx.delete(mobileDevices).where(eq(mobileDevices.userId, userId));
       await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
       await tx.delete(familyRelationships).where(
         or(

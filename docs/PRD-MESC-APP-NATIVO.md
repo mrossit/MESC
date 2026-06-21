@@ -1,2020 +1,1222 @@
-# PRD - MESC App Nativo (Clone)
+# PRD v3 - MESC Native
 
-## Product Requirements Document
-**Versão:** 1.0
-**Data:** Fevereiro 2026
-**Projeto:** Clone do MESC como App Nativo
-
----
-
-## 1. VISÃO GERAL DO PRODUTO
-
-### 1.1 O Que É
-O **MESC (Sistema de Escalas e Coordenação Ministerial)** é um aplicativo para gerenciamento de escalas de ministérios em igrejas católicas. Este PRD descreve os requisitos para criar um clone como **app nativo** (React Native ou Flutter).
-
-### 1.2 Problema que Resolve
-- Coordenadores gastam horas criando escalas manualmente
-- Ministros não sabem quando servir com antecedência
-- Dificuldade de gerenciar substituições de última hora
-- Falta de histórico e métricas de participação
-- Comunicação fragmentada (WhatsApp grupos, ligações, etc)
-
-### 1.3 Usuários-Alvo
-| Papel | Descrição | Quantidade Típica |
-|-------|-----------|-------------------|
-| **Gestor** | Administrador do sistema | 1-2 por paróquia |
-| **Coordenador** | Gerencia escalas e ministros | 2-5 por paróquia |
-| **Ministro** | Serve nas missas | 20-100+ por paróquia |
-
-### 1.4 Stack Tecnológica Recomendada
-
-#### Opção A: React Native (Recomendado)
-```
-Frontend: React Native + Expo
-UI: React Native Paper ou NativeBase
-State: Zustand ou Redux Toolkit
-Navigation: React Navigation
-Backend: Reutilizar o existente (Node.js/Express)
-Database: PostgreSQL (mesmo banco)
-```
-
-#### Opção B: Flutter
-```
-Frontend: Flutter + Dart
-UI: Material Design 3
-State: Riverpod ou BLoC
-Backend: Reutilizar o existente (Node.js/Express)
-Database: PostgreSQL (mesmo banco)
-```
+**Data:** 2026-06-20
+**Status:** rascunho revisado a partir do briefing de transicao
+**Fonte principal:** `docs/MESC_NATIVE_TRANSITION_BRIEF_2026-06-20.md`
+**Produto:** novo app nativo MESC para iOS e Android
+**Sistema atual:** permanece em producao como referencia funcional e operacional
 
 ---
 
-## 2. ARQUITETURA DO BANCO DE DADOS
-
-### 2.1 Diagrama de Entidades Principais
-
-```
-┌─────────────┐     ┌─────────────┐     ┌──────────────────┐
-│   USERS     │────▶│  SCHEDULES  │────▶│ SCHEDULE_CONFIRM │
-└─────────────┘     └─────────────┘     └──────────────────┘
-       │                   │
-       │                   ▼
-       │            ┌──────────────────┐
-       │            │ SUBSTITUTION_REQ │
-       │            └──────────────────┘
-       │
-       ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
-│  FAMILIES   │     │QUESTIONNAIRE│────▶│QUESTIONNAIRE_RSP│
-└─────────────┘     └─────────────┘     └─────────────────┘
-       │
-       ▼
-┌─────────────────┐
-│FAMILY_RELATIONS │
-└─────────────────┘
-
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│FORM_TRACKS  │────▶│FORM_MODULES │────▶│FORM_LESSONS │
-└─────────────┘     └─────────────┘     └─────────────┘
-                                               │
-                                               ▼
-                                        ┌─────────────────┐
-                                        │FORM_LESSON_SECT │
-                                        └─────────────────┘
-
-┌─────────────┐     ┌─────────────┐
-│   BADGES    │────▶│ USER_BADGES │
-└─────────────┘     └─────────────┘
-       │
-       ▼
-┌─────────────┐     ┌─────────────────┐
-│ USER_POINTS │     │POINT_TRANSACT   │
-└─────────────┘     └─────────────────┘
-```
-
-### 2.2 Tabelas Detalhadas
-
-#### 2.2.1 Users (Usuários)
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  phone VARCHAR(20),
-  whatsapp VARCHAR(20),
-  photo_url TEXT,
-  schedule_display_name VARCHAR(100),
-
-  -- Role e Status
-  role VARCHAR(20) DEFAULT 'ministro', -- 'gestor', 'coordenador', 'ministro'
-  status VARCHAR(20) DEFAULT 'pending', -- 'active', 'inactive', 'pending'
-  requires_password_change BOOLEAN DEFAULT true,
-
-  -- Dados Pessoais
-  birth_date DATE,
-  address TEXT,
-  city VARCHAR(100),
-  state VARCHAR(50),
-  zip_code VARCHAR(10),
-  marital_status VARCHAR(50),
-
-  -- Dados Sacramentais
-  baptism_date DATE,
-  baptism_parish VARCHAR(255),
-  confirmation_date DATE,
-  confirmation_parish VARCHAR(255),
-  marriage_date DATE,
-  marriage_parish VARCHAR(255),
-
-  -- Preferências Ministeriais
-  preferred_position INTEGER,
-  preferred_positions INTEGER[], -- Array de posições preferidas
-  avoid_positions INTEGER[], -- Posições a evitar
-  available_for_special_events BOOLEAN DEFAULT false,
-
-  -- Família
-  family_id UUID REFERENCES families(id),
-  spouse_minister_id UUID REFERENCES users(id),
-
-  -- Atividades Extras (JSON)
-  extra_activities JSONB DEFAULT '{}',
-  -- Exemplo: {"sickCommunion": true, "mondayAdoration": true}
-
-  -- Métricas de Confiabilidade
-  reliability_score INTEGER DEFAULT 100, -- 0-100
-  substitution_request_count INTEGER DEFAULT 0,
-  substitution_fulfilled_count INTEGER DEFAULT 0,
-  no_show_count INTEGER DEFAULT 0,
-  manual_removal_count INTEGER DEFAULT 0,
-
-  -- Timestamps
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Índices importantes
-CREATE INDEX idx_users_status ON users(status);
-CREATE INDEX idx_users_role_status ON users(role, status);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_family ON users(family_id);
-```
-
-#### 2.2.2 Families (Famílias)
-```sql
-CREATE TABLE families (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  prefer_serve_together BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE family_relationships (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  family_id UUID REFERENCES families(id),
-  user_id UUID REFERENCES users(id),
-  relationship_type VARCHAR(20), -- 'spouse', 'parent', 'child', 'sibling'
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 2.2.3 Schedules (Escalas)
-```sql
-CREATE TABLE schedules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  date DATE NOT NULL,
-  time TIME NOT NULL,
-  type VARCHAR(50) DEFAULT 'missa', -- 'missa', 'celebracao', 'evento'
-  location VARCHAR(255),
-
-  -- Atribuição
-  minister_id UUID REFERENCES users(id),
-  position INTEGER DEFAULT 0,
-
-  -- Status
-  status VARCHAR(20) DEFAULT 'scheduled', -- 'scheduled', 'published', 'completed'
-
-  -- Substituição
-  substitute_id UUID REFERENCES users(id),
-
-  -- Notas e Ajustes
-  notes TEXT,
-  on_site_adjustments JSONB DEFAULT '[]',
-
-  -- Timestamps
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Índices importantes
-CREATE INDEX idx_schedules_date ON schedules(date);
-CREATE INDEX idx_schedules_minister ON schedules(minister_id);
-CREATE INDEX idx_schedules_date_time ON schedules(date, time);
-CREATE INDEX idx_schedules_status ON schedules(status);
-CREATE INDEX idx_schedules_date_status ON schedules(date, status);
-```
-
-#### 2.2.4 Schedule Confirmations
-```sql
-CREATE TABLE schedule_confirmations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id UUID REFERENCES schedules(id) NOT NULL,
-  minister_id UUID REFERENCES users(id) NOT NULL,
-
-  status VARCHAR(20) DEFAULT 'pending',
-  -- 'pending', 'confirmed', 'declined', 'no_response', 'no_show'
-
-  requested_at TIMESTAMP DEFAULT NOW(),
-  responded_at TIMESTAMP,
-  reminder_sent_at TIMESTAMP,
-  reminder_count INTEGER DEFAULT 0,
-
-  decline_reason TEXT,
-
-  UNIQUE(schedule_id, minister_id)
-);
-```
-
-#### 2.2.5 Substitution Requests
-```sql
-CREATE TABLE substitution_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id UUID REFERENCES schedules(id) NOT NULL,
-  requester_id UUID REFERENCES users(id) NOT NULL,
-  substitute_id UUID REFERENCES users(id),
-
-  status VARCHAR(20) DEFAULT 'available',
-  -- 'available', 'pending', 'approved', 'rejected', 'cancelled', 'auto_approved'
-
-  urgency VARCHAR(20) DEFAULT 'medium',
-  -- 'low' (>72h), 'medium' (24-72h), 'high' (12-24h), 'critical' (<12h)
-
-  reason TEXT,
-  response_message TEXT,
-
-  approved_by UUID REFERENCES users(id),
-  approved_at TIMESTAMP,
-
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 2.2.6 Questionnaires
-```sql
-CREATE TABLE questionnaires (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  month INTEGER NOT NULL,
-  year INTEGER NOT NULL,
-
-  status VARCHAR(20) DEFAULT 'draft', -- 'draft', 'published', 'closed'
-
-  questions JSONB NOT NULL,
-  -- Estrutura de perguntas (ver seção 2.3)
-
-  deadline TIMESTAMP,
-  target_user_ids UUID[],
-  notified_user_ids UUID[],
-
-  created_by_id UUID REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE questionnaire_responses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  questionnaire_id UUID REFERENCES questionnaires(id) NOT NULL,
-  user_id UUID REFERENCES users(id) NOT NULL,
-
-  responses JSONB NOT NULL,
-
-  -- Campos parseados
-  available_sundays TEXT[], -- ['2024-02-04', '2024-02-11']
-  preferred_mass_times TEXT[], -- ['07:00', '09:00']
-  alternative_times TEXT[],
-  daily_mass_availability TEXT[],
-  special_events JSONB,
-  can_substitute BOOLEAN DEFAULT false,
-
-  -- Metadados
-  unmapped_responses JSONB,
-  processing_warnings TEXT[],
-  is_shared_response BOOLEAN DEFAULT false,
-
-  -- Soft Delete
-  is_deleted BOOLEAN DEFAULT false,
-  deleted_at TIMESTAMP,
-
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-
-  UNIQUE(questionnaire_id, user_id)
-);
-```
-
-#### 2.2.7 Mass Configurations
-```sql
-CREATE TABLE mass_configurations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-
-  recurrence_type VARCHAR(20) NOT NULL,
-  -- 'weekly', 'monthly', 'yearly', 'one_time'
-
-  day_of_week INTEGER, -- 0-6 (Sunday-Saturday)
-  day_of_month INTEGER, -- 1-31
-  occurrence_in_month INTEGER, -- 1=first, -1=last
-
-  time TIME NOT NULL,
-  min_ministers INTEGER DEFAULT 4,
-  max_ministers INTEGER DEFAULT 6,
-
-  mass_type VARCHAR(50),
-  -- 'missa_diaria', 'missa_dominical', 'festa_padroeiro', etc
-
-  valid_from DATE,
-  valid_until DATE,
-  excluded_dates DATE[],
-  priority INTEGER DEFAULT 50,
-  is_active BOOLEAN DEFAULT true,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE special_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-
-  event_date DATE NOT NULL,
-  event_time TIME NOT NULL,
-
-  min_ministers INTEGER DEFAULT 4,
-  max_ministers INTEGER DEFAULT 6,
-
-  suppresses_mass_types TEXT[],
-  priority INTEGER DEFAULT 100,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 2.2.8 Formation (Formação)
-```sql
-CREATE TABLE formation_tracks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  category VARCHAR(50), -- 'liturgia', 'espiritualidade', 'pratica'
-  icon VARCHAR(50),
-  order_index INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE formation_modules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  track_id UUID REFERENCES formation_tracks(id) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  video_url TEXT,
-  duration_minutes INTEGER,
-  order_index INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE formation_lessons (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  module_id UUID REFERENCES formation_modules(id) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  lesson_number INTEGER,
-  objectives TEXT,
-  duration_minutes INTEGER,
-  order_index INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE formation_lesson_sections (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  lesson_id UUID REFERENCES formation_lessons(id) NOT NULL,
-  title VARCHAR(255),
-  section_type VARCHAR(20) NOT NULL,
-  -- 'text', 'video', 'audio', 'document', 'quiz', 'interactive'
-
-  content TEXT,
-  video_url TEXT,
-  audio_url TEXT,
-  document_url TEXT,
-  image_url TEXT,
-  quiz_data JSONB,
-
-  estimated_minutes INTEGER,
-  is_required BOOLEAN DEFAULT true,
-  order_index INTEGER DEFAULT 0,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE formation_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-  module_id UUID REFERENCES formation_modules(id) NOT NULL,
-
-  status VARCHAR(20) DEFAULT 'not_started',
-  -- 'not_started', 'in_progress', 'completed'
-
-  progress_percentage INTEGER DEFAULT 0,
-  completed_at TIMESTAMP,
-
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-
-  UNIQUE(user_id, module_id)
-);
-
-CREATE TABLE formation_certificates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-  track_id UUID REFERENCES formation_tracks(id) NOT NULL,
-
-  certificate_number VARCHAR(50) UNIQUE NOT NULL,
-
-  -- Snapshots no momento da emissão
-  user_name VARCHAR(255) NOT NULL,
-  track_title VARCHAR(255) NOT NULL,
-
-  total_lessons INTEGER,
-  total_hours DECIMAL(5,2),
-
-  verification_code VARCHAR(100),
-  metadata JSONB,
-
-  issued_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 2.2.9 Gamification
-```sql
-CREATE TABLE badges (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-
-  category VARCHAR(20) NOT NULL,
-  -- 'participation', 'formation', 'community', 'streak', 'milestone', 'special'
-
-  rarity VARCHAR(20) DEFAULT 'common',
-  -- 'common', 'uncommon', 'rare', 'epic', 'legendary'
-
-  points_awarded INTEGER DEFAULT 0,
-
-  requirement JSONB,
-  -- {"type": "mass_count", "value": 100, "description": "Servir 100 missas"}
-
-  icon_name VARCHAR(50),
-  icon_color VARCHAR(20),
-  is_secret BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE user_badges (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-  badge_id UUID REFERENCES badges(id) NOT NULL,
-
-  earned_at TIMESTAMP DEFAULT NOW(),
-  is_featured BOOLEAN DEFAULT false,
-  progress INTEGER DEFAULT 0, -- 0-100
-
-  UNIQUE(user_id, badge_id)
-);
-
-CREATE TABLE user_points (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) UNIQUE NOT NULL,
-
-  total_points INTEGER DEFAULT 0,
-  current_streak INTEGER DEFAULT 0,
-  longest_streak INTEGER DEFAULT 0,
-
-  level INTEGER DEFAULT 1,
-  level_progress INTEGER DEFAULT 0,
-
-  masses_served INTEGER DEFAULT 0,
-  substitutions_helped INTEGER DEFAULT 0,
-  materials_completed INTEGER DEFAULT 0,
-  quizzes_completed INTEGER DEFAULT 0,
-
-  last_activity_at TIMESTAMP
-);
-
-CREATE TABLE point_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-
-  action VARCHAR(50) NOT NULL,
-  -- 'mass_served', 'substitution_offered', 'material_completed', etc
-
-  points INTEGER NOT NULL,
-
-  related_entity_type VARCHAR(50),
-  related_entity_id UUID,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE level_definitions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  level INTEGER UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  min_points INTEGER NOT NULL,
-  max_points INTEGER,
-  benefits JSONB,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+## 1. Decisao De Produto
+
+O MESC Native sera iniciado como um novo produto nativo, usando o app atual em Replit/Capacitor apenas como referencia de dominio, dados, regras e aprendizados.
+
+A publicacao nas lojas do app Capacitor deixa de ser o objetivo principal. O ciclo de TestFlight mostrou que o app atual pode ser empacotado, mas tambem mostrou limites de UX nativa, WebView, safe area, biometria, header, bottom navigation, fotos autenticadas e manutencao acumulada.
+
+O objetivo agora e construir com calma:
+
+- PRD v3 revisado antes de codigo pesado;
+- telas e fluxos definidos antes da implementacao;
+- arquitetura nativa iOS/Android;
+- contratos de API mobile versionados;
+- testes fortes desde o primeiro milestone;
+- menor dependencia de remendos sobre a base web/PWA.
+
+### 1.1 O Que Continua Vivo
+
+O app atual continua atendendo a operacao enquanto o MESC Native amadurece.
+
+Devem ser preservados como aprendizado e materia-prima:
+
+- banco de dados real, depois de revisado e saneado;
+- usuarios, ministros, comunidades, fotos, escala oficial e historico;
+- regras de negocio ja validadas na pratica;
+- scripts de backup, restore, health check e data doctor;
+- aprendizados de TestFlight 5.4.3 (50414);
+- documentos existentes sobre questionarios, escalas, multi-comunidade e seguranca;
+- dominio `https://saojudastadeu.app`;
+- identidade visual Sao Judas Tadeu/MESC.
+
+### 1.2 O Que Nao Sera Base Obrigatoria
+
+O novo app nao deve nascer como clone do web app.
+
+Nao usar como base obrigatoria:
+
+- WebView como experiencia principal;
+- componentes mobile derivados de dashboard web;
+- Liquid Glass via CSS como objetivo final;
+- navegacao dependente de rotas web;
+- telas administrativas densas como primeira experiencia mobile;
+- estados de erro tecnicos exibidos ao ministro;
+- rotas de API atuais sem contrato mobile claro.
+
+---
+
+## 2. Objetivo Do Produto
+
+O MESC Native deve ser o app oficial dos ministros, coordenadores de comunidade e coordenadores paroquiais para organizar missoes, disponibilidade, escalas, substituicoes, comunicacao e crescimento multi-comunidade.
+
+O produto deve transmitir tres sensacoes:
+
+- **Clareza:** o ministro sabe sua proxima missao e o que precisa responder.
+- **Confianca:** o coordenador entende cobertura, pendencias e motivos das sugestoes de escala.
+- **Cuidado:** a experiencia parece feita para a comunidade, nao adaptada de um painel administrativo.
+
+### 2.1 Problemas A Resolver
+
+- Ministros nao sabem com facilidade quando servirao, se precisam responder questionario ou se ha pendencias.
+- Coordenadores perdem tempo consolidando disponibilidade, substituicoes e cobertura.
+- Questionarios, eventos, escala e gerador precisam de contratos rigidos para evitar respostas ignoradas.
+- Multi-comunidade exige isolamento de dados antes de conveniencia operacional.
+- O app atual mistura PWA, Replit, admin web, mobile e release em uma mesma base.
+- Recursos nativos, como biometria, camera, notificacoes e localizacao, precisam de justificativa, fallback e testes.
+
+### 2.2 Objetivos
+
+- Criar uma experiencia nativa serena, rapida e confiavel para ministros.
+- Dar ao coordenador uma operacao mobile segura para acompanhar respostas, substituicoes e publicacao de escala.
+- Proteger dados por comunidade, papel e contexto.
+- Definir uma API mobile v1 que reduza dependencia de payloads e fluxos da UI web.
+- Construir base tecnica preparada para iOS e Android sem pressa artificial de loja.
+- Garantir que cada feature P0 tenha criterio de aceite, estados de tela, contrato de API e plano de teste.
+
+### 2.3 Nao Objetivos Do MVP
+
+- Substituir todo o admin web no primeiro release nativo.
+- Copiar todas as telas do app atual.
+- Reimplementar o gerador completo antes de corrigir contratos de questionario, evento e multi-comunidade.
+- Fazer IA decidir escala sem revisao humana.
+- Exigir geolocalizacao, camera ou biometria para uso basico.
+- Criar sessao infinita sob o nome de "manter conectado".
+- Priorizar widgets, Apple Watch, calendario nativo ou IA local antes do fluxo P0.
+
+---
+
+## 3. Personas E Contexto De Uso
+
+### 3.1 Ministro
+
+Usa o app em momentos curtos: antes da missa, ao responder disponibilidade, ao receber aviso ou ao precisar pedir substituicao.
+
+Tarefas principais:
+
+- entrar com seguranca;
+- manter sessao restauravel;
+- desbloquear com Face ID/Touch ID/biometria apos primeiro login;
+- ver a proxima missa;
+- consultar escalas do mes;
+- responder questionario;
+- pedir substituicao;
+- acompanhar status da substituicao;
+- receber avisos;
+- atualizar perfil, foto e contato;
+- gerenciar privacidade e exclusao de conta.
+
+### 3.2 Coordenador De Comunidade
+
+Usa o app para acompanhar a vida operacional da comunidade, mas ainda pode depender do admin web para tarefas densas enquanto o nativo amadurece.
+
+Tarefas principais:
+
+- ver painel da comunidade;
+- acompanhar respostas do questionario;
+- identificar pendencias;
+- revisar cobertura por missa;
+- acompanhar substituicoes pendentes;
+- consultar diretorio de ministros;
+- ajustar e publicar escala dentro de limites seguros;
+- entender motivos, confianca e alertas da sugestao de escala.
+
+### 3.3 Coordenador Paroquial
+
+Atua no nivel consolidado, com acesso multi-comunidade controlado.
+
+Tarefas principais:
+
+- alternar comunidade;
+- ver cobertura consolidada;
+- criar e acompanhar comunidades;
+- atribuir coordenadores por comunidade;
+- auditar isolamento e inconsistencias;
+- padronizar regras, calendario e comunicados.
+
+### 3.4 Administrador Tecnico
+
+Nao e o foco de UX do app nativo P0, mas precisa de suporte operacional no ecossistema.
+
+Tarefas principais:
+
+- monitorar erros;
+- validar integridade de dados;
+- executar backup/restore;
+- acompanhar logs e auditoria;
+- gerenciar configuracoes sensiveis;
+- apoiar release e rollback.
+
+---
+
+## 4. Escopo Por Release
+
+### 4.1 P0 - MVP Nativo
+
+P0 deve resolver o ciclo essencial sem tentar copiar o web app.
+
+Ministro:
+
+- login seguro;
+- primeiro login sempre com senha;
+- biometria para desbloquear credenciais salvas;
+- sessao persistente segura com "manter conectado";
+- home "Minha Missao";
+- proxima escala;
+- lista de escalas do mes;
+- responder questionario atual;
+- pedir substituicao;
+- acompanhar status da substituicao;
+- avisos e notificacoes;
+- perfil, contato e foto por camera/galeria;
+- privacidade e exclusao de conta;
+- estados sem conexao e sessao expirada.
+
+Coordenador:
+
+- painel da comunidade;
+- respostas do questionario;
+- pendencias de disponibilidade;
+- escala do mes;
+- cobertura por missa;
+- substituicoes pendentes;
+- publicar/ajustar escala com seguranca;
+- diretorio de ministros da comunidade.
+
+Plataforma:
+
+- API mobile v1;
+- multi-comunidade com isolamento;
+- device registry, push token e preferencias de notificacao;
+- logs/auditoria;
+- backup/restore;
+- monitoramento;
+- contratos OpenAPI;
+- matriz de permissoes por papel e comunidade.
+
+### 4.2 P1 - Operacao E Crescimento
+
+- gerador v2.1 explicavel;
+- aprendizado de ajustes apos publicacao;
+- exports nativos;
+- comunicacao segmentada;
+- notificacao de atualizacao do app/conteudo;
+- geolocalizacao opcional para check-in presencial;
+- formacao;
+- gamificacao com cuidado pastoral;
+- relatorios mobile simplificados.
+
+### 4.3 P2 - Inteligencia E Extensoes
+
+- widgets iOS/Android;
+- calendario nativo;
+- offline avancado;
+- Apple Watch;
+- Apple Intelligence via App Intents/Siri/Shortcuts;
+- Google Gemini/Gemini Nano/AppFunctions;
+- assistente de coordenador com feature flag, auditoria e fallback sem IA.
+
+---
+
+## 5. Metricas De Sucesso
+
+### 5.1 Produto
+
+- ministros conseguem identificar a proxima missao em ate 10 segundos apos abrir o app;
+- taxa de resposta de questionario mensal aumenta;
+- tempo de resolucao de substituicao cai;
+- queda de mensagens manuais para confirmar escala;
+- coordenador consegue ver cobertura e pendencias sem abrir planilha ou WhatsApp;
+- erros humanos de escala por resposta ignorada diminuem.
+
+### 5.2 Tecnicas
+
+- crash-free sessions acima de 99,5% no MVP;
+- p95 de bootstrap da home abaixo de 2,5 segundos em rede boa;
+- endpoints P0 com testes de contrato;
+- zero vazamento conhecido entre comunidades em testes automatizados;
+- refresh token rotativo validado por testes;
+- logs suficientes para auditoria sem expor dados sensiveis desnecessarios.
+
+### 5.3 Release
+
+- smoke test em aparelho real iOS e Android antes de release;
+- backup/restore validado antes de migracoes;
+- health check e data doctor executados antes de rollout;
+- monitoramento de crash ativo;
+- rollback operacional definido.
+
+---
+
+## 6. Jornadas Principais
+
+### 6.1 Jornada Do Ministro
+
+1. Abre o app.
+2. Faz login com email/senha.
+3. Opcionalmente ativa biometria.
+4. Ve "Minha Missao" com proxima missa, avisos e pendencias.
+5. Responde questionario atual ou confirma que nao ha pendencias.
+6. Consulta escalas do mes.
+7. Se nao puder servir, solicita substituicao.
+8. Acompanha status e recebe notificacao quando houver decisao.
+9. Atualiza foto/contato quando necessario.
+10. Gerencia sessao, dispositivos e privacidade.
+
+### 6.2 Jornada Do Coordenador
+
+1. Abre painel da comunidade.
+2. Confere pendencias de questionario e cobertura do mes.
+3. Revisa respostas e eventos vinculados.
+4. Gera ou consulta sugestao de escala.
+5. Analisa motivos, confianca, alertas e alternativas.
+6. Ajusta escala.
+7. Publica escala.
+8. Acompanha confirmacoes, substituicoes e faltas.
+9. Fecha aprendizado mensal com diferenca entre sugestao, ajustes e execucao real.
+
+### 6.3 Jornada Do Coordenador Paroquial
+
+1. Acessa visao consolidada.
+2. Alterna entre comunidades.
+3. Verifica cobertura, pendencias e risco por comunidade.
+4. Audita dados sensiveis e isolamento.
+5. Define ou revisa coordenadores por comunidade.
+6. Exporta ou acompanha relatorios permitidos pelo papel.
+
+---
+
+## 7. Telas E Estados Obrigatorios
+
+Toda tela P0 deve ter:
+
+- estado carregando;
+- estado vazio;
+- estado de erro humano;
+- estado sem conexao quando aplicavel;
+- estado de permissao negada quando aplicavel;
+- modo claro;
+- modo escuro;
+- acessibilidade com Dynamic Type/font scale;
+- criterio de aceite.
+
+### 7.1 Ministro
+
+1. Login
+2. Ativar biometria
+3. Home Minha Missao
+4. Proxima missa
+5. Minhas escalas
+6. Responder questionario
+7. Confirmacao de resposta
+8. Pedir substituicao
+9. Status da substituicao
+10. Avisos
+11. Perfil
+12. Foto e dados pessoais
+13. Permissoes do dispositivo
+14. Sessao e dispositivos conectados
+15. Privacidade e exclusao de conta
+16. Sem conexao
+17. Sessao expirada
+
+### 7.2 Coordenador
+
+1. Painel da comunidade
+2. Respostas do questionario
+3. Criar/editar questionario
+4. Pergunta vinculada a evento/missa
+5. Preview de eventos gerados
+6. Gerar escala
+7. Revisar sugestao
+8. Motivos/confianca do algoritmo
+9. Ajustar escala
+10. Publicar escala
+11. Aprendizado apos publicacao
+12. Substituicoes
+13. Diretorio de ministros
+14. Convites/aprovacoes
+
+### 7.3 Coordenador Paroquial
+
+1. Visao consolidada
+2. Seletor de comunidade
+3. Cadastro de comunidade
+4. Coordenadores por comunidade
+5. Relatorios por comunidade
+6. Auditoria de isolamento
+
+---
+
+## 8. Requisitos De UX E Design System
+
+Referencia visual detalhada: `docs/MESC_NATIVE_VISUAL_SYSTEM_2026-06-20.md`.
+
+### 8.1 Direcao Visual
+
+O visual deve ser sereno, liturgico, moderno e nativo.
+
+Usar:
+
+- navegacao nativa;
+- hierarquia clara;
+- superficies glass apenas em barras, sheets e destaques;
+- componentes com toque confortavel;
+- alto contraste;
+- estados vazios humanos;
+- linguagem pastoral, curta e objetiva;
+- identidade Sao Judas Tadeu/MESC sem transformar cada tela em material promocional.
+
+Evitar:
+
+- dashboard administrativo como primeira tela do ministro;
+- excesso de cards;
+- bordas fortes em todos os elementos;
+- fundo bege/preto solido demais;
+- vidro aplicado indiscriminadamente;
+- textos explicativos longos dentro da UI;
+- mensagens tecnicas como erro final para usuario.
+
+### 8.2 Liquid Glass E Plataformas
+
+iOS:
+
+- usar APIs nativas quando disponiveis;
+- respeitar Reduce Transparency e Increase Contrast;
+- oferecer fallback elegante em versoes antigas;
+- testar em device real, nao somente no Simulator.
+
+Android:
+
+- nao copiar iOS literalmente;
+- adaptar com Material/Jetpack Compose;
+- usar translucidez moderada quando fizer sentido;
+- preservar consistencia de marca.
+
+### 8.3 Acessibilidade
+
+- suportar Dynamic Type/font scale;
+- alvos de toque confortaveis;
+- contraste validado nos modos claro e escuro;
+- labels acessiveis para botoes de icone;
+- telas criticas navegaveis por leitor de tela;
+- nenhuma informacao essencial deve depender apenas de cor.
+
+---
+
+## 9. Capacidades Nativas E Permissoes
+
+Permissoes devem ser solicitadas apenas no momento de uso, com justificativa humana e alternativa funcional quando negadas.
+
+| Capacidade | Prioridade | Decisao de produto |
+|------------|------------|--------------------|
+| Camera | P0 | Usar para foto de perfil e, futuramente, anexos autorizados. O app tambem aceita galeria/arquivos. Negar camera nao bloqueia o ministro. |
+| Biometria | P0 | Face ID/Touch ID no iOS e BiometricPrompt no Android para desbloquear credenciais salvas. Primeiro login sempre exige senha. |
+| Sessao persistente | P0 | "Manter conectado" restaura sessao com refresh token rotativo, armazenamento seguro e logout remoto por dispositivo. Nao e token infinito. |
+| Push notification | P0 | Registrar dispositivo, token, plataforma e preferencias. Push abre a tela correta por deep link e respeita horario silencioso. |
+| Notificacoes de atualizacao | P0/P1 | P0 para escala, questionario, substituicao e comunicados. P1 para nova versao, atualizacao obrigatoria e notas de versao via configuracao remota. |
+| Geolocalizacao | P1 | Somente para check-in presencial, validacao de chegada ou sugestao de comunidade proxima. Sem rastreamento continuo em background. |
+| Apple Intelligence | P2 | Expor acoes seguras por App Intents/Siri/Shortcuts quando adequado. Nao enviar dados pastorais/sacramentais a modelos sem base legal e consentimento claro. |
+| Google Gemini | P2 | Avaliar Gemini API, Gemini Nano/AICore e AppFunctions. Priorizar casos locais/privados quando disponiveis e manter fallback sem IA. |
+
+Regras comuns:
+
+- privacidade e exclusao de dados cobrem foto, device token, localizacao e preferencias de IA;
+- IA apoia coordenadores, nao toma decisao final de escala;
+- recursos de IA sao desligaveis por comunidade/paroquia;
+- recursos de IA sao auditaveis e protegidos por feature flag.
+
+---
+
+## 10. Arquitetura Recomendada
+
+### 10.1 Decisao Preferencial
+
+Caminho preferencial inicial:
+
+- iOS: SwiftUI;
+- Android: Kotlin + Jetpack Compose;
+- Backend: manter backend atual, criando camada de contratos mobile;
+- Banco: Postgres atual, depois de revisao e saneamento;
+- Admin web/Replit: continua em uso enquanto o app nativo amadurece.
+
+Alternativas como Kotlin Multiplatform, Flutter ou React Native podem ser reavaliadas se dois apps nativos ficarem caros demais. Elas nao sao o ponto de partida deste PRD.
+
+### 10.2 Repositorio
+
+Recomendacao inicial: criar novo repositorio `MESC-Native` para apps nativos.
+
+Motivos:
+
+- separa ciclo novo do legado;
+- reduz risco de misturar PWA, Capacitor, admin web e nativo real;
+- melhora clareza mental de produto novo;
+- permite usar este repositorio como referencia e backend ate haver motivo forte para migrar.
+
+Opcao alternativa: monorepo dentro do repo atual, caso o custo operacional de dois repositorios pese mais que a separacao.
+
+### 10.3 Visao Geral
+
+```text
+MESC Native iOS (SwiftUI)
+        |
+        | HTTPS / API Mobile v1
+        |
+Backend atual evoluido
+        |
+Postgres atual saneado
+        |
+Admin Web/Replit continua em uso
+        |
+MESC Native Android (Kotlin/Compose)
 ```
 
-#### 2.2.10 Auxiliary Panel (Painel Auxiliar)
-```sql
-CREATE TABLE minister_check_ins (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id UUID REFERENCES schedules(id) NOT NULL,
-  minister_id UUID REFERENCES users(id) NOT NULL,
+### 10.4 Camadas iOS
 
-  status VARCHAR(20) DEFAULT 'present',
-  -- 'present', 'late', 'absent'
+- `App`: bootstrap, navegacao, dependency injection;
+- `DesignSystem`: cores, tipografia, Liquid Glass nativo, componentes;
+- `Auth`: login, biometria, keychain, sessao;
+- `Mission`: home do ministro e proxima missa;
+- `Schedules`: escalas;
+- `Questionnaires`: disponibilidade;
+- `Substitutions`: trocas;
+- `Communities`: multi-comunidade;
+- `Profile`: perfil, foto e privacidade;
+- `DeviceCapabilities`: camera, notificacoes, localizacao, biometria e versao do app;
+- `Intelligence`: App Intents e assistencias protegidas;
+- `Networking`: API client, retries e refresh de auth;
+- `Persistence`: cache local seguro;
+- `Observability`: logs, crash e analytics etico.
 
-  checked_in_at TIMESTAMP DEFAULT NOW(),
-  checked_in_by UUID REFERENCES users(id),
+### 10.5 Camadas Android
 
-  notes TEXT
-);
+- `app`: navegacao, DI e theme;
+- `designsystem`: Material/Compose adaptado a identidade MESC;
+- `auth`: login, biometria e encrypted storage;
+- `mission`;
+- `schedules`;
+- `questionnaires`;
+- `substitutions`;
+- `communities`;
+- `profile`;
+- `devicecapabilities`;
+- `intelligence`;
+- `network`;
+- `datastore`;
+- `observability`.
 
-CREATE TABLE standby_ministers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id UUID REFERENCES schedules(id) NOT NULL,
-  minister_id UUID REFERENCES users(id) NOT NULL,
+---
 
-  confirmed_available BOOLEAN,
-  called_at TIMESTAMP,
-  responded_at TIMESTAMP,
+## 11. Dados E Migracao
 
-  response VARCHAR(20),
-  -- 'available', 'unavailable', 'on_way', 'arrived'
+### 11.1 Dados A Preservar
 
-  assigned_position INTEGER,
+- usuarios e papeis;
+- ministros ativos/inativos;
+- comunidades;
+- fotos;
+- escalas oficiais;
+- historico de confirmacoes e substituicoes;
+- questionarios e respostas;
+- configuracoes de missas e eventos;
+- materiais de formacao quando entrarem no escopo;
+- logs/auditoria necessarios para suporte.
 
-  created_at TIMESTAMP DEFAULT NOW()
-);
+### 11.2 Dados A Reavaliar
 
-CREATE TABLE mass_execution_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id UUID REFERENCES schedules(id) NOT NULL,
-  date DATE NOT NULL,
-  time TIME NOT NULL,
+- modelo de roles e permissao;
+- formato das respostas de questionario;
+- relacao entre pergunta personalizada, evento e gerador;
+- gerador legado de escala;
+- formato de push subscriptions web versus device registry nativo;
+- dados sensiveis exibidos em telas administrativas mobile.
 
-  changes_made JSONB DEFAULT '[]',
-  -- [{type: 'check_in', ministerId, timestamp}, ...]
+### 11.3 Gates De Migracao
 
-  attendance JSONB DEFAULT '[]',
-  -- [{ministerId, status, position, arrivalTime}, ...]
+- app atual congelado como sistema em producao antes de migracoes destrutivas;
+- backup testado antes de qualquer alteracao relevante;
+- data doctor executado sobre dados reais;
+- fixtures anonimizadas para testes;
+- contratos mobile escritos antes de alterar payloads usados pelo web;
+- rotas web e mobile coexistem ate o nativo provar equivalencia funcional P0.
 
-  incidents JSONB DEFAULT '[]',
-  -- [{type: 'late_arrival', ministerId, details}, ...]
+---
 
-  mass_quality INTEGER, -- 1-5
-  highlights TEXT,
+## 12. API Mobile v1
 
-  completed_by UUID REFERENCES users(id),
-  completed_at TIMESTAMP,
+O briefing lista os contratos como `/mobile/v1`. Como o backend atual usa prefixo `/api`, este PRD define a forma implementavel como `/api/mobile/v1`.
 
-  created_at TIMESTAMP DEFAULT NOW()
-);
+### 12.1 Convencoes
+
+Headers:
+
+```http
+Authorization: Bearer <access_token>
+X-Device-Id: <device_id>
+X-App-Version: <semver/build>
+X-Platform: ios | android
+X-Community-Id: <community_id opcional por contexto>
+Idempotency-Key: <uuid para mutacoes criticas>
 ```
 
-#### 2.2.11 Notifications
-```sql
-CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-
-  type VARCHAR(20) NOT NULL,
-  -- 'schedule', 'substitution', 'formation', 'announcement', 'reminder'
-
-  title VARCHAR(255) NOT NULL,
-  message TEXT NOT NULL,
-  data JSONB,
-
-  read BOOLEAN DEFAULT false,
-  read_at TIMESTAMP,
-
-  action_url TEXT,
-  priority VARCHAR(20) DEFAULT 'normal',
-  expires_at TIMESTAMP,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_notifications_user_read ON notifications(user_id, read);
-
-CREATE TABLE push_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-
-  endpoint TEXT UNIQUE NOT NULL,
-  p256dh_key TEXT NOT NULL,
-  auth_key TEXT NOT NULL,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 2.2.12 Adorations (Adoração)
-```sql
-CREATE TABLE adoration_draws (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  month INTEGER NOT NULL,
-  year INTEGER NOT NULL,
-
-  total_ministers_to_draw INTEGER,
-
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE adoration_draw_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  draw_id UUID REFERENCES adoration_draws(id) NOT NULL,
-  minister_id UUID REFERENCES users(id) NOT NULL,
-
-  monday_of_week INTEGER NOT NULL, -- 1-5
-  is_voluntary BOOLEAN DEFAULT false,
-
-  created_at TIMESTAMP DEFAULT NOW(),
-
-  UNIQUE(draw_id, minister_id, monday_of_week)
-);
-```
-
-#### 2.2.13 Activity Logs
-```sql
-CREATE TABLE activity_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-
-  action VARCHAR(100) NOT NULL,
-  -- 'login', 'view_schedule', 'respond_questionnaire', etc
-
-  details JSONB,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  session_id UUID,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_activity_logs_user ON activity_logs(user_id);
-CREATE INDEX idx_activity_logs_action ON activity_logs(action);
-
-CREATE TABLE active_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) NOT NULL,
-
-  session_token VARCHAR(255) UNIQUE NOT NULL,
-
-  expires_at TIMESTAMP NOT NULL,
-  last_activity_at TIMESTAMP DEFAULT NOW(),
-
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-
-  is_active BOOLEAN DEFAULT true,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 2.3 Estrutura de Perguntas (Questionário)
+Formato de erro:
 
 ```json
 {
-  "questions": [
+  "error": {
+    "code": "QUESTIONNAIRE_EVENT_BINDING_REQUIRED",
+    "message": "Revise os eventos antes de publicar o questionario.",
+    "details": {},
+    "traceId": "req_123"
+  }
+}
+```
+
+Regras:
+
+- toda resposta sensivel deriva escopo do usuario autenticado;
+- `communityId` explicito nao pode ampliar permissao;
+- mutacoes criticas usam idempotencia;
+- endpoints P0 tem contrato OpenAPI;
+- respostas sao pequenas e orientadas a tela mobile;
+- versao de contrato nao quebra clientes antigos sem feature/version gate.
+
+### 12.2 Auth E Sessao
+
+```http
+POST /api/mobile/v1/auth/login
+POST /api/mobile/v1/auth/refresh
+POST /api/mobile/v1/auth/logout
+GET  /api/mobile/v1/session
+GET  /api/mobile/v1/session/devices
+DELETE /api/mobile/v1/session/devices/{deviceId}
+```
+
+`POST /auth/login`:
+
+```json
+{
+  "email": "ministro@example.com",
+  "password": "senha",
+  "rememberDevice": true,
+  "device": {
+    "platform": "ios",
+    "model": "iPhone",
+    "appVersion": "1.0.0"
+  }
+}
+```
+
+Resposta:
+
+```json
+{
+  "accessToken": "jwt_curto",
+  "refreshToken": "refresh_rotativo",
+  "expiresAt": "2026-06-20T18:00:00-03:00",
+  "user": {
+    "id": "uuid",
+    "name": "Maria",
+    "role": "ministro",
+    "communities": [
+      { "id": "uuid", "name": "Sao Judas Tadeu", "role": "ministro" }
+    ]
+  },
+  "requiresPasswordChange": false,
+  "canEnableBiometrics": true
+}
+```
+
+### 12.3 Device Registry E Configuracao
+
+```http
+POST   /api/mobile/v1/devices
+PATCH  /api/mobile/v1/devices/{id}
+DELETE /api/mobile/v1/devices/{id}
+GET    /api/mobile/v1/app/config
+```
+
+Device:
+
+```json
+{
+  "platform": "ios",
+  "pushToken": "apns_or_fcm_token",
+  "appVersion": "1.0.0",
+  "locale": "pt-BR",
+  "timezone": "America/Sao_Paulo",
+  "notificationPreferences": {
+    "schedule": true,
+    "questionnaire": true,
+    "substitution": true,
+    "announcements": true,
+    "quietHours": { "start": "22:00", "end": "07:00" }
+  }
+}
+```
+
+Config:
+
+```json
+{
+  "minimumSupportedVersion": "1.0.0",
+  "latestVersion": "1.0.1",
+  "forceUpdate": false,
+  "featureFlags": {
+    "nativeCheckin": false,
+    "coordinatorAssist": false
+  }
+}
+```
+
+### 12.4 Perfil
+
+```http
+GET  /api/mobile/v1/me
+PATCH /api/mobile/v1/me
+POST /api/mobile/v1/me/photo
+GET  /api/mobile/v1/me/privacy
+DELETE /api/mobile/v1/me/account
+```
+
+Regras:
+
+- foto aceita camera, galeria ou arquivo;
+- upload grande tem validacao de tamanho e tipo;
+- dados sacramentais e pastorais sao minimizados no app P0;
+- exclusao de conta segue regras de compliance e preservacao legal/auditoria.
+
+### 12.5 Minha Missao
+
+```http
+GET /api/mobile/v1/mission/home
+```
+
+Resposta:
+
+```json
+{
+  "nextMission": {
+    "scheduleId": "uuid",
+    "date": "2026-07-05",
+    "time": "09:00",
+    "community": "Sao Judas Tadeu",
+    "position": 2,
+    "status": "published",
+    "confirmation": "pending"
+  },
+  "pendingActions": [
     {
-      "id": "q1",
-      "type": "checkbox",
-      "question": "Quais domingos você está disponível?",
-      "options": [
-        {"value": "2024-02-04", "label": "04/02 (1º Domingo)"},
-        {"value": "2024-02-11", "label": "11/02 (2º Domingo)"},
-        {"value": "2024-02-18", "label": "18/02 (3º Domingo)"},
-        {"value": "2024-02-25", "label": "25/02 (4º Domingo)"}
-      ],
-      "required": true,
-      "category": "availability"
-    },
-    {
-      "id": "q2",
-      "type": "checkbox",
-      "question": "Quais horários você prefere?",
-      "options": [
-        {"value": "07:00", "label": "7h"},
-        {"value": "09:00", "label": "9h"},
-        {"value": "11:00", "label": "11h"},
-        {"value": "19:00", "label": "19h"}
-      ],
-      "required": true,
-      "category": "preference"
-    },
-    {
-      "id": "q3",
-      "type": "yes_no",
-      "question": "Você pode ser chamado como substituto?",
-      "required": true,
-      "category": "substitution"
-    },
-    {
-      "id": "q4",
-      "type": "yes_no_with_options",
-      "question": "Você participa da Adoração às segundas?",
-      "conditionalOptions": {
-        "yes": [
-          {"value": "week1", "label": "1ª segunda"},
-          {"value": "week2", "label": "2ª segunda"},
-          {"value": "week3", "label": "3ª segunda"},
-          {"value": "week4", "label": "4ª segunda"}
-        ]
-      },
-      "required": false,
-      "category": "adoration"
+      "type": "questionnaire",
+      "title": "Disponibilidade de julho",
+      "dueAt": "2026-06-25T23:59:00-03:00",
+      "deepLink": "mesc://questionnaires/current"
     }
-  ]
+  ],
+  "announcements": []
 }
 ```
 
----
+### 12.6 Escalas
 
-## 3. FUNCIONALIDADES POR TELA
+```http
+GET  /api/mobile/v1/schedules/month?month=YYYY-MM
+GET  /api/mobile/v1/schedules/{id}
+POST /api/mobile/v1/schedules/{id}/confirm
+POST /api/mobile/v1/schedules/generate-preview
+POST /api/mobile/v1/schedules/generation/{id}/publish
+PATCH /api/mobile/v1/schedules/{id}/assignments
+```
 
-### 3.1 Autenticação
+Regras:
 
-#### Tela: Login
-**Rota:** `/login`
+- ministro ve suas escalas e informacoes publicas permitidas;
+- coordenador ve apenas comunidade permitida;
+- publicacao exige validacao de cobertura, conflitos e auditoria;
+- gerador preview nao escreve escala oficial ate publicacao.
 
-**Campos:**
-- Email (input text)
-- Senha (input password)
-- Checkbox "Lembrar-me"
+### 12.7 Questionarios
 
-**Ações:**
-- Botão "Entrar"
-- Link "Esqueci minha senha"
-- Link "Primeiro acesso"
+```http
+GET  /api/mobile/v1/questionnaires/current
+GET  /api/mobile/v1/questionnaires/{id}
+POST /api/mobile/v1/questionnaires/{id}/responses
+GET  /api/mobile/v1/admin/questionnaires/{id}/responses
+POST /api/mobile/v1/admin/questionnaires
+PATCH /api/mobile/v1/admin/questionnaires/{id}
+POST /api/mobile/v1/admin/questionnaires/{id}/publish
+```
 
-**Fluxo:**
-1. Usuário insere credenciais
-2. App envia POST `/api/auth/login`
-3. Se sucesso, recebe JWT token
-4. Se `requiresPasswordChange=true`, redireciona para troca de senha
-5. Armazena token no secure storage
-6. Redireciona para Dashboard ou Escalas
+Pergunta vinculada a evento:
 
-**API:**
-```typescript
-POST /api/auth/login
-Body: { email: string, password: string }
-Response: {
-  token: string,
-  user: User,
-  requiresPasswordChange: boolean
+```json
+{
+  "questionId": "q_event_01",
+  "questionType": "availability",
+  "label": "Voce pode servir na missa de 12/07 as 19h?",
+  "eventBinding": {
+    "eventId": "uuid",
+    "date": "2026-07-12",
+    "time": "19:00",
+    "communityId": "uuid",
+    "requiredForScheduleGeneration": true
+  },
+  "eligibilityRule": {
+    "roles": ["ministro"],
+    "communityId": "uuid"
+  }
 }
 ```
 
-#### Tela: Troca de Senha Obrigatória
-**Rota:** `/change-password`
+### 12.8 Substituicoes
 
-**Campos:**
-- Nova senha
-- Confirmar nova senha
+```http
+GET  /api/mobile/v1/substitutions
+POST /api/mobile/v1/substitutions
+PATCH /api/mobile/v1/substitutions/{id}/cancel
+PATCH /api/mobile/v1/admin/substitutions/{id}/approve
+PATCH /api/mobile/v1/admin/substitutions/{id}/reject
+```
 
-**Validação:**
-- Mínimo 8 caracteres
-- Pelo menos 1 número
-- Pelo menos 1 letra maiúscula
+Regras:
+
+- urgencia e calculada pelo backend;
+- coordenador recebe contexto suficiente para decidir;
+- solicitante acompanha status sem precisar perguntar por fora;
+- aprovar substituicao atualiza escala e gera auditoria.
+
+### 12.9 Comunidades E Admin Mobile Leve
+
+```http
+GET  /api/mobile/v1/communities
+GET  /api/mobile/v1/admin/community-dashboard
+GET  /api/mobile/v1/admin/ministers
+GET  /api/mobile/v1/admin/coverage?month=YYYY-MM
+GET  /api/mobile/v1/admin/audit/community-scope
+```
+
+### 12.10 Check-in E IA
+
+```http
+POST /api/mobile/v1/checkins
+POST /api/mobile/v1/ai/coordinator-assist
+```
+
+`/checkins` e P1 e exige geolocalizacao foreground opcional quando habilitada.
+
+`/ai/coordinator-assist` e P2, protegido por feature flag, rate limit, logs, autorizacao estrita e redacao de dados sensiveis.
 
 ---
 
-### 3.2 Dashboard (Coordenador/Gestor)
+## 13. Contratos Criticos De Produto
 
-#### Tela: Dashboard Principal
-**Rota:** `/dashboard`
+### 13.1 Questionario, Evento E Gerador
 
-**Seções:**
+Regra: pergunta personalizada que representa missa/evento deve gerar ou se vincular a um evento real.
 
-1. **Alertas Urgentes** (Card vermelho)
-   - Missas sem ministros suficientes
-   - Substituições pendentes críticas
-   - Questionários não respondidos (>50% faltando)
+Contrato minimo:
 
-2. **Estatísticas do Mês** (Cards)
-   - Ministros ativos
-   - Taxa de resposta questionário
-   - Cobertura de escalas (%)
-   - Substituições pendentes
+- `questionId` estavel;
+- `questionType`;
+- `eventBinding`;
+- `communityId`;
+- `date`;
+- `time`;
+- `eligibilityRule`;
+- `requiredForScheduleGeneration`.
 
-3. **Próximas Missas** (Lista)
-   - Data/Hora
-   - Quantidade de ministros
-   - Status (completa/incompleta)
-   - Botão "Ver detalhes"
+Gate:
 
-4. **Atividade Recente** (Timeline)
-   - Últimas ações no sistema
-   - Quem fez o quê
+- questionario nao publica com evento sem binding;
+- gerador nao roda com respostas validas ignoradas;
+- preview mostra eventos gerados;
+- respostas vinculadas a evento aparecem no painel do coordenador antes da geracao.
 
-**APIs:**
-```typescript
-GET /api/dashboard/stats
-GET /api/dashboard/urgent-alerts
-GET /api/dashboard/upcoming-masses
-GET /api/dashboard/activity
-```
+### 13.2 Gerador De Escala Explicavel
 
----
+Toda sugestao deve incluir:
 
-### 3.3 Escalas
+- ministro sugerido;
+- disponibilidade considerada;
+- restricoes aplicadas;
+- score;
+- motivos;
+- confianca;
+- alertas;
+- alternativas.
 
-#### Tela: Minhas Escalas (Ministro)
-**Rota:** `/schedules`
+Toda publicacao deve comparar:
 
-**Visualizações:**
-- Lista (próximas escalas)
-- Calendário (visão mensal)
+- sugestao original;
+- edicoes do coordenador;
+- substituicoes posteriores;
+- confirmacoes;
+- faltas;
+- aprendizado produzido.
 
-**Card de Escala:**
-- Data (Ex: "Dom, 04 Fev")
-- Horário (Ex: "9h")
-- Local
-- Posição (1º, 2º, etc)
-- Status de confirmação
-- Botões: "Confirmar" / "Pedir Substituição"
+### 13.3 Multi-Comunidade
 
-**Filtros:**
-- Mês/Ano
-- Apenas minhas escalas
-- Todas as escalas (se coordenador)
+Regra: isolamento de dados vem antes de conveniencia.
 
-**APIs:**
-```typescript
-GET /api/schedules?month=2&year=2024&ministerId=xxx
-GET /api/schedules/minister/upcoming
-```
+Todo endpoint sensivel deve receber ou derivar:
 
-#### Tela: Gerenciar Escalas (Coordenador)
-**Rota:** `/schedules/manage`
+- `communityId`;
+- papel do usuario;
+- escopo permitido;
+- modo consolidado apenas para coordenador paroquial/gestor.
 
-**Funcionalidades:**
-- Ver todas as escalas do mês
-- Editar atribuições (drag & drop)
-- Adicionar/remover ministros
-- Publicar escalas
+Gates:
 
-**Componentes:**
-- Seletor de mês/ano
-- Grid por data/horário
-- Modal de edição
-- Botão "Gerar Escala"
-- Botão "Publicar"
+- ministro de A nao ve dados de B;
+- coordenador de A nao exporta B;
+- coordenador paroquial alterna e consolida dentro do escopo;
+- logs registram escopo usado.
 
-**APIs:**
-```typescript
-GET /api/schedules?month=2&year=2024
-POST /api/schedules
-PUT /api/schedules/:id
-DELETE /api/schedules/:id
-POST /api/schedules/publish
-POST /api/schedules/generate
-```
+### 13.4 Sessao, Biometria E Dispositivos
 
-#### Tela: Editor de Escala (Drag & Drop)
-**Rota:** `/schedules/edit/:date`
+Regra: biometria desbloqueia credenciais locais, nao substitui seguranca de servidor.
 
-**Layout:**
-- Colunas por horário de missa
-- Cards de ministros arrastáveis
-- Pool de ministros disponíveis
-- Indicador de conflitos
+Gates:
 
-**Funcionalidades:**
-- Arrastar ministro para posição
-- Trocar posições entre ministros
-- Adicionar ministro do pool
-- Remover ministro da escala
-- Ver disponibilidade ao passar mouse
+- primeiro login exige senha;
+- refresh token e rotativo;
+- logout remoto revoga dispositivo;
+- troca de senha revoga sessoes conforme politica;
+- app lida com refresh expirado sem loop;
+- "manter conectado" e opcional e revogavel.
 
 ---
 
-### 3.4 Substituições
+## 14. Permissoes E Autorizacao
 
-#### Tela: Solicitar Substituição (Ministro)
-**Rota:** `/substitutions/request`
+### 14.1 Papeis
 
-**Campos:**
-- Seletor de escala (data/hora)
-- Motivo (opcional)
-- Sugerir substituto (opcional)
+| Papel | Escopo padrao |
+|-------|---------------|
+| Ministro | Dados proprios, escalas publicadas e informacoes necessarias da sua comunidade. |
+| Coordenador de comunidade | Dados operacionais da comunidade atribuida. |
+| Coordenador paroquial | Visao consolidada e alternancia entre comunidades autorizadas. |
+| Gestor/admin | Administracao ampla, auditoria e configuracoes sensiveis. |
+| Administrador tecnico | Operacao tecnica sem necessidade de expor mais dados pastorais que o necessario. |
 
-**Fluxo:**
-1. Seleciona escala que não pode comparecer
-2. Escreve motivo (opcional)
-3. Pode selecionar substituto sugerido
-4. Envia solicitação
-5. Aguarda aprovação
+### 14.2 Matriz P0
 
-**API:**
-```typescript
-POST /api/substitutions
-Body: {
-  scheduleId: string,
-  reason?: string,
-  suggestedSubstituteId?: string
-}
-```
-
-#### Tela: Gerenciar Substituições (Coordenador)
-**Rota:** `/substitutions`
-
-**Tabs:**
-- Pendentes
-- Aprovadas
-- Rejeitadas
-
-**Card de Substituição:**
-- Quem solicitou
-- Data/hora da missa
-- Urgência (badge colorido)
-- Motivo
-- Substituto sugerido
-- Botões: Aprovar / Rejeitar
-
-**APIs:**
-```typescript
-GET /api/substitutions?status=pending
-PUT /api/substitutions/:id/approve
-PUT /api/substitutions/:id/reject
-```
+| Acao | Ministro | Coord. comunidade | Coord. paroquial | Gestor |
+|------|----------|-------------------|------------------|--------|
+| Ver propria proxima missao | Sim | Sim | Sim | Sim |
+| Responder proprio questionario | Sim | Sim | Sim | Sim |
+| Pedir propria substituicao | Sim | Sim | Sim | Sim |
+| Ver respostas da comunidade | Nao | Sim | Sim, por escopo | Sim |
+| Publicar escala | Nao | Sim, comunidade | Sim, por escopo | Sim |
+| Ver outra comunidade | Nao | Nao | Sim | Sim |
+| Gerenciar usuarios | Nao | Limitado | Sim, por escopo | Sim |
+| Auditar isolamento | Nao | Nao | Sim | Sim |
+| Configurar feature flags/IA | Nao | Nao | Limitado | Sim |
 
 ---
 
-### 3.5 Questionários
+## 15. Offline E Sincronizacao
 
-#### Tela: Responder Questionário (Ministro)
-**Rota:** `/questionnaire/:id`
+### 15.1 P0
 
-**Layout:**
-- Título do questionário
-- Prazo para resposta
-- Perguntas em sequência
-- Barra de progresso
-- Botão "Enviar"
+Cache local seguro para:
 
-**Tipos de Pergunta:**
-- Checkbox (múltipla seleção)
-- Radio (seleção única)
-- Sim/Não
-- Texto livre
-- Seleção de datas (calendário)
-- Seleção de horários
+- usuario autenticado;
+- configuracao do app;
+- proxima missao;
+- escalas publicadas do mes;
+- questionario atual em andamento;
+- avisos recentes;
+- preferencias de notificacao.
 
-**API:**
-```typescript
-GET /api/questionnaires/:id
-POST /api/questionnaires/:id/responses
-Body: { responses: { [questionId]: answer } }
-```
+Regras:
 
-#### Tela: Criar Questionário (Coordenador)
-**Rota:** `/questionnaires/create`
+- dados sensiveis ficam em armazenamento seguro quando aplicavel;
+- resposta de questionario pode ser salva como rascunho local;
+- mutacoes offline sao limitadas e precisam de estado claro;
+- ao reconectar, conflitos sao explicados de forma humana.
 
-**Campos:**
-- Título
-- Mês/Ano de referência
-- Prazo de resposta
-- Perguntas (builder)
+### 15.2 P1/P2
 
-**Builder de Perguntas:**
-- Tipo de pergunta
-- Texto da pergunta
-- Opções (se aplicável)
-- Obrigatória?
-
-**API:**
-```typescript
-POST /api/questionnaires
-Body: {
-  title: string,
-  month: number,
-  year: number,
-  deadline: Date,
-  questions: Question[]
-}
-```
+- fila de sincronizacao mais robusta;
+- resolucao de conflitos em questionarios e substituicoes;
+- calendario nativo;
+- modo offline avancado para coordenador apenas apos contratos P0 estaveis.
 
 ---
 
-### 3.6 Formação
+## 16. Seguranca, Privacidade E Compliance
 
-#### Tela: Trilhas de Formação
-**Rota:** `/formation`
+Requisitos:
 
-**Layout:**
-- Cards de trilhas (Liturgia, Espiritualidade, Prática)
-- Progresso geral do usuário
-- Certificados obtidos
-
-**Card de Trilha:**
-- Ícone
-- Título
-- Descrição
-- Progresso (%)
-- Módulos completados / total
-- Botão "Continuar"
-
-**API:**
-```typescript
-GET /api/formation/tracks
-GET /api/formation/progress
-```
-
-#### Tela: Módulos da Trilha
-**Rota:** `/formation/track/:trackId`
-
-**Layout:**
-- Breadcrumb (Formação > Trilha)
-- Lista de módulos em ordem
-- Status de cada módulo (bloqueado/disponível/concluído)
-
-**Card de Módulo:**
-- Título
-- Duração estimada
-- Aulas completadas / total
-- Status (ícone)
-
-**API:**
-```typescript
-GET /api/formation/tracks/:trackId/modules
-```
-
-#### Tela: Aula
-**Rota:** `/formation/lesson/:lessonId`
-
-**Layout:**
-- Título da aula
-- Seções de conteúdo
-- Navegação (anterior/próxima)
-- Botão "Marcar como concluída"
-
-**Tipos de Seção:**
-- Texto (markdown)
-- Vídeo (player embutido)
-- Quiz (perguntas interativas)
-- Documento (PDF viewer)
-
-**APIs:**
-```typescript
-GET /api/formation/lessons/:lessonId
-POST /api/formation/progress/update
-Body: { lessonId, completed: boolean, timeSpent: number }
-```
+- HTTPS obrigatorio;
+- access token curto;
+- refresh token rotativo;
+- armazenamento seguro: Keychain no iOS, EncryptedSharedPreferences/Keystore no Android;
+- protecao contra replay em mutacoes criticas;
+- rate limit em auth, substituicoes e endpoints de IA;
+- logs sem segredos;
+- mascaramento de dados sensiveis em crash reports;
+- exclusao de conta e privacidade disponiveis no app;
+- consentimento claro para notificacoes, camera, localizacao e IA;
+- nenhuma credencial ou segredo em documento, repo ou fixture.
 
 ---
 
-### 3.7 Gamificação
+## 17. Observabilidade
 
-#### Tela: Meu Perfil de Gamificação
-**Rota:** `/gamification`
+### 17.1 App
 
-**Seções:**
+- crash reporting;
+- eventos de erro por tela;
+- falhas de login, refresh e upload;
+- status de push token;
+- tempo de bootstrap da home;
+- deep links abertos por notificacao;
+- estado offline/sync.
 
-1. **Header**
-   - Avatar
-   - Nome
-   - Nível atual (Ex: "Ministro Veterano")
-   - Barra de XP para próximo nível
+### 17.2 Backend
 
-2. **Estatísticas**
-   - Pontos totais
-   - Missas servidas
-   - Streak atual
-   - Rank no leaderboard
+- traceId por request;
+- logs de auditoria para escala, questionario, substituicao e comunidade;
+- alertas de erro por endpoint;
+- metricas de latencia p50/p95;
+- health check e readiness;
+- data doctor periodico para inconsistencias criticas.
 
-3. **Badges Conquistados**
-   - Grid de badges
-   - Clique para ver detalhes
-   - Badges secretos (com "?")
+### 17.3 Etica De Analytics
 
-4. **Histórico de Pontos**
-   - Timeline de transações
-   - +10 pts - Serviu na missa
-   - +20 pts - Completou material
-
-**APIs:**
-```typescript
-GET /api/gamification/profile
-GET /api/gamification/badges
-GET /api/gamification/transactions
-```
-
-#### Tela: Leaderboard
-**Rota:** `/gamification/leaderboard`
-
-**Tabs:**
-- Semanal
-- Mensal
-- Geral
-
-**Lista:**
-- Posição (#1, #2, etc)
-- Avatar + Nome
-- Pontos
-- Nível
-- Destaque para usuário atual
-
-**API:**
-```typescript
-GET /api/gamification/leaderboard?period=weekly
-```
+- coletar o minimo necessario;
+- nao criar leaderboard pastoral invasivo;
+- evitar rastreamento comportamental sem necessidade;
+- permitir desligar recursos sensiveis por configuracao.
 
 ---
 
-### 3.8 Painel Auxiliar
+## 18. Plano De Testes
 
-#### Tela: Check-in da Missa
-**Rota:** `/auxiliary/:scheduleId`
+### 18.1 Antes Do Codigo
 
-**Header:**
-- Data e horário da missa
-- Contagem regressiva para início
-- Status geral (X de Y presentes)
+- checklist de aceite por feature;
+- prototipo de fluxo;
+- revisao de API;
+- matriz de permissoes;
+- fixtures de dados reais anonimizados;
+- OpenAPI inicial;
+- criterios de release por milestone.
 
-**Lista de Ministros:**
-- Foto + Nome
-- Posição atribuída
-- Status (Aguardando / Presente / Atrasado / Ausente)
-- Botão "Check-in"
-- Botão "Chamar Standby" (se ausente)
+### 18.2 iOS
 
-**Ações:**
-- Check-in individual
-- Trocar posições (drag & drop)
-- Chamar standby
-- Registrar incidente
-- Finalizar missa
+- unit tests de services/view models;
+- snapshot tests das telas principais;
+- UI tests de login, home, escala, questionario e substituicao;
+- testes de biometria no Simulator e aparelho real;
+- testes de camera/galeria, upload de foto, permissao negada e imagem grande;
+- testes de sessao persistente, refresh expirado, logout remoto e troca de aparelho;
+- testes de push, deep link, horario silencioso e notificacao de atualizacao;
+- testes de App Intents/Apple Intelligence com feature flag, fallback e dados sensiveis redigidos.
 
-**APIs:**
-```typescript
-GET /api/auxiliary/panel/:scheduleId
-POST /api/auxiliary/checkin
-Body: { scheduleId, ministerId, status }
+### 18.3 Android
 
-POST /api/auxiliary/standby/call
-Body: { scheduleId, ministerId }
+- unit tests;
+- Compose UI tests;
+- screenshot tests;
+- testes de biometria em emulator e aparelho real;
+- testes de camera/galeria, upload de foto, permissao negada e imagem grande;
+- testes de sessao persistente, refresh expirado, logout remoto e troca de aparelho;
+- testes de push, deep link, horario silencioso e notificacao de atualizacao;
+- testes de geolocalizacao foreground, permissao negada, local impreciso e ausencia de GPS;
+- testes de Gemini/Gemini Nano/AppFunctions com feature flag, fallback e dados sensiveis redigidos.
 
-POST /api/auxiliary/position/change
-Body: { scheduleId, fromPosition, toPosition }
+### 18.4 Backend/API
 
-POST /api/auxiliary/log
-Body: { scheduleId, quality, highlights, incidents }
-```
+- contratos OpenAPI;
+- testes anti-vazamento multi-comunidade;
+- testes de questionario-evento-gerador;
+- testes de escala v2.1 com fixtures de junho/2026;
+- testes de registro/revogacao de dispositivo e push token;
+- testes de version gate para atualizacao opcional/obrigatoria;
+- testes de check-in com localizacao, anti-replay e auditoria;
+- testes de endpoints de IA com autorizacao, rate limit, logs e redacao de dados.
 
----
+### 18.5 Release
 
-### 3.9 Relatórios (Coordenador)
-
-#### Tela: Dashboard de Relatórios
-**Rota:** `/reports`
-
-**Cards de Relatório:**
-- Participação por Ministro
-- Taxa de Resposta de Questionários
-- Substituições (solicitadas vs atendidas)
-- Confiabilidade dos Ministros
-- Progresso de Formação
-
-**Filtros Globais:**
-- Período (mês/trimestre/ano)
-- Ministro específico (opcional)
-
-#### Tela: Relatório de Participação
-**Rota:** `/reports/participation`
-
-**Visualizações:**
-- Gráfico de barras (missas por ministro)
-- Tabela detalhada
-- Exportar CSV/Excel
-
-**APIs:**
-```typescript
-GET /api/reports/participation?startDate=&endDate=
-GET /api/reports/participation/export?format=csv
-```
+- health check;
+- data doctor;
+- backup/restore;
+- smoke test em device real;
+- crash monitoring ativo;
+- plano de rollback.
 
 ---
 
-### 3.10 Configurações e Perfil
+## 19. Plano De Implementacao
 
-#### Tela: Meu Perfil
-**Rota:** `/profile`
+### Fase 0 - Preparacao
 
-**Seções:**
+- aprovar PRD v3;
+- definir telas P0;
+- validar matriz de permissoes;
+- desenhar contrato API mobile v1;
+- decidir repositorio;
+- escolher se o primeiro milestone sera iOS-only ou iOS/Android em paralelo;
+- congelar app atual como sistema em producao para evitar acoplamento de emergencia.
 
-1. **Dados Pessoais**
-   - Foto (upload)
-   - Nome
-   - Email
-   - Telefone
-   - WhatsApp
-   - Endereço
+### Fase 1 - Base Nativa
 
-2. **Dados Sacramentais**
-   - Data de batismo
-   - Data de crisma
-   - Data de casamento (se aplicável)
+- criar projeto SwiftUI;
+- criar projeto Android/Compose ou iniciar iOS primeiro com arquitetura replicavel;
+- implementar design system base;
+- implementar API client;
+- login, sessao e refresh token;
+- biometria;
+- device registry;
+- observabilidade.
 
-3. **Preferências**
-   - Posições preferidas
-   - Posições a evitar
-   - Disponível para eventos especiais
+### Fase 2 - Ministro
 
-4. **Segurança**
-   - Alterar senha
-   - Sessões ativas
+- Home Minha Missao;
+- proxima escala;
+- escalas do mes;
+- questionario atual;
+- substituicao;
+- perfil/foto;
+- privacidade e exclusao de conta;
+- notificacoes P0.
 
-**API:**
-```typescript
-GET /api/users/me
-PATCH /api/users/me
-Body: { name?, phone?, preferences?, etc }
-```
+### Fase 3 - Coordenador
 
-#### Tela: Configurações do App
-**Rota:** `/settings`
+- painel comunidade;
+- respostas;
+- escalas;
+- substituicoes;
+- diretorio;
+- publicacao segura.
 
-**Seções:**
-- Notificações (push on/off)
-- Tema (claro/escuro/sistema)
-- Idioma
-- Sobre o app
-- Política de privacidade
-- Sair
+### Fase 4 - Contratos Fortes
+
+- questionario -> evento -> gerador;
+- gerador v2.1 explicavel;
+- aprendizado mensal;
+- multi-comunidade completo;
+- auditoria ampliada.
+
+### Fase 5 - Lojas
+
+- TestFlight/Play Internal;
+- testers externos;
+- screenshots;
+- privacy labels/data safety;
+- review;
+- rollout gradual.
 
 ---
 
-## 4. APIs - ESPECIFICAÇÃO COMPLETA
-
-### 4.1 Autenticação
-
-```typescript
-// Login
-POST /api/auth/login
-Body: { email: string, password: string }
-Response: { token: string, user: User, requiresPasswordChange: boolean }
-
-// Logout
-POST /api/auth/logout
-Headers: { Authorization: "Bearer {token}" }
-
-// Verificar sessão
-GET /api/auth/verify
-Headers: { Authorization: "Bearer {token}" }
-Response: { valid: boolean, user?: User }
-
-// Trocar senha
-POST /api/auth/change-password
-Body: { currentPassword: string, newPassword: string }
-
-// Esqueci minha senha
-POST /api/auth/forgot-password
-Body: { email: string }
-
-// Reset de senha
-POST /api/auth/reset-password
-Body: { token: string, newPassword: string }
-```
-
-### 4.2 Usuários
-
-```typescript
-// Meu perfil
-GET /api/users/me
-Response: User
-
-// Atualizar perfil
-PATCH /api/users/me
-Body: Partial<User>
-
-// Listar usuários (admin)
-GET /api/users?role=ministro&status=active
-Response: User[]
-
-// Buscar usuário
-GET /api/users/:id
-Response: User
-
-// Criar usuário (admin)
-POST /api/users
-Body: CreateUserDto
-
-// Atualizar usuário (admin)
-PATCH /api/users/:id
-Body: Partial<User>
-
-// Desativar usuário
-DELETE /api/users/:id
-```
-
-### 4.3 Escalas
-
-```typescript
-// Listar escalas
-GET /api/schedules?month=2&year=2024&ministerId=xxx
-Response: Schedule[]
-
-// Próximas escalas do ministro
-GET /api/schedules/minister/upcoming
-Response: Schedule[]
-
-// Escalas por data
-GET /api/schedules/by-date/:date
-Response: { schedules: Schedule[], assignments: Assignment[] }
-
-// Criar escala
-POST /api/schedules
-Body: { date, time, ministerId, position }
-
-// Atualizar escala
-PUT /api/schedules/:id
-Body: Partial<Schedule>
-
-// Deletar escala
-DELETE /api/schedules/:id
-
-// Gerar escalas automaticamente
-POST /api/schedules/generate
-Body: { month: number, year: number }
-Response: { generated: Schedule[], conflicts: Conflict[] }
-
-// Publicar escalas
-POST /api/schedules/publish
-Body: { month: number, year: number }
-
-// Confirmar presença
-POST /api/schedules/:id/confirm
-Body: { status: 'confirmed' | 'declined', reason?: string }
-```
-
-### 4.4 Substituições
-
-```typescript
-// Solicitar substituição
-POST /api/substitutions
-Body: { scheduleId, reason?, suggestedSubstituteId? }
-
-// Listar substituições
-GET /api/substitutions?status=pending
-Response: SubstitutionRequest[]
-
-// Aprovar substituição
-PUT /api/substitutions/:id/approve
-Body: { substituteId }
-
-// Rejeitar substituição
-PUT /api/substitutions/:id/reject
-Body: { reason? }
-
-// Histórico de substituições
-GET /api/substitutions/history?ministerId=xxx
-```
-
-### 4.5 Questionários
-
-```typescript
-// Listar questionários
-GET /api/questionnaires?year=2024
-Response: Questionnaire[]
-
-// Buscar questionário
-GET /api/questionnaires/:id
-Response: Questionnaire
-
-// Criar questionário
-POST /api/questionnaires
-Body: CreateQuestionnaireDto
-
-// Enviar questionário (notificar ministros)
-POST /api/questionnaires/:id/send
-
-// Responder questionário
-POST /api/questionnaires/:id/responses
-Body: { responses: Record<string, any> }
-
-// Ver respostas (admin)
-GET /api/questionnaires/:id/responses
-Response: QuestionnaireResponse[]
-
-// Enviar lembrete
-POST /api/questionnaires/:id/remind
-```
-
-### 4.6 Formação
-
-```typescript
-// Listar trilhas
-GET /api/formation/tracks
-Response: FormationTrack[]
-
-// Módulos de uma trilha
-GET /api/formation/tracks/:trackId/modules
-Response: FormationModule[]
-
-// Aulas de um módulo
-GET /api/formation/modules/:moduleId/lessons
-Response: FormationLesson[]
-
-// Detalhes da aula
-GET /api/formation/lessons/:lessonId
-Response: FormationLesson & { sections: LessonSection[] }
-
-// Progresso do usuário
-GET /api/formation/progress
-Response: FormationProgress[]
-
-// Atualizar progresso
-POST /api/formation/progress/update
-Body: { lessonId, completed: boolean, timeSpent: number }
-
-// Certificados
-GET /api/formation/certificates
-Response: FormationCertificate[]
-
-// Gerar certificado
-POST /api/formation/certificates/generate
-Body: { trackId }
-```
-
-### 4.7 Gamificação
-
-```typescript
-// Perfil de gamificação
-GET /api/gamification/profile
-Response: { points: UserPoints, badges: UserBadge[], level: Level }
-
-// Todos os badges
-GET /api/gamification/badges
-Response: Badge[]
-
-// Leaderboard
-GET /api/gamification/leaderboard?period=weekly
-Response: LeaderboardEntry[]
-
-// Histórico de pontos
-GET /api/gamification/transactions?limit=20
-Response: PointTransaction[]
-
-// Verificar badges (interno)
-POST /api/gamification/check-badges
-```
-
-### 4.8 Painel Auxiliar
-
-```typescript
-// Dados da missa
-GET /api/auxiliary/panel/:scheduleId
-Response: {
-  schedule: Schedule,
-  ministers: MinisterStatus[],
-  standbyAvailable: User[]
-}
-
-// Check-in
-POST /api/auxiliary/checkin
-Body: { scheduleId, ministerId, status: 'present' | 'late' }
-
-// Chamar standby
-POST /api/auxiliary/standby/call
-Body: { scheduleId, ministerId }
-
-// Resposta do standby
-POST /api/auxiliary/standby/:id/response
-Body: { response: 'available' | 'unavailable' }
-
-// Trocar posição
-POST /api/auxiliary/position/change
-Body: { scheduleId, ministerId, fromPosition, toPosition }
-
-// Registrar incidente
-POST /api/auxiliary/incidents
-Body: { scheduleId, type, ministerId?, details }
-
-// Finalizar missa
-POST /api/auxiliary/log
-Body: { scheduleId, quality: 1-5, highlights?, incidents? }
-```
-
-### 4.9 Notificações
-
-```typescript
-// Listar notificações
-GET /api/notifications?unreadOnly=true
-Response: Notification[]
-
-// Marcar como lida
-PUT /api/notifications/:id/read
-
-// Marcar todas como lidas
-PUT /api/notifications/read-all
-
-// Registrar push subscription
-POST /api/push-subscriptions
-Body: { endpoint, p256dhKey, authKey }
-```
-
-### 4.10 Relatórios
-
-```typescript
-// Participação
-GET /api/reports/participation?startDate=&endDate=
-Response: ParticipationReport
-
-// Disponibilidade
-GET /api/reports/availability?month=2&year=2024
-Response: AvailabilityReport
-
-// Substituições
-GET /api/reports/substitutions?startDate=&endDate=
-Response: SubstitutionReport
-
-// Confiabilidade
-GET /api/reports/reliability
-Response: ReliabilityReport
-
-// Formação
-GET /api/reports/formation
-Response: FormationReport
-
-// Exportar
-GET /api/reports/:type/export?format=csv|xlsx
-Response: Binary file
-```
+## 20. Backlog Inicial
+
+### Produto E UX
+
+- desenhar fluxos P0 do ministro;
+- desenhar fluxos P0 do coordenador;
+- definir tom de voz de mensagens de erro;
+- definir estados vazios;
+- definir criterio de aceite por tela;
+- validar acessibilidade minima.
+
+### API E Dados
+
+- mapear endpoints atuais usados pelo app;
+- desenhar OpenAPI `/api/mobile/v1`;
+- criar fixtures anonimizadas;
+- definir modelo de device registry nativo;
+- definir contrato questionario-evento;
+- definir matriz multi-comunidade;
+- planejar migracoes sem quebrar web.
+
+### Nativo
+
+- decidir repositorio;
+- decidir iOS primeiro ou paralelo;
+- definir arquitetura de modulos;
+- definir armazenamento seguro;
+- definir estrategia de push;
+- definir estrategia de cache;
+- definir observabilidade.
 
 ---
 
-## 5. REGRAS DE NEGÓCIO
+## 21. Riscos E Cuidados
 
-### 5.1 Geração de Escalas
+Riscos:
 
-1. **Prioridade de Atribuição:**
-   - Ministros com maior reliability score têm prioridade
-   - Respeitar preferências de horário do questionário
-   - Evitar posições marcadas como "evitar"
-   - Famílias que preferem servir juntas devem ser agrupadas
+- tentar copiar tudo do app atual;
+- iniciar Swift e Android ao mesmo tempo sem PRD fechado;
+- manter backend sem contrato mobile claro;
+- gastar energia em visual antes de contrato de dados;
+- prometer multi-comunidade antes de read-scoping completo;
+- usar biometria como seguranca falsa;
+- pedir camera/localizacao cedo demais;
+- transformar geolocalizacao em rastreamento;
+- deixar IA sugerir ou publicar escala sem auditoria humana.
 
-2. **Conflitos:**
-   - Ministro não pode ser escalado 2x no mesmo dia
-   - Ministro não pode ser escalado em data que marcou indisponível
-   - Alertar se ministro foi escalado muitas vezes no mês
+Cuidados:
 
-3. **Aprendizado:**
-   - Sistema aprende com edições do coordenador
-   - Padrões detectados são usados em futuras gerações
-
-### 5.2 Substituições
-
-1. **Cálculo de Urgência:**
-   ```
-   < 12 horas  → CRÍTICA (vermelho)
-   12-24 horas → ALTA (laranja)
-   24-72 horas → MÉDIA (amarelo)
-   > 72 horas  → BAIXA (verde)
-   ```
-
-2. **Auto-aprovação:**
-   - Se ministro sugere substituto E substituto aceita → auto-aprovar
-
-3. **Impacto na Confiabilidade:**
-   - Cada substituição solicitada: -2 pontos
-   - Cada substituição atendida (ajudou): +3 pontos
-   - No-show: -10 pontos
-
-### 5.3 Gamificação
-
-1. **Pontuação:**
-   ```
-   Servir na missa:        +10 pts
-   Substituição oferecida: +5 pts
-   Substituição aceita:    +15 pts
-   Material completado:    +20 pts
-   Quiz perfeito:          +20 pts
-   Streak semanal:         +50 pts
-   Badge conquistado:      +[pts do badge]
-   ```
-
-2. **Níveis:**
-   ```
-   Nível 1: Iniciante       (0-99 pts)
-   Nível 2: Aprendiz        (100-299 pts)
-   Nível 3: Ministro        (300-599 pts)
-   Nível 4: Ministro Fiel   (600-999 pts)
-   Nível 5: Veterano        (1000-1499 pts)
-   Nível 6: Mestre          (1500-2499 pts)
-   Nível 7: Guardião        (2500+ pts)
-   ```
-
-3. **Badges:**
-   - Primeira missa servida
-   - 10/50/100 missas servidas
-   - Streak de 4 semanas
-   - Trilha de formação completa
-   - Ajudou em 10 substituições
-   - Participou de evento especial
-
-### 5.4 Confirmação de Presença
-
-1. **Fluxo:**
-   - Escala publicada → Confirmação criada com status "pending"
-   - Enviar notificação ao ministro
-   - Se não responder em 48h → enviar lembrete
-   - Máximo de 3 lembretes
-   - Se não aparecer → marcar como "no_show"
-
-2. **Impacto:**
-   - Confirmou e apareceu: +5 reliability
-   - Confirmou e não apareceu: -15 reliability
-   - Não confirmou e apareceu: 0
-   - Não confirmou e não apareceu: -10 reliability
+- app atual segue vivo;
+- codigo novo so com feature definida;
+- toda feature nasce com criterio de aceite;
+- toda tela nasce com estados;
+- toda regra sensivel nasce com teste;
+- toda permissao nativa nasce com justificativa, fallback e teste de negacao;
+- todo recurso de IA nasce atras de feature flag, logs e revisao humana.
 
 ---
 
-## 6. FLUXOS DE NAVEGAÇÃO
+## 22. Decisoes Em Aberto
 
-### 6.1 Ministro
-
-```
-Login
-  │
-  ├─► Home (Minhas Escalas)
-  │     ├─► Ver Detalhes da Escala
-  │     ├─► Confirmar Presença
-  │     └─► Solicitar Substituição
-  │
-  ├─► Questionário
-  │     └─► Responder
-  │
-  ├─► Formação
-  │     ├─► Trilhas
-  │     ├─► Módulos
-  │     └─► Aulas
-  │
-  ├─► Gamificação
-  │     ├─► Meu Perfil
-  │     ├─► Badges
-  │     └─► Leaderboard
-  │
-  ├─► Notificações
-  │
-  └─► Perfil
-        ├─► Editar Dados
-        └─► Configurações
-```
-
-### 6.2 Coordenador
-
-```
-Login
-  │
-  ├─► Dashboard
-  │     ├─► Alertas Urgentes
-  │     └─► Estatísticas
-  │
-  ├─► Escalas
-  │     ├─► Visualizar
-  │     ├─► Editar (Drag & Drop)
-  │     ├─► Gerar
-  │     └─► Publicar
-  │
-  ├─► Substituições
-  │     ├─► Pendentes
-  │     ├─► Aprovar/Rejeitar
-  │     └─► Histórico
-  │
-  ├─► Questionários
-  │     ├─► Criar
-  │     ├─► Enviar
-  │     └─► Ver Respostas
-  │
-  ├─► Painel Auxiliar
-  │     ├─► Check-in
-  │     ├─► Standby
-  │     └─► Finalizar Missa
-  │
-  ├─► Relatórios
-  │     └─► Vários tipos
-  │
-  ├─► Ministros
-  │     └─► Diretório
-  │
-  └─► (Todas as telas de Ministro também)
-```
+- Novo repositorio `MESC-Native` ou monorepo?
+- iOS primeiro ou iOS e Android juntos?
+- Backend atual com API mobile nova ou backend novo em paralelo?
+- Qual usuario/conta demo representara reviewer/tester?
+- Qual escopo exato do MVP nativo para ministros?
+- Quando o admin web sera substituido, se for?
+- Como anonimizar fixtures reais para testes?
+- Qual politica de retencao para device tokens, logs e geolocalizacao de check-in?
 
 ---
 
-## 7. NOTIFICAÇÕES PUSH
+## 23. Criterio De Pronto Da Transicao
 
-### 7.1 Tipos de Notificação
+Esta transicao estara pronta quando houver:
 
-| Tipo | Título | Corpo | Ação |
-|------|--------|-------|------|
-| **schedule_published** | "Escala Publicada!" | "A escala de {mês} foi publicada. Confira suas datas." | Abrir escalas |
-| **schedule_reminder** | "Lembrete de Escala" | "Amanhã você serve na missa das {hora}." | Abrir escala |
-| **confirmation_request** | "Confirme sua Presença" | "Por favor, confirme sua presença na missa de {data}." | Abrir confirmação |
-| **substitution_needed** | "Substituição Necessária" | "{nome} precisa de substituto para {data}." | Abrir substituição |
-| **substitution_approved** | "Substituição Aprovada" | "Sua substituição para {data} foi aprovada." | Abrir escalas |
-| **formation_new** | "Novo Conteúdo" | "Nova aula disponível: {título}" | Abrir formação |
-| **badge_earned** | "Badge Conquistado!" | "Você ganhou o badge '{nome}'!" | Abrir gamificação |
-
-### 7.2 Configurações
-
-```typescript
-interface NotificationSettings {
-  pushEnabled: boolean;
-  scheduleReminders: boolean;  // 24h antes
-  substitutionAlerts: boolean;
-  formationUpdates: boolean;
-  gamificationAlerts: boolean;
-  quietHoursStart?: string;    // Ex: "22:00"
-  quietHoursEnd?: string;      // Ex: "07:00"
-}
-```
+- PRD v3 aprovado;
+- telas P0 definidas;
+- matriz de permissao aprovada;
+- contrato API mobile v1 desenhado;
+- arquitetura iOS/Android decidida;
+- backlog inicial escrito;
+- app atual mantido estavel em producao;
+- primeiro milestone nativo com escopo pequeno e testavel.
 
 ---
 
-## 8. OFFLINE SUPPORT
+## 24. Proxima Entrega Recomendada
 
-### 8.1 Dados para Cache Local
+Produzir a especificacao de telas P0 com:
 
-```typescript
-// Essenciais (sempre sincronizar)
-- Minhas escalas do mês atual e próximo
-- Meu perfil
-- Configurações
-
-// Secundários (sincronizar quando possível)
-- Trilhas de formação em progresso
-- Badges conquistados
-- Últimas notificações
-
-// Não cachear
-- Dados de outros ministros
-- Relatórios
-- Questionários (sempre online)
-```
-
-### 8.2 Sync Strategy
-
-1. **Pull on Launch:** Buscar dados novos ao abrir app
-2. **Background Sync:** Sincronizar periodicamente
-3. **Push Sync:** Atualizar via push notification
-4. **Conflict Resolution:** Server wins (dados do servidor têm prioridade)
-
----
-
-## 9. SEGURANÇA
-
-### 9.1 Autenticação
-- JWT com expiração de 24h
-- Refresh token com 7 dias
-- Secure storage para tokens
-- Biometria opcional para login
-
-### 9.2 Autorização
-- RBAC (Role-Based Access Control)
-- Middleware de verificação em cada rota
-- Validação de ownership para recursos pessoais
-
-### 9.3 Dados Sensíveis
-- Senhas com bcrypt (10 rounds)
-- HTTPS obrigatório
-- Sanitização de inputs
-- Rate limiting em APIs
-
----
-
-## 10. MÉTRICAS E ANALYTICS
-
-### 10.1 Eventos para Rastrear
-
-```typescript
-// Autenticação
-- login_success
-- login_failure
-- logout
-
-// Escalas
-- schedule_viewed
-- confirmation_sent
-- substitution_requested
-
-// Formação
-- lesson_started
-- lesson_completed
-- quiz_answered
-
-// Engajamento
-- app_opened
-- notification_received
-- notification_clicked
-```
-
-### 10.2 KPIs
-
-- DAU/MAU (usuários ativos)
-- Taxa de resposta de questionários
-- Taxa de confirmação de presença
-- Tempo médio em formação
-- Badges mais conquistados
-
----
-
-## 11. ROADMAP DE IMPLEMENTAÇÃO
-
-### Fase 1: MVP (4-6 semanas)
-- [ ] Setup do projeto (React Native/Flutter)
-- [ ] Autenticação (login, logout, troca de senha)
-- [ ] Visualização de escalas
-- [ ] Confirmação de presença
-- [ ] Perfil básico
-- [ ] Push notifications básicas
-
-### Fase 2: Core Features (4-6 semanas)
-- [ ] Solicitação de substituição
-- [ ] Questionários (responder)
-- [ ] Dashboard coordenador
-- [ ] Gerenciamento de escalas
-- [ ] Publicação de escalas
-
-### Fase 3: Engagement (3-4 semanas)
-- [ ] Gamificação completa
-- [ ] Formação (trilhas, módulos, aulas)
-- [ ] Certificados
-- [ ] Leaderboard
-
-### Fase 4: Advanced (3-4 semanas)
-- [ ] Painel auxiliar (check-in)
-- [ ] Relatórios
-- [ ] Geração inteligente de escalas
-- [ ] Integração WhatsApp
-
-### Fase 5: Polish (2-3 semanas)
-- [ ] Offline support
-- [ ] Otimizações de performance
-- [ ] Testes E2E
-- [ ] Preparação para lojas (App Store, Play Store)
-
----
-
-## 12. BACKUP DO BANCO DE DADOS
-
-### 12.1 Como Fazer Backup (PostgreSQL)
-
-```bash
-# Backup completo
-pg_dump -h localhost -U postgres -d mesc_db -F c -f mesc_backup.dump
-
-# Backup apenas dados (sem estrutura)
-pg_dump -h localhost -U postgres -d mesc_db --data-only -f mesc_data.sql
-
-# Backup de tabelas específicas
-pg_dump -h localhost -U postgres -d mesc_db -t users -t schedules -f mesc_partial.sql
-```
-
-### 12.2 Como Restaurar
-
-```bash
-# Criar banco novo
-createdb -h localhost -U postgres mesc_new_db
-
-# Restaurar
-pg_restore -h localhost -U postgres -d mesc_new_db mesc_backup.dump
-
-# Ou com SQL puro
-psql -h localhost -U postgres -d mesc_new_db -f mesc_data.sql
-```
-
-### 12.3 Variáveis de Ambiente Necessárias
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@host:5432/database
-
-# Auth
-JWT_SECRET=sua-chave-secreta-muito-longa
-
-# Push Notifications (VAPID)
-VAPID_PUBLIC_KEY=sua-chave-publica
-VAPID_PRIVATE_KEY=sua-chave-privada
-VAPID_SUBJECT=mailto:seu@email.com
-
-# WhatsApp (Z-API) - Opcional
-ZAPI_INSTANCE_ID=seu-instance-id
-ZAPI_TOKEN=seu-token
-ZAPI_SECURITY_TOKEN=seu-security-token
-```
-
----
-
-## 13. CHECKLIST PARA O CURSOR
-
-### Antes de Começar
-
-- [ ] Instalar Node.js 18+
-- [ ] Instalar PostgreSQL 14+
-- [ ] Fazer backup do banco atual
-- [ ] Configurar variáveis de ambiente
-- [ ] Escolher stack (React Native ou Flutter)
-
-### Estrutura de Pastas Sugerida (React Native)
-
-```
-mesc-native/
-├── src/
-│   ├── api/           # Chamadas de API
-│   ├── components/    # Componentes reutilizáveis
-│   ├── hooks/         # Custom hooks
-│   ├── navigation/    # Configuração de navegação
-│   ├── screens/       # Telas do app
-│   ├── services/      # Serviços (auth, storage, etc)
-│   ├── store/         # Estado global (Zustand/Redux)
-│   ├── theme/         # Cores, fontes, espaçamentos
-│   ├── types/         # TypeScript types
-│   └── utils/         # Funções utilitárias
-├── assets/            # Imagens, fontes, etc
-├── __tests__/         # Testes
-├── app.json           # Configuração Expo
-├── package.json
-└── tsconfig.json
-```
-
-### Comandos para Iniciar
-
-```bash
-# Com Expo (recomendado para React Native)
-npx create-expo-app mesc-native --template expo-template-blank-typescript
-cd mesc-native
-
-# Instalar dependências essenciais
-npx expo install @react-navigation/native @react-navigation/native-stack
-npx expo install react-native-screens react-native-safe-area-context
-npx expo install @react-native-async-storage/async-storage
-npx expo install expo-secure-store
-npx expo install expo-notifications
-
-# UI Library
-npm install react-native-paper
-
-# State Management
-npm install zustand
-
-# API Client
-npm install axios
-
-# Forms
-npm install react-hook-form zod @hookform/resolvers
-```
-
----
-
-## 14. CONCLUSÃO
-
-Este PRD documenta completamente o sistema MESC e fornece todas as especificações necessárias para criar um clone como app nativo. O documento inclui:
-
-1. **Estrutura completa do banco de dados** com todas as tabelas e relacionamentos
-2. **Especificação de todas as telas** com campos e ações
-3. **APIs detalhadas** para cada funcionalidade
-4. **Regras de negócio** documentadas
-5. **Fluxos de navegação** claros
-6. **Instruções de backup e restauração** do banco
-
-Com este documento e o backup do banco de dados, você terá tudo necessário para implementar o app nativo no Cursor.
-
----
-
-**Documento criado em:** Fevereiro 2026
-**Baseado em:** MESC v5.4.3
-**Autor:** Claude (assistente AI)
+- objetivo da tela;
+- usuario principal;
+- entrada/saida de dados;
+- estados obrigatorios;
+- acoes primarias e secundarias;
+- contratos de API usados;
+- permissoes nativas envolvidas;
+- criterios de aceite;
+- testes esperados.

@@ -55,6 +55,7 @@ backup-*.json
 *.sql
 *.sql.gz
 *.dump
+!migrations/*.sql
 
 # Chaves privadas e certificados
 *.key

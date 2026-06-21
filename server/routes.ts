@@ -47,6 +47,7 @@ import healthRoutes from "./routes/health";
 import massTimesRoutes from "./routes/mass-times";
 import formationRoutes from "./routes/formation";
 import accountRoutes from "./routes/account";
+import mobileRoutes from "./routes/mobile";
 import { insertQuestionnaireSchema, substitutionRequests } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./utils/logger";
@@ -129,6 +130,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Version endpoint (public - sem auth, sem CSRF)
   app.use('/api/version', versionRoutes);
+
+  // Mobile Native API v1 (Bearer token, no CSRF; payloads orientados ao app nativo)
+  app.use('/api/mobile/v1', mobileRoutes);
 
   // Dashboard routes (apenas leitura, requer autenticação)
   app.use('/api/dashboard', authenticateToken, dashboardRoutes);
