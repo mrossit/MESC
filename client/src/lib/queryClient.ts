@@ -1,10 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { apiUrl, getStoredAuthToken } from "./api-url";
 import { clearLocalStoragePreservingSession } from "./persistent-storage";
+import { APP_BUILD_ID, APP_VERSION as DISPLAY_APP_VERSION } from "./version";
 
 // CRITICAL: App version for cache invalidation
-// This VERSION changes on every build, forcing cache refresh
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '5.4.2';
+// APP_CACHE_VERSION changes on every build, forcing cache refresh even when
+// TestFlight build numbers change without bumping the public app version.
+export const APP_VERSION = DISPLAY_APP_VERSION;
+export const APP_CACHE_VERSION = import.meta.env.VITE_APP_BUILD || APP_BUILD_ID;
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -106,12 +109,12 @@ export const queryClient = new QueryClient({
 // CRITICAL: Add version to localStorage for cache invalidation check
 if (typeof window !== 'undefined') {
   const storedVersion = localStorage.getItem('app_version');
-  if (storedVersion !== APP_VERSION) {
-    console.warn(`Version changed from ${storedVersion} to ${APP_VERSION} - clearing caches`);
+  if (storedVersion !== APP_CACHE_VERSION) {
+    console.warn(`Version changed from ${storedVersion} to ${APP_CACHE_VERSION} - clearing caches`);
     // Clear React Query cache
     queryClient.clear();
     clearLocalStoragePreservingSession();
     // Update version
-    localStorage.setItem('app_version', APP_VERSION);
+    localStorage.setItem('app_version', APP_CACHE_VERSION);
   }
 }

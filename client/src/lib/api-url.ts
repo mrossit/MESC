@@ -106,6 +106,20 @@ export function getStoredAuthToken(): string | null {
   return localStorage.getItem("token") || localStorage.getItem("auth_token");
 }
 
+async function clearNativeWebCaches() {
+  if (!isNativeRuntime()) return;
+
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+
+  if ("caches" in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+  }
+}
+
 function withApiAuthorization(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {
   if (!isApiRequestUrl(fetchInputUrl(input))) return init;
 
@@ -134,6 +148,9 @@ export function configureClientRuntime() {
     document.documentElement.classList.add("capacitor-native", `capacitor-${platform}`);
     void configureNativeStatusBar().catch((error) => {
       console.warn("Native status bar configuration failed", error);
+    });
+    void clearNativeWebCaches().catch((error) => {
+      console.warn("Native cache cleanup failed", error);
     });
   }
 

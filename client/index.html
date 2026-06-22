@@ -118,6 +118,32 @@
     <!-- PWA Update Prompt -->
     <script>
       if ('serviceWorker' in navigator) {
+        const isCapacitorNative = window.location.protocol === 'capacitor:' ||
+                                  window.location.protocol === 'ionic:';
+
+        if (isCapacitorNative) {
+          console.log('[SW] Native runtime detected - Service Worker DISABLED');
+
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              registrations.forEach(registration => {
+                registration.unregister().then(() => {
+                  console.log('[SW] Unregistered service worker in native runtime:', registration.scope);
+                });
+              });
+            });
+
+            if ('caches' in window) {
+              caches.keys().then(cacheNames => {
+                cacheNames.forEach(cacheName => {
+                  caches.delete(cacheName).then(() => {
+                    console.log('[SW] Deleted native runtime cache:', cacheName);
+                  });
+                });
+              });
+            }
+          });
+        } else {
         // Detecta se está em desenvolvimento local/preview vs produção (.replit.app)
         const isLocalDev = window.location.hostname === 'localhost' ||
                            window.location.hostname === '127.0.0.1' ||
@@ -216,6 +242,7 @@
               );
             });
           });
+        }
         }
       }
     </script>

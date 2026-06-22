@@ -3,10 +3,11 @@
 // DO NOT manually edit APP_VERSION - it's synced with package.json
 
 export const APP_VERSION = '5.4.3'; // Auto-synced with package.json by build script
-export const BUILD_DATE = new Date().toISOString();
+export const APP_BUILD_ID = '5.4.3-local'; // Fallback only; production builds use VITE_APP_BUILD
+export const BUILD_DATE = '1970-01-01T00:00:00.000Z'; // Fallback only; see version.json for build timestamp
 
 // Gera um hash único baseado na versão e data de build
-export const VERSION_HASH = `${APP_VERSION}-${BUILD_DATE.split('T')[0]}`;
+export const VERSION_HASH = APP_BUILD_ID;
 
 // Chave para armazenar versão no localStorage
 export const VERSION_STORAGE_KEY = 'mesc-app-version';
@@ -25,11 +26,11 @@ interface VersionInfo {
 export function hasVersionChanged(): boolean {
   const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
   if (!storedVersion) {
-    localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+    localStorage.setItem(VERSION_STORAGE_KEY, APP_BUILD_ID);
     return false;
   }
 
-  if (storedVersion !== APP_VERSION) {
+  if (storedVersion !== APP_BUILD_ID) {
     return true;
   }
 
@@ -40,7 +41,7 @@ export function hasVersionChanged(): boolean {
  * Atualiza a versão armazenada
  */
 export function updateStoredVersion(): void {
-  localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+  localStorage.setItem(VERSION_STORAGE_KEY, APP_BUILD_ID);
 }
 
 /**
@@ -115,7 +116,7 @@ export function checkInactivityAndClear(): void {
  */
 export function checkVersion(): boolean {
   const stored = localStorage.getItem(VERSION_STORAGE_KEY);
-  if (!stored || stored !== APP_VERSION) {
+  if (!stored || stored !== APP_BUILD_ID) {
     return true;
   }
   return false;
@@ -173,7 +174,7 @@ export async function clearAppCache(): Promise<void> {
 export function forceReload(): void {
   console.log('[Version] Force reloading page...');
   // Update version before reload
-  localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+  localStorage.setItem(VERSION_STORAGE_KEY, APP_BUILD_ID);
   // Reload
   window.location.reload();
 }
