@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { APP_VERSION, queryClient } from '@/lib/queryClient';
+import { APP_CACHE_VERSION, queryClient } from '@/lib/queryClient';
 import { clearLocalStoragePreservingSession } from '@/lib/persistent-storage';
 
 /**
@@ -22,8 +22,8 @@ export function useVersionCheck() {
         
         const storedVersion = localStorage.getItem('app_version');
 
-        if (storedVersion && storedVersion !== APP_VERSION) {
-          console.warn(`Version changed from ${storedVersion} to ${APP_VERSION} - clearing caches`);
+        if (storedVersion && storedVersion !== APP_CACHE_VERSION) {
+          console.warn(`Version changed from ${storedVersion} to ${APP_CACHE_VERSION} - clearing caches`);
 
           // 1. Clear React Query cache
           queryClient.clear();
@@ -38,7 +38,7 @@ export function useVersionCheck() {
           clearLocalStoragePreservingSession();
 
           // 4. Update version
-          localStorage.setItem('app_version', APP_VERSION);
+          localStorage.setItem('app_version', APP_CACHE_VERSION);
 
           // 5. Unregister Service Worker
           if ('serviceWorker' in navigator) {
@@ -57,12 +57,12 @@ export function useVersionCheck() {
           }
         } else if (!storedVersion) {
           // First time - just set version
-          localStorage.setItem('app_version', APP_VERSION);
+          localStorage.setItem('app_version', APP_CACHE_VERSION);
         }
       } catch (error) {
         console.error('Error checking version:', error);
         // Even on error, set version to prevent infinite loops
-        localStorage.setItem('app_version', APP_VERSION);
+        localStorage.setItem('app_version', APP_CACHE_VERSION);
       }
     };
 
@@ -74,7 +74,7 @@ export function useVersionCheck() {
  * Get current app version
  */
 export function getAppVersion(): string {
-  return APP_VERSION;
+  return APP_CACHE_VERSION;
 }
 
 /**
@@ -93,7 +93,7 @@ export async function forceClearAllCaches(): Promise<void> {
   }
 
   clearLocalStoragePreservingSession();
-  localStorage.setItem('app_version', APP_VERSION);
+  localStorage.setItem('app_version', APP_CACHE_VERSION);
 
   // Unregister Service Worker
   if ('serviceWorker' in navigator) {
