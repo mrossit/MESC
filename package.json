@@ -15,6 +15,7 @@
     "db:restore": "NODE_ENV=production tsx scripts/restore-db.ts",
     "db:studio": "drizzle-kit studio",
     "db:indexes": "NODE_ENV=production tsx scripts/add-database-indexes.ts",
+    "db:bootstrap:native": "tsx scripts/bootstrap-native-database.ts",
     "db:migrate:mobile": "tsx scripts/apply-mobile-migrations.ts",
     "db:validate:mobile": "tsx scripts/validate-mobile-foundation.ts",
     "db:seed:test": "NODE_ENV=development tsx test/fixtures/seedTestData.ts",

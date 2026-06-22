@@ -5,6 +5,51 @@
 
 ---
 
+## Decisao De Ambiente
+
+- PWA atual: manter em `https://saojudastadeu.replit.app`.
+- Novo ambiente nativo: usar `https://saojudastadeu.app`.
+- Banco do novo ambiente nativo: separado do banco atual do Replit, preferencialmente em um projeto Supabase proprio.
+
+Nao usar este checklist para reescrever ou substituir o MESC atual no Replit. Ele serve para preparar o ambiente do app nativo.
+
+---
+
+## Status Atual Do Staging Nativo
+
+Projeto Supabase criado:
+
+- nome: `mesc-native-staging`;
+- project ref: `sdochgpfjosmhrbztthr`;
+- region: `sa-east-1`;
+- API URL: `https://sdochgpfjosmhrbztthr.supabase.co`.
+
+Bootstrap remoto aplicado em 2026-06-21:
+
+- schema P0/runtime do app mobile criado para login, sessoes, auditoria, questionario, escalas, substituicoes, notificacoes, dispositivos, refresh token e idempotencia;
+- RLS habilitado e policies de deny explicito aplicadas nas 13 tabelas criadas;
+- security advisor sem lints;
+- seed demo aplicada com 2 comunidades, 4 usuarios, 2 questionarios, 3 escalas, 2 substituicoes e 8 notificacoes;
+- avisos de performance restantes sao `unused_index`, esperados enquanto a base nao tem trafego.
+
+Este staging ainda precisa receber um deploy de API apontando para esse banco antes de o TestFlight conseguir testar contra `https://saojudastadeu.app`.
+
+---
+
+## 0. Bootstrap De Banco Nativo Novo
+
+Para um Supabase/Postgres novo e vazio:
+
+```bash
+CONFIRM_NATIVE_SCHEMA_BOOTSTRAP=true \
+DATABASE_URL="$NATIVE_DATABASE_URL" \
+npm run db:bootstrap:native
+```
+
+O comando aplica o schema atual com protecoes de ambiente e, em seguida, aplica/valida a fundacao mobile. Ele deve ser usado somente em banco novo, antes de importar dados reais ou demo.
+
+---
+
 ## 1. Antes De Rodar
 
 - confirmar qual banco sera usado: staging, demo ou producao;
