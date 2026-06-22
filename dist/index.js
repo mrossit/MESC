@@ -1709,9 +1709,22 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-function shouldUseNeonDriver(databaseUrl) {
+function resolveDatabaseUrl() {
+  const databaseUrl2 = process.env.DATABASE_URL?.trim();
+  const vercelPostgresUrl = process.env.POSTGRES_URL?.trim();
+  if (process.env.VERCEL === "1" && vercelPostgresUrl) {
+    process.env.DATABASE_URL = vercelPostgresUrl;
+    return vercelPostgresUrl;
+  }
+  const resolvedUrl = databaseUrl2 || vercelPostgresUrl;
+  if (resolvedUrl) {
+    process.env.DATABASE_URL = resolvedUrl;
+  }
+  return resolvedUrl;
+}
+function shouldUseNeonDriver(databaseUrl2) {
   try {
-    const hostname = new URL(databaseUrl).hostname.toLowerCase();
+    const hostname = new URL(databaseUrl2).hostname.toLowerCase();
     return hostname.includes("neon.tech");
   } catch {
     return false;
@@ -1721,29 +1734,30 @@ function parseMaxConnections(value) {
   const parsed = Number.parseInt(value ?? "5", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
 }
-var db, pool, isProduction, isDevelopment;
+var db, pool, isProduction, isDevelopment, databaseUrl;
 var init_db = __esm({
   async "server/db.ts"() {
     "use strict";
     init_schema();
     isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1" || !!process.env.REPL_SLUG && !process.env.DATABASE_URL;
     isDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev";
-    if (process.env.DATABASE_URL) {
+    databaseUrl = resolveDatabaseUrl();
+    if (databaseUrl) {
       if (isDevelopment) {
         console.log("\u{1F680} Using PostgreSQL database");
       }
       try {
-        if (shouldUseNeonDriver(process.env.DATABASE_URL)) {
+        if (shouldUseNeonDriver(databaseUrl)) {
           const { Pool, neonConfig } = await import("@neondatabase/serverless");
           const { drizzle } = await import("drizzle-orm/neon-serverless");
           const ws = await import("ws");
           neonConfig.webSocketConstructor = ws.default;
-          pool = new Pool({ connectionString: process.env.DATABASE_URL });
+          pool = new Pool({ connectionString: databaseUrl });
           db = drizzle({ client: pool, schema: schema_exports });
         } else {
           const postgres = (await import("postgres")).default;
           const { drizzle } = await import("drizzle-orm/postgres-js");
-          pool = postgres(process.env.DATABASE_URL, {
+          pool = postgres(databaseUrl, {
             max: parseMaxConnections(process.env.POSTGRES_MAX_CONNECTIONS),
             prepare: false
           });
@@ -8609,6 +8623,60 @@ var init_whatsappHandler = __esm({
     await init_db();
     init_schema();
     openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+});
+
+// server/static.ts
+var static_exports = {};
+__export(static_exports, {
+  serveStatic: () => serveStatic
+});
+import express from "express";
+import fs from "fs";
+import path from "path";
+function serveStatic(app2) {
+  const distPath = path.resolve(import.meta.dirname, "public");
+  if (!fs.existsSync(distPath)) {
+    throw new Error(
+      `Could not find the build directory: ${distPath}, make sure to build the client first`
+    );
+  }
+  app2.use("/assets", express.static(path.join(distPath, "assets"), {
+    maxAge: "1y",
+    immutable: true
+  }));
+  app2.use(express.static(distPath, {
+    maxAge: "1d",
+    setHeaders: (res, filepath) => {
+      if (filepath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else if (filepath.endsWith("sw.js")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        res.setHeader("Service-Worker-Allowed", "/");
+      } else if (filepath.endsWith("version.json")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      }
+    }
+  }));
+  app2.use("*", (req, res) => {
+    if (req.originalUrl.startsWith("/api/")) {
+      return res.status(404).json({ error: "API endpoint not found" });
+    }
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.sendFile(path.resolve(distPath, "index.html"));
+  });
+}
+var init_static = __esm({
+  "server/static.ts"() {
+    "use strict";
   }
 });
 
@@ -30793,10 +30861,10 @@ function requireIdempotencyKey(req) {
 }
 async function startMobileMutationIdempotency(input) {
   const idempotencyKey = requireIdempotencyKey(input.req);
-  const path4 = (input.req.originalUrl || `${input.req.baseUrl}${input.req.path}`).split("?")[0];
+  const path3 = (input.req.originalUrl || `${input.req.baseUrl}${input.req.path}`).split("?")[0];
   const requestHash = buildMobileRequestFingerprint({
     method: input.req.method,
-    path: path4,
+    path: path3,
     communityId: input.communityId,
     body: input.body ?? input.req.body ?? null
   });
@@ -30804,7 +30872,7 @@ async function startMobileMutationIdempotency(input) {
     userId: input.userId,
     idempotencyKey,
     method: input.req.method,
-    path: path4,
+    path: path3,
     requestHash
   });
 }
@@ -32798,200 +32866,6 @@ async function registerRoutes(app2) {
   return httpServer;
 }
 
-// server/vite.ts
-import express from "express";
-import fs from "fs";
-import path2 from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-
-// vite.config.ts
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-var vite_config_default = defineConfig({
-  plugins: [
-    react(),
-    runtimeErrorOverlay(),
-    ...process.env.NODE_ENV !== "production" && process.env.REPL_ID !== void 0 ? [
-      await import("@replit/vite-plugin-cartographer").then(
-        (m) => m.cartographer()
-      )
-    ] : []
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets")
-    }
-  },
-  root: path.resolve(import.meta.dirname, "client"),
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
-    // Gerar hash nos arquivos para cache busting automático
-    rollupOptions: {
-      output: {
-        // CRITICAL: Hash patterns for cache busting
-        assetFileNames: "assets/[name]-[hash][extname]",
-        chunkFileNames: "js/[name]-[hash].js",
-        entryFileNames: "js/[name]-[hash].js",
-        // Manual chunks for better code splitting
-        manualChunks: {
-          // Vendor chunks - separate large libraries
-          "vendor-react": ["react", "react-dom", "react/jsx-runtime"],
-          "vendor-router": ["wouter"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-alert-dialog",
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-avatar",
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-label",
-            "@radix-ui/react-switch"
-          ],
-          "vendor-form": ["react-hook-form", "@hookform/resolvers", "zod"],
-          "vendor-date": ["date-fns"],
-          "vendor-icons": ["lucide-react"],
-          "vendor-charts": ["recharts"]
-        }
-      }
-    },
-    minify: "terser",
-    sourcemap: false,
-    // Disable for production
-    chunkSizeWarningLimit: 500
-    // Keep warning at 500KB
-  },
-  server: {
-    proxy: {
-      "/api": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-        secure: false
-      }
-    },
-    fs: {
-      strict: true,
-      deny: ["**/.*"]
-    }
-  }
-});
-
-// server/vite.ts
-import { nanoid as nanoid2 } from "nanoid";
-var viteLogger = createLogger();
-function log(message, source = "express") {
-  const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true
-  });
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-async function setupVite(app2, server) {
-  const hmrPort = Number(process.env.PORT || "5000");
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: {
-      server,
-      host: "localhost",
-      clientPort: hmrPort
-    },
-    allowedHosts: true
-  };
-  const vite = await createViteServer({
-    ...vite_config_default,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      }
-    },
-    server: serverOptions,
-    appType: "custom"
-  });
-  app2.use(vite.middlewares);
-  app2.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-    if (url.startsWith("/api/")) {
-      return next();
-    }
-    try {
-      const clientTemplate = path2.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html"
-      );
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid2()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e);
-      next(e);
-    }
-  });
-}
-function serveStatic(app2) {
-  const distPath = path2.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
-  }
-  app2.use("/assets", express.static(path2.join(distPath, "assets"), {
-    maxAge: "1y",
-    // Cache por 1 ano
-    immutable: true
-    // Assets com hash são imutáveis
-  }));
-  app2.use(express.static(distPath, {
-    maxAge: "1d",
-    // 1 dia de cache
-    setHeaders: (res, filepath) => {
-      if (filepath.endsWith("index.html")) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-      } else if (filepath.endsWith("sw.js")) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-        res.setHeader("Service-Worker-Allowed", "/");
-      } else if (filepath.endsWith("version.json")) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-      }
-    }
-  }));
-  app2.use("*", (req, res) => {
-    if (req.originalUrl.startsWith("/api/")) {
-      return res.status(404).json({ error: "API endpoint not found" });
-    }
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.sendFile(path2.resolve(distPath, "index.html"));
-  });
-}
-
 // server/middleware/errorHandler.ts
 init_logger();
 import { ZodError } from "zod";
@@ -33110,7 +32984,7 @@ function errorHandler(err, req, res, _next) {
 }
 
 // server/index.ts
-import path3 from "path";
+import path2 from "path";
 process.env.TZ = "America/Sao_Paulo";
 var errorMonitoringEnabled = initErrorMonitoring();
 if (errorMonitoringEnabled) {
@@ -33131,6 +33005,15 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 var app = express2();
 var isVercelRuntime = process.env.VERCEL === "1";
+function log(message, source = "express") {
+  const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 app.set("trust proxy", true);
 app.use(
   helmet({
@@ -33266,8 +33149,8 @@ app.post("/api/whatsapp/webhook", express2.json(), async (req, res) => {
   }
 });
 console.log("\u2705 Webhook WhatsApp MESC registrado diretamente em /api/whatsapp/webhook");
-app.use(express2.static(path3.join(process.cwd(), "public")));
-app.use("/uploads", express2.static(path3.join(process.cwd(), "uploads")));
+app.use(express2.static(path2.join(process.cwd(), "public")));
+app.use("/uploads", express2.static(path2.join(process.cwd(), "uploads")));
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
@@ -33302,10 +33185,13 @@ async function bootstrapServer({ listen = true } = {}) {
     app.use(errorHandler);
     const isDevelopment2 = process.env.NODE_ENV === "development";
     if (isDevelopment2) {
+      const viteModulePath = "./vite";
+      const { setupVite } = await import(viteModulePath);
       await setupVite(app, server);
     } else if (!isVercelRuntime) {
       try {
-        serveStatic(app);
+        const { serveStatic: serveStatic2 } = await Promise.resolve().then(() => (init_static(), static_exports));
+        serveStatic2(app);
       } catch (error) {
         console.error("\u274C Failed to configure static file serving:", error);
         process.exit(1);

@@ -151,3 +151,4 @@ coverage/
 # ARCHIVE (scripts históricos - não versionar)
 # ==========================================
 archive/
+.vercel

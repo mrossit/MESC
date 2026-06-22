@@ -6,7 +6,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { updateMetrics } from "./routes/metrics";
@@ -41,6 +40,17 @@ process.on("unhandledRejection", (reason, promise) => {
 
 const app = express();
 const isVercelRuntime = process.env.VERCEL === "1";
+
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 // =============================================
 //  Express Base Config
@@ -279,9 +289,12 @@ async function bootstrapServer({ listen = true } = {}): Promise<Server> {
     const isDevelopment = process.env.NODE_ENV === "development";
 
     if (isDevelopment) {
+      const viteModulePath = "./vite";
+      const { setupVite } = await import(viteModulePath);
       await setupVite(app, server);
     } else if (!isVercelRuntime) {
       try {
+        const { serveStatic } = await import("./static");
         serveStatic(app);
       } catch (error) {
         console.error("❌ Failed to configure static file serving:", error);

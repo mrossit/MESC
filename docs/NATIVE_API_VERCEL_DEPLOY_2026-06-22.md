@@ -8,9 +8,10 @@ Este documento prepara o deploy da API do MVP nativo fora do Replit, apontando p
 
 - O PWA atual continua em `https://saojudastadeu.replit.app`.
 - A API/web shell do app nativo deve usar `https://saojudastadeu.app`.
-- A Vercel deve publicar este repositorio como app Express, usando `index.ts` na raiz como entrypoint.
+- A Vercel deve publicar este repositorio como app Express, usando `index.js` na raiz como entrypoint para o bundle `dist/index.js`.
 - O runtime Vercel nao abre porta propria e nao depende do build estatico do PWA.
 - O banco Supabase usa o driver `postgres-js`; bancos Neon continuam usando o driver Neon existente.
+- Em Vercel, o runtime prefere `POSTGRES_URL` da integracao Supabase quando ela existir, mesmo que uma `DATABASE_URL` antiga tambem esteja configurada.
 
 ## Projeto Vercel
 
@@ -19,8 +20,9 @@ Configuracao versionada:
 - Framework: `express`
 - Region: `gru1` (Sao Paulo)
 - Fluid compute: ativo
-- Function principal: `index.ts`
-- Build command: desativado para permitir o fluxo zero-config do Express
+- Function principal: `index.js`, carregando `dist/index.js`
+- Install command: `npm ci --include=dev`, porque o build remoto usa Vite/esbuild de `devDependencies`.
+- Build command: `npm run build`
 
 ## Variaveis Necessarias
 
@@ -30,6 +32,7 @@ Definir no projeto Vercel antes do primeiro smoke:
 NODE_ENV=production
 APP_URL=https://saojudastadeu.app
 DATABASE_URL=<Supabase Postgres URL com sslmode=require>
+POSTGRES_URL=<fornecida pela integracao Supabase/Vercel>
 POSTGRES_MAX_CONNECTIONS=5
 ALLOWED_ORIGINS=https://saojudastadeu.app,capacitor://localhost,https://localhost
 JWT_SECRET=<64+ caracteres aleatorios>
@@ -58,7 +61,9 @@ Smoke esperado:
 ```bash
 curl "$VERCEL_PREVIEW_URL/health"
 curl "$VERCEL_PREVIEW_URL/health/ready"
-curl -i "$VERCEL_PREVIEW_URL/api/mobile/v1/openapi.json"
+curl -i "$VERCEL_PREVIEW_URL/api/mobile/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"mobile.ministro.a@example.test","password":"MobileDemo123!","keepSignedIn":true,"deviceId":"vercel-smoke-device","platform":"ios","appVersion":"staging"}'
 ```
 
 O dominio `saojudastadeu.app` so deve ser apontado para a Vercel depois que `/health/ready` e o smoke mobile P0 passarem no preview.
