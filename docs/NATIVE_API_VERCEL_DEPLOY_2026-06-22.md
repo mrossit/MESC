@@ -59,7 +59,9 @@ Smoke esperado:
 ```bash
 curl "$VERCEL_PREVIEW_URL/health"
 curl "$VERCEL_PREVIEW_URL/health/ready"
-curl -i "$VERCEL_PREVIEW_URL/api/mobile/v1/openapi.json"
+curl -i "$VERCEL_PREVIEW_URL/api/mobile/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"mobile.ministro.a@example.test","password":"MobileDemo123!","keepSignedIn":true,"deviceId":"vercel-smoke-device","platform":"ios","appVersion":"staging"}'
 ```
 
 O dominio `saojudastadeu.app` so deve ser apontado para a Vercel depois que `/health/ready` e o smoke mobile P0 passarem no preview.
