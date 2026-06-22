@@ -20,7 +20,8 @@ Configuracao versionada:
 - Region: `gru1` (Sao Paulo)
 - Fluid compute: ativo
 - Function principal: `index.ts`
-- Build command: desativado para permitir o fluxo zero-config do Express
+- Install command: `npm ci --include=dev`, porque o build remoto usa Vite/esbuild de `devDependencies`.
+- Build command: `npm run build`
 
 ## Variaveis Necessarias
 
