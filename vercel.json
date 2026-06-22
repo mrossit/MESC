@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "express",
+  "buildCommand": null,
+  "installCommand": "npm ci",
+  "regions": ["gru1"],
+  "fluid": true,
+  "functions": {
+    "index.ts": {
+      "maxDuration": 60
+    }
+  }
+}

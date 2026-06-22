@@ -14,6 +14,7 @@ import { scheduleCache } from "./services/scheduleCache";
 import { getHealthStatus } from "./services/healthService";
 import { captureError, initErrorMonitoring } from "./services/errorMonitoring";
 import path from "path";
+import type { Server } from "http";
 
 // =============================================
 //  Global Error Handlers
@@ -39,6 +40,7 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 const app = express();
+const isVercelRuntime = process.env.VERCEL === "1";
 
 // =============================================
 //  Express Base Config
@@ -177,7 +179,16 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-CSRF-Token",
+      "X-Community-Id",
+      "X-Device-Id",
+      "X-Platform",
+      "X-App-Version",
+      "Idempotency-Key",
+    ],
     exposedHeaders: [
       "RateLimit-Limit",
       "RateLimit-Remaining",
@@ -249,43 +260,64 @@ app.use((req, res, next) => {
 // ⚠️ Mantenha o rate limiter após o webhook
 app.use("/api", apiRateLimiter);
 
+let bootstrapPromise: Promise<Server> | undefined;
+
 // =============================================
 //  Error Handling & Server Startup
 // =============================================
-(async () => {
-  const server = await registerRoutes(app);
-
-  // Use centralized error handler middleware
-  app.use(errorHandler);
-
-  const isDevelopment = process.env.NODE_ENV === "development";
-
-  if (isDevelopment) {
-    await setupVite(app, server);
-  } else {
-    try {
-      serveStatic(app);
-    } catch (error) {
-      console.error("❌ Failed to configure static file serving:", error);
-      process.exit(1);
-    }
+async function bootstrapServer({ listen = true } = {}): Promise<Server> {
+  if (bootstrapPromise) {
+    return bootstrapPromise;
   }
 
-  const port = parseInt(process.env.PORT || "5000", 10);
+  bootstrapPromise = (async () => {
+    const server = await registerRoutes(app);
 
-  server.on("error", (error: NodeJS.ErrnoException) => {
-    console.error("❌ Server error:", error);
-    if (error.code === "EADDRINUSE") {
-      console.error(`❌ Port ${port} is already in use`);
+    // Use centralized error handler middleware
+    app.use(errorHandler);
+
+    const isDevelopment = process.env.NODE_ENV === "development";
+
+    if (isDevelopment) {
+      await setupVite(app, server);
+    } else if (!isVercelRuntime) {
+      try {
+        serveStatic(app);
+      } catch (error) {
+        console.error("❌ Failed to configure static file serving:", error);
+        process.exit(1);
+      }
     }
-    process.exit(1);
-  });
 
-  // Clear schedule cache on startup to ensure fresh data after deployments
-  await scheduleCache.clear();
-  console.log("🧹 Schedule cache cleared on startup");
+    const port = parseInt(process.env.PORT || "5000", 10);
 
-  server.listen(port, "0.0.0.0", () => {
-    console.log(`✅ Server started on port ${port} (${process.env.NODE_ENV})`);
-  });
-})();
+    server.on("error", (error: NodeJS.ErrnoException) => {
+      console.error("❌ Server error:", error);
+      if (error.code === "EADDRINUSE") {
+        console.error(`❌ Port ${port} is already in use`);
+      }
+      process.exit(1);
+    });
+
+    // Clear schedule cache on startup to ensure fresh data after deployments
+    await scheduleCache.clear();
+    console.log("🧹 Schedule cache cleared on startup");
+
+    if (listen) {
+      server.listen(port, "0.0.0.0", () => {
+        console.log(`✅ Server started on port ${port} (${process.env.NODE_ENV})`);
+      });
+    } else {
+      console.log(`✅ Server bootstrapped for Vercel (${process.env.NODE_ENV})`);
+    }
+
+    return server;
+  })();
+
+  return bootstrapPromise;
+}
+
+await bootstrapServer({ listen: !isVercelRuntime });
+
+export { app, bootstrapServer };
+export default app;
