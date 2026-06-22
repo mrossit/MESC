@@ -1709,6 +1709,18 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
+function shouldUseNeonDriver(databaseUrl) {
+  try {
+    const hostname = new URL(databaseUrl).hostname.toLowerCase();
+    return hostname.includes("neon.tech");
+  } catch {
+    return false;
+  }
+}
+function parseMaxConnections(value) {
+  const parsed = Number.parseInt(value ?? "5", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+}
 var db, pool, isProduction, isDevelopment;
 var init_db = __esm({
   async "server/db.ts"() {
@@ -1721,12 +1733,22 @@ var init_db = __esm({
         console.log("\u{1F680} Using PostgreSQL database");
       }
       try {
-        const { Pool, neonConfig } = await import("@neondatabase/serverless");
-        const { drizzle } = await import("drizzle-orm/neon-serverless");
-        const ws = await import("ws");
-        neonConfig.webSocketConstructor = ws.default;
-        pool = new Pool({ connectionString: process.env.DATABASE_URL });
-        db = drizzle({ client: pool, schema: schema_exports });
+        if (shouldUseNeonDriver(process.env.DATABASE_URL)) {
+          const { Pool, neonConfig } = await import("@neondatabase/serverless");
+          const { drizzle } = await import("drizzle-orm/neon-serverless");
+          const ws = await import("ws");
+          neonConfig.webSocketConstructor = ws.default;
+          pool = new Pool({ connectionString: process.env.DATABASE_URL });
+          db = drizzle({ client: pool, schema: schema_exports });
+        } else {
+          const postgres = (await import("postgres")).default;
+          const { drizzle } = await import("drizzle-orm/postgres-js");
+          pool = postgres(process.env.DATABASE_URL, {
+            max: parseMaxConnections(process.env.POSTGRES_MAX_CONNECTIONS),
+            prepare: false
+          });
+          db = drizzle(pool, { schema: schema_exports });
+        }
         if (isDevelopment) {
           console.log("\u2705 PostgreSQL connected");
         }
@@ -33108,6 +33130,7 @@ process.on("unhandledRejection", (reason, promise) => {
   });
 });
 var app = express2();
+var isVercelRuntime = process.env.VERCEL === "1";
 app.set("trust proxy", true);
 app.use(
   helmet({
@@ -33211,7 +33234,16 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-CSRF-Token",
+      "X-Community-Id",
+      "X-Device-Id",
+      "X-Platform",
+      "X-App-Version",
+      "Idempotency-Key"
+    ],
     exposedHeaders: [
       "RateLimit-Limit",
       "RateLimit-Remaining",
@@ -33260,31 +33292,50 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/api", apiRateLimiter);
-(async () => {
-  const server = await registerRoutes(app);
-  app.use(errorHandler);
-  const isDevelopment2 = process.env.NODE_ENV === "development";
-  if (isDevelopment2) {
-    await setupVite(app, server);
-  } else {
-    try {
-      serveStatic(app);
-    } catch (error) {
-      console.error("\u274C Failed to configure static file serving:", error);
-      process.exit(1);
-    }
+var bootstrapPromise;
+async function bootstrapServer({ listen = true } = {}) {
+  if (bootstrapPromise) {
+    return bootstrapPromise;
   }
-  const port = parseInt(process.env.PORT || "5000", 10);
-  server.on("error", (error) => {
-    console.error("\u274C Server error:", error);
-    if (error.code === "EADDRINUSE") {
-      console.error(`\u274C Port ${port} is already in use`);
+  bootstrapPromise = (async () => {
+    const server = await registerRoutes(app);
+    app.use(errorHandler);
+    const isDevelopment2 = process.env.NODE_ENV === "development";
+    if (isDevelopment2) {
+      await setupVite(app, server);
+    } else if (!isVercelRuntime) {
+      try {
+        serveStatic(app);
+      } catch (error) {
+        console.error("\u274C Failed to configure static file serving:", error);
+        process.exit(1);
+      }
     }
-    process.exit(1);
-  });
-  await scheduleCache.clear();
-  console.log("\u{1F9F9} Schedule cache cleared on startup");
-  server.listen(port, "0.0.0.0", () => {
-    console.log(`\u2705 Server started on port ${port} (${process.env.NODE_ENV})`);
-  });
-})();
+    const port = parseInt(process.env.PORT || "5000", 10);
+    server.on("error", (error) => {
+      console.error("\u274C Server error:", error);
+      if (error.code === "EADDRINUSE") {
+        console.error(`\u274C Port ${port} is already in use`);
+      }
+      process.exit(1);
+    });
+    await scheduleCache.clear();
+    console.log("\u{1F9F9} Schedule cache cleared on startup");
+    if (listen) {
+      server.listen(port, "0.0.0.0", () => {
+        console.log(`\u2705 Server started on port ${port} (${process.env.NODE_ENV})`);
+      });
+    } else {
+      console.log(`\u2705 Server bootstrapped for Vercel (${process.env.NODE_ENV})`);
+    }
+    return server;
+  })();
+  return bootstrapPromise;
+}
+await bootstrapServer({ listen: !isVercelRuntime });
+var index_default = app;
+export {
+  app,
+  bootstrapServer,
+  index_default as default
+};
