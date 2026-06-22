@@ -10,6 +10,23 @@ import type { Sql } from "postgres";
 let db: NeonDatabase<typeof schema>;
 let pool: Pool | Sql | undefined;
 
+function resolveDatabaseUrl(): string | undefined {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const vercelPostgresUrl = process.env.POSTGRES_URL?.trim();
+
+  if (process.env.VERCEL === "1" && vercelPostgresUrl) {
+    process.env.DATABASE_URL = vercelPostgresUrl;
+    return vercelPostgresUrl;
+  }
+
+  const resolvedUrl = databaseUrl || vercelPostgresUrl;
+  if (resolvedUrl) {
+    process.env.DATABASE_URL = resolvedUrl;
+  }
+
+  return resolvedUrl;
+}
+
 function shouldUseNeonDriver(databaseUrl: string): boolean {
   try {
     const hostname = new URL(databaseUrl).hostname.toLowerCase();
@@ -32,26 +49,28 @@ const isProduction = process.env.NODE_ENV === 'production' ||
 const isDevelopment = process.env.NODE_ENV === 'development' ||
                      process.env.NODE_ENV === 'dev';
 
-if (process.env.DATABASE_URL) {
+const databaseUrl = resolveDatabaseUrl();
+
+if (databaseUrl) {
   // PostgreSQL (Production)
   if (isDevelopment) {
     console.log('🚀 Using PostgreSQL database');
   }
 
   try {
-    if (shouldUseNeonDriver(process.env.DATABASE_URL)) {
+    if (shouldUseNeonDriver(databaseUrl)) {
       const { Pool, neonConfig } = await import('@neondatabase/serverless');
       const { drizzle } = await import('drizzle-orm/neon-serverless');
       const ws = await import('ws');
 
       neonConfig.webSocketConstructor = ws.default;
-      pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      pool = new Pool({ connectionString: databaseUrl });
       db = drizzle({ client: pool, schema });
     } else {
       const postgres = (await import('postgres')).default;
       const { drizzle } = await import('drizzle-orm/postgres-js');
 
-      pool = postgres(process.env.DATABASE_URL, {
+      pool = postgres(databaseUrl, {
         max: parseMaxConnections(process.env.POSTGRES_MAX_CONNECTIONS),
         prepare: false,
       });

@@ -1709,9 +1709,22 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-function shouldUseNeonDriver(databaseUrl) {
+function resolveDatabaseUrl() {
+  const databaseUrl2 = process.env.DATABASE_URL?.trim();
+  const vercelPostgresUrl = process.env.POSTGRES_URL?.trim();
+  if (process.env.VERCEL === "1" && vercelPostgresUrl) {
+    process.env.DATABASE_URL = vercelPostgresUrl;
+    return vercelPostgresUrl;
+  }
+  const resolvedUrl = databaseUrl2 || vercelPostgresUrl;
+  if (resolvedUrl) {
+    process.env.DATABASE_URL = resolvedUrl;
+  }
+  return resolvedUrl;
+}
+function shouldUseNeonDriver(databaseUrl2) {
   try {
-    const hostname = new URL(databaseUrl).hostname.toLowerCase();
+    const hostname = new URL(databaseUrl2).hostname.toLowerCase();
     return hostname.includes("neon.tech");
   } catch {
     return false;
@@ -1721,29 +1734,30 @@ function parseMaxConnections(value) {
   const parsed = Number.parseInt(value ?? "5", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
 }
-var db, pool, isProduction, isDevelopment;
+var db, pool, isProduction, isDevelopment, databaseUrl;
 var init_db = __esm({
   async "server/db.ts"() {
     "use strict";
     init_schema();
     isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1" || !!process.env.REPL_SLUG && !process.env.DATABASE_URL;
     isDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev";
-    if (process.env.DATABASE_URL) {
+    databaseUrl = resolveDatabaseUrl();
+    if (databaseUrl) {
       if (isDevelopment) {
         console.log("\u{1F680} Using PostgreSQL database");
       }
       try {
-        if (shouldUseNeonDriver(process.env.DATABASE_URL)) {
+        if (shouldUseNeonDriver(databaseUrl)) {
           const { Pool, neonConfig } = await import("@neondatabase/serverless");
           const { drizzle } = await import("drizzle-orm/neon-serverless");
           const ws = await import("ws");
           neonConfig.webSocketConstructor = ws.default;
-          pool = new Pool({ connectionString: process.env.DATABASE_URL });
+          pool = new Pool({ connectionString: databaseUrl });
           db = drizzle({ client: pool, schema: schema_exports });
         } else {
           const postgres = (await import("postgres")).default;
           const { drizzle } = await import("drizzle-orm/postgres-js");
-          pool = postgres(process.env.DATABASE_URL, {
+          pool = postgres(databaseUrl, {
             max: parseMaxConnections(process.env.POSTGRES_MAX_CONNECTIONS),
             prepare: false
           });

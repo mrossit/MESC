@@ -11,6 +11,7 @@ Este documento prepara o deploy da API do MVP nativo fora do Replit, apontando p
 - A Vercel deve publicar este repositorio como app Express, usando `index.js` na raiz como entrypoint para o bundle `dist/index.js`.
 - O runtime Vercel nao abre porta propria e nao depende do build estatico do PWA.
 - O banco Supabase usa o driver `postgres-js`; bancos Neon continuam usando o driver Neon existente.
+- Em Vercel, o runtime prefere `POSTGRES_URL` da integracao Supabase quando ela existir, mesmo que uma `DATABASE_URL` antiga tambem esteja configurada.
 
 ## Projeto Vercel
 
@@ -31,6 +32,7 @@ Definir no projeto Vercel antes do primeiro smoke:
 NODE_ENV=production
 APP_URL=https://saojudastadeu.app
 DATABASE_URL=<Supabase Postgres URL com sslmode=require>
+POSTGRES_URL=<fornecida pela integracao Supabase/Vercel>
 POSTGRES_MAX_CONNECTIONS=5
 ALLOWED_ORIGINS=https://saojudastadeu.app,capacitor://localhost,https://localhost
 JWT_SECRET=<64+ caracteres aleatorios>
