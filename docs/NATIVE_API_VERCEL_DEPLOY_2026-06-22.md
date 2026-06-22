@@ -8,7 +8,7 @@ Este documento prepara o deploy da API do MVP nativo fora do Replit, apontando p
 
 - O PWA atual continua em `https://saojudastadeu.replit.app`.
 - A API/web shell do app nativo deve usar `https://saojudastadeu.app`.
-- A Vercel deve publicar este repositorio como app Express, usando `index.ts` na raiz como entrypoint.
+- A Vercel deve publicar este repositorio como app Express, usando `index.js` na raiz como entrypoint para o bundle `dist/index.js`.
 - O runtime Vercel nao abre porta propria e nao depende do build estatico do PWA.
 - O banco Supabase usa o driver `postgres-js`; bancos Neon continuam usando o driver Neon existente.
 
@@ -19,7 +19,7 @@ Configuracao versionada:
 - Framework: `express`
 - Region: `gru1` (Sao Paulo)
 - Fluid compute: ativo
-- Function principal: `index.ts`
+- Function principal: `index.js`, carregando `dist/index.js`
 - Install command: `npm ci --include=dev`, porque o build remoto usa Vite/esbuild de `devDependencies`.
 - Build command: `npm run build`
 
