@@ -1,5 +1,5 @@
 import express from "express";
-import app from "./server/index";
+import app from "./server/index.js";
 
 void express;
 
