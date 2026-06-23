@@ -129,16 +129,130 @@ app.head("/health/ready", async (_req: Request, res: Response) => {
   res.status(health.status === "ok" ? 200 : 503).end();
 });
 
-app.get("/", (_req: Request, res: Response, next) => {
-  if (res.headersSent) return;
-  const acceptHeader = _req.get("accept") || "";
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return character;
+    }
+  });
+}
+
+app.get("/", async (req: Request, res: Response) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  const payload = {
+    name: "MESC Native API",
+    status: health.status,
+    environment: health.environment,
+    apiVersion: "mobile-v1",
+    links: {
+      ready: "/health/ready",
+      mobileConfig: "/api/mobile/v1/app/config",
+      currentPwa: "https://saojudastadeu.replit.app",
+    },
+  };
+
+  const acceptHeader = req.get("accept") || "";
   if (
     acceptHeader.includes("application/json") &&
     !acceptHeader.includes("text/html")
   ) {
-    return res.status(200).json({ status: "ok" });
+    return res.status(health.status === "ok" ? 200 : 503).json(payload);
   }
-  next();
+
+  res
+    .status(health.status === "ok" ? 200 : 503)
+    .type("html")
+    .send(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MESC Native API</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fdfbf7;
+        --surface: rgba(255, 255, 255, 0.76);
+        --text: #2c2c2c;
+        --muted: #6b6257;
+        --primary: #722f37;
+        --gold: #b38f4d;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a1a1a;
+          --surface: rgba(44, 44, 44, 0.78);
+          --text: #fdfbf7;
+          --muted: #d5cabb;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at top, rgba(179, 143, 77, 0.22), transparent 36%), var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(92vw, 560px);
+        padding: 32px;
+        border: 1px solid rgba(179, 143, 77, 0.26);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+      }
+      .mark {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #f8e5ad;
+        font-family: Georgia, serif;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 20px 0 8px;
+        font-family: Georgia, serif;
+        font-size: 32px;
+        line-height: 1.1;
+      }
+      p { margin: 0 0 20px; color: var(--muted); line-height: 1.55; }
+      dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; margin: 0; }
+      dt { color: var(--muted); }
+      dd { margin: 0; font-weight: 700; }
+      a { color: var(--primary); font-weight: 700; text-decoration-color: var(--gold); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">M</div>
+      <h1>MESC Native API</h1>
+      <p>Ambiente nativo do MESC Sao Judas Tadeu. O PWA atual continua em <a href="https://saojudastadeu.replit.app">saojudastadeu.replit.app</a>.</p>
+      <dl>
+        <dt>Status</dt><dd>${escapeHtml(payload.status)}</dd>
+        <dt>Ambiente</dt><dd>${escapeHtml(payload.environment)}</dd>
+        <dt>API mobile</dt><dd><a href="/api/mobile/v1/app/config">mobile-v1</a></dd>
+        <dt>Healthcheck</dt><dd><a href="/health/ready">ready</a></dd>
+      </dl>
+    </main>
+  </body>
+</html>`);
 });
 
 // =============================================
