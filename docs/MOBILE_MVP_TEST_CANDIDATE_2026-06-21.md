@@ -21,7 +21,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50415)` validado pela Apple e distribuido para testers internos.
+- iOS TestFlight: build `5.4.3 (50419)` validado pela Apple e distribuido para testers internos.
 
 ## Comandos Validados
 
@@ -65,18 +65,18 @@ npm run mobile:mvp:check
 
 - Android APK debug: `android/app/build/outputs/apk/debug/app-debug.apk`
 - iOS app de simulador: `build/ios-derived-data/Build/Products/Debug-iphonesimulator/App.app`
-- iOS IPA TestFlight: `build/ios/upload-50415/App.ipa`
+- iOS IPA TestFlight: `build/MESC-50419-export/App.ipa`
 
 Os artefatos acima sao gerados localmente e nao devem ser commitados.
 
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50415`
-- Delivery UUID: `1d9608d9-5bfb-4bd5-bfc8-b4551877c59e`
+- Build: `50419`
+- Delivery UUID: `c135e769-997c-4205-8fd7-93b61f46f8a7`
 - Status App Store Connect: `VALID`
 - Distribuicao: testers internos
-- Changelog: `MVP nativo P0: contrato mobile, Minha Missao, questionario, escalas, substituicoes, notificacoes e visual liturgico inicial.`
+- Changelog: `MVP nativo P0 com questionario vigente corrigido para teste fiel: fallback para questionario publicado do proximo mes, links mobile reais, seletor de mes sincronizado, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -96,7 +96,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo ja existe e esta populado, mas ainda falta publicar a API apontando para esse banco e apontar `https://saojudastadeu.app` para o novo ambiente. Enquanto isso nao acontecer, o TestFlight `5.4.3 (50415)` ainda nao tera um backend nativo fiel para testar.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o TestFlight `5.4.3 (50419)` usa esse host para o teste fiel do MVP.
 
 ## Smoke Manual Do MVP
 
@@ -113,8 +113,7 @@ Com o ambiente demo/staging preparado:
 
 ## Bloqueios Para Beta Real
 
-- PR `#38` ja foi mergeado em `main`; o codigo precisa ser publicado no novo ambiente que servira a API do app.
-- `https://saojudastadeu.app` precisa apontar para o ambiente nativo novo; o PWA atual permanece em `https://saojudastadeu.replit.app`.
-- Supabase staging ja esta criado e populado; ainda falta configurar o deploy da API com `DATABASE_URL` desse banco.
+- `https://saojudastadeu.app` ja aponta para o ambiente nativo novo; o PWA atual permanece em `https://saojudastadeu.replit.app`.
+- Supabase staging ja esta criado e populado; o deploy da API nativa usa o `DATABASE_URL` desse banco.
 - Para Android release, usar upload key local fora do Git.
 - Para iOS TestFlight, gerar archive assinado no Xcode/App Store Connect.
