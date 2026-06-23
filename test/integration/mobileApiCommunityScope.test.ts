@@ -167,6 +167,25 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     expect(communityB.status).toBe(200);
     expect(communityB.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityB);
     expect(communityB.body.questionnaire.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireB);
+
+    const communityAFallback = await mobileGet("/questionnaires/current?month=2026-06", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+    });
+
+    expect(communityAFallback.status).toBe(200);
+    expect(communityAFallback.body.month).toBe(MOBILE_P0_DEMO_MONTH);
+    expect(communityAFallback.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
+    expect(communityAFallback.body.questionnaire.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireA);
+
+    const communityBFallback = await mobileGet("/questionnaires/current?month=2026-06", {
+      userId: MOBILE_P0_DEMO_IDS.parishCoordinator,
+      communityId: MOBILE_P0_DEMO_IDS.communityB,
+    });
+
+    expect(communityBFallback.status).toBe(200);
+    expect(communityBFallback.body.month).toBe(MOBILE_P0_DEMO_MONTH);
+    expect(communityBFallback.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityB);
+    expect(communityBFallback.body.questionnaire.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireB);
   });
 
   it("does not leak substitution requests across communities", async () => {

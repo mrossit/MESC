@@ -153,7 +153,7 @@ describe("mobile auth session storage", () => {
             photoUrl: null,
           },
           substitute: null,
-          deepLink: "/substitutions/substitution-1",
+          deepLink: "/schedules/substitutions",
           createdAt: "2026-06-21T12:00:00.000Z",
           updatedAt: "2026-06-21T12:00:00.000Z",
         }],

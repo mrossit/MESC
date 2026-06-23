@@ -240,6 +240,50 @@ function getRequestedMonth(value: unknown) {
   }
 }
 
+function questionnaireMonthKey(year: number, month: number) {
+  return year * 100 + month;
+}
+
+function toIsoMonthFromParts(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function questionnaireMonthOrderSql() {
+  return sql<number>`(${questionnaires.year} * 100 + ${questionnaires.month})`;
+}
+
+async function loadRelevantPublishedQuestionnaires(input: {
+  communityId: string;
+  monthRange: ReturnType<typeof getRequestedMonth>;
+  limit?: number;
+}) {
+  const monthOrder = questionnaireMonthOrderSql();
+
+  return db
+    .select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      description: questionnaires.description,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      status: questionnaires.status,
+      questions: questionnaires.questions,
+      deadline: questionnaires.deadline,
+      targetUserIds: questionnaires.targetUserIds,
+      updatedAt: questionnaires.updatedAt,
+    })
+    .from(questionnaires)
+    .where(
+      and(
+        eq(questionnaires.communityId, input.communityId),
+        eq(questionnaires.status, "published"),
+        gte(monthOrder, questionnaireMonthKey(input.monthRange.year, input.monthRange.month)),
+      ),
+    )
+    .orderBy(monthOrder, desc(questionnaires.updatedAt))
+    .limit(input.limit ?? 5);
+}
+
 function parseStoredJson(value: unknown) {
   let current = value;
 
@@ -490,11 +534,11 @@ function toMobileSubstitution(row: {
       time: row.scheduleTime,
       type: row.scheduleType,
       location: row.scheduleLocation,
-      deepLink: `/schedules/${row.scheduleId}`,
+      deepLink: mobileScheduleDeepLink(row.scheduleDate),
     },
     requester: row.requester ?? null,
     substitute: row.substitute ?? null,
-    deepLink: `/substitutions/${row.id}`,
+    deepLink: normalizeMobileDeepLink("/substitutions"),
     createdAt: toIsoDate(row.createdAt),
     updatedAt: toIsoDate(row.updatedAt),
   };
@@ -516,6 +560,23 @@ function toMobileCommunity(row: {
     parishName: row.parishName,
     isMatriz: row.isMatriz,
   };
+}
+
+function mobileScheduleDeepLink(date?: string | null) {
+  return date ? `/schedules?date=${date}` : "/schedules";
+}
+
+function normalizeMobileDeepLink(value: string | null | undefined, fallback = "/dashboard") {
+  if (!value) return fallback;
+
+  if (value === "/questionnaires" || value.startsWith("/questionnaires/")) return "/questionnaire";
+  if (value === "/notices" || value === "/notifications") return "/communication";
+  if (value.startsWith("/substitutions")) return "/schedules/substitutions";
+  if (value === "/confirmations") return "/schedules";
+  if (value.startsWith("/admin/questionnaires/")) return "/questionnaire-responses";
+  if (value.startsWith("/admin/ministers/")) return "/ministers-directory";
+
+  return value;
 }
 
 function toMobileProfile(user: {
@@ -1121,7 +1182,7 @@ router.get("/notifications", authenticateToken, async (req: AuthRequest, res) =>
         priority: notification.priority,
         read: Boolean(notification.read),
         readAt: toIsoDate(notification.readAt),
-        deepLink: notification.actionUrl ?? "/notifications",
+        deepLink: normalizeMobileDeepLink(notification.actionUrl, "/communication"),
         createdAt: toIsoDate(notification.createdAt),
       })),
       unreadCount: Number(unread?.total ?? 0),
@@ -1210,29 +1271,11 @@ router.get("/questionnaires/current", authenticateToken, async (req: AuthRequest
     const activeCommunity = await resolveActiveCommunity(req);
     const monthRange = getRequestedMonth(req.query.month);
 
-    const [questionnaire] = await db
-      .select({
-        id: questionnaires.id,
-        title: questionnaires.title,
-        description: questionnaires.description,
-        month: questionnaires.month,
-        year: questionnaires.year,
-        status: questionnaires.status,
-        questions: questionnaires.questions,
-        deadline: questionnaires.deadline,
-        updatedAt: questionnaires.updatedAt,
-      })
-      .from(questionnaires)
-      .where(
-        and(
-          eq(questionnaires.communityId, activeCommunity.id),
-          eq(questionnaires.status, "published"),
-          eq(questionnaires.month, monthRange.month),
-          eq(questionnaires.year, monthRange.year),
-        ),
-      )
-      .orderBy(desc(questionnaires.updatedAt))
-      .limit(1);
+    const [questionnaire] = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 1,
+    });
 
     if (!questionnaire) {
       return res.json({
@@ -1263,7 +1306,7 @@ router.get("/questionnaires/current", authenticateToken, async (req: AuthRequest
     res.json({
       success: true,
       community: activeCommunity,
-      month: monthRange.isoMonth,
+      month: toIsoMonthFromParts(questionnaire.year, questionnaire.month),
       questionnaire: {
         id: questionnaire.id,
         title: questionnaire.title,
@@ -1810,7 +1853,7 @@ router.post("/substitutions/:id/claim", authenticateToken, async (req: AuthReque
       })),
       read: dbBoolean(false),
       readAt: null,
-      actionUrl: "/substitutions",
+      actionUrl: "/schedules/substitutions",
       priority: "high",
       expiresAt: null,
       createdAt: new Date(),
@@ -1898,23 +1941,11 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
       )
       .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position));
 
-    const [currentQuestionnaire] = await db
-      .select({
-        id: questionnaires.id,
-        title: questionnaires.title,
-        targetUserIds: questionnaires.targetUserIds,
-      })
-      .from(questionnaires)
-      .where(
-        and(
-          eq(questionnaires.communityId, activeCommunity.id),
-          eq(questionnaires.status, "published"),
-          eq(questionnaires.month, monthRange.month),
-          eq(questionnaires.year, monthRange.year),
-        ),
-      )
-      .orderBy(desc(questionnaires.updatedAt))
-      .limit(1);
+    const [currentQuestionnaire] = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 1,
+    });
 
     let responseCount = 0;
     let questionnaireTargetCount: number | null = null;
@@ -2006,7 +2037,9 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
     res.json({
       success: true,
       community: activeCommunity,
-      month: monthRange.isoMonth,
+      month: currentQuestionnaire
+        ? toIsoMonthFromParts(currentQuestionnaire.year, currentQuestionnaire.month)
+        : monthRange.isoMonth,
       metrics: {
         activeMinisters: activeMinisterRows.length,
         publishedAssignments: publishedSchedules.length,
@@ -2024,13 +2057,15 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
         ? {
             id: currentQuestionnaire.id,
             title: currentQuestionnaire.title,
+            month: currentQuestionnaire.month,
+            year: currentQuestionnaire.year,
             responses: responseCount,
             pending: Math.max((questionnaireTargetCount ?? 0) - responseCount, 0),
             target: questionnaireTargetCount ?? 0,
             responseRate: questionnaireTargetCount && questionnaireTargetCount > 0
               ? Math.round((responseCount / questionnaireTargetCount) * 100)
               : 0,
-            deepLink: `/admin/questionnaires/${currentQuestionnaire.id}/responses`,
+            deepLink: "/questionnaire-responses",
           }
         : null,
       coverage: Array.from(coverageMap.values()).map((item) => ({
@@ -2257,7 +2292,7 @@ router.get("/admin/ministers", authenticateToken, async (req: AuthRequest, res) 
       preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
       ministryStartDate: toDateOnly(minister.ministryStartDate),
       dataQuality: toMobileDataQuality(minister),
-      deepLink: `/admin/ministers/${minister.id}`,
+      deepLink: "/ministers-directory",
     }));
     const qualitySummary = summarizeDataQuality(ministers);
 
@@ -2342,27 +2377,11 @@ router.get("/mission/home", authenticateToken, async (req: AuthRequest, res) => 
       )
       .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position));
 
-    const questionnaireCandidates = await db
-      .select({
-        id: questionnaires.id,
-        title: questionnaires.title,
-        description: questionnaires.description,
-        month: questionnaires.month,
-        year: questionnaires.year,
-        deadline: questionnaires.deadline,
-        updatedAt: questionnaires.updatedAt,
-      })
-      .from(questionnaires)
-      .where(
-        and(
-          eq(questionnaires.communityId, activeCommunity.id),
-          eq(questionnaires.status, "published"),
-          eq(questionnaires.month, monthRange.month),
-          eq(questionnaires.year, monthRange.year),
-        ),
-      )
-      .orderBy(desc(questionnaires.updatedAt))
-      .limit(5);
+    const questionnaireCandidates = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 5,
+    });
 
     let pendingQuestionnaire: (typeof questionnaireCandidates)[number] | null = null;
     for (const questionnaire of questionnaireCandidates) {
@@ -2443,7 +2462,7 @@ router.get("/mission/home", authenticateToken, async (req: AuthRequest, res) => 
             confirmationStatus: nextMission.confirmationStatus ?? null,
             canConfirm: !nextMission.confirmationStatus || nextMission.confirmationStatus === "pending",
             canRequestSubstitution: true,
-            deepLink: `/schedules/${nextMission.id}`,
+            deepLink: mobileScheduleDeepLink(nextMission.date),
           }
         : null,
       pendingActions,
@@ -2460,7 +2479,7 @@ router.get("/mission/home", authenticateToken, async (req: AuthRequest, res) => 
         message: notice.message,
         priority: notice.priority,
         read: Boolean(notice.read),
-        deepLink: notice.actionUrl ?? "/notices",
+        deepLink: normalizeMobileDeepLink(notice.actionUrl, "/communication"),
         createdAt: toIsoDate(notice.createdAt),
       })),
       sync: {
@@ -2519,7 +2538,7 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
         position: schedule.position,
         status: schedule.status,
         notes: schedule.notes,
-        deepLink: `/schedules/${schedule.id}`,
+        deepLink: mobileScheduleDeepLink(toDateOnly(schedule.date)),
       })),
     });
   } catch (error) {
@@ -2626,7 +2645,7 @@ router.post("/schedules/:id/confirm", authenticateToken, async (req: AuthRequest
         id: schedule.id,
         date: schedule.date,
         time: schedule.time,
-        deepLink: `/schedules/${schedule.id}`,
+        deepLink: mobileScheduleDeepLink(schedule.date),
       },
     };
 
@@ -2714,7 +2733,7 @@ router.get("/schedules/:id", authenticateToken, async (req: AuthRequest, res) =>
         position: row.position,
         status: row.status,
         notes: row.notes,
-        deepLink: `/schedules/${row.id}`,
+        deepLink: mobileScheduleDeepLink(toDateOnly(row.date)),
         confirmationStatus: row.confirmationStatus ?? null,
         substitution: substitution
           ? {

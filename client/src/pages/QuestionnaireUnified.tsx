@@ -432,6 +432,13 @@ export default function QuestionnaireUnified() {
           return;
         }
 
+        if (mobileQuestionnaire.month !== selectedMonth) {
+          setSelectedMonth(mobileQuestionnaire.month);
+        }
+        if (mobileQuestionnaire.year !== selectedYear) {
+          setSelectedYear(mobileQuestionnaire.year);
+        }
+
         const mobileTemplate = mobileQuestionnaireToTemplate(mobileQuestionnaire);
         const initialResponses = createInitialResponses(mobileTemplate.questions);
         const responseEntries = normalizeResponseEntries(mobileQuestionnaire.response?.responses);

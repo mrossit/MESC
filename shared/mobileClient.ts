@@ -352,6 +352,8 @@ export interface MobileAdminCommunityHomeResponse {
   questionnaire: {
     id: string;
     title: string;
+    month: number;
+    year: number;
     responses: number;
     pending: number;
     target: number;

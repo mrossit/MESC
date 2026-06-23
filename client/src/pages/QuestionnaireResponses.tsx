@@ -184,6 +184,25 @@ function NativeCoordinatorResponses({
     queryFn: () => mobileGetAdminQuestionnaireResponses(questionnaireId!),
   });
 
+  useEffect(() => {
+    const questionnaire = homeQuery.data?.questionnaire;
+    if (!questionnaire) return;
+
+    if (questionnaire.month !== selectedMonth) {
+      setSelectedMonth(questionnaire.month);
+    }
+    if (questionnaire.year !== selectedYear) {
+      setSelectedYear(questionnaire.year);
+    }
+  }, [
+    homeQuery.data?.questionnaire?.month,
+    homeQuery.data?.questionnaire?.year,
+    selectedMonth,
+    selectedYear,
+    setSelectedMonth,
+    setSelectedYear,
+  ]);
+
   const payload = responsesQuery.data;
   const responseByUserId = useMemo(() => {
     const map = new Map<string, MobileAdminQuestionnaireResponsesResponse['responses'][number]>();

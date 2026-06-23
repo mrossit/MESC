@@ -419,6 +419,7 @@ paths:
                     $ref: "#/components/schemas/Community"
                   month:
                     type: string
+                    description: Effective questionnaire month. May be the next published month when the requested month has no published questionnaire.
                   questionnaire:
                     nullable: true
                     allOf:
@@ -1259,6 +1260,7 @@ components:
           $ref: "#/components/schemas/Community"
         month:
           type: string
+          description: Effective questionnaire month when a published questionnaire is available; otherwise the requested month.
         metrics:
           type: object
           required:
@@ -1291,6 +1293,26 @@ components:
         questionnaire:
           type: object
           nullable: true
+          required: [id, title, month, year, responses, pending, target, responseRate, deepLink]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            month:
+              type: integer
+            year:
+              type: integer
+            responses:
+              type: integer
+            pending:
+              type: integer
+            target:
+              type: integer
+            responseRate:
+              type: integer
+            deepLink:
+              type: string
         coverage:
           type: array
           items:

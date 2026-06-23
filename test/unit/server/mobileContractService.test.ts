@@ -83,19 +83,19 @@ describe("mobileContractService", () => {
       id: "questionnaire-1",
       type: "questionnaire",
       priority: "high",
-      deepLink: "/questionnaires/questionnaire-1",
+      deepLink: "/questionnaire",
     });
     expect(actions[1]).toMatchObject({
       id: "substitution-1",
       type: "substitution",
       priority: "high",
-      deepLink: "/substitutions/substitution-1",
+      deepLink: "/schedules/substitutions",
     });
     expect(actions[2]).toMatchObject({
       id: "notices-unread",
       type: "notice",
       priority: "normal",
-      deepLink: "/notices",
+      deepLink: "/communication",
     });
   });
 

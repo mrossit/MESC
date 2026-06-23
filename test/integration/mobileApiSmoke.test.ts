@@ -115,6 +115,16 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(mission.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
     expect(mission.nextMission?.id).toBe(MOBILE_P0_DEMO_IDS.scheduleA);
 
+    const missionFromPreviousMonth = await client.getMissionHome({ month: "2026-06" });
+    expect(missionFromPreviousMonth.success).toBe(true);
+    expect(missionFromPreviousMonth.pendingActions).toContainEqual(
+      expect.objectContaining({
+        id: MOBILE_P0_DEMO_IDS.questionnaireA,
+        type: "questionnaire",
+        deepLink: "/questionnaire",
+      }),
+    );
+
     const notificationList = await client.listNotifications({ limit: 1 });
     expect(notificationList.success).toBe(true);
     expect(notificationList.unreadCount).toBe(1);
@@ -137,6 +147,11 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(questionnaire.success).toBe(true);
     expect(questionnaire.questionnaire?.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireA);
     expect(questionnaire.questionnaire?.responseStatus).toBe("pending");
+
+    const questionnaireFromPreviousMonth = await client.getCurrentQuestionnaire({ month: "2026-06" });
+    expect(questionnaireFromPreviousMonth.success).toBe(true);
+    expect(questionnaireFromPreviousMonth.month).toBe(MOBILE_P0_DEMO_MONTH);
+    expect(questionnaireFromPreviousMonth.questionnaire?.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireA);
 
     const questionnaireResponse = await client.submitQuestionnaireResponse(
       MOBILE_P0_DEMO_IDS.questionnaireA,
@@ -221,10 +236,21 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(coordinatorHome.success).toBe(true);
     expect(coordinatorHome.questionnaire).toMatchObject({
       id: MOBILE_P0_DEMO_IDS.questionnaireA,
+      month: 7,
+      year: 2026,
       responses: 1,
       pending: 0,
       target: 1,
       responseRate: 100,
+    });
+
+    const coordinatorHomeFromPreviousMonth = await substituteClient.getAdminCommunityHome({ month: "2026-06" });
+    expect(coordinatorHomeFromPreviousMonth.month).toBe(MOBILE_P0_DEMO_MONTH);
+    expect(coordinatorHomeFromPreviousMonth.questionnaire).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.questionnaireA,
+      month: 7,
+      year: 2026,
+      responses: 1,
     });
     expect(coordinatorHome.metrics).toMatchObject({
       questionnaireResponses: 1,

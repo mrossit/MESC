@@ -250,7 +250,7 @@ export function buildMissionPendingActions(input: {
       title: "Responder questionario",
       subtitle: input.questionnaire.title,
       priority: "high",
-      deepLink: `/questionnaires/${input.questionnaire.id}`,
+      deepLink: "/questionnaire",
       dueAt: toIsoDate(input.questionnaire.deadline),
     });
   }
@@ -262,7 +262,7 @@ export function buildMissionPendingActions(input: {
       title: "Acompanhar substituicao",
       subtitle: `Status: ${input.substitution.status}`,
       priority: input.substitution.status === "pending" ? "high" : "normal",
-      deepLink: `/substitutions/${input.substitution.id}`,
+      deepLink: "/schedules/substitutions",
     });
   }
 
@@ -273,7 +273,7 @@ export function buildMissionPendingActions(input: {
       title: "Avisos nao lidos",
       subtitle: `${input.unreadNoticesCount} aviso(s) aguardando leitura`,
       priority: "normal",
-      deepLink: "/notices",
+      deepLink: "/communication",
     });
   }
 
