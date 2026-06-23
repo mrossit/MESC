@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
 import { db } from "../../server/db";
-import { users } from "../../shared/schema";
+import { schedules, substitutionRequests, users } from "../../shared/schema";
 import {
   MOBILE_P0_DEMO_IDS,
   MOBILE_P0_DEMO_MONTH,
@@ -172,6 +172,72 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(confirmation.success).toBe(true);
     expect(confirmation.confirmation.status).toBe("confirmed");
     expect(confirmation.schedule.id).toBe(MOBILE_P0_DEMO_IDS.scheduleA);
+
+    const smokeClaimScheduleId = "10101010-1010-4010-8010-101010101010";
+    await db.delete(substitutionRequests).where(eq(substitutionRequests.scheduleId, smokeClaimScheduleId));
+    await db.delete(schedules).where(eq(schedules.id, smokeClaimScheduleId));
+    await db.insert(schedules).values({
+      id: smokeClaimScheduleId,
+      communityId: MOBILE_P0_DEMO_IDS.communityA,
+      date: "2026-07-19",
+      time: "15:00",
+      type: "missa",
+      location: "Igreja Matriz",
+      ministerId: MOBILE_P0_DEMO_IDS.ministerA,
+      position: 3,
+      status: "published",
+      notes: "Escala isolada para smoke de aceite de substituicao",
+      createdAt: new Date("2026-06-21T12:00:00.000Z"),
+    });
+
+    const claimableSubstitution = await client.requestSubstitution(
+      {
+        scheduleId: smokeClaimScheduleId,
+        reason: "Smoke test de aceite",
+      },
+      { idempotencyKey: createMobileIdempotencyKey(randomUUID) },
+    );
+
+    expect(claimableSubstitution.success).toBe(true);
+    expect(claimableSubstitution.substitution.status).toBe("available");
+
+    const substituteClient = new MescMobileApiClient({
+      baseUrl,
+      deviceId: "mobile-smoke-substitute-ios-device",
+      platform: "ios",
+      appVersion: "1.0.0-smoke",
+    });
+
+    const substituteLogin = await substituteClient.login({
+      email: "mobile.coord.a@example.test",
+      password: MOBILE_P0_DEMO_PASSWORD,
+      keepSignedIn: true,
+    });
+
+    expect(substituteLogin.success).toBe(true);
+    expect(substituteLogin.activeCommunityId).toBe(MOBILE_P0_DEMO_IDS.communityA);
+
+    const claimedSubstitution = await substituteClient.claimSubstitution(
+      claimableSubstitution.substitution.id,
+      { message: "Aceito pelo smoke mobile" },
+      { idempotencyKey: createMobileIdempotencyKey(randomUUID) },
+    );
+
+    expect(claimedSubstitution.success).toBe(true);
+    expect(claimedSubstitution.substitution.status).toBe("approved");
+    expect(claimedSubstitution.substitution.substitute?.id).toBe(MOBILE_P0_DEMO_IDS.coordinatorA);
+
+    const [claimedSchedule] = await db
+      .select({
+        ministerId: schedules.ministerId,
+        substituteId: schedules.substituteId,
+      })
+      .from(schedules)
+      .where(eq(schedules.id, smokeClaimScheduleId))
+      .limit(1);
+
+    expect(claimedSchedule.ministerId).toBe(MOBILE_P0_DEMO_IDS.coordinatorA);
+    expect(claimedSchedule.substituteId).toBe(MOBILE_P0_DEMO_IDS.ministerA);
 
     const substitution = await client.requestSubstitution(
       {

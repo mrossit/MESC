@@ -63,6 +63,7 @@ describe("mobile OpenAPI contract", () => {
     const criticalMutations = [
       { path: "/questionnaires/{id}/response", method: "post" },
       { path: "/substitutions", method: "post" },
+      { path: "/substitutions/{id}/claim", method: "post" },
       { path: "/schedules/{id}/confirm", method: "post" },
     ];
 

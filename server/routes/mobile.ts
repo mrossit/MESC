@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, asc, count, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
   communities,
   notifications,
@@ -13,7 +13,7 @@ import {
   users,
 } from "@shared/schema";
 import { isAdmin, isParishWide } from "@shared/roles";
-import { extractMobileNotificationEventKey } from "@shared/mobileNotificationEvents";
+import { extractMobileNotificationEventKey, mobileNotificationData } from "@shared/mobileNotificationEvents";
 import { db } from "../db";
 import { authenticateToken, type AuthRequest, generateToken, login } from "../auth";
 import { authRateLimiter } from "../middleware/rateLimiter";
@@ -22,7 +22,7 @@ import { logActivity } from "../utils/activityLogger";
 import { createSession } from "./session";
 import { QuestionnaireService } from "../services/questionnaireService";
 import { scheduleCache } from "../services/scheduleCache";
-import { trackSubstitutionRequest } from "../services/reliabilityScoreService";
+import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../services/reliabilityScoreService";
 import { formatMinisterName } from "../utils/formatters";
 import {
   beginMobileIdempotency,
@@ -109,6 +109,10 @@ const substitutionCreateSchema = z.object({
   scheduleId: z.string().uuid(),
   substituteId: z.string().optional().nullable(),
   reason: z.string().max(1000).optional().nullable(),
+});
+
+const substitutionClaimSchema = z.object({
+  message: z.string().max(1000).optional().nullable(),
 });
 
 const confirmationSchema = z.object({
@@ -1478,6 +1482,208 @@ router.get("/substitutions/:id", authenticateToken, async (req: AuthRequest, res
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar substituicao");
+  }
+});
+
+router.post("/substitutions/:id/claim", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const parsed = substitutionClaimSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+
+    const [row] = await db
+      .select({
+        id: substitutionRequests.id,
+        scheduleId: substitutionRequests.scheduleId,
+        requesterId: substitutionRequests.requesterId,
+        substituteId: substitutionRequests.substituteId,
+        status: substitutionRequests.status,
+        reason: substitutionRequests.reason,
+        urgency: substitutionRequests.urgency,
+        responseMessage: substitutionRequests.responseMessage,
+        createdAt: substitutionRequests.createdAt,
+        updatedAt: substitutionRequests.updatedAt,
+        scheduleDate: schedules.date,
+        scheduleTime: schedules.time,
+        scheduleType: schedules.type,
+        scheduleLocation: schedules.location,
+      })
+      .from(substitutionRequests)
+      .innerJoin(schedules, eq(substitutionRequests.scheduleId, schedules.id))
+      .where(and(eq(substitutionRequests.id, req.params.id), eq(substitutionRequests.communityId, activeCommunity.id)))
+      .limit(1);
+
+    if (!row) {
+      throw new MobileHttpError(404, "Substituicao nao encontrada");
+    }
+
+    const isAvailable = row.status === "available" || (row.status === "pending" && !row.substituteId);
+    if (!isAvailable) {
+      throw new MobileHttpError(400, "Esta substituicao nao esta mais disponivel");
+    }
+
+    if (row.requesterId === user.id) {
+      throw new MobileHttpError(400, "Voce nao pode aceitar sua propria substituicao");
+    }
+
+    if (isLocalScheduleDateTimePast(row.scheduleDate, row.scheduleTime)) {
+      throw new MobileHttpError(400, "Nao e possivel aceitar substituicao para missa que ja passou");
+    }
+
+    const conflictingSchedule = await db
+      .select({ id: schedules.id })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.communityId, activeCommunity.id),
+          eq(schedules.ministerId, user.id),
+          eq(schedules.date, row.scheduleDate),
+          eq(schedules.time, row.scheduleTime),
+          inArray(schedules.status, ["scheduled", "published"]),
+          ne(schedules.id, row.scheduleId),
+        ),
+      )
+      .limit(1);
+
+    if (conflictingSchedule.length > 0) {
+      throw new MobileHttpError(400, "Voce ja esta escalado neste horario");
+    }
+
+    let claimed = row;
+
+    const claimWithClient = async (tx: typeof db) => {
+      const [currentRequest] = await tx
+        .select()
+        .from(substitutionRequests)
+        .where(and(eq(substitutionRequests.id, row.id), eq(substitutionRequests.communityId, activeCommunity.id)))
+        .limit(1);
+
+      const stillAvailable = currentRequest
+        && (currentRequest.status === "available" || (currentRequest.status === "pending" && !currentRequest.substituteId));
+
+      if (!stillAvailable) {
+        throw new MobileHttpError(409, "Esta substituicao ja foi aceita por outro ministro");
+      }
+
+      const [updated] = await tx
+        .update(substitutionRequests)
+        .set({
+          status: "approved",
+          substituteId: user.id,
+          approvedBy: user.id,
+          approvedAt: new Date(),
+          responseMessage: parsed.message || null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(substitutionRequests.id, row.id), eq(substitutionRequests.communityId, activeCommunity.id)))
+        .returning();
+
+      await tx
+        .update(schedules)
+        .set({
+          ministerId: user.id,
+          substituteId: row.requesterId,
+        })
+        .where(and(eq(schedules.id, row.scheduleId), eq(schedules.communityId, activeCommunity.id)));
+
+      claimed = {
+        ...row,
+        substituteId: updated.substituteId,
+        status: updated.status,
+        responseMessage: updated.responseMessage,
+        updatedAt: updated.updatedAt,
+      };
+    };
+
+    if (process.env.DATABASE_URL) {
+      await db.transaction(async (tx) => {
+        await claimWithClient(tx as typeof db);
+      });
+    } else {
+      await claimWithClient(db);
+    }
+
+    scheduleCache.invalidateByDate(row.scheduleDate);
+    await trackSubstitutionFulfillment(user.id, row.scheduleId);
+
+    const substituteName = formatMinisterName(user.name);
+    await db.insert(notifications).values({
+      ...localUuid(),
+      userId: row.requesterId,
+      type: "substitution",
+      title: "Substituto aceitou",
+      message: `${substituteName} aceitou substituir voce na missa de ${row.scheduleDate} as ${row.scheduleTime}.`,
+      data: dbJson(mobileNotificationData("substitute_accepted", {
+        substitutionId: row.id,
+        scheduleId: row.scheduleId,
+        substituteId: user.id,
+        communityId: activeCommunity.id,
+      })),
+      read: dbBoolean(false),
+      readAt: null,
+      actionUrl: "/substitutions",
+      priority: "high",
+      expiresAt: null,
+      createdAt: new Date(),
+    });
+
+    await logActivity(user.id, "approve_substitution", {
+      source: "mobile-v1",
+      scheduleId: row.scheduleId,
+      substitutionId: row.id,
+      requesterId: row.requesterId,
+      communityId: activeCommunity.id,
+      idempotencyKey,
+    }, req);
+
+    const usersById = await loadMobileSubstitutionUsers([{
+      requesterId: row.requesterId,
+      substituteId: user.id,
+    }]);
+
+    const responseBody = {
+      success: true,
+      substitution: toMobileSubstitution({
+        ...claimed,
+        scheduleDate: row.scheduleDate,
+        scheduleTime: row.scheduleTime,
+        scheduleType: row.scheduleType,
+        scheduleLocation: row.scheduleLocation,
+        requester: usersById.get(row.requesterId) ?? null,
+        substitute: usersById.get(user.id) ?? null,
+      }),
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao aceitar substituicao");
   }
 });
 

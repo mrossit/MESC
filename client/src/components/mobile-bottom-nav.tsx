@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Calendar, Home, Menu, Repeat2, UserRound } from "lucide-react";
+import { Calendar, Church, Menu, Repeat2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -16,9 +16,9 @@ export function MobileBottomNav() {
 
   const navItems: NavItem[] = [
     {
-      title: "Home",
+      title: "Missão",
       href: "/dashboard",
-      icon: Home,
+      icon: Church,
     },
     {
       title: "Escalas",

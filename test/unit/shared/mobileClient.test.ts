@@ -18,6 +18,8 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.submitQuestionnaire("questionnaire/with slash"))
       .toBe("/questionnaires/questionnaire%2Fwith%20slash/response");
     expect(mobileEndpoints.confirmSchedule("schedule-1")).toBe("/schedules/schedule-1/confirm");
+    expect(mobileEndpoints.claimSubstitution("substitution/with slash"))
+      .toBe("/substitutions/substitution%2Fwith%20slash/claim");
     expect(mobileEndpoints.notifications({ limit: 5 })).toBe("/notifications?limit=5");
     expect(mobileEndpoints.readNotification("notification/with slash"))
       .toBe("/notifications/notification%2Fwith%20slash/read");

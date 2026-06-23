@@ -1405,7 +1405,11 @@ export default function QuestionnaireUnified() {
         // Para ministros: mostrar baseado se já respondeu ou não
         admin: { color: 'bg-blue-100 text-blue-800', label: 'Enviado aos Ministros', icon: Send },
         pending: { color: 'bg-yellow-500 text-white', label: 'Pendente', icon: AlertCircle },
-        responded: { color: 'bg-blue-500 text-white', label: 'Respondido - ainda aceita respostas', icon: CheckCircle }
+        responded: {
+          color: 'bg-blue-500 text-white',
+          label: useNativeQuestionnaire ? 'Respondido' : 'Respondido - ainda aceita respostas',
+          icon: CheckCircle
+        }
       },
       closed: { color: 'bg-gray-500 text-white', label: 'Encerrado', icon: Lock }
     };
@@ -1696,26 +1700,66 @@ export default function QuestionnaireUnified() {
     setSuccess('Perguntas ordenadas: múltipla escolha primeiro, texto por último');
   };
 
+  const layoutTitle = useNativeQuestionnaire
+    ? "Disponibilidade"
+    : `Questionário de Disponibilidade ${mode === 'respond' ? '- Modo Resposta' : mode === 'admin' ? '- Modo Admin' : ''}`;
+  const layoutSubtitle = useNativeQuestionnaire
+    ? `${monthNames[selectedMonth - 1]} de ${selectedYear}`
+    : mode === 'admin'
+      ? 'Configure o questionário antes de enviar aos ministros'
+      : mode === 'respond'
+        ? 'Responda as perguntas abaixo e envie no final'
+        : 'Visualizando questionário';
+  const pageContainerClass = useNativeQuestionnaire
+    ? "mx-auto w-full max-w-3xl space-y-3 sm:space-y-4"
+    : "max-w-5xl mx-auto p-6 ml-[-4px] mr-[-4px] pt-[0px] pb-[0px] pl-[0px] pr-[0px]";
+  const shellCardClass = useNativeQuestionnaire
+    ? "border-0 bg-transparent shadow-none"
+    : "border-opacity-30";
+  const shellContentClass = useNativeQuestionnaire
+    ? "p-0"
+    : "p-3 sm:p-4";
+  const submitPanelClass = useNativeQuestionnaire
+    ? "mt-8 rounded-lg border border-white/50 bg-white/45 p-3 dark:border-white/10 dark:bg-white/5"
+    : "flex justify-center mt-8 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border";
+
   return (
     <Layout 
-      title={`Questionário de Disponibilidade ${mode === 'respond' ? '- Modo Resposta' : mode === 'admin' ? '- Modo Admin' : ''}`}
-      subtitle={mode === 'admin' 
-        ? 'Configure o questionário antes de enviar aos ministros'
-        : mode === 'respond'
-        ? '✍️ Responda as perguntas abaixo e clique em "Enviar Questionário" no final'
-        : 'Visualizando questionário'}
+      title={layoutTitle}
+      subtitle={layoutSubtitle}
     >
-      <div className="max-w-5xl mx-auto p-6 ml-[-4px] mr-[-4px] pt-[0px] pb-[0px] pl-[0px] pr-[0px]">
-        <Card className="border-opacity-30">
-          <CardHeader className="flex flex-col space-y-1.5 p-6 mt-[0px] mb-[0px] pt-[10px] pb-[10px]">
-            <div className="flex items-center justify-between">
-              {getStatusBadge()}
+      <div className={pageContainerClass}>
+        {useNativeQuestionnaire && (
+          <div className="liquid-glass rounded-lg border-0 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-semibold uppercase text-burgundy dark:text-amber-200">
+                  Questionário mensal
+                </p>
+                <h2 className="text-xl font-semibold leading-tight text-foreground">
+                  {monthNames[selectedMonth - 1]} de {selectedYear}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Informe sua disponibilidade para a próxima escala da comunidade.
+                </p>
+              </div>
+              <div className="shrink-0">{getStatusBadge()}</div>
             </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4">
+          </div>
+        )}
+
+        <Card className={shellCardClass}>
+          {!useNativeQuestionnaire && (
+            <CardHeader className="flex flex-col space-y-1.5 p-6 mt-[0px] mb-[0px] pt-[10px] pb-[10px]">
+              <div className="flex items-center justify-between">
+                {getStatusBadge()}
+              </div>
+            </CardHeader>
+          )}
+          <CardContent className={shellContentClass}>
             {/* Seletor de Mês/Ano */}
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={useNativeQuestionnaire ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
                 <div>
                   <Label htmlFor="month" className="text-sm font-medium">Mês</Label>
                   <select
@@ -2347,7 +2391,7 @@ export default function QuestionnaireUnified() {
                     }).map((question) => (
                         <Card 
                           key={question.id} 
-                          className="border-l-4" 
+                          className={useNativeQuestionnaire ? "liquid-glass border-l-4" : "border-l-4"}
                           style={{ borderLeftColor: getCategoryColor(question.category) }}
                         >
                           <CardContent className="p-3 sm:p-4 pt-4 sm:pt-6">
@@ -2532,7 +2576,7 @@ export default function QuestionnaireUnified() {
                     )}
 
                     {/* Botão de envio */}
-                    <div className="flex justify-center mt-8 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border">
+                    <div className={submitPanelClass}>
                       {template.status === 'closed' ? (
                         <div className="w-full space-y-3">
                           <Alert variant="destructive">
@@ -2559,7 +2603,7 @@ export default function QuestionnaireUnified() {
                           onClick={handleSubmitResponse}
                           disabled={submitting || isSubmitted}
                           size="lg"
-                          className={`gap-2 px-8 py-3 text-lg font-semibold shadow-lg transition-all ${
+                          className={`${useNativeQuestionnaire ? 'h-12 w-full rounded-lg text-base' : 'px-8 py-3 text-lg'} gap-2 font-semibold shadow-lg transition-all ${
                             isSubmitted ? 'bg-green-600 hover:bg-green-700' : ''
                           }`}
                           data-testid="button-submit-questionnaire"

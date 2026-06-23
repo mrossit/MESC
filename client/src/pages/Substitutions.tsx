@@ -56,6 +56,7 @@ import { cn, parseScheduleDate } from "@/lib/utils";
 import { formatMassTime, capitalizeFirst } from "@/features/schedules/utils/formatters";
 import { LITURGICAL_POSITIONS, getPositionDisplayName } from "@shared/constants";
 import {
+  mobileClaimSubstitution,
   mobileGetSchedulesMonth,
   mobileListSubstitutions,
   mobileRequestSubstitution,
@@ -372,6 +373,32 @@ export default function Substitutions() {
   }, [mobileSubstitutions?.substitutions, useNativeSubstitutions, user, webSubstitutionRequests]);
 
   const loadingRequests = useNativeSubstitutions ? loadingMobileRequests : loadingWebRequests;
+
+  const claimMobileSubstitutionMutation = useMutation({
+    mutationFn: (requestId: string) => mobileClaimSubstitution(
+      requestId,
+      { message: "Aceito substituir pelo app nativo." },
+      { idempotencyKey: createMobileIdempotencyKey() },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: mobileSubstitutionsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: mobileSchedulesQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ["mobile", "mission-home"], exact: false }),
+      ]);
+      toast({
+        title: "Substituição aceita",
+        description: "A escala foi atualizada com você como substituto.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Não foi possível aceitar",
+        description: error.message || "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Função auxiliar para converter horário para minutos (para ordenação)
   const timeToMinutes = (time: string): number => {
@@ -970,6 +997,25 @@ export default function Substitutions() {
 
                       {/* Botões de ação */}
                       <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
+                        {useNativeSubstitutions &&
+                          (item.request.status === "available" || (item.request.status === "pending" && !isDirected)) &&
+                          !isMyRequest && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={claimMobileSubstitutionMutation.isPending}
+                              onClick={() => claimMobileSubstitutionMutation.mutate(item.request.id)}
+                              className="flex-1 sm:flex-initial"
+                            >
+                              {claimMobileSubstitutionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4 mr-1" />
+                              )}
+                              Aceitar Substituição
+                            </Button>
+                          )}
+
                         {/* Botão para aceitar solicitação direcionada (pending com substituteId) */}
                         {!useNativeSubstitutions && item.request.status === "pending" && !isMyRequest && isDirected && isForMe && (
                           <Button
@@ -1137,24 +1183,68 @@ export default function Substitutions() {
   return (
     <Layout 
       title="Substituições"
-      subtitle={isCoordinator ? "Gerencie pendências e substituições" : "Gerencie solicitações de substituição"}
+      subtitle={
+        useNativeSubstitutions
+          ? "Troque uma escala ou aceite um pedido"
+          : isCoordinator
+            ? "Gerencie pendências e substituições"
+            : "Gerencie solicitações de substituição"
+      }
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn("grid w-full", isCoordinator ? "grid-cols-2" : "grid-cols-1")}>
-          {isCoordinator && (
-            <TabsTrigger value="pendencies" className="relative">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Pendências
-              {massPendencies.filter(p => p.urgencyLevel === "critical" || p.urgencyLevel === "high").length > 0 && (
-                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
-              )}
+      {useNativeSubstitutions ? (
+        <div className="mx-auto w-full max-w-3xl space-y-3 sm:space-y-4">
+          <div className="liquid-glass rounded-lg border-0 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-semibold uppercase text-burgundy dark:text-amber-200">
+                  Trocas de escala
+                </p>
+                <h2 className="text-xl font-semibold leading-tight text-foreground">
+                  Pedidos abertos e suas solicitações
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Acompanhe pedidos da comunidade e solicite ajuda quando não puder servir.
+                </p>
+              </div>
+              <Button onClick={openNewRequestDialog} className="h-11 shrink-0 gap-2">
+                <Plus className="h-4 w-4" />
+                Nova solicitação
+              </Button>
+            </div>
+          </div>
+
+          <Card className="liquid-glass border-0">
+            <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <Users className="h-4 w-4 text-burgundy dark:text-amber-200" />
+                Substituições
+              </CardTitle>
+              <CardDescription>
+                Pedidos que você pode atender e solicitações que você criou.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
+              {renderSubstitutionList()}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className={cn("grid w-full", isCoordinator ? "grid-cols-2" : "grid-cols-1")}>
+            {isCoordinator && (
+              <TabsTrigger value="pendencies" className="relative">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Pendências
+                {massPendencies.filter(p => p.urgencyLevel === "critical" || p.urgencyLevel === "high").length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                )}
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="substitutions">
+              <Users className="h-4 w-4 mr-2" />
+              Substituições
             </TabsTrigger>
-          )}
-          <TabsTrigger value="substitutions">
-            <Users className="h-4 w-4 mr-2" />
-            Substituições
-          </TabsTrigger>
-        </TabsList>
+          </TabsList>
 
         {isCoordinator && (
           <TabsContent value="pendencies" className="space-y-4">
@@ -1371,7 +1461,8 @@ export default function Substitutions() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      )}
 
       {/* Rest of the dialogs and modals will remain the same below */}
       {/* Response Dialog */}
@@ -1536,7 +1627,7 @@ export default function Substitutions() {
       <Dialog open={isNewRequestDialogOpen} onOpenChange={setIsNewRequestDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Nova Solicitação de Substituição</DialogTitle>
+            <DialogTitle>{useNativeSubstitutions ? "Pedir substituição" : "Nova Solicitação de Substituição"}</DialogTitle>
             <DialogDescription>
               Solicite um substituto para uma de suas escalas
             </DialogDescription>

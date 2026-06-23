@@ -23,6 +23,8 @@ import {
   type MobileQuestionnaireSubmitResponse,
   type MobileScheduleConfirmPayload,
   type MobileScheduleConfirmResponse,
+  type MobileSubstitutionClaimPayload,
+  type MobileSubstitutionClaimResponse,
   type MobileScheduleMonthResponse,
   type MobileSubstitutionCreatePayload,
   type MobileSubstitutionCreateResponse,
@@ -339,6 +341,14 @@ export async function mobileRequestSubstitution(
   options: MobileClientRequestOptions,
 ): Promise<MobileSubstitutionCreateResponse> {
   return runWithMobileAuthRetry((client) => client.requestSubstitution(payload, options));
+}
+
+export async function mobileClaimSubstitution(
+  substitutionId: string,
+  payload: MobileSubstitutionClaimPayload,
+  options: MobileClientRequestOptions,
+): Promise<MobileSubstitutionClaimResponse> {
+  return runWithMobileAuthRetry((client) => client.claimSubstitution(substitutionId, payload, options));
 }
 
 export async function mobileListSubstitutions(): Promise<MobileSubstitutionsResponse> {

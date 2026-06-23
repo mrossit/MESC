@@ -324,6 +324,15 @@ export interface MobileSubstitutionCreateResponse {
   substitution: MobileSubstitution;
 }
 
+export interface MobileSubstitutionClaimPayload {
+  message?: string | null;
+}
+
+export interface MobileSubstitutionClaimResponse {
+  success: true;
+  substitution: MobileSubstitution;
+}
+
 export interface MobileProfile {
   id: string;
   email: string;
@@ -532,6 +541,7 @@ export const mobileEndpoints = {
   submitQuestionnaire: (id: string) => `/questionnaires/${encodePathSegment(id)}/response`,
   substitutions: () => "/substitutions",
   substitution: (id: string) => `/substitutions/${encodePathSegment(id)}`,
+  claimSubstitution: (id: string) => `/substitutions/${encodePathSegment(id)}/claim`,
   missionHome: (input: { month?: string } = {}) =>
     withQuery("/mission/home", { month: input.month }),
   schedulesMonth: (input: { month?: string } = {}) =>
@@ -790,6 +800,19 @@ export class MescMobileApiClient {
     return this.request<MobileSubstitutionCreateResponse>({
       method: "POST",
       path: mobileEndpoints.substitutions(),
+      body: payload,
+      ...options,
+    });
+  }
+
+  async claimSubstitution(
+    substitutionId: string,
+    payload: MobileSubstitutionClaimPayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileSubstitutionClaimResponse>({
+      method: "POST",
+      path: mobileEndpoints.claimSubstitution(substitutionId),
       body: payload,
       ...options,
     });

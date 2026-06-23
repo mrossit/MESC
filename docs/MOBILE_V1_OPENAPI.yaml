@@ -557,6 +557,49 @@ paths:
           description: The user cannot see this substitution request.
         "404":
           description: Substitution not found.
+  /substitutions/{id}/claim:
+    post:
+      summary: Claim an open substitution request as the active community user.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Substitution claimed and schedule updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, substitution]
+                properties:
+                  success:
+                    type: boolean
+                  substitution:
+                    $ref: "#/components/schemas/Substitution"
+        "400":
+          description: Substitution is unavailable, belongs to the same minister, conflicts with another schedule, is in the past, or Idempotency-Key is invalid.
+        "403":
+          description: The user cannot claim this substitution request.
+        "404":
+          description: Substitution not found.
+        "409":
+          description: Idempotency-Key is already in progress, was reused with a different mutation, or another minister claimed first.
   /admin/community/home:
     get:
       summary: Read the lightweight coordinator community dashboard.
