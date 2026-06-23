@@ -124,6 +124,17 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
 
     expect(forbidden.status).toBe(403);
     expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
+
+    const forbiddenResponses = await mobileGet(
+      `/admin/questionnaires/${MOBILE_P0_DEMO_IDS.questionnaireB}/responses`,
+      {
+        userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+      },
+    );
+
+    expect(forbiddenResponses.status).toBe(403);
+    expect(forbiddenResponses.body.message).toBe("Comunidade fora do escopo do usuario");
   });
 
   it("allows a parish coordinator to switch active community without leaking the previous one", async () => {

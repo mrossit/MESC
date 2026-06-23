@@ -217,6 +217,68 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(substituteLogin.success).toBe(true);
     expect(substituteLogin.activeCommunityId).toBe(MOBILE_P0_DEMO_IDS.communityA);
 
+    const coordinatorHome = await substituteClient.getAdminCommunityHome({ month: MOBILE_P0_DEMO_MONTH });
+    expect(coordinatorHome.success).toBe(true);
+    expect(coordinatorHome.questionnaire).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.questionnaireA,
+      responses: 1,
+      pending: 0,
+      target: 1,
+      responseRate: 100,
+    });
+    expect(coordinatorHome.metrics).toMatchObject({
+      questionnaireResponses: 1,
+      questionnairePending: 0,
+      questionnaireTarget: 1,
+      profileBlocked: 0,
+    });
+
+    const coordinatorResponses = await substituteClient.getAdminQuestionnaireResponses(
+      MOBILE_P0_DEMO_IDS.questionnaireA,
+    );
+    expect(coordinatorResponses.success).toBe(true);
+    expect(coordinatorResponses.summary).toMatchObject({
+      targetCount: 1,
+      respondedCount: 1,
+      pendingCount: 0,
+      responseRate: 100,
+      dataQuality: {
+        ready: 0,
+        needsAttention: 1,
+        blocked: 0,
+      },
+    });
+    expect(coordinatorResponses.ministers).toHaveLength(1);
+    expect(coordinatorResponses.ministers[0]).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.ministerA,
+      responded: true,
+      availability: "Disponivel",
+      dataQuality: {
+        status: "needs_attention",
+      },
+    });
+    expect(coordinatorResponses.responses[0]).toMatchObject({
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      canSubstitute: false,
+      preferredMassTimes: ["10:00"],
+      dataQuality: {
+        status: "needs_attention",
+      },
+    });
+
+    const coordinatorMinisters = await substituteClient.listAdminMinisters();
+    expect(coordinatorMinisters.success).toBe(true);
+    expect(coordinatorMinisters.summary).toMatchObject({
+      total: 3,
+      blocked: 0,
+    });
+    expect(coordinatorMinisters.ministers.map((minister) => minister.id))
+      .toEqual([
+        MOBILE_P0_DEMO_IDS.ministerA,
+        MOBILE_P0_DEMO_IDS.coordinatorA,
+        MOBILE_P0_DEMO_IDS.parishCoordinator,
+      ]);
+
     const claimedSubstitution = await substituteClient.claimSubstitution(
       claimableSubstitution.substitution.id,
       { message: "Aceito pelo smoke mobile" },

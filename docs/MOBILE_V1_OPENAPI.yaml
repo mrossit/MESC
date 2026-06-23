@@ -637,7 +637,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, community, questionnaire, responses]
+                required: [success, community, questionnaire, summary, ministers, responses]
                 properties:
                   success:
                     type: boolean
@@ -645,6 +645,12 @@ paths:
                     $ref: "#/components/schemas/Community"
                   questionnaire:
                     type: object
+                  summary:
+                    type: object
+                  ministers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminQuestionnaireTargetMinister"
                   responses:
                     type: array
                     items:
@@ -665,12 +671,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, community, ministers]
+                required: [success, community, summary, ministers]
                 properties:
                   success:
                     type: boolean
                   community:
                     $ref: "#/components/schemas/Community"
+                  summary:
+                    type: object
                   ministers:
                     type: array
                     items:
@@ -1271,6 +1279,15 @@ components:
             questionnairePending:
               type: integer
               nullable: true
+            questionnaireTarget:
+              type: integer
+              nullable: true
+            profileReady:
+              type: integer
+            profileNeedsAttention:
+              type: integer
+            profileBlocked:
+              type: integer
         questionnaire:
           type: object
           nullable: true
@@ -1304,6 +1321,80 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Substitution"
+    ProfileReadinessIssue:
+      type: object
+      required: [field, label, severity, message]
+      properties:
+        field:
+          type: string
+        label:
+          type: string
+        severity:
+          type: string
+          enum: [critical, recommended, future]
+        message:
+          type: string
+    ProfileReadiness:
+      type: object
+      required: [status, score, missing, completedFields]
+      properties:
+        status:
+          type: string
+          enum: [ready, needs_attention, blocked]
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        missing:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileReadinessIssue"
+        completedFields:
+          type: array
+          items:
+            type: string
+    AdminQuestionnaireTargetMinister:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - phone
+        - whatsapp
+        - displayName
+        - responded
+        - responseId
+        - respondedAt
+        - availability
+        - dataQuality
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        whatsapp:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        responded:
+          type: boolean
+        responseId:
+          type: string
+          nullable: true
+        respondedAt:
+          type: string
+          nullable: true
+        availability:
+          type: string
+          nullable: true
+        dataQuality:
+          $ref: "#/components/schemas/ProfileReadiness"
     AdminQuestionnaireResponse:
       type: object
       required:
@@ -1315,6 +1406,7 @@ components:
         - preferredMassTimes
         - responses
         - submittedAt
+        - dataQuality
       properties:
         id:
           type: string
@@ -1358,6 +1450,8 @@ components:
         updatedAt:
           type: string
           nullable: true
+        dataQuality:
+          $ref: "#/components/schemas/ProfileReadiness"
     AdminMinister:
       type: object
       required:
@@ -1368,6 +1462,8 @@ components:
         - status
         - preferredPositions
         - avoidPositions
+        - preferredTimes
+        - dataQuality
         - deepLink
       properties:
         id:
@@ -1400,6 +1496,15 @@ components:
           type: array
           items:
             type: integer
+        preferredTimes:
+          type: array
+          items:
+            type: string
+        ministryStartDate:
+          type: string
+          nullable: true
+        dataQuality:
+          $ref: "#/components/schemas/ProfileReadiness"
         deepLink:
           type: string
     MissionHome:

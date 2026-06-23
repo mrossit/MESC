@@ -12,8 +12,9 @@ import {
   substitutionRequests,
   users,
 } from "@shared/schema";
-import { isAdmin, isParishWide } from "@shared/roles";
+import { DB_MINISTER_AND_COORDINATOR_ROLES, isAdmin, isParishWide } from "@shared/roles";
 import { extractMobileNotificationEventKey, mobileNotificationData } from "@shared/mobileNotificationEvents";
+import { buildMobileProfileReadiness } from "@shared/mobileDataReadiness";
 import { db } from "../db";
 import { authenticateToken, type AuthRequest, generateToken, login } from "../auth";
 import { authRateLimiter } from "../middleware/rateLimiter";
@@ -240,13 +241,182 @@ function getRequestedMonth(value: unknown) {
 }
 
 function parseStoredJson(value: unknown) {
-  if (typeof value !== "string") return value;
+  let current = value;
 
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (typeof current !== "string") return current;
+
+    try {
+      current = JSON.parse(current);
+    } catch {
+      return current;
+    }
   }
+
+  return current;
+}
+
+function normalizeStoredStringArray(value: unknown): string[] {
+  const parsed = parseStoredJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item): item is string => typeof item === "string");
+}
+
+function normalizeStoredNumberArray(value: unknown): number[] {
+  const parsed = parseStoredJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item): item is number => typeof item === "number" && Number.isFinite(item));
+}
+
+function getQuestionnaireTargetUserIds(value: unknown): string[] {
+  return normalizeStoredStringArray(value);
+}
+
+function getResponseAvailability(value: unknown) {
+  const parsed = parseStoredJson(value);
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const sections = [
+      (parsed as { masses?: unknown }).masses,
+      (parsed as { special_events?: unknown }).special_events,
+      (parsed as { weekdays?: unknown }).weekdays,
+    ];
+    const hasAvailability = sections.some((section) => {
+      if (!section || typeof section !== "object") return false;
+      return JSON.stringify(section).includes("true");
+    });
+
+    return hasAvailability ? "Disponivel" : "Indisponivel";
+  }
+
+  if (!Array.isArray(parsed)) return "Nao informado";
+
+  const monthlyAvailability = parsed.find((item) =>
+    item && typeof item === "object" && (item as { questionId?: unknown }).questionId === "monthly_availability",
+  ) as { answer?: unknown } | undefined;
+  const legacyAvailability = parsed.find((item) =>
+    item && typeof item === "object" && (item as { questionId?: unknown }).questionId === "availability",
+  ) as { answer?: unknown } | undefined;
+  const answer = monthlyAvailability?.answer ?? legacyAvailability?.answer;
+  const normalizedAnswer =
+    answer && typeof answer === "object" && !Array.isArray(answer) && "answer" in answer
+      ? (answer as { answer?: unknown }).answer
+      : answer;
+
+  const normalizedText = typeof normalizedAnswer === "string"
+    ? normalizedAnswer.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    : normalizedAnswer;
+
+  if (normalizedText === "Sim" || normalizedText === "yes" || normalizedText === "Disponivel") {
+    return "Disponivel";
+  }
+
+  if (normalizedText === "Nao" || normalizedText === "no" || normalizedText === "Indisponivel") {
+    return "Indisponivel";
+  }
+
+  return typeof normalizedAnswer === "string" && normalizedAnswer.trim() ? normalizedAnswer : "Nao informado";
+}
+
+function toMobileDataQuality(user: {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  homeCommunityId?: string | null;
+  scheduleDisplayName?: string | null;
+  preferredPosition?: number | null;
+  preferredPositions?: unknown;
+  preferredTimes?: unknown;
+  ministryStartDate?: string | Date | null;
+  birthDate?: string | Date | null;
+  address?: string | null;
+  city?: string | null;
+  maritalStatus?: string | null;
+  baptismDate?: string | Date | null;
+  baptismParish?: string | null;
+  confirmationDate?: string | Date | null;
+  confirmationParish?: string | null;
+  liturgicalTraining?: boolean | number | null;
+  formationCompleted?: boolean | number | null;
+  canServeAsCouple?: boolean | number | null;
+  spouseMinisterId?: string | null;
+}) {
+  return buildMobileProfileReadiness({
+    ...user,
+    preferredPositions: normalizeStoredNumberArray(user.preferredPositions),
+    preferredTimes: normalizeStoredStringArray(user.preferredTimes),
+  });
+}
+
+function summarizeDataQuality(rows: Array<{ dataQuality: ReturnType<typeof toMobileDataQuality> }>) {
+  return rows.reduce(
+    (summary, row) => {
+      if (row.dataQuality.status === "ready") summary.ready += 1;
+      else if (row.dataQuality.status === "blocked") summary.blocked += 1;
+      else summary.needsAttention += 1;
+      return summary;
+    },
+    { ready: 0, needsAttention: 0, blocked: 0 },
+  );
+}
+
+async function loadMobileQuestionnaireTargetMinisters(input: {
+  communityId: string;
+  targetUserIds?: string[];
+}) {
+  const targetUserIds = input.targetUserIds?.filter(Boolean) ?? [];
+
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      status: users.status,
+      phone: users.phone,
+      whatsapp: users.whatsapp,
+      photoUrl: users.photoUrl,
+      homeCommunityId: users.homeCommunityId,
+      scheduleDisplayName: users.scheduleDisplayName,
+      preferredPosition: users.preferredPosition,
+      preferredPositions: users.preferredPositions,
+      avoidPositions: users.avoidPositions,
+      preferredTimes: users.preferredTimes,
+      ministryStartDate: users.ministryStartDate,
+      birthDate: users.birthDate,
+      address: users.address,
+      city: users.city,
+      maritalStatus: users.maritalStatus,
+      baptismDate: users.baptismDate,
+      baptismParish: users.baptismParish,
+      confirmationDate: users.confirmationDate,
+      confirmationParish: users.confirmationParish,
+      liturgicalTraining: users.liturgicalTraining,
+      formationCompleted: users.formationCompleted,
+      canServeAsCouple: users.canServeAsCouple,
+      spouseMinisterId: users.spouseMinisterId,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.homeCommunityId, input.communityId),
+        eq(users.status, "active"),
+        inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+        targetUserIds.length > 0 ? inArray(users.id, targetUserIds) : undefined,
+      ),
+    )
+    .orderBy(asc(users.name));
+
+  return rows.map((minister) => ({
+    ...minister,
+    displayName: minister.scheduleDisplayName || minister.name,
+    photoUrl: minister.photoUrl ?? null,
+    preferredPositions: normalizeStoredNumberArray(minister.preferredPositions),
+    avoidPositions: normalizeStoredNumberArray(minister.avoidPositions),
+    preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
+    dataQuality: toMobileDataQuality(minister),
+  }));
 }
 
 type MobileSubstitutionUserSummary = {
@@ -386,9 +556,9 @@ function toMobileProfile(user: {
     ministryStartDate: toDateOnly(user.ministryStartDate),
     maritalStatus: user.maritalStatus,
     preferredPosition: user.preferredPosition,
-    preferredPositions: user.preferredPositions ?? [],
-    avoidPositions: user.avoidPositions ?? [],
-    preferredTimes: user.preferredTimes ?? [],
+    preferredPositions: normalizeStoredNumberArray(user.preferredPositions),
+    avoidPositions: normalizeStoredNumberArray(user.avoidPositions),
+    preferredTimes: normalizeStoredStringArray(user.preferredTimes),
     availableForSpecialEvents: Boolean(user.availableForSpecialEvents),
     extraActivities: user.extraActivities ?? {},
     requiresPasswordChange: Boolean(user.requiresPasswordChange),
@@ -1701,16 +1871,10 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
     const activeCommunity = await resolveActiveCommunity(req);
     const monthRange = getRequestedMonth(req.query.month);
 
-    const [activeMinistersResult] = await db
-      .select({ total: count() })
-      .from(users)
-      .where(
-        and(
-          eq(users.homeCommunityId, activeCommunity.id),
-          eq(users.status, "active"),
-          inArray(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"]),
-        ),
-      );
+    const activeMinisterRows = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+    });
+    const profileSummary = summarizeDataQuality(activeMinisterRows);
 
     const publishedSchedules = await db
       .select({
@@ -1753,17 +1917,34 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
       .limit(1);
 
     let responseCount = 0;
+    let questionnaireTargetCount: number | null = null;
     if (currentQuestionnaire) {
-      const [responseResult] = await db
-        .select({ total: count() })
+      const targetUserIds = getQuestionnaireTargetUserIds(currentQuestionnaire.targetUserIds);
+      const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+        communityId: activeCommunity.id,
+        targetUserIds,
+      });
+      const targetIds = targetMinisters.map((minister) => minister.id);
+      const hasExplicitTarget = targetUserIds.length > 0;
+      const targetFilter = targetIds.length > 0
+        ? inArray(questionnaireResponses.userId, targetIds)
+        : hasExplicitTarget
+          ? sql`1 = 0`
+          : undefined;
+      questionnaireTargetCount = targetMinisters.length;
+
+      const responseRows = await db
+        .select({ userId: questionnaireResponses.userId })
         .from(questionnaireResponses)
         .where(
           and(
             eq(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
+            eq(questionnaireResponses.communityId, activeCommunity.id),
             eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+            targetFilter,
           ),
         );
-      responseCount = Number(responseResult?.total ?? 0);
+      responseCount = new Set(responseRows.map((row) => row.userId)).size;
     }
 
     const pendingSubstitutions = await db
@@ -1827,20 +2008,28 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
       community: activeCommunity,
       month: monthRange.isoMonth,
       metrics: {
-        activeMinisters: Number(activeMinistersResult?.total ?? 0),
+        activeMinisters: activeMinisterRows.length,
         publishedAssignments: publishedSchedules.length,
         pendingSubstitutions: pendingSubstitutions.length,
         questionnaireResponses: responseCount,
         questionnairePending: currentQuestionnaire
-          ? Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0)
+          ? Math.max((questionnaireTargetCount ?? 0) - responseCount, 0)
           : null,
+        questionnaireTarget: questionnaireTargetCount,
+        profileReady: profileSummary.ready,
+        profileNeedsAttention: profileSummary.needsAttention,
+        profileBlocked: profileSummary.blocked,
       },
       questionnaire: currentQuestionnaire
         ? {
             id: currentQuestionnaire.id,
             title: currentQuestionnaire.title,
             responses: responseCount,
-            pending: Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0),
+            pending: Math.max((questionnaireTargetCount ?? 0) - responseCount, 0),
+            target: questionnaireTargetCount ?? 0,
+            responseRate: questionnaireTargetCount && questionnaireTargetCount > 0
+              ? Math.round((responseCount / questionnaireTargetCount) * 100)
+              : 0,
             deepLink: `/admin/questionnaires/${currentQuestionnaire.id}/responses`,
           }
         : null,
@@ -1875,6 +2064,8 @@ router.get("/admin/questionnaires/:id/responses", authenticateToken, async (req:
         year: questionnaires.year,
         status: questionnaires.status,
         deadline: questionnaires.deadline,
+        questions: questionnaires.questions,
+        targetUserIds: questionnaires.targetUserIds,
       })
       .from(questionnaires)
       .where(and(eq(questionnaires.id, req.params.id), eq(questionnaires.communityId, activeCommunity.id)))
@@ -1883,6 +2074,19 @@ router.get("/admin/questionnaires/:id/responses", authenticateToken, async (req:
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
+
+    const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+    const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+      targetUserIds,
+    });
+    const targetIds = targetMinisters.map((minister) => minister.id);
+    const hasExplicitTarget = targetUserIds.length > 0;
+    const targetFilter = targetIds.length > 0
+      ? inArray(questionnaireResponses.userId, targetIds)
+      : hasExplicitTarget
+        ? sql`1 = 0`
+        : undefined;
 
     const rows = await db
       .select({
@@ -1908,9 +2112,35 @@ router.get("/admin/questionnaires/:id/responses", authenticateToken, async (req:
           eq(questionnaireResponses.questionnaireId, questionnaire.id),
           eq(questionnaireResponses.communityId, activeCommunity.id),
           eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+          targetFilter,
         ),
       )
       .orderBy(asc(users.name));
+
+    const responseByUserId = new Map(rows.map((row) => [row.userId, row]));
+    const targetMinisterById = new Map(targetMinisters.map((minister) => [minister.id, minister]));
+    const ministers = targetMinisters.map((minister) => {
+      const response = responseByUserId.get(minister.id);
+
+      return {
+        id: minister.id,
+        name: minister.name,
+        email: minister.email,
+        phone: minister.phone,
+        whatsapp: minister.whatsapp,
+        displayName: minister.displayName,
+        responded: Boolean(response),
+        responseId: response?.responseId ?? null,
+        respondedAt: response ? toIsoDate(response.submittedAt) : null,
+        availability: response ? getResponseAvailability(response.responses) : null,
+        dataQuality: minister.dataQuality,
+      };
+    });
+    const dataQualitySummary = summarizeDataQuality(targetMinisters);
+    const respondedCount = new Set(rows.map((row) => row.userId)).size;
+    const responseRate = targetMinisters.length > 0
+      ? Math.round((respondedCount / targetMinisters.length) * 100)
+      : 0;
 
     res.json({
       success: true,
@@ -1922,22 +2152,36 @@ router.get("/admin/questionnaires/:id/responses", authenticateToken, async (req:
         year: questionnaire.year,
         status: questionnaire.status,
         deadline: toIsoDate(questionnaire.deadline),
+        questions: parseStoredJson(questionnaire.questions),
       },
+      summary: {
+        targetCount: targetMinisters.length,
+        respondedCount,
+        pendingCount: Math.max(targetMinisters.length - respondedCount, 0),
+        responseRate,
+        dataQuality: {
+          ready: dataQualitySummary.ready,
+          needsAttention: dataQualitySummary.needsAttention,
+          blocked: dataQualitySummary.blocked,
+        },
+      },
+      ministers,
       responses: rows.map((row) => ({
         id: row.responseId,
         userId: row.userId,
         ministerName: row.ministerName,
         ministerPhotoUrl: row.ministerPhotoUrl,
         canSubstitute: Boolean(row.canSubstitute),
-        availableSundays: row.availableSundays ?? [],
-        preferredMassTimes: row.preferredMassTimes ?? [],
-        alternativeTimes: row.alternativeTimes ?? [],
-        dailyMassAvailability: row.dailyMassAvailability ?? [],
+        availableSundays: normalizeStoredStringArray(row.availableSundays),
+        preferredMassTimes: normalizeStoredStringArray(row.preferredMassTimes),
+        alternativeTimes: normalizeStoredStringArray(row.alternativeTimes),
+        dailyMassAvailability: normalizeStoredStringArray(row.dailyMassAvailability),
         notes: row.notes,
-        processingWarnings: row.processingWarnings ?? [],
+        processingWarnings: parseStoredJson(row.processingWarnings) ?? [],
         responses: parseStoredJson(row.responses),
         submittedAt: toIsoDate(row.submittedAt),
         updatedAt: toIsoDate(row.updatedAt),
+        dataQuality: targetMinisterById.get(row.userId)?.dataQuality ?? buildMobileProfileReadiness({}),
       })),
     });
   } catch (error) {
@@ -1961,44 +2205,72 @@ router.get("/admin/ministers", authenticateToken, async (req: AuthRequest, res) 
       .select({
         id: users.id,
         name: users.name,
+        email: users.email,
         role: users.role,
         status: users.status,
         phone: users.phone,
         whatsapp: users.whatsapp,
         photoUrl: users.photoUrl,
+        homeCommunityId: users.homeCommunityId,
         scheduleDisplayName: users.scheduleDisplayName,
         preferredPosition: users.preferredPosition,
         preferredPositions: users.preferredPositions,
         avoidPositions: users.avoidPositions,
+        preferredTimes: users.preferredTimes,
+        ministryStartDate: users.ministryStartDate,
+        birthDate: users.birthDate,
+        address: users.address,
+        city: users.city,
+        maritalStatus: users.maritalStatus,
+        baptismDate: users.baptismDate,
+        baptismParish: users.baptismParish,
+        confirmationDate: users.confirmationDate,
+        confirmationParish: users.confirmationParish,
+        liturgicalTraining: users.liturgicalTraining,
+        formationCompleted: users.formationCompleted,
+        canServeAsCouple: users.canServeAsCouple,
+        spouseMinisterId: users.spouseMinisterId,
       })
       .from(users)
       .where(
         and(
           eq(users.homeCommunityId, activeCommunity.id),
           inArray(users.status, ["active", "pending"]),
-          inArray(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"]),
+          inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
         ),
       )
       .orderBy(asc(users.name))
       .limit(200);
 
+    const ministers = rows.map((minister) => ({
+      id: minister.id,
+      name: minister.name,
+      displayName: minister.scheduleDisplayName || minister.name,
+      role: minister.role,
+      status: minister.status,
+      phone: minister.phone,
+      whatsapp: minister.whatsapp,
+      photoUrl: minister.photoUrl,
+      preferredPosition: minister.preferredPosition,
+      preferredPositions: normalizeStoredNumberArray(minister.preferredPositions),
+      avoidPositions: normalizeStoredNumberArray(minister.avoidPositions),
+      preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
+      ministryStartDate: toDateOnly(minister.ministryStartDate),
+      dataQuality: toMobileDataQuality(minister),
+      deepLink: `/admin/ministers/${minister.id}`,
+    }));
+    const qualitySummary = summarizeDataQuality(ministers);
+
     res.json({
       success: true,
       community: activeCommunity,
-      ministers: rows.map((minister) => ({
-        id: minister.id,
-        name: minister.name,
-        displayName: minister.scheduleDisplayName || minister.name,
-        role: minister.role,
-        status: minister.status,
-        phone: minister.phone,
-        whatsapp: minister.whatsapp,
-        photoUrl: minister.photoUrl,
-        preferredPosition: minister.preferredPosition,
-        preferredPositions: minister.preferredPositions ?? [],
-        avoidPositions: minister.avoidPositions ?? [],
-        deepLink: `/admin/ministers/${minister.id}`,
-      })),
+      summary: {
+        total: ministers.length,
+        ready: qualitySummary.ready,
+        needsAttention: qualitySummary.needsAttention,
+        blocked: qualitySummary.blocked,
+      },
+      ministers,
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar diretorio de ministros");
