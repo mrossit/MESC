@@ -1,4 +1,5 @@
 import type { MobileNotificationEventKey } from "./mobileNotificationEvents";
+import type { MobileProfileReadiness } from "./mobileDataReadiness";
 
 export const MOBILE_API_BASE_PATH = "/api/mobile/v1" as const;
 export const MOBILE_IDEMPOTENCY_HEADER = "Idempotency-Key" as const;
@@ -324,6 +325,141 @@ export interface MobileSubstitutionCreateResponse {
   substitution: MobileSubstitution;
 }
 
+export interface MobileSubstitutionClaimPayload {
+  message?: string | null;
+}
+
+export interface MobileSubstitutionClaimResponse {
+  success: true;
+  substitution: MobileSubstitution;
+}
+
+export interface MobileAdminCommunityHomeResponse {
+  success: true;
+  community: MobileCommunity;
+  month: string;
+  metrics: {
+    activeMinisters: number;
+    publishedAssignments: number;
+    pendingSubstitutions: number;
+    questionnaireResponses: number;
+    questionnairePending: number | null;
+    questionnaireTarget: number | null;
+    profileReady: number;
+    profileNeedsAttention: number;
+    profileBlocked: number;
+  };
+  questionnaire: {
+    id: string;
+    title: string;
+    responses: number;
+    pending: number;
+    target: number;
+    responseRate: number;
+    deepLink: string;
+  } | null;
+  coverage: Array<{
+    date: string;
+    time: string;
+    type: string;
+    location: string | null;
+    assigned: number;
+    vacancies: number;
+    scheduleIds: string[];
+    status: "covered" | "needs_attention";
+  }>;
+  substitutions: MobileSubstitution[];
+}
+
+export interface MobileAdminQuestionnaireTargetMinister {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  whatsapp: string | null;
+  displayName: string;
+  responded: boolean;
+  responseId: string | null;
+  respondedAt: string | null;
+  availability: string | null;
+  dataQuality: MobileProfileReadiness;
+}
+
+export interface MobileAdminQuestionnaireResponseItem {
+  id: string;
+  userId: string;
+  ministerName: string;
+  ministerPhotoUrl: string | null;
+  canSubstitute: boolean;
+  availableSundays: string[];
+  preferredMassTimes: string[];
+  alternativeTimes: string[];
+  dailyMassAvailability: string[];
+  notes: string | null;
+  processingWarnings: unknown[];
+  responses: unknown;
+  submittedAt: string | null;
+  updatedAt: string | null;
+  dataQuality: MobileProfileReadiness;
+}
+
+export interface MobileAdminQuestionnaireResponsesResponse {
+  success: true;
+  community: MobileCommunity;
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    status: string;
+    deadline: string | null;
+    questions: unknown;
+  };
+  summary: {
+    targetCount: number;
+    respondedCount: number;
+    pendingCount: number;
+    responseRate: number;
+    dataQuality: {
+      ready: number;
+      needsAttention: number;
+      blocked: number;
+    };
+  };
+  ministers: MobileAdminQuestionnaireTargetMinister[];
+  responses: MobileAdminQuestionnaireResponseItem[];
+}
+
+export interface MobileAdminMinister {
+  id: string;
+  name: string;
+  displayName: string;
+  role: string;
+  status: string;
+  phone: string | null;
+  whatsapp: string | null;
+  photoUrl: string | null;
+  preferredPosition: number | null;
+  preferredPositions: number[];
+  avoidPositions: number[];
+  preferredTimes: string[];
+  ministryStartDate: string | null;
+  dataQuality: MobileProfileReadiness;
+  deepLink: string;
+}
+
+export interface MobileAdminMinistersResponse {
+  success: true;
+  community: MobileCommunity;
+  summary: {
+    total: number;
+    ready: number;
+    needsAttention: number;
+    blocked: number;
+  };
+  ministers: MobileAdminMinister[];
+}
+
 export interface MobileProfile {
   id: string;
   email: string;
@@ -532,6 +668,7 @@ export const mobileEndpoints = {
   submitQuestionnaire: (id: string) => `/questionnaires/${encodePathSegment(id)}/response`,
   substitutions: () => "/substitutions",
   substitution: (id: string) => `/substitutions/${encodePathSegment(id)}`,
+  claimSubstitution: (id: string) => `/substitutions/${encodePathSegment(id)}/claim`,
   missionHome: (input: { month?: string } = {}) =>
     withQuery("/mission/home", { month: input.month }),
   schedulesMonth: (input: { month?: string } = {}) =>
@@ -795,6 +932,19 @@ export class MescMobileApiClient {
     });
   }
 
+  async claimSubstitution(
+    substitutionId: string,
+    payload: MobileSubstitutionClaimPayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileSubstitutionClaimResponse>({
+      method: "POST",
+      path: mobileEndpoints.claimSubstitution(substitutionId),
+      body: payload,
+      ...options,
+    });
+  }
+
   async getProfile(options: MobileClientRequestOptions = {}) {
     return this.request<MobileProfileResponse>({
       method: "GET",
@@ -817,6 +967,30 @@ export class MescMobileApiClient {
       method: "PUT",
       path: mobileEndpoints.currentDevice(),
       body: payload,
+      ...options,
+    });
+  }
+
+  async getAdminCommunityHome(input: { month?: string } = {}, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAdminCommunityHomeResponse>({
+      method: "GET",
+      path: mobileEndpoints.adminCommunityHome(input),
+      ...options,
+    });
+  }
+
+  async getAdminQuestionnaireResponses(questionnaireId: string, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAdminQuestionnaireResponsesResponse>({
+      method: "GET",
+      path: mobileEndpoints.adminQuestionnaireResponses(questionnaireId),
+      ...options,
+    });
+  }
+
+  async listAdminMinisters(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAdminMinistersResponse>({
+      method: "GET",
+      path: mobileEndpoints.adminMinisters(),
       ...options,
     });
   }

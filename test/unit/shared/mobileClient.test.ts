@@ -18,10 +18,17 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.submitQuestionnaire("questionnaire/with slash"))
       .toBe("/questionnaires/questionnaire%2Fwith%20slash/response");
     expect(mobileEndpoints.confirmSchedule("schedule-1")).toBe("/schedules/schedule-1/confirm");
+    expect(mobileEndpoints.claimSubstitution("substitution/with slash"))
+      .toBe("/substitutions/substitution%2Fwith%20slash/claim");
     expect(mobileEndpoints.notifications({ limit: 5 })).toBe("/notifications?limit=5");
     expect(mobileEndpoints.readNotification("notification/with slash"))
       .toBe("/notifications/notification%2Fwith%20slash/read");
     expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
+    expect(mobileEndpoints.adminCommunityHome({ month: "2026-07" }))
+      .toBe("/admin/community/home?month=2026-07");
+    expect(mobileEndpoints.adminQuestionnaireResponses("questionnaire/with slash"))
+      .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/responses");
+    expect(mobileEndpoints.adminMinisters()).toBe("/admin/ministers");
   });
 
   it("sends native contract headers and stores auth state after login", async () => {
@@ -298,5 +305,117 @@ describe("mobileClient contract", () => {
       biometricCapable: true,
       biometricEnabled: true,
     });
+  });
+
+  it("exposes coordinator dashboard, questionnaire responses and minister readiness endpoints", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+
+      if (input.endsWith("/admin/community/home?month=2026-07")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          month: "2026-07",
+          metrics: {
+            activeMinisters: 1,
+            publishedAssignments: 0,
+            pendingSubstitutions: 0,
+            questionnaireResponses: 1,
+            questionnairePending: 0,
+            questionnaireTarget: 1,
+            profileReady: 1,
+            profileNeedsAttention: 0,
+            profileBlocked: 0,
+          },
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            responses: 1,
+            pending: 0,
+            target: 1,
+            responseRate: 100,
+            deepLink: "/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses",
+          },
+          coverage: [],
+          substitutions: [],
+        }), { status: 200 });
+      }
+
+      if (input.endsWith("/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            month: 7,
+            year: 2026,
+            status: "published",
+            deadline: null,
+            questions: [],
+          },
+          summary: {
+            targetCount: 1,
+            respondedCount: 1,
+            pendingCount: 0,
+            responseRate: 100,
+            dataQuality: { ready: 1, needsAttention: 0, blocked: 0 },
+          },
+          ministers: [],
+          responses: [],
+        }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        community: {
+          id: "community-1",
+          name: "Comunidade",
+          slug: "comunidade",
+          colorHex: "#722F37",
+          parishName: "Paroquia",
+          isMatriz: true,
+        },
+        summary: { total: 1, ready: 1, needsAttention: 0, blocked: 0 },
+        ministers: [],
+      }), { status: 200 });
+    };
+
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: fetcher,
+    });
+
+    await expect(client.getAdminCommunityHome({ month: "2026-07" }))
+      .resolves.toMatchObject({ questionnaire: { responseRate: 100 } });
+    await expect(client.getAdminQuestionnaireResponses("33333333-3333-4333-8333-333333333333"))
+      .resolves.toMatchObject({ summary: { pendingCount: 0 } });
+    await expect(client.listAdminMinisters())
+      .resolves.toMatchObject({ summary: { ready: 1 } });
+
+    expect(requests.map((request) => [request.init.method, request.input])).toEqual([
+      ["GET", "https://example.test/api/mobile/v1/admin/community/home?month=2026-07"],
+      ["GET", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses"],
+      ["GET", "https://example.test/api/mobile/v1/admin/ministers"],
+    ]);
   });
 });

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,8 +43,22 @@ import {
   FileText,
   MessageSquare,
   List,
-  Grid3x3
+  Grid3x3,
+  ShieldCheck,
+  UserCog
 } from 'lucide-react';
+import { authAPI } from '@/lib/auth';
+import {
+  mobileGetAdminCommunityHome,
+  mobileGetAdminQuestionnaireResponses,
+  shouldUseMobileAuth,
+} from '@/lib/mobile-auth-session';
+import { isAdmin as isAdminRole } from '@shared/roles';
+import type {
+  MobileAdminQuestionnaireResponsesResponse,
+  MobileAdminQuestionnaireTargetMinister,
+} from '@shared/mobileClient';
+import type { MobileProfileReadinessStatus } from '@shared/mobileDataReadiness';
 
 interface MinisterResponse {
   id: string;
@@ -117,6 +132,346 @@ interface ResponseSummary {
   summary: Record<string, Record<string, number>>;
 }
 
+function toIsoMonth(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function readinessBadge(status: MobileProfileReadinessStatus) {
+  if (status === 'ready') {
+    return {
+      label: 'Pronto',
+      className: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100',
+    };
+  }
+
+  if (status === 'blocked') {
+    return {
+      label: 'Bloqueado',
+      className: 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-100',
+    };
+  }
+
+  return {
+    label: 'Atenção',
+    className: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100',
+  };
+}
+
+function NativeCoordinatorResponses({
+  selectedMonth,
+  selectedYear,
+  setSelectedMonth,
+  setSelectedYear,
+  monthNames,
+}: {
+  selectedMonth: number;
+  selectedYear: number;
+  setSelectedMonth: (value: number) => void;
+  setSelectedYear: (value: number) => void;
+  monthNames: string[];
+}) {
+  const [nativeSearch, setNativeSearch] = useState('');
+  const isoMonth = toIsoMonth(selectedYear, selectedMonth);
+
+  const homeQuery = useQuery({
+    queryKey: ['mobile', 'admin-community-home', isoMonth],
+    queryFn: () => mobileGetAdminCommunityHome({ month: isoMonth }),
+  });
+  const questionnaireId = homeQuery.data?.questionnaire?.id ?? null;
+  const responsesQuery = useQuery({
+    queryKey: ['mobile', 'admin-questionnaire-responses', questionnaireId],
+    enabled: Boolean(questionnaireId),
+    queryFn: () => mobileGetAdminQuestionnaireResponses(questionnaireId!),
+  });
+
+  const payload = responsesQuery.data;
+  const responseByUserId = useMemo(() => {
+    const map = new Map<string, MobileAdminQuestionnaireResponsesResponse['responses'][number]>();
+    for (const response of payload?.responses ?? []) {
+      map.set(response.userId, response);
+    }
+    return map;
+  }, [payload?.responses]);
+
+  const filteredMinisters = useMemo(() => {
+    const normalizedSearch = nativeSearch.trim().toLowerCase();
+    const ministers = payload?.ministers ?? [];
+    if (!normalizedSearch) return ministers;
+
+    return ministers.filter((minister) =>
+      minister.name.toLowerCase().includes(normalizedSearch) ||
+      minister.email.toLowerCase().includes(normalizedSearch) ||
+      (minister.phone ?? '').toLowerCase().includes(normalizedSearch) ||
+      (minister.whatsapp ?? '').toLowerCase().includes(normalizedSearch),
+    );
+  }, [nativeSearch, payload?.ministers]);
+
+  const isLoading = homeQuery.isLoading || responsesQuery.isLoading;
+  const hasQuestionnaire = Boolean(homeQuery.data?.questionnaire);
+  const summary = payload?.summary;
+
+  const renderMinister = (minister: MobileAdminQuestionnaireTargetMinister) => {
+    const response = responseByUserId.get(minister.id);
+    const badge = readinessBadge(minister.dataQuality.status);
+    const criticalMissing = minister.dataQuality.missing.filter((issue) => issue.severity === 'critical');
+    const recommendedMissing = minister.dataQuality.missing.filter((issue) => issue.severity === 'recommended');
+
+    return (
+      <div
+        key={minister.id}
+        className="rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-md dark:bg-dark-8/80"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-base font-semibold">{minister.displayName || minister.name}</h3>
+              <Badge variant={minister.responded ? 'default' : 'secondary'}>
+                {minister.responded ? 'Respondido' : 'Pendente'}
+              </Badge>
+              <Badge variant="outline" className={badge.className}>
+                {badge.label} {minister.dataQuality.score}%
+              </Badge>
+            </div>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{minister.name}</p>
+          </div>
+          {minister.responded ? (
+            <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
+          ) : (
+            <Clock className="h-5 w-5 shrink-0 text-amber-600" />
+          )}
+        </div>
+
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <a href={`mailto:${minister.email}`} className="flex min-w-0 items-center gap-2 text-primary">
+            <Mail className="h-4 w-4 shrink-0" />
+            <span className="truncate">{minister.email}</span>
+          </a>
+          {(minister.whatsapp || minister.phone) && (
+            <a href={`tel:${minister.whatsapp || minister.phone}`} className="flex min-w-0 items-center gap-2 text-primary">
+              <Phone className="h-4 w-4 shrink-0" />
+              <span className="truncate">{minister.whatsapp || minister.phone}</span>
+            </a>
+          )}
+        </div>
+
+        {response && (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/40 p-3 text-sm">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div>
+                <span className="block text-xs text-muted-foreground">Disponibilidade</span>
+                <span className="font-medium">{minister.availability ?? 'Não informado'}</span>
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Domingos</span>
+                <span className="font-medium">
+                  {response.availableSundays.length > 0 ? response.availableSundays.join(', ') : '-'}
+                </span>
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Horários</span>
+                <span className="font-medium">
+                  {response.preferredMassTimes.length > 0 ? response.preferredMassTimes.join(', ') : '-'}
+                </span>
+              </div>
+            </div>
+            {response.processingWarnings.length > 0 && (
+              <Alert className="mt-3 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {response.processingWarnings.length} aviso(s) de processamento nesta resposta.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
+        {(criticalMissing.length > 0 || recommendedMissing.length > 0) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[...criticalMissing, ...recommendedMissing].slice(0, 4).map((issue) => (
+              <Badge key={issue.field} variant="outline" className="text-xs">
+                {issue.label}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Layout
+      title="Respostas"
+      subtitle="Questionário, pendências e cadastro"
+    >
+      <div className="mx-auto w-full max-w-5xl space-y-4 px-0 py-1 sm:px-2">
+        <Card className="border-border/60 bg-card/80 backdrop-blur-md dark:bg-dark-8/80">
+          <CardContent className="p-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
+              <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
+                <SelectTrigger>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthNames.map((name, index) => (
+                    <SelectItem key={name} value={String(index + 1)}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2026, 2027, 2028].map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  homeQuery.refetch();
+                  responsesQuery.refetch();
+                }}
+                disabled={isLoading}
+              >
+                <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+                Atualizar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {!hasQuestionnaire && !isLoading ? (
+          <Alert>
+            <FileText className="h-4 w-4" />
+            <AlertDescription>
+              Não há questionário publicado para {monthNames[selectedMonth - 1]} de {selectedYear}.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4" />
+                    Alvo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary?.targetCount ?? homeQuery.data?.questionnaire?.target ?? 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <UserCheck className="h-4 w-4" />
+                    Respostas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary?.respondedCount ?? homeQuery.data?.questionnaire?.responses ?? 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <UserX className="h-4 w-4" />
+                    Pendentes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary?.pendingCount ?? homeQuery.data?.questionnaire?.pending ?? 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <ShieldCheck className="h-4 w-4" />
+                    Cadastros
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary?.dataQuality.blocked ?? homeQuery.data?.metrics.profileBlocked ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">bloqueados</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold">{payload?.questionnaire.title ?? homeQuery.data?.questionnaire?.title ?? 'Questionário'}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {summary?.responseRate ?? homeQuery.data?.questionnaire?.responseRate ?? 0}% respondido
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={nativeSearch}
+                      onChange={(event) => setNativeSearch(event.target.value)}
+                      placeholder="Buscar ministro"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                {isLoading ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
+                    Carregando acompanhamento...
+                  </div>
+                ) : filteredMinisters.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Nenhum ministro encontrado.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredMinisters.map(renderMinister)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <UserCog className="h-4 w-4" />
+                  Qualidade cadastral
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border p-3">
+                  <div className="text-xl font-bold">{summary?.dataQuality.ready ?? homeQuery.data?.metrics.profileReady ?? 0}</div>
+                  <p className="text-sm text-muted-foreground">prontos</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xl font-bold">{summary?.dataQuality.needsAttention ?? homeQuery.data?.metrics.profileNeedsAttention ?? 0}</div>
+                  <p className="text-sm text-muted-foreground">em atenção</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xl font-bold">{summary?.dataQuality.blocked ?? homeQuery.data?.metrics.profileBlocked ?? 0}</div>
+                  <p className="text-sm text-muted-foreground">bloqueados</p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
 export default function QuestionnaireResponses() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -137,6 +492,16 @@ export default function QuestionnaireResponses() {
   
   // Ref para scroll automático
   const listSectionRef = useRef<HTMLDivElement>(null);
+  const authQuery = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: authAPI.getMe,
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+  const canUseNativeAdminResponses = authQuery.data?.user
+    ? isAdminRole(authQuery.data.user.role)
+    : true;
+  const useNativeAdminResponses = shouldUseMobileAuth() && canUseNativeAdminResponses;
 
   const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -144,6 +509,8 @@ export default function QuestionnaireResponses() {
   ];
 
   const fetchResponseStatus = async () => {
+    if (shouldUseMobileAuth()) return;
+
     setLoading(true);
     
     try {
@@ -170,6 +537,8 @@ export default function QuestionnaireResponses() {
   };
 
   const fetchResponseSummary = async () => {
+    if (shouldUseMobileAuth()) return;
+
     setLoadingSummary(true);
     
     try {
@@ -197,6 +566,7 @@ export default function QuestionnaireResponses() {
   };
 
   const fetchDetailedResponse = async (minister: MinisterResponse) => {
+    if (shouldUseMobileAuth()) return;
     if (!status?.templateId) return;
     
     setSelectedMinister(minister);
@@ -229,14 +599,28 @@ export default function QuestionnaireResponses() {
   };
 
   useEffect(() => {
+    if (useNativeAdminResponses) return;
     fetchResponseStatus();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, useNativeAdminResponses]);
 
   useEffect(() => {
+    if (useNativeAdminResponses) return;
     if (viewMode === 'summary' && status?.templateExists) {
       fetchResponseSummary();
     }
-  }, [viewMode, selectedMonth, selectedYear]);
+  }, [viewMode, selectedMonth, selectedYear, useNativeAdminResponses]);
+
+  if (useNativeAdminResponses) {
+    return (
+      <NativeCoordinatorResponses
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        setSelectedMonth={setSelectedMonth}
+        setSelectedYear={setSelectedYear}
+        monthNames={monthNames}
+      />
+    );
+  }
 
   const filteredResponses = status?.responses.filter(minister => {
     const matchesSearch = minister.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

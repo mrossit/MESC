@@ -283,13 +283,13 @@ export default function Dashboard() {
 
   const getTitle = () => {
     if (isAdminRole(user?.role)) return "Central de Operações";
-    return "Dashboard Ministro";
+    return "Minha Missão";
   };
 
   const getSubtitle = () => {
     return isCoordinator
       ? "Visão completa e ações rápidas"
-      : "Acompanhe suas atividades";
+      : "Escalas, avisos e disponibilidade";
   };
 
   // Se for ministro, mostra o dashboard simplificado

@@ -62,6 +62,7 @@ async function seedPostgres(databaseUrl: string) {
       await tx`DELETE FROM schedules WHERE id IN ${tx(demo.schedules.map((item) => item.id))}`;
       await tx`DELETE FROM questionnaire_responses WHERE questionnaire_id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
       await tx`DELETE FROM questionnaires WHERE id IN ${tx(demo.questionnaires.map((item) => item.id))}`;
+      await tx`DELETE FROM notifications WHERE user_id IN ${tx(demo.users.map((item) => item.id))}`;
       await tx`DELETE FROM notifications WHERE id IN ${tx(demo.notifications.map((item) => item.id))}`;
       await tx`DELETE FROM users WHERE id IN ${tx(demo.users.map((item) => item.id))}`;
       await tx`DELETE FROM communities WHERE id IN ${tx(demo.communities.map((item) => item.id))}`;
@@ -433,6 +434,7 @@ async function seedSqlite() {
     sqlite.prepare(`DELETE FROM schedules WHERE id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM questionnaire_responses WHERE questionnaire_id IN (${ids(demo.questionnaires.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM questionnaires WHERE id IN (${ids(demo.questionnaires.map((item) => item.id))})`).run();
+    sqlite.prepare(`DELETE FROM notifications WHERE user_id IN (${ids(demo.users.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM notifications WHERE id IN (${ids(demo.notifications.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM users WHERE id IN (${ids(demo.users.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM communities WHERE id IN (${ids(demo.communities.map((item) => item.id))})`).run();

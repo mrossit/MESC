@@ -3,6 +3,9 @@ import { getApiOrigin, getStoredAuthToken, isNativeRuntime } from "@/lib/api-url
 import {
   MescMobileApiClient,
   MescMobileApiError,
+  type MobileAdminCommunityHomeResponse,
+  type MobileAdminMinistersResponse,
+  type MobileAdminQuestionnaireResponsesResponse,
   type MobileAuthResponse,
   type MobileClientRequestOptions,
   type MobileDeviceResponse,
@@ -23,6 +26,8 @@ import {
   type MobileQuestionnaireSubmitResponse,
   type MobileScheduleConfirmPayload,
   type MobileScheduleConfirmResponse,
+  type MobileSubstitutionClaimPayload,
+  type MobileSubstitutionClaimResponse,
   type MobileScheduleMonthResponse,
   type MobileSubstitutionCreatePayload,
   type MobileSubstitutionCreateResponse,
@@ -341,6 +346,14 @@ export async function mobileRequestSubstitution(
   return runWithMobileAuthRetry((client) => client.requestSubstitution(payload, options));
 }
 
+export async function mobileClaimSubstitution(
+  substitutionId: string,
+  payload: MobileSubstitutionClaimPayload,
+  options: MobileClientRequestOptions,
+): Promise<MobileSubstitutionClaimResponse> {
+  return runWithMobileAuthRetry((client) => client.claimSubstitution(substitutionId, payload, options));
+}
+
 export async function mobileListSubstitutions(): Promise<MobileSubstitutionsResponse> {
   return runWithMobileAuthRetry((client) => client.listSubstitutions());
 }
@@ -351,6 +364,22 @@ export async function mobileGetProfile(): Promise<MobileProfileResponse> {
 
 export async function mobileUpdateProfile(payload: MobileProfileUpdatePayload): Promise<MobileProfileResponse> {
   return runWithMobileAuthRetry((client) => client.updateProfile(payload));
+}
+
+export async function mobileGetAdminCommunityHome(
+  input: { month?: string } = {},
+): Promise<MobileAdminCommunityHomeResponse> {
+  return runWithMobileAuthRetry((client) => client.getAdminCommunityHome(input));
+}
+
+export async function mobileGetAdminQuestionnaireResponses(
+  questionnaireId: string,
+): Promise<MobileAdminQuestionnaireResponsesResponse> {
+  return runWithMobileAuthRetry((client) => client.getAdminQuestionnaireResponses(questionnaireId));
+}
+
+export async function mobileListAdminMinisters(): Promise<MobileAdminMinistersResponse> {
+  return runWithMobileAuthRetry((client) => client.listAdminMinisters());
 }
 
 export async function mobileLogout() {
