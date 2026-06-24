@@ -7,6 +7,7 @@ import { calculateSaintNameMatchBonus, loadAllSaintsData } from './saintNameMatc
 import { isAvailableForMass } from './ministerAvailabilityChecker.js';
 import { massConfigService, type MassInstance } from '../services/massConfigService';
 import { learningService } from '../services/learningService';
+import { isMissingTableError } from './databaseErrors.js';
 
 // Question types from questionnaires
 interface QuestionnaireQuestionItem {
@@ -1498,22 +1499,35 @@ export class ScheduleGenerator {
       return;
     }
 
-    const config = await this.db.select().from(massTimesConfig)
-      .where(
-        and(
-          eq(massTimesConfig.isActive, true),
-          this.options.communityId ? eq(massTimesConfig.communityId, this.options.communityId) : undefined,
-        )
-      );
+    try {
+      const config = await this.db.select().from(massTimesConfig)
+        .where(
+          and(
+            eq(massTimesConfig.isActive, true),
+            this.options.communityId ? eq(massTimesConfig.communityId, this.options.communityId) : undefined,
+          )
+        );
 
-    type ConfigRow = typeof config[number];
-    this.massTimes = config.map((c: ConfigRow) => ({
-      id: c.id,
-      dayOfWeek: c.dayOfWeek,
-      time: c.time,
-      minMinisters: c.minMinisters,
-      maxMinisters: c.maxMinisters
-    }));
+      type ConfigRow = typeof config[number];
+      this.massTimes = config.map((c: ConfigRow) => ({
+        id: c.id,
+        dayOfWeek: c.dayOfWeek,
+        time: c.time,
+        minMinisters: c.minMinisters,
+        maxMinisters: c.maxMinisters
+      }));
+    } catch (error) {
+      if (!isMissingTableError(error, 'mass_times_config')) {
+        throw error;
+      }
+
+      this.massTimes = [
+        { id: 'fallback-sunday-08', dayOfWeek: 0, time: '08:00', minMinisters: 3, maxMinisters: 6 },
+        { id: 'fallback-sunday-10', dayOfWeek: 0, time: '10:00', minMinisters: 4, maxMinisters: 8 },
+        { id: 'fallback-sunday-19', dayOfWeek: 0, time: '19:00', minMinisters: 3, maxMinisters: 6 }
+      ];
+      logger.warn('Using default mass times configuration because mass_times_config is missing');
+    }
   }
 
   /**

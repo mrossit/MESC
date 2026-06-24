@@ -25,6 +25,7 @@ import { createSession } from "./session";
 import { QuestionnaireService } from "../services/questionnaireService";
 import { scheduleCache } from "../services/scheduleCache";
 import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../services/reliabilityScoreService";
+import { isMissingTableError } from "../utils/databaseErrors";
 import { formatMinisterName } from "../utils/formatters";
 import {
   beginMobileIdempotency,
@@ -2179,15 +2180,24 @@ router.get("/admin/schedules/readiness", authenticateToken, async (req: AuthRequ
       responseRate = targetCount > 0 ? Math.round((responseCount / targetCount) * 100) : 0;
     }
 
-    const [massConfigSummary] = await db
-      .select({ configuredSlots: count() })
-      .from(massTimesConfig)
-      .where(
-        and(
-          eq(massTimesConfig.communityId, activeCommunity.id),
-          eq(massTimesConfig.isActive, dbBoolean(true)),
-        ),
-      );
+    let massConfigSchemaMissing = false;
+    let massConfigSummary: { configuredSlots: number } | undefined;
+    try {
+      [massConfigSummary] = await db
+        .select({ configuredSlots: count() })
+        .from(massTimesConfig)
+        .where(
+          and(
+            eq(massTimesConfig.communityId, activeCommunity.id),
+            eq(massTimesConfig.isActive, dbBoolean(true)),
+          ),
+        );
+    } catch (error) {
+      if (!isMissingTableError(error, "mass_times_config")) {
+        throw error;
+      }
+      massConfigSchemaMissing = true;
+    }
 
     const existingScheduleRows = await db
       .select({ status: schedules.status })
@@ -2228,6 +2238,9 @@ router.get("/admin/schedules/readiness", authenticateToken, async (req: AuthRequ
     }
     if (profileSummary.needsAttention > 0) {
       warnings.push(`${profileSummary.needsAttention} cadastro(s) precisam de complemento`);
+    }
+    if (massConfigSchemaMissing) {
+      warnings.push("Tabela de horarios de missa ausente neste ambiente; aplicar bootstrap/migrations antes de gerar escala real");
     }
     if (questionnaire && targetCount > responseCount) {
       warnings.push(`${Math.max(targetCount - responseCount, 0)} ministro(s) ainda nao responderam`);

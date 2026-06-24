@@ -3948,6 +3948,24 @@ var init_massConfigService = __esm({
   }
 });
 
+// server/utils/databaseErrors.ts
+function isMissingTableError(error, tableName) {
+  const candidate = error;
+  const message = String(candidate?.message ?? "");
+  if (candidate?.code === "42P01") {
+    return candidate.table === tableName || message.includes(`"${tableName}"`);
+  }
+  if (candidate?.code === "SQLITE_ERROR") {
+    return message.includes(`no such table: ${tableName}`);
+  }
+  return false;
+}
+var init_databaseErrors = __esm({
+  "server/utils/databaseErrors.ts"() {
+    "use strict";
+  }
+});
+
 // server/utils/scheduleGenerator.ts
 var scheduleGenerator_exports = {};
 __export(scheduleGenerator_exports, {
@@ -3999,6 +4017,7 @@ var init_scheduleGenerator = __esm({
     init_schema();
     await init_saintNameMatching();
     await init_massConfigService();
+    init_databaseErrors();
     ScheduleGenerator = class {
       constructor(options = {}) {
         this.options = options;
@@ -5077,19 +5096,31 @@ ${"!".repeat(60)}`);
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(
-          and8(
-            eq14(massTimesConfig.isActive, true),
-            this.options.communityId ? eq14(massTimesConfig.communityId, this.options.communityId) : void 0
-          )
-        );
-        this.massTimes = config.map((c) => ({
-          id: c.id,
-          dayOfWeek: c.dayOfWeek,
-          time: c.time,
-          minMinisters: c.minMinisters,
-          maxMinisters: c.maxMinisters
-        }));
+        try {
+          const config = await this.db.select().from(massTimesConfig).where(
+            and8(
+              eq14(massTimesConfig.isActive, true),
+              this.options.communityId ? eq14(massTimesConfig.communityId, this.options.communityId) : void 0
+            )
+          );
+          this.massTimes = config.map((c) => ({
+            id: c.id,
+            dayOfWeek: c.dayOfWeek,
+            time: c.time,
+            minMinisters: c.minMinisters,
+            maxMinisters: c.maxMinisters
+          }));
+        } catch (error) {
+          if (!isMissingTableError(error, "mass_times_config")) {
+            throw error;
+          }
+          this.massTimes = [
+            { id: "fallback-sunday-08", dayOfWeek: 0, time: "08:00", minMinisters: 3, maxMinisters: 6 },
+            { id: "fallback-sunday-10", dayOfWeek: 0, time: "10:00", minMinisters: 4, maxMinisters: 8 },
+            { id: "fallback-sunday-19", dayOfWeek: 0, time: "19:00", minMinisters: 3, maxMinisters: 6 }
+          ];
+          logger.warn("Using default mass times configuration because mass_times_config is missing");
+        }
       }
       /**
        * Gera horários de missa usando configurações do banco de dados
@@ -30278,6 +30309,7 @@ function buildMobileProfileReadiness(input) {
 
 // server/routes/mobile.ts
 await init_db();
+init_databaseErrors();
 
 // server/services/mobileIdempotencyService.ts
 init_schema();
@@ -32556,12 +32588,21 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
       responseCount = new Set(responseRows.map((row) => row.userId)).size;
       responseRate = targetCount > 0 ? Math.round(responseCount / targetCount * 100) : 0;
     }
-    const [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
-      and42(
-        eq54(massTimesConfig.communityId, activeCommunity.id),
-        eq54(massTimesConfig.isActive, dbBoolean2(true))
-      )
-    );
+    let massConfigSchemaMissing = false;
+    let massConfigSummary;
+    try {
+      [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
+        and42(
+          eq54(massTimesConfig.communityId, activeCommunity.id),
+          eq54(massTimesConfig.isActive, dbBoolean2(true))
+        )
+      );
+    } catch (error) {
+      if (!isMissingTableError(error, "mass_times_config")) {
+        throw error;
+      }
+      massConfigSchemaMissing = true;
+    }
     const existingScheduleRows = await db.select({ status: schedules.status }).from(schedules).where(
       and42(
         eq54(schedules.communityId, activeCommunity.id),
@@ -32596,6 +32637,9 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
     }
     if (profileSummary.needsAttention > 0) {
       warnings.push(`${profileSummary.needsAttention} cadastro(s) precisam de complemento`);
+    }
+    if (massConfigSchemaMissing) {
+      warnings.push("Tabela de horarios de missa ausente neste ambiente; aplicar bootstrap/migrations antes de gerar escala real");
     }
     if (questionnaire && targetCount > responseCount) {
       warnings.push(`${Math.max(targetCount - responseCount, 0)} ministro(s) ainda nao responderam`);
