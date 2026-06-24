@@ -30,16 +30,21 @@ export class MassConfigService {
   /**
    * Load all active mass configurations from the database
    */
-  async loadMassConfigurations(): Promise<MassConfiguration[]> {
+  async loadMassConfigurations(communityId?: string): Promise<MassConfiguration[]> {
     return db.select()
       .from(massConfigurations)
-      .where(eq(massConfigurations.isActive, true));
+      .where(
+        and(
+          eq(massConfigurations.isActive, true),
+          communityId ? eq(massConfigurations.communityId, communityId) : undefined,
+        ),
+      );
   }
 
   /**
    * Load special events for a given month/year
    */
-  async loadSpecialEvents(year: number, month: number): Promise<SpecialEvent[]> {
+  async loadSpecialEvents(year: number, month: number, communityId?: string): Promise<SpecialEvent[]> {
     const startDate = format(startOfMonth(new Date(year, month - 1)), 'yyyy-MM-dd');
     const endDate = format(endOfMonth(new Date(year, month - 1)), 'yyyy-MM-dd');
 
@@ -48,6 +53,7 @@ export class MassConfigService {
       .where(
         and(
           eq(specialEvents.isActive, true),
+          communityId ? eq(specialEvents.communityId, communityId) : undefined,
           gte(specialEvents.eventDate, startDate),
           lte(specialEvents.eventDate, endDate)
         )
@@ -66,12 +72,12 @@ export class MassConfigService {
   /**
    * Generate all mass instances for a given month based on configurations and events
    */
-  async generateMonthlyMassInstances(year: number, month: number): Promise<MassInstance[]> {
+  async generateMonthlyMassInstances(year: number, month: number, communityId?: string): Promise<MassInstance[]> {
     const instances: MassInstance[] = [];
 
     // Load configurations and events
-    const configs = await this.loadMassConfigurations();
-    const events = await this.loadSpecialEvents(year, month);
+    const configs = await this.loadMassConfigurations(communityId);
+    const events = await this.loadSpecialEvents(year, month, communityId);
 
     console.log(`[MassConfigService] Loaded ${configs.length} configurations, ${events.length} special events`);
 

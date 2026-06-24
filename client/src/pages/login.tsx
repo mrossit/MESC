@@ -21,9 +21,6 @@ import { toast } from "@/hooks/use-toast";
 import {
   clearAutoBiometricAttempt,
   clearLocalSession,
-  consumeSkipAutoBiometricOnce,
-  hasAutoBiometricAttempted,
-  isAutoBiometricCooldownActive,
   markAutoBiometricAttempt,
 } from "@/lib/persistent-storage";
 import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
@@ -50,9 +47,6 @@ export default function Login() {
     email: "",
     password: "",
   });
-  const autoBiometricAttemptRef = useRef(false);
-  const manualLoginInProgressRef = useRef(false);
-  const userStartedTypingRef = useRef(false);
   const biometricPromptResolvingRef = useRef(false);
   const biometricUnlockInProgressRef = useRef(false);
 
@@ -111,8 +105,6 @@ export default function Login() {
       return authAPI.login({ ...creds, rememberMe });
     },
     onSuccess: async (data) => {
-      manualLoginInProgressRef.current = false;
-      
       // Set the user data in the cache immediately
       queryClient.setQueryData(["/api/auth/me"], data);
       
@@ -146,7 +138,6 @@ export default function Login() {
       }
     },
     onError: (error: Error) => {
-      manualLoginInProgressRef.current = false;
       // Verifica se é erro de conta pendente
       if (error.message === "Account pending approval") {
         setPendingUserEmail(credentials.email);
@@ -163,7 +154,6 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    manualLoginInProgressRef.current = true;
     
     // Limpar tokens antigos antes de fazer novo login
     clearLocalSession();
@@ -179,7 +169,6 @@ export default function Login() {
   };
 
   const handleInputChange = (field: keyof typeof credentials, value: string) => {
-    userStartedTypingRef.current = true;
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
 
@@ -271,12 +260,9 @@ export default function Login() {
         }
       }
 
-      const skipAutoBiometric = consumeSkipAutoBiometricOnce();
       const canResumeMobileSession = shouldUseMobileAuth() && hasStoredMobileRefreshToken();
-      const alreadyAttempted = hasAutoBiometricAttempted();
-      const autoBiometricInCooldown = isAutoBiometricCooldownActive();
 
-      if (!token && canResumeMobileSession && !inactivityReason && !skipAutoBiometric) {
+      if (!token && canResumeMobileSession && !inactivityReason) {
         try {
           const data = await authAPI.getMe();
           if (cancelled) return;
@@ -286,50 +272,6 @@ export default function Login() {
         } catch {
           clearLocalSession();
         }
-      }
-
-      if (
-        !status.enabled ||
-        inactivityReason ||
-        skipAutoBiometric ||
-        alreadyAttempted ||
-        autoBiometricInCooldown ||
-        autoBiometricAttemptRef.current ||
-        biometricUnlockInProgressRef.current ||
-        manualLoginInProgressRef.current ||
-        userStartedTypingRef.current
-      ) {
-        return;
-      }
-
-      autoBiometricAttemptRef.current = true;
-      markAutoBiometricAttempt();
-
-      await new Promise((resolve) => window.setTimeout(resolve, 450));
-      if (
-        cancelled ||
-        biometricUnlockInProgressRef.current ||
-        manualLoginInProgressRef.current ||
-        userStartedTypingRef.current
-      ) {
-        return;
-      }
-
-      biometricUnlockInProgressRef.current = true;
-      setBiometricBusy(true);
-      try {
-        await unlockNativeBiometricLogin();
-        const data = await authAPI.getMe();
-        if (cancelled) return;
-        queryClient.setQueryData(["/api/auth/me"], data);
-        clearAutoBiometricAttempt();
-        navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
-      } catch {
-        markAutoBiometricAttempt();
-        clearLocalSession();
-      } finally {
-        biometricUnlockInProgressRef.current = false;
-        if (!cancelled) setBiometricBusy(false);
       }
     };
 

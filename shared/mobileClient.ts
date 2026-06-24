@@ -373,6 +373,47 @@ export interface MobileAdminCommunityHomeResponse {
   substitutions: MobileSubstitution[];
 }
 
+export interface MobileAdminScheduleReadinessResponse {
+  success: true;
+  community: MobileCommunity;
+  month: string;
+  readiness: {
+    canPreview: boolean;
+    canPublish: boolean;
+    blockers: string[];
+    publishBlockers: string[];
+    warnings: string[];
+  };
+  ministers: {
+    active: number;
+    ready: number;
+    needsAttention: number;
+    blocked: number;
+  };
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    status: string;
+    deadline: string | null;
+    targetCount: number;
+    responseCount: number;
+    pendingCount: number;
+    responseRate: number;
+  } | null;
+  massConfig: {
+    configuredSlots: number;
+  };
+  existingSchedules: {
+    total: number;
+    draft: number;
+    scheduled: number;
+    published: number;
+    completed: number;
+  };
+}
+
 export interface MobileAdminQuestionnaireTargetMinister {
   id: string;
   name: string;
@@ -724,6 +765,8 @@ export const mobileEndpoints = {
   schedule: (id: string) => `/schedules/${encodePathSegment(id)}`,
   adminCommunityHome: (input: { month?: string } = {}) =>
     withQuery("/admin/community/home", { month: input.month }),
+  adminScheduleReadiness: (input: { month?: string } = {}) =>
+    withQuery("/admin/schedules/readiness", { month: input.month }),
   adminQuestionnaireResponses: (id: string) =>
     `/admin/questionnaires/${encodePathSegment(id)}/responses`,
   adminQuestionnaireReminders: (id: string) =>
@@ -1024,6 +1067,14 @@ export class MescMobileApiClient {
     return this.request<MobileAdminCommunityHomeResponse>({
       method: "GET",
       path: mobileEndpoints.adminCommunityHome(input),
+      ...options,
+    });
+  }
+
+  async getAdminScheduleReadiness(input: { month?: string } = {}, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAdminScheduleReadinessResponse>({
+      method: "GET",
+      path: mobileEndpoints.adminScheduleReadiness(input),
       ...options,
     });
   }

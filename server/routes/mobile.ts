@@ -4,6 +4,7 @@ import { z } from "zod";
 import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
   communities,
+  massTimesConfig,
   notifications,
   questionnaireResponses,
   questionnaires,
@@ -2101,6 +2102,181 @@ router.get("/admin/community/home", authenticateToken, async (req: AuthRequest, 
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar painel da comunidade");
+  }
+});
+
+router.get("/admin/schedules/readiness", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const activeMinisterRows = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+    });
+    const profileSummary = summarizeDataQuality(activeMinisterRows);
+
+    const [questionnaire] = await db
+      .select({
+        id: questionnaires.id,
+        title: questionnaires.title,
+        month: questionnaires.month,
+        year: questionnaires.year,
+        status: questionnaires.status,
+        deadline: questionnaires.deadline,
+        targetUserIds: questionnaires.targetUserIds,
+        updatedAt: questionnaires.updatedAt,
+      })
+      .from(questionnaires)
+      .where(
+        and(
+          eq(questionnaires.communityId, activeCommunity.id),
+          eq(questionnaires.month, monthRange.month),
+          eq(questionnaires.year, monthRange.year),
+        ),
+      )
+      .orderBy(desc(questionnaires.updatedAt))
+      .limit(1);
+
+    let targetCount = 0;
+    let responseCount = 0;
+    let responseRate = 0;
+    if (questionnaire) {
+      const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+      const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+        communityId: activeCommunity.id,
+        targetUserIds,
+      });
+      const targetIds = targetMinisters.map((minister) => minister.id);
+      const hasExplicitTarget = targetUserIds.length > 0;
+      const targetFilter = targetIds.length > 0
+        ? inArray(questionnaireResponses.userId, targetIds)
+        : hasExplicitTarget
+          ? sql`1 = 0`
+          : undefined;
+      targetCount = targetMinisters.length;
+
+      const responseRows = await db
+        .select({ userId: questionnaireResponses.userId })
+        .from(questionnaireResponses)
+        .where(
+          and(
+            eq(questionnaireResponses.questionnaireId, questionnaire.id),
+            eq(questionnaireResponses.communityId, activeCommunity.id),
+            eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+            targetFilter,
+          ),
+        );
+
+      responseCount = new Set(responseRows.map((row) => row.userId)).size;
+      responseRate = targetCount > 0 ? Math.round((responseCount / targetCount) * 100) : 0;
+    }
+
+    const [massConfigSummary] = await db
+      .select({ configuredSlots: count() })
+      .from(massTimesConfig)
+      .where(
+        and(
+          eq(massTimesConfig.communityId, activeCommunity.id),
+          eq(massTimesConfig.isActive, dbBoolean(true)),
+        ),
+      );
+
+    const existingScheduleRows = await db
+      .select({ status: schedules.status })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.communityId, activeCommunity.id),
+          gte(schedules.date, monthRange.startDate),
+          lte(schedules.date, monthRange.endDate),
+        ),
+      );
+    const existingSchedules = existingScheduleRows.reduce(
+      (summary, row) => {
+        summary.total += 1;
+        if (row.status === "published") summary.published += 1;
+        else if (row.status === "completed") summary.completed += 1;
+        else if (row.status === "draft") summary.draft += 1;
+        else summary.scheduled += 1;
+        return summary;
+      },
+      { total: 0, draft: 0, scheduled: 0, published: 0, completed: 0 },
+    );
+
+    const blockers: string[] = [];
+    const publishBlockers: string[] = [];
+    const warnings: string[] = [];
+    const configuredSlots = Number(massConfigSummary?.configuredSlots ?? 0);
+
+    if (activeMinisterRows.length === 0) blockers.push("Nenhum ministro ativo na comunidade");
+    if (!questionnaire) blockers.push("Nenhum questionario encontrado para o mes");
+    if (questionnaire && responseCount === 0) blockers.push("Nenhuma resposta de questionario para o mes");
+    if (configuredSlots === 0) blockers.push("Nenhuma configuracao de missa ativa para a comunidade");
+    if (questionnaire && questionnaire.status !== "closed") {
+      publishBlockers.push("Questionario precisa estar encerrado para publicacao definitiva");
+    }
+    if (profileSummary.blocked > 0) {
+      warnings.push(`${profileSummary.blocked} cadastro(s) com dados bloqueantes para escala fiel`);
+    }
+    if (profileSummary.needsAttention > 0) {
+      warnings.push(`${profileSummary.needsAttention} cadastro(s) precisam de complemento`);
+    }
+    if (questionnaire && targetCount > responseCount) {
+      warnings.push(`${Math.max(targetCount - responseCount, 0)} ministro(s) ainda nao responderam`);
+    }
+    if (existingSchedules.total > 0) {
+      warnings.push("Ja existem escalas cadastradas para este mes");
+    }
+
+    const canPreview = blockers.length === 0;
+    const canPublish = canPreview && publishBlockers.length === 0;
+
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      readiness: {
+        canPreview,
+        canPublish,
+        blockers,
+        publishBlockers,
+        warnings,
+      },
+      ministers: {
+        active: activeMinisterRows.length,
+        ready: profileSummary.ready,
+        needsAttention: profileSummary.needsAttention,
+        blocked: profileSummary.blocked,
+      },
+      questionnaire: questionnaire
+        ? {
+            id: questionnaire.id,
+            title: questionnaire.title,
+            month: questionnaire.month,
+            year: questionnaire.year,
+            status: questionnaire.status,
+            deadline: toIsoDate(questionnaire.deadline),
+            targetCount,
+            responseCount,
+            pendingCount: Math.max(targetCount - responseCount, 0),
+            responseRate,
+          }
+        : null,
+      massConfig: {
+        configuredSlots,
+      },
+      existingSchedules,
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar prontidao da escala");
   }
 });
 

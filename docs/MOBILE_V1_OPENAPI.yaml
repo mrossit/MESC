@@ -620,6 +620,25 @@ paths:
                 $ref: "#/components/schemas/AdminCommunityHome"
         "403":
           description: User is not a coordinator or manager.
+  /admin/schedules/readiness:
+    get:
+      summary: Read coordinator readiness to preview or publish a monthly schedule.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: query
+          name: month
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Schedule generation readiness for the active community.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminScheduleReadiness"
+        "403":
+          description: User is not a coordinator or manager, or the requested community is outside scope.
   /admin/questionnaires/{id}/responses:
     get:
       summary: Read questionnaire responses for the active coordinator community.
@@ -1376,6 +1395,102 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Substitution"
+    AdminScheduleReadiness:
+      type: object
+      required:
+        - success
+        - community
+        - month
+        - readiness
+        - ministers
+        - questionnaire
+        - massConfig
+        - existingSchedules
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        month:
+          type: string
+        readiness:
+          type: object
+          required: [canPreview, canPublish, blockers, publishBlockers, warnings]
+          properties:
+            canPreview:
+              type: boolean
+            canPublish:
+              type: boolean
+            blockers:
+              type: array
+              items:
+                type: string
+            publishBlockers:
+              type: array
+              items:
+                type: string
+            warnings:
+              type: array
+              items:
+                type: string
+        ministers:
+          type: object
+          required: [active, ready, needsAttention, blocked]
+          properties:
+            active:
+              type: integer
+            ready:
+              type: integer
+            needsAttention:
+              type: integer
+            blocked:
+              type: integer
+        questionnaire:
+          type: object
+          nullable: true
+          required: [id, title, month, year, status, deadline, targetCount, responseCount, pendingCount, responseRate]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            month:
+              type: integer
+            year:
+              type: integer
+            status:
+              type: string
+            deadline:
+              type: string
+              nullable: true
+            targetCount:
+              type: integer
+            responseCount:
+              type: integer
+            pendingCount:
+              type: integer
+            responseRate:
+              type: integer
+        massConfig:
+          type: object
+          required: [configuredSlots]
+          properties:
+            configuredSlots:
+              type: integer
+        existingSchedules:
+          type: object
+          required: [total, draft, scheduled, published, completed]
+          properties:
+            total:
+              type: integer
+            draft:
+              type: integer
+            scheduled:
+              type: integer
+            published:
+              type: integer
+            completed:
+              type: integer
     ProfileReadinessIssue:
       type: object
       required: [field, label, severity, message]

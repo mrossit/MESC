@@ -5,6 +5,7 @@ import {
   hasStoredMobileRefreshToken,
   MOBILE_AUTH_STORAGE_KEYS,
   mobileGetProfile,
+  mobileGetAdminScheduleReadiness,
   mobileGetCurrentQuestionnaire,
   mobileListNotifications,
   mobileMarkAllNotificationsRead,
@@ -394,6 +395,74 @@ describe("mobile auth session storage", () => {
       "/api/mobile/v1/notifications/read-all",
       expect.objectContaining({
         method: "PATCH",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("loads coordinator schedule readiness through the mobile contract", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        community: authResponse.communities[0],
+        month: "2026-07",
+        readiness: {
+          canPreview: true,
+          canPublish: false,
+          blockers: [],
+          publishBlockers: ["Questionario precisa estar encerrado para publicacao definitiva"],
+          warnings: [],
+        },
+        ministers: {
+          active: 12,
+          ready: 10,
+          needsAttention: 2,
+          blocked: 0,
+        },
+        questionnaire: {
+          id: "questionnaire-1",
+          title: "Disponibilidade Julho",
+          month: 7,
+          year: 2026,
+          status: "published",
+          deadline: null,
+          targetCount: 12,
+          responseCount: 11,
+          pendingCount: 1,
+          responseRate: 92,
+        },
+        massConfig: {
+          configuredSlots: 3,
+        },
+        existingSchedules: {
+          total: 0,
+          draft: 0,
+          scheduled: 0,
+          published: 0,
+          completed: 0,
+        },
+      }), { status: 200 }));
+
+    await expect(mobileGetAdminScheduleReadiness({ month: "2026-07" }))
+      .resolves.toMatchObject({
+        readiness: { canPreview: true },
+        questionnaire: { responseRate: 92 },
+      });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/admin/schedules/readiness?month=2026-07",
+      expect.objectContaining({
+        method: "GET",
         credentials: "include",
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",

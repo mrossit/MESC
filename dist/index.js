@@ -3728,18 +3728,24 @@ var init_massConfigService = __esm({
       /**
        * Load all active mass configurations from the database
        */
-      async loadMassConfigurations() {
-        return db.select().from(massConfigurations).where(eq13(massConfigurations.isActive, true));
+      async loadMassConfigurations(communityId) {
+        return db.select().from(massConfigurations).where(
+          and7(
+            eq13(massConfigurations.isActive, true),
+            communityId ? eq13(massConfigurations.communityId, communityId) : void 0
+          )
+        );
       }
       /**
        * Load special events for a given month/year
        */
-      async loadSpecialEvents(year, month) {
+      async loadSpecialEvents(year, month, communityId) {
         const startDate = format2(startOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
         const endDate = format2(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
         return db.select().from(specialEvents).where(
           and7(
             eq13(specialEvents.isActive, true),
+            communityId ? eq13(specialEvents.communityId, communityId) : void 0,
             gte3(specialEvents.eventDate, startDate),
             lte3(specialEvents.eventDate, endDate)
           )
@@ -3754,10 +3760,10 @@ var init_massConfigService = __esm({
       /**
        * Generate all mass instances for a given month based on configurations and events
        */
-      async generateMonthlyMassInstances(year, month) {
+      async generateMonthlyMassInstances(year, month, communityId) {
         const instances = [];
-        const configs = await this.loadMassConfigurations();
-        const events = await this.loadSpecialEvents(year, month);
+        const configs = await this.loadMassConfigurations(communityId);
+        const events = await this.loadSpecialEvents(year, month, communityId);
         console.log(`[MassConfigService] Loaded ${configs.length} configurations, ${events.length} special events`);
         for (const config of configs) {
           const configInstances = this.generateInstancesFromConfig(config, year, month);
@@ -3949,7 +3955,7 @@ __export(scheduleGenerator_exports, {
   generateAutomaticSchedule: () => generateAutomaticSchedule,
   getMassDisplayName: () => getMassDisplayName
 });
-import { eq as eq14, and as and8, or as or6, sql as sql4, ne as ne2, inArray as inArray5, isNull as isNull2 } from "drizzle-orm";
+import { eq as eq14, and as and8, or as or6, gte as gte4, lte as lte4, sql as sql4, ne as ne2, inArray as inArray5, isNull as isNull2 } from "drizzle-orm";
 import { format as format3, addDays as addDays3, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2, getDay as getDay3, getDate as getDate2, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
 function getMassDisplayName(massTime) {
   const t = massTime.type;
@@ -3981,8 +3987,8 @@ function getMassDisplayName(massTime) {
 function isV2QuestionnaireData(data) {
   return data !== null && typeof data === "object" && "format_version" in data && data.format_version === "2.0";
 }
-async function generateAutomaticSchedule(year, month, isPreview = false) {
-  const generator = new ScheduleGenerator();
+async function generateAutomaticSchedule(year, month, isPreview = false, options = {}) {
+  const generator = new ScheduleGenerator(options);
   return await generator.generateScheduleForMonth(year, month, isPreview);
 }
 var ScheduleGenerator;
@@ -3994,6 +4000,9 @@ var init_scheduleGenerator = __esm({
     await init_saintNameMatching();
     await init_massConfigService();
     ScheduleGenerator = class {
+      constructor(options = {}) {
+        this.options = options;
+      }
       ministers = [];
       availabilityData = /* @__PURE__ */ new Map();
       massTimes = [];
@@ -4321,6 +4330,7 @@ ${"!".repeat(60)}`);
             noShowCount: users.noShowCount
           }).from(users).where(
             and8(
+              this.options.communityId ? eq14(users.homeCommunityId, this.options.communityId) : void 0,
               or6(
                 eq14(users.status, "active"),
                 sql4`${users.status} IS NULL`
@@ -4433,20 +4443,22 @@ ${"!".repeat(60)}`);
           console.log(`[HISTORICAL] Loading assignment counts from previous 3 months...`);
           const ministerWeightedCounts = /* @__PURE__ */ new Map();
           for (const range of ranges) {
-            const rows = await this.db.execute(
-              sql4`SELECT minister_id, COUNT(*)::int as cnt
-              FROM schedules
-              WHERE date >= ${range.start} AND date <= ${range.end}
-                AND status IN ('scheduled', 'published')
-                AND minister_id IS NOT NULL
-              GROUP BY minister_id`
-            );
-            if (rows.rows) {
-              for (const row of rows.rows) {
-                const id = row.minister_id;
-                const cnt = row.cnt * range.weight;
-                ministerWeightedCounts.set(id, (ministerWeightedCounts.get(id) || 0) + cnt);
-              }
+            const rows = await this.db.select({
+              ministerId: schedules.ministerId,
+              cnt: sql4`COUNT(*)::int`
+            }).from(schedules).where(
+              and8(
+                gte4(schedules.date, range.start),
+                lte4(schedules.date, range.end),
+                inArray5(schedules.status, ["scheduled", "published"]),
+                sql4`${schedules.ministerId} IS NOT NULL`,
+                this.options.communityId ? eq14(schedules.communityId, this.options.communityId) : void 0
+              )
+            ).groupBy(schedules.ministerId);
+            for (const row of rows) {
+              if (!row.ministerId) continue;
+              const cnt = Number(row.cnt) * range.weight;
+              ministerWeightedCounts.set(row.ministerId, (ministerWeightedCounts.get(row.ministerId) || 0) + cnt);
             }
           }
           let applied = 0;
@@ -4808,9 +4820,10 @@ ${"!".repeat(60)}`);
           });
           return;
         }
-        const allowedStatuses = isPreview ? ["open", "sent", "active", "closed"] : ["closed"];
+        const allowedStatuses = isPreview ? ["open", "sent", "active", "published", "closed"] : ["closed"];
         const [targetQuestionnaire] = await this.db.select().from(questionnaires).where(
           and8(
+            this.options.communityId ? eq14(questionnaires.communityId, this.options.communityId) : void 0,
             eq14(questionnaires.month, month),
             eq14(questionnaires.year, year)
           )
@@ -4874,7 +4887,12 @@ ${"!".repeat(60)}`);
         if (customEventIdToDateTime.size > 0) {
           console.log(`[SCHEDULE_GEN] \u{1F4CB} Custom event mappings:`, Object.fromEntries(customEventIdToDateTime));
         }
-        const responses = await this.db.select().from(questionnaireResponses).where(eq14(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+        const responses = await this.db.select().from(questionnaireResponses).where(
+          and8(
+            eq14(questionnaireResponses.questionnaireId, targetQuestionnaire.id),
+            this.options.communityId ? eq14(questionnaireResponses.communityId, this.options.communityId) : void 0
+          )
+        );
         console.log(`[SCHEDULE_GEN] \u{1F50D} DEBUGGING: Encontradas ${responses.length} respostas no banco`);
         console.log(`[SCHEDULE_GEN] \u{1F504} Using COMPATIBILITY LAYER for ${year}/${month}`);
         responses.forEach((r) => {
@@ -5059,7 +5077,12 @@ ${"!".repeat(60)}`);
           logger.warn("Using default mass times configuration due to missing database");
           return;
         }
-        const config = await this.db.select().from(massTimesConfig).where(eq14(massTimesConfig.isActive, true));
+        const config = await this.db.select().from(massTimesConfig).where(
+          and8(
+            eq14(massTimesConfig.isActive, true),
+            this.options.communityId ? eq14(massTimesConfig.communityId, this.options.communityId) : void 0
+          )
+        );
         this.massTimes = config.map((c) => ({
           id: c.id,
           dayOfWeek: c.dayOfWeek,
@@ -5075,7 +5098,7 @@ ${"!".repeat(60)}`);
       async generateMonthlyMassTimesFromDatabase(year, month) {
         console.log(`[SCHEDULE_GEN] \u{1F5C4}\uFE0F Gerando hor\xE1rios de ${month}/${year} a partir do BANCO DE DADOS`);
         try {
-          const instances = await massConfigService.generateMonthlyMassInstances(year, month);
+          const instances = await massConfigService.generateMonthlyMassInstances(year, month, this.options.communityId);
           console.log(`[SCHEDULE_GEN] \u{1F4CA} Carregadas ${instances.length} inst\xE2ncias de missa do banco`);
           const massTimes = instances.map((instance) => ({
             id: instance.id,
@@ -5324,6 +5347,7 @@ ${"!".repeat(60)}`);
         try {
           const [questionnaire] = await this.db.select().from(questionnaires).where(
             and8(
+              this.options.communityId ? eq14(questionnaires.communityId, this.options.communityId) : void 0,
               eq14(questionnaires.month, month),
               eq14(questionnaires.year, year)
             )
@@ -6583,7 +6607,8 @@ ${"!".repeat(60)}`);
           const ministerIds = results.map((r) => r.ministerId);
           const ministersData = await this.db.select().from(users).where(and8(
             inArray5(users.id, ministerIds),
-            eq14(users.status, "active")
+            eq14(users.status, "active"),
+            this.options.communityId ? eq14(users.homeCommunityId, this.options.communityId) : void 0
           ));
           const ministers = ministersData.map((m) => ({
             id: m.id,
@@ -15586,14 +15611,14 @@ async function saveGeneratedSchedules(generatedSchedules, replaceExisting, commu
     return savedCount;
   });
 }
-function calculateAverageConfidence(schedules3) {
-  if (schedules3.length === 0) return 0;
-  const sum2 = schedules3.reduce((acc, s) => acc + s.confidence, 0);
-  return Math.round(sum2 / schedules3.length * 100) / 100;
+function calculateAverageConfidence(schedules2) {
+  if (schedules2.length === 0) return 0;
+  const sum2 = schedules2.reduce((acc, s) => acc + s.confidence, 0);
+  return Math.round(sum2 / schedules2.length * 100) / 100;
 }
-function groupSchedulesByWeek(schedules3) {
+function groupSchedulesByWeek(schedules2) {
   const weeks = {};
-  schedules3.forEach((schedule) => {
+  schedules2.forEach((schedule) => {
     if (schedule.massTime.date) {
       const date2 = new Date(schedule.massTime.date);
       const weekKey = `Semana ${Math.ceil(date2.getDate() / 7)}`;
@@ -15603,20 +15628,20 @@ function groupSchedulesByWeek(schedules3) {
   });
   return weeks;
 }
-function calculateQualityMetrics(schedules3) {
-  const totalMinisters = new Set(schedules3.flatMap((s) => s.ministers.map((m) => m.id))).size;
-  const totalSchedules = schedules3.reduce((acc, s) => acc + s.ministers.length, 0);
+function calculateQualityMetrics(schedules2) {
+  const totalMinisters = new Set(schedules2.flatMap((s) => s.ministers.map((m) => m.id))).size;
+  const totalSchedules = schedules2.reduce((acc, s) => acc + s.ministers.length, 0);
   return {
     uniqueMinistersUsed: totalMinisters,
-    averageMinistersPerMass: Math.round(totalSchedules / schedules3.length * 10) / 10,
-    highConfidenceSchedules: schedules3.filter((s) => s.confidence >= 0.8).length,
-    lowConfidenceSchedules: schedules3.filter((s) => s.confidence < 0.5).length,
-    balanceScore: calculateBalanceScore(schedules3)
+    averageMinistersPerMass: Math.round(totalSchedules / schedules2.length * 10) / 10,
+    highConfidenceSchedules: schedules2.filter((s) => s.confidence >= 0.8).length,
+    lowConfidenceSchedules: schedules2.filter((s) => s.confidence < 0.5).length,
+    balanceScore: calculateBalanceScore(schedules2)
   };
 }
-function calculateBalanceScore(schedules3) {
+function calculateBalanceScore(schedules2) {
   const ministerCounts = {};
-  schedules3.forEach((schedule) => {
+  schedules2.forEach((schedule) => {
     schedule.ministers.forEach((minister) => {
       if (minister.id !== null) {
         ministerCounts[minister.id] = (ministerCounts[minister.id] || 0) + 1;
@@ -15630,9 +15655,9 @@ function calculateBalanceScore(schedules3) {
   const variance = counts.reduce((sum2, c) => sum2 + Math.pow(c - avg3, 2), 0) / counts.length;
   return Math.max(0, 1 - Math.sqrt(variance) / avg3);
 }
-function formatSchedulesForAPI(schedules3) {
-  console.log(`[API_FILTER] \u{1F525} EXECUTANDO FILTRO! Total schedules: ${schedules3.length}`);
-  const filteredSchedules = schedules3.filter((schedule) => {
+function formatSchedulesForAPI(schedules2) {
+  console.log(`[API_FILTER] \u{1F525} EXECUTANDO FILTRO! Total schedules: ${schedules2.length}`);
+  const filteredSchedules = schedules2.filter((schedule) => {
     const isDay28 = schedule.massTime.date?.endsWith("-28");
     const isDailyMass = schedule.massTime.type === "missa_diaria";
     console.log(`[API_FILTER] \u{1F50D} Checking: ${schedule.massTime.date} ${schedule.massTime.time} type=${schedule.massTime.type}`);
@@ -15642,7 +15667,7 @@ function formatSchedulesForAPI(schedules3) {
     }
     return true;
   });
-  console.log(`[API_FILTER] \u{1F4CA} Filtro final: ${schedules3.length} \u2192 ${filteredSchedules.length} escalas`);
+  console.log(`[API_FILTER] \u{1F4CA} Filtro final: ${schedules2.length} \u2192 ${filteredSchedules.length} escalas`);
   return filteredSchedules.map((schedule) => ({
     date: schedule.massTime.date,
     time: schedule.massTime.time,
@@ -15675,9 +15700,9 @@ function calculateScheduleQuality(schedule) {
   if (schedule.confidence >= 0.4) return "Regular";
   return "Baixa";
 }
-function calculateDistributionBalance(schedules3) {
+function calculateDistributionBalance(schedules2) {
   const ministerCounts = {};
-  schedules3.forEach((s) => {
+  schedules2.forEach((s) => {
     const ministerId = s.schedules.ministerId;
     if (ministerId) {
       ministerCounts[ministerId] = (ministerCounts[ministerId] || 0) + 1;
@@ -15690,9 +15715,9 @@ function calculateDistributionBalance(schedules3) {
   const variance = counts.reduce((sum2, c) => sum2 + Math.pow(c - avg3, 2), 0) / counts.length;
   return Math.max(0, 1 - Math.sqrt(variance) / avg3);
 }
-function calculateCoverageByDay(schedules3) {
+function calculateCoverageByDay(schedules2) {
   const coverage = {};
-  schedules3.forEach((s) => {
+  schedules2.forEach((s) => {
     const date2 = s.schedules.date;
     if (date2) {
       const day = format5(new Date(date2), "EEEE", { locale: ptBR2 });
@@ -16643,12 +16668,12 @@ router8.get("/validation/:year/:month", authenticateToken, requireRole(["coorden
     });
   }
 });
-function calculateGenerationStatistics(schedules3, options) {
+function calculateGenerationStatistics(schedules2, options) {
   const assignmentsPerMinister = {};
   const specialMassCoverage = {};
   let totalPositions = 0;
   let filledPositions = 0;
-  for (const schedule of schedules3) {
+  for (const schedule of schedules2) {
     const massType = schedule.massTime.type || "regular";
     totalPositions += schedule.massTime.minMinisters;
     filledPositions += schedule.ministers.length;
@@ -30096,7 +30121,162 @@ init_roles();
 import { Router as Router41 } from "express";
 import { randomUUID as randomUUID7 } from "crypto";
 import { z as z18 } from "zod";
-import { and as and42, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray19, lte as lte19, or as or16, sql as sql29 } from "drizzle-orm";
+import { and as and42, asc as asc5, count as count14, desc as desc19, eq as eq54, gte as gte23, inArray as inArray19, lte as lte19, ne as ne5, or as or16, sql as sql29 } from "drizzle-orm";
+
+// shared/mobileDataReadiness.ts
+function hasText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function parseArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function hasBooleanFlag(value) {
+  return value === true || value === 1;
+}
+var weightBySeverity = {
+  critical: 3,
+  recommended: 2,
+  future: 1
+};
+var readinessRules = [
+  {
+    field: "name",
+    label: "Nome completo",
+    severity: "critical",
+    message: "Sem nome confiavel nao conseguimos identificar a pessoa na escala.",
+    isComplete: (input) => hasText(input.name)
+  },
+  {
+    field: "email",
+    label: "Email",
+    severity: "critical",
+    message: "O email e necessario para login, recuperacao de acesso e comunicacoes.",
+    isComplete: (input) => hasText(input.email)
+  },
+  {
+    field: "contact",
+    label: "Telefone ou WhatsApp",
+    severity: "critical",
+    message: "A coordenacao precisa de pelo menos um contato direto.",
+    isComplete: (input) => hasText(input.phone) || hasText(input.whatsapp)
+  },
+  {
+    field: "homeCommunityId",
+    label: "Comunidade",
+    severity: "critical",
+    message: "Sem comunidade principal o app nao consegue aplicar o escopo correto.",
+    isComplete: (input) => hasText(input.homeCommunityId)
+  },
+  {
+    field: "scheduleDisplayName",
+    label: "Nome na escala",
+    severity: "recommended",
+    message: "Ajuda a escala a ficar legivel quando o nome completo e longo.",
+    isComplete: (input) => hasText(input.scheduleDisplayName) || hasText(input.name)
+  },
+  {
+    field: "positionPreference",
+    label: "Preferencia de posicao",
+    severity: "recommended",
+    message: "Melhora a sugestao automatica e reduz ajustes manuais.",
+    isComplete: (input) => typeof input.preferredPosition === "number" || parseArray(input.preferredPositions).length > 0
+  },
+  {
+    field: "preferredTimes",
+    label: "Horarios preferenciais",
+    severity: "recommended",
+    message: "Ajuda a coordenacao a respeitar preferencias recorrentes.",
+    isComplete: (input) => parseArray(input.preferredTimes).length > 0
+  },
+  {
+    field: "ministryStartDate",
+    label: "Inicio no ministerio",
+    severity: "recommended",
+    message: "Importante para experiencia, historico e futuras regras de formacao.",
+    isComplete: (input) => Boolean(input.ministryStartDate)
+  },
+  {
+    field: "formation",
+    label: "Formacao liturgica",
+    severity: "recommended",
+    message: "Permite cruzar escalas com trilhas e treinamentos obrigatorios.",
+    isComplete: (input) => hasBooleanFlag(input.liturgicalTraining) || hasBooleanFlag(input.formationCompleted)
+  },
+  {
+    field: "birthDate",
+    label: "Data de nascimento",
+    severity: "future",
+    message: "Dado util para cadastro pastoral completo e politicas futuras.",
+    isComplete: (input) => Boolean(input.birthDate)
+  },
+  {
+    field: "address",
+    label: "Endereco e cidade",
+    severity: "future",
+    message: "Dado geral do cadastro de pessoas para equalizacao com o MESC atual.",
+    isComplete: (input) => hasText(input.address) && hasText(input.city)
+  },
+  {
+    field: "maritalStatus",
+    label: "Estado civil",
+    severity: "future",
+    message: "Ajuda a qualificar cadastro e regras familiares no futuro.",
+    isComplete: (input) => hasText(input.maritalStatus)
+  },
+  {
+    field: "sacramentalData",
+    label: "Dados sacramentais",
+    severity: "future",
+    message: "Nao bloqueia o MVP, mas sera importante para o cadastro pastoral completo.",
+    isComplete: (input) => Boolean(input.baptismDate || input.confirmationDate) || hasText(input.baptismParish) || hasText(input.confirmationParish)
+  },
+  {
+    field: "spouseMinisterId",
+    label: "Vinculo de casal",
+    severity: "recommended",
+    message: "Se serve como casal, precisamos do vinculo para escalar corretamente.",
+    isComplete: (input) => !hasBooleanFlag(input.canServeAsCouple) || hasText(input.spouseMinisterId)
+  }
+];
+function buildMobileProfileReadiness(input) {
+  const missing = [];
+  const completedFields = [];
+  let totalWeight = 0;
+  let completedWeight = 0;
+  for (const rule of readinessRules) {
+    const weight = weightBySeverity[rule.severity];
+    totalWeight += weight;
+    if (rule.isComplete(input)) {
+      completedFields.push(rule.field);
+      completedWeight += weight;
+      continue;
+    }
+    missing.push({
+      field: rule.field,
+      label: rule.label,
+      severity: rule.severity,
+      message: rule.message
+    });
+  }
+  const score = totalWeight > 0 ? Math.round(completedWeight / totalWeight * 100) : 100;
+  const hasCriticalMissing = missing.some((issue) => issue.severity === "critical");
+  const hasRecommendedMissing = missing.some((issue) => issue.severity === "recommended");
+  return {
+    status: hasCriticalMissing ? "blocked" : hasRecommendedMissing || score < 80 ? "needs_attention" : "ready",
+    score,
+    missing,
+    completedFields
+  };
+}
+
+// server/routes/mobile.ts
 await init_db();
 
 // server/services/mobileIdempotencyService.ts
@@ -30724,7 +30904,7 @@ function buildMissionPendingActions(input) {
       title: "Responder questionario",
       subtitle: input.questionnaire.title,
       priority: "high",
-      deepLink: `/questionnaires/${input.questionnaire.id}`,
+      deepLink: "/questionnaire",
       dueAt: toIsoDate(input.questionnaire.deadline)
     });
   }
@@ -30735,7 +30915,7 @@ function buildMissionPendingActions(input) {
       title: "Acompanhar substituicao",
       subtitle: `Status: ${input.substitution.status}`,
       priority: input.substitution.status === "pending" ? "high" : "normal",
-      deepLink: `/substitutions/${input.substitution.id}`
+      deepLink: "/schedules/substitutions"
     });
   }
   if ((input.unreadNoticesCount ?? 0) > 0) {
@@ -30745,7 +30925,7 @@ function buildMissionPendingActions(input) {
       title: "Avisos nao lidos",
       subtitle: `${input.unreadNoticesCount} aviso(s) aguardando leitura`,
       priority: "normal",
-      deepLink: "/notices"
+      deepLink: "/communication"
     });
   }
   return actions;
@@ -30801,10 +30981,20 @@ var substitutionCreateSchema = z18.object({
   substituteId: z18.string().optional().nullable(),
   reason: z18.string().max(1e3).optional().nullable()
 });
+var substitutionClaimSchema = z18.object({
+  message: z18.string().max(1e3).optional().nullable()
+});
 var confirmationSchema = z18.object({
   status: z18.enum(["confirmed", "declined"]).default("confirmed"),
   declineReason: z18.string().max(1e3).optional().nullable(),
   notes: z18.string().max(1e3).optional().nullable()
+});
+var adminQuestionnaireReminderSchema = z18.object({
+  target: z18.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"]).optional().default("pending_questionnaire"),
+  dataQualityStatuses: z18.array(z18.enum(["blocked", "needs_attention"])).optional(),
+  ministerIds: z18.array(z18.string()).optional(),
+  message: z18.string().trim().max(1e3).nullable().optional(),
+  dryRun: z18.boolean().optional().default(false)
 });
 var profileUpdateSchema = z18.object({
   name: z18.string().min(3).max(255).optional(),
@@ -30845,6 +31035,17 @@ function dbBoolean2(value) {
 }
 function dbCurrentTimestamp() {
   return sql29`CURRENT_TIMESTAMP`;
+}
+function toValidDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value !== "string" && typeof value !== "number") {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 function dbJson(value) {
   return process.env.DATABASE_URL ? value : JSON.stringify(value ?? null);
@@ -30898,13 +31099,158 @@ function getRequestedMonth(value) {
     throw new MobileHttpError(400, message);
   }
 }
+function questionnaireMonthKey(year, month) {
+  return year * 100 + month;
+}
+function toIsoMonthFromParts(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+function questionnaireMonthOrderSql() {
+  return sql29`(${questionnaires.year} * 100 + ${questionnaires.month})`;
+}
+async function loadRelevantPublishedQuestionnaires(input) {
+  const monthOrder = questionnaireMonthOrderSql();
+  return db.select({
+    id: questionnaires.id,
+    title: questionnaires.title,
+    description: questionnaires.description,
+    month: questionnaires.month,
+    year: questionnaires.year,
+    status: questionnaires.status,
+    questions: questionnaires.questions,
+    deadline: questionnaires.deadline,
+    targetUserIds: questionnaires.targetUserIds,
+    updatedAt: questionnaires.updatedAt
+  }).from(questionnaires).where(
+    and42(
+      eq54(questionnaires.communityId, input.communityId),
+      eq54(questionnaires.status, "published"),
+      gte23(monthOrder, questionnaireMonthKey(input.monthRange.year, input.monthRange.month))
+    )
+  ).orderBy(monthOrder, desc19(questionnaires.updatedAt)).limit(input.limit ?? 5);
+}
 function parseStoredJson(value) {
-  if (typeof value !== "string") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
+  let current = value;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (typeof current !== "string") return current;
+    try {
+      current = JSON.parse(current);
+    } catch {
+      return current;
+    }
   }
+  return current;
+}
+function normalizeStoredStringArray(value) {
+  const parsed = parseStoredJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item) => typeof item === "string");
+}
+function normalizeStoredNumberArray(value) {
+  const parsed = parseStoredJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item) => typeof item === "number" && Number.isFinite(item));
+}
+function getQuestionnaireTargetUserIds(value) {
+  return normalizeStoredStringArray(value);
+}
+function getResponseAvailability(value) {
+  const parsed = parseStoredJson(value);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const sections = [
+      parsed.masses,
+      parsed.special_events,
+      parsed.weekdays
+    ];
+    const hasAvailability = sections.some((section) => {
+      if (!section || typeof section !== "object") return false;
+      return JSON.stringify(section).includes("true");
+    });
+    return hasAvailability ? "Disponivel" : "Indisponivel";
+  }
+  if (!Array.isArray(parsed)) return "Nao informado";
+  const monthlyAvailability = parsed.find(
+    (item) => item && typeof item === "object" && item.questionId === "monthly_availability"
+  );
+  const legacyAvailability = parsed.find(
+    (item) => item && typeof item === "object" && item.questionId === "availability"
+  );
+  const answer = monthlyAvailability?.answer ?? legacyAvailability?.answer;
+  const normalizedAnswer = answer && typeof answer === "object" && !Array.isArray(answer) && "answer" in answer ? answer.answer : answer;
+  const normalizedText = typeof normalizedAnswer === "string" ? normalizedAnswer.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : normalizedAnswer;
+  if (normalizedText === "Sim" || normalizedText === "yes" || normalizedText === "Disponivel") {
+    return "Disponivel";
+  }
+  if (normalizedText === "Nao" || normalizedText === "no" || normalizedText === "Indisponivel") {
+    return "Indisponivel";
+  }
+  return typeof normalizedAnswer === "string" && normalizedAnswer.trim() ? normalizedAnswer : "Nao informado";
+}
+function toMobileDataQuality(user) {
+  return buildMobileProfileReadiness({
+    ...user,
+    preferredPositions: normalizeStoredNumberArray(user.preferredPositions),
+    preferredTimes: normalizeStoredStringArray(user.preferredTimes)
+  });
+}
+function summarizeDataQuality(rows) {
+  return rows.reduce(
+    (summary, row) => {
+      if (row.dataQuality.status === "ready") summary.ready += 1;
+      else if (row.dataQuality.status === "blocked") summary.blocked += 1;
+      else summary.needsAttention += 1;
+      return summary;
+    },
+    { ready: 0, needsAttention: 0, blocked: 0 }
+  );
+}
+async function loadMobileQuestionnaireTargetMinisters(input) {
+  const targetUserIds = input.targetUserIds?.filter(Boolean) ?? [];
+  const rows = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+    status: users.status,
+    phone: users.phone,
+    whatsapp: users.whatsapp,
+    photoUrl: users.photoUrl,
+    homeCommunityId: users.homeCommunityId,
+    scheduleDisplayName: users.scheduleDisplayName,
+    preferredPosition: users.preferredPosition,
+    preferredPositions: users.preferredPositions,
+    avoidPositions: users.avoidPositions,
+    preferredTimes: users.preferredTimes,
+    ministryStartDate: users.ministryStartDate,
+    birthDate: users.birthDate,
+    address: users.address,
+    city: users.city,
+    maritalStatus: users.maritalStatus,
+    baptismDate: users.baptismDate,
+    baptismParish: users.baptismParish,
+    confirmationDate: users.confirmationDate,
+    confirmationParish: users.confirmationParish,
+    liturgicalTraining: users.liturgicalTraining,
+    formationCompleted: users.formationCompleted,
+    canServeAsCouple: users.canServeAsCouple,
+    spouseMinisterId: users.spouseMinisterId
+  }).from(users).where(
+    and42(
+      eq54(users.homeCommunityId, input.communityId),
+      eq54(users.status, "active"),
+      inArray19(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+      targetUserIds.length > 0 ? inArray19(users.id, targetUserIds) : void 0
+    )
+  ).orderBy(asc5(users.name));
+  return rows.map((minister) => ({
+    ...minister,
+    displayName: minister.scheduleDisplayName || minister.name,
+    photoUrl: minister.photoUrl ?? null,
+    preferredPositions: normalizeStoredNumberArray(minister.preferredPositions),
+    avoidPositions: normalizeStoredNumberArray(minister.avoidPositions),
+    preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
+    dataQuality: toMobileDataQuality(minister)
+  }));
 }
 async function loadMobileSubstitutionUsers(rows) {
   const userIds = Array.from(new Set(
@@ -30944,11 +31290,11 @@ function toMobileSubstitution(row) {
       time: row.scheduleTime,
       type: row.scheduleType,
       location: row.scheduleLocation,
-      deepLink: `/schedules/${row.scheduleId}`
+      deepLink: mobileScheduleDeepLink(row.scheduleDate)
     },
     requester: row.requester ?? null,
     substitute: row.substitute ?? null,
-    deepLink: `/substitutions/${row.id}`,
+    deepLink: normalizeMobileDeepLink("/substitutions"),
     createdAt: toIsoDate(row.createdAt),
     updatedAt: toIsoDate(row.updatedAt)
   };
@@ -30962,6 +31308,19 @@ function toMobileCommunity(row) {
     parishName: row.parishName,
     isMatriz: row.isMatriz
   };
+}
+function mobileScheduleDeepLink(date2) {
+  return date2 ? `/schedules?date=${date2}` : "/schedules";
+}
+function normalizeMobileDeepLink(value, fallback = "/dashboard") {
+  if (!value) return fallback;
+  if (value === "/questionnaires" || value.startsWith("/questionnaires/")) return "/questionnaire";
+  if (value === "/notices" || value === "/notifications") return "/communication";
+  if (value.startsWith("/substitutions")) return "/schedules/substitutions";
+  if (value === "/confirmations") return "/schedules";
+  if (value.startsWith("/admin/questionnaires/")) return "/questionnaire-responses";
+  if (value.startsWith("/admin/ministers/")) return "/ministers-directory";
+  return value;
 }
 function toMobileProfile(user) {
   return {
@@ -30978,9 +31337,9 @@ function toMobileProfile(user) {
     ministryStartDate: toDateOnly(user.ministryStartDate),
     maritalStatus: user.maritalStatus,
     preferredPosition: user.preferredPosition,
-    preferredPositions: user.preferredPositions ?? [],
-    avoidPositions: user.avoidPositions ?? [],
-    preferredTimes: user.preferredTimes ?? [],
+    preferredPositions: normalizeStoredNumberArray(user.preferredPositions),
+    avoidPositions: normalizeStoredNumberArray(user.avoidPositions),
+    preferredTimes: normalizeStoredStringArray(user.preferredTimes),
     availableForSpecialEvents: Boolean(user.availableForSpecialEvents),
     extraActivities: user.extraActivities ?? {},
     requiresPasswordChange: Boolean(user.requiresPasswordChange),
@@ -31445,7 +31804,7 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
         priority: notification.priority,
         read: Boolean(notification.read),
         readAt: toIsoDate(notification.readAt),
-        deepLink: notification.actionUrl ?? "/notifications",
+        deepLink: normalizeMobileDeepLink(notification.actionUrl, "/communication"),
         createdAt: toIsoDate(notification.createdAt)
       })),
       unreadCount: Number(unread?.total ?? 0)
@@ -31515,24 +31874,11 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
     }
     const activeCommunity = await resolveActiveCommunity(req);
     const monthRange = getRequestedMonth(req.query.month);
-    const [questionnaire] = await db.select({
-      id: questionnaires.id,
-      title: questionnaires.title,
-      description: questionnaires.description,
-      month: questionnaires.month,
-      year: questionnaires.year,
-      status: questionnaires.status,
-      questions: questionnaires.questions,
-      deadline: questionnaires.deadline,
-      updatedAt: questionnaires.updatedAt
-    }).from(questionnaires).where(
-      and42(
-        eq54(questionnaires.communityId, activeCommunity.id),
-        eq54(questionnaires.status, "published"),
-        eq54(questionnaires.month, monthRange.month),
-        eq54(questionnaires.year, monthRange.year)
-      )
-    ).orderBy(desc19(questionnaires.updatedAt)).limit(1);
+    const [questionnaire] = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 1
+    });
     if (!questionnaire) {
       return res.json({
         success: true,
@@ -31556,7 +31902,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
     res.json({
       success: true,
       community: activeCommunity,
-      month: monthRange.isoMonth,
+      month: toIsoMonthFromParts(questionnaire.year, questionnaire.month),
       questionnaire: {
         id: questionnaire.id,
         title: questionnaire.title,
@@ -31868,6 +32214,160 @@ router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar substituicao");
   }
 });
+router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const parsed = substitutionClaimSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+    const [row] = await db.select({
+      id: substitutionRequests.id,
+      scheduleId: substitutionRequests.scheduleId,
+      requesterId: substitutionRequests.requesterId,
+      substituteId: substitutionRequests.substituteId,
+      status: substitutionRequests.status,
+      reason: substitutionRequests.reason,
+      urgency: substitutionRequests.urgency,
+      responseMessage: substitutionRequests.responseMessage,
+      createdAt: substitutionRequests.createdAt,
+      updatedAt: substitutionRequests.updatedAt,
+      scheduleDate: schedules.date,
+      scheduleTime: schedules.time,
+      scheduleType: schedules.type,
+      scheduleLocation: schedules.location
+    }).from(substitutionRequests).innerJoin(schedules, eq54(substitutionRequests.scheduleId, schedules.id)).where(and42(eq54(substitutionRequests.id, req.params.id), eq54(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+    if (!row) {
+      throw new MobileHttpError(404, "Substituicao nao encontrada");
+    }
+    const isAvailable = row.status === "available" || row.status === "pending" && !row.substituteId;
+    if (!isAvailable) {
+      throw new MobileHttpError(400, "Esta substituicao nao esta mais disponivel");
+    }
+    if (row.requesterId === user.id) {
+      throw new MobileHttpError(400, "Voce nao pode aceitar sua propria substituicao");
+    }
+    if (isLocalScheduleDateTimePast(row.scheduleDate, row.scheduleTime)) {
+      throw new MobileHttpError(400, "Nao e possivel aceitar substituicao para missa que ja passou");
+    }
+    const conflictingSchedule = await db.select({ id: schedules.id }).from(schedules).where(
+      and42(
+        eq54(schedules.communityId, activeCommunity.id),
+        eq54(schedules.ministerId, user.id),
+        eq54(schedules.date, row.scheduleDate),
+        eq54(schedules.time, row.scheduleTime),
+        inArray19(schedules.status, ["scheduled", "published"]),
+        ne5(schedules.id, row.scheduleId)
+      )
+    ).limit(1);
+    if (conflictingSchedule.length > 0) {
+      throw new MobileHttpError(400, "Voce ja esta escalado neste horario");
+    }
+    let claimed = row;
+    const claimWithClient = async (tx) => {
+      const [currentRequest] = await tx.select().from(substitutionRequests).where(and42(eq54(substitutionRequests.id, row.id), eq54(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+      const stillAvailable = currentRequest && (currentRequest.status === "available" || currentRequest.status === "pending" && !currentRequest.substituteId);
+      if (!stillAvailable) {
+        throw new MobileHttpError(409, "Esta substituicao ja foi aceita por outro ministro");
+      }
+      const [updated] = await tx.update(substitutionRequests).set({
+        status: "approved",
+        substituteId: user.id,
+        approvedBy: user.id,
+        approvedAt: /* @__PURE__ */ new Date(),
+        responseMessage: parsed.message || null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(and42(eq54(substitutionRequests.id, row.id), eq54(substitutionRequests.communityId, activeCommunity.id))).returning();
+      await tx.update(schedules).set({
+        ministerId: user.id,
+        substituteId: row.requesterId
+      }).where(and42(eq54(schedules.id, row.scheduleId), eq54(schedules.communityId, activeCommunity.id)));
+      claimed = {
+        ...row,
+        substituteId: updated.substituteId,
+        status: updated.status,
+        responseMessage: updated.responseMessage,
+        updatedAt: updated.updatedAt
+      };
+    };
+    if (process.env.DATABASE_URL) {
+      await db.transaction(async (tx) => {
+        await claimWithClient(tx);
+      });
+    } else {
+      await claimWithClient(db);
+    }
+    scheduleCache.invalidateByDate(row.scheduleDate);
+    await trackSubstitutionFulfillment(user.id, row.scheduleId);
+    const substituteName = formatMinisterName(user.name);
+    await db.insert(notifications).values({
+      ...localUuid(),
+      userId: row.requesterId,
+      type: "substitution",
+      title: "Substituto aceitou",
+      message: `${substituteName} aceitou substituir voce na missa de ${row.scheduleDate} as ${row.scheduleTime}.`,
+      data: dbJson(mobileNotificationData("substitute_accepted", {
+        substitutionId: row.id,
+        scheduleId: row.scheduleId,
+        substituteId: user.id,
+        communityId: activeCommunity.id
+      })),
+      read: dbBoolean2(false),
+      readAt: null,
+      actionUrl: "/schedules/substitutions",
+      priority: "high",
+      expiresAt: null,
+      createdAt: /* @__PURE__ */ new Date()
+    });
+    await logActivity(user.id, "approve_substitution", {
+      source: "mobile-v1",
+      scheduleId: row.scheduleId,
+      substitutionId: row.id,
+      requesterId: row.requesterId,
+      communityId: activeCommunity.id,
+      idempotencyKey
+    }, req);
+    const usersById = await loadMobileSubstitutionUsers([{
+      requesterId: row.requesterId,
+      substituteId: user.id
+    }]);
+    const responseBody = {
+      success: true,
+      substitution: toMobileSubstitution({
+        ...claimed,
+        scheduleDate: row.scheduleDate,
+        scheduleTime: row.scheduleTime,
+        scheduleType: row.scheduleType,
+        scheduleLocation: row.scheduleLocation,
+        requester: usersById.get(row.requesterId) ?? null,
+        substitute: usersById.get(user.id) ?? null
+      })
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody
+    });
+    idempotencyRecordId = null;
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao aceitar substituicao");
+  }
+});
 router41.get("/admin/community/home", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
@@ -31879,13 +32379,10 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     }
     const activeCommunity = await resolveActiveCommunity(req);
     const monthRange = getRequestedMonth(req.query.month);
-    const [activeMinistersResult] = await db.select({ total: count14() }).from(users).where(
-      and42(
-        eq54(users.homeCommunityId, activeCommunity.id),
-        eq54(users.status, "active"),
-        inArray19(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
-      )
-    );
+    const activeMinisterRows = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id
+    });
+    const profileSummary = summarizeDataQuality(activeMinisterRows);
     const publishedSchedules = await db.select({
       id: schedules.id,
       date: schedules.date,
@@ -31903,27 +32400,32 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
         lte19(schedules.date, monthRange.endDate)
       )
     ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
-    const [currentQuestionnaire] = await db.select({
-      id: questionnaires.id,
-      title: questionnaires.title,
-      targetUserIds: questionnaires.targetUserIds
-    }).from(questionnaires).where(
-      and42(
-        eq54(questionnaires.communityId, activeCommunity.id),
-        eq54(questionnaires.status, "published"),
-        eq54(questionnaires.month, monthRange.month),
-        eq54(questionnaires.year, monthRange.year)
-      )
-    ).orderBy(desc19(questionnaires.updatedAt)).limit(1);
+    const [currentQuestionnaire] = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 1
+    });
     let responseCount = 0;
+    let questionnaireTargetCount = null;
     if (currentQuestionnaire) {
-      const [responseResult] = await db.select({ total: count14() }).from(questionnaireResponses).where(
+      const targetUserIds = getQuestionnaireTargetUserIds(currentQuestionnaire.targetUserIds);
+      const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+        communityId: activeCommunity.id,
+        targetUserIds
+      });
+      const targetIds = targetMinisters.map((minister) => minister.id);
+      const hasExplicitTarget = targetUserIds.length > 0;
+      const targetFilter = targetIds.length > 0 ? inArray19(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
+      questionnaireTargetCount = targetMinisters.length;
+      const responseRows = await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
         and42(
           eq54(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
-          eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
+          eq54(questionnaireResponses.communityId, activeCommunity.id),
+          eq54(questionnaireResponses.isDeleted, dbBoolean2(false)),
+          targetFilter
         )
       );
-      responseCount = Number(responseResult?.total ?? 0);
+      responseCount = new Set(responseRows.map((row) => row.userId)).size;
     }
     const pendingSubstitutions = await db.select({
       id: substitutionRequests.id,
@@ -31966,20 +32468,28 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     res.json({
       success: true,
       community: activeCommunity,
-      month: monthRange.isoMonth,
+      month: currentQuestionnaire ? toIsoMonthFromParts(currentQuestionnaire.year, currentQuestionnaire.month) : monthRange.isoMonth,
       metrics: {
-        activeMinisters: Number(activeMinistersResult?.total ?? 0),
+        activeMinisters: activeMinisterRows.length,
         publishedAssignments: publishedSchedules.length,
         pendingSubstitutions: pendingSubstitutions.length,
         questionnaireResponses: responseCount,
-        questionnairePending: currentQuestionnaire ? Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0) : null
+        questionnairePending: currentQuestionnaire ? Math.max((questionnaireTargetCount ?? 0) - responseCount, 0) : null,
+        questionnaireTarget: questionnaireTargetCount,
+        profileReady: profileSummary.ready,
+        profileNeedsAttention: profileSummary.needsAttention,
+        profileBlocked: profileSummary.blocked
       },
       questionnaire: currentQuestionnaire ? {
         id: currentQuestionnaire.id,
         title: currentQuestionnaire.title,
+        month: currentQuestionnaire.month,
+        year: currentQuestionnaire.year,
         responses: responseCount,
-        pending: Math.max(Number(activeMinistersResult?.total ?? 0) - responseCount, 0),
-        deepLink: `/admin/questionnaires/${currentQuestionnaire.id}/responses`
+        pending: Math.max((questionnaireTargetCount ?? 0) - responseCount, 0),
+        target: questionnaireTargetCount ?? 0,
+        responseRate: questionnaireTargetCount && questionnaireTargetCount > 0 ? Math.round(responseCount / questionnaireTargetCount * 100) : 0,
+        deepLink: "/questionnaire-responses"
       } : null,
       coverage: Array.from(coverageMap.values()).map((item) => ({
         ...item,
@@ -31989,6 +32499,148 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar painel da comunidade");
+  }
+});
+router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(req.query.month);
+    const activeMinisterRows = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id
+    });
+    const profileSummary = summarizeDataQuality(activeMinisterRows);
+    const [questionnaire] = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      status: questionnaires.status,
+      deadline: questionnaires.deadline,
+      targetUserIds: questionnaires.targetUserIds,
+      updatedAt: questionnaires.updatedAt
+    }).from(questionnaires).where(
+      and42(
+        eq54(questionnaires.communityId, activeCommunity.id),
+        eq54(questionnaires.month, monthRange.month),
+        eq54(questionnaires.year, monthRange.year)
+      )
+    ).orderBy(desc19(questionnaires.updatedAt)).limit(1);
+    let targetCount = 0;
+    let responseCount = 0;
+    let responseRate = 0;
+    if (questionnaire) {
+      const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+      const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+        communityId: activeCommunity.id,
+        targetUserIds
+      });
+      const targetIds = targetMinisters.map((minister) => minister.id);
+      const hasExplicitTarget = targetUserIds.length > 0;
+      const targetFilter = targetIds.length > 0 ? inArray19(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
+      targetCount = targetMinisters.length;
+      const responseRows = await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
+        and42(
+          eq54(questionnaireResponses.questionnaireId, questionnaire.id),
+          eq54(questionnaireResponses.communityId, activeCommunity.id),
+          eq54(questionnaireResponses.isDeleted, dbBoolean2(false)),
+          targetFilter
+        )
+      );
+      responseCount = new Set(responseRows.map((row) => row.userId)).size;
+      responseRate = targetCount > 0 ? Math.round(responseCount / targetCount * 100) : 0;
+    }
+    const [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
+      and42(
+        eq54(massTimesConfig.communityId, activeCommunity.id),
+        eq54(massTimesConfig.isActive, dbBoolean2(true))
+      )
+    );
+    const existingScheduleRows = await db.select({ status: schedules.status }).from(schedules).where(
+      and42(
+        eq54(schedules.communityId, activeCommunity.id),
+        gte23(schedules.date, monthRange.startDate),
+        lte19(schedules.date, monthRange.endDate)
+      )
+    );
+    const existingSchedules = existingScheduleRows.reduce(
+      (summary, row) => {
+        summary.total += 1;
+        if (row.status === "published") summary.published += 1;
+        else if (row.status === "completed") summary.completed += 1;
+        else if (row.status === "draft") summary.draft += 1;
+        else summary.scheduled += 1;
+        return summary;
+      },
+      { total: 0, draft: 0, scheduled: 0, published: 0, completed: 0 }
+    );
+    const blockers = [];
+    const publishBlockers = [];
+    const warnings = [];
+    const configuredSlots = Number(massConfigSummary?.configuredSlots ?? 0);
+    if (activeMinisterRows.length === 0) blockers.push("Nenhum ministro ativo na comunidade");
+    if (!questionnaire) blockers.push("Nenhum questionario encontrado para o mes");
+    if (questionnaire && responseCount === 0) blockers.push("Nenhuma resposta de questionario para o mes");
+    if (configuredSlots === 0) blockers.push("Nenhuma configuracao de missa ativa para a comunidade");
+    if (questionnaire && questionnaire.status !== "closed") {
+      publishBlockers.push("Questionario precisa estar encerrado para publicacao definitiva");
+    }
+    if (profileSummary.blocked > 0) {
+      warnings.push(`${profileSummary.blocked} cadastro(s) com dados bloqueantes para escala fiel`);
+    }
+    if (profileSummary.needsAttention > 0) {
+      warnings.push(`${profileSummary.needsAttention} cadastro(s) precisam de complemento`);
+    }
+    if (questionnaire && targetCount > responseCount) {
+      warnings.push(`${Math.max(targetCount - responseCount, 0)} ministro(s) ainda nao responderam`);
+    }
+    if (existingSchedules.total > 0) {
+      warnings.push("Ja existem escalas cadastradas para este mes");
+    }
+    const canPreview = blockers.length === 0;
+    const canPublish = canPreview && publishBlockers.length === 0;
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      readiness: {
+        canPreview,
+        canPublish,
+        blockers,
+        publishBlockers,
+        warnings
+      },
+      ministers: {
+        active: activeMinisterRows.length,
+        ready: profileSummary.ready,
+        needsAttention: profileSummary.needsAttention,
+        blocked: profileSummary.blocked
+      },
+      questionnaire: questionnaire ? {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        deadline: toIsoDate(questionnaire.deadline),
+        targetCount,
+        responseCount,
+        pendingCount: Math.max(targetCount - responseCount, 0),
+        responseRate
+      } : null,
+      massConfig: {
+        configuredSlots
+      },
+      existingSchedules
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar prontidao da escala");
   }
 });
 router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (req, res) => {
@@ -32007,11 +32659,21 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       month: questionnaires.month,
       year: questionnaires.year,
       status: questionnaires.status,
-      deadline: questionnaires.deadline
+      deadline: questionnaires.deadline,
+      questions: questionnaires.questions,
+      targetUserIds: questionnaires.targetUserIds
     }).from(questionnaires).where(and42(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
+    const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+    const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+      targetUserIds
+    });
+    const targetIds = targetMinisters.map((minister) => minister.id);
+    const hasExplicitTarget = targetUserIds.length > 0;
+    const targetFilter = targetIds.length > 0 ? inArray19(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
     const rows = await db.select({
       responseId: questionnaireResponses.id,
       userId: questionnaireResponses.userId,
@@ -32031,10 +32693,171 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       and42(
         eq54(questionnaireResponses.questionnaireId, questionnaire.id),
         eq54(questionnaireResponses.communityId, activeCommunity.id),
-        eq54(questionnaireResponses.isDeleted, dbBoolean2(false))
+        eq54(questionnaireResponses.isDeleted, dbBoolean2(false)),
+        targetFilter
       )
     ).orderBy(asc5(users.name));
+    const responseByUserId = new Map(rows.map((row) => [row.userId, row]));
+    const targetMinisterById = new Map(targetMinisters.map((minister) => [minister.id, minister]));
+    const ministers = targetMinisters.map((minister) => {
+      const response = responseByUserId.get(minister.id);
+      return {
+        id: minister.id,
+        name: minister.name,
+        email: minister.email,
+        phone: minister.phone,
+        whatsapp: minister.whatsapp,
+        displayName: minister.displayName,
+        responded: Boolean(response),
+        responseId: response?.responseId ?? null,
+        respondedAt: response ? toIsoDate(response.submittedAt) : null,
+        availability: response ? getResponseAvailability(response.responses) : null,
+        dataQuality: minister.dataQuality
+      };
+    });
+    const dataQualitySummary = summarizeDataQuality(targetMinisters);
+    const respondedCount = new Set(rows.map((row) => row.userId)).size;
+    const responseRate = targetMinisters.length > 0 ? Math.round(respondedCount / targetMinisters.length * 100) : 0;
     res.json({
+      success: true,
+      community: activeCommunity,
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        deadline: toIsoDate(questionnaire.deadline),
+        questions: parseStoredJson(questionnaire.questions)
+      },
+      summary: {
+        targetCount: targetMinisters.length,
+        respondedCount,
+        pendingCount: Math.max(targetMinisters.length - respondedCount, 0),
+        responseRate,
+        dataQuality: {
+          ready: dataQualitySummary.ready,
+          needsAttention: dataQualitySummary.needsAttention,
+          blocked: dataQualitySummary.blocked
+        }
+      },
+      ministers,
+      responses: rows.map((row) => ({
+        id: row.responseId,
+        userId: row.userId,
+        ministerName: row.ministerName,
+        ministerPhotoUrl: row.ministerPhotoUrl,
+        canSubstitute: Boolean(row.canSubstitute),
+        availableSundays: normalizeStoredStringArray(row.availableSundays),
+        preferredMassTimes: normalizeStoredStringArray(row.preferredMassTimes),
+        alternativeTimes: normalizeStoredStringArray(row.alternativeTimes),
+        dailyMassAvailability: normalizeStoredStringArray(row.dailyMassAvailability),
+        notes: row.notes,
+        processingWarnings: parseStoredJson(row.processingWarnings) ?? [],
+        responses: parseStoredJson(row.responses),
+        submittedAt: toIsoDate(row.submittedAt),
+        updatedAt: toIsoDate(row.updatedAt),
+        dataQuality: targetMinisterById.get(row.userId)?.dataQuality ?? buildMobileProfileReadiness({})
+      }))
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar respostas do questionario");
+  }
+});
+router41.post("/admin/questionnaires/:id/reminders", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+    const parsed = adminQuestionnaireReminderSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+    const [questionnaire] = await db.select({
+      id: questionnaires.id,
+      title: questionnaires.title,
+      month: questionnaires.month,
+      year: questionnaires.year,
+      status: questionnaires.status,
+      deadline: questionnaires.deadline,
+      targetUserIds: questionnaires.targetUserIds
+    }).from(questionnaires).where(and42(eq54(questionnaires.id, req.params.id), eq54(questionnaires.communityId, activeCommunity.id))).limit(1);
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+    const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+      targetUserIds
+    });
+    const requestedMinisterIds = Array.from(new Set((parsed.ministerIds ?? []).filter(Boolean)));
+    const requestedMinisterIdSet = new Set(requestedMinisterIds);
+    const candidateMinisters = requestedMinisterIdSet.size > 0 ? targetMinisters.filter((minister) => requestedMinisterIdSet.has(minister.id)) : targetMinisters;
+    const candidateIds = candidateMinisters.map((minister) => minister.id);
+    const responseRows = candidateIds.length > 0 ? await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
+      and42(
+        eq54(questionnaireResponses.questionnaireId, questionnaire.id),
+        eq54(questionnaireResponses.communityId, activeCommunity.id),
+        eq54(questionnaireResponses.isDeleted, dbBoolean2(false)),
+        inArray19(questionnaireResponses.userId, candidateIds)
+      )
+    ) : [];
+    const respondedUserIds = new Set(responseRows.map((row) => row.userId));
+    const dataQualityStatuses = new Set(parsed.dataQualityStatuses?.length ? parsed.dataQualityStatuses : ["blocked", "needs_attention"]);
+    const recipients = candidateMinisters.filter((minister) => {
+      const isPending = !respondedUserIds.has(minister.id);
+      const hasDataQualityIssue = dataQualityStatuses.has(minister.dataQuality.status);
+      if (parsed.target === "pending_questionnaire") return isPending;
+      if (parsed.target === "data_quality") return hasDataQualityIssue;
+      return isPending || hasDataQualityIssue;
+    });
+    const notificationIds = recipients.map(() => randomUUID7());
+    const message = parsed.message || `Por favor, confira o questionario "${questionnaire.title}" e complete as informacoes pendentes.`;
+    const expiresAt = toValidDate(questionnaire.deadline);
+    if (!parsed.dryRun && recipients.length > 0) {
+      await db.insert(notifications).values(recipients.map((minister, index2) => ({
+        id: notificationIds[index2],
+        userId: minister.id,
+        type: "reminder",
+        title: "Lembrete do questionario",
+        message,
+        data: dbJson(mobileNotificationData("coordinator_announcement", {
+          kind: "questionnaire_reminder",
+          questionnaireId: questionnaire.id,
+          questionnaireTitle: questionnaire.title,
+          communityId: activeCommunity.id,
+          requestedBy: user.id,
+          target: parsed.target,
+          responded: respondedUserIds.has(minister.id),
+          dataQualityStatus: minister.dataQuality.status
+        })),
+        read: dbBoolean2(false),
+        readAt: null,
+        actionUrl: "/questionnaire",
+        priority: "medium",
+        expiresAt,
+        createdAt: /* @__PURE__ */ new Date()
+      })));
+    }
+    const skippedCount = Math.max(
+      (requestedMinisterIdSet.size > 0 ? requestedMinisterIdSet.size : targetMinisters.length) - recipients.length,
+      0
+    );
+    const responseBody = {
       success: true,
       community: activeCommunity,
       questionnaire: {
@@ -32045,25 +32868,44 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
         status: questionnaire.status,
         deadline: toIsoDate(questionnaire.deadline)
       },
-      responses: rows.map((row) => ({
-        id: row.responseId,
-        userId: row.userId,
-        ministerName: row.ministerName,
-        ministerPhotoUrl: row.ministerPhotoUrl,
-        canSubstitute: Boolean(row.canSubstitute),
-        availableSundays: row.availableSundays ?? [],
-        preferredMassTimes: row.preferredMassTimes ?? [],
-        alternativeTimes: row.alternativeTimes ?? [],
-        dailyMassAvailability: row.dailyMassAvailability ?? [],
-        notes: row.notes,
-        processingWarnings: row.processingWarnings ?? [],
-        responses: parseStoredJson(row.responses),
-        submittedAt: toIsoDate(row.submittedAt),
-        updatedAt: toIsoDate(row.updatedAt)
-      }))
+      reminder: {
+        target: parsed.target,
+        dryRun: parsed.dryRun,
+        deliveredCount: parsed.dryRun ? 0 : recipients.length,
+        recipientCount: recipients.length,
+        skippedCount,
+        recipients: recipients.map((minister, index2) => ({
+          id: minister.id,
+          name: minister.name,
+          email: minister.email,
+          responded: respondedUserIds.has(minister.id),
+          dataQualityStatus: minister.dataQuality.status,
+          notificationId: parsed.dryRun ? null : notificationIds[index2]
+        }))
+      }
+    };
+    await logActivity(user.id, "send_notification", {
+      source: "mobile-v1",
+      notificationIntent: "questionnaire_reminder",
+      questionnaireId: questionnaire.id,
+      communityId: activeCommunity.id,
+      target: parsed.target,
+      dryRun: parsed.dryRun,
+      recipientCount: recipients.length,
+      deliveredCount: responseBody.reminder.deliveredCount,
+      skippedCount,
+      idempotencyKey
+    }, req);
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody
     });
+    idempotencyRecordId = null;
+    res.json(responseBody);
   } catch (error) {
-    return handleMobileError(res, error, "Erro ao carregar respostas do questionario");
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao enviar lembretes do questionario");
   }
 });
 router41.get("/admin/ministers", authenticateToken, async (req, res) => {
@@ -32079,39 +32921,66 @@ router41.get("/admin/ministers", authenticateToken, async (req, res) => {
     const rows = await db.select({
       id: users.id,
       name: users.name,
+      email: users.email,
       role: users.role,
       status: users.status,
       phone: users.phone,
       whatsapp: users.whatsapp,
       photoUrl: users.photoUrl,
+      homeCommunityId: users.homeCommunityId,
       scheduleDisplayName: users.scheduleDisplayName,
       preferredPosition: users.preferredPosition,
       preferredPositions: users.preferredPositions,
-      avoidPositions: users.avoidPositions
+      avoidPositions: users.avoidPositions,
+      preferredTimes: users.preferredTimes,
+      ministryStartDate: users.ministryStartDate,
+      birthDate: users.birthDate,
+      address: users.address,
+      city: users.city,
+      maritalStatus: users.maritalStatus,
+      baptismDate: users.baptismDate,
+      baptismParish: users.baptismParish,
+      confirmationDate: users.confirmationDate,
+      confirmationParish: users.confirmationParish,
+      liturgicalTraining: users.liturgicalTraining,
+      formationCompleted: users.formationCompleted,
+      canServeAsCouple: users.canServeAsCouple,
+      spouseMinisterId: users.spouseMinisterId
     }).from(users).where(
       and42(
         eq54(users.homeCommunityId, activeCommunity.id),
         inArray19(users.status, ["active", "pending"]),
-        inArray19(users.role, ["ministro", "coordenador_comunidade", "coordenador_paroquial"])
+        inArray19(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     ).orderBy(asc5(users.name)).limit(200);
+    const ministers = rows.map((minister) => ({
+      id: minister.id,
+      name: minister.name,
+      displayName: minister.scheduleDisplayName || minister.name,
+      role: minister.role,
+      status: minister.status,
+      phone: minister.phone,
+      whatsapp: minister.whatsapp,
+      photoUrl: minister.photoUrl,
+      preferredPosition: minister.preferredPosition,
+      preferredPositions: normalizeStoredNumberArray(minister.preferredPositions),
+      avoidPositions: normalizeStoredNumberArray(minister.avoidPositions),
+      preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
+      ministryStartDate: toDateOnly(minister.ministryStartDate),
+      dataQuality: toMobileDataQuality(minister),
+      deepLink: "/ministers-directory"
+    }));
+    const qualitySummary = summarizeDataQuality(ministers);
     res.json({
       success: true,
       community: activeCommunity,
-      ministers: rows.map((minister) => ({
-        id: minister.id,
-        name: minister.name,
-        displayName: minister.scheduleDisplayName || minister.name,
-        role: minister.role,
-        status: minister.status,
-        phone: minister.phone,
-        whatsapp: minister.whatsapp,
-        photoUrl: minister.photoUrl,
-        preferredPosition: minister.preferredPosition,
-        preferredPositions: minister.preferredPositions ?? [],
-        avoidPositions: minister.avoidPositions ?? [],
-        deepLink: `/admin/ministers/${minister.id}`
-      }))
+      summary: {
+        total: ministers.length,
+        ready: qualitySummary.ready,
+        needsAttention: qualitySummary.needsAttention,
+        blocked: qualitySummary.blocked
+      },
+      ministers
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar diretorio de ministros");
@@ -32168,22 +33037,11 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
         lte19(schedules.date, monthRange.endDate)
       )
     ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
-    const questionnaireCandidates = await db.select({
-      id: questionnaires.id,
-      title: questionnaires.title,
-      description: questionnaires.description,
-      month: questionnaires.month,
-      year: questionnaires.year,
-      deadline: questionnaires.deadline,
-      updatedAt: questionnaires.updatedAt
-    }).from(questionnaires).where(
-      and42(
-        eq54(questionnaires.communityId, activeCommunity.id),
-        eq54(questionnaires.status, "published"),
-        eq54(questionnaires.month, monthRange.month),
-        eq54(questionnaires.year, monthRange.year)
-      )
-    ).orderBy(desc19(questionnaires.updatedAt)).limit(5);
+    const questionnaireCandidates = await loadRelevantPublishedQuestionnaires({
+      communityId: activeCommunity.id,
+      monthRange,
+      limit: 5
+    });
     let pendingQuestionnaire = null;
     for (const questionnaire of questionnaireCandidates) {
       const [response] = await db.select({ id: questionnaireResponses.id }).from(questionnaireResponses).where(
@@ -32243,7 +33101,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
         confirmationStatus: nextMission.confirmationStatus ?? null,
         canConfirm: !nextMission.confirmationStatus || nextMission.confirmationStatus === "pending",
         canRequestSubstitution: true,
-        deepLink: `/schedules/${nextMission.id}`
+        deepLink: mobileScheduleDeepLink(nextMission.date)
       } : null,
       pendingActions,
       monthlySummary: {
@@ -32259,7 +33117,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
         message: notice.message,
         priority: notice.priority,
         read: Boolean(notice.read),
-        deepLink: notice.actionUrl ?? "/notices",
+        deepLink: normalizeMobileDeepLink(notice.actionUrl, "/communication"),
         createdAt: toIsoDate(notice.createdAt)
       })),
       sync: {
@@ -32310,7 +33168,7 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
         position: schedule.position,
         status: schedule.status,
         notes: schedule.notes,
-        deepLink: `/schedules/${schedule.id}`
+        deepLink: mobileScheduleDeepLink(toDateOnly(schedule.date))
       }))
     });
   } catch (error) {
@@ -32396,7 +33254,7 @@ router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
         id: schedule.id,
         date: schedule.date,
         time: schedule.time,
-        deepLink: `/schedules/${schedule.id}`
+        deepLink: mobileScheduleDeepLink(schedule.date)
       }
     };
     await completeMobileIdempotency({
@@ -32466,7 +33324,7 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
         position: row.position,
         status: row.status,
         notes: row.notes,
-        deepLink: `/schedules/${row.id}`,
+        deepLink: mobileScheduleDeepLink(toDateOnly(row.date)),
         confirmationStatus: row.confirmationStatus ?? null,
         substitution: substitution ? {
           id: substitution.id,
@@ -33073,13 +33931,121 @@ app.head("/health/ready", async (_req, res) => {
   const health = await getHealthStatus({ includeDatabase: true });
   res.status(health.status === "ok" ? 200 : 503).end();
 });
-app.get("/", (_req, res, next) => {
-  if (res.headersSent) return;
-  const acceptHeader = _req.get("accept") || "";
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return character;
+    }
+  });
+}
+app.get("/", async (req, res) => {
+  const health = await getHealthStatus({ includeDatabase: true });
+  const payload = {
+    name: "MESC Native API",
+    status: health.status,
+    environment: health.environment,
+    apiVersion: "mobile-v1",
+    links: {
+      ready: "/health/ready",
+      mobileConfig: "/api/mobile/v1/app/config",
+      currentPwa: "https://saojudastadeu.replit.app"
+    }
+  };
+  const acceptHeader = req.get("accept") || "";
   if (acceptHeader.includes("application/json") && !acceptHeader.includes("text/html")) {
-    return res.status(200).json({ status: "ok" });
+    return res.status(health.status === "ok" ? 200 : 503).json(payload);
   }
-  next();
+  res.status(health.status === "ok" ? 200 : 503).type("html").send(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MESC Native API</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fdfbf7;
+        --surface: rgba(255, 255, 255, 0.76);
+        --text: #2c2c2c;
+        --muted: #6b6257;
+        --primary: #722f37;
+        --gold: #b38f4d;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a1a1a;
+          --surface: rgba(44, 44, 44, 0.78);
+          --text: #fdfbf7;
+          --muted: #d5cabb;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at top, rgba(179, 143, 77, 0.22), transparent 36%), var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(92vw, 560px);
+        padding: 32px;
+        border: 1px solid rgba(179, 143, 77, 0.26);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+      }
+      .mark {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #f8e5ad;
+        font-family: Georgia, serif;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 20px 0 8px;
+        font-family: Georgia, serif;
+        font-size: 32px;
+        line-height: 1.1;
+      }
+      p { margin: 0 0 20px; color: var(--muted); line-height: 1.55; }
+      dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; margin: 0; }
+      dt { color: var(--muted); }
+      dd { margin: 0; font-weight: 700; }
+      a { color: var(--primary); font-weight: 700; text-decoration-color: var(--gold); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">M</div>
+      <h1>MESC Native API</h1>
+      <p>Ambiente nativo do MESC Sao Judas Tadeu. O PWA atual continua em <a href="https://saojudastadeu.replit.app">saojudastadeu.replit.app</a>.</p>
+      <dl>
+        <dt>Status</dt><dd>${escapeHtml(payload.status)}</dd>
+        <dt>Ambiente</dt><dd>${escapeHtml(payload.environment)}</dd>
+        <dt>API mobile</dt><dd><a href="/api/mobile/v1/app/config">mobile-v1</a></dd>
+        <dt>Healthcheck</dt><dd><a href="/health/ready">ready</a></dd>
+      </dl>
+    </main>
+  </body>
+</html>`);
 });
 var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [
   "http://localhost:5000",

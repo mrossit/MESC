@@ -209,6 +209,26 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
       .toEqual([MOBILE_P0_DEMO_IDS.ministerB]);
   });
 
+  it("keeps schedule readiness scoped to the active community", async () => {
+    const forbidden = await mobileGet(`/admin/schedules/readiness?month=${MOBILE_P0_DEMO_MONTH}`, {
+      userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+      communityId: MOBILE_P0_DEMO_IDS.communityB,
+    });
+
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
+
+    const allowed = await mobileGet(`/admin/schedules/readiness?month=${MOBILE_P0_DEMO_MONTH}`, {
+      userId: MOBILE_P0_DEMO_IDS.parishCoordinator,
+      communityId: MOBILE_P0_DEMO_IDS.communityB,
+    });
+
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityB);
+    expect(allowed.body.questionnaire.id).toBe(MOBILE_P0_DEMO_IDS.questionnaireB);
+    expect(allowed.body.questionnaire.id).not.toBe(MOBILE_P0_DEMO_IDS.questionnaireA);
+  });
+
   it("returns the questionnaire only for the active community", async () => {
     const communityA = await mobileGet(`/questionnaires/current?month=${MOBILE_P0_DEMO_MONTH}`, {
       userId: MOBILE_P0_DEMO_IDS.ministerA,

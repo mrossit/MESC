@@ -26,6 +26,8 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
     expect(mobileEndpoints.adminCommunityHome({ month: "2026-07" }))
       .toBe("/admin/community/home?month=2026-07");
+    expect(mobileEndpoints.adminScheduleReadiness({ month: "2026-07" }))
+      .toBe("/admin/schedules/readiness?month=2026-07");
     expect(mobileEndpoints.adminQuestionnaireResponses("questionnaire/with slash"))
       .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/responses");
     expect(mobileEndpoints.adminQuestionnaireReminders("questionnaire/with slash"))
@@ -353,6 +355,56 @@ describe("mobileClient contract", () => {
         }), { status: 200 });
       }
 
+      if (input.endsWith("/admin/schedules/readiness?month=2026-07")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          month: "2026-07",
+          readiness: {
+            canPreview: true,
+            canPublish: false,
+            blockers: [],
+            publishBlockers: ["Questionario precisa estar encerrado para publicacao definitiva"],
+            warnings: ["1 ministro(s) ainda nao responderam"],
+          },
+          ministers: {
+            active: 12,
+            ready: 10,
+            needsAttention: 2,
+            blocked: 0,
+          },
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            month: 7,
+            year: 2026,
+            status: "published",
+            deadline: null,
+            targetCount: 12,
+            responseCount: 11,
+            pendingCount: 1,
+            responseRate: 92,
+          },
+          massConfig: {
+            configuredSlots: 3,
+          },
+          existingSchedules: {
+            total: 0,
+            draft: 0,
+            scheduled: 0,
+            published: 0,
+            completed: 0,
+          },
+        }), { status: 200 });
+      }
+
       if (input.endsWith("/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses")) {
         return new Response(JSON.stringify({
           success: true,
@@ -448,6 +500,8 @@ describe("mobileClient contract", () => {
 
     await expect(client.getAdminCommunityHome({ month: "2026-07" }))
       .resolves.toMatchObject({ questionnaire: { responseRate: 100 } });
+    await expect(client.getAdminScheduleReadiness({ month: "2026-07" }))
+      .resolves.toMatchObject({ readiness: { canPreview: true }, questionnaire: { responseRate: 92 } });
     await expect(client.getAdminQuestionnaireResponses("33333333-3333-4333-8333-333333333333"))
       .resolves.toMatchObject({ summary: { pendingCount: 0 } });
     await expect(client.sendAdminQuestionnaireReminders(
@@ -460,14 +514,15 @@ describe("mobileClient contract", () => {
 
     expect(requests.map((request) => [request.init.method, request.input])).toEqual([
       ["GET", "https://example.test/api/mobile/v1/admin/community/home?month=2026-07"],
+      ["GET", "https://example.test/api/mobile/v1/admin/schedules/readiness?month=2026-07"],
       ["GET", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses"],
       ["POST", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/reminders"],
       ["GET", "https://example.test/api/mobile/v1/admin/ministers"],
     ]);
-    expect(requests[2].init.headers).toMatchObject({
+    expect(requests[3].init.headers).toMatchObject({
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
     });
-    expect(JSON.parse(String(requests[2].init.body))).toEqual({
+    expect(JSON.parse(String(requests[3].init.body))).toEqual({
       target: "data_quality",
     });
   });

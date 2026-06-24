@@ -175,6 +175,8 @@ export class ScheduleGenerator {
   // Set to true to enable dynamic configuration from mass_configurations and special_events tables
   private useDatabaseConfig: boolean = process.env.USE_DATABASE_MASS_CONFIG === 'true';
 
+  constructor(private readonly options: { communityId?: string } = {}) {}
+
   /**
    * Gera escalas automaticamente para um mês específico
    */
@@ -528,6 +530,7 @@ export class ScheduleGenerator {
         noShowCount: users.noShowCount
       }).from(users).where(
         and(
+          this.options.communityId ? eq(users.homeCommunityId, this.options.communityId) : undefined,
           or(
             eq(users.status, 'active'),
             sql`${users.status} IS NULL` // Incluir usuários com status null
@@ -665,21 +668,27 @@ export class ScheduleGenerator {
       const ministerWeightedCounts = new Map<string, number>();
 
       for (const range of ranges) {
-        const rows = await this.db.execute(
-          sql`SELECT minister_id, COUNT(*)::int as cnt
-              FROM schedules
-              WHERE date >= ${range.start} AND date <= ${range.end}
-                AND status IN ('scheduled', 'published')
-                AND minister_id IS NOT NULL
-              GROUP BY minister_id`
-        );
+        const rows = await this.db
+          .select({
+            ministerId: schedules.ministerId,
+            cnt: sql<number>`COUNT(*)::int`,
+          })
+          .from(schedules)
+          .where(
+            and(
+              gte(schedules.date, range.start),
+              lte(schedules.date, range.end),
+              inArray(schedules.status, ['scheduled', 'published']),
+              sql`${schedules.ministerId} IS NOT NULL`,
+              this.options.communityId ? eq(schedules.communityId, this.options.communityId) : undefined,
+            )
+          )
+          .groupBy(schedules.ministerId);
 
-        if (rows.rows) {
-          for (const row of rows.rows) {
-            const id = row.minister_id as string;
-            const cnt = (row.cnt as number) * range.weight;
-            ministerWeightedCounts.set(id, (ministerWeightedCounts.get(id) || 0) + cnt);
-          }
+        for (const row of rows) {
+          if (!row.ministerId) continue;
+          const cnt = Number(row.cnt) * range.weight;
+          ministerWeightedCounts.set(row.ministerId, (ministerWeightedCounts.get(row.ministerId) || 0) + cnt);
         }
       }
 
@@ -1142,7 +1151,7 @@ export class ScheduleGenerator {
 
     // Definir status permitidos baseado no tipo de geração
     const allowedStatuses = isPreview
-      ? ['open', 'sent', 'active', 'closed'] // Preview: aceita qualquer status
+      ? ['open', 'sent', 'active', 'published', 'closed'] // Preview: aceita questionário aberto/publicado
       : ['closed']; // Definitivo: apenas questionários fechados
 
     // Primeiro buscar o questionário do período
@@ -1150,6 +1159,7 @@ export class ScheduleGenerator {
       .from(questionnaires)
       .where(
         and(
+          this.options.communityId ? eq(questionnaires.communityId, this.options.communityId) : undefined,
           eq(questionnaires.month, month),
           eq(questionnaires.year, year)
         )
@@ -1229,7 +1239,12 @@ export class ScheduleGenerator {
     // Buscar as respostas deste questionário
     const responses = await this.db.select()
       .from(questionnaireResponses)
-      .where(eq(questionnaireResponses.questionnaireId, targetQuestionnaire.id));
+      .where(
+        and(
+          eq(questionnaireResponses.questionnaireId, targetQuestionnaire.id),
+          this.options.communityId ? eq(questionnaireResponses.communityId, this.options.communityId) : undefined,
+        )
+      );
 
     console.log(`[SCHEDULE_GEN] 🔍 DEBUGGING: Encontradas ${responses.length} respostas no banco`);
     console.log(`[SCHEDULE_GEN] 🔄 Using COMPATIBILITY LAYER for ${year}/${month}`);
@@ -1484,7 +1499,12 @@ export class ScheduleGenerator {
     }
 
     const config = await this.db.select().from(massTimesConfig)
-      .where(eq(massTimesConfig.isActive, true));
+      .where(
+        and(
+          eq(massTimesConfig.isActive, true),
+          this.options.communityId ? eq(massTimesConfig.communityId, this.options.communityId) : undefined,
+        )
+      );
 
     type ConfigRow = typeof config[number];
     this.massTimes = config.map((c: ConfigRow) => ({
@@ -1504,7 +1524,7 @@ export class ScheduleGenerator {
     console.log(`[SCHEDULE_GEN] 🗄️ Gerando horários de ${month}/${year} a partir do BANCO DE DADOS`);
 
     try {
-      const instances = await massConfigService.generateMonthlyMassInstances(year, month);
+      const instances = await massConfigService.generateMonthlyMassInstances(year, month, this.options.communityId);
       console.log(`[SCHEDULE_GEN] 📊 Carregadas ${instances.length} instâncias de missa do banco`);
 
       // Convert MassInstance to MassTime format
@@ -1819,6 +1839,7 @@ export class ScheduleGenerator {
         .from(questionnaires)
         .where(
           and(
+            this.options.communityId ? eq(questionnaires.communityId, this.options.communityId) : undefined,
             eq(questionnaires.month, month),
             eq(questionnaires.year, year)
           )
@@ -3622,7 +3643,8 @@ export class ScheduleGenerator {
         .from(users)
         .where(and(
           inArray(users.id, ministerIds),
-          eq(users.status, 'active')
+          eq(users.status, 'active'),
+          this.options.communityId ? eq(users.homeCommunityId, this.options.communityId) : undefined
         ));
 
       // 4. Convert to Minister objects
@@ -3657,7 +3679,12 @@ export class ScheduleGenerator {
 }
 
 // Função de conveniência para uso direto
-export async function generateAutomaticSchedule(year: number, month: number, isPreview: boolean = false): Promise<GeneratedSchedule[]> {
-  const generator = new ScheduleGenerator();
+export async function generateAutomaticSchedule(
+  year: number,
+  month: number,
+  isPreview: boolean = false,
+  options: { communityId?: string } = {},
+): Promise<GeneratedSchedule[]> {
+  const generator = new ScheduleGenerator(options);
   return await generator.generateScheduleForMonth(year, month, isPreview);
 }

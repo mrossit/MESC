@@ -281,6 +281,20 @@ async function ensureSqliteDemoSchema(sqlite: import("better-sqlite3").Database)
     CREATE UNIQUE INDEX IF NOT EXISTS uq_questionnaire_responses_user_questionnaire
       ON questionnaire_responses(user_id, questionnaire_id);
 
+    CREATE TABLE IF NOT EXISTS mass_times_config (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      community_id TEXT NOT NULL,
+      day_of_week INTEGER NOT NULL,
+      time TEXT NOT NULL,
+      min_ministers INTEGER NOT NULL DEFAULT 3,
+      max_ministers INTEGER NOT NULL DEFAULT 6,
+      is_active INTEGER DEFAULT 1,
+      special_event INTEGER DEFAULT 0,
+      event_name TEXT,
+      created_at TEXT,
+      updated_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY,
       community_id TEXT NOT NULL,

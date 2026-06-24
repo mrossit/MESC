@@ -6,6 +6,7 @@ import {
   createMobileIdempotencyKey,
   type MobileAdminCommunityHomeResponse,
   type MobileAdminMinistersResponse,
+  type MobileAdminScheduleReadinessResponse,
   type MobileAdminQuestionnaireReminderPayload,
   type MobileAdminQuestionnaireReminderResponse,
   type MobileAdminQuestionnaireResponsesResponse,
@@ -373,6 +374,12 @@ export async function mobileGetAdminCommunityHome(
   input: { month?: string } = {},
 ): Promise<MobileAdminCommunityHomeResponse> {
   return runWithMobileAuthRetry((client) => client.getAdminCommunityHome(input));
+}
+
+export async function mobileGetAdminScheduleReadiness(
+  input: { month?: string } = {},
+): Promise<MobileAdminScheduleReadinessResponse> {
+  return runWithMobileAuthRetry((client) => client.getAdminScheduleReadiness(input));
 }
 
 export async function mobileGetAdminQuestionnaireResponses(
