@@ -9,6 +9,7 @@
 ## 1. O Que Esta Coberto
 
 - migrations mobile versionadas: `0007_mobile_device_sessions.sql` e `0008_mobile_idempotency_keys.sql`;
+- migration nativa de configuracao de missas: `0009_native_mass_configuration_baseline.sql`;
 - registro de dispositivos nativos;
 - refresh token rotativo;
 - idempotencia persistida por 24h para mutacoes criticas;
@@ -17,6 +18,7 @@
 - eventos minimos de notificacao mobile versionados no contrato (`eventKey`);
 - teste de integracao anti-vazamento multi-comunidade;
 - seed local para exercitar MVP tecnico sem depender da UI nativa.
+- seed idempotente de horarios/eventos para prontidao da escala nativa.
 
 ---
 
@@ -44,9 +46,19 @@ Validar tabelas e indices:
 npm run db:validate:mobile
 ```
 
+Aplicar a base de missas/algoritmo em banco nativo:
+
+```bash
+CONFIRM_NATIVE_MASS_CONFIG_MIGRATION=true \
+DATABASE_URL="$NATIVE_DATABASE_URL" \
+npm run db:migrate:native-mass-config
+```
+
+O aplicador tem guard explicito e recusa o host do MESC/Replit atual, salvo com `ALLOW_CURRENT_MESC_DB=true`.
+
 ---
 
-## 3. Demo P0
+## 3. Demo P0 E Calendario De Missas
 
 Carregar fixtures/demo:
 
@@ -79,6 +91,27 @@ Credencial demo local:
 - senha: `MobileDemo123!`.
 
 Arquivo base: `test/fixtures/mobileP0DemoData.ts`.
+
+Depois da seed demo, popular a base de missas/eventos no ambiente nativo:
+
+```bash
+CONFIRM_NATIVE_MASS_CONFIG_SEED=true \
+DATABASE_URL="$DEMO_DATABASE_URL" \
+npm run db:seed:native-mass-config -- --write --all-active-communities --year=2026 --years=2
+```
+
+Validar a prontidao minima da escala:
+
+```bash
+DATABASE_URL="$DEMO_DATABASE_URL" \
+npm run db:validate:native-schedule -- --community-slug=mobile-demo-matriz --community-slug=mobile-demo-sao-lucas
+```
+
+No staging Supabase `mesc-native-staging`, a validacao esperada depois do seed e:
+
+- 12 registros ativos em `mass_times_config` por comunidade;
+- 15 registros ativos em `mass_configurations` por comunidade;
+- 32 registros ativos em `special_events` por comunidade para 2026/2027.
 
 ---
 

@@ -1,7 +1,7 @@
 # MESC Native - Checklist Seguro De Staging/Deploy
 
 **Data:** 2026-06-21
-**Escopo:** aplicar e validar a fundacao mobile `0007/0008` fora do ambiente local.
+**Escopo:** aplicar e validar a fundacao mobile `0007/0008` e a base nativa de configuracao de missas `0009` fora do ambiente local.
 
 ---
 
@@ -30,9 +30,11 @@ Bootstrap remoto aplicado em 2026-06-21:
 - RLS habilitado e policies de deny explicito aplicadas nas 13 tabelas criadas;
 - security advisor sem lints;
 - seed demo aplicada com 2 comunidades, 4 usuarios, 2 questionarios, 3 escalas, 2 substituicoes e 8 notificacoes;
+- configuracao nativa de missas aplicada em 2026-06-24 com `0009_native_mass_configuration_baseline.sql`;
+- seed de horarios/eventos aplicada nas comunidades `mobile-demo-matriz` e `mobile-demo-sao-lucas`, com 12 horarios legados, 15 configuracoes dinamicas e 32 eventos especiais por comunidade;
 - avisos de performance restantes sao `unused_index`, esperados enquanto a base nao tem trafego.
 
-Este staging ainda precisa receber um deploy de API apontando para esse banco antes de o TestFlight conseguir testar contra `https://saojudastadeu.app`.
+Este staging ja responde pela API nativa publicada em `https://saojudastadeu.app`.
 
 ---
 
@@ -108,7 +110,44 @@ Nao usar `STAGING_DATABASE_URL` ou `PRODUCTION_DATABASE_URL` para demo seed, a m
 
 ---
 
-## 5. Smoke Manual Esperado
+## 5. Configuracao Nativa De Missas E Eventos
+
+A migration `0009` cria a base usada pela prontidao da escala e pelo futuro algoritmo nativo:
+
+- `mass_times_config`;
+- `mass_configurations`;
+- `special_events`;
+- `question_mass_mappings`;
+- `learned_patterns`.
+
+Aplicar em staging/demo:
+
+```bash
+CONFIRM_NATIVE_MASS_CONFIG_MIGRATION=true \
+DATABASE_URL="$STAGING_DATABASE_URL" \
+npm run db:migrate:native-mass-config
+```
+
+Popular horarios e eventos canonicos no banco nativo, por comunidade:
+
+```bash
+CONFIRM_NATIVE_MASS_CONFIG_SEED=true \
+DATABASE_URL="$STAGING_DATABASE_URL" \
+npm run db:seed:native-mass-config -- --write --all-active-communities --year=2026 --years=2
+```
+
+Validar:
+
+```bash
+DATABASE_URL="$STAGING_DATABASE_URL" \
+npm run db:validate:native-schedule -- --community-slug=mobile-demo-matriz --community-slug=mobile-demo-sao-lucas
+```
+
+O seed e idempotente: uma segunda execucao deve atualizar os mesmos registros sem duplicar horarios/eventos.
+
+---
+
+## 6. Smoke Manual Esperado
 
 Com a seed demo aplicada em ambiente demo:
 
@@ -131,7 +170,7 @@ Conta demo local:
 
 ---
 
-## 6. Rollback
+## 7. Rollback
 
 As migrations criam apenas tabelas mobile novas e indices associados. Em caso de incidente antes do app nativo consumir dados reais:
 
@@ -142,3 +181,5 @@ DROP TABLE IF EXISTS mobile_devices;
 ```
 
 Antes de qualquer rollback em ambiente com uso real, exportar as tres tabelas para auditoria.
+
+Para a configuracao nativa de missas, preferir desativar registros (`is_active=false`) em vez de remover tabelas se ja houver questionarios, respostas ou escalas vinculadas a esse calendario.

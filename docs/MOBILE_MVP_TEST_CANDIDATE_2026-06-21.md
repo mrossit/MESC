@@ -12,6 +12,7 @@ Atualizacao de ambiente nativo:
 - PR de ambiente: `#39`.
 - Supabase staging criado: `mesc-native-staging` (`sdochgpfjosmhrbztthr`, `sa-east-1`).
 - Seed demo e schema P0/runtime aplicados no staging em 2026-06-21.
+- Base nativa de configuracao de missas/eventos aplicada no staging em 2026-06-24.
 
 ## Status Do Candidato
 
@@ -97,6 +98,23 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
 Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o TestFlight `5.4.3 (50422)` esta validado no App Store Connect para o proximo teste fiel do MVP.
+
+## Prontidao De Escala No Staging
+
+Em 2026-06-24 foi aplicada a migration `0009_native_mass_configuration_baseline.sql` e o seed canonico de horarios/eventos em `mesc-native-staging`.
+
+Resultado validado por comunidade demo:
+
+- `mobile-demo-matriz`: 12 horarios legados, 15 configuracoes dinamicas e 32 eventos especiais;
+- `mobile-demo-sao-lucas`: 12 horarios legados, 15 configuracoes dinamicas e 32 eventos especiais.
+
+Smoke da API em `https://saojudastadeu.app`:
+
+- login coordenador demo: `200`;
+- `GET /api/mobile/v1/admin/schedules/readiness?month=2026-07`: `200`;
+- `massConfig.configuredSlots`: `12`.
+
+Bloqueio esperado restante para gerar/publicar escala definitiva: resposta de questionario do mes e encerramento do questionario. Isso deixa o TestFlight pronto para testar o fluxo real de resposta do ministro e revisao do coordenador.
 
 ## Smoke Manual Do MVP
 
