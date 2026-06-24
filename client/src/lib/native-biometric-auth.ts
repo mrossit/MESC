@@ -32,6 +32,8 @@ interface StoredSession {
   savedAt: string;
 }
 
+let unlockPromise: Promise<{ email: string; token: string }> | null = null;
+
 function isEnabledFlagSet(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(BIOMETRIC_ENABLED_KEY) === "true";
@@ -170,7 +172,7 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
   };
 }
 
-export async function unlockNativeBiometricLogin(): Promise<{ email: string; token: string }> {
+async function performNativeBiometricUnlock(): Promise<{ email: string; token: string }> {
   const status = await getNativeBiometricStatus();
   if (!status.native || !status.available || !status.enabled) {
     throw new Error(status.detail || "Entrada por biometria nao esta ativa.");
@@ -200,6 +202,15 @@ export async function unlockNativeBiometricLogin(): Promise<{ email: string; tok
     email: credentials.username,
     token: storedSession.token,
   };
+}
+
+export async function unlockNativeBiometricLogin(): Promise<{ email: string; token: string }> {
+  if (unlockPromise) return unlockPromise;
+
+  unlockPromise = performNativeBiometricUnlock().finally(() => {
+    unlockPromise = null;
+  });
+  return unlockPromise;
 }
 
 export async function disableNativeBiometricLogin(): Promise<NativeBiometricStatus> {

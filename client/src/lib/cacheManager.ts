@@ -40,6 +40,8 @@ export function clearAllCache(): void {
     'auth_token', // Token de autenticação usado por hooks legados
     'session_token', // Sessão ativa para monitor de atividade
     'mesc_biometric_login_enabled', // Preferência nativa de biometria
+    'mesc_skip_auto_biometric_once', // Evita Face ID automatico logo apos logout/update
+    'mesc_auto_biometric_last_attempt_at', // Cooldown contra prompts biometricos repetidos
     'mesc-ui-theme', // Tema do usuário
     'theme', // Tema legado
     CACHE_VERSION_KEY, // Versão do cache

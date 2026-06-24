@@ -21,7 +21,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50419)` validado pela Apple e distribuido para testers internos.
+- iOS TestFlight: build `5.4.3 (50420)` validado pela Apple e distribuido para testers internos.
 
 ## Comandos Validados
 
@@ -65,18 +65,18 @@ npm run mobile:mvp:check
 
 - Android APK debug: `android/app/build/outputs/apk/debug/app-debug.apk`
 - iOS app de simulador: `build/ios-derived-data/Build/Products/Debug-iphonesimulator/App.app`
-- iOS IPA TestFlight: `build/MESC-50419-export/App.ipa`
+- iOS IPA TestFlight: `build/MESC-50420-export/App.ipa`
 
 Os artefatos acima sao gerados localmente e nao devem ser commitados.
 
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50419`
-- Delivery UUID: `c135e769-997c-4205-8fd7-93b61f46f8a7`
+- Build: `50420`
+- Delivery UUID: `330303f8-c8aa-413b-96fa-99338a0cf152`
 - Status App Store Connect: `VALID`
 - Distribuicao: testers internos
-- Changelog: `MVP nativo P0 com questionario vigente corrigido para teste fiel: fallback para questionario publicado do proximo mes, links mobile reais, seletor de mes sincronizado, Minha Missao, escalas, substituicoes e notificacoes.`
+- Changelog: `MVP nativo P0 com questionario vigente corrigido e biometria estabilizada: fallback para questionario publicado do proximo mes, links mobile reais, seletor de mes sincronizado, trava contra loop de Face ID, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -96,7 +96,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o TestFlight `5.4.3 (50419)` usa esse host para o teste fiel do MVP.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o TestFlight `5.4.3 (50420)` usa esse host para o teste fiel do MVP.
 
 ## Smoke Manual Do MVP
 

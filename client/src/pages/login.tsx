@@ -18,7 +18,14 @@ import {
 import { Eye, EyeOff, Clock, Fingerprint, MessageCircle, ShieldCheck, UserCheck, Mail } from "lucide-react";
 import { authAPI, type AuthUser } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
-import { clearLocalSession, consumeSkipAutoBiometricOnce } from "@/lib/persistent-storage";
+import {
+  clearAutoBiometricAttempt,
+  clearLocalSession,
+  consumeSkipAutoBiometricOnce,
+  hasAutoBiometricAttempted,
+  isAutoBiometricCooldownActive,
+  markAutoBiometricAttempt,
+} from "@/lib/persistent-storage";
 import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 import {
   enableNativeBiometricLogin,
@@ -26,8 +33,6 @@ import {
   unlockNativeBiometricLogin,
   type NativeBiometricStatus,
 } from "@/lib/native-biometric-auth";
-
-const AUTO_BIOMETRIC_ATTEMPTED_KEY = "mesc_auto_biometric_attempted";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -49,6 +54,7 @@ export default function Login() {
   const manualLoginInProgressRef = useRef(false);
   const userStartedTypingRef = useRef(false);
   const biometricPromptResolvingRef = useRef(false);
+  const biometricUnlockInProgressRef = useRef(false);
 
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
@@ -119,6 +125,18 @@ export default function Login() {
         navigate("/change-password");
       } else {
         const status = await refreshBiometricStatus();
+        if (status.native && status.available && status.enabled) {
+          try {
+            const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
+            setBiometricStatus(refreshedStatus);
+            clearAutoBiometricAttempt();
+          } catch {
+            markAutoBiometricAttempt();
+            // Do not block a valid password login if Keychain refresh fails.
+          }
+          finishLogin(data.user);
+          return;
+        }
         if (status.native && status.available && !status.enabled) {
           setPendingLoginUser(data.user);
           setShowBiometricPrompt(true);
@@ -166,13 +184,17 @@ export default function Login() {
   };
 
   const handleBiometricUnlock = async () => {
+    if (biometricUnlockInProgressRef.current) return;
+    biometricUnlockInProgressRef.current = true;
     setBiometricBusy(true);
     try {
       await unlockNativeBiometricLogin();
       const data = await authAPI.getMe();
       queryClient.setQueryData(["/api/auth/me"], data);
+      clearAutoBiometricAttempt();
       finishLogin(data.user);
     } catch (error) {
+      markAutoBiometricAttempt();
       clearLocalSession();
       const message = error instanceof Error
         ? error.message
@@ -184,6 +206,7 @@ export default function Login() {
       });
       void refreshBiometricStatus();
     } finally {
+      biometricUnlockInProgressRef.current = false;
       setBiometricBusy(false);
     }
   };
@@ -250,7 +273,8 @@ export default function Login() {
 
       const skipAutoBiometric = consumeSkipAutoBiometricOnce();
       const canResumeMobileSession = shouldUseMobileAuth() && hasStoredMobileRefreshToken();
-      const alreadyAttempted = sessionStorage.getItem(AUTO_BIOMETRIC_ATTEMPTED_KEY) === "true";
+      const alreadyAttempted = hasAutoBiometricAttempted();
+      const autoBiometricInCooldown = isAutoBiometricCooldownActive();
 
       if (!token && canResumeMobileSession && !inactivityReason && !skipAutoBiometric) {
         try {
@@ -269,7 +293,9 @@ export default function Login() {
         inactivityReason ||
         skipAutoBiometric ||
         alreadyAttempted ||
+        autoBiometricInCooldown ||
         autoBiometricAttemptRef.current ||
+        biometricUnlockInProgressRef.current ||
         manualLoginInProgressRef.current ||
         userStartedTypingRef.current
       ) {
@@ -277,27 +303,32 @@ export default function Login() {
       }
 
       autoBiometricAttemptRef.current = true;
-      sessionStorage.setItem(AUTO_BIOMETRIC_ATTEMPTED_KEY, "true");
+      markAutoBiometricAttempt();
 
       await new Promise((resolve) => window.setTimeout(resolve, 450));
       if (
         cancelled ||
+        biometricUnlockInProgressRef.current ||
         manualLoginInProgressRef.current ||
         userStartedTypingRef.current
       ) {
         return;
       }
 
+      biometricUnlockInProgressRef.current = true;
       setBiometricBusy(true);
       try {
         await unlockNativeBiometricLogin();
         const data = await authAPI.getMe();
         if (cancelled) return;
         queryClient.setQueryData(["/api/auth/me"], data);
+        clearAutoBiometricAttempt();
         navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
       } catch {
+        markAutoBiometricAttempt();
         clearLocalSession();
       } finally {
+        biometricUnlockInProgressRef.current = false;
         if (!cancelled) setBiometricBusy(false);
       }
     };
