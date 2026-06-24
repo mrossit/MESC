@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ import {
   Search,
   FileDown,
   AlertCircle,
+  BellRing,
   ChartBar,
   Eye,
   PieChart,
@@ -51,10 +52,12 @@ import { authAPI } from '@/lib/auth';
 import {
   mobileGetAdminCommunityHome,
   mobileGetAdminQuestionnaireResponses,
+  mobileSendAdminQuestionnaireReminders,
   shouldUseMobileAuth,
 } from '@/lib/mobile-auth-session';
 import { isAdmin as isAdminRole } from '@shared/roles';
 import type {
+  MobileAdminQuestionnaireReminderTarget,
   MobileAdminQuestionnaireResponsesResponse,
   MobileAdminQuestionnaireTargetMinister,
 } from '@shared/mobileClient';
@@ -171,6 +174,7 @@ function NativeCoordinatorResponses({
   monthNames: string[];
 }) {
   const [nativeSearch, setNativeSearch] = useState('');
+  const queryClient = useQueryClient();
   const isoMonth = toIsoMonth(selectedYear, selectedMonth);
 
   const homeQuery = useQuery({
@@ -204,6 +208,41 @@ function NativeCoordinatorResponses({
   ]);
 
   const payload = responsesQuery.data;
+  const reminderMutation = useMutation({
+    mutationFn: (input: {
+      target: MobileAdminQuestionnaireReminderTarget;
+      ministerIds?: string[];
+    }) => {
+      if (!questionnaireId) {
+        throw new Error('Questionário indisponível');
+      }
+
+      return mobileSendAdminQuestionnaireReminders(questionnaireId, {
+        target: input.target,
+        ministerIds: input.ministerIds,
+      });
+    },
+    onSuccess: (response) => {
+      const deliveredCount = response.reminder.deliveredCount;
+      const recipientCount = response.reminder.recipientCount;
+
+      toast({
+        title: deliveredCount > 0 ? 'Lembrete enviado' : 'Nenhum lembrete enviado',
+        description: deliveredCount > 0
+          ? `${deliveredCount} ministro(s) receberam o lembrete.`
+          : `${recipientCount} ministro(s) estavam no alvo, mas nenhuma notificação foi entregue.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['mobile', 'notifications'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Não foi possível enviar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+        variant: 'destructive',
+      });
+    },
+  });
   const responseByUserId = useMemo(() => {
     const map = new Map<string, MobileAdminQuestionnaireResponsesResponse['responses'][number]>();
     for (const response of payload?.responses ?? []) {
@@ -228,12 +267,23 @@ function NativeCoordinatorResponses({
   const isLoading = homeQuery.isLoading || responsesQuery.isLoading;
   const hasQuestionnaire = Boolean(homeQuery.data?.questionnaire);
   const summary = payload?.summary;
+  const pendingCount = summary?.pendingCount ?? homeQuery.data?.questionnaire?.pending ?? 0;
+  const dataQualityIssueCount =
+    (summary?.dataQuality.needsAttention ?? homeQuery.data?.metrics.profileNeedsAttention ?? 0)
+    + (summary?.dataQuality.blocked ?? homeQuery.data?.metrics.profileBlocked ?? 0);
+  const reminderIsBusy = reminderMutation.isPending;
+
+  const sendReminder = (
+    target: MobileAdminQuestionnaireReminderTarget,
+    ministerIds?: string[],
+  ) => reminderMutation.mutate({ target, ministerIds });
 
   const renderMinister = (minister: MobileAdminQuestionnaireTargetMinister) => {
     const response = responseByUserId.get(minister.id);
     const badge = readinessBadge(minister.dataQuality.status);
     const criticalMissing = minister.dataQuality.missing.filter((issue) => issue.severity === 'critical');
     const recommendedMissing = minister.dataQuality.missing.filter((issue) => issue.severity === 'recommended');
+    const canSendReminder = !minister.responded || minister.dataQuality.status !== 'ready';
 
     return (
       <div
@@ -254,9 +304,37 @@ function NativeCoordinatorResponses({
             <p className="mt-1 truncate text-sm text-muted-foreground">{minister.name}</p>
           </div>
           {minister.responded ? (
-            <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
+            <div className="flex shrink-0 items-center gap-2">
+              {canSendReminder && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-9 w-9"
+                  aria-label={`Enviar lembrete para ${minister.name}`}
+                  disabled={reminderIsBusy}
+                  onClick={() => sendReminder('data_quality', [minister.id])}
+                >
+                  <BellRing className="h-4 w-4" />
+                </Button>
+              )}
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
+            </div>
           ) : (
-            <Clock className="h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-9 w-9"
+                aria-label={`Enviar lembrete para ${minister.name}`}
+                disabled={reminderIsBusy}
+                onClick={() => sendReminder('pending_or_data_quality', [minister.id])}
+              >
+                <BellRing className="h-4 w-4" />
+              </Button>
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
           )}
         </div>
 
@@ -443,6 +521,29 @@ function NativeCoordinatorResponses({
                       className="pl-9"
                     />
                   </div>
+                </div>
+
+                <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start"
+                    disabled={!questionnaireId || pendingCount === 0 || reminderIsBusy}
+                    onClick={() => sendReminder('pending_questionnaire')}
+                  >
+                    <BellRing className={cn('mr-2 h-4 w-4', reminderIsBusy && 'animate-pulse')} />
+                    Lembrar pendentes ({pendingCount})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start"
+                    disabled={!questionnaireId || dataQualityIssueCount === 0 || reminderIsBusy}
+                    onClick={() => sendReminder('data_quality')}
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Lembrar cadastro ({dataQualityIssueCount})
+                  </Button>
                 </div>
 
                 {isLoading ? (

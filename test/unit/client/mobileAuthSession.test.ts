@@ -10,6 +10,7 @@ import {
   mobileMarkAllNotificationsRead,
   mobileMarkNotificationRead,
   mobileListSubstitutions,
+  mobileSendAdminQuestionnaireReminders,
   mobileSubmitQuestionnaireResponse,
   mobileUpdateProfile,
   readStoredMobileAuthSession,
@@ -396,6 +397,69 @@ describe("mobile auth session storage", () => {
         credentials: "include",
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("sends coordinator questionnaire reminders with idempotency", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        community: authResponse.communities[0],
+        questionnaire: {
+          id: "questionnaire-1",
+          title: "Disponibilidade Julho",
+          month: 7,
+          year: 2026,
+          status: "published",
+          deadline: null,
+        },
+        reminder: {
+          target: "pending_questionnaire",
+          dryRun: false,
+          deliveredCount: 1,
+          recipientCount: 1,
+          skippedCount: 0,
+          recipients: [{
+            id: "user-1",
+            name: "Ministro Demo",
+            email: "ministro@example.test",
+            responded: false,
+            dataQualityStatus: "needs_attention",
+            notificationId: "notification-1",
+          }],
+        },
+      }), { status: 200 }));
+
+    await expect(mobileSendAdminQuestionnaireReminders(
+      "questionnaire-1",
+      { target: "pending_questionnaire" },
+      { idempotencyKey: "11111111-2222-4333-8444-555555555555" },
+    )).resolves.toMatchObject({
+      reminder: {
+        deliveredCount: 1,
+        recipients: [{ id: "user-1" }],
+      },
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/admin/questionnaires/questionnaire-1/reminders",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ target: "pending_questionnaire" }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "Content-Type": "application/json",
+          "Idempotency-Key": "11111111-2222-4333-8444-555555555555",
           "X-Community-Id": "community-1",
           "X-Device-Id": "ios-device-1",
         }),

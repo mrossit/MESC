@@ -3,8 +3,11 @@ import { getApiOrigin, getStoredAuthToken, isNativeRuntime } from "@/lib/api-url
 import {
   MescMobileApiClient,
   MescMobileApiError,
+  createMobileIdempotencyKey,
   type MobileAdminCommunityHomeResponse,
   type MobileAdminMinistersResponse,
+  type MobileAdminQuestionnaireReminderPayload,
+  type MobileAdminQuestionnaireReminderResponse,
   type MobileAdminQuestionnaireResponsesResponse,
   type MobileAuthResponse,
   type MobileClientRequestOptions,
@@ -376,6 +379,21 @@ export async function mobileGetAdminQuestionnaireResponses(
   questionnaireId: string,
 ): Promise<MobileAdminQuestionnaireResponsesResponse> {
   return runWithMobileAuthRetry((client) => client.getAdminQuestionnaireResponses(questionnaireId));
+}
+
+export async function mobileSendAdminQuestionnaireReminders(
+  questionnaireId: string,
+  payload: MobileAdminQuestionnaireReminderPayload,
+  options: MobileClientRequestOptions = {},
+): Promise<MobileAdminQuestionnaireReminderResponse> {
+  return runWithMobileAuthRetry((client) => client.sendAdminQuestionnaireReminders(
+    questionnaireId,
+    payload,
+    {
+      ...options,
+      idempotencyKey: options.idempotencyKey ?? createMobileIdempotencyKey(),
+    },
+  ));
 }
 
 export async function mobileListAdminMinisters(): Promise<MobileAdminMinistersResponse> {

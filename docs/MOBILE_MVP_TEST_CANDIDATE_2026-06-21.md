@@ -110,6 +110,8 @@ Com o ambiente demo/staging preparado:
 6. Confirmar presenca em escala publicada.
 7. Pedir substituicao em escala futura.
 8. Validar replay seguro de idempotencia repetindo a mesma mutacao.
+9. Login mobile com `mobile.coord.a@example.test` / `MobileDemo123!`.
+10. Abrir Respostas do questionario, revisar pendentes/cadastros e enviar lembrete para pendentes ou cadastro incompleto.
 
 ## Bloqueios Para Beta Real
 
