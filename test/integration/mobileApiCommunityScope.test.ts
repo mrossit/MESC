@@ -52,6 +52,29 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     };
   }
 
+  async function mobilePost(path: string, input: {
+    userId: string;
+    communityId?: string;
+    idempotencyKey?: string;
+    body?: unknown;
+  }) {
+    const response = await fetch(`${baseUrl}/api/mobile/v1${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokenFor(input.userId)}`,
+        "Content-Type": "application/json",
+        ...(input.communityId ? { "X-Community-Id": input.communityId } : {}),
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
+      },
+      body: JSON.stringify(input.body ?? {}),
+    });
+
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }
+
   beforeAll(async () => {
     process.env.JWT_SECRET = "mobile-api-community-scope-test-secret";
     await seedMobileP0Demo();
@@ -148,6 +171,42 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     const visibleIds = response.body.ministers.map((minister: { id: string }) => minister.id);
     expect(visibleIds).toContain(MOBILE_P0_DEMO_IDS.ministerB);
     expect(visibleIds).not.toContain(MOBILE_P0_DEMO_IDS.ministerA);
+  });
+
+  it("keeps questionnaire reminders scoped to the active community", async () => {
+    const forbidden = await mobilePost(
+      `/admin/questionnaires/${MOBILE_P0_DEMO_IDS.questionnaireB}/reminders`,
+      {
+        userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+        idempotencyKey: "10101010-2020-4030-8040-505050505050",
+      },
+    );
+
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
+
+    const allowed = await mobilePost(
+      `/admin/questionnaires/${MOBILE_P0_DEMO_IDS.questionnaireB}/reminders`,
+      {
+        userId: MOBILE_P0_DEMO_IDS.parishCoordinator,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+        idempotencyKey: "20202020-3030-4040-8050-606060606060",
+        body: {
+          target: "pending_or_data_quality",
+          ministerIds: [
+            MOBILE_P0_DEMO_IDS.ministerA,
+            MOBILE_P0_DEMO_IDS.ministerB,
+          ],
+        },
+      },
+    );
+
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityB);
+    expect(allowed.body.reminder.skippedCount).toBe(1);
+    expect(allowed.body.reminder.recipients.map((recipient: { id: string }) => recipient.id))
+      .toEqual([MOBILE_P0_DEMO_IDS.ministerB]);
   });
 
   it("returns the questionnaire only for the active community", async () => {

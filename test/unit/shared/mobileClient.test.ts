@@ -28,6 +28,8 @@ describe("mobileClient contract", () => {
       .toBe("/admin/community/home?month=2026-07");
     expect(mobileEndpoints.adminQuestionnaireResponses("questionnaire/with slash"))
       .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/responses");
+    expect(mobileEndpoints.adminQuestionnaireReminders("questionnaire/with slash"))
+      .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/reminders");
     expect(mobileEndpoints.adminMinisters()).toBe("/admin/ministers");
   });
 
@@ -383,6 +385,43 @@ describe("mobileClient contract", () => {
         }), { status: 200 });
       }
 
+      if (input.endsWith("/admin/questionnaires/33333333-3333-4333-8333-333333333333/reminders")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            month: 7,
+            year: 2026,
+            status: "published",
+            deadline: null,
+          },
+          reminder: {
+            target: "data_quality",
+            dryRun: false,
+            deliveredCount: 1,
+            recipientCount: 1,
+            skippedCount: 0,
+            recipients: [{
+              id: "user-1",
+              name: "Ministro Demo",
+              email: "ministro@example.test",
+              responded: true,
+              dataQualityStatus: "needs_attention",
+              notificationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            }],
+          },
+        }), { status: 200 });
+      }
+
       return new Response(JSON.stringify({
         success: true,
         community: {
@@ -411,13 +450,25 @@ describe("mobileClient contract", () => {
       .resolves.toMatchObject({ questionnaire: { responseRate: 100 } });
     await expect(client.getAdminQuestionnaireResponses("33333333-3333-4333-8333-333333333333"))
       .resolves.toMatchObject({ summary: { pendingCount: 0 } });
+    await expect(client.sendAdminQuestionnaireReminders(
+      "33333333-3333-4333-8333-333333333333",
+      { target: "data_quality" },
+      { idempotencyKey: "11111111-1111-4111-8111-111111111111" },
+    )).resolves.toMatchObject({ reminder: { deliveredCount: 1 } });
     await expect(client.listAdminMinisters())
       .resolves.toMatchObject({ summary: { ready: 1 } });
 
     expect(requests.map((request) => [request.init.method, request.input])).toEqual([
       ["GET", "https://example.test/api/mobile/v1/admin/community/home?month=2026-07"],
       ["GET", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses"],
+      ["POST", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/reminders"],
       ["GET", "https://example.test/api/mobile/v1/admin/ministers"],
     ]);
+    expect(requests[2].init.headers).toMatchObject({
+      [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(JSON.parse(String(requests[2].init.body))).toEqual({
+      target: "data_quality",
+    });
   });
 });

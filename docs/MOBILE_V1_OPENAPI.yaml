@@ -660,6 +660,39 @@ paths:
           description: User is not a coordinator or manager.
         "404":
           description: Questionnaire not found in the active community.
+  /admin/questionnaires/{id}/reminders:
+    post:
+      summary: Send questionnaire reminders to pending ministers or ministers with incomplete profile data.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminQuestionnaireReminderRequest"
+      responses:
+        "200":
+          description: Reminder delivery plan and created notification ids.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminQuestionnaireReminderResponse"
+        "400":
+          description: Idempotency-Key is missing or invalid, or the payload is invalid.
+        "403":
+          description: User is not a coordinator or manager.
+        "404":
+          description: Questionnaire not found in the active community.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
   /admin/ministers:
     get:
       summary: Read a lightweight minister directory for the active community.
@@ -1474,6 +1507,102 @@ components:
           nullable: true
         dataQuality:
           $ref: "#/components/schemas/ProfileReadiness"
+    AdminQuestionnaireReminderRequest:
+      type: object
+      properties:
+        target:
+          type: string
+          enum: [pending_questionnaire, data_quality, pending_or_data_quality]
+          default: pending_questionnaire
+        dataQualityStatuses:
+          type: array
+          description: Profile readiness statuses included when target checks data quality.
+          items:
+            type: string
+            enum: [blocked, needs_attention]
+        ministerIds:
+          type: array
+          description: Optional subset of questionnaire target ministers to evaluate.
+          items:
+            type: string
+        message:
+          type: string
+          nullable: true
+        dryRun:
+          type: boolean
+          default: false
+    AdminQuestionnaireReminderResponse:
+      type: object
+      required: [success, community, questionnaire, reminder]
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        questionnaire:
+          type: object
+          required: [id, title, month, year, status, deadline]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            month:
+              type: integer
+            year:
+              type: integer
+            status:
+              type: string
+            deadline:
+              type: string
+              nullable: true
+        reminder:
+          type: object
+          required:
+            - target
+            - dryRun
+            - deliveredCount
+            - recipientCount
+            - skippedCount
+            - recipients
+          properties:
+            target:
+              type: string
+              enum: [pending_questionnaire, data_quality, pending_or_data_quality]
+            dryRun:
+              type: boolean
+            deliveredCount:
+              type: integer
+            recipientCount:
+              type: integer
+            skippedCount:
+              type: integer
+            recipients:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                  - name
+                  - email
+                  - responded
+                  - dataQualityStatus
+                  - notificationId
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  responded:
+                    type: boolean
+                  dataQualityStatus:
+                    type: string
+                    enum: [ready, needs_attention, blocked]
+                  notificationId:
+                    type: string
+                    nullable: true
     AdminMinister:
       type: object
       required:

@@ -122,6 +122,16 @@ const confirmationSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+const adminQuestionnaireReminderSchema = z.object({
+  target: z.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"])
+    .optional()
+    .default("pending_questionnaire"),
+  dataQualityStatuses: z.array(z.enum(["blocked", "needs_attention"])).optional(),
+  ministerIds: z.array(z.string()).optional(),
+  message: z.string().trim().max(1000).nullable().optional(),
+  dryRun: z.boolean().optional().default(false),
+});
+
 const profileUpdateSchema = z.object({
   name: z.string().min(3).max(255).optional(),
   phone: z.string().max(20).nullable().optional(),
@@ -169,6 +179,21 @@ function dbBoolean(value: boolean) {
 
 function dbCurrentTimestamp() {
   return sql`CURRENT_TIMESTAMP` as any;
+}
+
+function toValidDate(value: unknown): Date | null {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== "string" && typeof value !== "number") {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function dbJson(value: unknown) {
@@ -2221,6 +2246,179 @@ router.get("/admin/questionnaires/:id/responses", authenticateToken, async (req:
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar respostas do questionario");
+  }
+});
+
+router.post("/admin/questionnaires/:id/reminders", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+
+    const parsed = adminQuestionnaireReminderSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+
+    const [questionnaire] = await db
+      .select({
+        id: questionnaires.id,
+        title: questionnaires.title,
+        month: questionnaires.month,
+        year: questionnaires.year,
+        status: questionnaires.status,
+        deadline: questionnaires.deadline,
+        targetUserIds: questionnaires.targetUserIds,
+      })
+      .from(questionnaires)
+      .where(and(eq(questionnaires.id, req.params.id), eq(questionnaires.communityId, activeCommunity.id)))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+
+    const targetUserIds = getQuestionnaireTargetUserIds(questionnaire.targetUserIds);
+    const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+      communityId: activeCommunity.id,
+      targetUserIds,
+    });
+    const requestedMinisterIds = Array.from(new Set((parsed.ministerIds ?? []).filter(Boolean)));
+    const requestedMinisterIdSet = new Set(requestedMinisterIds);
+    const candidateMinisters = requestedMinisterIdSet.size > 0
+      ? targetMinisters.filter((minister) => requestedMinisterIdSet.has(minister.id))
+      : targetMinisters;
+    const candidateIds = candidateMinisters.map((minister) => minister.id);
+    const responseRows = candidateIds.length > 0
+      ? await db
+        .select({ userId: questionnaireResponses.userId })
+        .from(questionnaireResponses)
+        .where(
+          and(
+            eq(questionnaireResponses.questionnaireId, questionnaire.id),
+            eq(questionnaireResponses.communityId, activeCommunity.id),
+            eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+            inArray(questionnaireResponses.userId, candidateIds),
+          ),
+        )
+      : [];
+    const respondedUserIds = new Set(responseRows.map((row) => row.userId));
+    const dataQualityStatuses = new Set(parsed.dataQualityStatuses?.length
+      ? parsed.dataQualityStatuses
+      : ["blocked", "needs_attention"]);
+    const recipients = candidateMinisters.filter((minister) => {
+      const isPending = !respondedUserIds.has(minister.id);
+      const hasDataQualityIssue = dataQualityStatuses.has(minister.dataQuality.status);
+
+      if (parsed.target === "pending_questionnaire") return isPending;
+      if (parsed.target === "data_quality") return hasDataQualityIssue;
+      return isPending || hasDataQualityIssue;
+    });
+    const notificationIds = recipients.map(() => randomUUID());
+    const message = parsed.message
+      || `Por favor, confira o questionario "${questionnaire.title}" e complete as informacoes pendentes.`;
+    const expiresAt = toValidDate(questionnaire.deadline);
+
+    if (!parsed.dryRun && recipients.length > 0) {
+      await db.insert(notifications).values(recipients.map((minister, index) => ({
+        id: notificationIds[index],
+        userId: minister.id,
+        type: "reminder" as const,
+        title: "Lembrete do questionario",
+        message,
+        data: dbJson(mobileNotificationData("coordinator_announcement", {
+          kind: "questionnaire_reminder",
+          questionnaireId: questionnaire.id,
+          questionnaireTitle: questionnaire.title,
+          communityId: activeCommunity.id,
+          requestedBy: user.id,
+          target: parsed.target,
+          responded: respondedUserIds.has(minister.id),
+          dataQualityStatus: minister.dataQuality.status,
+        })),
+        read: dbBoolean(false),
+        readAt: null,
+        actionUrl: "/questionnaire",
+        priority: "medium",
+        expiresAt,
+        createdAt: new Date(),
+      })));
+    }
+
+    const skippedCount = Math.max(
+      (requestedMinisterIdSet.size > 0 ? requestedMinisterIdSet.size : targetMinisters.length) - recipients.length,
+      0,
+    );
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        deadline: toIsoDate(questionnaire.deadline),
+      },
+      reminder: {
+        target: parsed.target,
+        dryRun: parsed.dryRun,
+        deliveredCount: parsed.dryRun ? 0 : recipients.length,
+        recipientCount: recipients.length,
+        skippedCount,
+        recipients: recipients.map((minister, index) => ({
+          id: minister.id,
+          name: minister.name,
+          email: minister.email,
+          responded: respondedUserIds.has(minister.id),
+          dataQualityStatus: minister.dataQuality.status,
+          notificationId: parsed.dryRun ? null : notificationIds[index],
+        })),
+      },
+    };
+
+    await logActivity(user.id, "send_notification", {
+      source: "mobile-v1",
+      notificationIntent: "questionnaire_reminder",
+      questionnaireId: questionnaire.id,
+      communityId: activeCommunity.id,
+      target: parsed.target,
+      dryRun: parsed.dryRun,
+      recipientCount: recipients.length,
+      deliveredCount: responseBody.reminder.deliveredCount,
+      skippedCount,
+      idempotencyKey,
+    }, req);
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao enviar lembretes do questionario");
   }
 });
 

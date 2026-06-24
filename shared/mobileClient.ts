@@ -432,6 +432,51 @@ export interface MobileAdminQuestionnaireResponsesResponse {
   responses: MobileAdminQuestionnaireResponseItem[];
 }
 
+export type MobileAdminQuestionnaireReminderTarget =
+  | "pending_questionnaire"
+  | "data_quality"
+  | "pending_or_data_quality";
+
+export type MobileAdminQuestionnaireReminderDataQualityStatus =
+  | "blocked"
+  | "needs_attention";
+
+export interface MobileAdminQuestionnaireReminderPayload {
+  target?: MobileAdminQuestionnaireReminderTarget;
+  dataQualityStatuses?: MobileAdminQuestionnaireReminderDataQualityStatus[];
+  ministerIds?: string[];
+  message?: string | null;
+  dryRun?: boolean;
+}
+
+export interface MobileAdminQuestionnaireReminderResponse {
+  success: true;
+  community: MobileCommunity;
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    status: string;
+    deadline: string | null;
+  };
+  reminder: {
+    target: MobileAdminQuestionnaireReminderTarget;
+    dryRun: boolean;
+    deliveredCount: number;
+    recipientCount: number;
+    skippedCount: number;
+    recipients: Array<{
+      id: string;
+      name: string;
+      email: string;
+      responded: boolean;
+      dataQualityStatus: "ready" | "needs_attention" | "blocked";
+      notificationId: string | null;
+    }>;
+  };
+}
+
 export interface MobileAdminMinister {
   id: string;
   name: string;
@@ -681,6 +726,8 @@ export const mobileEndpoints = {
     withQuery("/admin/community/home", { month: input.month }),
   adminQuestionnaireResponses: (id: string) =>
     `/admin/questionnaires/${encodePathSegment(id)}/responses`,
+  adminQuestionnaireReminders: (id: string) =>
+    `/admin/questionnaires/${encodePathSegment(id)}/reminders`,
   adminMinisters: () => "/admin/ministers",
 } as const;
 
@@ -985,6 +1032,19 @@ export class MescMobileApiClient {
     return this.request<MobileAdminQuestionnaireResponsesResponse>({
       method: "GET",
       path: mobileEndpoints.adminQuestionnaireResponses(questionnaireId),
+      ...options,
+    });
+  }
+
+  async sendAdminQuestionnaireReminders(
+    questionnaireId: string,
+    payload: MobileAdminQuestionnaireReminderPayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileAdminQuestionnaireReminderResponse>({
+      method: "POST",
+      path: mobileEndpoints.adminQuestionnaireReminders(questionnaireId),
+      body: payload,
       ...options,
     });
   }

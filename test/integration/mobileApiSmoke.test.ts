@@ -292,6 +292,43 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       },
     });
 
+    const reminderIdempotencyKey = createMobileIdempotencyKey(randomUUID);
+    const questionnaireReminder = await substituteClient.sendAdminQuestionnaireReminders(
+      MOBILE_P0_DEMO_IDS.questionnaireA,
+      { target: "data_quality" },
+      { idempotencyKey: reminderIdempotencyKey },
+    );
+
+    expect(questionnaireReminder.success).toBe(true);
+    expect(questionnaireReminder.reminder).toMatchObject({
+      target: "data_quality",
+      deliveredCount: 1,
+      recipientCount: 1,
+      skippedCount: 0,
+      recipients: [{
+        id: MOBILE_P0_DEMO_IDS.ministerA,
+        responded: true,
+        dataQualityStatus: "needs_attention",
+      }],
+    });
+    expect(questionnaireReminder.reminder.recipients[0].notificationId)
+      .toEqual(expect.any(String));
+
+    await expect(substituteClient.sendAdminQuestionnaireReminders(
+      MOBILE_P0_DEMO_IDS.questionnaireA,
+      { target: "data_quality" },
+      { idempotencyKey: reminderIdempotencyKey },
+    )).resolves.toEqual(questionnaireReminder);
+
+    const notificationsAfterReminder = await client.listNotifications({ limit: 5 });
+    expect(notificationsAfterReminder.unreadCount).toBe(1);
+    expect(notificationsAfterReminder.notifications[0]).toMatchObject({
+      eventKey: "coordinator_announcement",
+      type: "reminder",
+      deepLink: "/questionnaire",
+      read: false,
+    });
+
     const coordinatorMinisters = await substituteClient.listAdminMinisters();
     expect(coordinatorMinisters.success).toBe(true);
     expect(coordinatorMinisters.summary).toMatchObject({
