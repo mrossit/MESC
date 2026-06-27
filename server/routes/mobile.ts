@@ -665,8 +665,7 @@ function toMobileProfile(user: {
 }
 
 function toMobileSchedulePreview(schedule: GeneratedSchedule) {
-  const assignedMinisters = schedule.ministers.filter((minister) => minister.id).length;
-  const vacancies = schedule.ministers.filter((minister) => !minister.id || minister.name === "VACANTE").length;
+  const stats = getScheduleAssignmentStats(schedule);
 
   return {
     date: schedule.massTime.date ?? null,
@@ -676,10 +675,10 @@ function toMobileSchedulePreview(schedule: GeneratedSchedule) {
     location: schedule.massTime.location ?? null,
     requiredMinisters: schedule.massTime.minMinisters,
     maxMinisters: schedule.massTime.maxMinisters,
-    assignedMinisters,
-    vacancies,
+    assignedMinisters: stats.assignedMinisters,
+    vacancies: stats.vacancies,
     confidence: Math.round((schedule.confidence ?? 0) * 100),
-    status: vacancies > 0 ? "needs_attention" : "covered",
+    status: stats.vacancies > 0 ? "needs_attention" : "covered",
     ministers: schedule.ministers.map((minister, index) => ({
       id: minister.id,
       name: minister.name,
@@ -689,20 +688,31 @@ function toMobileSchedulePreview(schedule: GeneratedSchedule) {
     backupMinisters: schedule.backupMinisters.slice(0, 5).map((minister, index) => ({
       id: minister.id,
       name: minister.name,
-      position: minister.position ?? assignedMinisters + index + 1,
+      position: minister.position ?? stats.assignedMinisters + index + 1,
       availabilityScore: minister.availabilityScore ?? 0,
     })),
+  };
+}
+
+function getScheduleAssignmentStats(schedule: GeneratedSchedule) {
+  const assignedMinisters = schedule.ministers.filter((minister) => minister.id).length;
+  const placeholderVacancies = schedule.ministers.filter((minister) => !minister.id || minister.name === "VACANTE").length;
+  const requiredVacancies = Math.max(0, schedule.massTime.minMinisters - assignedMinisters);
+
+  return {
+    assignedMinisters,
+    vacancies: Math.max(placeholderVacancies, requiredVacancies),
   };
 }
 
 function summarizeSchedulePreview(generatedSchedules: GeneratedSchedule[]) {
   const totalMasses = generatedSchedules.length;
   const totalAssignments = generatedSchedules.reduce(
-    (total, schedule) => total + schedule.ministers.filter((minister) => minister.id).length,
+    (total, schedule) => total + getScheduleAssignmentStats(schedule).assignedMinisters,
     0,
   );
   const totalVacancies = generatedSchedules.reduce(
-    (total, schedule) => total + schedule.ministers.filter((minister) => !minister.id || minister.name === "VACANTE").length,
+    (total, schedule) => total + getScheduleAssignmentStats(schedule).vacancies,
     0,
   );
   const averageConfidence = totalMasses > 0
