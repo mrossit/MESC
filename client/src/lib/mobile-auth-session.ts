@@ -197,6 +197,16 @@ export function clearStoredMobileAuthSession() {
   localStorage.removeItem(MOBILE_AUTH_STORAGE_KEYS.appVersion);
 }
 
+export function clearExpiredMobileAuthSession() {
+  const localStorage = storage();
+  if (!localStorage) return;
+
+  localStorage.removeItem("token");
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("session_token");
+  clearStoredMobileAuthSession();
+}
+
 export function storeMobileAuthResponse(response: MobileAuthResponse) {
   const localStorage = storage();
   if (!localStorage) return;
@@ -253,10 +263,19 @@ export async function refreshMobileAuthSession() {
   }
 
   const client = createClient({ accessToken: null, communityId: null });
-  const response = await client.refresh({
-    refreshToken,
-    deviceId: getOrCreateMobileDeviceId(),
-  });
+  let response: MobileAuthResponse;
+  try {
+    response = await client.refresh({
+      refreshToken,
+      deviceId: getOrCreateMobileDeviceId(),
+    });
+  } catch (error) {
+    if (error instanceof MescMobileApiError && error.status === 401) {
+      clearExpiredMobileAuthSession();
+    }
+    throw error;
+  }
+
   storeMobileAuthResponse(response);
   return response;
 }

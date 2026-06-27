@@ -11,6 +11,7 @@ import {
   mobileMarkAllNotificationsRead,
   mobileMarkNotificationRead,
   mobileListSubstitutions,
+  refreshMobileAuthSession,
   mobileSendAdminQuestionnaireReminders,
   mobileSubmitQuestionnaireResponse,
   mobileUpdateProfile,
@@ -104,6 +105,41 @@ describe("mobile auth session storage", () => {
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.deviceId)).toBe("ios-device-1");
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBeNull();
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId)).toBeNull();
+  });
+
+  it("clears expired access and refresh tokens when mobile refresh is rejected", async () => {
+    localStorage.setItem("token", "expired-access-token");
+    localStorage.setItem("auth_token", "expired-access-token");
+    localStorage.setItem("session_token", "expired-session-token");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken, "expired-refresh-token");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.communities, JSON.stringify(authResponse.communities));
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.platform, "ios");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.appVersion, "1.0.0");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: false,
+        message: "Sessao mobile expirada",
+      }), { status: 401 }));
+
+    await expect(refreshMobileAuthSession()).rejects.toMatchObject({ status: 401 });
+
+    expect(localStorage.getItem("token")).toBeNull();
+    expect(localStorage.getItem("auth_token")).toBeNull();
+    expect(localStorage.getItem("session_token")).toBeNull();
+    expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBeNull();
+    expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId)).toBeNull();
+    expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.deviceId)).toBe("ios-device-1");
+    expect(hasStoredMobileRefreshToken()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/mobile/v1/auth/refresh",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+      }),
+    );
   });
 
   it("calls mobile contract endpoints with auth headers and idempotency", async () => {

@@ -26,11 +26,13 @@ import {
 } from "@/lib/persistent-storage";
 import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 import {
+  disableNativeBiometricLogin,
   enableNativeBiometricLogin,
   getNativeBiometricStatus,
   unlockNativeBiometricLogin,
   type NativeBiometricStatus,
 } from "@/lib/native-biometric-auth";
+import { MescMobileApiError } from "@shared/mobileClient";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -61,6 +63,30 @@ export default function Login() {
     const status = await getNativeBiometricStatus();
     setBiometricStatus(status);
     return status;
+  };
+
+  const isUnauthorizedSessionError = (error: unknown) => {
+    if (error instanceof MescMobileApiError) return error.status === 401;
+    if (!(error instanceof Error)) return false;
+
+    return (
+      error.message.startsWith("401") ||
+      /sess[aã]o.*expirada|sess[aã]o.*invalida|token.*expirado|token.*inv[aá]lido|n[aã]o autenticado|unauthorized/i
+        .test(error.message)
+    );
+  };
+
+  const expireBiometricSession = async () => {
+    markAutoBiometricAttempt();
+    clearLocalSession();
+    queryClient.clear();
+
+    try {
+      const status = await disableNativeBiometricLogin();
+      setBiometricStatus(status);
+    } catch {
+      setBiometricStatus((current) => current ? { ...current, enabled: false } : current);
+    }
   };
 
   const finishLogin = (user: AuthUser) => {
@@ -119,6 +145,13 @@ export default function Login() {
       } else {
         const status = await refreshBiometricStatus();
         if (status.native && status.available && status.enabled) {
+          try {
+            const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
+            setBiometricStatus(refreshedStatus);
+          } catch {
+            // A senha ja autenticou o usuario; se o refresh da credencial falhar,
+            // mantemos o login e o usuario pode reativar em Configuracoes.
+          }
           clearAutoBiometricAttempt();
           finishLogin(data.user);
           return;
@@ -179,13 +212,25 @@ export default function Login() {
     biometricUnlockInProgressRef.current = true;
     markAutoBiometricAttempt();
     setBiometricBusy(true);
+    let unlockedStoredSession = false;
     try {
       await unlockNativeBiometricLogin();
+      unlockedStoredSession = true;
       const data = await authAPI.getMe();
       queryClient.setQueryData(["/api/auth/me"], data);
       clearAutoBiometricAttempt();
       finishLogin(data.user);
     } catch (error) {
+      if (unlockedStoredSession && isUnauthorizedSessionError(error)) {
+        await expireBiometricSession();
+        toast({
+          title: "Sessao biometrica expirada",
+          description: "Entre com email e senha para reativar o Face ID neste aparelho.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       markAutoBiometricAttempt();
       clearLocalSession();
       const message = error instanceof Error
@@ -258,8 +303,12 @@ export default function Login() {
           queryClient.setQueryData(["/api/auth/me"], data);
           navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
           return;
-        } catch {
-          clearLocalSession();
+        } catch (error) {
+          if (isUnauthorizedSessionError(error) && status.enabled) {
+            await expireBiometricSession();
+          } else {
+            clearLocalSession();
+          }
         }
       }
 
@@ -272,8 +321,12 @@ export default function Login() {
           queryClient.setQueryData(["/api/auth/me"], data);
           navigate(data.user.requiresPasswordChange ? "/change-password" : "/dashboard");
           return;
-        } catch {
-          clearLocalSession();
+        } catch (error) {
+          if (isUnauthorizedSessionError(error) && status.enabled) {
+            await expireBiometricSession();
+          } else {
+            clearLocalSession();
+          }
         }
       }
     };
