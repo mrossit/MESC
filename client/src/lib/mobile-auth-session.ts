@@ -211,14 +211,15 @@ export function storeMobileAuthResponse(response: MobileAuthResponse) {
   const localStorage = storage();
   if (!localStorage) return;
 
-  const existing = readStoredMobileAuthSession();
   const platform = getMobilePlatform();
   const appVersion = getMobileAppVersion() ?? null;
 
   localStorage.setItem("token", response.auth.accessToken);
   localStorage.setItem("auth_token", response.auth.accessToken);
-  if (response.auth.sessionToken ?? existing?.sessionToken) {
-    localStorage.setItem("session_token", response.auth.sessionToken ?? existing?.sessionToken ?? "");
+  if (response.auth.sessionToken) {
+    localStorage.setItem("session_token", response.auth.sessionToken);
+  } else {
+    localStorage.removeItem("session_token");
   }
 
   if (response.auth.refreshToken) {
@@ -278,6 +279,38 @@ export async function refreshMobileAuthSession() {
 
   storeMobileAuthResponse(response);
   return response;
+}
+
+export async function ensureMobileBiometricSession(): Promise<StoredMobileAuthSession> {
+  const existing = readStoredMobileAuthSession();
+  if (existing?.refreshToken) return existing;
+
+  if (!getStoredAuthToken()) {
+    throw new MescMobileApiError({
+      status: 401,
+      message: "Entre com email e senha antes de ativar a biometria.",
+      retryable: false,
+    });
+  }
+
+  const client = createClient();
+  const response = await client.createBiometricSession({
+    deviceId: getOrCreateMobileDeviceId(),
+    platform: getMobilePlatform(),
+    appVersion: getMobileAppVersion(),
+  });
+
+  storeMobileAuthResponse(response);
+  const session = readStoredMobileAuthSession();
+  if (!session?.refreshToken) {
+    throw new MescMobileApiError({
+      status: 401,
+      message: "Nao foi possivel preparar a sessao biometrica.",
+      retryable: false,
+    });
+  }
+
+  return session;
 }
 
 async function runWithMobileAuthRetry<T>(

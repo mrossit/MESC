@@ -93,6 +93,36 @@ paths:
           description: Expired, reused, revoked, or invalid refresh token.
         "429":
           description: Refresh rate limit exceeded.
+  /auth/biometric-session:
+    post:
+      summary: Create a renewable mobile session for native biometric unlock.
+      parameters:
+        - $ref: "#/components/parameters/DeviceHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android]
+                appVersion:
+                  type: string
+      responses:
+        "200":
+          description: Renewable session prepared for Keychain or Keystore storage.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Missing or invalid access token.
+        "403":
+          description: Expired access token or inactive account.
   /auth/logout:
     post:
       summary: Revoke the current mobile device and its refresh tokens.

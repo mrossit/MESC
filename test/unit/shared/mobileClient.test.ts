@@ -13,6 +13,7 @@ describe("mobileClient contract", () => {
   it("builds stable mobile endpoint paths", () => {
     expect(MOBILE_API_BASE_PATH).toBe("/api/mobile/v1");
     expect(mobileEndpoints.appConfig({ platform: "ios" })).toBe("/app/config?platform=ios");
+    expect(mobileEndpoints.biometricSession()).toBe("/auth/biometric-session");
     expect(mobileEndpoints.currentQuestionnaire({ month: "2026-07" }))
       .toBe("/questionnaires/current?month=2026-07");
     expect(mobileEndpoints.submitQuestionnaire("questionnaire/with slash"))
@@ -197,6 +198,76 @@ describe("mobileClient contract", () => {
     });
     expect(JSON.parse(String(requests[1].init.body))).toEqual({
       deviceId: "ios-device-1",
+    });
+  });
+
+  it("creates a biometric mobile session with auth and device context", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+
+      return new Response(JSON.stringify({
+        success: true,
+        auth: {
+          tokenType: "Bearer",
+          accessToken: "access-token-2",
+          refreshToken: "refresh-token-2",
+          refreshTokenExpiresAt: "2026-07-21T00:00:00.000Z",
+          sessionToken: "session-token-2",
+          expiresInSeconds: 86400,
+          keepSignedIn: true,
+        },
+        user: {
+          id: "user-1",
+          email: "ministro@example.test",
+          name: "Ministro Demo",
+          role: "ministro",
+          homeCommunityId: "community-1",
+          requiresPasswordChange: false,
+          photoUrl: null,
+        },
+        communities: [],
+        activeCommunityId: "community-1",
+        device: {
+          id: "device-db-1",
+          deviceId: "ios-device-1",
+          platform: "ios",
+          appVersion: "1.0.0",
+          pushEnabled: false,
+          pushProvider: null,
+          biometricCapable: true,
+          biometricEnabled: true,
+          lastSeenAt: null,
+          revokedAt: null,
+          createdAt: null,
+          registered: true,
+        },
+      }), { status: 200 });
+    };
+
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      appVersion: "1.0.0",
+      fetch: fetcher,
+    });
+
+    await client.createBiometricSession();
+
+    expect(requests[0].input).toBe("https://example.test/api/mobile/v1/auth/biometric-session");
+    expect(requests[0].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Device-Id": "ios-device-1",
+      "X-Platform": "ios",
+      "X-App-Version": "1.0.0",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(String(requests[0].init.body))).toEqual({
+      deviceId: "ios-device-1",
+      platform: "ios",
+      appVersion: "1.0.0",
     });
   });
 

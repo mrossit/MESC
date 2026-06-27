@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoredMobileAuthSession,
+  ensureMobileBiometricSession,
   getOrCreateMobileDeviceId,
   hasStoredMobileRefreshToken,
   MOBILE_AUTH_STORAGE_KEYS,
@@ -105,6 +106,103 @@ describe("mobile auth session storage", () => {
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.deviceId)).toBe("ios-device-1");
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBeNull();
     expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId)).toBeNull();
+  });
+
+  it("stores rotated refresh and session tokens after a mobile refresh", async () => {
+    localStorage.setItem("token", "expired-access-token");
+    localStorage.setItem("auth_token", "expired-access-token");
+    localStorage.setItem("session_token", "expired-session-token");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken, "refresh-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ...authResponse,
+        auth: {
+          ...authResponse.auth,
+          accessToken: "access-token-2",
+          refreshToken: "refresh-token-2",
+          sessionToken: "session-token-2",
+        },
+        device: {
+          ...authResponse.device,
+          biometricEnabled: true,
+        },
+      }), { status: 200 }));
+
+    await expect(refreshMobileAuthSession()).resolves.toMatchObject({
+      auth: {
+        accessToken: "access-token-2",
+        refreshToken: "refresh-token-2",
+        sessionToken: "session-token-2",
+      },
+    });
+
+    expect(localStorage.getItem("token")).toBe("access-token-2");
+    expect(localStorage.getItem("auth_token")).toBe("access-token-2");
+    expect(localStorage.getItem("session_token")).toBe("session-token-2");
+    expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBe("refresh-token-2");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/mobile/v1/auth/refresh",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          refreshToken: "refresh-token-1",
+          deviceId: "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("creates a biometric refresh session when password login did not keep the user signed in", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem("auth_token", "access-token-1");
+    localStorage.setItem("session_token", "session-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ...authResponse,
+        auth: {
+          ...authResponse.auth,
+          accessToken: "access-token-biometric",
+          refreshToken: "refresh-token-biometric",
+          sessionToken: "session-token-biometric",
+          keepSignedIn: true,
+        },
+        device: {
+          ...authResponse.device,
+          biometricEnabled: true,
+        },
+      }), { status: 200 }));
+
+    await expect(ensureMobileBiometricSession()).resolves.toMatchObject({
+      accessToken: "access-token-biometric",
+      refreshToken: "refresh-token-biometric",
+      sessionToken: "session-token-biometric",
+    });
+
+    expect(localStorage.getItem("token")).toBe("access-token-biometric");
+    expect(localStorage.getItem(MOBILE_AUTH_STORAGE_KEYS.refreshToken)).toBe("refresh-token-biometric");
+    expect(localStorage.getItem("session_token")).toBe("session-token-biometric");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/mobile/v1/auth/biometric-session",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "Content-Type": "application/json",
+          "X-Device-Id": "ios-device-1",
+        }),
+        body: JSON.stringify({
+          deviceId: "ios-device-1",
+        }),
+      }),
+    );
   });
 
   it("clears expired access and refresh tokens when mobile refresh is rejected", async () => {

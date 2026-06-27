@@ -787,6 +787,7 @@ export const mobileEndpoints = {
     withQuery("/app/config", { platform: input.platform }),
   login: () => "/auth/login",
   refresh: () => "/auth/refresh",
+  biometricSession: () => "/auth/biometric-session",
   logout: () => "/auth/logout",
   me: () => "/auth/me",
   devices: () => "/devices",
@@ -933,6 +934,23 @@ export class MescMobileApiClient {
         deviceId: payload.deviceId ?? this.deviceId ?? undefined,
       },
       auth: false,
+    });
+
+    this.setAccessToken(response.auth.accessToken);
+    this.setCommunityId(response.activeCommunityId);
+    this.setDeviceId(response.device.deviceId);
+    return response;
+  }
+
+  async createBiometricSession(payload: Partial<MobileLoginPayload> = {}) {
+    const response = await this.request<MobileAuthResponse>({
+      method: "POST",
+      path: mobileEndpoints.biometricSession(),
+      body: {
+        deviceId: payload.deviceId ?? this.deviceId ?? undefined,
+        platform: payload.platform ?? this.platform,
+        appVersion: payload.appVersion ?? this.appVersion,
+      },
     });
 
     this.setAccessToken(response.auth.accessToken);

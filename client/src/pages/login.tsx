@@ -21,10 +21,14 @@ import { toast } from "@/hooks/use-toast";
 import {
   clearAutoBiometricAttempt,
   clearLocalSession,
-  isAutoBiometricCooldownActive,
   markAutoBiometricAttempt,
 } from "@/lib/persistent-storage";
-import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
+import {
+  ensureMobileBiometricSession,
+  hasStoredMobileRefreshToken,
+  refreshMobileAuthSession,
+  shouldUseMobileAuth,
+} from "@/lib/mobile-auth-session";
 import {
   disableNativeBiometricLogin,
   enableNativeBiometricLogin,
@@ -66,7 +70,7 @@ export default function Login() {
   };
 
   const isUnauthorizedSessionError = (error: unknown) => {
-    if (error instanceof MescMobileApiError) return error.status === 401;
+    if (error instanceof MescMobileApiError) return error.status === 401 || error.status === 403;
     if (!(error instanceof Error)) return false;
 
     return (
@@ -201,23 +205,30 @@ export default function Login() {
 
   const handleBiometricUnlock = async () => {
     if (biometricUnlockInProgressRef.current) return;
-    if (isAutoBiometricCooldownActive()) {
-      toast({
-        title: "Biometria pausada",
-        description: "Use email e senha agora. Voce podera tentar a biometria novamente em alguns minutos.",
-      });
-      return;
-    }
 
     biometricUnlockInProgressRef.current = true;
-    markAutoBiometricAttempt();
     setBiometricBusy(true);
     let unlockedStoredSession = false;
     try {
       await unlockNativeBiometricLogin();
       unlockedStoredSession = true;
+
+      if (shouldUseMobileAuth()) {
+        if (hasStoredMobileRefreshToken()) {
+          await refreshMobileAuthSession();
+        } else {
+          await ensureMobileBiometricSession();
+        }
+      }
+
       const data = await authAPI.getMe();
       queryClient.setQueryData(["/api/auth/me"], data);
+      try {
+        const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
+        setBiometricStatus(refreshedStatus);
+      } catch {
+        void refreshBiometricStatus();
+      }
       clearAutoBiometricAttempt();
       finishLogin(data.user);
     } catch (error) {

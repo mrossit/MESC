@@ -7,7 +7,7 @@ import {
 } from "@capgo/capacitor-native-biometric";
 import { isNativeRuntime } from "@/lib/api-url";
 import {
-  readStoredMobileAuthSession,
+  ensureMobileBiometricSession,
   restoreMobileAuthSession,
   type StoredMobileAuthSession,
 } from "@/lib/mobile-auth-session";
@@ -145,15 +145,12 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
     throw new Error(status.detail);
   }
 
-  const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
-  if (!token) {
-    throw new Error("Entre com email e senha antes de ativar a biometria.");
-  }
+  const mobileSession = await ensureMobileBiometricSession();
 
   const storedSession: StoredSession = {
-    token,
-    sessionToken: localStorage.getItem("session_token"),
-    mobile: readStoredMobileAuthSession(),
+    token: mobileSession.accessToken,
+    sessionToken: mobileSession.sessionToken,
+    mobile: mobileSession,
     savedAt: new Date().toISOString(),
   };
 

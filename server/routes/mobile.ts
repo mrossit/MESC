@@ -934,6 +934,11 @@ router.post("/auth/refresh", authRateLimiter, async (req, res) => {
     });
 
     const accessToken = generateToken(refreshed.user);
+    const sessionToken = await createSession(
+      refreshed.user.id,
+      req.ip || req.socket.remoteAddress,
+      req.get("user-agent"),
+    );
     const mobileUser = sanitizeMobileUser(refreshed.user);
     const accessibleCommunities = await getAccessibleCommunities(refreshed.user);
 
@@ -944,7 +949,7 @@ router.post("/auth/refresh", authRateLimiter, async (req, res) => {
         accessToken,
         refreshToken: refreshed.refreshToken,
         refreshTokenExpiresAt: refreshed.refreshTokenExpiresAt.toISOString(),
-        sessionToken: null,
+        sessionToken,
         expiresInSeconds: parseJwtExpirySeconds(process.env.JWT_EXPIRES_IN || "24h"),
         keepSignedIn: true,
       },
@@ -958,6 +963,75 @@ router.post("/auth/refresh", authRateLimiter, async (req, res) => {
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao renovar sessao mobile");
+  }
+});
+
+router.post("/auth/biometric-session", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const parsed = deviceSchema.pick({
+      deviceId: true,
+      platform: true,
+      appVersion: true,
+    }).parse(req.body ?? {});
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const [fullUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!fullUser) {
+      throw new MobileHttpError(404, "Usuario nao encontrado");
+    }
+
+    const sessionToken = await createSession(
+      fullUser.id,
+      req.ip || req.socket.remoteAddress,
+      req.get("user-agent"),
+    );
+    const mobileSession = await createMobileSession({
+      userId: fullUser.id,
+      deviceId: getDeviceId(req, parsed.deviceId),
+      platform: parsed.platform ?? req.get("x-platform"),
+      appVersion: parsed.appVersion ?? req.get("x-app-version"),
+      keepSignedIn: true,
+      biometricCapable: true,
+      biometricEnabled: true,
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.get("user-agent"),
+    });
+    const accessibleCommunities = await getAccessibleCommunities(fullUser);
+
+    res.json({
+      success: true,
+      auth: {
+        tokenType: "Bearer",
+        accessToken: generateToken(fullUser),
+        refreshToken: mobileSession.refreshToken,
+        refreshTokenExpiresAt: mobileSession.refreshTokenExpiresAt?.toISOString() ?? null,
+        sessionToken,
+        expiresInSeconds: parseJwtExpirySeconds(process.env.JWT_EXPIRES_IN || "24h"),
+        keepSignedIn: true,
+      },
+      user: sanitizeMobileUser(fullUser),
+      communities: accessibleCommunities,
+      activeCommunityId: fullUser.homeCommunityId,
+      device: {
+        ...sanitizeMobileDevice(mobileSession.device),
+        registered: true,
+      },
+      capabilities: {
+        biometricUnlock: true,
+        refreshTokenRotation: true,
+        remoteDeviceLogout: true,
+      },
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao preparar sessao biometrica");
   }
 });
 
