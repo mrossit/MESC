@@ -152,3 +152,4 @@ coverage/
 # ==========================================
 archive/
 .vercel
+.env.local

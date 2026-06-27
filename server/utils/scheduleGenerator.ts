@@ -3047,7 +3047,7 @@ export class ScheduleGenerator {
     }
 
     if (eligible.length === 0) {
-      logger.error(`[FAIR_ALGORITHM] ❌ NO ELIGIBLE MINISTERS for ${massTime.date} ${massTime.time}!`);
+      logger.warn(`[FAIR_ALGORITHM] No eligible ministers for ${massTime.date} ${massTime.time}.`);
       return [];
     }
 
@@ -3686,7 +3686,15 @@ export class ScheduleGenerator {
       return ministers;
 
     } catch (error) {
-      console.error('[ADORATION] Error loading ministers for adoration:', error);
+      if (
+        isMissingTableError(error, 'adoration_draws') ||
+        isMissingTableError(error, 'adoration_draw_results')
+      ) {
+        logger.warn('[ADORATION] Draw tables unavailable; skipping adoration integration for schedule generation.');
+        return [];
+      }
+
+      logger.error('[ADORATION] Error loading ministers for adoration', error);
       return [];
     }
   }

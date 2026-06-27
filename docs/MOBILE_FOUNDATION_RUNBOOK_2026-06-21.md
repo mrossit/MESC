@@ -10,6 +10,7 @@
 
 - migrations mobile versionadas: `0007_mobile_device_sessions.sql` e `0008_mobile_idempotency_keys.sql`;
 - migration nativa de configuracao de missas: `0009_native_mass_configuration_baseline.sql`;
+- migration nativa de sorteio de adoracao: `0010_native_adoration_draws_baseline.sql`;
 - registro de dispositivos nativos;
 - refresh token rotativo;
 - idempotencia persistida por 24h para mutacoes criticas;
@@ -40,12 +41,6 @@ Sem `DATABASE_URL`, o comando cria as tabelas equivalentes em `local.db`:
 
 Nao usar `drizzle-kit push` em producao. O projeto ja contem guard contra esse fluxo.
 
-Validar tabelas e indices:
-
-```bash
-npm run db:validate:mobile
-```
-
 Aplicar a base de missas/algoritmo em banco nativo:
 
 ```bash
@@ -55,6 +50,22 @@ npm run db:migrate:native-mass-config
 ```
 
 O aplicador tem guard explicito e recusa o host do MESC/Replit atual, salvo com `ALLOW_CURRENT_MESC_DB=true`.
+
+Aplicar a base de sorteio de adoracao usada pelo algoritmo:
+
+```bash
+CONFIRM_NATIVE_ADORATION_MIGRATION=true \
+DATABASE_URL="$NATIVE_DATABASE_URL" \
+npm run db:migrate:native-adoration
+```
+
+Essa migration cria `adoration_draws` e `adoration_draw_results` de forma idempotente e habilita RLS nas duas tabelas.
+
+Validar tabelas e indices depois das migrations mobile e da base de adoracao:
+
+```bash
+npm run db:validate:mobile
+```
 
 ---
 

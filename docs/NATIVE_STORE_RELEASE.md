@@ -15,6 +15,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
 - PWA atual durante a transicao: `https://saojudastadeu.replit.app`
+- Backend baseline extra: `0010_native_adoration_draws_baseline.sql` versiona as tabelas de sorteio de adoracao consultadas pelo algoritmo de escala; o runtime tolera bancos antigos sem gerar erro 500/log de erro.
 
 O app id ja foi registrado no App Store Connect. Trate `app.saojudastadeu.mesc` como definitivo para iOS.
 
@@ -50,7 +51,7 @@ Configuracao inicial de loja:
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
 - TestFlight: build `5.4.3 (50423)` enviado ao App Store Connect para substituir o `50422` nos testes internos contra `https://saojudastadeu.app`; aguardar processamento/validacao da Apple e confirmar disponibilidade no grupo `MESC Interno` pela tela de TestFlight.
 - DNS nativo: `saojudastadeu.app` e `www.saojudastadeu.app` resolvem para a Vercel (`76.76.21.21`) e a home nativa responde `200`.
-- Supabase nativo: `mesc-native-staging` recebeu `0009_native_mass_configuration_baseline.sql` e seed idempotente de horarios/eventos em 2026-06-24; a prontidao de escala da API retorna `massConfig.configuredSlots=12` para julho/2026 na comunidade demo Matriz.
+- Supabase nativo: `mesc-native-staging` recebeu `0009_native_mass_configuration_baseline.sql` e seed idempotente de horarios/eventos em 2026-06-24; `0010_native_adoration_draws_baseline.sql` esta versionada para a base de sorteio de adoracao usada pelo algoritmo; a prontidao de escala da API retorna `massConfig.configuredSlots=12` para julho/2026 na comunidade demo Matriz.
 - Decisao de ambiente nativo: manter o MESC atual no Replit em `https://saojudastadeu.replit.app` e reservar `https://saojudastadeu.app` para o novo ambiente nativo com banco proprio. Ver `docs/NATIVE_ENVIRONMENT_SPLIT_2026-06-21.md`.
 - Android: SDK 36 instalado localmente; `:app:assembleDebug` OK; `:app:bundleRelease` OK.
 - Android AAB assinado: `android/app/build/outputs/bundle/release/app-release.aab`.

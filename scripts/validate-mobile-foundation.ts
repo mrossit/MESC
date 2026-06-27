@@ -4,12 +4,17 @@ const requiredMobileTables = [
   "mobile_devices",
   "mobile_refresh_tokens",
   "mobile_idempotency_keys",
+  "adoration_draws",
+  "adoration_draw_results",
 ];
 
 const requiredMobileIndexes = [
   "uq_mobile_devices_user_device",
   "mobile_refresh_tokens_hash_idx",
   "mobile_idempotency_keys_user_key_idx",
+  "idx_adoration_draws_month_year",
+  "idx_adoration_draw_results_draw",
+  "idx_adoration_draw_results_minister",
 ];
 
 const expectDemo = process.argv.includes("--expect-demo");

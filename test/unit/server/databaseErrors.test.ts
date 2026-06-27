@@ -22,4 +22,11 @@ describe("database error helpers", () => {
       message: 'relation "users" does not exist',
     }, "mass_times_config")).toBe(false);
   });
+
+  it("detects missing native adoration support tables", () => {
+    expect(isMissingTableError({
+      code: "42P01",
+      message: 'relation "adoration_draws" does not exist',
+    }, "adoration_draws")).toBe(true);
+  });
 });

@@ -31,6 +31,7 @@ Bootstrap remoto aplicado em 2026-06-21:
 - security advisor sem lints;
 - seed demo aplicada com 2 comunidades, 4 usuarios, 2 questionarios, 3 escalas, 2 substituicoes e 8 notificacoes;
 - configuracao nativa de missas aplicada em 2026-06-24 com `0009_native_mass_configuration_baseline.sql`;
+- base nativa de sorteio de adoracao versionada em `0010_native_adoration_draws_baseline.sql`;
 - seed de horarios/eventos aplicada nas comunidades `mobile-demo-matriz` e `mobile-demo-sao-lucas`, com 12 horarios legados, 15 configuracoes dinamicas e 32 eventos especiais por comunidade;
 - avisos de performance restantes sao `unused_index`, esperados enquanto a base nao tem trafego.
 
@@ -144,6 +145,22 @@ npm run db:validate:native-schedule -- --community-slug=mobile-demo-matriz --com
 ```
 
 O seed e idempotente: uma segunda execucao deve atualizar os mesmos registros sem duplicar horarios/eventos.
+
+### 5.1. Sorteio De Adoracao Para O Algoritmo
+
+O gerador de escala consulta sorteios de adoracao de segunda-feira quando existirem. Em bancos nativos que foram criados antes dessa baseline, aplicar:
+
+```bash
+CONFIRM_NATIVE_ADORATION_MIGRATION=true \
+DATABASE_URL="$STAGING_DATABASE_URL" \
+npm run db:migrate:native-adoration
+```
+
+Validar junto com a fundacao:
+
+```bash
+DATABASE_URL="$STAGING_DATABASE_URL" npm run db:validate:mobile
+```
 
 ---
 
