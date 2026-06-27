@@ -22,7 +22,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50422)` validado no App Store Connect para substituir o `50421` nos testers internos.
+- iOS TestFlight: build `5.4.3 (50423)` enviado em 27/06/2026 para substituir o `50422` nos testers internos.
 
 ## Comandos Validados
 
@@ -66,18 +66,18 @@ npm run mobile:mvp:check
 
 - Android APK debug: `android/app/build/outputs/apk/debug/app-debug.apk`
 - iOS app de simulador: `build/ios-derived-data/Build/Products/Debug-iphonesimulator/App.app`
-- iOS IPA TestFlight: `build/MESC-50422-export/App.ipa`
+- iOS IPA TestFlight: `build/ios/upload/App.ipa` apos archive/export assinado.
 
 Os artefatos acima sao gerados localmente e nao devem ser commitados.
 
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50422`
-- Delivery UUID: `7dd4cbc9-785e-42ec-813b-a7b094780692`
-- Status App Store Connect: `VALID`
-- Distribuicao: testers internos via TestFlight; vinculacao manual por API ao grupo interno nao e aceita pela Apple, validar disponibilidade no App Store Connect/TestFlight.
-- Changelog: `MVP nativo P0 com respostas do coordenador acionaveis, lembretes para pendentes/cadastros incompletos, Face ID apenas por toque manual para eliminar loop de prompt, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
+- Build: `50423`
+- Delivery UUID: `057d77aa-c0a9-42e7-97b6-fece5be7f695`
+- Status App Store Connect: upload aceito; aguardando processamento/validacao da Apple.
+- Distribuicao: testers internos via TestFlight apos processamento do build pela Apple.
+- Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, nova trava contra loop de Face ID, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -97,7 +97,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o TestFlight `5.4.3 (50422)` esta validado no App Store Connect para o proximo teste fiel do MVP.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50423)` foi enviado ao App Store Connect para o proximo teste fiel do MVP.
 
 ## Prontidao De Escala No Staging
 
