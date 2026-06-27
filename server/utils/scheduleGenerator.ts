@@ -250,7 +250,11 @@ export class ScheduleGenerator {
 
       if (!this.availabilityData || this.availabilityData.size === 0) {
         const warning = `⚠️  WARNING: No questionnaire responses found for ${month}/${year}! Schedules will use default availability.`;
-        console.warn(`\n${warning}`);
+        if (isPreview) {
+          console.log(`\n${warning}`);
+        } else {
+          console.warn(`\n${warning}`);
+        }
         if (!isPreview) {
           const error = new Error(`❌ CRITICAL: No questionnaire responses for ${month}/${year}. Cannot generate final schedules without responses!`);
           console.error(`\n${'!'.repeat(60)}`);
@@ -305,7 +309,7 @@ export class ScheduleGenerator {
       }
 
       // 2.5. Load ALL saints data ONCE (crucial performance optimization) - OPTIONAL
-      console.time('[PERF] Load all saints data');
+      console.time('[PERF] Schedule generator saints data');
       try {
         this.saintsData = await loadAllSaintsData();
         console.log(`[SCHEDULE_GEN] ✅ Saints data loaded successfully`);
@@ -313,7 +317,7 @@ export class ScheduleGenerator {
         console.log(`[SCHEDULE_GEN] ⚠️ Saints table not found, skipping saint name bonuses`);
         this.saintsData = null;
       }
-      console.timeEnd('[PERF] Load all saints data');
+      console.timeEnd('[PERF] Schedule generator saints data');
 
       // 2.6. Pré-calcular bônus de santos para todas as combinações ministro-data
       if (this.saintsData) {
@@ -369,7 +373,7 @@ export class ScheduleGenerator {
         });
 
         console.log(`[SCHEDULE_GEN] =========================================================\n`);
-        logger.warn(`${incompleteSchedules.length} escalas incompletas detectadas para ${month}/${year}`);
+        logger.info(`${incompleteSchedules.length} escalas incompletas detectadas para ${month}/${year}`);
       } else {
         console.log(`[SCHEDULE_GEN] ✅ Todas as escalas atingiram o número mínimo de ministros!`);
       }
@@ -3047,7 +3051,7 @@ export class ScheduleGenerator {
     }
 
     if (eligible.length === 0) {
-      logger.warn(`[FAIR_ALGORITHM] No eligible ministers for ${massTime.date} ${massTime.time}.`);
+      logger.info(`[FAIR_ALGORITHM] No eligible ministers for ${massTime.date} ${massTime.time}.`);
       return [];
     }
 
@@ -3275,7 +3279,7 @@ export class ScheduleGenerator {
       // Final check after potential Tier B fill
       if (selected.length < targetCount) {
         const finalShortage = targetCount - selected.length;
-        logger.warn(`⚠️ [FAIR_ALGORITHM] INCOMPLETE: ${selected.length}/${targetCount} (short by ${finalShortage})`);
+        logger.info(`[FAIR_ALGORITHM] Incomplete: ${selected.length}/${targetCount} (short by ${finalShortage})`);
         console.log(`[FAIR_ALGORITHM] ⚠️ INCOMPLETE: ${selected.length}/${targetCount}`);
         console.log(`[FAIR_ALGORITHM] Reason: Only ${available.length} ministers available in pool`);
 
@@ -3690,7 +3694,7 @@ export class ScheduleGenerator {
         isMissingTableError(error, 'adoration_draws') ||
         isMissingTableError(error, 'adoration_draw_results')
       ) {
-        logger.warn('[ADORATION] Draw tables unavailable; skipping adoration integration for schedule generation.');
+        logger.info('[ADORATION] Draw tables unavailable; skipping adoration integration for schedule generation.');
         return [];
       }
 
