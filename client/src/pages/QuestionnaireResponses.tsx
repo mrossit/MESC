@@ -51,7 +51,9 @@ import {
 import { authAPI } from '@/lib/auth';
 import {
   mobileGetAdminCommunityHome,
+  mobileGenerateAdminSchedulePreview,
   mobileGetAdminQuestionnaireResponses,
+  mobileGetAdminScheduleReadiness,
   mobileSendAdminQuestionnaireReminders,
   shouldUseMobileAuth,
 } from '@/lib/mobile-auth-session';
@@ -60,6 +62,7 @@ import type {
   MobileAdminQuestionnaireReminderTarget,
   MobileAdminQuestionnaireResponsesResponse,
   MobileAdminQuestionnaireTargetMinister,
+  MobileAdminSchedulePreviewResponse,
 } from '@shared/mobileClient';
 import type { MobileProfileReadinessStatus } from '@shared/mobileDataReadiness';
 
@@ -174,6 +177,7 @@ function NativeCoordinatorResponses({
   monthNames: string[];
 }) {
   const [nativeSearch, setNativeSearch] = useState('');
+  const [schedulePreview, setSchedulePreview] = useState<MobileAdminSchedulePreviewResponse | null>(null);
   const queryClient = useQueryClient();
   const isoMonth = toIsoMonth(selectedYear, selectedMonth);
 
@@ -182,6 +186,12 @@ function NativeCoordinatorResponses({
     queryFn: () => mobileGetAdminCommunityHome({ month: isoMonth }),
   });
   const questionnaireId = homeQuery.data?.questionnaire?.id ?? null;
+  const readinessQuery = useQuery({
+    queryKey: ['mobile', 'admin-schedule-readiness', isoMonth],
+    queryFn: () => mobileGetAdminScheduleReadiness({ month: isoMonth }),
+    enabled: Boolean(questionnaireId),
+    staleTime: 60 * 1000,
+  });
   const responsesQuery = useQuery({
     queryKey: ['mobile', 'admin-questionnaire-responses', questionnaireId],
     enabled: Boolean(questionnaireId),
@@ -206,6 +216,10 @@ function NativeCoordinatorResponses({
     setSelectedMonth,
     setSelectedYear,
   ]);
+
+  useEffect(() => {
+    setSchedulePreview(null);
+  }, [isoMonth]);
 
   const payload = responsesQuery.data;
   const reminderMutation = useMutation({
@@ -243,6 +257,23 @@ function NativeCoordinatorResponses({
       });
     },
   });
+  const schedulePreviewMutation = useMutation({
+    mutationFn: () => mobileGenerateAdminSchedulePreview({ month: isoMonth }),
+    onSuccess: (response) => {
+      setSchedulePreview(response);
+      toast({
+        title: 'Preview gerado',
+        description: `${response.summary.totalMasses} missa(s), ${response.summary.totalVacancies} vaga(s) em atenção.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Não foi possível gerar',
+        description: error instanceof Error ? error.message : 'Revise questionário, respostas e configuração das missas.',
+        variant: 'destructive',
+      });
+    },
+  });
   const responseByUserId = useMemo(() => {
     const map = new Map<string, MobileAdminQuestionnaireResponsesResponse['responses'][number]>();
     for (const response of payload?.responses ?? []) {
@@ -272,6 +303,11 @@ function NativeCoordinatorResponses({
     (summary?.dataQuality.needsAttention ?? homeQuery.data?.metrics.profileNeedsAttention ?? 0)
     + (summary?.dataQuality.blocked ?? homeQuery.data?.metrics.profileBlocked ?? 0);
   const reminderIsBusy = reminderMutation.isPending;
+  const readiness = readinessQuery.data?.readiness;
+  const canGeneratePreview = Boolean(questionnaireId) && readiness?.canPreview !== false;
+  const previewAttentionSchedules = schedulePreview?.schedules
+    .filter((schedule) => schedule.status === 'needs_attention')
+    .slice(0, 5) ?? [];
 
   const sendReminder = (
     target: MobileAdminQuestionnaireReminderTarget,
@@ -502,6 +538,118 @@ function NativeCoordinatorResponses({
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Calendar className="h-4 w-4" />
+                      Preview da escala
+                    </CardTitle>
+                    <CardDescription>
+                      {readiness?.canPreview === false
+                        ? 'Há pendências antes da simulação.'
+                        : 'Simulação da escala para revisão da coordenação.'}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => schedulePreviewMutation.mutate()}
+                    disabled={!canGeneratePreview || readinessQuery.isLoading || schedulePreviewMutation.isPending}
+                  >
+                    <RefreshCw className={cn('mr-2 h-4 w-4', schedulePreviewMutation.isPending && 'animate-spin')} />
+                    {schedulePreview ? 'Gerar novamente' : 'Gerar preview'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {readinessQuery.isLoading ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Verificando prontidão da escala...
+                  </div>
+                ) : readiness?.blockers.length ? (
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {readiness.blockers.slice(0, 2).join(' ')}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg border p-3">
+                      <div className="text-xl font-bold">{readinessQuery.data?.massConfig.configuredSlots ?? 0}</div>
+                      <p className="text-sm text-muted-foreground">horários</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <div className="text-xl font-bold">{readinessQuery.data?.questionnaire?.responseCount ?? 0}</div>
+                      <p className="text-sm text-muted-foreground">respostas</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <div className="text-xl font-bold">{schedulePreview?.summary.totalMasses ?? '-'}</div>
+                      <p className="text-sm text-muted-foreground">missas</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <div className={cn(
+                        'text-xl font-bold',
+                        schedulePreview && schedulePreview.summary.totalVacancies > 0 ? 'text-amber-700 dark:text-amber-300' : '',
+                      )}>
+                        {schedulePreview?.summary.totalVacancies ?? '-'}
+                      </div>
+                      <p className="text-sm text-muted-foreground">vagas</p>
+                    </div>
+                  </div>
+                )}
+
+                {schedulePreview && (
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xl font-bold">{schedulePreview.summary.totalAssignments}</div>
+                        <p className="text-sm text-muted-foreground">atribuições</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xl font-bold">{schedulePreview.summary.averageConfidence}%</div>
+                        <p className="text-sm text-muted-foreground">confiança média</p>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xl font-bold">{schedulePreview.summary.lowConfidenceMasses}</div>
+                        <p className="text-sm text-muted-foreground">baixa confiança</p>
+                      </div>
+                    </div>
+
+                    {previewAttentionSchedules.length > 0 ? (
+                      <div className="space-y-2">
+                        {previewAttentionSchedules.map((schedule) => (
+                          <div
+                            key={`${schedule.date ?? 'sem-data'}-${schedule.time}-${schedule.type}`}
+                            className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{schedule.displayName}</p>
+                              <p className="text-muted-foreground">
+                                {schedule.date ?? 'Sem data'} às {schedule.time}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="w-fit border-amber-300 text-amber-800 dark:border-amber-700 dark:text-amber-100">
+                              {schedule.assignedMinisters}/{schedule.requiredMinisters} ministros
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <Alert className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950">
+                        <CheckCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Todas as missas do preview atingiram o mínimo configurado.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardContent className="p-4">
