@@ -105,6 +105,7 @@ export function isAutoBiometricCooldownActive(now = Date.now()): boolean {
 
   const active = elapsed < AUTO_BIOMETRIC_COOLDOWN_MS;
   if (!active) {
+    sessionStorage.removeItem(AUTO_BIOMETRIC_ATTEMPTED_KEY);
     localStorage.removeItem(AUTO_BIOMETRIC_LAST_ATTEMPT_KEY);
   }
   return active;

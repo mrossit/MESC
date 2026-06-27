@@ -40,6 +40,7 @@ describe("persistent storage biometric guards", () => {
     vi.setSystemTime(new Date("2026-06-23T12:06:00.000Z"));
 
     expect(isAutoBiometricCooldownActive()).toBe(false);
+    expect(hasAutoBiometricAttempted()).toBe(false);
     expect(localStorage.getItem("mesc_auto_biometric_last_attempt_at")).toBeNull();
   });
 

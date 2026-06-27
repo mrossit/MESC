@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   clearAutoBiometricAttempt,
   clearLocalSession,
+  isAutoBiometricCooldownActive,
   markAutoBiometricAttempt,
 } from "@/lib/persistent-storage";
 import { hasStoredMobileRefreshToken, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
@@ -118,14 +119,7 @@ export default function Login() {
       } else {
         const status = await refreshBiometricStatus();
         if (status.native && status.available && status.enabled) {
-          try {
-            const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
-            setBiometricStatus(refreshedStatus);
-            clearAutoBiometricAttempt();
-          } catch {
-            markAutoBiometricAttempt();
-            // Do not block a valid password login if Keychain refresh fails.
-          }
+          clearAutoBiometricAttempt();
           finishLogin(data.user);
           return;
         }
@@ -174,7 +168,16 @@ export default function Login() {
 
   const handleBiometricUnlock = async () => {
     if (biometricUnlockInProgressRef.current) return;
+    if (isAutoBiometricCooldownActive()) {
+      toast({
+        title: "Biometria pausada",
+        description: "Use email e senha agora. Voce podera tentar a biometria novamente em alguns minutos.",
+      });
+      return;
+    }
+
     biometricUnlockInProgressRef.current = true;
+    markAutoBiometricAttempt();
     setBiometricBusy(true);
     try {
       await unlockNativeBiometricLogin();
