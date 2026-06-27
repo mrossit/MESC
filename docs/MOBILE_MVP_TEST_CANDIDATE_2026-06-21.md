@@ -22,7 +22,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50424)` enviado em 27/06/2026 para substituir o `50423` nos testers internos.
+- iOS TestFlight: build `5.4.3 (50425)` enviado em 27/06/2026 para substituir o `50424` nos testers internos.
 
 ## Comandos Validados
 
@@ -73,11 +73,11 @@ Os artefatos acima sao gerados localmente e nao devem ser commitados.
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50424`
-- Delivery UUID: `69a6f0d9-2b4c-4176-a661-a277d317c4f5`
+- Build: `50425`
+- Delivery UUID: `74035f97-f747-44d4-829d-e2cd0fc55274`
 - Status App Store Connect: upload aceito; aguardando processamento/validacao da Apple.
 - Distribuicao: testers internos via TestFlight apos processamento do build pela Apple.
-- Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, invalidacao de sessao biometrica expirada, renovacao da credencial Face ID/Touch ID apos login por senha, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
+- Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, novo session token apos Face ID/Touch ID, remocao do cooldown no toque manual da biometria, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -97,7 +97,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50424)` foi enviado ao App Store Connect para o proximo teste fiel do MVP.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50425)` foi enviado ao App Store Connect para o proximo teste fiel do MVP.
 
 ## Prontidao De Escala No Staging
 
