@@ -639,6 +639,32 @@ paths:
                 $ref: "#/components/schemas/AdminScheduleReadiness"
         "403":
           description: User is not a coordinator or manager, or the requested community is outside scope.
+  /admin/schedules/generate-preview:
+    post:
+      summary: Generate a scoped schedule preview for the active coordinator community without publishing.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                month:
+                  type: string
+                  pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Generated schedule preview for review in the native coordinator app.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSchedulePreview"
+        "400":
+          description: Missing questionnaire responses or mass configuration for the requested month.
+        "403":
+          description: User is not a coordinator or manager, or the requested community is outside scope.
   /admin/questionnaires/{id}/responses:
     get:
       summary: Read questionnaire responses for the active coordinator community.
@@ -1491,6 +1517,115 @@ components:
               type: integer
             completed:
               type: integer
+    AdminSchedulePreview:
+      type: object
+      required: [success, community, month, generatedAt, questionnaire, summary, schedules]
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        month:
+          type: string
+        generatedAt:
+          type: string
+        questionnaire:
+          type: object
+          required: [id, title, month, year, status, responseCount]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            month:
+              type: integer
+            year:
+              type: integer
+            status:
+              type: string
+            responseCount:
+              type: integer
+        summary:
+          type: object
+          required: [totalMasses, totalAssignments, totalVacancies, averageConfidence, lowConfidenceMasses]
+          properties:
+            totalMasses:
+              type: integer
+            totalAssignments:
+              type: integer
+            totalVacancies:
+              type: integer
+            averageConfidence:
+              type: integer
+            lowConfidenceMasses:
+              type: integer
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSchedulePreviewItem"
+    AdminSchedulePreviewMinister:
+      type: object
+      required: [id, name, position, availabilityScore]
+      properties:
+        id:
+          type: string
+          nullable: true
+        name:
+          type: string
+        position:
+          type: integer
+        availabilityScore:
+          type: integer
+    AdminSchedulePreviewItem:
+      type: object
+      required:
+        - date
+        - time
+        - type
+        - displayName
+        - location
+        - requiredMinisters
+        - maxMinisters
+        - assignedMinisters
+        - vacancies
+        - confidence
+        - status
+        - ministers
+        - backupMinisters
+      properties:
+        date:
+          type: string
+          nullable: true
+        time:
+          type: string
+        type:
+          type: string
+        displayName:
+          type: string
+        location:
+          type: string
+          nullable: true
+        requiredMinisters:
+          type: integer
+        maxMinisters:
+          type: integer
+        assignedMinisters:
+          type: integer
+        vacancies:
+          type: integer
+        confidence:
+          type: integer
+        status:
+          type: string
+          enum: [covered, needs_attention]
+        ministers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSchedulePreviewMinister"
+        backupMinisters:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSchedulePreviewMinister"
     ProfileReadinessIssue:
       type: object
       required: [field, label, severity, message]

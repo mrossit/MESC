@@ -28,6 +28,11 @@ import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../servi
 import { isMissingTableError } from "../utils/databaseErrors";
 import { formatMinisterName } from "../utils/formatters";
 import {
+  generateAutomaticSchedule,
+  getMassDisplayName,
+  type GeneratedSchedule,
+} from "../utils/scheduleGenerator";
+import {
   beginMobileIdempotency,
   buildMobileRequestFingerprint,
   completeMobileIdempotency,
@@ -132,6 +137,10 @@ const adminQuestionnaireReminderSchema = z.object({
   ministerIds: z.array(z.string()).optional(),
   message: z.string().trim().max(1000).nullable().optional(),
   dryRun: z.boolean().optional().default(false),
+});
+
+const adminSchedulePreviewSchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional(),
 });
 
 const profileUpdateSchema = z.object({
@@ -652,6 +661,60 @@ function toMobileProfile(user: {
     requiresPasswordChange: Boolean(user.requiresPasswordChange),
     createdAt: toIsoDate(user.createdAt),
     updatedAt: toIsoDate(user.updatedAt),
+  };
+}
+
+function toMobileSchedulePreview(schedule: GeneratedSchedule) {
+  const assignedMinisters = schedule.ministers.filter((minister) => minister.id).length;
+  const vacancies = schedule.ministers.filter((minister) => !minister.id || minister.name === "VACANTE").length;
+
+  return {
+    date: schedule.massTime.date ?? null,
+    time: schedule.massTime.time,
+    type: schedule.massTime.type ?? "missa",
+    displayName: getMassDisplayName(schedule.massTime),
+    location: schedule.massTime.location ?? null,
+    requiredMinisters: schedule.massTime.minMinisters,
+    maxMinisters: schedule.massTime.maxMinisters,
+    assignedMinisters,
+    vacancies,
+    confidence: Math.round((schedule.confidence ?? 0) * 100),
+    status: vacancies > 0 ? "needs_attention" : "covered",
+    ministers: schedule.ministers.map((minister, index) => ({
+      id: minister.id,
+      name: minister.name,
+      position: minister.position ?? index + 1,
+      availabilityScore: minister.availabilityScore ?? 0,
+    })),
+    backupMinisters: schedule.backupMinisters.slice(0, 5).map((minister, index) => ({
+      id: minister.id,
+      name: minister.name,
+      position: minister.position ?? assignedMinisters + index + 1,
+      availabilityScore: minister.availabilityScore ?? 0,
+    })),
+  };
+}
+
+function summarizeSchedulePreview(generatedSchedules: GeneratedSchedule[]) {
+  const totalMasses = generatedSchedules.length;
+  const totalAssignments = generatedSchedules.reduce(
+    (total, schedule) => total + schedule.ministers.filter((minister) => minister.id).length,
+    0,
+  );
+  const totalVacancies = generatedSchedules.reduce(
+    (total, schedule) => total + schedule.ministers.filter((minister) => !minister.id || minister.name === "VACANTE").length,
+    0,
+  );
+  const averageConfidence = totalMasses > 0
+    ? Math.round((generatedSchedules.reduce((total, schedule) => total + (schedule.confidence ?? 0), 0) / totalMasses) * 100)
+    : 0;
+
+  return {
+    totalMasses,
+    totalAssignments,
+    totalVacancies,
+    averageConfidence,
+    lowConfidenceMasses: generatedSchedules.filter((schedule) => (schedule.confidence ?? 0) < 0.6).length,
   };
 }
 
@@ -2290,6 +2353,109 @@ router.get("/admin/schedules/readiness", authenticateToken, async (req: AuthRequ
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar prontidao da escala");
+  }
+});
+
+router.post("/admin/schedules/generate-preview", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+
+    const parsed = adminSchedulePreviewSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(parsed.month ?? req.query.month);
+
+    const [questionnaire] = await db
+      .select({
+        id: questionnaires.id,
+        title: questionnaires.title,
+        month: questionnaires.month,
+        year: questionnaires.year,
+        status: questionnaires.status,
+      })
+      .from(questionnaires)
+      .where(
+        and(
+          eq(questionnaires.communityId, activeCommunity.id),
+          eq(questionnaires.month, monthRange.month),
+          eq(questionnaires.year, monthRange.year),
+        ),
+      )
+      .orderBy(desc(questionnaires.updatedAt))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(400, "Nenhum questionario encontrado para o mes");
+    }
+
+    const [responseSummary] = await db
+      .select({ responses: count() })
+      .from(questionnaireResponses)
+      .where(
+        and(
+          eq(questionnaireResponses.questionnaireId, questionnaire.id),
+          eq(questionnaireResponses.communityId, activeCommunity.id),
+          eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+        ),
+      );
+
+    if (Number(responseSummary?.responses ?? 0) === 0) {
+      throw new MobileHttpError(400, "Nenhuma resposta de questionario para o mes");
+    }
+
+    const [massConfigSummary] = await db
+      .select({ configuredSlots: count() })
+      .from(massTimesConfig)
+      .where(
+        and(
+          eq(massTimesConfig.communityId, activeCommunity.id),
+          eq(massTimesConfig.isActive, dbBoolean(true)),
+        ),
+      );
+
+    if (Number(massConfigSummary?.configuredSlots ?? 0) === 0) {
+      throw new MobileHttpError(400, "Nenhuma configuracao de missa ativa para a comunidade");
+    }
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Tempo limite excedido ao gerar preview de escala."));
+      }, 30000);
+    });
+
+    const generatedSchedules = await Promise.race([
+      generateAutomaticSchedule(monthRange.year, monthRange.month, true, { communityId: activeCommunity.id }),
+      timeoutPromise,
+    ]);
+
+    const filteredSchedules = generatedSchedules
+      .filter((schedule) => !(schedule.massTime.date?.endsWith("-28") && schedule.massTime.type === "missa_diaria"));
+    const schedulesPreview = filteredSchedules.map(toMobileSchedulePreview);
+
+    res.json({
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      generatedAt: new Date().toISOString(),
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        responseCount: Number(responseSummary?.responses ?? 0),
+      },
+      summary: summarizeSchedulePreview(filteredSchedules),
+      schedules: schedulesPreview,
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao gerar preview de escala");
   }
 });
 

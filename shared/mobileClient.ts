@@ -414,6 +414,52 @@ export interface MobileAdminScheduleReadinessResponse {
   };
 }
 
+export interface MobileAdminSchedulePreviewMinister {
+  id: string | null;
+  name: string;
+  position: number;
+  availabilityScore: number;
+}
+
+export interface MobileAdminSchedulePreviewItem {
+  date: string | null;
+  time: string;
+  type: string;
+  displayName: string;
+  location: string | null;
+  requiredMinisters: number;
+  maxMinisters: number;
+  assignedMinisters: number;
+  vacancies: number;
+  confidence: number;
+  status: "covered" | "needs_attention";
+  ministers: MobileAdminSchedulePreviewMinister[];
+  backupMinisters: MobileAdminSchedulePreviewMinister[];
+}
+
+export interface MobileAdminSchedulePreviewResponse {
+  success: true;
+  community: MobileCommunity;
+  month: string;
+  generatedAt: string;
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    status: string;
+    responseCount: number;
+  };
+  summary: {
+    totalMasses: number;
+    totalAssignments: number;
+    totalVacancies: number;
+    averageConfidence: number;
+    lowConfidenceMasses: number;
+  };
+  schedules: MobileAdminSchedulePreviewItem[];
+}
+
 export interface MobileAdminQuestionnaireTargetMinister {
   id: string;
   name: string;
@@ -767,6 +813,7 @@ export const mobileEndpoints = {
     withQuery("/admin/community/home", { month: input.month }),
   adminScheduleReadiness: (input: { month?: string } = {}) =>
     withQuery("/admin/schedules/readiness", { month: input.month }),
+  adminScheduleGeneratePreview: () => "/admin/schedules/generate-preview",
   adminQuestionnaireResponses: (id: string) =>
     `/admin/questionnaires/${encodePathSegment(id)}/responses`,
   adminQuestionnaireReminders: (id: string) =>
@@ -1075,6 +1122,15 @@ export class MescMobileApiClient {
     return this.request<MobileAdminScheduleReadinessResponse>({
       method: "GET",
       path: mobileEndpoints.adminScheduleReadiness(input),
+      ...options,
+    });
+  }
+
+  async generateAdminSchedulePreview(input: { month?: string } = {}, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAdminSchedulePreviewResponse>({
+      method: "POST",
+      path: mobileEndpoints.adminScheduleGeneratePreview(),
+      body: input,
       ...options,
     });
   }

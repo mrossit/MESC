@@ -28,6 +28,8 @@ describe("mobileClient contract", () => {
       .toBe("/admin/community/home?month=2026-07");
     expect(mobileEndpoints.adminScheduleReadiness({ month: "2026-07" }))
       .toBe("/admin/schedules/readiness?month=2026-07");
+    expect(mobileEndpoints.adminScheduleGeneratePreview())
+      .toBe("/admin/schedules/generate-preview");
     expect(mobileEndpoints.adminQuestionnaireResponses("questionnaire/with slash"))
       .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/responses");
     expect(mobileEndpoints.adminQuestionnaireReminders("questionnaire/with slash"))
@@ -405,6 +407,52 @@ describe("mobileClient contract", () => {
         }), { status: 200 });
       }
 
+      if (input.endsWith("/admin/schedules/generate-preview")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          month: "2026-07",
+          generatedAt: "2026-06-24T12:00:00.000Z",
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            month: 7,
+            year: 2026,
+            status: "published",
+            responseCount: 11,
+          },
+          summary: {
+            totalMasses: 1,
+            totalAssignments: 2,
+            totalVacancies: 0,
+            averageConfidence: 88,
+            lowConfidenceMasses: 0,
+          },
+          schedules: [{
+            date: "2026-07-05",
+            time: "10:00",
+            type: "missa_dominical",
+            displayName: "Missa Dominical",
+            location: "Igreja Matriz",
+            requiredMinisters: 2,
+            maxMinisters: 2,
+            assignedMinisters: 2,
+            vacancies: 0,
+            confidence: 88,
+            status: "covered",
+            ministers: [],
+            backupMinisters: [],
+          }],
+        }), { status: 200 });
+      }
+
       if (input.endsWith("/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses")) {
         return new Response(JSON.stringify({
           success: true,
@@ -502,6 +550,8 @@ describe("mobileClient contract", () => {
       .resolves.toMatchObject({ questionnaire: { responseRate: 100 } });
     await expect(client.getAdminScheduleReadiness({ month: "2026-07" }))
       .resolves.toMatchObject({ readiness: { canPreview: true }, questionnaire: { responseRate: 92 } });
+    await expect(client.generateAdminSchedulePreview({ month: "2026-07" }))
+      .resolves.toMatchObject({ summary: { totalMasses: 1, averageConfidence: 88 } });
     await expect(client.getAdminQuestionnaireResponses("33333333-3333-4333-8333-333333333333"))
       .resolves.toMatchObject({ summary: { pendingCount: 0 } });
     await expect(client.sendAdminQuestionnaireReminders(
@@ -515,14 +565,18 @@ describe("mobileClient contract", () => {
     expect(requests.map((request) => [request.init.method, request.input])).toEqual([
       ["GET", "https://example.test/api/mobile/v1/admin/community/home?month=2026-07"],
       ["GET", "https://example.test/api/mobile/v1/admin/schedules/readiness?month=2026-07"],
+      ["POST", "https://example.test/api/mobile/v1/admin/schedules/generate-preview"],
       ["GET", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses"],
       ["POST", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/reminders"],
       ["GET", "https://example.test/api/mobile/v1/admin/ministers"],
     ]);
-    expect(requests[3].init.headers).toMatchObject({
+    expect(JSON.parse(String(requests[2].init.body))).toEqual({
+      month: "2026-07",
+    });
+    expect(requests[4].init.headers).toMatchObject({
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
     });
-    expect(JSON.parse(String(requests[3].init.body))).toEqual({
+    expect(JSON.parse(String(requests[4].init.body))).toEqual({
       target: "data_quality",
     });
   });
