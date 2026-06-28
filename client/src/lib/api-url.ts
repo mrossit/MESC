@@ -33,7 +33,11 @@ function isApiRequestUrl(value: string): boolean {
 
 export function isNativeRuntime(): boolean {
   if (typeof window === "undefined") return false;
-  return Capacitor.isNativePlatform() || window.location.protocol === "capacitor:";
+  const platform = Capacitor.getPlatform();
+  return Capacitor.isNativePlatform()
+    || window.location.protocol === "capacitor:"
+    || platform === "ios"
+    || platform === "android";
 }
 
 export function getApiOrigin(): string {

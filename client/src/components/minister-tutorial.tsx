@@ -149,28 +149,28 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
   const StepIcon = step.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="native-tutorial-shell fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
       {/* Overlay escuro */}
       <div 
-        className="absolute inset-0 bg-black/70"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={handleSkip}
       />
 
       {/* Card do Tutorial */}
-      <Card className={`relative w-full max-w-lg mx-4 shadow-2xl border-neutral-accentWarm/30 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 ${
+      <Card className={`native-tutorial-card liquid-glass relative w-full max-w-lg min-w-0 overflow-hidden border-0 shadow-2xl transition-all duration-200 ${
         isAnimating ? "scale-95 opacity-50" : "scale-100 opacity-100"
       }`}>
-        <CardContent className="p-6">
+        <CardContent className="native-tutorial-scroll overflow-y-auto p-5 sm:p-6">
           {/* Header com botão fechar e pular tutorial */}
           <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               {/* Progress Bar */}
               <div className="mb-2">
-                <div className="flex items-center justify-between text-sm text-mesc-text/60 mb-2">
-                  <span>Passo {currentStep + 1} de {tutorialSteps.length}</span>
+                <div className="mb-2 flex items-center justify-between gap-3 pr-9 text-sm text-mesc-text/60">
+                  <span className="shrink-0">Passo {currentStep + 1} de {tutorialSteps.length}</span>
                   <button 
                     onClick={handleSkip}
-                    className="text-mesc-text/60 hover:text-mesc-text underline text-sm mr-8"
+                    className="min-w-0 truncate text-sm text-mesc-text/60 underline hover:text-mesc-text"
                   >
                     Pular tutorial
                   </button>
@@ -182,7 +182,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-2 z-10 hover:bg-gray-100"
+              className="absolute right-2 top-2 z-10 h-8 w-8 rounded-lg hover:bg-white/40 dark:hover:bg-white/10"
               onClick={handleSkip}
             >
               <X className="h-4 w-4" />
@@ -246,26 +246,26 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="flex-1 font-semibold shadow-md border-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="min-w-0 flex-1 border-2 bg-white/72 font-semibold shadow-md hover:bg-white/86 dark:bg-white/10 dark:hover:bg-white/15"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Anterior
+                <span className="truncate">Anterior</span>
               </Button>
 
               {currentStep === tutorialSteps.length - 1 ? (
                 <Button
                   onClick={handleFinish}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-neutral-cream dark:text-text-light font-semibold shadow-lg border border-green-500"
+                  className="min-w-0 flex-1 border border-green-500 bg-green-600 font-semibold text-neutral-cream shadow-lg hover:bg-green-700 dark:text-text-light"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Concluir
+                  <span className="truncate">Concluir</span>
                 </Button>
               ) : (
                 <Button
                   onClick={handleNext}
-                  className="flex-1 bg-neutral-accentWarm dark:bg-amber-700 hover:bg-neutral-accentWarm/90 dark:hover:bg-amber-600 text-neutral-textDark dark:text-text-light font-semibold shadow-lg border border-amber-500"
+                  className="min-w-0 flex-1 border border-amber-500 bg-neutral-accentWarm font-semibold text-neutral-textDark shadow-lg hover:bg-neutral-accentWarm/90 dark:bg-amber-700 dark:text-text-light dark:hover:bg-amber-600"
                 >
-                  Próximo
+                  <span className="truncate">Próximo</span>
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               )}
