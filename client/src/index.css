@@ -260,7 +260,7 @@
     --app-safe-area-top: max(env(safe-area-inset-top, 0px), 3.75rem);
     --app-safe-area-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 0.45rem), 0.35rem);
     --app-header-content-height: 3.6rem;
-    --app-toast-safe-top: calc(var(--app-safe-area-top) + 0.7rem);
+    --app-toast-safe-top: calc(var(--app-safe-area-top) + 1.15rem);
     --app-tab-bar-height: 3.28rem;
   }
 
@@ -791,6 +791,7 @@
     top: var(--app-toast-safe-top) !important;
     padding-left: 0.75rem;
     padding-right: 0.75rem;
+    max-height: calc(100dvh - var(--app-toast-safe-top) - 1rem);
   }
 
   .mobile-bottom-nav {
