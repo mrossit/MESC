@@ -1,7 +1,7 @@
 # MESC Native - Checklist Seguro De Staging/Deploy
 
 **Data:** 2026-06-21
-**Escopo:** aplicar e validar a fundacao mobile `0007/0008` e a base nativa de configuracao de missas `0009` fora do ambiente local.
+**Escopo:** aplicar e validar a fundacao mobile `0007/0008`, o escopo multi-comunidade da escala `0011` e a base nativa de configuracao de missas `0009` fora do ambiente local.
 
 ---
 
@@ -32,6 +32,7 @@ Bootstrap remoto aplicado em 2026-06-21:
 - seed demo aplicada com 2 comunidades, 4 usuarios, 2 questionarios, 3 escalas, 2 substituicoes e 8 notificacoes;
 - configuracao nativa de missas aplicada em 2026-06-24 com `0009_native_mass_configuration_baseline.sql`;
 - base nativa de sorteio de adoracao versionada em `0010_native_adoration_draws_baseline.sql`;
+- unicidade de escala por comunidade versionada em `0011_scope_schedule_unique_constraint_by_community.sql`;
 - seed de horarios/eventos aplicada nas comunidades `mobile-demo-matriz` e `mobile-demo-sao-lucas`, com 12 horarios legados, 15 configuracoes dinamicas e 32 eventos especiais por comunidade;
 - avisos de performance restantes sao `unused_index`, esperados enquanto a base nao tem trafego.
 
@@ -57,7 +58,7 @@ O comando aplica o schema atual com protecoes de ambiente e, em seguida, aplica/
 
 - confirmar qual banco sera usado: staging, demo ou producao;
 - fazer backup antes de qualquer migration em banco com dados reais;
-- confirmar que o deploy atual ja contem o commit com `migrations/0007_mobile_device_sessions.sql` e `migrations/0008_mobile_idempotency_keys.sql`;
+- confirmar que o deploy atual ja contem o commit com `migrations/0007_mobile_device_sessions.sql`, `migrations/0008_mobile_idempotency_keys.sql` e `migrations/0011_scope_schedule_unique_constraint_by_community.sql`;
 - nunca rodar seed demo em producao;
 - nunca rodar `drizzle-kit push` para esta etapa.
 
@@ -77,7 +78,7 @@ Producao, somente na janela aprovada:
 DATABASE_URL="$PRODUCTION_DATABASE_URL" npm run db:migrate:mobile
 ```
 
-O comando aplica apenas as SQLs versionadas `0007` e `0008`.
+O comando aplica as SQLs versionadas `0007`, `0008` e `0011`, alem da compatibilidade `0006` quando ainda nao aplicada.
 
 ---
 

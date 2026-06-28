@@ -1,11 +1,11 @@
 import express from "express";
 import { randomUUID } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
 import { db } from "../../server/db";
-import { schedules, substitutionRequests, users } from "../../shared/schema";
+import { massTimesConfig, questionnaires, schedules, substitutionRequests, users } from "../../shared/schema";
 import {
   MOBILE_P0_DEMO_IDS,
   MOBILE_P0_DEMO_MONTH,
@@ -462,5 +462,66 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       item.id === substitution.substitution.id &&
       item.requester?.id === MOBILE_P0_DEMO_IDS.ministerA,
     )).toBe(true);
+
+    await db
+      .update(questionnaires)
+      .set({ status: "closed" as any, updatedAt: new Date("2026-06-28T12:00:00.000Z") })
+      .where(eq(questionnaires.id, MOBILE_P0_DEMO_IDS.questionnaireA));
+
+    await db
+      .delete(substitutionRequests)
+      .where(eq(substitutionRequests.communityId, MOBILE_P0_DEMO_IDS.communityB));
+    await db
+      .delete(schedules)
+      .where(eq(schedules.communityId, MOBILE_P0_DEMO_IDS.communityB));
+    await db
+      .delete(massTimesConfig)
+      .where(eq(massTimesConfig.communityId, MOBILE_P0_DEMO_IDS.communityA));
+    await db.insert(massTimesConfig).values({
+      id: "20260705-0000-4000-8000-000000000001",
+      communityId: MOBILE_P0_DEMO_IDS.communityA,
+      dayOfWeek: 0,
+      time: "08:00",
+      minMinisters: 1,
+      maxMinisters: 1,
+      isActive: 1 as any,
+      specialEvent: 0 as any,
+      eventName: null,
+      createdAt: new Date("2026-06-28T12:00:00.000Z"),
+      updatedAt: new Date("2026-06-28T12:00:00.000Z"),
+    });
+
+    const publishIdempotencyKey = createMobileIdempotencyKey(randomUUID);
+    const publishedSchedule = await substituteClient.publishAdminSchedule(
+      { month: MOBILE_P0_DEMO_MONTH, replaceExisting: true },
+      { idempotencyKey: publishIdempotencyKey },
+    );
+
+    expect(publishedSchedule.success).toBe(true);
+    expect(publishedSchedule.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
+    expect(publishedSchedule.summary.publishedAssignments).toBeGreaterThan(0);
+    expect(publishedSchedule.summary.replacedSchedules).toBeGreaterThan(0);
+    expect(publishedSchedule.summary.notificationsQueued).toBeGreaterThan(0);
+
+    await expect(substituteClient.publishAdminSchedule(
+      { month: MOBILE_P0_DEMO_MONTH, replaceExisting: true },
+      { idempotencyKey: publishIdempotencyKey },
+    )).resolves.toEqual(publishedSchedule);
+
+    const publishedRows = await db
+      .select({
+        communityId: schedules.communityId,
+        status: schedules.status,
+      })
+      .from(schedules)
+      .where(and(
+        eq(schedules.communityId, MOBILE_P0_DEMO_IDS.communityA),
+        gte(schedules.date, "2026-07-01"),
+        lte(schedules.date, "2026-07-31"),
+      ));
+
+    expect(publishedRows.length).toBe(publishedSchedule.summary.publishedAssignments);
+    expect(publishedRows.every((row) => row.communityId === MOBILE_P0_DEMO_IDS.communityA)).toBe(true);
+    expect(publishedRows.every((row) => row.status === "published")).toBe(true);
   });
 });

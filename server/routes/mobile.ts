@@ -33,6 +33,7 @@ import {
   getMassDisplayName,
   type GeneratedSchedule,
 } from "../utils/scheduleGenerator";
+import { sendPushNotificationToUsers } from "../utils/pushNotifications";
 import {
   beginMobileIdempotency,
   buildMobileRequestFingerprint,
@@ -142,6 +143,11 @@ const adminQuestionnaireReminderSchema = z.object({
 
 const adminSchedulePreviewSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional(),
+});
+
+const adminSchedulePublishSchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional(),
+  replaceExisting: z.boolean().optional().default(false),
 });
 
 const profileUpdateSchema = z.object({
@@ -2571,6 +2577,277 @@ router.post("/admin/schedules/generate-preview", authenticateToken, async (req: 
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao gerar preview de escala");
+  }
+});
+
+router.post("/admin/schedules/publish", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    if (!isAdmin(user.role)) {
+      throw new MobileHttpError(403, "Acesso restrito a coordenadores");
+    }
+
+    const parsed = adminSchedulePublishSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const monthRange = getRequestedMonth(parsed.month ?? req.query.month);
+    const idempotencyBody = {
+      month: monthRange.isoMonth,
+      replaceExisting: parsed.replaceExisting,
+    };
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: idempotencyBody,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const idempotencyKey = idempotency.idempotencyKey;
+
+    const [questionnaire] = await db
+      .select({
+        id: questionnaires.id,
+        title: questionnaires.title,
+        month: questionnaires.month,
+        year: questionnaires.year,
+        status: questionnaires.status,
+      })
+      .from(questionnaires)
+      .where(
+        and(
+          eq(questionnaires.communityId, activeCommunity.id),
+          eq(questionnaires.month, monthRange.month),
+          eq(questionnaires.year, monthRange.year),
+        ),
+      )
+      .orderBy(desc(questionnaires.updatedAt))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(400, "Nenhum questionario encontrado para o mes");
+    }
+
+    if (questionnaire.status !== "closed") {
+      throw new MobileHttpError(400, "Questionario precisa estar encerrado para publicacao definitiva");
+    }
+
+    const [responseSummary] = await db
+      .select({ responses: count() })
+      .from(questionnaireResponses)
+      .where(
+        and(
+          eq(questionnaireResponses.questionnaireId, questionnaire.id),
+          eq(questionnaireResponses.communityId, activeCommunity.id),
+          eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+        ),
+      );
+
+    if (Number(responseSummary?.responses ?? 0) === 0) {
+      throw new MobileHttpError(400, "Nenhuma resposta de questionario para o mes");
+    }
+
+    const [massConfigSummary] = await db
+      .select({ configuredSlots: count() })
+      .from(massTimesConfig)
+      .where(
+        and(
+          eq(massTimesConfig.communityId, activeCommunity.id),
+          eq(massTimesConfig.isActive, dbBoolean(true)),
+        ),
+      );
+
+    if (Number(massConfigSummary?.configuredSlots ?? 0) === 0) {
+      throw new MobileHttpError(400, "Nenhuma configuracao de missa ativa para a comunidade");
+    }
+
+    const existingScheduleRows = await db
+      .select({ id: schedules.id, status: schedules.status })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.communityId, activeCommunity.id),
+          gte(schedules.date, monthRange.startDate),
+          lte(schedules.date, monthRange.endDate),
+        ),
+      );
+
+    if (existingScheduleRows.length > 0 && !parsed.replaceExisting) {
+      throw new MobileHttpError(409, "Ja existem escalas cadastradas para este mes. Confirme substituicao para publicar novamente.");
+    }
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Tempo limite excedido ao publicar escala."));
+      }, 30000);
+    });
+
+    const generatedSchedules = await Promise.race([
+      generateAutomaticSchedule(monthRange.year, monthRange.month, false, { communityId: activeCommunity.id }),
+      timeoutPromise,
+    ]);
+
+    const filteredSchedules = generatedSchedules
+      .filter((schedule) => !(schedule.massTime.date?.endsWith("-28") && schedule.massTime.type === "missa_diaria"));
+    const scheduleRowsToInsert = filteredSchedules.flatMap((schedule) => {
+      if (!schedule.massTime.date) return [];
+
+      const validMinisters = schedule.ministers.filter((minister) => minister.id && minister.id !== "VACANT");
+      const massName = getMassDisplayName(schedule.massTime);
+
+      return validMinisters.map((minister, index) => ({
+        id: randomUUID(),
+        communityId: activeCommunity.id,
+        date: schedule.massTime.date!,
+        time: schedule.massTime.time,
+        type: "missa" as const,
+        location: schedule.massTime.location ?? null,
+        ministerId: minister.id,
+        position: minister.position ?? index + 1,
+        status: "published",
+        notes: `${massName} | Gerado automaticamente pelo app nativo - Confianca: ${Math.round((schedule.confidence ?? 0) * 100)}%`,
+        createdAt: new Date(),
+      }));
+    });
+
+    if (scheduleRowsToInsert.length === 0) {
+      throw new MobileHttpError(400, "A geracao nao encontrou ministros validos para publicar");
+    }
+
+    const replaceExistingSchedules = async (executor: typeof db) => {
+      if (!parsed.replaceExisting || existingScheduleRows.length === 0) return;
+
+      const existingScheduleIds = existingScheduleRows.map((row) => row.id);
+
+      await executor
+        .delete(scheduleConfirmations)
+        .where(inArray(scheduleConfirmations.scheduleId, existingScheduleIds));
+      await executor
+        .delete(substitutionRequests)
+        .where(inArray(substitutionRequests.scheduleId, existingScheduleIds));
+      await executor
+        .delete(schedules)
+        .where(
+          and(
+            eq(schedules.communityId, activeCommunity.id),
+            gte(schedules.date, monthRange.startDate),
+            lte(schedules.date, monthRange.endDate),
+          ),
+        );
+    };
+
+    const insertedSchedules = process.env.DATABASE_URL
+      ? await db.transaction(async (tx) => {
+        await replaceExistingSchedules(tx as typeof db);
+        return tx.insert(schedules).values(scheduleRowsToInsert).returning();
+      })
+      : await (async () => {
+        await replaceExistingSchedules(db);
+        return db.insert(schedules).values(scheduleRowsToInsert).returning();
+      })();
+
+    scheduleCache.invalidate(monthRange.year, monthRange.month);
+
+    const ministerIds = Array.from(new Set(
+      insertedSchedules
+        .map((schedule) => schedule.ministerId)
+        .filter((ministerId): ministerId is string => Boolean(ministerId)),
+    ));
+    const notificationTitle = "Nova escala publicada";
+    const notificationMessage = `A escala de ${monthRange.isoMonth} foi publicada. Confira seus horarios no app.`;
+    const notificationData = mobileNotificationData("schedule_published", {
+      month: monthRange.month,
+      year: monthRange.year,
+      isoMonth: monthRange.isoMonth,
+      communityId: activeCommunity.id,
+      source: "mobile-v1",
+    });
+
+    if (ministerIds.length > 0) {
+      await db.insert(notifications).values(ministerIds.map((ministerId) => ({
+        id: randomUUID(),
+        userId: ministerId,
+        type: "schedule" as const,
+        title: notificationTitle,
+        message: notificationMessage,
+        data: dbJson(notificationData),
+        read: dbBoolean(false),
+        readAt: null,
+        actionUrl: "/schedules",
+        priority: "medium",
+        expiresAt: null,
+        createdAt: new Date(),
+      })));
+
+      try {
+        await sendPushNotificationToUsers(ministerIds, {
+          title: notificationTitle,
+          body: notificationMessage,
+          url: "/schedules",
+          tag: `mobile-schedule-published-${activeCommunity.id}-${monthRange.isoMonth}`,
+          data: notificationData,
+        });
+      } catch (error) {
+        console.error("[MOBILE_SCHEDULE_PUBLISH] Erro ao enviar push nativo:", error);
+      }
+    }
+
+    const summary = summarizeSchedulePreview(filteredSchedules);
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      month: monthRange.isoMonth,
+      publishedAt: new Date().toISOString(),
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        month: questionnaire.month,
+        year: questionnaire.year,
+        status: questionnaire.status,
+        responseCount: Number(responseSummary?.responses ?? 0),
+      },
+      summary: {
+        ...summary,
+        publishedAssignments: insertedSchedules.length,
+        notificationsQueued: ministerIds.length,
+        replacedSchedules: parsed.replaceExisting ? existingScheduleRows.length : 0,
+      },
+      schedules: filteredSchedules.map(toMobileSchedulePreview),
+    };
+
+    await logActivity(user.id, "create_schedule", {
+      source: "mobile-v1",
+      communityId: activeCommunity.id,
+      month: monthRange.month,
+      year: monthRange.year,
+      isoMonth: monthRange.isoMonth,
+      questionnaireId: questionnaire.id,
+      publishedAssignments: insertedSchedules.length,
+      notificationsQueued: ministerIds.length,
+      replacedSchedules: responseBody.summary.replacedSchedules,
+      idempotencyKey,
+    }, req);
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao publicar escala");
   }
 });
 

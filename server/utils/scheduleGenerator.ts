@@ -1504,10 +1504,11 @@ export class ScheduleGenerator {
     }
 
     try {
+      const activeValue = (process.env.DATABASE_URL ? true : 1) as any;
       const config = await this.db.select().from(massTimesConfig)
         .where(
           and(
-            eq(massTimesConfig.isActive, true),
+            eq(massTimesConfig.isActive, activeValue),
             this.options.communityId ? eq(massTimesConfig.communityId, this.options.communityId) : undefined,
           )
         );

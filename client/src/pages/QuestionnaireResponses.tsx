@@ -54,6 +54,7 @@ import {
   mobileGenerateAdminSchedulePreview,
   mobileGetAdminQuestionnaireResponses,
   mobileGetAdminScheduleReadiness,
+  mobilePublishAdminSchedule,
   mobileSendAdminQuestionnaireReminders,
   shouldUseMobileAuth,
 } from '@/lib/mobile-auth-session';
@@ -274,6 +275,30 @@ function NativeCoordinatorResponses({
       });
     },
   });
+  const schedulePublishMutation = useMutation({
+    mutationFn: () => mobilePublishAdminSchedule({
+      month: isoMonth,
+      replaceExisting: (readinessQuery.data?.existingSchedules.total ?? 0) > 0,
+    }),
+    onSuccess: (response) => {
+      setSchedulePreview(null);
+      toast({
+        title: 'Escala publicada',
+        description: `${response.summary.publishedAssignments} atribuição(ões) publicadas para ${response.month}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['mobile', 'admin-community-home', isoMonth] });
+      queryClient.invalidateQueries({ queryKey: ['mobile', 'admin-schedule-readiness', isoMonth] });
+      queryClient.invalidateQueries({ queryKey: ['mobile', 'notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['mobile', 'schedules'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Não foi possível publicar',
+        description: error instanceof Error ? error.message : 'Revise o encerramento do questionário e tente novamente.',
+        variant: 'destructive',
+      });
+    },
+  });
   const responseByUserId = useMemo(() => {
     const map = new Map<string, MobileAdminQuestionnaireResponsesResponse['responses'][number]>();
     for (const response of payload?.responses ?? []) {
@@ -305,6 +330,10 @@ function NativeCoordinatorResponses({
   const reminderIsBusy = reminderMutation.isPending;
   const readiness = readinessQuery.data?.readiness;
   const canGeneratePreview = Boolean(questionnaireId) && readiness?.canPreview !== false;
+  const existingScheduleTotal = readinessQuery.data?.existingSchedules.total ?? 0;
+  const canPublishSchedule = Boolean(questionnaireId)
+    && readiness?.canPublish === true
+    && Boolean(schedulePreview);
   const previewAttentionSchedules = schedulePreview?.schedules
     .filter((schedule) => schedule.status === 'needs_attention')
     .slice(0, 5) ?? [];
@@ -553,14 +582,25 @@ function NativeCoordinatorResponses({
                         : 'Simulação da escala para revisão da coordenação.'}
                     </CardDescription>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => schedulePreviewMutation.mutate()}
-                    disabled={!canGeneratePreview || readinessQuery.isLoading || schedulePreviewMutation.isPending}
-                  >
-                    <RefreshCw className={cn('mr-2 h-4 w-4', schedulePreviewMutation.isPending && 'animate-spin')} />
-                    {schedulePreview ? 'Gerar novamente' : 'Gerar preview'}
-                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      onClick={() => schedulePreviewMutation.mutate()}
+                      disabled={!canGeneratePreview || readinessQuery.isLoading || schedulePreviewMutation.isPending}
+                    >
+                      <RefreshCw className={cn('mr-2 h-4 w-4', schedulePreviewMutation.isPending && 'animate-spin')} />
+                      {schedulePreview ? 'Gerar novamente' : 'Gerar preview'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={existingScheduleTotal > 0 ? 'outline' : 'default'}
+                      onClick={() => schedulePublishMutation.mutate()}
+                      disabled={!canPublishSchedule || schedulePublishMutation.isPending}
+                    >
+                      <CheckCircle className={cn('mr-2 h-4 w-4', schedulePublishMutation.isPending && 'animate-pulse')} />
+                      {existingScheduleTotal > 0 ? 'Substituir e publicar' : 'Publicar escala'}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -574,6 +614,13 @@ function NativeCoordinatorResponses({
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
                       {readiness.blockers.slice(0, 2).join(' ')}
+                    </AlertDescription>
+                  </Alert>
+                ) : readiness?.publishBlockers.length ? (
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {readiness.publishBlockers.slice(0, 2).join(' ')}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -604,6 +651,17 @@ function NativeCoordinatorResponses({
 
                 {schedulePreview && (
                   <div className="space-y-3">
+                    <Alert className={cn(
+                      'border-primary/20 bg-primary/5',
+                      existingScheduleTotal > 0 && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950',
+                    )}>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {existingScheduleTotal > 0
+                          ? `Há ${existingScheduleTotal} escala(s) neste mês. Ao publicar, elas serão substituídas para esta comunidade.`
+                          : 'Revise o preview antes de publicar a escala oficial para os ministros.'}
+                      </AlertDescription>
+                    </Alert>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-lg border p-3">
                         <div className="text-xl font-bold">{schedulePreview.summary.totalAssignments}</div>

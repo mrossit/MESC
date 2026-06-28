@@ -6,6 +6,8 @@ import {
   createMobileIdempotencyKey,
   type MobileAdminCommunityHomeResponse,
   type MobileAdminMinistersResponse,
+  type MobileAdminSchedulePublishPayload,
+  type MobileAdminSchedulePublishResponse,
   type MobileAdminSchedulePreviewResponse,
   type MobileAdminScheduleReadinessResponse,
   type MobileAdminQuestionnaireReminderPayload,
@@ -449,6 +451,19 @@ export async function mobileGenerateAdminSchedulePreview(
   input: { month?: string } = {},
 ): Promise<MobileAdminSchedulePreviewResponse> {
   return runWithMobileAuthRetry((client) => client.generateAdminSchedulePreview(input));
+}
+
+export async function mobilePublishAdminSchedule(
+  payload: MobileAdminSchedulePublishPayload = {},
+  options: MobileClientRequestOptions = {},
+): Promise<MobileAdminSchedulePublishResponse> {
+  return runWithMobileAuthRetry((client) => client.publishAdminSchedule(
+    payload,
+    {
+      ...options,
+      idempotencyKey: options.idempotencyKey ?? createMobileIdempotencyKey(),
+    },
+  ));
 }
 
 export async function mobileGetAdminQuestionnaireResponses(

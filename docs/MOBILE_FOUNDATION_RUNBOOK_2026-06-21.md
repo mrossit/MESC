@@ -8,7 +8,7 @@
 
 ## 1. O Que Esta Coberto
 
-- migrations mobile versionadas: `0007_mobile_device_sessions.sql` e `0008_mobile_idempotency_keys.sql`;
+- migrations mobile versionadas: `0007_mobile_device_sessions.sql`, `0008_mobile_idempotency_keys.sql` e `0011_scope_schedule_unique_constraint_by_community.sql`;
 - migration nativa de configuracao de missas: `0009_native_mass_configuration_baseline.sql`;
 - migration nativa de sorteio de adoracao: `0010_native_adoration_draws_baseline.sql`;
 - registro de dispositivos nativos;
@@ -31,7 +31,7 @@ Aplicar localmente:
 npm run db:migrate:mobile
 ```
 
-Com `DATABASE_URL` configurado, o mesmo comando aplica as SQLs Postgres `0007` e `0008`.
+Com `DATABASE_URL` configurado, o mesmo comando aplica as SQLs Postgres `0007`, `0008` e `0011`, alem da compatibilidade `0006` quando ainda nao aplicada.
 
 Sem `DATABASE_URL`, o comando cria as tabelas equivalentes em `local.db`:
 

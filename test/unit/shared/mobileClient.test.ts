@@ -32,6 +32,8 @@ describe("mobileClient contract", () => {
       .toBe("/admin/schedules/readiness?month=2026-07");
     expect(mobileEndpoints.adminScheduleGeneratePreview())
       .toBe("/admin/schedules/generate-preview");
+    expect(mobileEndpoints.adminSchedulePublish())
+      .toBe("/admin/schedules/publish");
     expect(mobileEndpoints.adminQuestionnaireResponses("questionnaire/with slash"))
       .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/responses");
     expect(mobileEndpoints.adminQuestionnaireReminders("questionnaire/with slash"))
@@ -556,6 +558,41 @@ describe("mobileClient contract", () => {
         }), { status: 200 });
       }
 
+      if (input.endsWith("/admin/schedules/publish")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Comunidade",
+            slug: "comunidade",
+            colorHex: "#722F37",
+            parishName: "Paroquia",
+            isMatriz: true,
+          },
+          month: "2026-07",
+          publishedAt: "2026-06-24T12:05:00.000Z",
+          questionnaire: {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Disponibilidade Julho",
+            month: 7,
+            year: 2026,
+            status: "closed",
+            responseCount: 11,
+          },
+          summary: {
+            totalMasses: 1,
+            totalAssignments: 2,
+            totalVacancies: 0,
+            averageConfidence: 88,
+            lowConfidenceMasses: 0,
+            publishedAssignments: 2,
+            notificationsQueued: 2,
+            replacedSchedules: 0,
+          },
+          schedules: [],
+        }), { status: 200 });
+      }
+
       if (input.endsWith("/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses")) {
         return new Response(JSON.stringify({
           success: true,
@@ -655,6 +692,11 @@ describe("mobileClient contract", () => {
       .resolves.toMatchObject({ readiness: { canPreview: true }, questionnaire: { responseRate: 92 } });
     await expect(client.generateAdminSchedulePreview({ month: "2026-07" }))
       .resolves.toMatchObject({ summary: { totalMasses: 1, averageConfidence: 88 } });
+    await expect(client.publishAdminSchedule(
+      { month: "2026-07", replaceExisting: false },
+      { idempotencyKey: "22222222-2222-4222-8222-222222222222" },
+    ))
+      .resolves.toMatchObject({ summary: { publishedAssignments: 2, notificationsQueued: 2 } });
     await expect(client.getAdminQuestionnaireResponses("33333333-3333-4333-8333-333333333333"))
       .resolves.toMatchObject({ summary: { pendingCount: 0 } });
     await expect(client.sendAdminQuestionnaireReminders(
@@ -669,6 +711,7 @@ describe("mobileClient contract", () => {
       ["GET", "https://example.test/api/mobile/v1/admin/community/home?month=2026-07"],
       ["GET", "https://example.test/api/mobile/v1/admin/schedules/readiness?month=2026-07"],
       ["POST", "https://example.test/api/mobile/v1/admin/schedules/generate-preview"],
+      ["POST", "https://example.test/api/mobile/v1/admin/schedules/publish"],
       ["GET", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/responses"],
       ["POST", "https://example.test/api/mobile/v1/admin/questionnaires/33333333-3333-4333-8333-333333333333/reminders"],
       ["GET", "https://example.test/api/mobile/v1/admin/ministers"],
@@ -676,10 +719,17 @@ describe("mobileClient contract", () => {
     expect(JSON.parse(String(requests[2].init.body))).toEqual({
       month: "2026-07",
     });
-    expect(requests[4].init.headers).toMatchObject({
+    expect(requests[3].init.headers).toMatchObject({
+      [MOBILE_IDEMPOTENCY_HEADER]: "22222222-2222-4222-8222-222222222222",
+    });
+    expect(JSON.parse(String(requests[3].init.body))).toEqual({
+      month: "2026-07",
+      replaceExisting: false,
+    });
+    expect(requests[5].init.headers).toMatchObject({
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
     });
-    expect(JSON.parse(String(requests[4].init.body))).toEqual({
+    expect(JSON.parse(String(requests[5].init.body))).toEqual({
       target: "data_quality",
     });
   });

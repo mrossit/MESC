@@ -1,7 +1,7 @@
 /**
  * Applies the MESC Native mobile foundation migrations.
  *
- * - With DATABASE_URL: applies the Postgres SQL migration files 0006, 0007 and 0008.
+ * - With DATABASE_URL: applies the Postgres SQL migration files 0006, 0007, 0008 and 0011.
  * - Without DATABASE_URL: applies SQLite-compatible local DDL to local.db.
  *
  * This intentionally does not call drizzle-kit push.
@@ -13,6 +13,7 @@ const migrationFiles = [
   "migrations/0006_account_deletion_compliance.sql",
   "migrations/0007_mobile_device_sessions.sql",
   "migrations/0008_mobile_idempotency_keys.sql",
+  "migrations/0011_scope_schedule_unique_constraint_by_community.sql",
 ];
 
 function readPostgresMigrations() {
@@ -138,6 +139,18 @@ async function applySqliteMigrations() {
       CREATE INDEX IF NOT EXISTS idx_mobile_idempotency_expires
         ON mobile_idempotency_keys(expires_at);
     `);
+    const schedulesTable = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schedules'")
+      .get();
+
+    if (schedulesTable) {
+      sqlite.exec(`
+        DROP INDEX IF EXISTS uq_schedules_date_time_position;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_schedules_community_date_time_position
+          ON schedules(community_id, date, time, position);
+      `);
+    }
     console.log("Mobile migrations applied to local SQLite.");
   } finally {
     sqlite.close();

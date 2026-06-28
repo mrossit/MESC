@@ -313,8 +313,8 @@ export const schedules = pgTable('schedules', {
   index('idx_schedules_minister_date').on(table.ministerId, table.date),
   // Published schedules filtering
   index('idx_schedules_date_status').on(table.date, table.status),
-  // Prevent duplicate position at same date/time
-  unique('uq_schedules_date_time_position').on(table.date, table.time, table.position)
+  // Prevent duplicate position at same date/time inside the same community
+  unique('uq_schedules_community_date_time_position').on(table.communityId, table.date, table.time, table.position)
 ]);
 
 // Mass Execution Logs (for auxiliary leaders)

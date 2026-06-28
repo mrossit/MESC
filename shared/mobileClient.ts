@@ -471,6 +471,37 @@ export interface MobileAdminSchedulePreviewResponse {
   schedules: MobileAdminSchedulePreviewItem[];
 }
 
+export interface MobileAdminSchedulePublishPayload {
+  month?: string;
+  replaceExisting?: boolean;
+}
+
+export interface MobileAdminSchedulePublishResponse {
+  success: true;
+  community: MobileCommunity;
+  month: string;
+  publishedAt: string;
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    status: string;
+    responseCount: number;
+  };
+  summary: {
+    totalMasses: number;
+    totalAssignments: number;
+    totalVacancies: number;
+    averageConfidence: number;
+    lowConfidenceMasses: number;
+    publishedAssignments: number;
+    notificationsQueued: number;
+    replacedSchedules: number;
+  };
+  schedules: MobileAdminSchedulePreviewItem[];
+}
+
 export interface MobileAdminQuestionnaireTargetMinister {
   id: string;
   name: string;
@@ -827,6 +858,7 @@ export const mobileEndpoints = {
   adminScheduleReadiness: (input: { month?: string } = {}) =>
     withQuery("/admin/schedules/readiness", { month: input.month }),
   adminScheduleGeneratePreview: () => "/admin/schedules/generate-preview",
+  adminSchedulePublish: () => "/admin/schedules/publish",
   adminQuestionnaireResponses: (id: string) =>
     `/admin/questionnaires/${encodePathSegment(id)}/responses`,
   adminQuestionnaireReminders: (id: string) =>
@@ -1178,6 +1210,18 @@ export class MescMobileApiClient {
       method: "POST",
       path: mobileEndpoints.adminScheduleGeneratePreview(),
       body: input,
+      ...options,
+    });
+  }
+
+  async publishAdminSchedule(
+    payload: MobileAdminSchedulePublishPayload = {},
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileAdminSchedulePublishResponse>({
+      method: "POST",
+      path: mobileEndpoints.adminSchedulePublish(),
+      body: payload,
       ...options,
     });
   }

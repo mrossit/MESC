@@ -12,6 +12,7 @@ import {
   mobileMarkAllNotificationsRead,
   mobileMarkNotificationRead,
   mobileListSubstitutions,
+  mobilePublishAdminSchedule,
   refreshMobileAuthSession,
   mobileSendAdminQuestionnaireReminders,
   mobileSubmitQuestionnaireResponse,
@@ -600,6 +601,66 @@ describe("mobile auth session storage", () => {
         credentials: "include",
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",
+          "X-Community-Id": "community-1",
+          "X-Device-Id": "ios-device-1",
+        }),
+      }),
+    );
+  });
+
+  it("publishes coordinator schedules with mobile idempotency", async () => {
+    localStorage.setItem("token", "access-token-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.activeCommunityId, "community-1");
+    localStorage.setItem(MOBILE_AUTH_STORAGE_KEYS.deviceId, "ios-device-1");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        community: authResponse.communities[0],
+        month: "2026-07",
+        publishedAt: "2026-06-24T12:05:00.000Z",
+        questionnaire: {
+          id: "questionnaire-1",
+          title: "Disponibilidade Julho",
+          month: 7,
+          year: 2026,
+          status: "closed",
+          responseCount: 11,
+        },
+        summary: {
+          totalMasses: 1,
+          totalAssignments: 2,
+          totalVacancies: 0,
+          averageConfidence: 88,
+          lowConfidenceMasses: 0,
+          publishedAssignments: 2,
+          notificationsQueued: 2,
+          replacedSchedules: 0,
+        },
+        schedules: [],
+      }), { status: 200 }));
+
+    await expect(mobilePublishAdminSchedule(
+      { month: "2026-07", replaceExisting: false },
+      { idempotencyKey: "22222222-2222-4222-8222-222222222222" },
+    )).resolves.toMatchObject({
+      summary: {
+        publishedAssignments: 2,
+        notificationsQueued: 2,
+      },
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/mobile/v1/admin/schedules/publish",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ month: "2026-07", replaceExisting: false }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token-1",
+          "Content-Type": "application/json",
+          "Idempotency-Key": "22222222-2222-4222-8222-222222222222",
           "X-Community-Id": "community-1",
           "X-Device-Id": "ios-device-1",
         }),

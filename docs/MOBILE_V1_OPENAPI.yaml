@@ -751,6 +751,31 @@ paths:
           description: Missing questionnaire responses or mass configuration for the requested month.
         "403":
           description: User is not a coordinator or manager, or the requested community is outside scope.
+  /admin/schedules/publish:
+    post:
+      summary: Publish a scoped monthly schedule for the active coordinator community.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSchedulePublishRequest"
+      responses:
+        "200":
+          description: Published schedule with native notifications queued for assigned ministers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSchedulePublish"
+        "400":
+          description: Questionnaire is not closed, has no responses, or Mass configuration is missing.
+        "403":
+          description: User is not a coordinator or manager, or the requested community is outside scope.
+        "409":
+          description: The month already has schedules and replaceExisting was not confirmed.
   /admin/questionnaires/{id}/responses:
     get:
       summary: Read questionnaire responses for the active coordinator community.
@@ -1647,6 +1672,75 @@ components:
             averageConfidence:
               type: integer
             lowConfidenceMasses:
+              type: integer
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSchedulePreviewItem"
+    AdminSchedulePublishRequest:
+      type: object
+      properties:
+        month:
+          type: string
+          pattern: "^\\d{4}-\\d{2}$"
+        replaceExisting:
+          type: boolean
+          default: false
+    AdminSchedulePublish:
+      type: object
+      required: [success, community, month, publishedAt, questionnaire, summary, schedules]
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        month:
+          type: string
+        publishedAt:
+          type: string
+        questionnaire:
+          type: object
+          required: [id, title, month, year, status, responseCount]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            month:
+              type: integer
+            year:
+              type: integer
+            status:
+              type: string
+            responseCount:
+              type: integer
+        summary:
+          type: object
+          required:
+            - totalMasses
+            - totalAssignments
+            - totalVacancies
+            - averageConfidence
+            - lowConfidenceMasses
+            - publishedAssignments
+            - notificationsQueued
+            - replacedSchedules
+          properties:
+            totalMasses:
+              type: integer
+            totalAssignments:
+              type: integer
+            totalVacancies:
+              type: integer
+            averageConfidence:
+              type: integer
+            lowConfidenceMasses:
+              type: integer
+            publishedAssignments:
+              type: integer
+            notificationsQueued:
+              type: integer
+            replacedSchedules:
               type: integer
         schedules:
           type: array
