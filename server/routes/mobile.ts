@@ -1112,6 +1112,34 @@ router.get("/devices", authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/devices/current", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const deviceId = getDeviceId(req);
+    if (!deviceId) {
+      throw new MobileHttpError(400, "Informe X-Device-Id para consultar o dispositivo atual");
+    }
+
+    const devices = await listMobileDevicesForUser(user.id);
+    const device = devices.find((item) => item.deviceId === deviceId && !item.revokedAt);
+
+    if (!device) {
+      throw new MobileHttpError(404, "Dispositivo atual nao encontrado");
+    }
+
+    res.json({
+      success: true,
+      device: sanitizeMobileDevice(device),
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao consultar dispositivo atual");
+  }
+});
+
 router.put("/devices/current", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;

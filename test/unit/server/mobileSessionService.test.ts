@@ -54,7 +54,10 @@ describe("mobileSessionService", () => {
       pushToken: "secret-push-token",
       pushProvider: "apns",
       pushEnabled: true,
-      notificationPreferences: {},
+      notificationPreferences: {
+        emailNotifications: true,
+        reminderHours: 24,
+      },
       biometricCapable: true,
       biometricEnabled: false,
       lastSeenAt: new Date("2026-06-20T12:00:00Z"),
@@ -70,6 +73,10 @@ describe("mobileSessionService", () => {
       appVersion: "1.0.0",
       pushEnabled: true,
       pushProvider: "apns",
+      notificationPreferences: {
+        emailNotifications: true,
+        reminderHours: 24,
+      },
       biometricCapable: true,
       biometricEnabled: false,
       lastSeenAt: "2026-06-20T12:00:00.000Z",

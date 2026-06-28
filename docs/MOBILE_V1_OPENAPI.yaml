@@ -194,6 +194,27 @@ paths:
                     items:
                       $ref: "#/components/schemas/MobileDevice"
   /devices/current:
+    get:
+      summary: Read the current native device registration.
+      parameters:
+        - $ref: "#/components/parameters/DeviceHeader"
+      responses:
+        "200":
+          description: Current device registration.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, device]
+                properties:
+                  success:
+                    type: boolean
+                  device:
+                    $ref: "#/components/schemas/MobileDevice"
+        "400":
+          description: Missing X-Device-Id header.
+        "404":
+          description: Current device not found.
     put:
       summary: Create or update the current native device registration.
       parameters:
@@ -1054,6 +1075,7 @@ components:
         - deviceId
         - platform
         - pushEnabled
+        - notificationPreferences
         - biometricCapable
         - biometricEnabled
         - lastSeenAt
@@ -1074,6 +1096,8 @@ components:
         pushProvider:
           type: string
           nullable: true
+        notificationPreferences:
+          type: object
         biometricCapable:
           type: boolean
         biometricEnabled:

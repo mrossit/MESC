@@ -55,9 +55,11 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
   });
 
   it("runs login, refresh, mission, notifications, questionnaire, confirmation and substitution", async () => {
+    const ministerDeviceId = `mobile-smoke-ios-device-${randomUUID()}`;
+    const substituteDeviceId = `mobile-smoke-substitute-ios-device-${randomUUID()}`;
     const client = new MescMobileApiClient({
       baseUrl,
-      deviceId: "mobile-smoke-ios-device",
+      deviceId: ministerDeviceId,
       platform: "ios",
       appVersion: "1.0.0-smoke",
     });
@@ -72,6 +74,36 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(login.auth.accessToken).toEqual(expect.any(String));
     expect(login.auth.refreshToken).toEqual(expect.any(String));
     expect(login.activeCommunityId).toBe(MOBILE_P0_DEMO_IDS.communityA);
+
+    const currentDevice = await client.getCurrentDevice();
+    expect(currentDevice.success).toBe(true);
+    expect(currentDevice.device).toMatchObject({
+      deviceId: ministerDeviceId,
+      pushEnabled: false,
+      notificationPreferences: {},
+    });
+
+    const updatedDevice = await client.updateCurrentDevice({
+      pushEnabled: true,
+      notificationPreferences: {
+        emailNotifications: true,
+        reminderHours: 24,
+        schedules: true,
+        questionnaires: true,
+        substitutions: true,
+        announcements: true,
+      },
+    });
+
+    expect(updatedDevice.success).toBe(true);
+    expect(updatedDevice.device).toMatchObject({
+      deviceId: ministerDeviceId,
+      pushEnabled: true,
+      notificationPreferences: {
+        emailNotifications: true,
+        reminderHours: 24,
+      },
+    });
 
     const refresh = await client.refresh({
       refreshToken: login.auth.refreshToken!,
@@ -218,7 +250,7 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
 
     const substituteClient = new MescMobileApiClient({
       baseUrl,
-      deviceId: "mobile-smoke-substitute-ios-device",
+      deviceId: substituteDeviceId,
       platform: "ios",
       appVersion: "1.0.0-smoke",
     });

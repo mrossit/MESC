@@ -72,6 +72,7 @@ describe("mobileClient contract", () => {
           appVersion: "1.0.0",
           pushEnabled: false,
           pushProvider: null,
+          notificationPreferences: {},
           biometricCapable: false,
           biometricEnabled: false,
           lastSeenAt: null,
@@ -235,6 +236,7 @@ describe("mobileClient contract", () => {
           appVersion: "1.0.0",
           pushEnabled: false,
           pushProvider: null,
+          notificationPreferences: {},
           biometricCapable: true,
           biometricEnabled: true,
           lastSeenAt: null,
@@ -314,6 +316,10 @@ describe("mobileClient contract", () => {
             appVersion: "1.0.0",
             pushEnabled: true,
             pushProvider: "apns",
+            notificationPreferences: {
+              emailNotifications: true,
+              reminderHours: 24,
+            },
             biometricCapable: true,
             biometricEnabled: true,
             lastSeenAt: null,
@@ -358,6 +364,15 @@ describe("mobileClient contract", () => {
       .resolves.toMatchObject({ notification: { read: true } });
     await expect(client.markAllNotificationsRead()).resolves.toEqual({ success: true });
     await expect(client.listDevices()).resolves.toEqual({ success: true, devices: [] });
+    await expect(client.getCurrentDevice()).resolves.toMatchObject({
+      device: {
+        pushEnabled: true,
+        notificationPreferences: {
+          emailNotifications: true,
+          reminderHours: 24,
+        },
+      },
+    });
     await expect(client.updateCurrentDevice({
       pushToken: "push-token-1",
       pushProvider: "apns",
@@ -372,10 +387,11 @@ describe("mobileClient contract", () => {
       ["PATCH", "https://example.test/api/mobile/v1/notifications/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/read"],
       ["PATCH", "https://example.test/api/mobile/v1/notifications/read-all"],
       ["GET", "https://example.test/api/mobile/v1/devices"],
+      ["GET", "https://example.test/api/mobile/v1/devices/current"],
       ["PUT", "https://example.test/api/mobile/v1/devices/current"],
       ["DELETE", "https://example.test/api/mobile/v1/devices/device-db-1"],
     ]);
-    expect(JSON.parse(String(requests[4].init.body))).toEqual({
+    expect(JSON.parse(String(requests[5].init.body))).toEqual({
       pushToken: "push-token-1",
       pushProvider: "apns",
       pushEnabled: true,

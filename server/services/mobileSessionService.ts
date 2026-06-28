@@ -92,6 +92,25 @@ function toSafeIsoDate(value: Date | string | null | undefined): string | null {
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 }
 
+function normalizeRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 export function sanitizeMobileDevice(device: MobileDevice) {
   return {
     id: device.id,
@@ -100,6 +119,7 @@ export function sanitizeMobileDevice(device: MobileDevice) {
     appVersion: device.appVersion,
     pushEnabled: Boolean(device.pushEnabled),
     pushProvider: device.pushProvider,
+    notificationPreferences: normalizeRecord(device.notificationPreferences),
     biometricCapable: Boolean(device.biometricCapable),
     biometricEnabled: Boolean(device.biometricEnabled),
     lastSeenAt: toSafeIsoDate(device.lastSeenAt),

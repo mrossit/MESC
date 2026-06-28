@@ -46,6 +46,7 @@ export interface MobileDevice {
   appVersion: string | null;
   pushEnabled: boolean;
   pushProvider: string | null;
+  notificationPreferences: Record<string, unknown>;
   biometricCapable: boolean;
   biometricEnabled: boolean;
   lastSeenAt: string | null;
@@ -983,6 +984,14 @@ export class MescMobileApiClient {
     return this.request<MobileDevicesResponse>({
       method: "GET",
       path: mobileEndpoints.devices(),
+      ...options,
+    });
+  }
+
+  async getCurrentDevice(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileDeviceResponse>({
+      method: "GET",
+      path: mobileEndpoints.currentDevice(),
       ...options,
     });
   }

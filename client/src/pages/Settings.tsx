@@ -34,6 +34,13 @@ import {
   getNativeBiometricStatus,
   type NativeBiometricStatus,
 } from '@/lib/native-biometric-auth';
+import {
+  mobileGetCurrentDevice,
+  mobileGetProfile,
+  mobileUpdateCurrentDevice,
+  mobileUpdateProfile,
+  shouldUseMobileAuth,
+} from '@/lib/mobile-auth-session';
 
 type UserSettings = {
   pushNotifications: boolean;
@@ -45,27 +52,61 @@ type UserSettings = {
   availableForEvents: boolean;
 };
 
+type ExtraActivities = {
+  sickCommunion: boolean;
+  mondayAdoration: boolean;
+  helpOtherPastorals: boolean;
+  festiveEvents: boolean;
+};
+
+const DEFAULT_USER_SETTINGS: UserSettings = {
+  pushNotifications: false,
+  emailNotifications: true,
+  reminderHours: 24,
+  availableForSickCommunion: false,
+  availableForAdoration: false,
+  availableForOtherPastorals: false,
+  availableForEvents: false,
+};
+
+const DEFAULT_EXTRA_ACTIVITIES: ExtraActivities = {
+  sickCommunion: false,
+  mondayAdoration: false,
+  helpOtherPastorals: false,
+  festiveEvents: false,
+};
+
+function normalizeExtraActivities(value: unknown): ExtraActivities {
+  const input = value && typeof value === 'object' ? value as Partial<ExtraActivities> : {};
+
+  return {
+    sickCommunion: Boolean(input.sickCommunion),
+    mondayAdoration: Boolean(input.mondayAdoration),
+    helpOtherPastorals: Boolean(input.helpOtherPastorals),
+    festiveEvents: Boolean(input.festiveEvents),
+  };
+}
+
+function normalizeDeviceSettings(value: unknown, pushEnabled = false): UserSettings {
+  const preferences = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const reminderHours = Number(preferences.reminderHours);
+
+  return {
+    ...DEFAULT_USER_SETTINGS,
+    pushNotifications: pushEnabled,
+    emailNotifications: typeof preferences.emailNotifications === 'boolean'
+      ? preferences.emailNotifications
+      : DEFAULT_USER_SETTINGS.emailNotifications,
+    reminderHours: [12, 24, 48, 72].includes(reminderHours)
+      ? reminderHours
+      : DEFAULT_USER_SETTINGS.reminderHours,
+  };
+}
+
 export default function Settings() {
-  const [settings, setSettings] = useState<UserSettings>({
-    pushNotifications: false,
-    emailNotifications: true,
-    reminderHours: 24,
-    availableForSickCommunion: false,
-    availableForAdoration: false,
-    availableForOtherPastorals: false,
-    availableForEvents: false
-  });
-  const [extraActivities, setExtraActivities] = useState<{
-    sickCommunion: boolean;
-    mondayAdoration: boolean;
-    helpOtherPastorals: boolean;
-    festiveEvents: boolean;
-  }>({
-    sickCommunion: false,
-    mondayAdoration: false,
-    helpOtherPastorals: false,
-    festiveEvents: false
-  });
+  const useNativeSettings = shouldUseMobileAuth();
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  const [extraActivities, setExtraActivities] = useState<ExtraActivities>(DEFAULT_EXTRA_ACTIVITIES);
   const [saving, setSaving] = useState(false);
   const [savingActivities, setSavingActivities] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,43 +151,45 @@ export default function Settings() {
 
   // Buscar configurações do usuário
   const { data: settingsData, isLoading } = useQuery({
-    queryKey: ['user-settings'],
+    queryKey: ['user-settings', useNativeSettings ? 'mobile' : 'web'],
     queryFn: async () => {
+      if (useNativeSettings) {
+        try {
+          const currentDevice = await mobileGetCurrentDevice();
+          return normalizeDeviceSettings(
+            currentDevice.device.notificationPreferences,
+            currentDevice.device.pushEnabled,
+          );
+        } catch (error) {
+          console.warn('[Settings] Failed to load native device settings:', error);
+          return DEFAULT_USER_SETTINGS;
+        }
+      }
+
       try {
         const res = await fetch('/api/user/settings', { credentials: 'include' });
         if (!res.ok) {
           // Se não existir ou houver erro, retorna valores padrão
-          return {
-            pushNotifications: false,
-            emailNotifications: true,
-            reminderHours: 24,
-            availableForSickCommunion: false,
-            availableForAdoration: false,
-            availableForOtherPastorals: false,
-            availableForEvents: false
-          };
+          return DEFAULT_USER_SETTINGS;
         }
         const data = await res.json();
         return data;
       } catch (error) {
         // Em caso de erro de rede ou outro, retorna valores padrão
-        return {
-          pushNotifications: false,
-          emailNotifications: true,
-          reminderHours: 24,
-          availableForSickCommunion: false,
-          availableForAdoration: false,
-          availableForOtherPastorals: false,
-          availableForEvents: false
-        };
+        return DEFAULT_USER_SETTINGS;
       }
     }
   });
 
   // Buscar atividades extras
   const { data: activitiesData, refetch: refetchActivities, isSuccess: activitiesLoaded } = useQuery({
-    queryKey: ['extra-activities'],
+    queryKey: ['extra-activities', useNativeSettings ? 'mobile' : 'web'],
     queryFn: async () => {
+      if (useNativeSettings) {
+        const profile = await mobileGetProfile();
+        return normalizeExtraActivities(profile.profile.extraActivities);
+      }
+
       try {
         const res = await fetch('/api/profile/extra-activities', { credentials: 'include' });
         if (!res.ok) {
@@ -188,17 +231,12 @@ export default function Settings() {
   // Carregar dados quando disponíveis
   useEffect(() => {
     if (activitiesLoaded && activitiesData) {
-      setExtraActivities(activitiesData);
+      setExtraActivities(normalizeExtraActivities(activitiesData));
       // Reset flag quando novos dados são carregados
       setHasUserInteracted(false);
     } else if (activitiesLoaded && !activitiesData) {
       // Se não há dados, usar valores padrão
-      setExtraActivities({
-        sickCommunion: false,
-        mondayAdoration: false,
-        helpOtherPastorals: false,
-        festiveEvents: false
-      });
+      setExtraActivities(DEFAULT_EXTRA_ACTIVITIES);
       setHasUserInteracted(false);
     }
   }, [activitiesData, activitiesLoaded]);
@@ -210,6 +248,13 @@ export default function Settings() {
 
     setSavingActivities(true);
     try {
+      if (useNativeSettings) {
+        await mobileUpdateProfile({ extraActivities: activities });
+        queryClient.setQueryData(['extra-activities', 'mobile'], activities);
+        setTimeout(() => setSavingActivities(false), 500);
+        return;
+      }
+
       const res = await fetch('/api/profile/extra-activities', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -293,6 +338,7 @@ export default function Settings() {
 
       try {
         await enablePushNotifications();
+        setSettings(prev => ({ ...prev, pushNotifications: true }));
         setSuccess(pushIsNative
           ? 'Notificações do aparelho ativadas com sucesso!'
           : 'Notificações push ativadas com sucesso!');
@@ -303,6 +349,7 @@ export default function Settings() {
       // Desativando notificações
       try {
         await disablePushNotifications();
+        setSettings(prev => ({ ...prev, pushNotifications: false }));
         setSuccess(pushIsNative ? 'Notificações do aparelho desativadas.' : 'Notificações push desativadas.');
       } catch (err) {
         setError(pushError || 'Erro ao desativar notificações push.');
@@ -316,6 +363,28 @@ export default function Settings() {
     setSuccess(null);
 
     try {
+      if (useNativeSettings) {
+        await Promise.all([
+          mobileUpdateCurrentDevice({
+            pushEnabled: pushSubscribed,
+            notificationPreferences: {
+              emailNotifications: settings.emailNotifications,
+              reminderHours: settings.reminderHours,
+              schedules: true,
+              questionnaires: true,
+              substitutions: true,
+              announcements: true,
+            },
+          }),
+          mobileUpdateProfile({ extraActivities }),
+        ]);
+
+        setSuccess('Configurações salvas com sucesso!');
+        queryClient.invalidateQueries({ queryKey: ['user-settings', 'mobile'] });
+        queryClient.invalidateQueries({ queryKey: ['extra-activities', 'mobile'] });
+        return;
+      }
+
       // Salvar configurações gerais
       const settingsRes = await fetch('/api/user/settings', {
         method: 'PUT',

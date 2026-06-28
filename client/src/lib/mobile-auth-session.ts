@@ -346,6 +346,10 @@ export async function mobileListDevices(): Promise<MobileDevicesResponse> {
   return runWithMobileAuthRetry((client) => client.listDevices());
 }
 
+export async function mobileGetCurrentDevice(): Promise<MobileDeviceResponse> {
+  return runWithMobileAuthRetry((client) => client.getCurrentDevice());
+}
+
 export async function mobileUpdateCurrentDevice(payload: MobileDeviceUpdatePayload): Promise<MobileDeviceResponse> {
   return runWithMobileAuthRetry((client) => client.updateCurrentDevice(payload));
 }
