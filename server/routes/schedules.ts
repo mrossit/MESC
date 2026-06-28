@@ -860,7 +860,12 @@ router.patch("/:id/publish", requireAuth, requireRole(['coordenador', 'gestor'])
         await sendPushNotificationToUsers(uniqueMinisterIds, {
           title: notificationTitle,
           body: notificationMessage,
-          url: '/schedules'
+          url: '/schedules',
+          tag: `schedule-published-${month}-${year}`,
+          data: mobileNotificationData('schedule_published', {
+            month,
+            year,
+          })
         });
 
         // Notificar via WebSocket para atualização em tempo real

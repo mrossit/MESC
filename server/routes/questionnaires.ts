@@ -10,7 +10,7 @@ import {
 } from '@shared/schema';
 import { eq, and, inArray, or } from 'drizzle-orm';
 import { mobileNotificationData } from '@shared/mobileNotificationEvents';
-import { pushConfig, sendPushNotificationToUsers } from '../utils/pushNotifications';
+import { sendPushNotificationToUsers } from '../utils/pushNotifications';
 import { generateQuestionnaireQuestions } from '../utils/questionnaireGenerator';
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from '../auth';
 import { isAdmin as isAdminRole } from '@shared/roles';
@@ -1200,14 +1200,17 @@ router.patch('/admin/templates/:id/close', requireAuth, requireRole(['coordenado
           })
         ));
 
-        if (pushConfig.enabled) {
-          await sendPushNotificationToUsers(recipientIds, {
-            title,
-            body: message,
-            url: '/questionnaires',
-            tag: `questionnaire-closed-${templateId}`,
-          });
-        }
+        await sendPushNotificationToUsers(recipientIds, {
+          title,
+          body: message,
+          url: '/questionnaires',
+          tag: `questionnaire-closed-${templateId}`,
+          data: mobileNotificationData('questionnaire_closed', {
+            questionnaireId: templateId,
+            month: existingTemplate.month,
+            year: existingTemplate.year,
+          })
+        });
       }
     } catch (notificationError) {
       console.error('Error sending questionnaire close notifications:', notificationError);

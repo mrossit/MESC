@@ -235,20 +235,20 @@ router.post("/mass-invite", requireAuth, requireRole(['coordenador', 'gestor']),
     const results = await Promise.all(notificationPromises);
     console.log(`Criadas ${results.length} notificações`);
 
-    if (pushConfig.enabled) {
-      await sendPushNotificationToUsers(
-        ministers.map((minister: { id: string; name: string; role: string }) => minister.id),
-        {
-          title,
-          body: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
-          url: '/schedules',
-          data: {
-            massId,
-            urgencyLevel
-          }
-        }
-      );
-    }
+    await sendPushNotificationToUsers(
+      ministers.map((minister: { id: string; name: string; role: string }) => minister.id),
+      {
+        title,
+        body: message || `Precisamos de ministros para a missa de ${date} às ${time} na ${location}. Por favor, confirme sua disponibilidade.`,
+        url: '/schedules',
+        tag: massId ? `mass-invite-${massId}` : undefined,
+        data: mobileNotificationData("coordinator_announcement", {
+          massId,
+          urgencyLevel,
+          senderId: req.user!.id,
+        })
+      }
+    );
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
     console.log(`[Activity Log] mass_invite_sent: Enviou convite para missa de ${date} às ${time}`, {
@@ -376,18 +376,17 @@ router.post("/", requireAuth, requireRole(['coordenador', 'gestor']), notificati
       console.log('[NOTIFICAÇÕES] WebSocket: notificação enviada para', recipientUserIds.length, 'usuários conectados');
     }
 
-    // Enviar push notification para dispositivos móveis/desktop
-    if (pushConfig.enabled) {
-      console.log('[NOTIFICAÇÕES] Push notifications habilitado, enviando para', recipientUserIds.length, 'destinatários');
-      await sendPushNotificationToUsers(recipientUserIds, {
-        title: data.title,
-        body: data.message,
-        url: data.actionUrl ?? '/communication'
-      });
-      console.log('[NOTIFICAÇÕES] Envio de push notifications concluído');
-    } else {
-      console.log('[NOTIFICAÇÕES] Push notifications DESABILITADO (VAPID keys não configuradas)');
-    }
+    console.log('[NOTIFICAÇÕES] Enviando push para canais disponíveis:', recipientUserIds.length, 'destinatários');
+    await sendPushNotificationToUsers(recipientUserIds, {
+      title: data.title,
+      body: data.message,
+      url: data.actionUrl ?? '/communication',
+      tag: `coordinator-announcement-${Date.now()}`,
+      data: mobileNotificationData("coordinator_announcement", {
+        senderId: req.user!.id,
+      })
+    });
+    console.log('[NOTIFICAÇÕES] Envio de push notifications concluído');
     
     // Registrar atividade (using console.log since storage.logActivity doesn't exist)
     console.log(`[Activity Log] notification_sent: Enviou comunicado: ${data.title}`, {

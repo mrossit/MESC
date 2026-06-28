@@ -9,7 +9,7 @@ import { DB_MINISTER_AND_COORDINATOR_ROLES } from '@shared/roles';
 import { mobileNotificationData } from '@shared/mobileNotificationEvents';
 import { resolveWriteCommunityId } from '../utils/communityContext';
 import { storage } from '../storage';
-import { sendPushNotificationToUsers, pushConfig } from '../utils/pushNotifications';
+import { sendPushNotificationToUsers } from '../utils/pushNotifications';
 import { logger } from '../utils/logger';
 import { mergeQuestionChanges, MergeableQuestion } from '../utils/questionnaireMerge';
 
@@ -104,14 +104,17 @@ async function notifyQuestionnaireClosed(template: {
       })
     ));
 
-    if (pushConfig.enabled) {
-      await sendPushNotificationToUsers(recipientIds, {
-        title,
-        body: message,
-        url: '/questionnaires',
-        tag: `questionnaire-closed-${template.id}`,
-      });
-    }
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: '/questionnaires',
+      tag: `questionnaire-closed-${template.id}`,
+      data: mobileNotificationData('questionnaire_closed', {
+        questionnaireId: template.id,
+        month: template.month ?? null,
+        year: template.year ?? null,
+      })
+    });
   } catch (error) {
     logger.error('Erro ao enviar notificações de encerramento do questionário:', error);
   }
@@ -806,18 +809,21 @@ router.post('/templates/:year/:month/send', requireAuth, requireRole(['gestor', 
       }
     }
     
-    // Enviar push notifications se habilitado
-    if (pushConfig.enabled) {
-      const pushUserIds = allMinisters.map(m => m.id).filter(Boolean) as string[];
-      await sendPushNotificationToUsers(pushUserIds, {
-        title: isResend ? 'Questionário Atualizado' : 'Novo Questionário Disponível',
-        body: isResend
-          ? `O questionário de ${monthNames[month - 1]} de ${year} foi atualizado. Revise suas respostas.`
-          : `Preencha suas disponibilidades para ${monthNames[month - 1]}/${year}`,
-        url: '/questionnaires',
-        tag: `questionnaire-${template.id}`
-      });
-    }
+    const pushUserIds = allMinisters.map(m => m.id).filter(Boolean) as string[];
+    await sendPushNotificationToUsers(pushUserIds, {
+      title: isResend ? 'Questionário Atualizado' : 'Novo Questionário Disponível',
+      body: isResend
+        ? `O questionário de ${monthNames[month - 1]} de ${year} foi atualizado. Revise suas respostas.`
+        : `Preencha suas disponibilidades para ${monthNames[month - 1]}/${year}`,
+      url: '/questionnaires',
+      tag: `questionnaire-${template.id}`,
+      data: mobileNotificationData('questionnaire_published', {
+        questionnaireId: template.id,
+        month,
+        year,
+        isResend,
+      })
+    });
 
     const message = isResend
       ? 'Questionário reenviado com sucesso! As mudanças estão disponíveis para todos os ministros.'
@@ -895,18 +901,20 @@ router.post('/templates/:id/send', requireAuth, requireRole(['gestor', 'coordena
       await Promise.all(notificationPromises);
       logger.info(`Criadas ${activeUsers.length} notificações para questionário ${templateId}`);
 
-      // Enviar push notifications se habilitado
-      if (pushConfig.enabled) {
-        await sendPushNotificationToUsers(
-          activeUsers.map((u: { id: string }) => u.id),
-          {
-            title: 'Novo Questionário de Disponibilidade',
-            body: `Preencha suas disponibilidades para ${monthName}/${questionnaireYear}`,
-            url: '/questionnaires',
-            tag: `questionnaire-${templateId}`
-          }
-        );
-      }
+      await sendPushNotificationToUsers(
+        activeUsers.map((u: { id: string }) => u.id),
+        {
+          title: 'Novo Questionário de Disponibilidade',
+          body: `Preencha suas disponibilidades para ${monthName}/${questionnaireYear}`,
+          url: '/questionnaires',
+          tag: `questionnaire-${templateId}`,
+          data: mobileNotificationData('questionnaire_published', {
+            questionnaireId: templateId,
+            month: questionnaireMonth,
+            year: questionnaireYear,
+          })
+        }
+      );
     } catch (notificationError) {
       logger.error('Erro ao enviar notificações do questionário:', notificationError);
       // Não falha a requisição, apenas loga o erro

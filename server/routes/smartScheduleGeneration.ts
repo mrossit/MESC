@@ -886,7 +886,11 @@ async function sendMinisterNotifications(
       title: `📅 Escala de ${monthName}/${year}`,
       body: 'Sua escala foi publicada! Clique para ver suas missas.',
       url: `/schedules?month=${month}&year=${year}`,
-      data: { month, year }
+      tag: `schedule-published-${month}-${year}`,
+      data: mobileNotificationData('schedule_published', {
+        month,
+        year
+      })
     });
   } catch (error) {
     console.error('[SMART_SCHEDULE] Failed to send push notifications:', error);
