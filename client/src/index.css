@@ -311,42 +311,50 @@
 @layer components {
   .liquid-glass {
     position: relative;
+    isolation: isolate;
     overflow: hidden;
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.18) 46%, rgba(255, 255, 255, 0.28)),
-      linear-gradient(220deg, rgba(var(--old-gold), 0.15), transparent 42%),
-      rgba(var(--card), 0.54);
-    border: 0.5px solid rgba(var(--old-gold), 0.15);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02) 42%, rgba(228, 233, 239, 0.045)),
+      linear-gradient(220deg, rgba(var(--old-gold), 0.08), transparent 46%),
+      rgba(255, 255, 255, 0.045);
+    border: 0.5px solid rgba(255, 255, 255, 0.58) !important;
     box-shadow:
-      0 18px 48px rgba(44, 44, 44, 0.10),
-      inset 0 1px 0 rgba(255, 255, 255, 0.66),
-      inset 0 -1px 0 rgba(var(--old-gold), 0.08);
-    backdrop-filter: blur(24px) saturate(1.34) contrast(1.02);
-    -webkit-backdrop-filter: blur(24px) saturate(1.34) contrast(1.02);
+      0 22px 58px rgba(44, 44, 44, 0.13),
+      0 2px 10px rgba(255, 255, 255, 0.38),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.24),
+      inset 18px 22px 42px rgba(255, 255, 255, 0.08),
+      inset -18px -24px 46px rgba(var(--liturgical-wine), 0.06) !important;
+    backdrop-filter: blur(38px) saturate(1.72) brightness(1.04) contrast(1.05) !important;
+    -webkit-backdrop-filter: blur(38px) saturate(1.72) brightness(1.04) contrast(1.05) !important;
   }
 
   .liquid-glass::before {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: 0;
     pointer-events: none;
     background:
-      linear-gradient(115deg, rgba(255, 255, 255, 0.48), transparent 28%),
-      radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.34), transparent 14rem),
-      linear-gradient(260deg, rgba(var(--old-gold), 0.13), transparent 44%);
-    opacity: 0.76;
+      linear-gradient(116deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.24) 16%, transparent 36%),
+      linear-gradient(292deg, transparent 48%, rgba(var(--old-gold), 0.12) 72%, rgba(255, 255, 255, 0.38) 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 52%);
+    opacity: 0.9;
   }
 
   .liquid-glass::after {
     content: "";
     position: absolute;
-    inset: 0.5px;
+    inset: 0;
+    z-index: 0;
     pointer-events: none;
     border-radius: inherit;
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.42),
-      inset 12px 14px 28px rgba(255, 255, 255, 0.14),
-      inset -10px -12px 24px rgba(var(--liturgical-wine), 0.055);
+      inset 1px 1px 1px rgba(255, 255, 255, 0.74),
+      inset -1px -1px 1px rgba(var(--liturgical-wine), 0.08),
+      inset 0 0 22px rgba(255, 255, 255, 0.13),
+      inset 0 -24px 42px rgba(var(--old-gold), 0.045);
   }
 
   .liquid-glass > * {
@@ -364,48 +372,95 @@
 
   .liquid-glass-interactive:hover {
     transform: translateY(-1px);
-    border-color: rgba(var(--old-gold), 0.38);
+    border-color: rgba(255, 255, 255, 0.72);
     box-shadow:
-      0 18px 44px rgba(44, 44, 44, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.68);
+      0 20px 54px rgba(44, 44, 44, 0.16),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.84),
+      inset -12px -16px 32px rgba(var(--liturgical-wine), 0.06) !important;
   }
 
   .liquid-glass-chip {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.18)),
-      rgba(255, 255, 255, 0.2);
-    border: 0.5px solid rgba(255, 255, 255, 0.48);
+      linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+      rgba(255, 255, 255, 0.055);
+    border: 0.5px solid rgba(255, 255, 255, 0.62) !important;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.56),
-      0 8px 18px rgba(44, 44, 44, 0.06);
-    backdrop-filter: blur(16px) saturate(1.25);
-    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+      0 10px 24px rgba(44, 44, 44, 0.08),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82),
+      inset 0 -1px 0 rgba(var(--liturgical-wine), 0.045) !important;
+    backdrop-filter: blur(24px) saturate(1.48) brightness(1.03) contrast(1.03) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(1.48) brightness(1.03) contrast(1.03) !important;
+  }
+
+  .liquid-glass-chip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(118deg, rgba(255, 255, 255, 0.48), transparent 34%),
+      linear-gradient(292deg, transparent 60%, rgba(var(--old-gold), 0.10));
+    opacity: 0.78;
+  }
+
+  .liquid-glass-chip > * {
+    position: relative;
+    z-index: 1;
   }
 
   .dark .liquid-glass {
     background:
-      linear-gradient(135deg, rgba(253, 251, 247, 0.12), rgba(253, 251, 247, 0.045) 46%, rgba(253, 251, 247, 0.08)),
-      linear-gradient(220deg, rgba(var(--dark-gold), 0.14), transparent 42%),
-      rgba(38, 38, 38, 0.58);
-    border-color: rgba(var(--old-gold), 0.14);
+      linear-gradient(135deg, rgba(253, 251, 247, 0.065), rgba(253, 251, 247, 0.022) 46%, rgba(253, 251, 247, 0.045)),
+      linear-gradient(220deg, rgba(var(--dark-gold), 0.10), transparent 44%),
+      rgba(253, 251, 247, 0.04);
+    border-color: rgba(253, 251, 247, 0.16) !important;
     box-shadow:
-      0 16px 42px rgba(0, 0, 0, 0.32),
-      inset 0 1px 0 rgba(253, 251, 247, 0.12),
-      inset 0 -1px 0 rgba(253, 251, 247, 0.05);
+      0 22px 58px rgba(0, 0, 0, 0.42),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.18),
+      inset 0 1px 0 rgba(253, 251, 247, 0.18),
+      inset 0 -1px 0 rgba(253, 251, 247, 0.06),
+      inset -18px -24px 46px rgba(var(--old-gold), 0.05) !important;
   }
 
   .dark .liquid-glass::before {
     background:
-      linear-gradient(115deg, rgba(253, 251, 247, 0.12), transparent 32%),
-      radial-gradient(circle at 82% 12%, rgba(253, 251, 247, 0.10), transparent 14rem),
-      linear-gradient(260deg, rgba(var(--dark-gold), 0.14), transparent 44%);
+      linear-gradient(116deg, rgba(253, 251, 247, 0.18) 0%, rgba(253, 251, 247, 0.07) 18%, transparent 38%),
+      linear-gradient(292deg, transparent 48%, rgba(var(--dark-gold), 0.12) 72%, rgba(253, 251, 247, 0.10) 100%),
+      linear-gradient(180deg, rgba(253, 251, 247, 0.07), transparent 52%);
   }
 
   .dark .liquid-glass-chip {
     background:
-      linear-gradient(145deg, rgba(253, 251, 247, 0.12), rgba(253, 251, 247, 0.045)),
-      rgba(253, 251, 247, 0.05);
-    border-color: rgba(var(--old-gold), 0.14);
+      linear-gradient(145deg, rgba(253, 251, 247, 0.07), rgba(253, 251, 247, 0.025)),
+      rgba(253, 251, 247, 0.045);
+    border-color: rgba(253, 251, 247, 0.14) !important;
+  }
+
+  .capacitor-native .liquid-glass {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.016) 42%, rgba(218, 226, 238, 0.04)),
+      linear-gradient(220deg, rgba(var(--old-gold), 0.075), transparent 46%),
+      rgba(255, 255, 255, 0.035);
+    backdrop-filter: blur(46px) saturate(1.86) brightness(1.06) contrast(1.06) !important;
+    -webkit-backdrop-filter: blur(46px) saturate(1.86) brightness(1.06) contrast(1.06) !important;
+  }
+
+  .capacitor-native .liquid-glass-chip {
+    backdrop-filter: blur(30px) saturate(1.62) brightness(1.04) contrast(1.04) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(1.62) brightness(1.04) contrast(1.04) !important;
+  }
+
+  .dark.capacitor-native .liquid-glass {
+    background:
+      linear-gradient(135deg, rgba(253, 251, 247, 0.055), rgba(253, 251, 247, 0.018) 46%, rgba(253, 251, 247, 0.038)),
+      linear-gradient(220deg, rgba(var(--dark-gold), 0.10), transparent 44%),
+      rgba(253, 251, 247, 0.035);
   }
 
   .login-screen {
@@ -416,7 +471,10 @@
     padding-top: calc(var(--app-safe-area-top) + clamp(0.85rem, 2.5vh, 1.25rem));
     padding-bottom: calc(var(--app-safe-area-bottom) + clamp(0.85rem, 2.5vh, 1.25rem));
     background:
-      linear-gradient(145deg, #FDFBF7 0%, #F6EFE3 54%, #ECE0CC 100%);
+      linear-gradient(145deg, rgba(253, 251, 247, 0.96) 0%, rgba(246, 239, 227, 0.92) 54%, rgba(236, 224, 204, 0.90) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.055) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(24deg, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px 42px),
+      #FDFBF7;
   }
 
   .login-screen::before {
@@ -441,7 +499,10 @@
 
   .dark .login-screen {
     background:
-      linear-gradient(160deg, rgb(var(--charcoal)) 0%, rgb(38, 38, 38) 47%, rgb(22, 22, 22) 100%);
+      linear-gradient(160deg, rgba(var(--charcoal), 0.96) 0%, rgba(38, 38, 38, 0.92) 47%, rgba(22, 22, 22, 0.94) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.04) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(24deg, rgba(253, 251, 247, 0.035) 0 1px, transparent 1px 44px),
+      rgb(var(--charcoal));
   }
 
   .dark .login-card {
@@ -599,13 +660,17 @@
     min-height: 100svh;
     overflow: hidden;
     background:
-      linear-gradient(180deg, rgba(253, 251, 247, 0.98) 0%, rgba(242, 233, 218, 0.94) 100%),
+      linear-gradient(180deg, rgba(253, 251, 247, 0.96) 0%, rgba(242, 233, 218, 0.90) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.045) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(24deg, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px 38px),
       rgb(var(--background));
   }
 
   .dark .app-shell {
     background:
-      linear-gradient(180deg, rgba(31, 31, 31, 0.98) 0%, rgba(26, 26, 26, 0.96) 100%),
+      linear-gradient(180deg, rgba(31, 31, 31, 0.96) 0%, rgba(26, 26, 26, 0.92) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.035) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(24deg, rgba(253, 251, 247, 0.035) 0 1px, transparent 1px 42px),
       rgb(var(--background));
   }
 
@@ -643,88 +708,135 @@
   }
 
   .ios-glass-header {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background:
-      linear-gradient(180deg, rgba(253, 251, 247, 0.92), rgba(253, 251, 247, 0.70)),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.30), rgba(var(--old-gold), 0.09)),
-      rgba(var(--background), 0.68);
-    border-color: rgba(var(--old-gold), 0.18);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(var(--old-gold), 0.075)),
+      rgba(253, 251, 247, 0.48);
+    border-color: rgba(var(--old-gold), 0.24);
     box-shadow:
-      0 14px 34px rgba(44, 44, 44, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
-      inset 0 -0.5px 0 rgba(var(--old-gold), 0.16);
-    backdrop-filter: blur(30px) saturate(1.35) contrast(1.02);
-    -webkit-backdrop-filter: blur(30px) saturate(1.35) contrast(1.02);
+      0 14px 36px rgba(44, 44, 44, 0.11),
+      inset 0 1px 0 rgba(255, 255, 255, 0.86),
+      inset 0 -0.5px 0 rgba(var(--old-gold), 0.26),
+      inset 0 -18px 38px rgba(var(--old-gold), 0.04);
+    backdrop-filter: blur(42px) saturate(1.74) brightness(1.04) contrast(1.05);
+    -webkit-backdrop-filter: blur(42px) saturate(1.74) brightness(1.04) contrast(1.05);
+  }
+
+  .ios-glass-header > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .ios-glass-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(108deg, rgba(255, 255, 255, 0.58), transparent 28%),
+      linear-gradient(286deg, transparent 58%, rgba(var(--old-gold), 0.12)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 58%);
+    opacity: 0.88;
+  }
+
+  .ios-glass-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(var(--old-gold), 0.55), rgba(255, 255, 255, 0.70), transparent);
   }
 
   .dark .ios-glass-header {
     background:
-      linear-gradient(180deg, rgba(38, 38, 38, 0.86), rgba(26, 26, 26, 0.68)),
-      linear-gradient(135deg, rgba(253, 251, 247, 0.08), rgba(var(--old-gold), 0.10)),
-      rgba(var(--background), 0.66);
-    border-color: rgba(var(--old-gold), 0.17);
+      linear-gradient(180deg, rgba(253, 251, 247, 0.055), rgba(253, 251, 247, 0.02)),
+      linear-gradient(135deg, rgba(253, 251, 247, 0.07), rgba(var(--old-gold), 0.09)),
+      rgba(26, 26, 26, 0.54);
+    border-color: rgba(var(--old-gold), 0.20);
     box-shadow:
-      0 14px 34px rgba(0, 0, 0, 0.32),
-      inset 0 1px 0 rgba(253, 251, 247, 0.12),
-      inset 0 -0.5px 0 rgba(var(--old-gold), 0.13);
+      0 14px 36px rgba(0, 0, 0, 0.38),
+      inset 0 1px 0 rgba(253, 251, 247, 0.16),
+      inset 0 -0.5px 0 rgba(var(--old-gold), 0.18);
+  }
+
+  .dark .ios-glass-header::before {
+    background:
+      linear-gradient(108deg, rgba(253, 251, 247, 0.13), transparent 30%),
+      linear-gradient(286deg, transparent 58%, rgba(var(--old-gold), 0.10)),
+      linear-gradient(180deg, rgba(253, 251, 247, 0.06), transparent 58%);
   }
 
   .capacitor-native .ios-glass-header {
     background:
-      linear-gradient(180deg, rgba(253, 251, 247, 0.94) 0%, rgba(253, 251, 247, 0.78) 58%, rgba(253, 251, 247, 0.58) 100%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.36), rgba(var(--old-gold), 0.12)),
-      rgba(var(--background), 0.58);
-    border-bottom-color: rgba(var(--old-gold), 0.16) !important;
+      linear-gradient(180deg, rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0.03) 58%, rgba(255, 255, 255, 0.018) 100%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.20), rgba(var(--old-gold), 0.09)),
+      rgba(253, 251, 247, 0.42);
+    border-bottom-color: rgba(var(--old-gold), 0.26) !important;
     box-shadow:
-      0 12px 34px rgba(44, 44, 44, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
-      inset 0 -0.5px 0 rgba(var(--old-gold), 0.16);
+      0 12px 36px rgba(44, 44, 44, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.88),
+      inset 0 -0.5px 0 rgba(var(--old-gold), 0.26);
   }
 
   .dark.capacitor-native .ios-glass-header {
     background:
-      linear-gradient(180deg, rgba(31, 31, 31, 0.92) 0%, rgba(38, 38, 38, 0.78) 58%, rgba(26, 26, 26, 0.62) 100%),
-      linear-gradient(135deg, rgba(253, 251, 247, 0.08), rgba(var(--old-gold), 0.12)),
-      rgba(var(--background), 0.58);
-    border-bottom-color: rgba(var(--old-gold), 0.14) !important;
+      linear-gradient(180deg, rgba(253, 251, 247, 0.052) 0%, rgba(253, 251, 247, 0.025) 58%, rgba(253, 251, 247, 0.016) 100%),
+      linear-gradient(135deg, rgba(253, 251, 247, 0.07), rgba(var(--old-gold), 0.10)),
+      rgba(26, 26, 26, 0.50);
+    border-bottom-color: rgba(var(--old-gold), 0.18) !important;
     box-shadow:
-      0 12px 34px rgba(0, 0, 0, 0.34),
-      inset 0 1px 0 rgba(253, 251, 247, 0.12),
-      inset 0 -0.5px 0 rgba(var(--old-gold), 0.12);
+      0 12px 36px rgba(0, 0, 0, 0.40),
+      inset 0 1px 0 rgba(253, 251, 247, 0.15),
+      inset 0 -0.5px 0 rgba(var(--old-gold), 0.16);
   }
 
   .capacitor-native .app-content-scroll {
     background:
-      linear-gradient(180deg, rgba(253, 251, 247, 0.94) 0%, rgba(242, 233, 218, 0.9) 100%),
+      linear-gradient(180deg, rgba(253, 251, 247, 0.92) 0%, rgba(242, 233, 218, 0.86) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.06) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(24deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 42px),
       rgb(var(--background));
   }
 
   .dark.capacitor-native .app-content-scroll {
     background:
-      linear-gradient(180deg, rgba(26, 26, 26, 0.97) 0%, rgba(38, 38, 38, 0.92) 100%),
+      linear-gradient(180deg, rgba(26, 26, 26, 0.94) 0%, rgba(38, 38, 38, 0.88) 100%),
+      repeating-linear-gradient(112deg, rgba(var(--old-gold), 0.04) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(24deg, rgba(253, 251, 247, 0.035) 0 1px, transparent 1px 44px),
       rgb(var(--background));
   }
 
   .capacitor-native .app-content-scroll .bg-card {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.18) 50%, rgba(var(--old-gold), 0.10)),
-      rgba(var(--card), 0.48) !important;
-    border-color: rgba(var(--old-gold), 0.22) !important;
+      linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.022) 50%, rgba(var(--old-gold), 0.055)),
+      rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.56) !important;
     box-shadow:
-      0 16px 42px rgba(44, 44, 44, 0.09),
-      inset 0 1px 0 rgba(255, 255, 255, 0.62),
-      inset 0 -0.5px 0 rgba(var(--old-gold), 0.12);
-    backdrop-filter: blur(26px) saturate(1.3) contrast(1.01);
-    -webkit-backdrop-filter: blur(26px) saturate(1.3) contrast(1.01);
+      0 18px 48px rgba(44, 44, 44, 0.12),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.20),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78),
+      inset 0 -0.5px 0 rgba(var(--liturgical-wine), 0.06);
+    backdrop-filter: blur(36px) saturate(1.58) brightness(1.04) contrast(1.04);
+    -webkit-backdrop-filter: blur(36px) saturate(1.58) brightness(1.04) contrast(1.04);
   }
 
   .dark.capacitor-native .app-content-scroll .bg-card {
     background:
-      linear-gradient(135deg, rgba(253, 251, 247, 0.13), rgba(253, 251, 247, 0.045) 50%, rgba(var(--old-gold), 0.08)),
-      rgba(38, 38, 38, 0.50) !important;
-    border-color: rgba(var(--old-gold), 0.17) !important;
+      linear-gradient(135deg, rgba(253, 251, 247, 0.065), rgba(253, 251, 247, 0.022) 50%, rgba(var(--old-gold), 0.055)),
+      rgba(253, 251, 247, 0.035) !important;
+    border-color: rgba(253, 251, 247, 0.16) !important;
     box-shadow:
-      0 16px 42px rgba(0, 0, 0, 0.34),
-      inset 0 1px 0 rgba(253, 251, 247, 0.11),
+      0 18px 48px rgba(0, 0, 0, 0.40),
+      inset 0 0 0 0.5px rgba(var(--old-gold), 0.16),
+      inset 0 1px 0 rgba(253, 251, 247, 0.14),
       inset 0 -0.5px 0 rgba(var(--old-gold), 0.10);
   }
 
@@ -759,27 +871,68 @@
   }
 
   .ios-glass-bar {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(253, 251, 247, 0.78)),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(var(--old-gold), 0.10)),
-      rgba(var(--background), 0.70);
-    border-color: rgba(var(--old-gold), 0.18);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.024)),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.20), rgba(var(--old-gold), 0.08)),
+      rgba(253, 251, 247, 0.44);
+    border-color: rgba(var(--old-gold), 0.25);
     box-shadow:
-      0 -10px 28px rgba(44, 44, 44, 0.09),
-      inset 0 0.5px 0 rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(32px) saturate(1.36) contrast(1.02);
-    -webkit-backdrop-filter: blur(32px) saturate(1.36) contrast(1.02);
+      0 -12px 34px rgba(44, 44, 44, 0.12),
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.88),
+      inset 0 18px 38px rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(46px) saturate(1.82) brightness(1.05) contrast(1.05);
+    -webkit-backdrop-filter: blur(46px) saturate(1.82) brightness(1.05) contrast(1.05);
+  }
+
+  .ios-glass-bar > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .ios-glass-bar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(112deg, rgba(255, 255, 255, 0.58), transparent 32%),
+      linear-gradient(292deg, transparent 55%, rgba(var(--old-gold), 0.12)),
+      linear-gradient(0deg, rgba(255, 255, 255, 0.14), transparent 56%);
+    opacity: 0.86;
+  }
+
+  .ios-glass-bar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), rgba(var(--old-gold), 0.50), transparent);
   }
 
   .dark .ios-glass-bar {
     background:
-      linear-gradient(180deg, rgba(42, 42, 42, 0.86), rgba(26, 26, 26, 0.76)),
-      linear-gradient(135deg, rgba(253, 251, 247, 0.07), rgba(var(--old-gold), 0.09)),
-      rgba(var(--background), 0.70);
-    border-color: rgba(var(--old-gold), 0.17);
+      linear-gradient(180deg, rgba(253, 251, 247, 0.055), rgba(253, 251, 247, 0.02)),
+      linear-gradient(135deg, rgba(253, 251, 247, 0.07), rgba(var(--old-gold), 0.085)),
+      rgba(26, 26, 26, 0.52);
+    border-color: rgba(var(--old-gold), 0.18);
     box-shadow:
-      0 -10px 28px rgba(0, 0, 0, 0.34),
-      inset 0 0.5px 0 rgba(253, 251, 247, 0.11);
+      0 -12px 34px rgba(0, 0, 0, 0.40),
+      inset 0 0.5px 0 rgba(253, 251, 247, 0.14);
+  }
+
+  .dark .ios-glass-bar::before {
+    background:
+      linear-gradient(112deg, rgba(253, 251, 247, 0.13), transparent 34%),
+      linear-gradient(292deg, transparent 55%, rgba(var(--old-gold), 0.10)),
+      linear-gradient(0deg, rgba(253, 251, 247, 0.055), transparent 56%);
   }
 
   .toast-viewport {
@@ -807,6 +960,29 @@
 
   .mobile-tab-item {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-tab-item[aria-current="page"] {
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)),
+      rgba(255, 255, 255, 0.055);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.58),
+      inset 0 1px 0 rgba(255, 255, 255, 0.76),
+      0 8px 20px rgba(44, 44, 44, 0.08);
+    backdrop-filter: blur(22px) saturate(1.42);
+    -webkit-backdrop-filter: blur(22px) saturate(1.42);
+  }
+
+  .dark .mobile-tab-item[aria-current="page"] {
+    background:
+      linear-gradient(145deg, rgba(253, 251, 247, 0.08), rgba(253, 251, 247, 0.022)),
+      rgba(253, 251, 247, 0.04);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(253, 251, 247, 0.14),
+      inset 0 1px 0 rgba(253, 251, 247, 0.14),
+      0 8px 20px rgba(0, 0, 0, 0.28);
   }
 
   .mobile-tab-icon,
@@ -843,29 +1019,56 @@
   
   /* Mobile sidebar - Sem bordas */
   [data-sidebar="sidebar"][data-mobile="true"] {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background:
-      linear-gradient(145deg, rgba(253, 251, 247, 0.90), rgba(253, 251, 247, 0.68)),
-      linear-gradient(220deg, rgba(var(--old-gold), 0.12), transparent 44%),
-      rgba(var(--sidebar-background), 0.74) !important;
+      linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+      linear-gradient(220deg, rgba(var(--old-gold), 0.08), transparent 44%),
+      rgba(253, 251, 247, 0.48) !important;
     color: rgb(var(--sidebar-foreground)) !important;
     border: none !important;
     box-shadow:
-      -18px 0 42px rgba(44, 44, 44, 0.14),
-      inset 1px 0 0 rgba(255, 255, 255, 0.64),
-      inset -0.5px 0 0 rgba(var(--old-gold), 0.16);
-    backdrop-filter: blur(30px) saturate(1.32);
-    -webkit-backdrop-filter: blur(30px) saturate(1.32);
+      -18px 0 46px rgba(44, 44, 44, 0.16),
+      inset 1px 0 0 rgba(255, 255, 255, 0.78),
+      inset -0.5px 0 0 rgba(var(--old-gold), 0.24),
+      inset -24px 0 46px rgba(var(--old-gold), 0.035);
+    backdrop-filter: blur(44px) saturate(1.74) brightness(1.04) contrast(1.04);
+    -webkit-backdrop-filter: blur(44px) saturate(1.74) brightness(1.04) contrast(1.04);
+  }
+
+  [data-sidebar="sidebar"][data-mobile="true"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(118deg, rgba(255, 255, 255, 0.52), transparent 34%),
+      linear-gradient(286deg, transparent 52%, rgba(var(--old-gold), 0.10));
+    opacity: 0.82;
+  }
+
+  [data-sidebar="sidebar"][data-mobile="true"] > * {
+    position: relative;
+    z-index: 1;
   }
 
   .dark [data-sidebar="sidebar"][data-mobile="true"] {
     background:
-      linear-gradient(145deg, rgba(38, 38, 38, 0.88), rgba(26, 26, 26, 0.70)),
-      linear-gradient(220deg, rgba(var(--old-gold), 0.10), transparent 44%),
-      rgba(var(--sidebar-background), 0.74) !important;
+      linear-gradient(145deg, rgba(253, 251, 247, 0.055), rgba(253, 251, 247, 0.02)),
+      linear-gradient(220deg, rgba(var(--old-gold), 0.09), transparent 44%),
+      rgba(26, 26, 26, 0.52) !important;
     box-shadow:
-      -18px 0 44px rgba(0, 0, 0, 0.42),
-      inset 1px 0 0 rgba(253, 251, 247, 0.10),
-      inset -0.5px 0 0 rgba(var(--old-gold), 0.12);
+      -18px 0 46px rgba(0, 0, 0, 0.44),
+      inset 1px 0 0 rgba(253, 251, 247, 0.14),
+      inset -0.5px 0 0 rgba(var(--old-gold), 0.16);
+  }
+
+  .dark [data-sidebar="sidebar"][data-mobile="true"]::before {
+    background:
+      linear-gradient(118deg, rgba(253, 251, 247, 0.13), transparent 34%),
+      linear-gradient(286deg, transparent 52%, rgba(var(--old-gold), 0.10));
   }
 
   .mobile-sidebar-sheet {
