@@ -5,7 +5,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
 import { db } from "../../server/db";
-import { massTimesConfig, questionnaires, schedules, substitutionRequests, users } from "../../shared/schema";
+import {
+  massTimesConfig,
+  questionnaireResponses,
+  questionnaires,
+  schedules,
+  substitutionRequests,
+  users,
+} from "../../shared/schema";
 import {
   MOBILE_P0_DEMO_IDS,
   MOBILE_P0_DEMO_MONTH,
@@ -463,10 +470,51 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       item.requester?.id === MOBILE_P0_DEMO_IDS.ministerA,
     )).toBe(true);
 
+    const smokePublishQuestionnaireId = "20260705-2026-4000-8000-000000000001";
+    const smokePublishResponseId = "20260705-2026-4000-8000-000000000002";
+    const smokePublishTimestamp = new Date("2026-06-29T12:00:00.000Z");
+
     await db
-      .update(questionnaires)
-      .set({ status: "closed" as any, updatedAt: new Date("2026-06-28T12:00:00.000Z") })
-      .where(eq(questionnaires.id, MOBILE_P0_DEMO_IDS.questionnaireA));
+      .delete(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, smokePublishQuestionnaireId));
+    await db
+      .delete(questionnaires)
+      .where(eq(questionnaires.id, smokePublishQuestionnaireId));
+
+    const [sourceQuestionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(eq(questionnaires.id, MOBILE_P0_DEMO_IDS.questionnaireA))
+      .limit(1);
+    const [sourceResponse] = await db
+      .select()
+      .from(questionnaireResponses)
+      .where(and(
+        eq(questionnaireResponses.questionnaireId, MOBILE_P0_DEMO_IDS.questionnaireA),
+        eq(questionnaireResponses.userId, MOBILE_P0_DEMO_IDS.ministerA),
+      ))
+      .limit(1);
+
+    if (!sourceQuestionnaire || !sourceResponse) {
+      throw new Error("Smoke publish setup failed: source questionnaire response not found");
+    }
+
+    await db.insert(questionnaires).values({
+      ...sourceQuestionnaire,
+      id: smokePublishQuestionnaireId,
+      title: "Disponibilidade Julho - Smoke Publish",
+      status: "closed",
+      deadline: smokePublishTimestamp,
+      createdAt: smokePublishTimestamp,
+      updatedAt: smokePublishTimestamp,
+    } as any);
+    await db.insert(questionnaireResponses).values({
+      ...sourceResponse,
+      id: smokePublishResponseId,
+      questionnaireId: smokePublishQuestionnaireId,
+      submittedAt: smokePublishTimestamp,
+      updatedAt: smokePublishTimestamp,
+    } as any);
 
     await db
       .delete(substitutionRequests)
@@ -507,6 +555,13 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       { month: MOBILE_P0_DEMO_MONTH, replaceExisting: true },
       { idempotencyKey: publishIdempotencyKey },
     )).resolves.toEqual(publishedSchedule);
+
+    await db
+      .delete(questionnaireResponses)
+      .where(eq(questionnaireResponses.questionnaireId, smokePublishQuestionnaireId));
+    await db
+      .delete(questionnaires)
+      .where(eq(questionnaires.id, smokePublishQuestionnaireId));
 
     const publishedRows = await db
       .select({

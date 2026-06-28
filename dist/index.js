@@ -4260,7 +4260,7 @@ __export(scheduleGenerator_exports, {
   generateAutomaticSchedule: () => generateAutomaticSchedule,
   getMassDisplayName: () => getMassDisplayName
 });
-import { eq as eq15, and as and9, or as or6, gte as gte4, lte as lte4, sql as sql4, ne as ne2, inArray as inArray6, isNull as isNull3 } from "drizzle-orm";
+import { eq as eq15, and as and9, or as or6, gte as gte4, lte as lte4, desc as desc3, sql as sql4, ne as ne2, inArray as inArray6, isNull as isNull3 } from "drizzle-orm";
 import { format as format3, addDays as addDays3, startOfMonth as startOfMonth2, endOfMonth as endOfMonth2, getDay as getDay3, getDate as getDate2, isSaturday, isFriday, isThursday, isMonday } from "date-fns";
 function getMassDisplayName(massTime) {
   const t = massTime.type;
@@ -5136,11 +5136,15 @@ ${"!".repeat(60)}`);
           and9(
             this.options.communityId ? eq15(questionnaires.communityId, this.options.communityId) : void 0,
             eq15(questionnaires.month, month),
-            eq15(questionnaires.year, year)
+            eq15(questionnaires.year, year),
+            inArray6(questionnaires.status, allowedStatuses)
           )
-        ).limit(1);
+        ).orderBy(desc3(questionnaires.updatedAt)).limit(1);
         if (!targetQuestionnaire) {
-          console.log(`[SCHEDULE_GEN] Nenhum question\xE1rio encontrado para ${month}/${year}`);
+          console.log(`[SCHEDULE_GEN] Nenhum question\xE1rio com status permitido encontrado para ${month}/${year}`);
+          if (!isPreview) {
+            throw new Error("O question\xE1rio precisa estar encerrado antes de gerar a escala definitiva.");
+          }
           return;
         }
         console.log(`[SCHEDULE_GEN] Question\xE1rio encontrado: ${targetQuestionnaire.title} (Status: ${targetQuestionnaire.status})`);

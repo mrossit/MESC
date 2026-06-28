@@ -1166,13 +1166,18 @@ export class ScheduleGenerator {
         and(
           this.options.communityId ? eq(questionnaires.communityId, this.options.communityId) : undefined,
           eq(questionnaires.month, month),
-          eq(questionnaires.year, year)
+          eq(questionnaires.year, year),
+          inArray(questionnaires.status, allowedStatuses)
         )
       )
+      .orderBy(desc(questionnaires.updatedAt))
       .limit(1);
 
     if (!targetQuestionnaire) {
-      console.log(`[SCHEDULE_GEN] Nenhum questionário encontrado para ${month}/${year}`);
+      console.log(`[SCHEDULE_GEN] Nenhum questionário com status permitido encontrado para ${month}/${year}`);
+      if (!isPreview) {
+        throw new Error("O questionário precisa estar encerrado antes de gerar a escala definitiva.");
+      }
       return;
     }
 
