@@ -75,8 +75,8 @@ Os artefatos acima sao gerados localmente e nao devem ser commitados.
 - Versao: `5.4.3`
 - Build: `50427`
 - Delivery UUID: `0add9114-9780-405a-8113-f26b66f111f3`
-- Status App Store Connect: upload aceito; aguardando processamento/validacao da Apple.
-- Distribuicao: testers internos via TestFlight apos processamento do build pela Apple.
+- Status App Store Connect: `VALID`.
+- Distribuicao: associado ao grupo interno `MESC Interno` no TestFlight.
 - Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais visivel no shell nativo, push nativo com permissao do aparelho e registro APNS/FCM, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste

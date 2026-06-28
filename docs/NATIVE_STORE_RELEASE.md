@@ -53,7 +53,7 @@ Configuracao inicial de loja:
 - App Store version: `5.4.3` em `PREPARE_FOR_SUBMISSION`, build `50414` selecionada para loja, release `AFTER_APPROVAL`.
 - App Store metadata pt-BR: nome, subtitulo, descricao, palavras-chave, texto promocional, URLs de marketing/suporte e privacy policy preenchidos em 18/06/2026.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
-- TestFlight: build `5.4.3 (50427)` enviado ao App Store Connect para substituir o `50426` nos testes internos contra `https://saojudastadeu.app`; aguardar processamento/validacao da Apple e confirmar disponibilidade no grupo `MESC Interno` pela tela de TestFlight.
+- TestFlight: build `5.4.3 (50427)` enviado ao App Store Connect para substituir o `50426` nos testes internos contra `https://saojudastadeu.app`; processamento `VALID` e build associado ao grupo interno `MESC Interno`.
 - Apple Developer: capability `PUSH_NOTIFICATIONS` habilitada para o Bundle ID `app.saojudastadeu.mesc`; provisioning profile App Store explicito regenerado com `aps-environment=production`.
 - DNS nativo: `saojudastadeu.app` e `www.saojudastadeu.app` resolvem para a Vercel (`76.76.21.21`) e a home nativa responde `200`.
 - Supabase nativo: `mesc-native-staging` recebeu `0009_native_mass_configuration_baseline.sql` e seed idempotente de horarios/eventos em 2026-06-24; `0010_native_adoration_draws_baseline.sql` esta versionada para a base de sorteio de adoracao usada pelo algoritmo; a prontidao de escala da API retorna `massConfig.configuredSlots=12` para julho/2026 na comunidade demo Matriz.
