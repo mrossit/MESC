@@ -708,7 +708,6 @@
   }
 
   .ios-glass-header {
-    position: relative;
     isolation: isolate;
     overflow: hidden;
     background:
@@ -871,7 +870,6 @@
   }
 
   .ios-glass-bar {
-    position: relative;
     isolation: isolate;
     overflow: hidden;
     background:
@@ -1019,7 +1017,6 @@
   
   /* Mobile sidebar - Sem bordas */
   [data-sidebar="sidebar"][data-mobile="true"] {
-    position: relative;
     isolation: isolate;
     overflow: hidden;
     background:
