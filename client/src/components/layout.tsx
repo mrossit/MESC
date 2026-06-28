@@ -43,7 +43,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
         <SidebarInset className="h-full min-w-0 overflow-hidden dark:bg-dark-8">
           {/* Header */}
           <header className="app-mobile-header ios-glass-header sticky top-0 z-40 border-b">
-            <div className="app-mobile-header-content flex items-center gap-2 px-3 sm:min-h-16 sm:gap-3 sm:px-6">
+            <div className="app-mobile-header-content flex items-center gap-2 px-3 py-2 sm:min-h-16 sm:gap-3 sm:px-6">
               {/* MOBILE: Avatar no canto superior esquerdo (atalho do perfil) */}
               {isMobile && user && (
                 <Link href="/profile">
