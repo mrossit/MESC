@@ -110,6 +110,16 @@ export interface MobileLogoutResponse {
   revoked: boolean;
 }
 
+export interface MobileAccountDeletePayload {
+  confirmation: string;
+  password: string;
+}
+
+export interface MobileAccountDeleteResponse {
+  success: true;
+  message: string;
+}
+
 export interface MobilePendingAction {
   id: string;
   type: "questionnaire" | "substitution" | "notice";
@@ -794,6 +804,7 @@ export const mobileEndpoints = {
   devices: () => "/devices",
   currentDevice: () => "/devices/current",
   revokeDevice: (id: string) => `/devices/${encodePathSegment(id)}`,
+  account: () => "/account",
   profile: () => "/profile",
   notifications: (input: { limit?: number } = {}) =>
     withQuery("/notifications", { limit: input.limit }),
@@ -968,6 +979,15 @@ export class MescMobileApiClient {
         ...payload,
         deviceId: payload.deviceId ?? this.deviceId ?? undefined,
       },
+      ...options,
+    });
+  }
+
+  async deleteAccount(payload: MobileAccountDeletePayload, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileAccountDeleteResponse>({
+      method: "DELETE",
+      path: mobileEndpoints.account(),
+      body: payload,
       ...options,
     });
   }

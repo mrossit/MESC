@@ -58,7 +58,7 @@ router.get("/deletion-info", authenticateToken, async (_req: AuthRequest, res) =
   });
 });
 
-router.delete("/", authenticateToken, async (req: AuthRequest, res) => {
+export async function deleteAccountHandler(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   if (!userId) {
     return res.status(401).json({ message: "Usuário não autenticado" });
@@ -269,6 +269,8 @@ router.delete("/", authenticateToken, async (req: AuthRequest, res) => {
       message: "Não foi possível excluir a conta agora. Tente novamente ou fale com o DPO.",
     });
   }
-});
+}
+
+router.delete("/", authenticateToken, deleteAccountHandler);
 
 export default router;

@@ -1,9 +1,16 @@
 import { Layout } from "@/components/layout";
 import { isAdmin as isAdminRole } from "@shared/roles";
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/lib/auth";
 import { invalidateScheduleCache } from "@/lib/cacheManager";
+import {
+  mobileConfirmSchedule,
+  mobileGetMe,
+  mobileGetSchedulesMonth,
+  mobileRequestSubstitution,
+  shouldUseMobileAuth,
+} from "@/lib/mobile-auth-session";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +69,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { ptBR } from "date-fns/locale";
 import { cn, formatMinisterName, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, getPositionDisplayName, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
+import { createMobileIdempotencyKey, type MobileMissionSchedule } from "@shared/mobileClient";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
@@ -76,6 +84,29 @@ const capitalizeFirst = (str: string) => {
 // Helper function to format time from "HH:MM:SS" to "HH:MM"
 const formatMassTime = (time: string) => {
   return time.substring(0, 5);
+};
+
+const formatScheduleDate = (date: string | null) => {
+  if (!date) return "Data a confirmar";
+  return format(parseScheduleDate(date), "EEEE, dd 'de' MMMM", { locale: ptBR });
+};
+
+const getConfirmationLabel = (status?: string | null) => {
+  if (status === "confirmed") return "Confirmada";
+  if (status === "declined") return "Recusada";
+  if (status === "pending") return "Pendente";
+  if (status === "no_show") return "Ausente";
+  return "Aguardando";
+};
+
+const getConfirmationBadgeClass = (status?: string | null) => {
+  if (status === "confirmed") {
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200";
+  }
+  if (status === "declined" || status === "no_show") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+  return "border-primary/20 bg-primary/10 text-primary dark:text-amber-100";
 };
 
 // Helper function to normalize mass time formats
@@ -233,6 +264,346 @@ type ListViewRow = {
 // Constantes importadas do arquivo centralizado
 
 export default function Schedules() {
+  const useMobileContract = shouldUseMobileAuth();
+  const {
+    data: mobileMe,
+    isLoading: mobileMeLoading,
+    isError: mobileMeError,
+    refetch: refetchMobileMe,
+  } = useQuery({
+    queryKey: ["mobile", "me", "schedules"],
+    queryFn: mobileGetMe,
+    enabled: useMobileContract,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+
+  if (useMobileContract) {
+    if (mobileMeLoading) {
+      return (
+        <Layout title="Escalas" subtitle="Carregando suas escalas">
+          <div className="mx-auto flex min-h-[45vh] max-w-3xl items-center justify-center">
+            <Card className="liquid-glass w-full border-0">
+              <CardContent className="flex items-center gap-3 p-5 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                Preparando sua agenda...
+              </CardContent>
+            </Card>
+          </div>
+        </Layout>
+      );
+    }
+
+    if (mobileMeError || !mobileMe?.user) {
+      return (
+        <Layout title="Escalas" subtitle="Sessão mobile">
+          <div className="mx-auto max-w-3xl space-y-4">
+            <Card className="liquid-glass border-0">
+              <CardContent className="space-y-4 p-5">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-1 h-5 w-5 shrink-0 text-destructive" />
+                  <div>
+                    <h2 className="font-sans text-lg font-semibold">Não foi possível carregar sua sessão</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Entre novamente para sincronizar suas escalas pelo app.
+                    </p>
+                  </div>
+                </div>
+                <Button className="w-full" onClick={() => refetchMobileMe()}>
+                  Tentar novamente
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </Layout>
+      );
+    }
+
+    if (mobileMe.user.role === "ministro") {
+      return <NativeMinisterSchedules userName={mobileMe.user.name} />;
+    }
+  }
+
+  return <LegacySchedules />;
+}
+
+function NativeMinisterSchedules({ userName }: { userName: string }) {
+  const queryClient = useQueryClient();
+  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const monthKey = format(currentMonth, "yyyy-MM");
+
+  const schedulesQuery = useQuery({
+    queryKey: ["mobile", "schedules", "month", monthKey],
+    queryFn: () => mobileGetSchedulesMonth({ month: monthKey }),
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  });
+
+  const schedules = useMemo(
+    () => schedulesQuery.data?.schedules ?? [],
+    [schedulesQuery.data?.schedules],
+  );
+  const confirmedCount = schedules.filter((schedule) => schedule.confirmationStatus === "confirmed").length;
+  const pendingCount = schedules.filter((schedule) => schedule.canConfirm).length;
+  const nextSchedule = schedules.find((schedule) => schedule.canConfirm) ?? schedules[0] ?? null;
+
+  const confirmMutation = useMutation({
+    mutationFn: (scheduleId: string) =>
+      mobileConfirmSchedule(
+        scheduleId,
+        { status: "confirmed" },
+        { idempotencyKey: createMobileIdempotencyKey() },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile", "schedules", "month", monthKey] });
+      queryClient.invalidateQueries({ queryKey: ["mobile", "mission-home"], exact: false });
+      toast({
+        title: "Presença confirmada",
+        description: "Sua escala foi atualizada no app.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Não foi possível confirmar",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const substitutionMutation = useMutation({
+    mutationFn: (schedule: MobileMissionSchedule) =>
+      mobileRequestSubstitution(
+        {
+          scheduleId: schedule.id,
+          reason: "Solicitado pelo app nativo.",
+        },
+        { idempotencyKey: createMobileIdempotencyKey() },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile", "schedules", "month", monthKey] });
+      queryClient.invalidateQueries({ queryKey: ["mobile", "mission-home"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["mobile", "substitutions"], exact: false });
+      toast({
+        title: "Pedido de substituição enviado",
+        description: "Os coordenadores e ministros disponíveis serão avisados.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Não foi possível pedir substituição",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const renderScheduleActions = (schedule: MobileMissionSchedule) => {
+    const confirmingThis = confirmMutation.isPending && confirmMutation.variables === schedule.id;
+    const requestingThis = substitutionMutation.isPending && substitutionMutation.variables?.id === schedule.id;
+
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button
+          className="min-h-11"
+          disabled={!schedule.canConfirm || confirmingThis || confirmMutation.isPending}
+          onClick={() => confirmMutation.mutate(schedule.id)}
+        >
+          {confirmingThis ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="mr-2 h-4 w-4" />
+          )}
+          {schedule.confirmationStatus === "confirmed" ? "Presença confirmada" : "Confirmar presença"}
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-11 bg-white/35 dark:bg-white/5"
+          disabled={!schedule.canRequestSubstitution || requestingThis || substitutionMutation.isPending}
+          onClick={() => substitutionMutation.mutate(schedule)}
+        >
+          {requestingThis ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="mr-2 h-4 w-4" />
+          )}
+          Pedir substituição
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <Layout title="Escalas" subtitle="Suas missões e confirmações">
+      <div className="mx-auto max-w-4xl space-y-4 pb-2">
+        <section className="liquid-glass rounded-lg border-0 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <Badge className="liquid-glass-chip mb-3 border-0 text-primary dark:text-amber-100">
+                Agenda ministerial
+              </Badge>
+              <h1 className="font-heading text-2xl leading-tight text-foreground sm:text-3xl">
+                Paz e bem, {userName.split(" ")[0]}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Confirme suas presenças e acompanhe pedidos de substituição do mês.
+              </p>
+            </div>
+            <div className="liquid-glass-chip flex items-center justify-between gap-2 rounded-lg p-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                aria-label="Mês anterior"
+                onClick={() => setCurrentMonth((month) => subMonths(month, 1))}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-[9.5rem] text-center">
+                <p className="text-xs uppercase text-muted-foreground">Mês</p>
+                <p className="font-semibold capitalize">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                aria-label="Próximo mês"
+                onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="liquid-glass-chip rounded-lg p-4">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Escalas</p>
+            <p className="mt-1 text-2xl font-semibold">{schedules.length}</p>
+          </div>
+          <div className="liquid-glass-chip rounded-lg p-4">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Confirmadas</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-700 dark:text-emerald-200">{confirmedCount}</p>
+          </div>
+          <div className="liquid-glass-chip rounded-lg p-4">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Pendentes</p>
+            <p className="mt-1 text-2xl font-semibold text-primary dark:text-amber-100">{pendingCount}</p>
+          </div>
+        </div>
+
+        {nextSchedule && (
+          <Card className="liquid-glass border-0">
+            <CardHeader className="pb-2">
+              <CardDescription>Próxima ação</CardDescription>
+              <CardTitle className="font-sans text-xl">{formatScheduleDate(nextSchedule.date)}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  {formatMassTime(nextSchedule.time)} · {nextSchedule.location ?? "Local a confirmar"}
+                </p>
+                <p>
+                  {nextSchedule.position
+                    ? getPositionDisplayName(nextSchedule.position)
+                    : "Posição a confirmar"}
+                </p>
+              </div>
+              <Badge className={cn("w-fit border px-3 py-1", getConfirmationBadgeClass(nextSchedule.confirmationStatus))}>
+                {getConfirmationLabel(nextSchedule.confirmationStatus)}
+              </Badge>
+            </CardContent>
+          </Card>
+        )}
+
+        {schedulesQuery.isLoading ? (
+          <Card className="liquid-glass border-0">
+            <CardContent className="flex items-center gap-3 p-5 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Carregando escalas do mês...
+            </CardContent>
+          </Card>
+        ) : schedulesQuery.isError ? (
+          <Card className="liquid-glass border-0">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-1 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <h2 className="font-sans text-lg font-semibold">Erro ao carregar escalas</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Verifique sua conexão e tente novamente.
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full" onClick={() => schedulesQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            </CardContent>
+          </Card>
+        ) : schedules.length === 0 ? (
+          <Card className="liquid-glass border-0">
+            <CardContent className="p-6 text-center">
+              <CalendarIcon className="mx-auto h-10 w-10 text-primary/70" />
+              <h2 className="mt-3 font-sans text-lg font-semibold">Nenhuma escala publicada</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Quando a coordenação publicar novas escalas, elas aparecerão aqui.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {schedules.map((schedule) => (
+              <Card key={schedule.id} className="liquid-glass liquid-glass-interactive border-0">
+                <CardContent className="space-y-4 p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-sans text-lg font-semibold leading-tight">
+                          {formatScheduleDate(schedule.date)}
+                        </h2>
+                        <Badge
+                          className={cn(
+                            "w-fit border px-2.5 py-1 text-xs",
+                            getConfirmationBadgeClass(schedule.confirmationStatus),
+                          )}
+                        >
+                          {getConfirmationLabel(schedule.confirmationStatus)}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                        <p className="liquid-glass-chip flex items-center gap-2 rounded-lg px-3 py-2">
+                          <Clock className="h-4 w-4 text-primary" />
+                          {formatMassTime(schedule.time)}
+                        </p>
+                        <p className="liquid-glass-chip flex items-center gap-2 rounded-lg px-3 py-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          {schedule.position
+                            ? getPositionDisplayName(schedule.position)
+                            : "Posição a confirmar"}
+                        </p>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {schedule.location ?? "Local a confirmar"}
+                      </p>
+                      {schedule.notes && (
+                        <p className="mt-2 rounded-lg bg-muted/70 p-3 text-sm text-muted-foreground">
+                          {schedule.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {renderScheduleActions(schedule)}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+function LegacySchedules() {
   const { data: authData } = useQuery({
     queryKey: ["/api/auth/me"],
     queryFn: () => authAPI.getMe(),

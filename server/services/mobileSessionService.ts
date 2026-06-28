@@ -223,7 +223,10 @@ export async function createOrUpdateMobileDevice(input: MobileDeviceInput): Prom
   if (input.biometricCapable !== undefined) devicePatch.biometricCapable = dbBoolean(input.biometricCapable);
   if (input.biometricEnabled !== undefined) devicePatch.biometricEnabled = dbBoolean(input.biometricEnabled);
   if (input.notificationPreferences !== undefined) {
-    devicePatch.notificationPreferences = input.notificationPreferences;
+    devicePatch.notificationPreferences = {
+      ...(existing ? normalizeRecord(existing.notificationPreferences) : {}),
+      ...input.notificationPreferences,
+    };
   }
 
   if (existing) {

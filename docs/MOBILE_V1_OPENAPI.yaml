@@ -445,6 +445,41 @@ paths:
             application/json:
               schema:
                 type: object
+  /account:
+    delete:
+      summary: Delete or anonymize the authenticated user's account from the native app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmation, password]
+              properties:
+                confirmation:
+                  type: string
+                  example: EXCLUIR MINHA CONTA
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Account deleted/anonymized.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Missing confirmation or password.
+        "401":
+          description: Missing or invalid bearer token.
+        "403":
+          description: Invalid password.
   /questionnaires/current:
     get:
       summary: Read the current published questionnaire for the active community/month.
@@ -2028,6 +2063,13 @@ components:
         notes:
           type: string
           nullable: true
+        confirmationStatus:
+          type: string
+          nullable: true
+        canConfirm:
+          type: boolean
+        canRequestSubstitution:
+          type: boolean
         deepLink:
           type: string
     ScheduleDetail:

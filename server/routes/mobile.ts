@@ -18,6 +18,7 @@ import { extractMobileNotificationEventKey, mobileNotificationData } from "@shar
 import { buildMobileProfileReadiness } from "@shared/mobileDataReadiness";
 import { db } from "../db";
 import { authenticateToken, type AuthRequest, generateToken, login } from "../auth";
+import { deleteAccountHandler } from "./account";
 import { authRateLimiter } from "../middleware/rateLimiter";
 import { auditLoginAttempt } from "../middleware/auditLogger";
 import { logActivity } from "../utils/activityLogger";
@@ -1462,6 +1463,8 @@ router.get("/privacy/account-deletion-info", authenticateToken, (_req: AuthReque
     ],
   });
 });
+
+router.delete("/account", authenticateToken, deleteAccountHandler);
 
 router.get("/questionnaires/current", authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -3177,8 +3180,16 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
         position: schedules.position,
         status: schedules.status,
         notes: schedules.notes,
+        confirmationStatus: scheduleConfirmations.status,
       })
       .from(schedules)
+      .leftJoin(
+        scheduleConfirmations,
+        and(
+          eq(scheduleConfirmations.scheduleId, schedules.id),
+          eq(scheduleConfirmations.ministerId, user.id),
+        ),
+      )
       .where(
         and(
           eq(schedules.communityId, activeCommunity.id),
@@ -3190,21 +3201,52 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
       )
       .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position));
 
+    const scheduleIds = rows.map((schedule) => schedule.id);
+    const activeSubstitutions = scheduleIds.length
+      ? await db
+          .select({
+            id: substitutionRequests.id,
+            scheduleId: substitutionRequests.scheduleId,
+            status: substitutionRequests.status,
+            updatedAt: substitutionRequests.updatedAt,
+          })
+          .from(substitutionRequests)
+          .where(
+            and(
+              eq(substitutionRequests.communityId, activeCommunity.id),
+              eq(substitutionRequests.requesterId, user.id),
+              inArray(substitutionRequests.scheduleId, scheduleIds),
+              inArray(substitutionRequests.status, ["available", "pending", "approved"]),
+            ),
+          )
+          .orderBy(desc(substitutionRequests.updatedAt))
+      : [];
+    const substitutionByScheduleId = new Map(activeSubstitutions.map((item) => [item.scheduleId, item]));
+
     res.json({
       success: true,
       community: activeCommunity,
       month: monthRange.isoMonth,
-      schedules: rows.map((schedule) => ({
-        id: schedule.id,
-        date: toDateOnly(schedule.date),
-        time: schedule.time,
-        type: schedule.type,
-        location: schedule.location,
-        position: schedule.position,
-        status: schedule.status,
-        notes: schedule.notes,
-        deepLink: mobileScheduleDeepLink(toDateOnly(schedule.date)),
-      })),
+      schedules: rows.map((schedule) => {
+        const dateOnly = toDateOnly(schedule.date);
+        const substitution = substitutionByScheduleId.get(schedule.id);
+        const isPast = isLocalScheduleDateTimePast(schedule.date, schedule.time);
+
+        return {
+          id: schedule.id,
+          date: dateOnly,
+          time: schedule.time,
+          type: schedule.type,
+          location: schedule.location,
+          position: schedule.position,
+          status: schedule.status,
+          notes: schedule.notes,
+          confirmationStatus: schedule.confirmationStatus ?? null,
+          canConfirm: !isPast && (!schedule.confirmationStatus || schedule.confirmationStatus === "pending"),
+          canRequestSubstitution: !isPast && !substitution,
+          deepLink: mobileScheduleDeepLink(dateOnly),
+        };
+      }),
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar escalas do mes");

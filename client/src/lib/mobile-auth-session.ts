@@ -11,6 +11,8 @@ import {
   type MobileAdminQuestionnaireReminderPayload,
   type MobileAdminQuestionnaireReminderResponse,
   type MobileAdminQuestionnaireResponsesResponse,
+  type MobileAccountDeletePayload,
+  type MobileAccountDeleteResponse,
   type MobileAuthResponse,
   type MobileClientRequestOptions,
   type MobileDeviceResponse,
@@ -356,6 +358,10 @@ export async function mobileUpdateCurrentDevice(payload: MobileDeviceUpdatePaylo
 
 export async function mobileRevokeDevice(deviceDbId: string) {
   return runWithMobileAuthRetry((client) => client.revokeDevice(deviceDbId));
+}
+
+export async function mobileDeleteAccount(payload: MobileAccountDeletePayload): Promise<MobileAccountDeleteResponse> {
+  return runWithMobileAuthRetry((client) => client.deleteAccount(payload));
 }
 
 export async function mobileListNotifications(input: { limit?: number } = {}): Promise<MobileNotificationsResponse> {

@@ -35,6 +35,7 @@ import {
   type NativeBiometricStatus,
 } from '@/lib/native-biometric-auth';
 import {
+  mobileDeleteAccount,
   mobileGetCurrentDevice,
   mobileGetProfile,
   mobileUpdateCurrentDevice,
@@ -310,13 +311,15 @@ export default function Settings() {
 
     if (!pushSupported) {
       setError(pushIsNative
-        ? 'Este aparelho não permite ativar notificações push pelo app.'
+        ? 'Este aparelho não permite ativar notificações pelo app.'
         : 'Seu navegador não suporta notificações push.');
       return;
     }
 
     if (pushStatus === 'missing-key') {
-      setError('Notificações push não estão configuradas neste ambiente.');
+      setError(pushIsNative
+        ? 'Notificações do aparelho não estão configuradas neste ambiente.'
+        : 'Notificações push não estão configuradas neste ambiente.');
       return;
     }
 
@@ -343,7 +346,9 @@ export default function Settings() {
           ? 'Notificações do aparelho ativadas com sucesso!'
           : 'Notificações push ativadas com sucesso!');
       } catch (err) {
-        setError(pushError || 'Erro ao ativar notificações push.');
+        setError(pushError || (pushIsNative
+          ? 'Erro ao ativar notificações do aparelho.'
+          : 'Erro ao ativar notificações push.'));
       }
     } else {
       // Desativando notificações
@@ -352,7 +357,9 @@ export default function Settings() {
         setSettings(prev => ({ ...prev, pushNotifications: false }));
         setSuccess(pushIsNative ? 'Notificações do aparelho desativadas.' : 'Notificações push desativadas.');
       } catch (err) {
-        setError(pushError || 'Erro ao desativar notificações push.');
+        setError(pushError || (pushIsNative
+          ? 'Erro ao desativar notificações do aparelho.'
+          : 'Erro ao desativar notificações push.'));
       }
     }
   };
@@ -451,6 +458,13 @@ export default function Settings() {
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
+      if (useNativeSettings) {
+        return mobileDeleteAccount({
+          confirmation: deleteConfirmation,
+          password: deletePassword,
+        });
+      }
+
       const res = await fetch('/api/account', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },

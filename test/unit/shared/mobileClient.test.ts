@@ -25,6 +25,7 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.readNotification("notification/with slash"))
       .toBe("/notifications/notification%2Fwith%20slash/read");
     expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
+    expect(mobileEndpoints.account()).toBe("/account");
     expect(mobileEndpoints.adminCommunityHome({ month: "2026-07" }))
       .toBe("/admin/community/home?month=2026-07");
     expect(mobileEndpoints.adminScheduleReadiness({ month: "2026-07" }))
@@ -183,6 +184,10 @@ describe("mobileClient contract", () => {
 
     await client.getMe();
     await client.logout();
+    await client.deleteAccount({
+      confirmation: "EXCLUIR MINHA CONTA",
+      password: "MobileDemo123!",
+    });
 
     expect(requests[0].input).toBe("https://example.test/api/mobile/v1/auth/me");
     expect(requests[0].init.headers).toMatchObject({
@@ -199,6 +204,17 @@ describe("mobileClient contract", () => {
     });
     expect(JSON.parse(String(requests[1].init.body))).toEqual({
       deviceId: "ios-device-1",
+    });
+
+    expect(requests[2].input).toBe("https://example.test/api/mobile/v1/account");
+    expect(requests[2].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Device-Id": "ios-device-1",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(String(requests[2].init.body))).toEqual({
+      confirmation: "EXCLUIR MINHA CONTA",
+      password: "MobileDemo123!",
     });
   });
 

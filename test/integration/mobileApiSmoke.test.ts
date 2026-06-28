@@ -105,6 +105,23 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       },
     });
 
+    const mergedDevicePreferences = await client.updateCurrentDevice({
+      notificationPreferences: {
+        schedules: false,
+      },
+    });
+
+    expect(mergedDevicePreferences.success).toBe(true);
+    expect(mergedDevicePreferences.device).toMatchObject({
+      deviceId: ministerDeviceId,
+      pushEnabled: true,
+      notificationPreferences: {
+        emailNotifications: true,
+        reminderHours: 24,
+        schedules: false,
+      },
+    });
+
     const refresh = await client.refresh({
       refreshToken: login.auth.refreshToken!,
     });
@@ -146,6 +163,25 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(mission.success).toBe(true);
     expect(mission.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
     expect(mission.nextMission?.id).toBe(MOBILE_P0_DEMO_IDS.scheduleA);
+
+    const monthlySchedules = await client.getSchedulesMonth({ month: MOBILE_P0_DEMO_MONTH });
+    expect(monthlySchedules.success).toBe(true);
+    const scheduleAFromMonth = monthlySchedules.schedules.find((item) =>
+      item.id === MOBILE_P0_DEMO_IDS.scheduleA
+    );
+    expect(scheduleAFromMonth).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.scheduleA,
+      confirmationStatus: null,
+      canConfirm: true,
+      canRequestSubstitution: false,
+    });
+    const scheduleOpenForSubstitutionFromMonth = monthlySchedules.schedules.find((item) =>
+      item.id === MOBILE_P0_DEMO_IDS.scheduleAForSubstitution
+    );
+    expect(scheduleOpenForSubstitutionFromMonth).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.scheduleAForSubstitution,
+      canRequestSubstitution: true,
+    });
 
     const missionFromPreviousMonth = await client.getMissionHome({ month: "2026-06" });
     expect(missionFromPreviousMonth.success).toBe(true);
@@ -219,6 +255,16 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     expect(confirmation.success).toBe(true);
     expect(confirmation.confirmation.status).toBe("confirmed");
     expect(confirmation.schedule.id).toBe(MOBILE_P0_DEMO_IDS.scheduleA);
+
+    const monthlySchedulesAfterConfirmation = await client.getSchedulesMonth({ month: MOBILE_P0_DEMO_MONTH });
+    const confirmedScheduleFromMonth = monthlySchedulesAfterConfirmation.schedules.find((item) =>
+      item.id === MOBILE_P0_DEMO_IDS.scheduleA
+    );
+    expect(confirmedScheduleFromMonth).toMatchObject({
+      id: MOBILE_P0_DEMO_IDS.scheduleA,
+      confirmationStatus: "confirmed",
+      canConfirm: false,
+    });
 
     const smokeClaimScheduleId = "10101010-1010-4010-8010-101010101010";
     await db.delete(substitutionRequests).where(eq(substitutionRequests.scheduleId, smokeClaimScheduleId));

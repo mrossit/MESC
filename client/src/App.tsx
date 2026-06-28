@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CachedAuthGuard as AuthGuard } from "@/components/cached-auth-guard";
 import { ThemeProvider } from "@/components/theme-provider";
-import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { UpdateNotification } from "@/components/update-notification";
 import { checkCacheVersion } from "@/lib/cacheManager";
@@ -16,6 +15,7 @@ import { useNativePushNotificationBridge } from "@/hooks/useNativePushNotificati
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { SessionIndicator } from "@/components/SessionIndicator";
 import { SentryErrorBoundary } from "@/lib/monitoring";
+import { isNativeRuntime } from "@/lib/api-url";
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -230,6 +230,8 @@ function RouterWithHooks() {
 }
 
 function App() {
+  const isNativeApp = isNativeRuntime();
+
   // Verificar versão do cache e inatividade ao iniciar a aplicação
   useEffect(() => {
     checkCacheVersion();
@@ -250,8 +252,8 @@ function App() {
           <TooltipProvider>
             <SessionIndicator />
             <Toaster />
-            <UpdateNotification />
-            <PWAInstallPrompt />
+            {!isNativeApp && <UpdateNotification />}
+            {!isNativeApp && <PWAInstallPrompt />}
             <RouterWithHooks />
           </TooltipProvider>
         </ThemeProvider>
