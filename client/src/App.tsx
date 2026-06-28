@@ -12,6 +12,7 @@ import { UpdateNotification } from "@/components/update-notification";
 import { checkCacheVersion } from "@/lib/cacheManager";
 import { checkInactivityAndClear } from "@/lib/version";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
+import { useNativePushNotificationBridge } from "@/hooks/useNativePushNotificationBridge";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { SessionIndicator } from "@/components/SessionIndicator";
 import { SentryErrorBoundary } from "@/lib/monitoring";
@@ -81,6 +82,9 @@ function RouterWithHooks() {
 
   // Verifica periodicamente se há nova versão e atualiza automaticamente
   useVersionCheck();
+
+  // Escuta ações de notificações nativas e abre a rota correta dentro do app.
+  useNativePushNotificationBridge();
 
   return (
     <Suspense fallback={<LoadingFallback />}>

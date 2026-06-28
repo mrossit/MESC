@@ -22,7 +22,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50426)` enviado em 27/06/2026 para substituir o `50425` nos testers internos.
+- iOS TestFlight: build `5.4.3 (50427)` enviado em 27/06/2026 para substituir o `50426` nos testers internos.
 
 ## Comandos Validados
 
@@ -73,11 +73,11 @@ Os artefatos acima sao gerados localmente e nao devem ser commitados.
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50426`
-- Delivery UUID: `b930861f-24be-4cc3-b563-16d71cc65702`
+- Build: `50427`
+- Delivery UUID: `0add9114-9780-405a-8113-f26b66f111f3`
 - Status App Store Connect: upload aceito; aguardando processamento/validacao da Apple.
 - Distribuicao: testers internos via TestFlight apos processamento do build pela Apple.
-- Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais visivel no shell nativo, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
+- Changelog: `MVP nativo P0 com preview de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais visivel no shell nativo, push nativo com permissao do aparelho e registro APNS/FCM, prontidao de escala por comunidade, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -97,7 +97,13 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50426)` foi enviado ao App Store Connect para o proximo teste fiel do MVP.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50427)` foi enviado ao App Store Connect para o proximo teste fiel do MVP.
+
+## Push Nativo
+
+O build `5.4.3 (50427)` remove a dependencia de Push API de navegador dentro do app nativo. Em iOS/Android, a tela de Configuracoes usa permissao do aparelho via Capacitor, registra `pushToken`, `pushProvider` e `pushEnabled` em `mobile_devices`, e o backend tenta entrega remota por APNS/FCM antes de cair para o Web Push PWA.
+
+Para envio remoto real em producao, ainda precisam existir as credenciais APNS/FCM no ambiente da API. Sem elas, o app registra o token e a UI fica correta, mas o backend registra skip operacional de entrega remota.
 
 ## Prontidao De Escala No Staging
 

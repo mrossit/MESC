@@ -95,6 +95,7 @@ export default function Settings() {
 
   // Push Notifications hook
   const {
+    runtime: pushRuntime,
     isSupported: pushSupported,
     status: pushStatus,
     permission: pushPermission,
@@ -104,6 +105,8 @@ export default function Settings() {
     isBusy: pushBusy,
     error: pushError
   } = usePushNotifications();
+  const pushIsNative = pushRuntime === 'native';
+  const pushSurfaceLabel = pushIsNative ? 'aparelho' : 'navegador';
 
   // Buscar configurações do usuário
   const { data: settingsData, isLoading } = useQuery({
@@ -261,7 +264,9 @@ export default function Settings() {
     setSuccess(null);
 
     if (!pushSupported) {
-      setError('Seu navegador não suporta notificações push.');
+      setError(pushIsNative
+        ? 'Este aparelho não permite ativar notificações push pelo app.'
+        : 'Seu navegador não suporta notificações push.');
       return;
     }
 
@@ -278,13 +283,17 @@ export default function Settings() {
     if (checked) {
       // Ativando notificações
       if (pushPermission === 'denied') {
-        setError('As notificações foram bloqueadas. Para reativar, acesse as configurações do seu navegador.');
+        setError(pushIsNative
+          ? 'As notificações foram bloqueadas. Para reativar, acesse os Ajustes do aparelho.'
+          : 'As notificações foram bloqueadas. Para reativar, acesse as configurações do seu navegador.');
         return;
       }
 
       try {
         await enablePushNotifications();
-        setSuccess('Notificações push ativadas com sucesso!');
+        setSuccess(pushIsNative
+          ? 'Notificações do aparelho ativadas com sucesso!'
+          : 'Notificações push ativadas com sucesso!');
       } catch (err) {
         setError(pushError || 'Erro ao ativar notificações push.');
       }
@@ -292,7 +301,7 @@ export default function Settings() {
       // Desativando notificações
       try {
         await disablePushNotifications();
-        setSuccess('Notificações push desativadas.');
+        setSuccess(pushIsNative ? 'Notificações do aparelho desativadas.' : 'Notificações push desativadas.');
       } catch (err) {
         setError(pushError || 'Erro ao desativar notificações push.');
       }
@@ -520,16 +529,18 @@ export default function Settings() {
                               Notificações Push
                             </Label>
                             <p className="text-xs sm:text-sm text-gray-500">
-                              Receba notificações no navegador sobre suas escalas
+                              {pushIsNative
+                                ? 'Receba avisos do app no aparelho sobre escalas, questionários e substituições'
+                                : 'Receba notificações no navegador sobre suas escalas'}
                             </p>
-                            {pushStatus === 'missing-key' && (
+                            {pushStatus === 'missing-key' && !pushIsNative && (
                               <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
                                 Notificações push indisponíveis neste ambiente
                               </p>
                             )}
                             {pushPermission === 'denied' && (
                               <p className="text-xs text-red-600 dark:text-red-500 mt-1">
-                                Bloqueado no navegador - altere as permissões
+                                Bloqueado no {pushSurfaceLabel} - altere as permissões
                               </p>
                             )}
                           </div>
@@ -537,7 +548,7 @@ export default function Settings() {
                             id="push"
                             checked={pushSubscribed}
                             onCheckedChange={handlePushNotificationToggle}
-                            disabled={pushBusy || pushStatus === 'missing-key' || pushStatus === 'errored'}
+                            disabled={pushBusy || pushStatus === 'no-support' || (!pushIsNative && (pushStatus === 'missing-key' || pushStatus === 'errored'))}
                           />
                         </div>
 

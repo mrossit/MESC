@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { sendNativePushNotificationToUsers } from "./nativePushNotifications";
 
 type PushPayload = {
   title: string;
@@ -60,11 +61,6 @@ const STALE_SUBSCRIPTION_DAYS = 45;
 export async function sendPushNotificationToUsers(userIds: string[], payload: PushPayload) {
   console.log('[PUSH] Iniciando envio para', userIds.length, 'userIds');
 
-  if (!pushConfig.enabled || !webpush) {
-    console.warn('[PUSH] Push desabilitado ou web-push não disponível');
-    return;
-  }
-
   if (!userIds || userIds.length === 0) {
     console.warn('[PUSH] Nenhum userIds fornecido');
     return;
@@ -73,11 +69,22 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
   const uniqueUserIds = Array.from(new Set(userIds));
   console.log('[PUSH] UserIds únicos:', uniqueUserIds.length);
 
+  const nativeDelivery = sendNativePushNotificationToUsers(uniqueUserIds, payload).catch((error) => {
+    console.error("[NATIVE_PUSH] Native delivery failed:", error);
+  });
+
+  if (!pushConfig.enabled || !webpush) {
+    console.warn('[PUSH] Web Push desabilitado ou web-push não disponível');
+    await nativeDelivery;
+    return;
+  }
+
   const allSubscriptions = await storage.getPushSubscriptionsByUserIds(uniqueUserIds);
   console.log('[PUSH] Subscriptions encontradas:', allSubscriptions.length);
 
   if (allSubscriptions.length === 0) {
     console.warn('[PUSH] Nenhuma subscription encontrada para os userIds fornecidos');
+    await nativeDelivery;
     return;
   }
 
@@ -110,6 +117,7 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
 
   if (freshSubscriptions.length === 0) {
     console.warn('[PUSH] Todas as subscriptions estão stale, nenhuma notificação enviada');
+    await nativeDelivery;
     return;
   }
 
@@ -152,6 +160,7 @@ export async function sendPushNotificationToUsers(userIds: string[], payload: Pu
   const successCount = results.filter(r => r.success).length;
   const failCount = results.filter(r => !r.success).length;
   console.log(`[PUSH] Resumo: Sucesso: ${successCount} | Falha: ${failCount} | Stale removidas: ${staleSubscriptions.length}`);
+  await nativeDelivery;
 }
 
 /**
