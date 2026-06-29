@@ -422,7 +422,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
       await sendPushNotificationToUsers([finalSubstituteId], {
         title: '📋 Pedido de Substituição',
         body: `${requesterName} solicitou que você o substitua na missa de ${formattedDate} às ${schedule.time || ''}`,
-        url: '/substitutions'
+        url: '/substitutions',
+        data: mobileNotificationData('substitution_requested', {
+          substitutionId: newRequest.id,
+          scheduleId,
+          requesterId,
+          directed: true,
+        })
       });
 
       // Notificar via WebSocket para atualização em tempo real
@@ -477,7 +483,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
         await sendPushNotificationToUsers(recipientIds, {
           title: notificationTitle,
           body: notificationMessage,
-          url: '/substitutions'
+          url: '/substitutions',
+          data: mobileNotificationData('substitution_requested', {
+            substitutionId: newRequest.id,
+            scheduleId,
+            requesterId,
+            directed: false,
+          })
         });
 
         notifyUsers(recipientIds, {

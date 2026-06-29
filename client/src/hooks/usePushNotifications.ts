@@ -28,8 +28,11 @@ export type PushPermissionState =
 
 const NATIVE_PUSH_TOKEN_KEY = "mesc_native_push_token";
 const NATIVE_PUSH_PROVIDER_KEY = "mesc_native_push_provider";
+const NATIVE_PUSH_PERMISSION_OUTCOME_KEY = "mesc_native_push_permission_outcome";
 export const NATIVE_PUSH_CHANNEL_ID = "mesc_general";
 const NATIVE_PUSH_REGISTRATION_TIMEOUT_MS = 20000;
+
+let nativeFirstLaunchSetupPromise: Promise<void> | null = null;
 
 function urlBase64ToUint8Array(base64String: string) {
   if (typeof window === "undefined") {
@@ -100,6 +103,22 @@ function clearStoredNativePushToken() {
 
   localStorage.removeItem(NATIVE_PUSH_TOKEN_KEY);
   localStorage.removeItem(NATIVE_PUSH_PROVIDER_KEY);
+}
+
+function readStoredNativePushPermissionOutcome() {
+  return getStorage()?.getItem(NATIVE_PUSH_PERMISSION_OUTCOME_KEY) ?? null;
+}
+
+function storeNativePushPermissionOutcome(permission: PushPermissionState) {
+  const localStorage = getStorage();
+  if (!localStorage) return;
+
+  localStorage.setItem(NATIVE_PUSH_PERMISSION_OUTCOME_KEY, permission);
+}
+
+function hasAuthToken() {
+  const localStorage = getStorage();
+  return Boolean(localStorage?.getItem("token") || localStorage?.getItem("auth_token"));
 }
 
 function normalizeNativePermission(value: string | undefined): PushPermissionState {
@@ -203,6 +222,39 @@ export function usePushNotifications(): PushNotificationsState {
         setStatus("ready");
         await ensureNativePushChannel();
 
+        if (!hasAuthToken()) {
+          return;
+        }
+
+        if (!nativeFirstLaunchSetupPromise) {
+          nativeFirstLaunchSetupPromise = (async () => {
+            const provider = getNativePushProvider();
+            if (!provider) return;
+
+            let nativePermission = normalizeNativePermission((await PushNotifications.checkPermissions()).receive);
+            if ((nativePermission === "prompt" || nativePermission === "prompt-with-rationale")
+              && !readStoredNativePushPermissionOutcome()) {
+              nativePermission = normalizeNativePermission((await PushNotifications.requestPermissions()).receive);
+              storeNativePushPermissionOutcome(nativePermission);
+            } else if (nativePermission === "granted" || nativePermission === "denied") {
+              storeNativePushPermissionOutcome(nativePermission);
+            }
+
+            if (nativePermission !== "granted") {
+              clearStoredNativePushToken();
+              return;
+            }
+
+            const storedToken = readStoredNativePushToken();
+            const token = storedToken ?? await waitForNativeRegistrationToken();
+            await syncNativePushDevice(token, provider, true);
+            storeNativePushToken(token, provider);
+          })().finally(() => {
+            nativeFirstLaunchSetupPromise = null;
+          });
+        }
+
+        await nativeFirstLaunchSetupPromise;
         const permissions = await PushNotifications.checkPermissions();
         if (cancelled) return;
 
@@ -212,14 +264,7 @@ export function usePushNotifications(): PushNotificationsState {
         const storedToken = readStoredNativePushToken();
         if (nativePermission === "granted" && storedToken) {
           setIsSubscribed(true);
-
-          const provider = getNativePushProvider();
-          if (provider && !hasSyncedRef.current) {
-            await syncNativePushDevice(storedToken, provider, true).catch((syncError) => {
-              console.warn("[Push] Failed to sync native token:", syncError);
-            });
-            hasSyncedRef.current = true;
-          }
+          hasSyncedRef.current = true;
         }
       } catch (setupError) {
         console.warn("[Push] Native push setup failed:", setupError);

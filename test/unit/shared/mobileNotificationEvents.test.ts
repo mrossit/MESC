@@ -15,6 +15,7 @@ describe("mobile notification events", () => {
       "questionnaire_closed",
       "schedule_published",
       "substitution_requested",
+      "sanctuary_event_published",
       "substitute_accepted",
       "formation_available",
       "schedule_reminder",

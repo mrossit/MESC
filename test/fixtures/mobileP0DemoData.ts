@@ -23,6 +23,7 @@ export const MOBILE_P0_DEMO_IDS = {
   notificationAQuestionnaireClosed: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   notificationASubstitutionRequested: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
   notificationASubstituteAccepted: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  notificationASanctuaryEventPublished: "abababab-abab-4aba-8aba-abababababab",
   notificationAFormationAvailable: "12121212-1212-4121-8121-121212121212",
   notificationAScheduleReminder: "34343434-3434-4343-8343-343434343434",
 };
@@ -378,6 +379,20 @@ export function getMobileP0DemoData() {
         priority: "high",
         expiresAt: null,
         createdAt: new Date("2026-06-21T11:00:00.000Z"),
+      },
+      {
+        id: MOBILE_P0_DEMO_IDS.notificationASanctuaryEventPublished,
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+        type: "announcement",
+        title: "Evento do Santuario publicado",
+        message: "Um evento do Santuario foi publicado no calendario.",
+        data: { eventKey: "sanctuary_event_published", eventId: "demo-sanctuary-event" },
+        read: true,
+        readAt: now,
+        actionUrl: "/schedules",
+        priority: "normal",
+        expiresAt: null,
+        createdAt: new Date("2026-06-21T10:55:00.000Z"),
       },
       {
         id: MOBILE_P0_DEMO_IDS.notificationAFormationAvailable,

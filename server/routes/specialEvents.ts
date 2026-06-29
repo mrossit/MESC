@@ -6,13 +6,65 @@
 
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { specialEvents, insertSpecialEventSchema } from '@shared/schema';
+import { notifications, specialEvents, insertSpecialEventSchema, users } from '@shared/schema';
 import type { SpecialEvent, InsertSpecialEvent } from '@shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { mobileNotificationData } from '@shared/mobileNotificationEvents';
+import { sendPushNotificationToUsers } from '../utils/pushNotifications';
 
 const router = Router();
+
+function formatEventDate(eventDate: string) {
+  return new Date(`${eventDate}T12:00:00`).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit'
+  });
+}
+
+async function notifySanctuaryEventPublished(event: SpecialEvent) {
+  const recipients = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(
+      eq(users.role, 'ministro'),
+      eq(users.status, 'active'),
+      eq(users.homeCommunityId, event.communityId)
+    ));
+
+  const recipientIds = recipients.map((recipient) => recipient.id);
+  if (recipientIds.length === 0) {
+    return;
+  }
+
+  const title = '📅 Evento do Santuário';
+  const message = `${event.name} foi publicado para ${formatEventDate(event.eventDate)} às ${event.eventTime}.`;
+  const data = mobileNotificationData('sanctuary_event_published', {
+    eventId: event.id,
+    eventDate: event.eventDate,
+    eventTime: event.eventTime,
+    communityId: event.communityId,
+  });
+
+  await db.insert(notifications).values(recipientIds.map((userId) => ({
+    userId,
+    type: 'announcement' as const,
+    title,
+    message,
+    read: false,
+    actionUrl: '/schedules',
+    data,
+  })));
+
+  await sendPushNotificationToUsers(recipientIds, {
+    title,
+    body: message,
+    url: '/schedules',
+    tag: `sanctuary-event-${event.id}`,
+    data,
+  });
+}
 
 /**
  * GET /api/special-events
@@ -119,6 +171,12 @@ router.post('/', async (req: Request, res: Response) => {
     const [newEvent] = await db.insert(specialEvents)
       .values(insertData)
       .returning();
+
+    try {
+      await notifySanctuaryEventPublished(newEvent);
+    } catch (notificationError) {
+      console.error('[SpecialEvents] Error notifying published event:', notificationError);
+    }
 
     console.log(`[SpecialEvents] Created new event: ${newEvent.name} on ${newEvent.eventDate}`);
     res.status(201).json(newEvent);
@@ -243,6 +301,14 @@ router.post('/batch', async (req: Request, res: Response) => {
     const newEvents = await db.insert(specialEvents)
       .values(validatedEvents)
       .returning();
+
+    await Promise.all(newEvents.map(async (event) => {
+      try {
+        await notifySanctuaryEventPublished(event);
+      } catch (notificationError) {
+        console.error(`[SpecialEvents] Error notifying published event ${event.id}:`, notificationError);
+      }
+    }));
 
     console.log(`[SpecialEvents] Created ${newEvents.length} events in batch`);
     res.status(201).json(newEvents);

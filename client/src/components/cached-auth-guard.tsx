@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient } from "@/lib/queryClient";
 import { hasValidUser, isAuthResponse, safeGetUserProperty, AuthResponse } from "@/lib/auth";
 import { expandRoles } from "@shared/roles";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 interface CachedAuthGuardProps {
   children: React.ReactNode;
@@ -12,6 +13,8 @@ interface CachedAuthGuardProps {
 
 export function CachedAuthGuard({ children, allowedRoles }: CachedAuthGuardProps) {
   const [location] = useLocation();
+  usePushNotifications();
+
   const hasStoredToken =
     typeof window !== "undefined" &&
     Boolean(localStorage.getItem("token") || localStorage.getItem("auth_token"));
