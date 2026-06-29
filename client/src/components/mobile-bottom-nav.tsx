@@ -43,7 +43,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="mobile-bottom-nav ios-glass-bar fixed inset-x-0 bottom-0 z-50 border-t md:hidden"
+      className="mobile-bottom-nav ios-glass-bar fixed inset-x-0 bottom-0 z-50 md:hidden"
     >
       <div className="mobile-bottom-nav-inner mx-auto grid max-w-lg grid-cols-5 items-stretch">
         {navItems.map((item) => {

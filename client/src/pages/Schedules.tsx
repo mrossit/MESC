@@ -685,12 +685,18 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
   const visibleSchedules = selectedScheduleDate
     ? schedulesByDate.get(selectedScheduleDate) ?? []
     : sortedSchedules;
+  const selectedDayOwnSchedules = selectedScheduleDate
+    ? schedulesByDate.get(selectedScheduleDate) ?? []
+    : [];
   const selectedScheduleDateLabel = selectedScheduleDate
     ? format(parseScheduleDate(selectedScheduleDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     : null;
   const visibleOfficialRows = selectedScheduleDate
     ? officialRowsByDate.get(selectedScheduleDate) ?? []
     : officialScheduleRows;
+  const selectedDayOfficialRows = selectedScheduleDate
+    ? officialRowsByDate.get(selectedScheduleDate) ?? []
+    : [];
   const availableExportFormats = schedulesQuery.data?.publicSchedule?.exportFormats ?? ["html", "excel", "pdf"];
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -703,10 +709,6 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
   const confirmedCount = schedules.filter((schedule) => schedule.confirmationStatus === "confirmed").length;
   const pendingCount = schedules.filter((schedule) => schedule.canConfirm).length;
   const nextSchedule = sortedSchedules.find((schedule) => schedule.canConfirm) ?? sortedSchedules[0] ?? null;
-
-  useEffect(() => {
-    setSelectedScheduleDate(null);
-  }, [monthKey]);
 
   const confirmMutation = useMutation({
     mutationFn: (scheduleId: string) =>
@@ -812,7 +814,29 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
     }
   };
 
-  const goToToday = () => setCurrentMonth(startOfMonth(new Date()));
+  const goToPreviousMonth = () => {
+    setCurrentMonth((month) => startOfMonth(subMonths(month, 1)));
+    setSelectedScheduleDate(null);
+  };
+
+  const goToNextMonth = () => {
+    setCurrentMonth((month) => startOfMonth(addMonths(month, 1)));
+    setSelectedScheduleDate(null);
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    setCurrentMonth(startOfMonth(today));
+    setSelectedScheduleDate(format(today, "yyyy-MM-dd"));
+  };
+
+  const handleScheduleViewModeChange = (value: string) => {
+    const nextViewMode = value as "calendar" | "table" | "list";
+    setScheduleViewMode(nextViewMode);
+    if (nextViewMode !== "calendar") {
+      setSelectedScheduleDate(null);
+    }
+  };
 
   return (
     <Layout title="Escalas" subtitle="Suas missões e confirmações">
@@ -836,7 +860,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                 size="icon"
                 className="h-10 w-10 shrink-0"
                 aria-label="Mês anterior"
-                onClick={() => setCurrentMonth((month) => subMonths(month, 1))}
+                onClick={goToPreviousMonth}
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -849,7 +873,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                 size="icon"
                 className="h-10 w-10 shrink-0"
                 aria-label="Próximo mês"
-                onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
+                onClick={goToNextMonth}
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
@@ -924,22 +948,12 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
               </Button>
             </CardContent>
           </Card>
-        ) : schedules.length === 0 && publicAssignments.length === 0 ? (
-          <Card className="liquid-glass border-0">
-            <CardContent className="p-6 text-center">
-              <CalendarIcon className="mx-auto h-10 w-10 text-primary/70" />
-              <h2 className="mt-3 font-sans text-lg font-semibold">Nenhuma escala publicada</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Quando a coordenação publicar novas escalas, elas aparecerão aqui.
-              </p>
-            </CardContent>
-          </Card>
         ) : (
-          <Tabs value={scheduleViewMode} onValueChange={(value) => setScheduleViewMode(value as "calendar" | "table" | "list")}>
+          <Tabs value={scheduleViewMode} onValueChange={handleScheduleViewModeChange}>
             <TabsList className="liquid-glass-chip grid h-auto w-full grid-cols-3 rounded-lg p-1">
               <TabsTrigger value="list" className="gap-1.5 text-xs sm:text-sm">
                 <List className="h-4 w-4" />
-                Lista
+                Minha escala
               </TabsTrigger>
               <TabsTrigger value="calendar" className="gap-1.5 text-xs sm:text-sm">
                 <CalendarIcon className="h-4 w-4" />
@@ -947,7 +961,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
               </TabsTrigger>
               <TabsTrigger value="table" className="gap-1.5 text-xs sm:text-sm">
                 <FileSpreadsheet className="h-4 w-4" />
-                Escala
+                Escala completa
               </TabsTrigger>
             </TabsList>
 
@@ -957,7 +971,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                   <CardTitle className="font-sans text-base">
                     {capitalizeFirst(format(currentMonth, "MMMM yyyy", { locale: ptBR }))}
                   </CardTitle>
-                  <CardDescription>Toque em um dia para abrir a escala completa.</CardDescription>
+                  <CardDescription>Toque em qualquer dia do mês para ver suas missões e a escala completa do dia.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 p-3 pt-0 sm:p-5 sm:pt-0">
                   <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase text-muted-foreground">
@@ -982,7 +996,6 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                           disabled={!isCurrentMonth}
                           onClick={() => {
                             setSelectedScheduleDate(dateKey);
-                            setScheduleViewMode("table");
                           }}
                           className={cn(
                             "relative flex min-h-12 flex-col items-center justify-center rounded-md border bg-white/25 p-1 text-center text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none dark:bg-white/5",
@@ -1010,6 +1023,64 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                       );
                     })}
                   </div>
+                  {selectedScheduleDate && selectedScheduleDateLabel && (
+                    <div className="liquid-glass-chip space-y-3 rounded-lg p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-medium uppercase text-muted-foreground">Dia selecionado</p>
+                          <p className="text-sm font-semibold capitalize">{selectedScheduleDateLabel}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg border border-white/25 bg-white/25 p-3 dark:bg-white/5">
+                          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Minha escala</p>
+                          {selectedDayOwnSchedules.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Você não está escalado neste dia.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedDayOwnSchedules.map((schedule) => (
+                                <div key={schedule.id} className="rounded-md bg-white/35 p-2 text-sm dark:bg-white/5">
+                                  <p className="font-semibold">{formatMassTime(schedule.time)}</p>
+                                  <p className="text-muted-foreground">
+                                    {schedule.position
+                                      ? getPositionDisplayName(schedule.position)
+                                      : "Posição a confirmar"}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-lg border border-white/25 bg-white/25 p-3 dark:bg-white/5">
+                          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Escala completa do dia</p>
+                          {selectedDayOfficialRows.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhuma celebração publicada para este dia.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedDayOfficialRows.map((row) => {
+                                const assignedNames = Array.from(row.assignmentsByPosition.values())
+                                  .map((assignment) => assignment.scheduleDisplayName || assignment.ministerName)
+                                  .filter(Boolean);
+
+                                return (
+                                  <div key={row.key} className="rounded-md bg-white/35 p-2 text-sm dark:bg-white/5">
+                                    <p className="font-semibold">{row.time}</p>
+                                    <p className="text-muted-foreground">
+                                      {assignedNames.length > 0
+                                        ? assignedNames.join(", ")
+                                        : "Sem ministros publicados neste horário."}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1215,7 +1286,9 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                 {visibleSchedules.length === 0 ? (
                   <Card className="liquid-glass border-0">
                     <CardContent className="p-5 text-center text-sm text-muted-foreground">
-                      Nenhuma escala publicada para este dia.
+                      {selectedScheduleDate
+                        ? "Você não está escalado neste dia."
+                        : "Você não tem escalas publicadas neste mês."}
                     </CardContent>
                   </Card>
                 ) : (
