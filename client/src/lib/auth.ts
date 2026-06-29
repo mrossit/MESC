@@ -1,5 +1,6 @@
 import { apiRequest, queryClient } from "./queryClient";
 import { clearLocalSession, markSkipAutoBiometricOnce } from "./persistent-storage";
+import { clearNativeBiometricSavedCredential } from "./native-biometric-auth";
 import {
   mobileGetMe,
   mobileLogin,
@@ -229,6 +230,7 @@ export const authAPI = {
     } catch {
       // Mesmo offline ou com sessao expirada, sair deve sempre limpar a sessao local.
     } finally {
+      await clearNativeBiometricSavedCredential().catch(() => undefined);
       clearLocalSession();
       markSkipAutoBiometricOnce();
       queryClient.clear();

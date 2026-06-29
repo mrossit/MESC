@@ -19,6 +19,8 @@ export interface NativeBiometricStatus {
   native: boolean;
   available: boolean;
   enabled: boolean;
+  preferenceEnabled: boolean;
+  credentialsSaved: boolean;
   label: string;
   detail: string;
   biometryType?: BiometryType;
@@ -102,6 +104,8 @@ export async function getNativeBiometricStatus(): Promise<NativeBiometricStatus>
       native: false,
       available: false,
       enabled: false,
+      preferenceEnabled: false,
+      credentialsSaved: false,
       label: "biometria",
       detail: unavailableDetail(),
     };
@@ -118,6 +122,8 @@ export async function getNativeBiometricStatus(): Promise<NativeBiometricStatus>
       native: true,
       available: availability.isAvailable,
       enabled: isEnabledFlagSet() && saved.isSaved,
+      preferenceEnabled: isEnabledFlagSet(),
+      credentialsSaved: saved.isSaved,
       label,
       detail: availability.isAvailable
         ? `Entrada rapida com ${label} neste aparelho.`
@@ -130,6 +136,8 @@ export async function getNativeBiometricStatus(): Promise<NativeBiometricStatus>
       native: true,
       available: false,
       enabled: false,
+      preferenceEnabled: isEnabledFlagSet(),
+      credentialsSaved: false,
       label: "biometria",
       detail: "Nao foi possivel consultar a biometria deste aparelho.",
     };
@@ -171,7 +179,7 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
 
 async function performNativeBiometricUnlock(): Promise<{ email: string; token: string }> {
   const status = await getNativeBiometricStatus();
-  if (!status.native || !status.available || !status.enabled) {
+  if (!status.native || !status.available || !status.enabled || !status.credentialsSaved) {
     throw new Error(status.detail || "Entrada por biometria nao esta ativa.");
   }
 
@@ -215,5 +223,12 @@ export async function disableNativeBiometricLogin(): Promise<NativeBiometricStat
     await NativeBiometric.deleteCredentials({ server: BIOMETRIC_SERVER }).catch(() => undefined);
   }
   setEnabledFlag(false);
+  return getNativeBiometricStatus();
+}
+
+export async function clearNativeBiometricSavedCredential(): Promise<NativeBiometricStatus> {
+  if (isNativeRuntime()) {
+    await NativeBiometric.deleteCredentials({ server: BIOMETRIC_SERVER }).catch(() => undefined);
+  }
   return getNativeBiometricStatus();
 }

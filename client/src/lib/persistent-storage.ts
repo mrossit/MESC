@@ -10,6 +10,7 @@ const PRESERVED_LOCAL_STORAGE_KEYS = [
   "mesc_mobile_platform",
   "mesc_mobile_app_version",
   "mesc_biometric_login_enabled",
+  "mesc_biometric_prompt_dismissed",
   "mesc-ui-theme",
   "theme",
   "userId",

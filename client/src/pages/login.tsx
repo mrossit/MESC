@@ -30,13 +30,15 @@ import {
   shouldUseMobileAuth,
 } from "@/lib/mobile-auth-session";
 import {
-  disableNativeBiometricLogin,
+  clearNativeBiometricSavedCredential,
   enableNativeBiometricLogin,
   getNativeBiometricStatus,
   unlockNativeBiometricLogin,
   type NativeBiometricStatus,
 } from "@/lib/native-biometric-auth";
 import { MescMobileApiError } from "@shared/mobileClient";
+
+const BIOMETRIC_PROMPT_DISMISSED_KEY = "mesc_biometric_prompt_dismissed";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -86,7 +88,7 @@ export default function Login() {
     queryClient.clear();
 
     try {
-      const status = await disableNativeBiometricLogin();
+      const status = await clearNativeBiometricSavedCredential();
       setBiometricStatus(status);
     } catch {
       setBiometricStatus((current) => current ? { ...current, enabled: false } : current);
@@ -148,7 +150,7 @@ export default function Login() {
         navigate("/change-password");
       } else {
         const status = await refreshBiometricStatus();
-        if (status.native && status.available && status.enabled) {
+        if (status.native && status.available && (status.enabled || status.preferenceEnabled)) {
           try {
             const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
             setBiometricStatus(refreshedStatus);
@@ -160,7 +162,8 @@ export default function Login() {
           finishLogin(data.user);
           return;
         }
-        if (status.native && status.available && !status.enabled) {
+        const biometricPromptDismissed = localStorage.getItem(BIOMETRIC_PROMPT_DISMISSED_KEY) === "true";
+        if (status.native && status.available && !status.enabled && !biometricPromptDismissed) {
           setPendingLoginUser(data.user);
           setShowBiometricPrompt(true);
           return;
@@ -210,6 +213,13 @@ export default function Login() {
     setBiometricBusy(true);
     let unlockedStoredSession = false;
     try {
+      const status = await getNativeBiometricStatus();
+      setBiometricStatus(status);
+      if (!status.enabled || !status.credentialsSaved) {
+        markAutoBiometricAttempt();
+        return;
+      }
+
       await unlockNativeBiometricLogin();
       unlockedStoredSession = true;
 
@@ -267,6 +277,7 @@ export default function Login() {
     try {
       const status = await enableNativeBiometricLogin(user.email);
       setBiometricStatus(status);
+      localStorage.removeItem(BIOMETRIC_PROMPT_DISMISSED_KEY);
       toast({
         title: "Biometria ativada",
         description: `Na proxima entrada, voce podera usar ${status.label}.`,
@@ -291,6 +302,7 @@ export default function Login() {
 
   const handleSkipBiometric = () => {
     const user = pendingLoginUser;
+    localStorage.setItem(BIOMETRIC_PROMPT_DISMISSED_KEY, "true");
     setShowBiometricPrompt(false);
     setPendingLoginUser(null);
     if (user) finishLogin(user);
@@ -382,7 +394,7 @@ export default function Login() {
             </Alert>
           )}
 
-          {biometricStatus?.enabled && (
+          {biometricStatus?.enabled && biometricStatus.credentialsSaved && (
             <Button
               type="button"
               variant="outline"
