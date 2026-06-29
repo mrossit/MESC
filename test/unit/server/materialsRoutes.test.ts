@@ -5,6 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  MATERIAL_ALLOWED_MIME_TYPES,
+  MATERIAL_MAX_FILE_SIZE,
+  getFileType,
+  inferMaterialTypeFromExternalUrl
+} from '../../../server/utils/materialTypes';
 
 // Mock database
 vi.mock('../../../server/db', () => ({
@@ -57,16 +63,6 @@ describe('Materials Routes', () => {
   });
 
   describe('File Type Detection', () => {
-    function getFileType(mimeType: string): 'pdf' | 'document' | 'video' | 'audio' | 'image' | 'presentation' | 'other' {
-      if (mimeType === 'application/pdf') return 'pdf';
-      if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'presentation';
-      if (mimeType.includes('word') || mimeType.includes('document')) return 'document';
-      if (mimeType.startsWith('image/')) return 'image';
-      if (mimeType.startsWith('audio/')) return 'audio';
-      if (mimeType.startsWith('video/')) return 'video';
-      return 'other';
-    }
-
     it('should detect PDF files', () => {
       expect(getFileType('application/pdf')).toBe('pdf');
     });
@@ -90,11 +86,13 @@ describe('Materials Routes', () => {
     it('should detect audio files', () => {
       expect(getFileType('audio/mpeg')).toBe('audio');
       expect(getFileType('audio/mp3')).toBe('audio');
+      expect(getFileType('audio/mp4')).toBe('audio');
     });
 
     it('should detect video files', () => {
       expect(getFileType('video/mp4')).toBe('video');
       expect(getFileType('video/webm')).toBe('video');
+      expect(getFileType('video/quicktime')).toBe('video');
     });
 
     it('should return other for unknown types', () => {
@@ -104,20 +102,7 @@ describe('Materials Routes', () => {
   });
 
   describe('File Upload Validation', () => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'audio/mpeg',
-      'audio/mp3',
-      'video/mp4',
-      'video/webm'
-    ];
+    const allowedTypes = MATERIAL_ALLOWED_MIME_TYPES;
 
     it('should allow PDF uploads', () => {
       expect(allowedTypes).toContain('application/pdf');
@@ -131,6 +116,13 @@ describe('Materials Routes', () => {
     it('should allow image uploads', () => {
       expect(allowedTypes).toContain('image/jpeg');
       expect(allowedTypes).toContain('image/png');
+      expect(allowedTypes).toContain('image/webp');
+    });
+
+    it('should allow common mobile audio and video uploads', () => {
+      expect(allowedTypes).toContain('audio/mp4');
+      expect(allowedTypes).toContain('audio/wav');
+      expect(allowedTypes).toContain('video/quicktime');
     });
 
     it('should reject executable files', () => {
@@ -145,7 +137,7 @@ describe('Materials Routes', () => {
   });
 
   describe('File Size Validation', () => {
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_FILE_SIZE = MATERIAL_MAX_FILE_SIZE; // 10MB
 
     it('should accept files under 10MB', () => {
       const fileSize = 5 * 1024 * 1024; // 5MB
@@ -368,6 +360,18 @@ describe('Materials Routes', () => {
       };
 
       expect(material.externalUrl).toMatch(/^https?:\/\//);
+    });
+
+    it('should infer external URL type from common file extensions', () => {
+      expect(inferMaterialTypeFromExternalUrl('https://example.com/formacao.pdf')).toBe('pdf');
+      expect(inferMaterialTypeFromExternalUrl('https://example.com/audio.m4a?download=1')).toBe('audio');
+      expect(inferMaterialTypeFromExternalUrl('https://example.com/video.mp4')).toBe('video');
+      expect(inferMaterialTypeFromExternalUrl('https://example.com/image.webp')).toBe('image');
+    });
+
+    it('should use explicit external URL type when provided', () => {
+      expect(inferMaterialTypeFromExternalUrl('https://drive.google.com/file/123', 'audio')).toBe('audio');
+      expect(inferMaterialTypeFromExternalUrl('https://youtube.com/watch?v=123')).toBe('video');
     });
 
     it('should require either file or URL', () => {

@@ -12,8 +12,14 @@ import { csrfProtection } from '../middleware/csrf';
 import { db } from '../db';
 import { formationMaterials, materialAccessLogs, formationTracks, users } from '@shared/schema';
 import { eq, desc, and, ilike, or, sql, inArray } from 'drizzle-orm';
-import { z } from 'zod';
 import { analyzeUploadedContent, generateQuizFromContent } from '../services/aiContentAnalyzer';
+import {
+  MATERIAL_ALLOWED_MIME_TYPES,
+  MATERIAL_MAX_FILE_SIZE,
+  type MaterialType,
+  getFileType,
+  inferMaterialTypeFromExternalUrl
+} from '../utils/materialTypes';
 
 const router = Router();
 
@@ -21,42 +27,16 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max
+    fileSize: MATERIAL_MAX_FILE_SIZE, // 10MB max
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'audio/mpeg',
-      'audio/mp3',
-      'video/mp4',
-      'video/webm'
-    ];
-
-    if (allowedTypes.includes(file.mimetype)) {
+    if ((MATERIAL_ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error(`Tipo de arquivo não permitido: ${file.mimetype}`));
     }
   }
 });
-
-// Get file type from mime type
-function getFileType(mimeType: string): 'pdf' | 'document' | 'video' | 'audio' | 'image' | 'presentation' | 'other' {
-  if (mimeType === 'application/pdf') return 'pdf';
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'document';
-  if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'presentation';
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.startsWith('video/')) return 'video';
-  return 'other';
-}
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -216,7 +196,7 @@ router.get('/categories', async (req: AuthRequest, res: Response) => {
  * GET /api/materials/:id
  * Get material details (without file data)
  */
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id([0-9a-fA-F-]{36})', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -269,7 +249,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
  * GET /api/materials/:id/download
  * Download material file
  */
-router.get('/:id/download', async (req: AuthRequest, res: Response) => {
+router.get('/:id([0-9a-fA-F-]{36})/download', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -343,7 +323,7 @@ router.get('/:id/download', async (req: AuthRequest, res: Response) => {
  */
 router.post('/', requireRole(['coordenador', 'gestor']), csrfProtection, upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, category, trackId, tags, externalUrl, isPublished } = req.body;
+    const { title, description, category, trackId, tags, externalUrl, isPublished, type } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Título é obrigatório' });
@@ -358,7 +338,7 @@ router.post('/', requireRole(['coordenador', 'gestor']), csrfProtection, upload.
     let fileName = 'external-link';
     let fileSize = 0;
     let mimeType = 'text/html';
-    let fileType: 'pdf' | 'document' | 'video' | 'audio' | 'image' | 'presentation' | 'other' = 'other';
+    let fileType: MaterialType = 'other';
 
     if (req.file) {
       // Process uploaded file
@@ -370,7 +350,7 @@ router.post('/', requireRole(['coordenador', 'gestor']), csrfProtection, upload.
     } else if (externalUrl) {
       // External URL
       fileName = title;
-      fileType = 'other'; // Could try to detect from URL
+      fileType = inferMaterialTypeFromExternalUrl(externalUrl, type);
     }
 
     const parsedTags = typeof tags === 'string' ? JSON.parse(tags) : (tags || []);
@@ -440,7 +420,7 @@ router.post('/', requireRole(['coordenador', 'gestor']), csrfProtection, upload.
  * PUT /api/materials/:id
  * Update material metadata (coordinators/managers only)
  */
-router.put('/:id', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+router.put('/:id([0-9a-fA-F-]{36})', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { title, description, category, trackId, tags, isPublished } = req.body;
@@ -476,7 +456,7 @@ router.put('/:id', requireRole(['coordenador', 'gestor']), csrfProtection, async
  * DELETE /api/materials/:id
  * Soft delete a material (coordinators/managers only)
  */
-router.delete('/:id', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+router.delete('/:id([0-9a-fA-F-]{36})', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -613,7 +593,7 @@ router.get('/stats/overview', async (req: AuthRequest, res: Response) => {
  * POST /api/materials/:id/analyze
  * Manually trigger AI analysis for a material (coordinators/managers only)
  */
-router.post('/:id/analyze', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+router.post('/:id([0-9a-fA-F-]{36})/analyze', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -685,7 +665,7 @@ router.post('/:id/analyze', requireRole(['coordenador', 'gestor']), csrfProtecti
  * GET /api/materials/:id/analysis
  * Get AI analysis results for a material
  */
-router.get('/:id/analysis', async (req: AuthRequest, res: Response) => {
+router.get('/:id([0-9a-fA-F-]{36})/analysis', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -738,7 +718,7 @@ router.get('/:id/analysis', async (req: AuthRequest, res: Response) => {
  * POST /api/materials/:id/apply-suggestions
  * Apply AI suggestions to material metadata (coordinators/managers only)
  */
-router.post('/:id/apply-suggestions', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+router.post('/:id([0-9a-fA-F-]{36})/apply-suggestions', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { applyCategory, applyTags, applyDescription } = req.body;
@@ -785,7 +765,7 @@ router.post('/:id/apply-suggestions', requireRole(['coordenador', 'gestor']), cs
  * POST /api/materials/:id/generate-quiz
  * Generate quiz questions from material content (coordinators/managers only)
  */
-router.post('/:id/generate-quiz', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
+router.post('/:id([0-9a-fA-F-]{36})/generate-quiz', requireRole(['coordenador', 'gestor']), csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { numQuestions = 5 } = req.body;
@@ -905,7 +885,7 @@ router.get('/my-progress', async (req: AuthRequest, res: Response) => {
  * POST /api/materials/:id/mark-completed
  * Mark a material as completed/studied by the user
  */
-router.post('/:id/mark-completed', csrfProtection, async (req: AuthRequest, res: Response) => {
+router.post('/:id([0-9a-fA-F-]{36})/mark-completed', csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -942,7 +922,7 @@ router.post('/:id/mark-completed', csrfProtection, async (req: AuthRequest, res:
  * DELETE /api/materials/:id/mark-completed
  * Remove completed status from a material
  */
-router.delete('/:id/mark-completed', csrfProtection, async (req: AuthRequest, res: Response) => {
+router.delete('/:id([0-9a-fA-F-]{36})/mark-completed', csrfProtection, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;

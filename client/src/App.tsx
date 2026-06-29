@@ -64,6 +64,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const Substitutions = lazy(() => import("@/pages/Substitutions"));
 const AutoScheduleGeneration = lazy(() => import("@/pages/AutoScheduleGeneration"));
 const Formation = lazy(() => import("@/pages/formation"));
+const FormationAdmin = lazy(() => import("@/pages/FormationAdmin"));
 const Communication = lazy(() => import("@/pages/communication"));
 const Install = lazy(() => import("@/pages/install"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
@@ -159,6 +160,12 @@ function RouterWithHooks() {
         <Route path="/formation/library">
           <AuthGuard>
             <Library />
+          </AuthGuard>
+        </Route>
+
+        <Route path="/formation-admin">
+          <AuthGuard allowedRoles={["gestor", "coordenador"]}>
+            <FormationAdmin />
           </AuthGuard>
         </Route>
 

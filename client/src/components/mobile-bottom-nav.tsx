@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Calendar, Church, Menu, Repeat2, UserRound } from "lucide-react";
+import { Calendar, Church, GraduationCap, Menu, Repeat2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -31,9 +31,9 @@ export function MobileBottomNav() {
       icon: Repeat2,
     },
     {
-      title: "Perfil",
-      href: "/profile",
-      icon: UserRound,
+      title: "Formação",
+      href: "/formation",
+      icon: GraduationCap,
     },
   ];
   const activeHref = [...navItems]

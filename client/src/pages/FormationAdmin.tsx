@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -1918,6 +1919,11 @@ function FormationDashboard({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Trilhas de Formação</h2>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/formation/library">
+              <BookOpen className="h-4 w-4 mr-1" /> Biblioteca
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setSeedConfirmOpen(true)}>
             <Database className="h-4 w-4 mr-1" /> Seed Database
           </Button>

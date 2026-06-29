@@ -127,6 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Formation admin routes - com proteção CSRF
   app.use('/api/formation/admin', csrfProtection, formationAdminRoutes);
+  app.use('/api/formation-admin', csrfProtection, formationAdminRoutes);
 
   // Version endpoint (public - sem auth, sem CSRF)
   app.use('/api/version', versionRoutes);

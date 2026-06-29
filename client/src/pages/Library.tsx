@@ -631,7 +631,7 @@ export default function Library() {
 
                     <div>
                       <Label htmlFor="file">Arquivo (max 10MB)</Label>
-                      <Input id="file" name="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.mp3,.mp4,.webm" />
+                      <Input id="file" name="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.mp4,.webm,.mov" />
                       <p className="text-xs text-muted-foreground mt-1">
                         <Sparkles className="h-3 w-3 inline mr-1" />
                         A IA analisara PDFs e documentos de texto
@@ -641,6 +641,24 @@ export default function Library() {
                     <div>
                       <Label htmlFor="externalUrl">Ou URL Externa</Label>
                       <Input id="externalUrl" name="externalUrl" type="url" placeholder="https://..." />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="type">Tipo da URL externa</Label>
+                      <Select name="type" defaultValue="other">
+                        <SelectTrigger id="type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="other">Detectar automaticamente</SelectItem>
+                          <SelectItem value="pdf">PDF</SelectItem>
+                          <SelectItem value="document">Documento</SelectItem>
+                          <SelectItem value="video">Vídeo</SelectItem>
+                          <SelectItem value="audio">Áudio</SelectItem>
+                          <SelectItem value="image">Imagem</SelectItem>
+                          <SelectItem value="presentation">Apresentação</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="flex items-center gap-2">

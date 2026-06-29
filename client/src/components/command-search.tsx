@@ -124,19 +124,19 @@ export function CommandSearch() {
       roles: ["gestor", "coordenador"]
     },
     {
-      id: "formation-liturgy",
-      title: "Trilha Liturgia",
-      description: "Formação em liturgia",
-      href: "/formation/liturgy",
+      id: "formation",
+      title: "Formação",
+      description: "Trilhas de formação",
+      href: "/formation",
       icon: GraduationCap,
       group: "Formação",
-      roles: ["gestor", "coordenador"]
+      roles: ["gestor", "coordenador", "ministro"]
     },
     {
-      id: "formation-spirituality",
-      title: "Espiritualidade",
-      description: "Formação espiritual",
-      href: "/formation/spirituality",
+      id: "formation-admin",
+      title: "Administração da Formação",
+      description: "Gerenciar trilhas, módulos, aulas e seções",
+      href: "/formation-admin",
       icon: GraduationCap,
       group: "Formação",
       roles: ["gestor", "coordenador"]
@@ -148,7 +148,7 @@ export function CommandSearch() {
       href: "/formation/library",
       icon: GraduationCap,
       group: "Formação",
-      roles: ["gestor", "coordenador"]
+      roles: ["gestor", "coordenador", "ministro"]
     },
     {
       id: "communication",
