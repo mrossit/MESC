@@ -258,13 +258,13 @@ export function AppSidebar() {
               size="lg"
               asChild
               tooltip="MESC - Santuário São Judas - Ir para Dashboard"
-              className="h-14 cursor-pointer"
+              className="h-[3.75rem] cursor-pointer"
             >
               <Link
                 href="/dashboard"
                 onClick={(event) => navigateAndClose("/dashboard", event)}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center">
                   <img
                     src="/sjtlogo.png"
                     alt="Santuário São Judas Tadeu"

@@ -330,7 +330,21 @@ export default function Schedules() {
 function NativeMinisterSchedules({ userName }: { userName: string }) {
   const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "table" | "list">("calendar");
   const monthKey = format(currentMonth, "yyyy-MM");
+  const selectedYear = currentMonth.getFullYear();
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, monthIndex) => ({
+        value: String(monthIndex),
+        label: capitalizeFirst(format(new Date(2026, monthIndex, 1), "MMMM", { locale: ptBR })),
+      })),
+    [],
+  );
+  const yearOptions = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => selectedYear - 3 + index),
+    [selectedYear],
+  );
 
   const schedulesQuery = useQuery({
     queryKey: ["mobile", "schedules", "month", monthKey],
@@ -343,9 +357,37 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
     () => schedulesQuery.data?.schedules ?? [],
     [schedulesQuery.data?.schedules],
   );
+  const sortedSchedules = useMemo(
+    () =>
+      [...schedules].sort((a, b) => {
+        const dateCompare = (a.date ?? "").localeCompare(b.date ?? "");
+        if (dateCompare !== 0) return dateCompare;
+        return a.time.localeCompare(b.time);
+      }),
+    [schedules],
+  );
+  const schedulesByDate = useMemo(() => {
+    const byDate = new Map<string, MobileMissionSchedule[]>();
+    sortedSchedules.forEach((schedule) => {
+      if (!schedule.date) return;
+      const daySchedules = byDate.get(schedule.date) ?? [];
+      daySchedules.push(schedule);
+      byDate.set(schedule.date, daySchedules);
+    });
+    return byDate;
+  }, [sortedSchedules]);
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    return eachDayOfInterval({
+      start: startOfWeek(monthStart, { weekStartsOn: 0 }),
+      end: endOfWeek(monthEnd, { weekStartsOn: 0 }),
+    });
+  }, [currentMonth]);
   const confirmedCount = schedules.filter((schedule) => schedule.confirmationStatus === "confirmed").length;
   const pendingCount = schedules.filter((schedule) => schedule.canConfirm).length;
-  const nextSchedule = schedules.find((schedule) => schedule.canConfirm) ?? schedules[0] ?? null;
+  const nextSchedule = sortedSchedules.find((schedule) => schedule.canConfirm) ?? sortedSchedules[0] ?? null;
+  const scheduledDayCount = schedulesByDate.size;
 
   const confirmMutation = useMutation({
     mutationFn: (scheduleId: string) =>
@@ -433,6 +475,16 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
     );
   };
 
+  const setSelectedMonth = (monthIndex: string) => {
+    setCurrentMonth((month) => startOfMonth(new Date(month.getFullYear(), Number(monthIndex), 1)));
+  };
+
+  const setSelectedYear = (year: string) => {
+    setCurrentMonth((month) => startOfMonth(new Date(Number(year), month.getMonth(), 1)));
+  };
+
+  const goToToday = () => setCurrentMonth(startOfMonth(new Date()));
+
   return (
     <Layout title="Escalas" subtitle="Suas missões e confirmações">
       <div className="mx-auto max-w-4xl space-y-4 pb-2">
@@ -449,29 +501,60 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                 Confirme suas presenças e acompanhe pedidos de substituição do mês.
               </p>
             </div>
-            <div className="liquid-glass-chip flex items-center justify-between gap-2 rounded-lg p-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                aria-label="Mês anterior"
-                onClick={() => setCurrentMonth((month) => subMonths(month, 1))}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <div className="min-w-[9.5rem] text-center">
-                <p className="text-xs uppercase text-muted-foreground">Mês</p>
-                <p className="font-semibold capitalize">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</p>
+            <div className="liquid-glass-chip grid w-full gap-2 rounded-lg p-2 sm:w-auto sm:min-w-[22rem]">
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  aria-label="Mês anterior"
+                  onClick={() => setCurrentMonth((month) => subMonths(month, 1))}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <div className="min-w-0 text-center">
+                  <p className="text-xs uppercase text-muted-foreground">Mês selecionado</p>
+                  <p className="font-semibold capitalize">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  aria-label="Próximo mês"
+                  onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                aria-label="Próximo mês"
-                onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
+              <div className="grid grid-cols-[1fr_5.5rem_auto] gap-2">
+                <Select value={String(currentMonth.getMonth())} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="h-9 bg-white/45 text-xs dark:bg-white/5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={String(currentMonth.getFullYear())} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-9 bg-white/45 text-xs dark:bg-white/5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" className="h-9 bg-white/35 px-3 text-xs dark:bg-white/5" onClick={goToToday}>
+                  Hoje
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -488,6 +571,10 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
           <div className="liquid-glass-chip rounded-lg p-4">
             <p className="text-xs font-medium uppercase text-muted-foreground">Pendentes</p>
             <p className="mt-1 text-2xl font-semibold text-primary dark:text-amber-100">{pendingCount}</p>
+          </div>
+          <div className="liquid-glass-chip rounded-lg p-4 sm:col-span-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Dias com escala no mês</p>
+            <p className="mt-1 text-2xl font-semibold">{scheduledDayCount}</p>
           </div>
         </div>
 
@@ -551,8 +638,126 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {schedules.map((schedule) => (
+          <Tabs value={scheduleViewMode} onValueChange={(value) => setScheduleViewMode(value as "calendar" | "table" | "list")}>
+            <TabsList className="liquid-glass-chip grid h-auto w-full grid-cols-3 rounded-lg p-1">
+              <TabsTrigger value="calendar" className="gap-1.5 text-xs sm:text-sm">
+                <CalendarIcon className="h-4 w-4" />
+                Calendário
+              </TabsTrigger>
+              <TabsTrigger value="table" className="gap-1.5 text-xs sm:text-sm">
+                <FileSpreadsheet className="h-4 w-4" />
+                Tabela
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-1.5 text-xs sm:text-sm">
+                <List className="h-4 w-4" />
+                Lista
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="calendar" className="mt-4">
+              <Card className="liquid-glass border-0">
+                <CardContent className="space-y-4 p-4 sm:p-5">
+                  <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase text-muted-foreground">
+                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
+                      <span key={day}>{day}</span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {calendarDays.map((day) => {
+                      const dateKey = format(day, "yyyy-MM-dd");
+                      const daySchedules = schedulesByDate.get(dateKey) ?? [];
+                      const isCurrentMonth = isSameMonth(day, currentMonth);
+                      const hasPending = daySchedules.some((schedule) => schedule.canConfirm);
+                      const hasConfirmed = daySchedules.some((schedule) => schedule.confirmationStatus === "confirmed");
+                      return (
+                        <div
+                          key={dateKey}
+                          className={cn(
+                            "liquid-glass-chip min-h-[5.6rem] rounded-lg p-2 text-left",
+                            !isCurrentMonth && "opacity-35",
+                            isSameDay(day, new Date()) && "ring-2 ring-primary/40",
+                            daySchedules.length > 0 && "liquid-glass-interactive",
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={cn("text-sm font-semibold", daySchedules.length > 0 && "text-burgundy dark:text-dark-gold")}>
+                              {format(day, "d")}
+                            </span>
+                            {daySchedules.length > 0 && (
+                              <Badge className="h-5 rounded-md px-1.5 text-[10px]">
+                                {daySchedules.length}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            {daySchedules.slice(0, 2).map((schedule) => (
+                              <div key={schedule.id} className="truncate rounded-md bg-white/35 px-1.5 py-1 text-[10px] font-medium dark:bg-white/5">
+                                {formatMassTime(schedule.time)}
+                              </div>
+                            ))}
+                            {daySchedules.length > 2 && (
+                              <p className="text-[10px] text-muted-foreground">+{daySchedules.length - 2} escala(s)</p>
+                            )}
+                          </div>
+                          {(hasPending || hasConfirmed) && (
+                            <div className="mt-2 flex items-center gap-1 text-[10px]">
+                              {hasConfirmed && <Check className="h-3 w-3 text-emerald-700 dark:text-emerald-200" />}
+                              {hasPending && <AlertCircle className="h-3 w-3 text-primary dark:text-amber-100" />}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="table" className="mt-4">
+              <Card className="liquid-glass border-0">
+                <CardContent className="p-3 sm:p-5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[42rem] text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border/70 text-muted-foreground">
+                          <th className="px-3 py-2 font-semibold uppercase">Data</th>
+                          <th className="px-3 py-2 font-semibold uppercase">Dia</th>
+                          <th className="px-3 py-2 font-semibold uppercase">Horário</th>
+                          <th className="px-3 py-2 font-semibold uppercase">Função</th>
+                          <th className="px-3 py-2 font-semibold uppercase">Local</th>
+                          <th className="px-3 py-2 font-semibold uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedSchedules.map((schedule) => {
+                          const date = schedule.date ? parseScheduleDate(schedule.date) : null;
+                          return (
+                            <tr key={schedule.id} className="border-b border-border/40">
+                              <td className="px-3 py-3 font-semibold">{date ? format(date, "dd/MM") : "--"}</td>
+                              <td className="px-3 py-3 capitalize">{date ? format(date, "EEEE", { locale: ptBR }) : "A confirmar"}</td>
+                              <td className="px-3 py-3">{formatMassTime(schedule.time)}</td>
+                              <td className="px-3 py-3">
+                                {schedule.position ? getPositionDisplayName(schedule.position) : "Posição a confirmar"}
+                              </td>
+                              <td className="px-3 py-3">{schedule.location ?? "Local a confirmar"}</td>
+                              <td className="px-3 py-3">
+                                <Badge className={cn("w-fit border px-2.5 py-1 text-xs", getConfirmationBadgeClass(schedule.confirmationStatus))}>
+                                  {getConfirmationLabel(schedule.confirmationStatus)}
+                                </Badge>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="list" className="mt-4">
+              <div className="space-y-3">
+            {sortedSchedules.map((schedule) => (
               <Card key={schedule.id} className="liquid-glass liquid-glass-interactive border-0">
                 <CardContent className="space-y-4 p-4 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -596,7 +801,9 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                 </CardContent>
               </Card>
             ))}
-          </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </Layout>
@@ -633,7 +840,7 @@ function LegacySchedules() {
   const [customTimeInput, setCustomTimeInput] = useState<string>("");
   const [selectedPosition, setSelectedPosition] = useState<number>(1);
   const [selectedMinisterId, setSelectedMinisterId] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"month" | "list">("month");
+  const [viewMode, setViewMode] = useState<"month" | "table" | "list">("month");
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const [isViewScheduleDialogOpen, setIsViewScheduleDialogOpen] = useState(false);
   const [selectedDateAssignments, setSelectedDateAssignments] = useState<ScheduleAssignment[]>([]);
@@ -1990,17 +2197,19 @@ function LegacySchedules() {
         </Card>
       )}
 
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "list")}>
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "table" | "list")}>
+        <TabsList className="liquid-glass-chip grid h-auto w-full grid-cols-3 rounded-lg p-1">
           <TabsTrigger value="month" className="text-xs sm:text-sm px-2 sm:px-3">
             <CalendarIcon className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
-            <span className="hidden sm:inline">Visualização Mensal</span>
-            <span className="sm:hidden">Mensal</span>
+            <span>Calendário</span>
+          </TabsTrigger>
+          <TabsTrigger value="table" className="text-xs sm:text-sm px-2 sm:px-3">
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
+            <span>Tabela</span>
           </TabsTrigger>
           <TabsTrigger value="list" className="text-xs sm:text-sm px-2 sm:px-3">
             <List className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2 flex-shrink-0" />
-            <span className="hidden sm:inline">Visualização Lista</span>
-            <span className="sm:hidden">Lista</span>
+            <span>Lista</span>
           </TabsTrigger>
         </TabsList>
 
@@ -2486,7 +2695,7 @@ function LegacySchedules() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="list" className="mt-4 sm:mt-6">
+        <TabsContent value="table" className="mt-4 sm:mt-6">
           <Card>
             <CardHeader className="p-3 pb-2 sm:p-6 sm:pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -2658,6 +2867,102 @@ function LegacySchedules() {
                   </table>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-4 sm:mt-6">
+          <Card className="liquid-glass border-0">
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base sm:text-lg">
+                    Lista de {capitalizeFirst(format(currentMonth, "MMMM yyyy", { locale: ptBR }))}
+                  </CardTitle>
+                  <CardDescription>
+                    Leitura rápida por celebração, com ministros agrupados.
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="bg-white/35 dark:bg-white/5" onClick={() => setCurrentMonth(startOfMonth(new Date()))}>
+                  Hoje
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
+              {listViewRows.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhuma celebração configurada para este mês.
+                </div>
+              ) : (
+                listViewRows.map((row) => {
+                  const assignedMinisters = Array.from(row.assignmentsByPosition.entries())
+                    .map(([position, assignment]) => ({
+                      position,
+                      name: !assignment.ministerId
+                        ? "VACANTE"
+                        : assignment.scheduleDisplayName || assignment.ministerName || "Sem nome",
+                    }))
+                    .filter((item) => item.name);
+
+                  return (
+                    <div key={row.key} className="liquid-glass-chip rounded-lg p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              className="border-0 px-2.5 py-1 text-xs"
+                              style={{ backgroundColor: row.color, color: row.textColor }}
+                            >
+                              {row.dayNumber} · {row.dayName}
+                            </Badge>
+                            <Badge variant="outline" className="px-2.5 py-1 text-xs">
+                              {row.isAdoration ? "Adoração" : row.time}
+                            </Badge>
+                          </div>
+                          <h3 className="mt-3 font-sans text-base font-semibold">
+                            {row.isAdoration ? "Adoração ao Santíssimo" : "Celebração"}
+                          </h3>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {row.isAdoration
+                            ? `${row.adorationMinisters?.length ?? 0} ministro(s)`
+                            : `${assignedMinisters.length} posição(ões) preenchida(s)`}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {row.isAdoration
+                          ? row.adorationMinisters?.map((minister, index) => (
+                              <span
+                                key={`${row.key}-${minister.name}-${index}`}
+                                className={cn(
+                                  "rounded-md border px-2.5 py-1 text-xs font-medium",
+                                  minister.isVoluntary
+                                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                                    : "border-purple-400/40 bg-purple-500/10 text-purple-800 dark:text-purple-200",
+                                )}
+                              >
+                                {minister.name}
+                              </span>
+                            ))
+                          : assignedMinisters.map((minister) => (
+                              <span
+                                key={`${row.key}-${minister.position}`}
+                                className={cn(
+                                  "rounded-md border px-2.5 py-1 text-xs font-medium",
+                                  minister.name === "VACANTE"
+                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                                    : "border-white/60 bg-white/30 text-foreground dark:border-white/10 dark:bg-white/5",
+                                )}
+                              >
+                                P{minister.position}: {minister.name}
+                              </span>
+                            ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>

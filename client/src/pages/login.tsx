@@ -357,7 +357,7 @@ export default function Login() {
             <img 
               src="/sjtlogo.png" 
               alt="Santuário São Judas Tadeu" 
-              className="login-logo h-24 w-full max-w-[11rem] object-contain sm:h-32 sm:max-w-[13rem]"
+              className="login-logo h-[6.5rem] w-full max-w-[11.75rem] object-contain sm:h-[8.5rem] sm:max-w-[13.75rem]"
             />
           </div>
           <CardTitle className="mb-1 text-2xl font-bold text-neutral-textDark dark:text-text-light sm:text-3xl">
