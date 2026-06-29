@@ -22,7 +22,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50435)` enviado em 28/06/2026 para substituir o `50434` nos testers internos.
+- iOS TestFlight: build `5.4.3 (50436)` enviado em 29/06/2026 para substituir o `50435` nos testers internos.
 
 ## Comandos Validados
 
@@ -73,11 +73,11 @@ Os artefatos acima sao gerados localmente e nao devem ser commitados.
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50435`
-- Delivery/build ID: `bd9d8960-acf9-474b-925f-8955c3f114a9`
+- Build: `50436`
+- Delivery/build ID: `f4aa6183-6df0-4781-8b6d-78e90b1c2bb4`
 - Status App Store Connect: `VALID`.
 - Distribuicao: visivel no grupo interno `MESC Interno` no TestFlight.
-- Changelog: `MVP nativo P0 com preview e publicacao de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais aparente e estavel no login, shell, header, cards, tab bar, bottom bar e menu lateral, push nativo com permissao do aparelho e registro APNS/FCM, notificacoes semanticas sem dependencia de Web Push/PWA, prontidao de escala por comunidade, area de escalas simplificada com Lista como modo inicial, calendario mensal compacto, Lista do coordenador no padrao de tabela anterior, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
+- Changelog: `MVP nativo P0 com preview e publicacao de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais aparente e estavel no login, shell, header, cards, tab bar, bottom bar e menu lateral, push nativo com permissao do aparelho e registro APNS/FCM, notificacoes semanticas sem dependencia de Web Push/PWA, prontidao de escala por comunidade, area de escalas simplificada com Lista como modo inicial, calendario mensal navegavel por dia, Lista do coordenador no padrao de tabela anterior, exportacao PDF/HTML/Excel no modelo oficial com posicoes 1-28, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -97,7 +97,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50435)` esta `VALID` no App Store Connect e visivel no grupo interno `MESC Interno`.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50436)` esta `VALID` no App Store Connect e visivel no grupo interno `MESC Interno`.
 
 ## Push Nativo
 
@@ -112,6 +112,8 @@ O build `5.4.3 (50431)` estabiliza o Liquid Glass e o layout mobile apos a regre
 O build `5.4.3 (50434)` reforca o Liquid Glass no app todo, aplica glass ao bottom bar, clareia o menu lateral no modo claro, aumenta discretamente os logos e restaura Escalas com navegacao de mes/ano, botao Hoje e modos Calendario, Tabela e Lista.
 
 O build `5.4.3 (50435)` simplifica a area de Escalas: Lista volta a ser a primeira visualizacao, o calendario mensal fica compacto e a Lista do coordenador volta ao formato de tabela do app anterior.
+
+O build `5.4.3 (50436)` torna o calendario navegavel por dia e filtra a Lista ao tocar numa data, mantendo a opcao de voltar para o mes inteiro. A exportacao de escala passa a usar a mesma fonte da Lista oficial, preservando o modelo PDF/HTML/Excel com grupos de posicoes 1-28, linhas coloridas e adoração distribuida em celulas.
 
 Para envio remoto real em producao, ainda precisam existir as credenciais APNS/FCM no ambiente da API. Sem elas, o app registra o token e a UI fica correta, mas o backend registra skip operacional de entrega remota.
 
