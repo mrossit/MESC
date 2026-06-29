@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { scheduleCache } from '../services/scheduleCache';
 import { learningService } from '../services/learningService';
 import { resolveWriteCommunityId } from '../utils/communityContext';
+import { canRearrangeMassSchedule, canDeleteEntireMass } from '../utils/scheduleAuthorization';
 import type {
   EmergencySaveScheduleInput,
   ScheduleSaveResult,
@@ -1932,7 +1933,7 @@ router.delete('/:id', authenticateToken, requireRole(['gestor', 'coordenador']),
  * Atualizar múltiplos ministros de uma vez (útil para drag and drop)
  * PATCH /api/schedules/batch-update
  */
-router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coordenador']), async (req: AuthRequest, res) => {
+router.patch('/batch-update', authenticateToken, async (req: AuthRequest, res) => {
   try {
     console.log('[batch-update] Request body:', req.body);
 
@@ -1964,8 +1965,21 @@ router.patch('/batch-update', authenticateToken, requireRole(['gestor', 'coorden
     console.log('[batch-update] Found existing schedules:', existingSchedules.length,
       'details:', existingSchedules.map(s => ({ id: s.id.substring(0, 8), pos: s.position, minister: s.ministerId?.substring(0, 8) })));
 
+    if (!canRearrangeMassSchedule({
+      role: req.user?.role,
+      userId: req.user?.id,
+      assignments: existingSchedules
+    })) {
+      return res.status(403).json({ message: 'Sem permissão para reorganizar esta escala' });
+    }
+
     // SPECIAL CASE: Se todos os ministros foram removidos (lista vazia), deletar a missa inteira
     if (ministers.length === 0) {
+      // Remover a missa do calendário é destrutivo — Auxiliar 1/2 pode reorganizar,
+      // mas apenas a coordenação pode apagar a missa inteira.
+      if (!canDeleteEntireMass(req.user?.role)) {
+        return res.status(403).json({ message: 'Apenas a coordenação pode remover a missa inteira do calendário' });
+      }
       console.log('[batch-update] All ministers removed - deleting entire mass and related substitutions');
 
       // Primeiro, deletar todas as substituições relacionadas

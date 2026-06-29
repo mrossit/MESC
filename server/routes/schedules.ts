@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { schedules, substitutionRequests, users } from "@shared/schema";
+import { schedules, specialEvents, substitutionRequests, users } from "@shared/schema";
 import { authenticateToken as requireAuth, AuthRequest, requireRole } from "../auth";
 import { isAdmin as isAdminRole } from "@shared/roles";
 import { mobileNotificationData } from "@shared/mobileNotificationEvents";
@@ -44,6 +44,38 @@ const isMissingSchedulesDateColumnError = (error: unknown) => {
 };
 
 const router = Router();
+
+router.get("/special-events/month/:year/:month", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const year = Number(req.params.year);
+    const month = Number(req.params.month);
+
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Ano ou mês inválido" });
+    }
+
+    const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+
+    const events = await db
+      .select()
+      .from(specialEvents)
+      .where(
+        and(
+          eq(specialEvents.isActive, true),
+          gte(specialEvents.eventDate, startDateStr),
+          lte(specialEvents.eventDate, endDateStr)
+        )
+      )
+      .orderBy(specialEvents.eventDate, specialEvents.eventTime, specialEvents.name);
+
+    res.json(events);
+  } catch (error) {
+    console.error("Error fetching schedule special events:", error);
+    res.status(500).json({ message: "Erro ao buscar eventos do Santuário" });
+  }
+});
 
 // Get upcoming schedules for a minister
 router.get("/minister/upcoming", requireAuth, async (req: AuthRequest, res: Response) => {

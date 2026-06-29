@@ -243,6 +243,19 @@ interface ScheduleAssignment {
   location?: string;
 }
 
+interface SanctuaryEvent {
+  id: string;
+  name: string;
+  description?: string | null;
+  eventDate: string;
+  eventTime: string;
+  durationMinutes?: number | null;
+  minMinisters?: number | null;
+  maxMinisters?: number | null;
+  massType: string;
+  location?: string | null;
+}
+
 interface SubstitutionRequest {
   id: string;
   assignmentId: string;
@@ -1356,6 +1369,7 @@ function LegacySchedules() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [substitutions, setSubstitutions] = useState<SubstitutionRequest[]>([]);
+  const [sanctuaryEvents, setSanctuaryEvents] = useState<SanctuaryEvent[]>([]);
   const [ministers, setMinisters] = useState<Minister[]>([]);
   const [adorationData, setAdorationData] = useState<{
     results: Array<{
@@ -1419,6 +1433,44 @@ function LegacySchedules() {
   const isCoordinator = isAdminRole(user?.role);
   const isMinister = user?.role === "ministro";
 
+  const selectedDateScheduleItems = useMemo(() => {
+    if (!selectedDate) {
+      return [];
+    }
+
+    const configuredMassTimes = getMassTimesForDate(selectedDate).map(normalizeMassTime);
+    const assignmentMassTimes = selectedDateAssignments.map((assignment) =>
+      normalizeMassTime(assignment.massTime || "")
+    );
+    const massTimes = Array.from(new Set([...configuredMassTimes, ...assignmentMassTimes]))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const timeToMinutes = (time: string) => {
+          const [hours, minutes] = time.split(':').map(Number);
+          return (hours || 0) * 60 + (minutes || 0);
+        };
+        return timeToMinutes(a) - timeToMinutes(b);
+      });
+
+    return massTimes.map((massTime) => ({
+      massTime,
+      assignments: selectedDateAssignments
+        .filter((assignment) => normalizeMassTime(assignment.massTime || "") === massTime)
+        .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || ((a.id || '') < (b.id || '') ? -1 : (a.id || '') > (b.id || '') ? 1 : 0))
+    }));
+  }, [selectedDate, selectedDateAssignments]);
+
+  const selectedDateSanctuaryEvents = useMemo(() => {
+    if (!selectedDate) {
+      return [];
+    }
+
+    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+    return sanctuaryEvents
+      .filter((event) => event.eventDate === selectedDateStr)
+      .sort((a, b) => normalizeMassTime(a.eventTime).localeCompare(normalizeMassTime(b.eventTime)));
+  }, [selectedDate, sanctuaryEvents]);
+
   // Invalidar cache ao entrar na página de escalas
   useEffect(() => {
     invalidateScheduleCache();
@@ -1426,6 +1478,7 @@ function LegacySchedules() {
 
   useEffect(() => {
     fetchSchedules();
+    fetchSanctuaryEvents();
     fetchMinisters();
     fetchAdorationData();
   }, [currentMonth]);
@@ -1453,6 +1506,26 @@ function LegacySchedules() {
     } catch (error) {
       console.error("Error fetching adoration data:", error);
       setAdorationData(null);
+    }
+  };
+
+  const fetchSanctuaryEvents = async () => {
+    try {
+      const month = currentMonth.getMonth() + 1;
+      const year = currentMonth.getFullYear();
+      const response = await fetch(`/api/schedules/special-events/month/${year}/${month}`, {
+        credentials: "include"
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSanctuaryEvents(Array.isArray(data) ? data : []);
+      } else {
+        setSanctuaryEvents([]);
+      }
+    } catch (error) {
+      console.error("Error fetching sanctuary events:", error);
+      setSanctuaryEvents([]);
     }
   };
 
@@ -4091,26 +4164,9 @@ function LegacySchedules() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="ml-2 text-sm text-muted-foreground">Carregando escalas...</p>
                 </div>
-              ) : selectedDateAssignments && selectedDateAssignments.length > 0 ? (
-                Object.entries(
-                  selectedDateAssignments.reduce((acc, assignment) => {
-                    const massTime = assignment.massTime || 'Sem horário';
-                    if (!acc[massTime]) {
-                      acc[massTime] = [];
-                    }
-                    acc[massTime].push(assignment);
-                    return acc;
-                  }, {} as Record<string, ScheduleAssignment[]>)
-                )
-                .sort(([a], [b]) => {
-                  const timeToMinutes = (time: string) => {
-                    if (time === 'Sem horário') return 9999;
-                    const [hours, minutes] = time.split(':').map(Number);
-                    return hours * 60 + minutes;
-                  };
-                  return timeToMinutes(a) - timeToMinutes(b);
-                })
-                .map(([massTime, assignments]) => {
+              ) : selectedDateScheduleItems.length > 0 || selectedDateSanctuaryEvents.length > 0 ? (
+                <>
+                {selectedDateScheduleItems.map(({ massTime, assignments }) => {
                   const confirmedCount = assignments.filter(a => a.ministerName && a.ministerName !== 'VACANTE').length;
                   const totalCount = assignments.length;
 
@@ -4207,7 +4263,7 @@ function LegacySchedules() {
                             <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                             <span className="hidden sm:inline">Ver</span>
                           </Button>
-                          {(() => {
+                          {assignments.length > 0 && (() => {
                             // Verificar se o usuário é auxiliar 1 ou 2 nesta missa
                             const isUserAuxiliar1or2InThisMass = userAssignment && 
                               (userAssignment.position === 1 || userAssignment.position === 2);
@@ -4218,6 +4274,8 @@ function LegacySchedules() {
                                 <Button
                                   size="sm"
                                   variant="default"
+                                  aria-label="Reorganizar escala"
+                                  title="Reorganizar escala"
                                   onClick={() => {
                                     // Preparar dados para edição
                                     const ministersForEdit = [...assignments]
@@ -4237,7 +4295,7 @@ function LegacySchedules() {
                                   className="h-8 px-2 sm:px-3 text-xs"
                                 >
                                   <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                                  <span className="hidden sm:inline">Editar</span>
+                                  <span>Reorganizar</span>
                                 </Button>
                               );
                             }
@@ -4248,7 +4306,7 @@ function LegacySchedules() {
 
                       {/* Preview dos ministros */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
-                        {assignments
+                        {assignments.length > 0 ? assignments
                           .sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || ((a.id || '') < (b.id || '') ? -1 : (a.id || '') > (b.id || '') ? 1 : 0))
                           .slice(0, 4)
                           .map((assignment, idx) => {
@@ -4274,7 +4332,11 @@ function LegacySchedules() {
                                 </span>
                               </div>
                             );
-                          })}
+                          }) : (
+                            <div className="text-xs text-muted-foreground italic">
+                              Nenhum ministro escalado neste horário.
+                            </div>
+                          )}
                         {assignments.length > 4 && (
                           <div className="text-xs text-muted-foreground italic">
                             +{assignments.length - 4} ministros...
@@ -4286,10 +4348,37 @@ function LegacySchedules() {
                       </div>
                     </div>
                   );
-                })
+                })}
+                {selectedDateSanctuaryEvents.map((event) => (
+                  <div key={event.id} className="p-4 rounded-lg border space-y-3 bg-card">
+                    <div className="flex items-start gap-3">
+                      <CalendarIcon className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm sm:text-base">
+                            {event.name}
+                          </p>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
+                            Evento do Santuário
+                          </Badge>
+                        </div>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          {formatMassTime(normalizeMassTime(event.eventTime))}
+                          {event.location ? ` · ${event.location}` : ""}
+                        </p>
+                        {event.description && (
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+                            {event.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>Nenhuma escala encontrada para esta data.</p>
+                  <p>Nenhuma missa ou evento encontrado para esta data.</p>
                 </div>
               )}
             </div>
