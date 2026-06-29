@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
+  adorationDrawResults,
+  adorationDraws,
   communities,
   massTimesConfig,
   notifications,
@@ -130,6 +132,48 @@ const confirmationSchema = z.object({
   declineReason: z.string().max(1000).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
+
+function normalizeMobileScheduleTime(time: string | null | undefined): string {
+  if (!time) return "";
+  if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time;
+  if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00`;
+  if (time.includes("h")) {
+    const [hours, minutes = "00"] = time.split("h");
+    return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
+  }
+  return time;
+}
+
+function getMondayDateForWeekOfMonth(year: number, month: number, mondayOfWeek: number): string | null {
+  if (mondayOfWeek < 1) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  while (date.getUTCDay() !== 1) {
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+
+  date.setUTCDate(date.getUTCDate() + (mondayOfWeek - 1) * 7);
+  if (date.getUTCMonth() !== month - 1) return null;
+
+  return date.toISOString().slice(0, 10);
+}
+
+type MobilePublicScheduleAssignmentPayload = {
+  id: string;
+  scheduleId: string;
+  date: string;
+  time: string;
+  type: string;
+  location: string | null;
+  position: number;
+  status: string;
+  notes: string | null;
+  ministerId: string | null;
+  ministerName: string | null;
+  scheduleDisplayName: string | null;
+  source: "schedule" | "adoration";
+  isCurrentUser: boolean;
+};
 
 const adminQuestionnaireReminderSchema = z.object({
   target: z.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"])
@@ -3478,6 +3522,144 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
       )
       .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position));
 
+    const publicRows = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        time: schedules.time,
+        type: schedules.type,
+        location: schedules.location,
+        position: schedules.position,
+        status: schedules.status,
+        notes: schedules.notes,
+        ministerId: schedules.ministerId,
+        ministerName: users.name,
+        scheduleDisplayName: users.scheduleDisplayName,
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.ministerId, users.id))
+      .where(
+        and(
+          eq(schedules.communityId, activeCommunity.id),
+          eq(schedules.status, "published"),
+          gte(schedules.date, monthRange.startDate),
+          lte(schedules.date, monthRange.endDate),
+        ),
+      )
+      .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position), asc(schedules.id));
+
+    const publicAssignments: MobilePublicScheduleAssignmentPayload[] = publicRows.map((schedule) => {
+      const isVacant = !schedule.ministerId || schedule.ministerId === "VACANT";
+      const dateOnly = toDateOnly(schedule.date) ?? monthRange.startDate;
+
+      return {
+        id: schedule.id,
+        scheduleId: schedule.id,
+        date: dateOnly,
+        time: normalizeMobileScheduleTime(schedule.time),
+        type: schedule.type,
+        location: schedule.location,
+        position: schedule.position ?? 0,
+        status: schedule.status,
+        notes: schedule.notes ?? null,
+        ministerId: isVacant ? null : schedule.ministerId,
+        ministerName: isVacant ? "VACANTE" : schedule.ministerName ?? null,
+        scheduleDisplayName: isVacant ? "VACANTE" : schedule.scheduleDisplayName ?? null,
+        source: "schedule" as const,
+        isCurrentUser: !isVacant && schedule.ministerId === user.id,
+      };
+    });
+
+    try {
+      const existingAdorationKeys = new Set(
+        publicAssignments
+          .filter((assignment) =>
+            assignment.type === "adoracao" ||
+            (assignment.location ?? "").toLowerCase().includes("adora"),
+          )
+          .map((assignment) => `${assignment.date}-${normalizeMobileScheduleTime(assignment.time)}`),
+      );
+
+      const [draw] = await db
+        .select({ id: adorationDraws.id })
+        .from(adorationDraws)
+        .where(and(
+          eq(adorationDraws.year, monthRange.year),
+          eq(adorationDraws.month, monthRange.month),
+        ))
+        .orderBy(desc(adorationDraws.createdAt))
+        .limit(1);
+
+      if (draw) {
+        const drawResults = await db
+          .select({
+            id: adorationDrawResults.id,
+            ministerId: adorationDrawResults.ministerId,
+            ministerName: users.name,
+            scheduleDisplayName: users.scheduleDisplayName,
+            mondayOfWeek: adorationDrawResults.mondayOfWeek,
+            isVoluntary: adorationDrawResults.isVoluntary,
+          })
+          .from(adorationDrawResults)
+          .innerJoin(users, eq(adorationDrawResults.ministerId, users.id))
+          .where(and(
+            eq(adorationDrawResults.drawId, draw.id),
+            eq(users.homeCommunityId, activeCommunity.id),
+          ))
+          .orderBy(asc(adorationDrawResults.mondayOfWeek), asc(users.name));
+
+        const adorationPositionByDate = new Map<string, number>();
+        for (const result of drawResults) {
+          const date = getMondayDateForWeekOfMonth(
+            monthRange.year,
+            monthRange.month,
+            result.mondayOfWeek,
+          );
+          if (!date) continue;
+
+          const key = `${date}-22:00:00`;
+          if (existingAdorationKeys.has(key)) continue;
+
+          const nextPosition = (adorationPositionByDate.get(date) ?? 0) + 1;
+          adorationPositionByDate.set(date, nextPosition);
+
+          publicAssignments.push({
+            id: `adoration-${result.id}`,
+            scheduleId: `adoration-${result.id}`,
+            date,
+            time: "22:00:00",
+            type: "adoracao",
+            location: "Adoração ao Santíssimo",
+            position: nextPosition,
+            status: "published",
+            notes: result.isVoluntary ? "Voluntário" : "Sorteado",
+            ministerId: result.ministerId,
+            ministerName: result.ministerName ?? null,
+            scheduleDisplayName: result.scheduleDisplayName ?? null,
+            source: "adoration" as const,
+            isCurrentUser: result.ministerId === user.id,
+          });
+        }
+
+        publicAssignments.sort((a, b) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          const timeCompare = a.time.localeCompare(b.time);
+          if (timeCompare !== 0) return timeCompare;
+          return a.position - b.position;
+        });
+      }
+    } catch (error) {
+      if (
+        isMissingTableError(error, "adoration_draws") ||
+        isMissingTableError(error, "adoration_draw_results")
+      ) {
+        console.info("[MOBILE_SCHEDULES] Adoration draw tables unavailable; skipping public adoration rows.");
+      } else {
+        throw error;
+      }
+    }
+
     const scheduleIds = rows.map((schedule) => schedule.id);
     const activeSubstitutions = scheduleIds.length
       ? await db
@@ -3524,6 +3706,10 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
           deepLink: mobileScheduleDeepLink(dateOnly),
         };
       }),
+      publicSchedule: {
+        assignments: publicAssignments,
+        exportFormats: ["html", "pdf", "excel"],
+      },
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar escalas do mes");

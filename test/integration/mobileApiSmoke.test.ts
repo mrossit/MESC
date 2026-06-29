@@ -173,6 +173,20 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
 
     const monthlySchedules = await client.getSchedulesMonth({ month: MOBILE_P0_DEMO_MONTH });
     expect(monthlySchedules.success).toBe(true);
+    expect(monthlySchedules.publicSchedule.exportFormats).toEqual(["html", "pdf", "excel"]);
+    const publicScheduleAFromMonth = monthlySchedules.publicSchedule.assignments.find((item) =>
+      item.scheduleId === MOBILE_P0_DEMO_IDS.scheduleA
+    );
+    expect(publicScheduleAFromMonth).toMatchObject({
+      scheduleId: MOBILE_P0_DEMO_IDS.scheduleA,
+      ministerId: MOBILE_P0_DEMO_IDS.ministerA,
+      source: "schedule",
+      isCurrentUser: true,
+    });
+    const publicScheduleIdsFromMonth = monthlySchedules.publicSchedule.assignments.map((item) => item.scheduleId);
+    expect(publicScheduleIdsFromMonth).toContain(MOBILE_P0_DEMO_IDS.scheduleAForSubstitution);
+    expect(publicScheduleIdsFromMonth).not.toContain(MOBILE_P0_DEMO_IDS.scheduleB);
+
     const scheduleAFromMonth = monthlySchedules.schedules.find((item) =>
       item.id === MOBILE_P0_DEMO_IDS.scheduleA
     );

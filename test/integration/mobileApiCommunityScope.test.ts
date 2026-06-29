@@ -119,6 +119,12 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     expect(visibleScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleA);
     expect(visibleScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleAForSubstitution);
     expect(visibleScheduleIds).not.toContain(MOBILE_P0_DEMO_IDS.scheduleB);
+    const publicScheduleIds = allowed.body.publicSchedule.assignments.map((assignment: { scheduleId: string }) =>
+      assignment.scheduleId
+    );
+    expect(publicScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleA);
+    expect(publicScheduleIds).toContain(MOBILE_P0_DEMO_IDS.scheduleAForSubstitution);
+    expect(publicScheduleIds).not.toContain(MOBILE_P0_DEMO_IDS.scheduleB);
 
     const forbidden = await mobileGet(`/schedules/month?month=${MOBILE_P0_DEMO_MONTH}`, {
       userId: MOBILE_P0_DEMO_IDS.ministerA,

@@ -191,6 +191,28 @@ export interface MobileMissionSchedule {
   deepLink: string;
 }
 
+export interface MobilePublicScheduleAssignment {
+  id: string;
+  scheduleId: string;
+  date: string;
+  time: string;
+  type: string;
+  location: string | null;
+  position: number;
+  status: string;
+  notes: string | null;
+  ministerId: string | null;
+  ministerName: string | null;
+  scheduleDisplayName: string | null;
+  source: "schedule" | "adoration";
+  isCurrentUser: boolean;
+}
+
+export interface MobilePublicScheduleMonth {
+  assignments: MobilePublicScheduleAssignment[];
+  exportFormats: Array<"html" | "pdf" | "excel">;
+}
+
 export interface MobileMissionHomeResponse {
   success: true;
   user: MobileUser;
@@ -269,6 +291,7 @@ export interface MobileScheduleMonthResponse {
   community: MobileCommunity;
   month: string;
   schedules: MobileMissionSchedule[];
+  publicSchedule: MobilePublicScheduleMonth;
 }
 
 export interface MobileScheduleConfirmPayload {

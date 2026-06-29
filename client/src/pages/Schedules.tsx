@@ -69,7 +69,11 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { ptBR } from "date-fns/locale";
 import { cn, formatMinisterName, parseScheduleDate } from "@/lib/utils";
 import { LITURGICAL_POSITIONS, getPositionDisplayName, MASS_TIMES_BY_DAY, ALL_MASS_TIMES, getMassTimesForDate } from "@shared/constants";
-import { createMobileIdempotencyKey, type MobileMissionSchedule } from "@shared/mobileClient";
+import {
+  createMobileIdempotencyKey,
+  type MobileMissionSchedule,
+  type MobilePublicScheduleAssignment,
+} from "@shared/mobileClient";
 import { ScheduleExport } from "@/components/ScheduleExport";
 import { ScheduleEditDialog } from "@/components/ScheduleEditDialog";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
@@ -250,6 +254,7 @@ interface SubstitutionRequest {
 
 type ListViewRow = {
   key: string;
+  date: string;
   dayNumber: number;
   dayName: string;
   time: string;
@@ -259,6 +264,300 @@ type ListViewRow = {
   // Campos opcionais para adoração
   isAdoration?: boolean;
   adorationMinisters?: Array<{ name: string; isVoluntary: boolean }>;
+};
+
+type OfficialScheduleExportFormat = "excel" | "pdf" | "html";
+
+const escapeScheduleHtml = (value: unknown): string =>
+  String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return entities[char] || char;
+  });
+
+const getScheduleLogoBase64 = async () => {
+  try {
+    const logoBlob = await fetch('/sjtlogo.png').then((response) => response.blob());
+    const base64Data = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1] || '');
+      };
+      reader.readAsDataURL(logoBlob);
+    });
+
+    return base64Data ? `data:image/png;base64,${base64Data}` : '';
+  } catch (error) {
+    console.error('Erro ao carregar logo:', error);
+    return '';
+  }
+};
+
+const mobilePublicAssignmentToScheduleAssignment = (
+  assignment: MobilePublicScheduleAssignment,
+): ScheduleAssignment & { isCurrentUser?: boolean; source?: "schedule" | "adoration" } => ({
+  id: assignment.id,
+  scheduleId: assignment.scheduleId,
+  ministerId: assignment.ministerId ?? "",
+  ministerName: assignment.ministerName ?? undefined,
+  scheduleDisplayName: assignment.scheduleDisplayName ?? undefined,
+  date: assignment.date,
+  massTime: assignment.time,
+  position: assignment.position,
+  confirmed: true,
+  notes: assignment.notes ?? undefined,
+  type: assignment.type,
+  location: assignment.location ?? undefined,
+  isCurrentUser: assignment.isCurrentUser,
+  source: assignment.source,
+});
+
+const buildOfficialScheduleRows = (month: Date, assignments: ScheduleAssignment[]): ListViewRow[] => {
+  const allMonthDays = eachDayOfInterval({
+    start: startOfMonth(month),
+    end: endOfMonth(month),
+  });
+
+  return allMonthDays.flatMap((day) => {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const rows: ListViewRow[] = [];
+    const standardMassTimes = getMassTimesForDate(day);
+    const actualMassTimes = assignments
+      .filter((assignment) => assignment.date === dateStr)
+      .map((assignment) => assignment.massTime);
+    const uniqueActualTimes = Array.from(new Set(actualMassTimes));
+    const allMassTimes = Array.from(
+      new Set([
+        ...standardMassTimes.map(normalizeMassTime),
+        ...uniqueActualTimes.map(normalizeMassTime),
+      ]),
+    ).sort();
+    const normalizedActualTimes = new Set(uniqueActualTimes.map(normalizeMassTime));
+    const filteredMassTimes = allMassTimes.filter((massTime) => {
+      if (normalizedActualTimes.has(massTime)) return true;
+      if (normalizedActualTimes.size > 0) return false;
+      return true;
+    });
+
+    filteredMassTimes.forEach((massTime) => {
+      const normalizedMassTime = normalizeMassTime(massTime);
+      const assignmentsForMass = assignments.filter(
+        (assignment) =>
+          assignment.date === dateStr &&
+          normalizeMassTime(assignment.massTime) === normalizedMassTime,
+      );
+      const assignmentsByPosition = new Map<number, ScheduleAssignment>();
+      assignmentsForMass.forEach((assignment) => {
+        assignmentsByPosition.set(assignment.position, assignment);
+      });
+
+      const firstAssignment = assignmentsForMass[0];
+      const massInfo = firstAssignment?.type === 'celebracao' && firstAssignment?.location
+        ? {
+            type: firstAssignment.location,
+            color: "#d4b5e8",
+            textColor: "#5B2C6F",
+          }
+        : getMassTypeAndColor(day, normalizedMassTime, firstAssignment);
+
+      rows.push({
+        key: `${dateStr}-${normalizedMassTime}`,
+        date: dateStr,
+        dayNumber: day.getDate(),
+        dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
+        time: formatMassTime(normalizedMassTime),
+        color: massInfo.color,
+        textColor: massInfo.textColor,
+        assignmentsByPosition,
+        isAdoration: massInfo.type === "Adoração ao Santíssimo",
+      });
+    });
+
+    return rows;
+  });
+};
+
+const getOfficialScheduleCellValue = (row: ListViewRow, position: number): string => {
+  if (row.isAdoration && row.adorationMinisters) {
+    return row.adorationMinisters[position - 1]?.name || '';
+  }
+
+  const assignment = row.assignmentsByPosition.get(position);
+  if (!assignment) return '';
+  if (!assignment.ministerId) return 'VACANTE';
+  return assignment.scheduleDisplayName || assignment.ministerName || '';
+};
+
+const renderOfficialScheduleHtmlRows = (rows: ListViewRow[]) =>
+  rows.map((row) => {
+    const cells = Array.from({ length: TOTAL_POSITIONS }, (_, index) =>
+      `<td>${escapeScheduleHtml(getOfficialScheduleCellValue(row, index + 1))}</td>`,
+    ).join('');
+
+    return `<tr style="background-color: ${row.color}; color: ${row.textColor};"><td>${row.dayNumber}</td><td>${escapeScheduleHtml(row.dayName.toLowerCase())}</td><td>${escapeScheduleHtml(row.time)}</td>${cells}</tr>`;
+  }).join('');
+
+const exportOfficialScheduleRows = async (
+  rows: ListViewRow[],
+  month: Date,
+  exportFormat: OfficialScheduleExportFormat,
+) => {
+  if (rows.length === 0) {
+    throw new Error("Não há celebrações configuradas para este mês");
+  }
+
+  const monthNameCapitalized = capitalizeFirst(format(month, "MMMM/yyyy", { locale: ptBR }));
+  const logoBase64 = await getScheduleLogoBase64();
+  const legendHtml = SCHEDULE_LEGEND_ITEMS.map((item) =>
+    `<div class="legend-item" style="color: ${item.textColor};"><div class="legend-color" style="background: ${item.color};"></div>${item.label}</div>`,
+  ).join('');
+  const renderHeaderRows = () => `
+    <tr class="header-row">
+      <th rowspan="2">Data</th>
+      <th rowspan="2">Dia</th>
+      <th rowspan="2">Hora</th>
+      ${POSITION_GROUPS.map((group) =>
+        `<th colspan="${group.positions.length}">${group.name}</th>`,
+      ).join('')}
+    </tr>
+    <tr class="header-row">
+      ${POSITION_GROUPS.map((group) =>
+        group.positions.map((position) => `<th>${position}</th>`).join(''),
+      ).join('')}
+    </tr>
+  `;
+
+  if (exportFormat === "pdf" || exportFormat === "html") {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Escala - ${monthNameCapitalized}</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+          .header-container { display: flex; align-items: center; justify-content: center; margin: 20px 0; position: relative; }
+          .logo { position: absolute; left: 20px; width: 60px; height: auto; }
+          h1 { text-align: center; font-size: 18px; margin: 0; flex: 1; }
+          .legend { display: flex; justify-content: center; gap: 20px; margin: 15px 0; font-size: 11px; flex-wrap: wrap; }
+          .legend-item { display: flex; align-items: center; gap: 8px; }
+          .legend-color { width: 16px; height: 16px; border: 1px solid #666; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+          th { background-color: #f0f0f0; font-weight: bold; text-align: center; vertical-align: middle; }
+          .header-row { background-color: #e0e0e0; }
+          @media print {
+            @page { size: A3 landscape; margin: 0.5cm; }
+            body { font-size: 8px; }
+            .logo { width: 50px; }
+            .legend { font-size: 7px; gap: 10px; }
+            .legend-color { width: 12px; height: 12px; }
+            th, td { padding: 2px 3px; font-size: 7px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : ''}
+          <h1>SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}</h1>
+        </div>
+        <div class="legend">${legendHtml}</div>
+        <table>
+          <thead>${renderHeaderRows()}</thead>
+          <tbody>${renderOfficialScheduleHtmlRows(rows)}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    if (exportFormat === "pdf") {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Não foi possível abrir a janela de impressão');
+      }
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+      return;
+    }
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Escala_${monthNameCapitalized.replace('/', '_')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const data: (string | number | null)[][] = [];
+  data.push([`SANTUÁRIO SÃO JUDAS TADEU - ${monthNameCapitalized.toUpperCase()}`]);
+  data.push([]);
+
+  const headerRow1 = ['Data', 'Dia', 'Hora'];
+  POSITION_GROUPS.forEach((group) => {
+    headerRow1.push(group.name);
+    for (let index = 1; index < group.positions.length; index++) {
+      headerRow1.push('');
+    }
+  });
+  data.push(headerRow1);
+
+  const headerRow2 = ['', '', ''];
+  POSITION_GROUPS.forEach((group) => {
+    group.positions.forEach((position) => headerRow2.push(position.toString()));
+  });
+  data.push(headerRow2);
+
+  rows.forEach((row) => {
+    const dataRow = [row.dayNumber.toString(), row.dayName.toLowerCase(), row.time];
+    for (let position = 1; position <= TOTAL_POSITIONS; position++) {
+      dataRow.push(getOfficialScheduleCellValue(row, position));
+    }
+    data.push(dataRow);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 20 },
+    { wch: 8 },
+    ...Array(TOTAL_POSITIONS).fill({ wch: 18 }),
+  ];
+  const lastCol = 3 + TOTAL_POSITIONS - 1;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 2, c: 0 }, e: { r: 3, c: 0 } },
+    { s: { r: 2, c: 1 }, e: { r: 3, c: 1 } },
+    { s: { r: 2, c: 2 }, e: { r: 3, c: 2 } },
+  ];
+  let currentCol = 3;
+  POSITION_GROUPS.forEach((group) => {
+    if (group.positions.length > 1) {
+      ws['!merges']!.push({
+        s: { r: 2, c: currentCol },
+        e: { r: 2, c: currentCol + group.positions.length - 1 },
+      });
+    }
+    currentCol += group.positions.length;
+  });
+  XLSX.utils.book_append_sheet(wb, ws, 'Escala');
+  XLSX.writeFile(wb, `Escala_${monthNameCapitalized.replace('/', '_')}.xlsx`);
 };
 
 // Constantes importadas do arquivo centralizado
@@ -345,6 +644,25 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
     () => schedulesQuery.data?.schedules ?? [],
     [schedulesQuery.data?.schedules],
   );
+  const publicAssignments = useMemo(
+    () =>
+      (schedulesQuery.data?.publicSchedule?.assignments ?? [])
+        .map(mobilePublicAssignmentToScheduleAssignment),
+    [schedulesQuery.data?.publicSchedule?.assignments],
+  );
+  const officialScheduleRows = useMemo(
+    () => buildOfficialScheduleRows(currentMonth, publicAssignments),
+    [currentMonth, publicAssignments],
+  );
+  const officialRowsByDate = useMemo(() => {
+    const byDate = new Map<string, ListViewRow[]>();
+    officialScheduleRows.forEach((row) => {
+      const dayRows = byDate.get(row.date) ?? [];
+      dayRows.push(row);
+      byDate.set(row.date, dayRows);
+    });
+    return byDate;
+  }, [officialScheduleRows]);
   const sortedSchedules = useMemo(
     () =>
       [...schedules].sort((a, b) => {
@@ -370,6 +688,10 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
   const selectedScheduleDateLabel = selectedScheduleDate
     ? format(parseScheduleDate(selectedScheduleDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     : null;
+  const visibleOfficialRows = selectedScheduleDate
+    ? officialRowsByDate.get(selectedScheduleDate) ?? []
+    : officialScheduleRows;
+  const availableExportFormats = schedulesQuery.data?.publicSchedule?.exportFormats ?? ["html", "excel", "pdf"];
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -470,6 +792,24 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
         </Button>
       </div>
     );
+  };
+
+  const handleExportOfficialSchedule = async (format: OfficialScheduleExportFormat) => {
+    try {
+      await exportOfficialScheduleRows(officialScheduleRows, currentMonth, format);
+      toast({
+        title: "Escala exportada",
+        description: format === "pdf"
+          ? "A janela de impressão foi aberta."
+          : "O arquivo da escala foi gerado.",
+      });
+    } catch (error) {
+      toast({
+        title: "Não foi possível exportar",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    }
   };
 
   const goToToday = () => setCurrentMonth(startOfMonth(new Date()));
@@ -584,7 +924,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
               </Button>
             </CardContent>
           </Card>
-        ) : schedules.length === 0 ? (
+        ) : schedules.length === 0 && publicAssignments.length === 0 ? (
           <Card className="liquid-glass border-0">
             <CardContent className="p-6 text-center">
               <CalendarIcon className="mx-auto h-10 w-10 text-primary/70" />
@@ -607,7 +947,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
               </TabsTrigger>
               <TabsTrigger value="table" className="gap-1.5 text-xs sm:text-sm">
                 <FileSpreadsheet className="h-4 w-4" />
-                Tabela
+                Escala
               </TabsTrigger>
             </TabsList>
 
@@ -617,7 +957,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                   <CardTitle className="font-sans text-base">
                     {capitalizeFirst(format(currentMonth, "MMMM yyyy", { locale: ptBR }))}
                   </CardTitle>
-                  <CardDescription>Resumo mensal das suas escalas.</CardDescription>
+                  <CardDescription>Toque em um dia para abrir a escala completa.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 p-3 pt-0 sm:p-5 sm:pt-0">
                   <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase text-muted-foreground">
@@ -629,6 +969,7 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                     {calendarDays.map((day) => {
                       const dateKey = format(day, "yyyy-MM-dd");
                       const daySchedules = schedulesByDate.get(dateKey) ?? [];
+                      const dayOfficialRows = officialRowsByDate.get(dateKey) ?? [];
                       const isCurrentMonth = isSameMonth(day, currentMonth);
                       const isSelected = selectedScheduleDate === dateKey;
                       const hasPending = daySchedules.some((schedule) => schedule.canConfirm);
@@ -637,17 +978,18 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                         <button
                           type="button"
                           key={dateKey}
-                          aria-label={`Ver escalas de ${format(day, "dd 'de' MMMM", { locale: ptBR })}`}
+                          aria-label={`Ver escala completa de ${format(day, "dd 'de' MMMM", { locale: ptBR })}`}
                           disabled={!isCurrentMonth}
                           onClick={() => {
                             setSelectedScheduleDate(dateKey);
-                            setScheduleViewMode("list");
+                            setScheduleViewMode("table");
                           }}
                           className={cn(
                             "relative flex min-h-12 flex-col items-center justify-center rounded-md border bg-white/25 p-1 text-center text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none dark:bg-white/5",
                             !isCurrentMonth && "opacity-35",
                             isSameDay(day, new Date()) && "border-primary/50",
                             isSelected && "border-primary bg-primary/10 shadow-sm",
+                            dayOfficialRows.length > 0 && "border-primary/20 bg-primary/5",
                             daySchedules.length > 0 && "border-primary/25 bg-primary/5",
                             hasConfirmed && "border-emerald-500/25 bg-emerald-500/10",
                             hasPending && "border-primary/35 bg-primary/10",
@@ -656,12 +998,12 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
                           <span className={cn("font-semibold", daySchedules.length > 0 && "text-burgundy dark:text-dark-gold")}>
                             {format(day, "d")}
                           </span>
-                          {daySchedules.length > 0 && (
+                          {(daySchedules.length > 0 || dayOfficialRows.length > 0) && (
                             <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary dark:bg-dark-gold" />
                           )}
-                          {daySchedules.length > 1 && (
+                          {dayOfficialRows.length > 0 && (
                             <span className="absolute right-1 top-1 text-[10px] font-semibold text-muted-foreground">
-                              {daySchedules.length}
+                              {dayOfficialRows.length}
                             </span>
                           )}
                         </button>
@@ -674,41 +1016,178 @@ function NativeMinisterSchedules({ userName }: { userName: string }) {
 
             <TabsContent value="table" className="mt-4">
               <Card className="liquid-glass border-0">
-                <CardContent className="p-3 sm:p-5">
+                <CardHeader className="space-y-3 p-3 pb-0 sm:p-5 sm:pb-0">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <CardTitle className="font-sans text-lg">Escala completa</CardTitle>
+                      <CardDescription>
+                        {selectedScheduleDateLabel
+                          ? `Visualizando ${selectedScheduleDateLabel}.`
+                          : `Modelo oficial de ${format(currentMonth, "MMMM yyyy", { locale: ptBR })}.`}
+                      </CardDescription>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-white/35 text-xs dark:bg-white/5"
+                        disabled={!availableExportFormats.includes("html") || officialScheduleRows.length === 0}
+                        onClick={() => handleExportOfficialSchedule("html")}
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        HTML
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-white/35 text-xs dark:bg-white/5"
+                        disabled={!availableExportFormats.includes("excel") || officialScheduleRows.length === 0}
+                        onClick={() => handleExportOfficialSchedule("excel")}
+                      >
+                        <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                        Excel
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-white/35 text-xs dark:bg-white/5"
+                        disabled={!availableExportFormats.includes("pdf") || officialScheduleRows.length === 0}
+                        onClick={() => handleExportOfficialSchedule("pdf")}
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        PDF
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 p-3 sm:p-5">
+                  <div className="liquid-glass-chip rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Legenda
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs">
+                      {SCHEDULE_LEGEND_ITEMS.map((item) => (
+                        <span
+                          key={item.label}
+                          className="inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/25 px-2.5 py-1 font-medium dark:bg-white/5"
+                          style={{ color: item.textColor }}
+                        >
+                          <span
+                            className="h-3 w-3 rounded-sm border border-black/20"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedScheduleDate && selectedScheduleDateLabel && (
+                    <div className="liquid-glass-chip flex flex-col gap-2 rounded-lg p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-medium uppercase text-muted-foreground">Dia selecionado</p>
+                        <p className="text-sm font-semibold capitalize">{selectedScheduleDateLabel}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-white/35 dark:bg-white/5"
+                        onClick={() => setSelectedScheduleDate(null)}
+                      >
+                        Ver mês inteiro
+                      </Button>
+                    </div>
+                  )}
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[42rem] text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-border/70 text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold uppercase">Data</th>
-                          <th className="px-3 py-2 font-semibold uppercase">Dia</th>
-                          <th className="px-3 py-2 font-semibold uppercase">Horário</th>
-                          <th className="px-3 py-2 font-semibold uppercase">Função</th>
-                          <th className="px-3 py-2 font-semibold uppercase">Local</th>
-                          <th className="px-3 py-2 font-semibold uppercase">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedSchedules.map((schedule) => {
-                          const date = schedule.date ? parseScheduleDate(schedule.date) : null;
-                          return (
-                            <tr key={schedule.id} className="border-b border-border/40">
-                              <td className="px-3 py-3 font-semibold">{date ? format(date, "dd/MM") : "--"}</td>
-                              <td className="px-3 py-3 capitalize">{date ? format(date, "EEEE", { locale: ptBR }) : "A confirmar"}</td>
-                              <td className="px-3 py-3">{formatMassTime(schedule.time)}</td>
-                              <td className="px-3 py-3">
-                                {schedule.position ? getPositionDisplayName(schedule.position) : "Posição a confirmar"}
+                    {visibleOfficialRows.length === 0 ? (
+                      <div className="rounded-lg border border-border/50 bg-white/25 p-6 text-center text-sm text-muted-foreground dark:bg-white/5">
+                        Nenhuma celebração publicada para este período.
+                      </div>
+                    ) : (
+                      <table className="w-full min-w-[86rem] border border-border/70 text-left text-[11px] sm:text-xs">
+                        <thead>
+                          <tr className="bg-white/45 text-muted-foreground dark:bg-white/10">
+                            <th className="border border-border/70 px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                              Data
+                            </th>
+                            <th className="border border-border/70 px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                              Dia
+                            </th>
+                            <th className="border border-border/70 px-2 py-2 text-center font-semibold uppercase" rowSpan={2}>
+                              Hora
+                            </th>
+                            {POSITION_GROUPS.map((group) => (
+                              <th
+                                key={group.name}
+                                className="border border-border/70 px-2 py-2 text-center font-semibold uppercase"
+                                colSpan={group.positions.length}
+                              >
+                                {group.name}
+                              </th>
+                            ))}
+                          </tr>
+                          <tr className="bg-white/45 text-muted-foreground dark:bg-white/10">
+                            {POSITION_GROUPS.map((group) =>
+                              group.positions.map((position) => (
+                                <th
+                                  key={`${group.name}-${position}`}
+                                  className="border border-border/70 px-2 py-1 text-center font-semibold uppercase"
+                                >
+                                  {position}
+                                </th>
+                              )),
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleOfficialRows.map((row) => (
+                            <tr
+                              key={row.key}
+                              style={{ backgroundColor: row.color, color: row.textColor }}
+                              className="border border-border/70"
+                            >
+                              <td className="border border-border/70 px-2 py-1 text-center font-semibold">
+                                {row.dayNumber}
                               </td>
-                              <td className="px-3 py-3">{schedule.location ?? "Local a confirmar"}</td>
-                              <td className="px-3 py-3">
-                                <Badge className={cn("w-fit border px-2.5 py-1 text-xs", getConfirmationBadgeClass(schedule.confirmationStatus))}>
-                                  {getConfirmationLabel(schedule.confirmationStatus)}
-                                </Badge>
+                              <td className="border border-border/70 px-2 py-1 text-center font-medium capitalize">
+                                {row.isAdoration ? (
+                                  <span className="flex items-center justify-center gap-1">
+                                    <Star className="h-3 w-3" />
+                                    {row.dayName}
+                                  </span>
+                                ) : row.dayName}
                               </td>
+                              <td className="border border-border/70 px-2 py-1 text-center font-medium">
+                                {row.time}
+                              </td>
+                              {Array.from({ length: TOTAL_POSITIONS }, (_, index) => {
+                                const position = index + 1;
+                                const assignment = row.assignmentsByPosition.get(position) as
+                                  | (ScheduleAssignment & { isCurrentUser?: boolean })
+                                  | undefined;
+                                const displayName = getOfficialScheduleCellValue(row, position);
+
+                                return (
+                                  <td
+                                    key={`${row.key}-${position}`}
+                                    className={cn(
+                                      "border border-border/70 px-2 py-1 align-middle",
+                                      assignment?.isCurrentUser && "bg-white/55 font-bold ring-1 ring-inset ring-primary/50 dark:bg-white/15",
+                                      displayName === "VACANTE" && "font-semibold opacity-80",
+                                    )}
+                                  >
+                                    {displayName}
+                                  </td>
+                                );
+                              })}
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1950,6 +2429,7 @@ function LegacySchedules() {
 
       rows.push({
         key: `${dateStr}-${normalizedMassTime}`,
+        date: dateStr,
         dayNumber: day.getDate(),
         dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
         time: formatMassTime(normalizedMassTime),
@@ -1969,6 +2449,7 @@ function LegacySchedules() {
       if (adorationMinisters.length > 0) {
         rows.push({
           key: `${dateStr}-adoracao`,
+          date: dateStr,
           dayNumber: day.getDate(),
           dayName: capitalizeFirst(format(day, "EEEE", { locale: ptBR })),
           time: "22:00",

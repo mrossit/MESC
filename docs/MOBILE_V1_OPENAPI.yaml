@@ -899,7 +899,7 @@ paths:
           description: Requested community is outside the user's scope.
   /schedules/month:
     get:
-      summary: List the authenticated minister's published schedules for a month.
+      summary: List the authenticated minister's schedules and the public community schedule for a month.
       parameters:
         - $ref: "#/components/parameters/CommunityHeader"
         - in: query
@@ -914,7 +914,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, community, month, schedules]
+                required: [success, community, month, schedules, publicSchedule]
                 properties:
                   success:
                     type: boolean
@@ -926,6 +926,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ScheduleSummary"
+                  publicSchedule:
+                    $ref: "#/components/schemas/PublicScheduleMonth"
   /schedules/{id}:
     get:
       summary: Read a single schedule visible to the authenticated user.
@@ -2166,6 +2168,72 @@ components:
           type: boolean
         deepLink:
           type: string
+    PublicScheduleMonth:
+      type: object
+      required: [assignments, exportFormats]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicScheduleAssignment"
+        exportFormats:
+          type: array
+          items:
+            type: string
+            enum: [html, pdf, excel]
+    PublicScheduleAssignment:
+      type: object
+      required:
+        - id
+        - scheduleId
+        - date
+        - time
+        - type
+        - location
+        - position
+        - status
+        - notes
+        - ministerId
+        - ministerName
+        - scheduleDisplayName
+        - source
+        - isCurrentUser
+      properties:
+        id:
+          type: string
+        scheduleId:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        type:
+          type: string
+        location:
+          type: string
+          nullable: true
+        position:
+          type: integer
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        ministerId:
+          type: string
+          nullable: true
+        ministerName:
+          type: string
+          nullable: true
+        scheduleDisplayName:
+          type: string
+          nullable: true
+        source:
+          type: string
+          enum: [schedule, adoration]
+        isCurrentUser:
+          type: boolean
     ScheduleDetail:
       allOf:
         - $ref: "#/components/schemas/ScheduleSummary"
