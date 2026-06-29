@@ -22,7 +22,7 @@ Atualizacao de ambiente nativo:
 - Capacitor doctor: iOS e Android OK.
 - Android debug APK: gerado localmente.
 - iOS simulator build: gerado localmente sem assinatura.
-- iOS TestFlight: build `5.4.3 (50436)` enviado em 29/06/2026 para substituir o `50435` nos testers internos.
+- iOS TestFlight: build `5.4.3 (50437)` enviado em 29/06/2026 para substituir o `50436` nos testers internos.
 
 ## Comandos Validados
 
@@ -73,11 +73,11 @@ Os artefatos acima sao gerados localmente e nao devem ser commitados.
 ## TestFlight
 
 - Versao: `5.4.3`
-- Build: `50436`
-- Delivery/build ID: `f4aa6183-6df0-4781-8b6d-78e90b1c2bb4`
+- Build: `50437`
+- Delivery/build ID: `ff6517a5-8687-4be5-97bb-4293cc9c7ba8`
 - Status App Store Connect: `VALID`.
 - Distribuicao: visivel no grupo interno `MESC Interno` no TestFlight.
-- Changelog: `MVP nativo P0 com preview e publicacao de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais aparente e estavel no login, shell, header, cards, tab bar, bottom bar e menu lateral, push nativo com permissao do aparelho e registro APNS/FCM, notificacoes semanticas sem dependencia de Web Push/PWA, prontidao de escala por comunidade, area de escalas simplificada com Lista como modo inicial, calendario mensal navegavel por dia, Lista do coordenador no padrao de tabela anterior, exportacao PDF/HTML/Excel no modelo oficial com posicoes 1-28, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
+- Changelog: `MVP nativo P0 com preview e publicacao de escala do coordenador, respostas acionaveis, lembretes para pendentes/cadastros incompletos, sessao biometrica renovavel sem salvar senha, ajustes de safe area para notch/status bar/toasts/menu lateral, Liquid Glass mais aparente e estavel no login, shell, header, cards, tab bar, bottom bar e menu lateral, push nativo com permissao do aparelho e registro APNS/FCM, notificacoes semanticas sem dependencia de Web Push/PWA, prontidao de escala por comunidade, area de escalas simplificada com Lista como modo inicial, calendario mensal navegavel por dia, escala completa oficial visivel para ministros com destaque do usuario logado, exportacao HTML/PDF/Excel no modelo oficial com posicoes 1-28, fallback para questionario publicado do proximo mes, links mobile reais, Minha Missao, escalas, substituicoes e notificacoes.`
 
 ## API De Teste
 
@@ -97,7 +97,7 @@ VITE_API_URL="$STAGING_OR_DEMO_BASE_URL" npm run mobile:sync
 
 Isso evita recompilar um app demo apontando acidentalmente para `https://saojudastadeu.app` antes de o novo ambiente nativo estar pronto.
 
-Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50436)` esta `VALID` no App Store Connect e visivel no grupo interno `MESC Interno`.
+Status atual: o banco staging nativo esta populado, a API nativa esta publicada em `https://saojudastadeu.app` e o build iOS `5.4.3 (50437)` esta `VALID` no App Store Connect e visivel no grupo interno `MESC Interno`.
 
 ## Push Nativo
 
@@ -114,6 +114,8 @@ O build `5.4.3 (50434)` reforca o Liquid Glass no app todo, aplica glass ao bott
 O build `5.4.3 (50435)` simplifica a area de Escalas: Lista volta a ser a primeira visualizacao, o calendario mensal fica compacto e a Lista do coordenador volta ao formato de tabela do app anterior.
 
 O build `5.4.3 (50436)` torna o calendario navegavel por dia e filtra a Lista ao tocar numa data, mantendo a opcao de voltar para o mes inteiro. A exportacao de escala passa a usar a mesma fonte da Lista oficial, preservando o modelo PDF/HTML/Excel com grupos de posicoes 1-28, linhas coloridas e adoração distribuida em celulas.
+
+O build `5.4.3 (50437)` disponibiliza para ministros a escala completa oficial da comunidade, separando a Lista pessoal de acoes da visualizacao mensal com todos os escalados. O contrato `/api/mobile/v1/schedules/month` passa a expor `publicSchedule.assignments` com anti-vazamento multi-comunidade, e a tela Escalas exporta HTML/PDF/Excel no modelo oficial enviado, com destaque visual para o ministro logado.
 
 Para envio remoto real em producao, ainda precisam existir as credenciais APNS/FCM no ambiente da API. Sem elas, o app registra o token e a UI fica correta, mas o backend registra skip operacional de entrega remota.
 
