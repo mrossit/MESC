@@ -8,6 +8,7 @@ import {
 import { isNativeRuntime } from "@/lib/api-url";
 import {
   ensureMobileBiometricSession,
+  readStoredMobileAuthSession,
   restoreMobileAuthSession,
   type StoredMobileAuthSession,
 } from "@/lib/mobile-auth-session";
@@ -35,6 +36,8 @@ interface StoredSession {
 }
 
 let unlockPromise: Promise<{ email: string; token: string }> | null = null;
+let activeUnlockAttemptId: string | null = null;
+let completedUnlockAttemptId: string | null = null;
 
 function isEnabledFlagSet(): boolean {
   if (typeof window === "undefined") return false;
@@ -162,12 +165,7 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
     savedAt: new Date().toISOString(),
   };
 
-  await NativeBiometric.setCredentials({
-    username: email,
-    password: JSON.stringify(storedSession),
-    server: BIOMETRIC_SERVER,
-    accessControl: AccessControl.BIOMETRY_ANY,
-  });
+  await writeNativeBiometricCredential(email, storedSession);
 
   setEnabledFlag(true);
   return {
@@ -175,6 +173,56 @@ export async function enableNativeBiometricLogin(email: string): Promise<NativeB
     enabled: true,
     detail: `Entrada rapida com ${status.label} neste aparelho.`,
   };
+}
+
+async function writeNativeBiometricCredential(email: string, storedSession: StoredSession) {
+  await NativeBiometric.deleteCredentials({ server: BIOMETRIC_SERVER }).catch(() => undefined);
+  await NativeBiometric.setCredentials({
+    username: email,
+    password: JSON.stringify(storedSession),
+    server: BIOMETRIC_SERVER,
+    accessControl: AccessControl.BIOMETRY_ANY,
+  });
+}
+
+export async function refreshNativeBiometricStoredSessionIfChanged(
+  email: string,
+  previousToken: string,
+): Promise<NativeBiometricStatus> {
+  const status = await getNativeBiometricStatus();
+  if (!status.native || !status.available || !status.enabled || !status.credentialsSaved) return status;
+
+  const mobileSession = readStoredMobileAuthSession();
+  const currentToken = mobileSession?.accessToken
+    || localStorage.getItem("token")
+    || localStorage.getItem("auth_token");
+
+  if (!currentToken || currentToken === previousToken) return status;
+
+  const storedSession: StoredSession = {
+    token: currentToken,
+    sessionToken: mobileSession?.sessionToken ?? localStorage.getItem("session_token"),
+    mobile: mobileSession,
+    savedAt: new Date().toISOString(),
+  };
+
+  await writeNativeBiometricCredential(email, storedSession);
+  return {
+    ...status,
+    enabled: true,
+    credentialsSaved: true,
+    detail: `Entrada rapida com ${status.label} neste aparelho.`,
+  };
+}
+
+export function createNativeBiometricUnlockAttemptId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function resetNativeBiometricUnlockSingleShot() {
+  activeUnlockAttemptId = null;
+  completedUnlockAttemptId = null;
+  unlockPromise = null;
 }
 
 async function performNativeBiometricUnlock(): Promise<{ email: string; token: string }> {
@@ -209,12 +257,30 @@ async function performNativeBiometricUnlock(): Promise<{ email: string; token: s
   };
 }
 
-export async function unlockNativeBiometricLogin(): Promise<{ email: string; token: string }> {
+export async function unlockNativeBiometricLogin(
+  attemptId = "native-biometric-login",
+): Promise<{ email: string; token: string }> {
+  if (completedUnlockAttemptId === attemptId) {
+    throw new Error("Entrada por biometria ja foi concluida nesta tentativa.");
+  }
   if (unlockPromise) return unlockPromise;
+  if (activeUnlockAttemptId && activeUnlockAttemptId !== attemptId && !completedUnlockAttemptId) {
+    throw new Error("Entrada por biometria ja esta em andamento.");
+  }
 
-  unlockPromise = performNativeBiometricUnlock().finally(() => {
-    unlockPromise = null;
-  });
+  activeUnlockAttemptId = attemptId;
+
+  unlockPromise = performNativeBiometricUnlock()
+    .then((result) => {
+      completedUnlockAttemptId = attemptId;
+      return result;
+    })
+    .finally(() => {
+      unlockPromise = null;
+      if (completedUnlockAttemptId !== attemptId) {
+        activeUnlockAttemptId = null;
+      }
+    });
   return unlockPromise;
 }
 

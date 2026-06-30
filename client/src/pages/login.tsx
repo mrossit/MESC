@@ -31,8 +31,11 @@ import {
 } from "@/lib/mobile-auth-session";
 import {
   clearNativeBiometricSavedCredential,
+  createNativeBiometricUnlockAttemptId,
   enableNativeBiometricLogin,
   getNativeBiometricStatus,
+  refreshNativeBiometricStoredSessionIfChanged,
+  resetNativeBiometricUnlockSingleShot,
   unlockNativeBiometricLogin,
   type NativeBiometricStatus,
 } from "@/lib/native-biometric-auth";
@@ -58,6 +61,7 @@ export default function Login() {
   });
   const biometricPromptResolvingRef = useRef(false);
   const biometricUnlockInProgressRef = useRef(false);
+  const biometricUnlockAttemptIdRef = useRef<string | null>(null);
 
   // Detecta se veio de timeout de inatividade
   const searchParams = new URLSearchParams(window.location.search);
@@ -207,21 +211,26 @@ export default function Login() {
   };
 
   const handleBiometricUnlock = async () => {
-    if (biometricUnlockInProgressRef.current) return;
+    if (biometricUnlockInProgressRef.current || biometricUnlockAttemptIdRef.current) return;
 
+    const attemptId = createNativeBiometricUnlockAttemptId();
+    biometricUnlockAttemptIdRef.current = attemptId;
     biometricUnlockInProgressRef.current = true;
     setBiometricBusy(true);
     let unlockedStoredSession = false;
+    let unlockedToken: string | null = null;
     try {
       const status = await getNativeBiometricStatus();
       setBiometricStatus(status);
       if (!status.enabled || !status.credentialsSaved) {
         markAutoBiometricAttempt();
+        biometricUnlockAttemptIdRef.current = null;
         return;
       }
 
-      await unlockNativeBiometricLogin();
+      const unlocked = await unlockNativeBiometricLogin(attemptId);
       unlockedStoredSession = true;
+      unlockedToken = unlocked.token;
 
       if (shouldUseMobileAuth()) {
         if (hasStoredMobileRefreshToken()) {
@@ -234,8 +243,10 @@ export default function Login() {
       const data = await authAPI.getMe();
       queryClient.setQueryData(["/api/auth/me"], data);
       try {
-        const refreshedStatus = await enableNativeBiometricLogin(data.user.email);
-        setBiometricStatus(refreshedStatus);
+        if (unlockedToken) {
+          const refreshedStatus = await refreshNativeBiometricStoredSessionIfChanged(data.user.email, unlockedToken);
+          setBiometricStatus(refreshedStatus);
+        }
       } catch {
         void refreshBiometricStatus();
       }
@@ -244,6 +255,8 @@ export default function Login() {
     } catch (error) {
       if (unlockedStoredSession && isUnauthorizedSessionError(error)) {
         await expireBiometricSession();
+        biometricUnlockAttemptIdRef.current = null;
+        resetNativeBiometricUnlockSingleShot();
         toast({
           title: "Sessao biometrica expirada",
           description: "Entre com email e senha para reativar o Face ID neste aparelho.",
@@ -253,6 +266,8 @@ export default function Login() {
       }
 
       markAutoBiometricAttempt();
+      biometricUnlockAttemptIdRef.current = null;
+      resetNativeBiometricUnlockSingleShot();
       clearLocalSession();
       const message = error instanceof Error
         ? error.message
